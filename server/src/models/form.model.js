@@ -2,6 +2,7 @@
 import appConfig from './../../config/app.config.js';
 import logger from "../lib/logger.js";
 import fs from "fs";
+import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import fse from "fs-extra";
@@ -281,6 +282,9 @@ function copyFormsDirectoryTemplate(toDir) {
   }
 }
 
+// the base config last parsed, by its text's hash (getBaseConfig)
+let baseConfigCache = { hash: null, config: null };
+
 async function getBaseConfig() {
   var rawdata=''
 
@@ -331,10 +335,14 @@ async function getBaseConfig() {
     }
   }
 
-  // now let's see if it's valid yaml
+  // now let's see if it's valid yaml - kept by the text's hash, a deep copy each time : the base
+  // config is read on every Form.load and every role check
   try{
+    const hash = crypto.createHash("sha256").update(String(rawdata)).digest("hex")
+    if (baseConfigCache.hash === hash) return structuredClone(baseConfigCache.config)
     const config = yaml.parse(rawdata)
     logger.debug("Base config loaded and is valid YAML")
+    baseConfigCache = { hash, config: structuredClone(config) }
     return config;
   }catch(err){
     logger.error("Error",err)
@@ -402,7 +410,7 @@ async function loadVarsFiles(varsFiles) {
 function getFormInfo(form,formName='',loadFullConfig=false) {
   // if we are loading full config, return the full form object
   if(loadFullConfig){
-     return Form.validateForm(form); // validate the form and return
+     return validatedForm(form); // validate the form and return
   }
   if(!formName){
     // list, only mimimal info
@@ -430,14 +438,73 @@ function getFormInfo(form,formName='',loadFullConfig=false) {
   }
   else if(form.name == formName) {
     // validate the form and return
-    return Form.validateForm(form);
+    return validatedForm(form);
   }
   // no match
   return null;
 }
 
 
+// The forms of a file, parsed, kept by the file's path, modification time and size : a file that
+// did not change is not read and parsed again on every Form.load (every form list, every dynamic
+// field's query). A changed file - a save, a repository pull, an edit on the volume - has another
+// mtime or size, and is read again ; nothing has to invalidate this. Every caller gets a deep
+// copy : the forms are changed downstream (defaults, vars, subforms). ytt renders from other files
+// too, so with USE_YTT nothing is kept.
+const parsedFiles = new Map();
+const MAX_CACHED_FILES = 5000;
+
+function fileKey(formPath) {
+  try {
+    const st = fs.statSync(formPath);
+    return `${st.mtimeMs}:${st.size}`;
+  } catch {
+    return null;
+  }
+}
+
+function cachedForms(formPath, read) {
+  if (appConfig.useYtt) return read();
+  const key = fileKey(formPath);
+  const hit = key && parsedFiles.get(formPath);
+  if (hit && hit.key === key) return cloneTagged(hit.forms, hit.key, formPath);
+  const forms = read();
+  if (key) {
+    if (parsedFiles.size >= MAX_CACHED_FILES) parsedFiles.delete(parsedFiles.keys().next().value);
+    parsedFiles.set(formPath, { key, forms: structuredClone(forms) });
+  }
+  return cloneTagged(forms, key, formPath);
+}
+
+// a copy of the file's forms, each tagged (not enumerable, so never saved nor sent) with where it
+// comes from : the key its validation is kept under (validatedForm)
+function cloneTagged(forms, key, formPath) {
+  return structuredClone(forms).map((form, i) => {
+    if (key && form && typeof form === "object") Object.defineProperty(form, "__cacheKey", { value: `${formPath}#${key}#${i}`, enumerable: false });
+    return form;
+  });
+}
+
+// A form's validation (AJV against the form schema, removedIn7), kept by its cache key : the same
+// file content validates the same way. A deep copy each time, as above.
+const validatedForms = new Map();
+function validatedForm(form) {
+  const key = form?.__cacheKey;
+  if (!key) return Form.validateForm(form);
+  const hit = validatedForms.get(key);
+  if (hit) return structuredClone(hit);
+  const valid = Form.validateForm(form);
+  if (validatedForms.size >= MAX_CACHED_FILES * 4) validatedForms.delete(validatedForms.keys().next().value);
+  validatedForms.set(key, structuredClone(valid));
+  return valid;
+}
+
 function getFormsFromFile(formsPath,filename){
+  const formPath = path.join(formsPath, filename);
+  return cachedForms(formPath, () => readFormsFile(formsPath, filename));
+}
+
+function readFormsFile(formsPath,filename){
   var rawData;
   const formPath = path.join(formsPath, filename);
   if (appConfig.useYtt) {
@@ -1497,3 +1564,5 @@ Form.initBackupFolder=function(){
   Form.removeOld(appConfig.oldBackupDays) // read now : OLD_BACKUP_DAYS changes without a restart
 }
 export default  Form;
+// the form file cache, for the tests
+export { getFormsFromFile };
