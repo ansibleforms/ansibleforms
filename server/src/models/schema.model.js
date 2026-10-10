@@ -33,7 +33,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import init from "../init/index.js";
 import { holdsWorkerLock } from "../lib/workerLock.js";
-import { missingFromManifest } from "../lib/schemaCompleteness.js";
 import { appVersion } from "../lib/version.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1004,25 +1003,25 @@ export async function copyMailSettingsToServers() {
 const LEGACY_TABLES = ["staging", "datasource", "datasource_schemas", "awx", "azuread", "oidc"];
 
 /**
- * Whether the patches have something to change : the schema lacks what the manifest says, or
- * still holds a table an upgrade drops.
+ * Whether the patches have something to change that loses data : a table an upgrade drops.
  *
  * Returns:
  *   Promise<string[]>: what is pending, for the log ; empty when nothing is.
  */
 async function pendingUpgrade() {
+  // what loses data : the tables an upgrade drops (and copies from first). An added table, column
+  // or index loses nothing, and needs no backup - every release adds some.
   const legacy = await mysql.do(
     "SELECT table_name AS t FROM information_schema.tables WHERE table_schema='AnsibleForms' AND table_name IN (?)",
     [LEGACY_TABLES]
   );
-  const { missingTables, missingColumns, missingIndexes } = await missingFromManifest(SCHEMA_MANIFEST, mysql);
-  return [
-    ...legacy.map((r) => `drop ${r.t}`),
-    ...missingTables.map((t) => `add table ${t}`),
-    ...missingColumns.map((c) => `add column ${c}`),
-    ...missingIndexes.map((i) => `add index ${i}`),
-  ];
+  return legacy.map((r) => `drop ${r.t}`);
 }
+
+// a backup that failed is not tried again on every request (an app node checks the schema per
+// request until it is complete) : once a minute at most
+const BACKUP_RETRY_MS = 60000;
+let backupFailedAt = 0;
 
 /**
  * A backup of the database before an upgrade changes it : the patches drop tables and alter
@@ -1043,12 +1042,16 @@ async function backupBeforeUpgrade() {
     logger.warning("UPGRADE_BACKUP=0 : upgrading the database without a backup first");
     return "Upgrading without a backup (UPGRADE_BACKUP=0)";
   }
+  if (Date.now() - backupFailedAt < BACKUP_RETRY_MS) {
+    throw new Error("The database needs upgrading, and the backup before it failed less than a minute ago. Fix the backup (MYSQLDUMP_COMMAND, BACKUP_PATH), or set UPGRADE_BACKUP=0 to upgrade without one");
+  }
   const { default: Backup } = await import("./backup.model.js");
   try {
     const { backupFolder } = await Backup.doBackup(`Before the upgrade to ${appVersion}`);
     logger.notice(`Backed up the database before the upgrade : ${backupFolder}`);
     return `Backed up the database before the upgrade (${backupFolder})`;
   } catch (err) {
+    backupFailedAt = Date.now();
     // not the backup's own message : it can carry the dump command, and the backup logged why
     // it failed already (masked)
     throw new Error("The database needs upgrading, and the backup before it failed (the backup's error is logged above). Fix the backup (MYSQLDUMP_COMMAND, BACKUP_PATH), or set UPGRADE_BACKUP=0 to upgrade without one", { cause: err });

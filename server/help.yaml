@@ -508,12 +508,13 @@
     short: Back up the database before an upgrade changes it
     hint: 0 upgrades without a backup
     description: |
-      When a new release finds the database needs upgrading - tables to add, columns to change,
-      tables 7.0.0 drops - the worker takes a regular backup first (it shows on the Backups page,
+      When a new release's upgrade would lose data - the tables 7.0.0 drops (staging, datasource,
+      awx...) - the worker takes a regular backup first (it shows on the Backups page,
       named after the release), then upgrades. If the backup fails (no `mysqldump`, BACKUP_PATH
       not writable) the upgrade stops and says why, and the app does not start on a half-upgraded
-      database. 0 upgrades without a backup. The patches applied, and by which release, are
-      recorded in the `schema_migrations` table.
+      database. Added tables, columns and indexes lose nothing and need no backup. 0 upgrades
+      without a backup. The patches applied, and by which release, are recorded in the
+      `schema_migrations` table.
   - name: REINIT_ADMIN
     type: number
     allowed: 0, 1
