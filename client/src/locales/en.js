@@ -1579,7 +1579,7 @@ export default {
       status: 'Status',
       all: 'All jobs',
       running: 'Running',
-      approve: 'Waiting for approval',
+      approve: 'Needs approval',
       success: 'Success',
       failed: 'Failed',
       aborted: 'Aborted',

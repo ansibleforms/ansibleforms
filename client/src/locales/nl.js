@@ -1597,7 +1597,7 @@ export default {
       status: 'Status',
       all: 'Alle jobs',
       running: 'Bezig',
-      approve: 'Wacht op goedkeuring',
+      approve: 'Goed te keuren',
       success: 'Geslaagd',
       failed: 'Mislukt',
       aborted: 'Afgebroken',

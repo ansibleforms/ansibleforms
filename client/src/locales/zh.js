@@ -1544,7 +1544,7 @@ export default {
       status: '状态',
       all: '所有作业',
       running: '运行中',
-      approve: '等待审批',
+      approve: '待审批',
       success: '成功',
       failed: '失败',
       aborted: '已中止',

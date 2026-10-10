@@ -1601,7 +1601,7 @@ export default {
       status: 'Estat',
       all: 'Totes les tasques',
       running: 'En execució',
-      approve: "Pendents d'aprovació",
+      approve: 'Cal aprovació',
       success: 'Correctes',
       failed: 'Fallides',
       aborted: 'Avortades',

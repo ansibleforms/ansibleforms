@@ -1594,7 +1594,7 @@ export default {
       status: 'Estado',
       all: 'Todos los jobs',
       running: 'En ejecución',
-      approve: 'Esperando aprobación',
+      approve: 'Por aprobar',
       success: 'Correcto',
       failed: 'Fallido',
       aborted: 'Cancelado',

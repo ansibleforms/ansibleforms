@@ -1617,7 +1617,7 @@ export default {
       status: 'Status',
       all: 'Alle Jobs',
       running: 'Läuft',
-      approve: 'Zur Genehmigung',
+      approve: 'Zu genehmigen',
       success: 'Erfolgreich',
       failed: 'Fehlgeschlagen',
       aborted: 'Abgebrochen',
