@@ -105,10 +105,9 @@ jobs:
       - name: Lint
         run: npm run lint:check
 
-      # No database service on purpose. The suite runs against the stubs in
+      # No database service here on purpose. The suite runs against the stubs in
       # tests/__mocks__, and the schema tests read src/db/*.sql as TEXT rather than
-      # executing it. A MySQL service here would slow every run and invite tests that
-      # depend on one ; if integration coverage is ever wanted, give it its own workflow.
+      # executing it. The SQL itself runs in the `database` job below.
       - name: Test
         # The server warns at startup when it has to make up a JWT secret. A fixed, throwaway
         # one keeps that warning out of the test output.
@@ -128,6 +127,77 @@ jobs:
             echo "| --- | --- |"
             jq -r '.total | to_entries[] | select(.key | test("^(lines|statements|functions|branches)$")) | "| \(.key) | \(.value.pct)% |"' coverage/coverage-summary.json
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # The schema on a real database : the fresh install creates it, the patches run a second time
+  # on the next start, and both must leave exactly what the schema manifest says - the unit tests
+  # never execute SQL. MySQL and MariaDB, as both are supported.
+  database:
+    name: Database (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ["mysql:8.4", "mariadb:11"]
+    services:
+      db:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_ROOT_PASSWORD: ci-not-a-real-password
+          MARIADB_ROOT_PASSWORD: ci-not-a-real-password
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent || mariadb-admin ping -h 127.0.0.1 --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    defaults:
+      run:
+        working-directory: server
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ci-not-a-real-password
+      ACCESS_TOKEN_SECRET: ci-not-a-real-secret-0123456789
+      ENCRYPTION_SECRET: ci-not-a-real-secret-0123456789ab
+      HTTPS: "0"
+      PORT: "8000"
+      LOG_PATH: /tmp/af-logs
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: First start - the fresh install creates the schema
+        run: |
+          node ./index.js > /tmp/af-first.log 2>&1 &
+          echo $! > /tmp/af.pid
+          node scripts/ci-database.mjs http://127.0.0.1:8000
+          kill "$(cat /tmp/af.pid)"
+          sleep 3
+
+      - name: Second start - the patches run on the existing schema
+        run: |
+          node ./index.js > /tmp/af-second.log 2>&1 &
+          echo $! > /tmp/af.pid
+          node scripts/ci-database.mjs http://127.0.0.1:8000
+          kill "$(cat /tmp/af.pid)"
+
+      - name: No error in the logs
+        run: |
+          if grep -E " error:" /tmp/af-first.log /tmp/af-second.log; then
+            echo "::error::the app logged errors against ${{ matrix.db }}"
+            exit 1
+          fi
+
+      - name: The logs, when it failed
+        if: failure()
+        run: tail -n 200 /tmp/af-first.log /tmp/af-second.log || true
 
   schema:
     name: Public schema is up to date
