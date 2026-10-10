@@ -1641,6 +1641,7 @@ export default {
     reviewApproval: 'Goedkeuring beoordelen',
     reviewLead: 'Deze job wacht op je goedkeuring voordat hij wordt uitgevoerd:',
     openJobDetails: 'Jobdetails openen',
+    details: 'details',
     alreadyDecided: 'Deze job wacht niet meer op goedkeuring: hij is intussen goedgekeurd of afgewezen.',
     approve: 'Goedkeuren',
     reject: 'Afwijzen',

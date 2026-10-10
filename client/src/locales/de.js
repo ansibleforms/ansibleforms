@@ -1663,6 +1663,7 @@ export default {
     reviewApproval: 'Genehmigung prüfen',
     reviewLead: 'Dieser Job wartet auf Ihre Genehmigung, bevor er ausgeführt wird:',
     openJobDetails: 'Jobdetails öffnen',
+    details: 'Details',
     alreadyDecided: 'Dieser Job braucht keine Genehmigung mehr: Er wurde inzwischen genehmigt oder abgelehnt.',
     approve: 'Freigeben',
     reject: 'Ablehnen',

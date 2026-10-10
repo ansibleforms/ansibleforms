@@ -1646,6 +1646,7 @@ export default {
     reviewApproval: 'Rever aprovação',
     reviewLead: 'Este trabalho aguarda a sua aprovação antes de ser executado:',
     openJobDetails: 'Abrir detalhes do trabalho',
+    details: 'detalhes',
     alreadyDecided: 'Este trabalho já não precisa de aprovação: foi aprovado ou rejeitado entretanto.',
     approve: 'Aprovar',
     reject: 'Rejeitar',
