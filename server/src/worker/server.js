@@ -28,6 +28,7 @@ import { startCluster } from "../init/cluster.js";
 import { runWorker, stopLostWorker } from "../init/worker.js";
 import { die } from "../lib/die.js";
 import Job from "../models/job.model.js";
+import { installFatalHandlers } from "../lib/fatal.js";
 
 function startHealthServer() {
   const app = express();
@@ -46,8 +47,7 @@ function startHealthServer() {
 }
 
 export async function startWorker() {
-  process.on("unhandledRejection", (reason) => logger.error("Unhandled promise rejection: ", reason));
-  process.on("uncaughtException", (err) => logger.error("Uncaught exception: ", err));
+  installFatalHandlers("worker");
 
   if (appConfig.encryptionSecretIsDefault) {
     logger.warning('[SECURITY] ENCRYPTION_SECRET is not set. The worker stores and reads credentials (the config seed) with the default key, which is public in the source code : set the same ENCRYPTION_SECRET as the app nodes.');

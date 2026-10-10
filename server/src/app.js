@@ -19,6 +19,7 @@ import { authRateLimit } from "./lib/authRateLimit.js";
 import { cspDirectives } from "./lib/csp.js";
 import { readinessHandlers } from "./lib/readiness.js";
 import { requestContext } from "./lib/requestContext.js";
+import { installFatalHandlers } from "./lib/fatal.js";
 import { httpMetrics, metricsHandler, addScrapeGauge } from "./lib/metrics.js";
 import { NODE_DEAD_SECONDS } from "./lib/nodes.js";
 import mysql from "./models/db.model.js";
@@ -147,15 +148,9 @@ const load = async (app) => {
   app.use(jsonBody);
   app.use(urlencodedBody);
 
-  // mysql2 has a bug that can throw an uncaught exception if the mysql server crashes (not enough mem for example)
-  // also git commands can chain child processes and cause issues
-  process.on("uncaughtException", function (err) {
-    logger.error("Uncaught exception: ", err);
-  });
-
-  process.on("unhandledRejection", function (reason) {
-    logger.error("Unhandled promise rejection: ", reason);
-  });
+  // an uncaught exception (mysql2 throws one when the database goes away, a git child process
+  // can too) exits the process to restart clean ; a rejection is logged (lib/fatal.js)
+  installFatalHandlers("app");
 
   // using json web tokens as middleware
   // the jwtauthentication strategy from passport (/auth/auth.js)
