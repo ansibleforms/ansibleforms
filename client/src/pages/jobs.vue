@@ -1095,19 +1095,21 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="lg" @close="reviewJob = null">
-      <template #title
-        >{{ t('jobs.reviewApproval') }} #{{ reviewJob.id }}
-        <!-- the whole job (extravars, output) a click away, where the job is named -->
-        <a
-          href="#"
-          class="af-review-open"
-          @click.prevent="
-            getJob(reviewJob.id);
-            reviewJob = null;
-          "
-          ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
-        ></template
-      >
+      <template #title>
+        <!-- the title and the whole job (extravars, output) a click away, on one centred line -->
+        <span class="af-review-head">
+          <span>{{ t('jobs.reviewApproval') }} #{{ reviewJob.id }}</span>
+          <a
+            href="#"
+            class="af-review-open"
+            @click.prevent="
+              getJob(reviewJob.id);
+              reviewJob = null;
+            "
+            ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
+          >
+        </span>
+      </template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mt-3 mb-0">{{ t('jobs.alreadyDecided') }}</div>
         <!-- who asks for what : the facts of the job's page -->
@@ -1817,11 +1819,17 @@ onMounted(async () => {
     overflow-wrap: anywhere;
   }
 }
+.af-review-head {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 1rem;
+}
+/* the link as body text, as the other links of a modal, not the title's size */
 .af-review-open {
-  margin-left: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 400;
-  vertical-align: middle;
+  font-size: var(--bs-body-font-size);
+  font-weight: var(--bs-body-font-weight);
+  line-height: var(--bs-body-line-height);
 }
 .af-review-title {
   margin-bottom: 0.5rem;
