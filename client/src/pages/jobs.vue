@@ -1094,10 +1094,8 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
-      <!-- the hourglass and the orange of a job that needs approval (jobs menu, status pill) -->
-      <template #title
-        ><FaIcon icon="hourglass-half" class="af-review-icon me-2" />{{ t('jobs.reviewApproval') }}</template
-      >
+      <!-- the hourglass of a job that needs approval (the jobs menu) -->
+      <template #title><FaIcon icon="hourglass-half" class="me-2" />{{ t('jobs.reviewApproval') }}</template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
         <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
@@ -1786,9 +1784,6 @@ onMounted(async () => {
   }
 }
 /* the approval review (openReview) : the question, then the job's facts as label and value */
-.af-review-icon {
-  color: #ef6009; /* the orange of a job that needs approval (.af-pill-orange) */
-}
 /* the question set apart : the orange of a job that needs approval, on its left edge */
 .af-review-ask {
   margin-bottom: 1.25rem;
