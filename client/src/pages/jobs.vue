@@ -1094,8 +1094,7 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
-      <!-- which job, by its number : two requests from the same form look alike by their name -->
-      <template #title>{{ t('jobs.reviewApproval') }} · {{ t('jobs.jobTitle', { id: '#' + reviewJob.id }) }}</template>
+      <template #title>{{ t('jobs.reviewApproval') }}</template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
         <!-- the job asking, by its name : the rest (its approval message, values, output) is behind
@@ -1108,6 +1107,12 @@ onMounted(async () => {
         <!-- the job, with the icon of a job's own page title (Jobs › Job #73) -->
         <p class="af-review-name">
           <FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}
+        </p>
+        <!-- which job, by its number (two requests from the same form share a name), and who asked -->
+        <p class="af-review-meta">{{ t('jobs.jobTitle', { id: '#' + reviewJob.id }) }}</p>
+        <p class="af-review-meta">
+          {{ t('jobs.launchedBy') }} {{ reviewJob.user || '–'
+          }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
         </p>
         <a
           href="#"
@@ -1778,10 +1783,22 @@ onMounted(async () => {
   margin-bottom: 1.25rem;
 }
 .af-review-name {
-  margin: 0 0 1.25rem;
+  margin: 0 0 0.5rem;
   font-size: 1.125rem;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+/* the job's number and who launched it, a line each under the name */
+.af-review-meta {
+  margin: 0 0 0.25rem;
+  color: var(--bs-secondary-color);
+}
+/* "launched by" is lower case in the translations (the job page's labels are upper case) */
+.af-review-meta::first-letter {
+  text-transform: uppercase;
+}
+.af-review-meta:last-of-type {
+  margin-bottom: 1.25rem;
 }
 /* the link on its own line under the name, as body text */
 .af-review-open {
