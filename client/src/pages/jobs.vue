@@ -1104,7 +1104,10 @@ onMounted(async () => {
         <p v-if="reviewJob.message" class="af-review-lead" v-html="reviewJob.message"></p>
         <p v-else class="af-review-lead">{{ t('jobs.reviewLead') }}</p>
         <!-- its name, and the whole job (extravars, output) a click away under it -->
-        <p class="af-review-name">{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}</p>
+        <!-- the job, with the icon of a job's own page title (Jobs › Job #73) -->
+        <p class="af-review-name">
+          <FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}
+        </p>
         <a
           href="#"
           class="af-review-open"
