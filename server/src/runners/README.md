@@ -149,6 +149,7 @@ All calls need `Authorization: Bearer <RTE_TOKEN>`.
 
 | Call | Answer |
 |---|---|
+| `GET /live`, `GET /ready` | no token : 200 while the process answers ; 200 when the database answers and the RTE is not stopping, else 503 - for a load balancer or Kubernetes probes |
 | `GET /rte/v1/health` | `{ id, version, contract, ansible, running: [jobIds] }` |
 | `POST /rte/v1/jobs` `{ jobId }` | `202` accepted; `404` unknown job; `409` not running, or claimed by another runner |
 | `GET /rte/v1/jobs/:id` | `running`, `finished` (+ `jobStatus`), or `unknown` |

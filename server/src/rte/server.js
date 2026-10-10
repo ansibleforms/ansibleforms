@@ -26,6 +26,7 @@ import appConfig from "../../config/app.config.js";
 import { runAnsibleJob, runnerIdentity } from "./ansible-core.js";
 import { RTE_CONTRACT } from "./contract.js";
 import { openJobSecrets } from "../lib/sealedSecrets.js";
+import { readinessHandlers } from "../lib/readiness.js";
 import { onShutdown, stopWithin, isStopping } from "../lib/shutdown.js";
 import { appVersion as version } from "../lib/version.js";
 import { startHeartbeat } from "../lib/nodes.js";
@@ -233,6 +234,11 @@ export async function startRte() {
   api.get("/jobs/:id", wrap(jobStatus));
   api.post("/jobs/:id/cancel", wrap(cancelJob));
   app.use("/rte/v1", api);
+  // liveness and readiness, without the token : for a load balancer or kubernetes (lib/readiness.js).
+  // Ready is false while it stops (drain) : no new job is routed to it
+  const probes = readinessHandlers(mysql);
+  app.get("/live", probes.live);
+  app.get("/ready", probes.ready);
 
   const port = appConfig.port;
   const server = httpsConfig.https

@@ -17,6 +17,8 @@ import passport from "passport";
 import Middleware from "./lib/middleware.js";
 import { authRateLimit } from "./lib/authRateLimit.js";
 import { cspDirectives } from "./lib/csp.js";
+import { readinessHandlers } from "./lib/readiness.js";
+import mysql from "./models/db.model.js";
 import authConfig from "../config/auth.config.js";
 import logger from "./lib/logger.js";
 import appConfig from "../config/app.config.js";
@@ -178,6 +180,12 @@ const load = async (app) => {
 
   // api route for version (no auth)
   app.use(`/api/v2/version`, cors(), versionRoutes);
+
+  // liveness and readiness for a load balancer or kubernetes (no auth, lib/readiness.js) : ready
+  // means the database answers and the schema is there
+  const probes = readinessHandlers(mysql);
+  app.get(`/api/v2/live`, probes.live);
+  app.get(`/api/v2/ready`, probes.ready);
 
   // api route for profile
   app.use(`/api/v2/profile`, cors(), authobj, profileRoutesv2);
