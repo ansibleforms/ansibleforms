@@ -1788,7 +1788,7 @@ onMounted(async () => {
 /* the approval review (openReview) : the question, then the job's facts as label and value */
 /* the question set apart : the orange of a job that needs approval, on its left edge */
 .af-review-ask {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
   padding: 0.75rem 1rem;
   border-left: 3px solid #ef6009;
   border-radius: 0.375rem;
