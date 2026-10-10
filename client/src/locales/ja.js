@@ -1617,6 +1617,7 @@ export default {
     reviewApproval: '承認を確認',
     reviewLead: 'このジョブは実行前にあなたの承認を待っています：',
     openJobDetails: 'ジョブ {id} の詳細を開く',
+    jobId: 'ジョブ ID',
     details: '詳細',
     alreadyDecided: 'このジョブはもう承認待ちではありません：その間に承認または却下されました。',
     approve: '承認',

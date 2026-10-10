@@ -1637,6 +1637,7 @@ export default {
     reviewApproval: 'Rozpatrz zatwierdzenie',
     reviewLead: 'To zadanie czeka na Twoje zatwierdzenie przed uruchomieniem:',
     openJobDetails: 'Otwórz szczegóły zadania {id}',
+    jobId: 'id zadania',
     details: 'szczegóły',
     alreadyDecided: 'To zadanie nie wymaga już zatwierdzenia: w międzyczasie zostało zatwierdzone lub odrzucone.',
     approve: 'Zatwierdź',

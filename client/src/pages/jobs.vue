@@ -1107,7 +1107,7 @@ onMounted(async () => {
         <dl class="af-review-facts">
           <dt>{{ t('jobs.form') }}</dt>
           <dd>{{ reviewJob.form || reviewJob.target || '–' }}</dd>
-          <dt>{{ t('jobs.id') }}</dt>
+          <dt>{{ t('jobs.jobId') }}</dt>
           <dd>#{{ reviewJob.id }}</dd>
           <dt>{{ t('jobs.launchedBy') }}</dt>
           <dd>

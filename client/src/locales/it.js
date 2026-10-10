@@ -1638,6 +1638,7 @@ export default {
     reviewApproval: 'Esamina approvazione',
     reviewLead: 'Questo job attende la tua approvazione prima di essere eseguito:',
     openJobDetails: 'Apri i dettagli del job {id}',
+    jobId: 'id del job',
     details: 'dettagli',
     alreadyDecided: 'Questo job non richiede più approvazione: nel frattempo è stato approvato o rifiutato.',
     approve: 'Approva',

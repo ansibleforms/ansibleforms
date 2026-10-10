@@ -1623,6 +1623,7 @@ export default {
     reviewApproval: 'Review approval',
     reviewLead: 'This job is waiting for your approval before it runs:',
     openJobDetails: 'Open job {id} details',
+    jobId: 'job id',
     details: 'details',
     alreadyDecided: 'This job no longer needs approval: it was approved or rejected in the meantime.',
     approve: 'Approve',

@@ -1645,6 +1645,7 @@ export default {
     reviewApproval: "Revisar l'aprovació",
     reviewLead: "Aquesta feina espera la teva aprovació abans d'executar-se:",
     openJobDetails: 'Obrir els detalls de la feina {id}',
+    jobId: 'id de la feina',
     details: 'detalls',
     alreadyDecided: "Aquesta feina ja no necessita aprovació: s'ha aprovat o rebutjat mentrestant.",
     approve: 'Aprova',
