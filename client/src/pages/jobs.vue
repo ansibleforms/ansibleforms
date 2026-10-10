@@ -1627,21 +1627,17 @@ onMounted(async () => {
                     </template>
                   </AppAnsibleOutput>
                   <!-- a multistep job's steps under it, in their order : the whole run reads down -->
-                  <AppAnsibleOutput
-                    v-for="(step, i) in steps"
-                    :key="step.id"
-                    :output="step.shown"
-                    :jobLog="step.job_log"
-                    numbered
-                  >
-                    <template #title>
-                      <h3 class="af-job-title">
-                        {{ t('jobs.stepN', { n: i + 1 })
-                        }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
-                        <AppStatusPill :status="step.status" />
-                      </h3>
-                    </template>
-                  </AppAnsibleOutput>
+                  <div v-for="(step, i) in steps" :key="step.id" class="af-job-step">
+                    <AppAnsibleOutput :output="step.shown" :jobLog="step.job_log" numbered>
+                      <template #title>
+                        <h3 class="af-job-title">
+                          {{ t('jobs.stepN', { n: i + 1 })
+                          }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
+                          <AppStatusPill :status="step.status" />
+                        </h3>
+                      </template>
+                    </AppAnsibleOutput>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1796,6 +1792,10 @@ onMounted(async () => {
 }
 /* the jobs table : the shared look (styles/tables.scss), plus every cell on one line (the
    action icons side by side, a date not broken in two) */
+/* a multistep job's step under the output before it : a line where one ends and the next begins */
+.af-job-step {
+  border-top: 1px solid var(--bs-border-color);
+}
 .custom-table {
   /* 20px lines : every row a whole 45px (12px padding twice, a 1px border). At 1.2 a row was
      44.19px, and the browser rounding each row's edges made one row in five a pixel taller */
