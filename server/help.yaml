@@ -1296,6 +1296,18 @@
     default: "%PERSISTENT_FOLDER%/uploads"
     description: |
       Since 4.0.16, a new field type is introduced that allows file uploads.  The files are uploaded in this path.
+  - name: AWX_LOST_MINUTES
+    version: 7.0.0
+    type: number
+    allowed: a positive number
+    default: 5
+    short: How long AWX may not answer before a followed job is given up
+    hint: Read by the app node or worker following the job
+    description: |
+      While an AWX job runs, the app asks AWX for its status and output every second. When AWX
+      does not answer (a network blip, a restart, a busy controller) it tries again with a
+      backoff - 1, 2, 4 seconds up to 30 - and ends the job as "lost contact" only after this many
+      minutes of failures in a row. The job may still be running in AWX ; the job's output says so.
   - name: AWX_API_PREFIX
     type: string
     version: 5.0.9

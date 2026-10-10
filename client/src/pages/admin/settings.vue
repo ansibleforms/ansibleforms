@@ -110,6 +110,7 @@ const envGroupOrder = [
       'UPLOAD_MAX_GB',
       'VARS_FILES_PATH',
       'AWX_API_PREFIX',
+      'AWX_LOST_MINUTES',
     ],
   },
   {
