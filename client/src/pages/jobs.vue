@@ -1240,7 +1240,7 @@ onMounted(async () => {
                 <th
                   v-for="col in visibleColumns"
                   :key="col.key"
-                  :class="{ 'is-clickable': col.sortable, [col.key]: true }"
+                  :class="{ 'is-clickable': col.sortable, [col.key]: true, 'text-end': col.align === 'end' }"
                   :style="{ userSelect: 'none', whiteSpace: 'nowrap', width: col.width || null }"
                   @click="col.sortable ? toggleSort(col.key) : undefined"
                 >
@@ -1292,11 +1292,11 @@ onMounted(async () => {
                       <AppStatusPill :status="j.status" />
                     </td>
                     <!-- the form in the link blue, as a list's name : the row opens the job -->
+                    <!-- a column with align 'end' (a duration) to the right, as its header -->
                     <td
                       v-else
                       role="button"
-                      class="text-start"
-                      :class="{ 'af-row-open': col.key === 'form' }"
+                      :class="[col.align === 'end' ? 'text-end' : 'text-start', { 'af-row-open': col.key === 'form' }]"
                       @click="getJob(j.id)"
                       :title="cellText(j, col)"
                     >
@@ -1412,7 +1412,13 @@ onMounted(async () => {
                       <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="getJob(c.id)">
                         <AppStatusPill :status="c.status" />
                       </td>
-                      <td v-else role="button" class="text-start" @click="getJob(c.id)" :title="cellText(c, col)">
+                      <td
+                        v-else
+                        role="button"
+                        :class="col.align === 'end' ? 'text-end' : 'text-start'"
+                        @click="getJob(c.id)"
+                        :title="cellText(c, col)"
+                      >
                         {{ cellText(c, col) }}
                       </td>
                     </template>
