@@ -1108,7 +1108,7 @@ onMounted(async () => {
              number (two requests from the same form share a name), who launched it -->
         <dl class="af-review-facts">
           <dt>{{ t('jobs.form') }}</dt>
-          <dd><FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || '–' }}</dd>
+          <dd>{{ reviewJob.form || reviewJob.target || '–' }}</dd>
           <dt>{{ t('jobs.id') }}</dt>
           <dd>#{{ reviewJob.id }}</dd>
           <dt>{{ t('jobs.launchedBy') }}</dt>
