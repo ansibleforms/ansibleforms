@@ -151,6 +151,8 @@ const columnDefs = computed(() => [
     width: headerWidth(t('jobs.duration')),
     render: (j) => formatDuration(durationSeconds(j)),
     type: 'number',
+    // a length, read against the others : to the right, like any number of a table
+    align: 'end',
     sortValue: (j) => durationSeconds(j) ?? -1,
   },
   {
