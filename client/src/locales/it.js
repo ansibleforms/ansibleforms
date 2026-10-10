@@ -1593,7 +1593,7 @@ export default {
       status: 'Stato',
       all: 'Tutti i job',
       running: 'In esecuzione',
-      approve: 'In attesa di approvazione',
+      approve: 'Da approvare',
       success: 'Riuscito',
       failed: 'Fallito',
       aborted: 'Interrotto',

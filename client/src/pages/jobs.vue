@@ -125,7 +125,7 @@ const columnDefs = computed(() => [
     width: headerWidth(t('jobs.jobType')),
     render: (j) => j.job_type || 'ansible',
   },
-  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: '7.5rem' },
+  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: '10.25rem' },
   {
     key: 'start',
     label: t('jobs.startTime'),

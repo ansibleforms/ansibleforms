@@ -186,6 +186,7 @@
    theme - the theme turns Bootstrap's bg-* into pale tints, which white text cannot sit on */
 .af-pill-blue,
 .af-pill-amber,
+.af-pill-orange,
 .af-pill-green,
 .af-pill-red,
 .af-pill-cyan,
@@ -199,6 +200,10 @@
 }
 .af-pill-amber {
   background-color: #b37700 !important;
+}
+/* a job waiting for an approval : waiting on a person, an orange apart from amber's stopped jobs */
+.af-pill-orange {
+  background-color: #ef6009 !important;
 }
 .af-pill-green {
   background-color: #198754 !important;

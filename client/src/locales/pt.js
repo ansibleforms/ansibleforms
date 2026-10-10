@@ -1601,7 +1601,7 @@ export default {
       status: 'Estado',
       all: 'Todas as tarefas',
       running: 'Em execução',
-      approve: 'A aguardar aprovação',
+      approve: 'Por aprovar',
       success: 'Sucesso',
       failed: 'Falhadas',
       aborted: 'Interrompidas',
