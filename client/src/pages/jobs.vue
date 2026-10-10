@@ -1277,16 +1277,19 @@ onMounted(async () => {
                     <td
                       v-if="col.key === 'id'"
                       role="button"
-                      class="text-left"
+                      class="text-start"
                       @click="j.job_type == 'multistep' ? toggleCollapse(j.id) : getJob(j.id)"
                     >
-                      <span>{{ j.id }}</span>
-                      <template v-if="j.job_type == 'multistep'">
-                        <span class="mx-2 float-end" v-if="!collapsed[j.id]"
-                          ><font-awesome-icon icon="angle-right"
-                        /></span>
-                        <span class="mx-2 float-end" v-else><font-awesome-icon icon="angle-down" /></span>
-                      </template>
+                      <!-- one line : the number where every job's is, a multistep's caret at the cell's end -->
+                      <span class="d-flex align-items-center">
+                        <span>{{ j.id }}</span>
+                        <font-awesome-icon
+                          v-if="j.job_type == 'multistep'"
+                          :icon="collapsed[j.id] ? 'angle-down' : 'angle-right'"
+                          fixed-width
+                          class="ms-auto"
+                        />
+                      </span>
                     </td>
                     <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="getJob(j.id)">
                       <AppStatusPill :status="j.status" />
