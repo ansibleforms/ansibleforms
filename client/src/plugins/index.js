@@ -11,7 +11,6 @@ import BaseUrl from '@/lib/BaseUrl';
 axios.defaults.baseURL = BaseUrl;
 
 // Plugins
-// import vuetify from './vuetify'
 import pinia from '@/stores';
 import router from '@/router';
 import { VueShowdownPlugin } from 'vue-showdown';
@@ -53,7 +52,6 @@ library.add(fas, far, fab);
 
 export function registerPlugins(app) {
   app
-    // .use(vuetify)
     .use(i18n)
     .use(router)
     .use(pinia)
