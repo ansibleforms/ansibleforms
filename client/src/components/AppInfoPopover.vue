@@ -25,6 +25,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Popover } from 'bootstrap';
+import { disposeWhenHidden } from '@/lib/popoverDispose';
 import showdown from 'showdown';
 
 // markdown to html, as the forms' help was shown (github flavour, fenced code)
@@ -127,7 +128,8 @@ watch(
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocument);
   document.removeEventListener('keydown', onDocument);
-  popover?.dispose();
+  // open as the page goes (a link followed) : disposed after its fade (lib/popoverDispose.js)
+  disposeWhenHidden(popover, button.value);
 });
 </script>
 
