@@ -32,6 +32,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAppStore } from '@/stores/app';
+import { mayOpen } from '@/lib/routePermission';
 import { remembered } from '@/lib/menuMemory';
 import { useLiveEvent } from '@/composables/useLiveEvent';
 
@@ -122,9 +123,9 @@ const sections = computed(() => {
   }
   // the jobs that run later : on a schedule, or saved to be submitted again
   const planned = [
-    { title: t('sidebar.schedules'), icon: 'clock', link: '/jobs/schedules', permission: 'allowScheduledJobs' },
-    { title: t('sidebar.storedJobs'), icon: 'floppy-disk', link: '/jobs/stored', permission: 'allowStoredJobs' },
-  ].filter((i) => can(i.permission));
+    { title: t('sidebar.schedules'), icon: 'clock', link: '/jobs/schedules' },
+    { title: t('sidebar.storedJobs'), icon: 'floppy-disk', link: '/jobs/stored' },
+  ].filter((i) => mayOpen(i.link, store.profile?.options));
   if (planned.length) sections.push({ title: t('jobs.menu.planned'), items: planned });
   return sections;
 });

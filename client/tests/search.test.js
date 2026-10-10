@@ -2,16 +2,12 @@
 //
 // The search runs over the forms list and the pages in the browser : every query word must
 // match, a title match ranks first, and highlight() returns plain parts the component renders
-// as text. The pages carry the role option of their route, so a result never leads to a page
-// whose guard sends the user back home - checked here against the router's guards.
+// as text. A page shows to a user who may open its route (its meta.permission), so a result never
+// leads to a page whose guard sends the user back home.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import Search from '@/lib/Search';
 import { searchPages } from '@/config/searchPages';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+import router from '@/router';
 
 const forms = [
   { name: 'Ansible Core Form', description: 'Targets an Ansible Core playbook', categories: ['Demo'] },
@@ -69,37 +65,13 @@ describe('Search.highlight', () => {
 
 describe('searchPages', () => {
   const t = (key) => key;
-  const routerSrc = readFileSync(path.join(here, '..', 'src/router/index.js'), 'utf8');
-
-  // guard function -> the role option it tests, and route path -> its guard
-  const guards = {};
-  for (const m of routerSrc.matchAll(/const\s+(\w+)\s*=\s*\(to,\s*from,\s*next\)\s*=>\s*\{([\s\S]*?)\n\}/g)) {
-    const opts = [...m[2].matchAll(/options\?\.(\w+)/g)].map((x) => x[1]);
-    if (opts.length) guards[m[1]] = opts;
-  }
-  const routes = {};
-  for (const m of routerSrc.matchAll(/\{\s*path:\s*'([^']+)'([^}]*)\}/g)) {
-    routes[m[1]] = /beforeEnter:\s*(\w+)/.exec(m[2])?.[1] || null;
-  }
-
-  it('offers only pages that exist, each with the option its route guard checks', () => {
+  it('offers only pages that exist, and declares no permission of its own (the route does)', () => {
     const all = searchPages(t, new Proxy({}, { get: () => true }));
     expect(all.length).toBeGreaterThan(20);
-    const wrong = [];
-    for (const page of all) {
-      // a link may open a page on a part of it (?view=...) : the route is its path
-      const path = page.link.split('?')[0];
-      if (!(path in routes)) {
-        wrong.push(`${page.link}: no such route`);
-        continue;
-      }
-      const guard = routes[path];
-      const expected = guard ? guards[guard]?.[0] : null;
-      if ((page.permission || null) !== (expected || null)) {
-        wrong.push(`${page.link}: search says '${page.permission}', the route checks '${expected}'`);
-      }
-    }
-    expect(wrong).toEqual([]);
+    // a link may open a page on a part of it (?view=...) : the route is its path
+    const missing = all.map((p) => p.link).filter((link) => router.resolve(link.split('?')[0]).matched.length === 0);
+    expect(missing).toEqual([]);
+    expect(all.some((p) => 'permission' in p)).toBe(false);
   });
 
   it('hides the pages the user may not open', () => {

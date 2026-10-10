@@ -1,90 +1,69 @@
-// The sidebar's `permission:` must match the route's `beforeEnter` guard.
-//
-// This has shipped wrong twice: a link rendered for a user whose route guard then bounces
-// them, or a page reachable by URL that the menu hides. Nothing fails when they diverge -
-// each side is correct on its own - so it needs a test rather than a convention.
-//
-// Both sides are plain declarations, so the pairing can be derived instead of restated:
-// the sidebar lists { link, permission } and the router lists { path, beforeEnter }, and
-// each guard function tests exactly one `options?.<name>`.
-import { describe, it, expect } from 'vitest';
+// Who may see a page is declared once : the route's `meta.permission` (router/index.js). The
+// router's one guard checks it, and the left menus and the header search read it from the route
+// a link resolves to (lib/routePermission.js). This used to be restated in three places, and
+// shipped wrong twice : a link shown to a user the route then bounced, or a page reachable by
+// url that the menu hid.
+import { describe, it, expect, vi } from 'vitest';
+import TokenStorage from '@/lib/TokenStorage';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import router, { permissionGuard } from '@/router';
+import { routePermission, mayOpen } from '@/lib/routePermission';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(path.join(here, '..', p), 'utf8');
+const menus = read('src/components/AppSidebar.vue') + read('src/components/AppJobsSidebar.vue');
+const links = [...menus.matchAll(/link:\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
 
-// both left menus declare { link, permission } : the settings menu, and the jobs menu
-// (the scheduled and stored jobs pages)
-const sidebarSrc = read('src/components/AppSidebar.vue') + read('src/components/AppJobsSidebar.vue');
-const routerSrc = read('src/router/index.js');
-
-/** link -> permission, from the sidebar's item declarations. */
-function sidebarPermissions() {
-  const out = {};
-  for (const m of sidebarSrc.matchAll(/link:\s*['"]([^'"]+)['"]([^}]*)\}/g)) {
-    const [, link, rest] = m;
-    const perm = /permission:\s*'([^']+)'/.exec(rest);
-    // documented default: a missing permission is treated as showSettings, the strictest
-    out[link] = perm ? perm[1] : 'showSettings';
-  }
-  return out;
-}
-
-/** guard function name -> the single role option it tests. */
-function guardOptions() {
-  const out = {};
-  for (const m of routerSrc.matchAll(/const\s+(\w+)\s*=\s*\(to,\s*from,\s*next\)\s*=>\s*\{([\s\S]*?)\n\}/g)) {
-    const [, name, body] = m;
-    const opts = [...body.matchAll(/options\?\.(\w+)/g)].map((x) => x[1]);
-    if (opts.length) out[name] = [...new Set(opts)];
-  }
-  return out;
-}
-
-/** route path -> guard function name. */
-function routeGuards() {
-  const out = {};
-  for (const m of routerSrc.matchAll(/path:\s*'([^']+)'[^}]*?beforeEnter:\s*(\w+)/g)) {
-    out[m[1]] = m[2];
-  }
-  return out;
-}
-
-describe('the sidebar and the router agree on who may see a page', () => {
-  const sidebar = sidebarPermissions();
-  const guards = guardOptions();
-  const routes = routeGuards();
-
-  it('all three were parsed, so these assertions are not vacuous', () => {
-    expect(Object.keys(sidebar).length).toBeGreaterThan(15);
-    expect(Object.keys(routes).length).toBeGreaterThan(15);
-    // the guards that carry their own option, named in CLAUDE.md
-    for (const g of ['allowBackupOps', 'allowScheduledJobs', 'allowStoredJobs']) {
-      expect(Object.keys(guards)).toContain(g);
-    }
-    // the jobs menu's links were read too
-    expect(sidebar['/jobs/schedules']).toBe('allowScheduledJobs');
-    expect(sidebar['/jobs/stored']).toBe('allowStoredJobs');
+describe('the routes declare who may see a page', () => {
+  it('the menus were read, so these assertions are not vacuous', () => {
+    expect(links.length).toBeGreaterThan(15);
+    expect(links).toContain('/jobs/schedules');
   });
 
-  it('every sidebar link points at a route that exists', () => {
-    const missing = Object.keys(sidebar).filter((link) => !(link in routes));
+  it('every menu link points at a route that exists', () => {
+    const missing = links.filter((link) => router.resolve(link).matched.length === 0);
     expect(missing).toEqual([]);
   });
 
-  it('every sidebar permission matches its route guard', () => {
-    const mismatched = [];
-    for (const [link, permission] of Object.entries(sidebar)) {
-      const guard = routes[link];
-      if (!guard) continue;
-      const opts = guards[guard];
-      if (!opts) continue; // a guard that checks something other than a role option
-      if (!opts.includes(permission)) {
-        mismatched.push(`${link}: sidebar says '${permission}', ${guard} checks ${opts.join('/')}`);
-      }
-    }
-    expect(mismatched).toEqual([]);
+  it('no menu item restates a permission : it comes from the route', () => {
+    expect(menus).not.toMatch(/permission:\s*'/);
+  });
+
+  it('each page has the role option its api needs', () => {
+    expect(routePermission('/settings/users')).toBe('showSettings');
+    expect(routePermission('/settings/backups')).toBe('allowBackupOps');
+    expect(routePermission('/settings/logs')).toBe('showLogs');
+    expect(routePermission('/jobs/schedules')).toBe('allowScheduledJobs');
+    expect(routePermission('/jobs/stored')).toBe('allowStoredJobs');
+    expect(routePermission('/designer')).toBe('showDesigner');
+    expect(routePermission('/jobs')).toBe('showJobs');
+    expect(routePermission('/profile')).toBe(null);
+  });
+
+  it('a link shows to a user with its option only', () => {
+    expect(mayOpen('/settings/users', { showSettings: true })).toBe(true);
+    expect(mayOpen('/settings/users', { showJobs: true })).toBe(false);
+    expect(mayOpen('/settings/backups', { showSettings: true })).toBe(false);
+    expect(mayOpen('/profile', {})).toBe(true);
+  });
+});
+
+describe('the guard', () => {
+  // the signed-in user's role options, as the guard reads them from the token
+  const as = (options) => vi.spyOn(TokenStorage, 'getPayload').mockReturnValue({ user: { username: 'u', options } });
+
+  it('a page needing an option the user lacks : home ; with it : the page', () => {
+    const designer = router.resolve('/designer');
+    as({ showJobs: true });
+    expect(permissionGuard(designer)).toEqual({ name: '/' });
+    as({ showDesigner: true });
+    expect(permissionGuard(designer)).toBe(true);
+  });
+
+  it('a page needing nothing opens for anybody', () => {
+    as({});
+    expect(permissionGuard(router.resolve('/profile'))).toBe(true);
   });
 });
