@@ -11,6 +11,7 @@ import axios from 'axios';
 import State from '@/lib/State';
 import Navigate from '@/lib/Navigate';
 import TokenStorage from '@/lib/TokenStorage';
+import { formsPath } from '@/lib/formsPath';
 import YAML from 'yaml';
 import { useFollowOutput } from '@/composables/useFollowOutput';
 import Time from '@/lib/Time';
@@ -933,7 +934,7 @@ const menuCategory = computed(() => {
  *   category (string): the category ; empty for All Forms.
  */
 function openCategory(category) {
-  router.push(category ? { path: '/', query: { category: encodeURIComponent(category) } } : { path: '/' });
+  router.push(formsPath(category));
 }
 
 function toggleShowExtraVars() {
@@ -1801,8 +1802,8 @@ onBeforeUnmount(() => {
           <div class="d-flex flex-wrap align-items-center border-bottom mb-3 pb-2 af-page-head">
             <h3 class="mb-0 me-3">
               <!-- the section first, as every page's title (lib/sections.js) : Forms › the form -->
-              <router-link to="/" class="af-crumb-link"
-                ><span class="me-2"><FaIcon :icon="store.navHomeIcon" /></span>{{ store.navHomeLabel }}</router-link
+              <router-link :to="formsPath('')" class="af-crumb-link"
+                ><span class="me-2"><FaIcon icon="rectangle-list" /></span>{{ t('nav.forms') }}</router-link
               ><span class="mx-2 text-body-secondary af-crumb-separator">›</span>
               {{ activeEntry ? activeEntry.subtitle || activeEntry.title : currentForm.name }}
               <AppInfoPopover

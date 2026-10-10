@@ -3,6 +3,7 @@ import Profile from '@/lib/Profile';
 import Form from '@/lib/Form';
 import Helpers from '@/lib/Helpers';
 import { useRoute, useRouter } from 'vue-router';
+import { formsPath, categoryFromPath } from '@/lib/formsPath';
 
 const { t } = useI18n();
 
@@ -36,8 +37,14 @@ const forms = computed(() => {
   });
 });
 
-const currentCategory = computed(() => {
-  return decodeURIComponent(route.query?.category || '');
+// the category browsed : its address read back against the config's categories ('' every
+// form, until the config is loaded too ; null for an address no category has)
+const categoryInPath = computed(() => categoryFromPath(route.params.category, formConfig.value?.categories));
+const currentCategory = computed(() => categoryInPath.value || '');
+// an address no category has (renamed, removed) : every form, at its own address - checked
+// again once the config is loaded, since until then no address names a category
+watch([categoryInPath, () => formConfig.value?.categories], ([category, categories]) => {
+  if (category === null && categories) router.replace(formsPath('')).catch((_e) => {});
 });
 
 const filteredFormsBySearch = computed(() => {
@@ -70,11 +77,7 @@ watch(
 );
 
 function select(path) {
-  if (path) {
-    router.replace({ path: '/', query: { category: encodeURIComponent(path) } }).catch((_e) => {});
-  } else {
-    router.replace({ path: '/' }).catch((_e) => {});
-  }
+  router.replace(formsPath(path)).catch((_e) => {});
 }
 
 const getForms = computed(() => {
@@ -94,7 +97,7 @@ const categoryTitle = computed(() => {
     title: name,
     icon: findCategory(formConfig.value?.categories, names.slice(0, i + 1))?.icon || 'folder',
     // each step a link to its category
-    to: { path: route.path, query: { ...route.query, category: names.slice(0, i + 1).join('/') } },
+    to: formsPath(names.slice(0, i + 1).join('/')),
   }));
   return { title: names.join(' › '), icon: crumbs[crumbs.length - 1].icon, crumbs: crumbs.length > 1 ? crumbs : [] };
 });

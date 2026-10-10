@@ -38,13 +38,11 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useAppStore } from '@/stores/app';
 import { sectionOf } from '@/lib/sections';
 
 // a title of one step links to the page itself : its plain address, without a tab or a filter
 const route = useRoute();
 const { t } = useI18n();
-const store = useAppStore();
 
 const props = defineProps({
   icon: {
@@ -75,7 +73,7 @@ const props = defineProps({
 // the title's steps : the page's section first, then its own (its crumbs, or its title)
 const steps = computed(() => {
   const own = props.crumbs.length ? props.crumbs : [{ title: props.title, icon: props.icon, to: route.path }];
-  const section = sectionOf(route.path, t, store);
+  const section = sectionOf(route.path, t);
   if (!section || own[0]?.title === section.title) return own;
   return [section, ...own];
 });

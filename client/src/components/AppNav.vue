@@ -35,8 +35,6 @@ import { jobsPath } from '@/lib/jobsPath';
 onMounted(async () => {
   try {
     const res = await axios.get('/api/v2/app/config');
-    store.navHomeLabel = res.data?.navHomeLabel || store.navHomeLabel;
-    store.navHomeIcon = res.data?.navHomeIcon || store.navHomeIcon;
     // Apply server default language if user hasn't chosen one
     if (res.data?.defaultLanguage) {
       applyDefaultLanguage(res.data.defaultLanguage);
@@ -135,11 +133,11 @@ const menu = computed(() => {
 
   // Add home menu item
   m.unshift({
-    title: store.navHomeLabel,
-    link: '/',
-    // a form is one of the forms : the link stays active on it
-    also: ['/form'],
-    icon: store.navHomeIcon,
+    title: t('nav.forms'),
+    link: '/forms/all',
+    // a category of forms, and a form, are the forms too : the link stays active on them
+    also: ['/forms', '/form'],
+    icon: 'rectangle-list',
     target: '_self',
   });
 

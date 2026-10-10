@@ -133,9 +133,6 @@ const LIVE = {
 // Read straight from process.env at call time by their consumer rather than captured into
 // appConfig, so setting the environment variable is enough - no appConfig key to update.
 const LIVE_ENV_ONLY = new Set([
-  // app.routes reads these inside the /api/v2/app/config handler, so the next page load
-  // has them
-  'NAV_HOME_LABEL', 'NAV_HOME_ICON',
   // hostfilter.assertUrlAllowed reads them on every outbound REST call
   'REST_ALLOWED_HOSTS', 'REST_DENIED_HOSTS',
   // expression.model reads it through getExpressionMode() on every expression

@@ -23,10 +23,6 @@ export const useAppStore = defineStore('app', () => {
   const serverBuild = ref(null);
   const clientBuild = ref(null);
   const approvals = ref(0);
-  // the Forms section's name and icon in the header, configurable (/api/v2/app/config) : the
-  // header and every page title's first step (lib/sections.js) say the same
-  const navHomeLabel = ref('Forms');
-  const navHomeIcon = ref('rectangle-list');
   // the designer lock as /api/v2/lock answers it ({ free } or { lock, match }) : the lock icon
   // on the header's Designer link ; null while unknown or for a user without the designer
   const designerLock = ref(null);
@@ -48,8 +44,6 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     theme,
-    navHomeLabel,
-    navHomeIcon,
     profile,
     authenticated,
     isAdmin,

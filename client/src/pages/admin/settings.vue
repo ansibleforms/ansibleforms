@@ -144,7 +144,6 @@ const envGroupOrder = [
     key: 'ui',
     label: () => t('settings.settingsPage.envGroupUi'),
     icon: 'palette',
-    prefix: ['NAV_HOME_'],
     exact: ['DEFAULT_LANGUAGE', 'SHOW_DESIGNER'],
   },
   // LOG_RETENTION_DAYS is Retention's, with the other retentions

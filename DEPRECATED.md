@@ -56,6 +56,7 @@ replaces each item and how to move over while still on 6.5.
 | `noOutput` | `output: false` | 6.3.0 |
 | `enableLogin` (role option) | `allowLogin` | 6.3.0 |
 | datasources and data schemas (their tables are dropped), the AnsibleForms Galaxy collection | none - an import runs as a playbook of your own | 7.0.0 |
+| `NAV_HOME_LABEL`, `NAV_HOME_ICON` | none - the header's first link is always Forms, as every page's title names it | 7.0.0 |
 
 
 ## Deprecating something
