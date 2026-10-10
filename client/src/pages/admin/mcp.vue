@@ -218,9 +218,7 @@ onMounted(async () => {
           </template>
           <div class="form-text mt-3">
             {{ t('settings.settingsPage.mcpTokenHint') }}
-            <router-link :to="{ path: '/profile', query: { view: 'token' } }">{{
-              t('settings.settingsPage.mcpCreateToken')
-            }}</router-link>
+            <router-link to="/profile/token">{{ t('settings.settingsPage.mcpCreateToken') }}</router-link>
           </div>
         </div>
       </template>

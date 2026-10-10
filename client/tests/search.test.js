@@ -77,7 +77,7 @@ describe('searchPages', () => {
 
   it('hides the pages the user may not open', () => {
     const links = searchPages(t, { showJobs: true }).map((p) => p.link);
-    expect(links).toContain('/jobs');
+    expect(links).toContain('/jobs/all');
     expect(links).toContain('/profile');
     expect(links).not.toContain('/settings/users');
     expect(links).not.toContain('/designer');

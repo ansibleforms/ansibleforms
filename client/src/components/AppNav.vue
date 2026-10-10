@@ -94,7 +94,8 @@ watch(
   },
 );
 const menuOptions = computed(() => [
-  { title: t('nav.jobs'), link: '/jobs', icon: 'history' },
+  // every job ; a status, a job, the scheduled and stored jobs are the jobs too : the link stays active on them
+  { title: t('nav.jobs'), link: '/jobs/all', also: ['/jobs'], icon: 'history' },
   // every settings page (all under /settings) keeps Settings active, not its General page alone
   { title: t('nav.settings'), link: '/settings/general', also: ['/settings'], icon: 'gear' },
   { title: t('nav.designer'), link: '/designer', icon: 'pen-to-square' },

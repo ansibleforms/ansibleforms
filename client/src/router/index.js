@@ -2,7 +2,7 @@
 
 // Composables
 import { createRouter, createWebHistory } from 'vue-router';
-import { JOBS_STATUS_SLUGS } from '@/lib/jobsPath';
+import { JOBS_STATUS_SLUGS, ALL_JOBS } from '@/lib/jobsPath';
 import { formsPath, formPath } from '@/lib/formsPath';
 import BaseUrl from '@/lib/BaseUrl';
 
@@ -88,9 +88,16 @@ const routes = [
   { path: '/form/:slug', name: '/form', component: form },
   { path: '/login', name: '/login', component: login },
   { path: '/change-password', name: '/change-password', component: changePassword },
-  { path: '/profile', name: '/profile', component: profile },
+  // the profile : a view at /profile/<view> ; /profile alone opens the first of its menu
+  { path: '/profile/:view?', name: '/profile', component: profile },
   { path: '/logout', name: '/logout', component: logout },
-  { path: '/jobs', name: '/jobs', component: jobs, meta: { permission: 'showJobs' } },
+  // every job at /jobs/all (lib/jobsPath.js) ; /jobs leads there
+  {
+    path: '/jobs',
+    name: '/jobs',
+    redirect: (to) => ({ path: `/jobs/${ALL_JOBS}`, query: to.query }),
+    meta: { permission: 'showJobs' },
+  },
   // the scheduled and stored jobs live with the jobs (their menu is the jobs menu) ; a fixed
   // segment outranks /jobs/:id, whatever the order
   {
@@ -110,7 +117,7 @@ const routes = [
   // the jobs of a status (/jobs/running, /jobs/approval ...) ; a job's page by its number only,
   // so a status's name is never read as a job
   {
-    path: `/jobs/:status(${JOBS_STATUS_SLUGS.join('|')})`,
+    path: `/jobs/:status(${[ALL_JOBS, ...JOBS_STATUS_SLUGS].join('|')})`,
     name: '/jobs/:status',
     component: jobs,
     meta: { permission: 'showJobs' },

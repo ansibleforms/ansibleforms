@@ -22,8 +22,8 @@ export function searchPages(t, options) {
     // ---------------------------------------------------------------
     // the header menu
     // ---------------------------------------------------------------
-    { title: t('nav.forms'), section: '', icon: 'rectangle-list', link: '/' },
-    { title: t('nav.jobs'), section: '', icon: 'history', link: '/jobs' },
+    { title: t('nav.forms'), section: '', icon: 'rectangle-list', link: '/forms/all' },
+    { title: t('nav.jobs'), section: '', icon: 'history', link: '/jobs/all' },
     { title: t('nav.designer'), section: '', icon: 'pen-to-square', link: '/designer' },
     { title: t('nav.profile'), section: '', icon: 'user-gear', link: '/profile' },
     { title: t('nav.apiDocs'), section: '', icon: 'code', link: '/api-docs' },
