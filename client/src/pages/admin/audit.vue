@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { toast } from 'vue-sonner';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers.js';
 import { PILL } from '@/lib/tableCells';
@@ -115,7 +114,7 @@ async function load() {
     if (filterActor.value) params.set('actor', filterActor.value);
     if (filterAction.value) params.set('action', filterAction.value);
     if (filterOutcome.value) params.set('outcome', filterOutcome.value);
-    const res = await axios.get(`/api/v2/audit?${params.toString()}`, TokenStorage.getAuthentication());
+    const res = await axios.get(`/api/v2/audit?${params.toString()}`);
     const data = res.data?.records !== undefined ? res.data : res.data?.result;
     records.value = data?.records || [];
     total.value = data?.total || 0;
@@ -140,7 +139,7 @@ async function load() {
 
 async function loadFacets() {
   try {
-    const res = await axios.get('/api/v2/audit/facets', TokenStorage.getAuthentication());
+    const res = await axios.get('/api/v2/audit/facets');
     facets.value = res.data?.actions !== undefined ? res.data : res.data?.result || { actions: [], actors: [] };
   } catch {
     facets.value = { actions: [], actors: [] };

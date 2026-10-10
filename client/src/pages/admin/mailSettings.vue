@@ -12,7 +12,6 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import getSettings from '@/config/settings';
 
 const { t } = useI18n();
@@ -24,7 +23,7 @@ const seeded = ref(false);
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
-  const res = await axios.get('/api/v2/settings/', TokenStorage.getAuthentication()).catch(() => null);
+  const res = await axios.get('/api/v2/settings/').catch(() => null);
   seeded.value = !!(res?.data?.managed && res?.data?.mail_server);
 });
 </script>

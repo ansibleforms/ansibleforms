@@ -8,7 +8,22 @@
 // must be prefixed with the runtime base path (empty for root hosting)
 import axios from 'axios';
 import BaseUrl from '@/lib/BaseUrl';
+import TokenStorage from '@/lib/TokenStorage';
 axios.defaults.baseURL = BaseUrl;
+
+// Every call to the app's own api carries the signed-in user's token : one place, instead of
+// each call passing TokenStorage.getAuthentication(). A call that sets its own Authorization
+// (the login's Basic header) keeps it, and a call to another site gets none.
+axios.interceptors.request.use((config) => {
+  const url = String(config.url || '');
+  const ownApi = !/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith(window.location.origin);
+  const token = TokenStorage.getToken();
+  if (ownApi && token && !config.headers?.Authorization && !config.headers?.authorization) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = 'Bearer ' + token;
+  }
+  return config;
+});
 
 // Plugins
 import pinia from '@/stores';

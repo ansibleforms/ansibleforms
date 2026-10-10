@@ -11,7 +11,6 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 
 /**
@@ -67,7 +66,7 @@ export function useEnvVars(names) {
    */
   async function loadEnvironmentVariables() {
     try {
-      const result = await axios.get('/api/v2/config/env', TokenStorage.getAuthentication());
+      const result = await axios.get('/api/v2/config/env');
       env.value = Array.isArray(result.data) ? result.data : [];
       const edits = {};
       for (const e of envItems.value) if (envEditable(e)) edits[e.name] = e.secret ? '' : (e.value ?? '');
@@ -87,7 +86,7 @@ export function useEnvVars(names) {
     const payload = {};
     for (const n of changed) payload[n] = envEdits.value[n] ?? '';
     try {
-      const result = await axios.put('/api/v2/config/env', payload, TokenStorage.getAuthentication());
+      const result = await axios.put('/api/v2/config/env', payload);
       toast.success(result.data.message);
       envRestartPending.value = result.data?.restartRequired || [];
       await loadEnvironmentVariables();

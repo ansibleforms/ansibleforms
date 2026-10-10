@@ -32,7 +32,6 @@ import { ref, onMounted, computed, watch } from 'vue';
 import axios from 'axios';
 import Helpers from '@/lib/Helpers';
 import { toast } from 'vue-sonner';
-import TokenStorage from '@/lib/TokenStorage';
 import { useVuelidate } from '@vuelidate/core';
 import { required, helpers, email, sameAs } from '@vuelidate/validators';
 import { useI18n } from 'vue-i18n';
@@ -137,7 +136,7 @@ function objectTitle(prefix = '', suffix = '') {
 
 async function loadItem() {
   try {
-    const result = await axios.get(`/api/v${props.apiVersion}/${objectType.value}/`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v${props.apiVersion}/${objectType.value}/`);
     item.value = result.data;
     for (const field of fields.value) {
       if (field.type == 'checkbox') {
@@ -162,7 +161,7 @@ function doEmit(action) {
 async function updateItem() {
   if (!isInvalid.value) {
     try {
-      await axios.put(`/api/v${props.apiVersion}/${objectType.value}/`, item.value, TokenStorage.getAuthentication());
+      await axios.put(`/api/v${props.apiVersion}/${objectType.value}/`, item.value);
       toast.success(objectTitle('', t('settings.common.isUpdated')));
       emit('saved', item.value);
       loadItem();
@@ -287,7 +286,7 @@ const loadedValues = ref({});
  */
 async function loadValues() {
   for (const field of props.settings.fields.filter((f) => f.valuesFrom)) {
-    const res = await axios.get(field.valuesFrom.url, TokenStorage.getAuthentication()).catch(() => null);
+    const res = await axios.get(field.valuesFrom.url).catch(() => null);
     const records = (res?.data?.records || []).filter((r) => !field.valuesFrom.filter || field.valuesFrom.filter(r));
     loadedValues.value[field.key] = [
       { value: '', label: '' },

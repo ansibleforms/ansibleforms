@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { toast } from 'vue-sonner';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers.js';
 import Time from '@/lib/Time';
@@ -57,7 +56,7 @@ function infoLabel(key) {
 async function load() {
   loading.value = true;
   try {
-    const res = await axios.get('/api/v2/health', TokenStorage.getAuthentication());
+    const res = await axios.get('/api/v2/health');
     result.value = res.data.result ?? res.data;
     checkedAt.value = Time.format(new Date(), 'HH:mm:ss');
   } catch (err) {

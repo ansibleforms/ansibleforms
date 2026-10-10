@@ -5,7 +5,6 @@ import { required, helpers } from '@vuelidate/validators';
 import Profile from '@/lib/Profile';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import Theme from '@/lib/Theme';
@@ -306,7 +305,7 @@ const settingsDirty = computed(() => {
 
 async function loadItem() {
   try {
-    const result = await axios.get('/api/v2/settings/', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/settings/');
     item.value = result.data;
     originalItem.value = JSON.parse(JSON.stringify(result.data));
   } catch (err) {
@@ -326,11 +325,7 @@ async function saveSettings() {
   }
   try {
     const { url, config_source, default_language, default_theme, default_theme_color } = item.value;
-    await axios.put(
-      '/api/v2/settings/',
-      { url, config_source, default_language, default_theme, default_theme_color },
-      TokenStorage.getAuthentication(),
-    );
+    await axios.put('/api/v2/settings/', { url, config_source, default_language, default_theme, default_theme_color });
     toast.success(t('settings.settingsPage.label') + ' ' + t('settings.common.isUpdated'));
     await loadItem();
     return true;
@@ -347,7 +342,7 @@ async function saveSettings() {
 async function importConfigToDatabase() {
   showImportConfirm.value = false;
   try {
-    const result = await axios.put('/api/v2/settings/importConfig', {}, TokenStorage.getAuthentication());
+    const result = await axios.put('/api/v2/settings/importConfig', {});
     toast.success(result.data.message);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err));
@@ -357,7 +352,7 @@ async function importConfigToDatabase() {
 async function exportConfigToFile() {
   showExportConfirm.value = false;
   try {
-    const result = await axios.put('/api/v2/settings/exportConfig', {}, TokenStorage.getAuthentication());
+    const result = await axios.put('/api/v2/settings/exportConfig', {});
     toast.success(result.data.message);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err));
@@ -394,7 +389,7 @@ async function saveEnvironmentVariables() {
   const payload = {};
   for (const n of names) payload[n] = envEdits.value[n] ?? '';
   try {
-    const result = await axios.put('/api/v2/config/env', payload, TokenStorage.getAuthentication());
+    const result = await axios.put('/api/v2/config/env', payload);
     toast.success(result.data.message);
     envRestartPending.value = result.data?.restartRequired || [];
     await loadEnvironmentVariables();
@@ -418,7 +413,7 @@ async function saveActiveTab() {
 
 async function loadEnvironmentVariables() {
   try {
-    const result = await axios.get('/api/v2/config/env', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/config/env');
     env.value = result.data;
     const edits = {};
     for (const e of result.data) if (envEditable(e)) edits[e.name] = e.secret ? '' : (e.value ?? '');

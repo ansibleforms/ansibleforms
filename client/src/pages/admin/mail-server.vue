@@ -20,7 +20,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import getSettings from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -73,7 +72,7 @@ const credentials = ref([]);
  * Loads the smtp credentials the Credential dropdown offers.
  */
 async function loadCredentials() {
-  const res = await axios.get('/api/v2/credential/', TokenStorage.getAuthentication()).catch(() => null);
+  const res = await axios.get('/api/v2/credential/').catch(() => null);
   credentials.value = [
     { name: '' },
     ...(res?.data?.records || []).filter((c) => c.credential_type === 'smtp').map((c) => ({ name: c.name })),
@@ -85,10 +84,7 @@ async function loadCredentials() {
  */
 async function load() {
   try {
-    const res = await axios.get(
-      `/api/v2/mailserver/${encodeURIComponent(serverId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     server.value = record?.id ? record : null;
     edit.value = server.value ? editable(record) : null;
@@ -110,7 +106,7 @@ async function load() {
  */
 async function update(data) {
   try {
-    await axios.put(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -195,11 +191,9 @@ async function sendTest() {
   }
   testing.value = true;
   try {
-    const res = await axios.post(
-      `/api/v2/mailserver/${encodeURIComponent(serverId.value)}/test`,
-      { to: testTo.value.trim() },
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.post(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}/test`, {
+      to: testTo.value.trim(),
+    });
     toast.success(res.data.message || res.data.result?.message);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err));
@@ -217,7 +211,7 @@ const confirmDelete = ref(false);
 async function deleteServer() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`);
     server.value = null;
     router.push('/settings/mailSettings');
   } catch (err) {

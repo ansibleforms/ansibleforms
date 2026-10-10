@@ -22,7 +22,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import getSettings, { SECRET_STORE_TYPES } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -99,10 +98,7 @@ useUnsavedGuard(dirty, () => t('settings.common.unsavedChanges'));
  */
 async function load() {
   try {
-    const res = await axios.get(
-      `/api/v2/secretstore/${encodeURIComponent(storeId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     store.value = record || null;
     edit.value = record ? editable(record) : null;
@@ -128,7 +124,7 @@ const credentials = computed(() => [
  * Loads the credentials the Credential dropdown chooses from.
  */
 async function loadCredentials() {
-  const res = await axios.get('/api/v2/credential/', TokenStorage.getAuthentication()).catch(() => null);
+  const res = await axios.get('/api/v2/credential/').catch(() => null);
   allCredentials.value = res?.data?.records || [];
 }
 
@@ -158,7 +154,7 @@ async function onCredentialCreated(name) {
  */
 async function update(data) {
   try {
-    await axios.put(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -222,11 +218,7 @@ const testing = ref(false);
 async function testConnection() {
   testing.value = true;
   try {
-    const result = await axios.post(
-      `/api/v2/secretstore/${encodeURIComponent(storeId.value)}/check`,
-      {},
-      TokenStorage.getAuthentication(),
-    );
+    const result = await axios.post(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}/check`, {});
     toast.success(result.data.result);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err, t('admin.connectionFailed')));
@@ -244,7 +236,7 @@ const confirmDelete = ref(false);
 async function deleteStore() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`);
     store.value = null;
     router.push('/settings/secretStores');
   } catch (err) {

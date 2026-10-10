@@ -20,7 +20,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import { useAppStore } from '@/stores/app';
 import { RUNNER_KINDS, runnerKind, registrationPill } from '@/config/settings';
@@ -100,14 +99,11 @@ useUnsavedGuard(dirty, () => t('settings.common.unsavedChanges'));
  */
 async function load() {
   try {
-    const res = await axios.get(
-      `/api/v2/runner/${encodeURIComponent(runnerId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/runner/${encodeURIComponent(runnerId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     // its registration (state) is added to the list only : read from there
     if (record) {
-      const list = await axios.get('/api/v2/runner/', TokenStorage.getAuthentication()).catch(() => null);
+      const list = await axios.get('/api/v2/runner/').catch(() => null);
       const listed = (list?.data?.records || []).find((r) => String(r.id) === String(record.id));
       if (listed?.state) record.state = listed.state;
     }
@@ -130,7 +126,7 @@ async function load() {
  */
 async function update(data) {
   try {
-    await axios.put(`/api/v2/runner/${encodeURIComponent(runnerId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/runner/${encodeURIComponent(runnerId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -205,11 +201,7 @@ const testing = ref(false);
 async function testConnection() {
   testing.value = true;
   try {
-    const result = await axios.post(
-      `/api/v2/runner/${encodeURIComponent(runnerId.value)}/check`,
-      {},
-      TokenStorage.getAuthentication(),
-    );
+    const result = await axios.post(`/api/v2/runner/${encodeURIComponent(runnerId.value)}/check`, {});
     toast.success(result.data.result);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err, t('admin.connectionFailed')));
@@ -244,7 +236,7 @@ const confirmDelete = ref(false);
 async function deleteRunner() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/runner/${encodeURIComponent(runnerId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/runner/${encodeURIComponent(runnerId.value)}`);
     runner.value = null;
     router.push('/settings/runners');
   } catch (err) {

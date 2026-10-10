@@ -21,7 +21,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import { statusPill, schedulePill } from '@/config/settings';
 import { editorStyle } from '@/config/editorStyle';
@@ -88,14 +87,11 @@ const launchError = computed(() =>
  */
 async function load(keepEdits = false) {
   try {
-    const res = await axios.get(
-      `/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     // when it runs next is worked out for the list only : read from there
     if (record?.id && !record.next_run) {
-      const list = await axios.get('/api/v2/schedule/', TokenStorage.getAuthentication()).catch(() => null);
+      const list = await axios.get('/api/v2/schedule/').catch(() => null);
       const listed = (list?.data?.records || []).find((r) => String(r.id) === String(record.id));
       if (listed) record.next_run = listed.next_run;
     }
@@ -111,7 +107,7 @@ async function load(keepEdits = false) {
  * Loads the forms a schedule can run, for the Form dropdown.
  */
 async function loadForms() {
-  const res = await axios.get('/api/v2/config/formnames/', TokenStorage.getAuthentication()).catch(() => null);
+  const res = await axios.get('/api/v2/config/formnames/').catch(() => null);
   formNames.value = (res?.data?.records || []).map((f) => ({ name: f.name }));
 }
 
@@ -164,7 +160,7 @@ async function save() {
     extra_vars: e.extra_vars,
   };
   try {
-    await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data);
     toast.success(`${data.name} ${t('settings.common.isUpdated')}`);
     await load();
   } catch (err) {
@@ -177,11 +173,7 @@ async function save() {
  */
 async function runNow() {
   try {
-    await axios.post(
-      `/api/v2/schedule/${encodeURIComponent(scheduleId.value)}/launch`,
-      {},
-      TokenStorage.getAuthentication(),
-    );
+    await axios.post(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}/launch`, {});
     schedule.value.state = 'queued';
     watchRun();
   } catch (err) {
@@ -198,7 +190,7 @@ const confirmDelete = ref(false);
 async function deleteSchedule() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`);
     schedule.value = null;
     router.push('/jobs/schedules');
   } catch (err) {

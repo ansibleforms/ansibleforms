@@ -38,7 +38,7 @@ const mustChange = !!TokenStorage.getPayload()?.user?.mustChangePassword;
 async function updateItem() {
   if (!$v.$invalid) {
     try {
-      await axios.put(`/api/v2/profile`, item.value, TokenStorage.getAuthentication());
+      await axios.put(`/api/v2/profile`, item.value);
       // a new password ends every session of the user, this one too : sign in again with it
       toast.success('Password is changed, sign in with your new password');
       TokenStorage.clear();
@@ -240,7 +240,7 @@ const $v = useVuelidate(rules, { item });
       update(){
         var ref= this;
         if (!this.v$.user.password.$invalid && !this.v$.user.password2.$invalid) {
-          axios.put(`/api/v2/profile`,this.user,TokenStorage.getAuthentication())
+          axios.put(`/api/v2/profile`,this.user)
             .then((result)=>{
               ref.$toast.success("Password is changed");
               ref.$router.push({name:"Home"}).catch(err => {});

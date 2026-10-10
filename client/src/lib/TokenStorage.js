@@ -20,11 +20,25 @@ var TokenStorage = {
   },
 
   getPayload() {
+    return this.decode(this.getToken());
+  },
+
+  /**
+   * The payload of a JWT, unverified : what the browser may read of its own tokens (the user,
+   * the expiry). The one decoder of the client.
+   *
+   * Args:
+   *   token (string): the token.
+   *
+   * Returns:
+   *   object: its payload, {} when it is no JWT.
+   */
+  decode(token) {
     var base64Url;
     var base64;
     var jsonPayload;
     try {
-      base64Url = this.getToken().split('.')[1];
+      base64Url = String(token).split('.')[1];
       base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       jsonPayload = decodeURIComponent(
         atob(base64)

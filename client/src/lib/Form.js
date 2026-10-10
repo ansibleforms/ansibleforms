@@ -1,13 +1,9 @@
 import axios from 'axios';
-import TokenStorage from './TokenStorage';
 
 const Form = {
   async loadAll() {
     try {
-      const result = await axios.get(
-        `/api/v2/config?timestamp=${new Date().getTime()}`,
-        TokenStorage.getAuthentication(),
-      );
+      const result = await axios.get(`/api/v2/config?timestamp=${new Date().getTime()}`);
       return result.data;
     } catch (err) {
       if (err.response?.status == 401) {
@@ -24,7 +20,6 @@ const Form = {
     try {
       const result = await axios.get(
         `/api/v2/config/form?name=${encodeURIComponent(name)}&timestamp=${new Date().getTime()}`,
-        TokenStorage.getAuthentication(),
       );
       return result.data;
     } catch (err) {
@@ -40,10 +35,7 @@ const Form = {
 
   async list() {
     try {
-      const result = await axios.get(
-        `/api/v2/config/formlist?timestamp=${new Date().getTime()}`,
-        TokenStorage.getAuthentication(),
-      );
+      const result = await axios.get(`/api/v2/config/formlist?timestamp=${new Date().getTime()}`);
       return result.data;
     } catch (err) {
       if (err.response?.status == 401) {
@@ -58,7 +50,7 @@ const Form = {
 
   async save(forms) {
     try {
-      await axios.post(`/api/v2/config`, { forms }, TokenStorage.getAuthentication());
+      await axios.post(`/api/v2/config`, { forms });
       return true;
     } catch (err) {
       if (err.response?.status == 401) {
@@ -72,7 +64,7 @@ const Form = {
   },
   async validate(forms) {
     try {
-      await axios.post(`/api/v2/config/check`, { forms }, TokenStorage.getAuthentication());
+      await axios.post(`/api/v2/config/check`, { forms });
       return true;
     } catch (err) {
       if (err.response?.status == 401) {

@@ -2,7 +2,6 @@
 import { toast } from 'vue-sonner';
 import axios from 'axios';
 import getSettings from '@/config/settings';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import Profile from '@/lib/Profile';
 import State from '@/lib/State';
@@ -38,7 +37,7 @@ async function saveSwitch() {
 async function testProvider(item) {
   testing.value = true;
   try {
-    const result = await axios.post('/api/v2/chatsettings/check/', item, TokenStorage.getAuthentication());
+    const result = await axios.post('/api/v2/chatsettings/check/', item);
     toast.success(t('settings.chat.checkOk', { reply: result.data?.reply || 'OK' }));
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err, t('settings.chat.checkFailed')));

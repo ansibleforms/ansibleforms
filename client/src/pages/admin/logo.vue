@@ -73,7 +73,7 @@ async function upload() {
 async function removeLogo() {
   busy.value = true;
   try {
-    await axios.delete(`/api/v2/logo`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/logo`);
     toast.success(t('logo.removed'));
     await State.loadLogo();
   } catch (err) {

@@ -38,7 +38,7 @@ var State = {
   async loadLogo() {
     const store = useAppStore();
     try {
-      const result = await axios.get(`/api/v2/logo`, TokenStorage.getAuthentication());
+      const result = await axios.get(`/api/v2/logo`);
       store.customLogo = result.data?.logo || null;
       store.logoIsDefault = result.data?.isDefault ?? true;
     } catch (err) {
@@ -59,7 +59,7 @@ var State = {
   },
   async refreshApprovals() {
     const store = useAppStore();
-    const res = await axios.get('/api/v2/job/approvals', TokenStorage.getAuthentication());
+    const res = await axios.get('/api/v2/job/approvals');
     store.approvals = res?.data || 0;
   },
 
@@ -72,7 +72,7 @@ var State = {
       return;
     }
     try {
-      const res = await axios.get('/api/v2/lock', TokenStorage.getAuthentication());
+      const res = await axios.get('/api/v2/lock');
       store.designerLock = res?.data || null;
     } catch (err) {
       // the designer is disabled, or the server is down : no icon rather than a wrong one

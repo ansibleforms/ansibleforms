@@ -11,7 +11,6 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
-import TokenStorage from '@/lib/TokenStorage';
 
 // the roles the config must keep : admin and public
 export const RESERVED_ROLES = ['admin', 'public'];
@@ -50,7 +49,7 @@ export function useRoleSupport(roles, save) {
   async function loadLocalNames() {
     await Promise.all([
       axios
-        .get('/api/v2/group/', TokenStorage.getAuthentication())
+        .get('/api/v2/group/')
         .then((result) => {
           const records = result.data.records || result.data;
           localGroups.value = records.map((g) => g.name);
@@ -58,7 +57,7 @@ export function useRoleSupport(roles, save) {
         })
         .catch(() => (localGroups.value = groupIds.value = [])),
       axios
-        .get('/api/v2/user/', TokenStorage.getAuthentication())
+        .get('/api/v2/user/')
         .then((result) => {
           const records = result.data.records || result.data;
           localUsers.value = records.map((u) => u.username);

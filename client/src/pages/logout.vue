@@ -20,9 +20,7 @@ var userType = store.profile?.type || 'local';
 // when they expire (server/src/lib/tokenRevocation.js). Fire and forget : the logout goes on
 // whatever the answer.
 if (TokenStorage.getToken()) {
-  axios
-    .post(`/api/v2/auth/logout`, { refreshtoken: TokenStorage.getRefreshToken() }, TokenStorage.getAuthentication())
-    .catch(() => {});
+  axios.post(`/api/v2/auth/logout`, { refreshtoken: TokenStorage.getRefreshToken() }).catch(() => {});
 }
 
 // For OIDC, get logout URL first before clearing tokens

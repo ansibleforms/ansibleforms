@@ -1922,11 +1922,7 @@ async function startDynamicFieldsLoop() {
                 if (props.rootFormName) body.subformName = props.currentForm.name;
                 if (item.jq) body.jq = item.jq;
                 const gen = fieldGeneration.value[item.name] || 0;
-                const result = await axios.post(
-                  `/api/v2/expression?noLog=${!!item.noLog}`,
-                  body,
-                  TokenStorage.getAuthentication(),
-                );
+                const result = await axios.post(`/api/v2/expression?noLog=${!!item.noLog}`, body);
                 // a dependency changed (resetField bumped the generation)
                 // while this was in flight: a newer request owns the field
                 // now, so drop this stale answer - return, not continue: the
@@ -2015,11 +2011,7 @@ async function startDynamicFieldsLoop() {
               if (props.rootFormName) body.subformName = props.currentForm.name;
               if (item.jq) body.jq = item.jq;
               const gen = fieldGeneration.value[item.name] || 0;
-              const result = await axios.post(
-                `/api/v2/query?noLog=${!!item.noLog}`,
-                body,
-                TokenStorage.getAuthentication(),
-              );
+              const result = await axios.post(`/api/v2/query?noLog=${!!item.noLog}`, body);
               // a dependency changed while this was in flight : a newer
               // request owns the field now, so drop this answer
               // return, not continue : the enclosing construct is a

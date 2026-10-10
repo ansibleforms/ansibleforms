@@ -8,7 +8,6 @@ const { t } = useI18n();
 const settings = computed(() => getSettings(t));
 import Profile from '@/lib/Profile';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers.js';
 
 const adminMulti = ref(null);
@@ -33,7 +32,7 @@ function offcanvasClose() {
 // the machine the backup was taken on - so this is an explicit, separate action.
 async function triggerRestoreEnv(item) {
   try {
-    const result = await axios.post(`/api/v2/backup/${item.folder}/restore-env`, {}, TokenStorage.getAuthentication());
+    const result = await axios.post(`/api/v2/backup/${item.folder}/restore-env`, {});
     const data = result.data?.data ?? result.data;
     if (data?.restored) {
       toast.success(t('admin.backups.restoreEnvDone'));
@@ -74,11 +73,7 @@ async function triggerRestore(item) {
     if (!restores.value[item.folder]) {
       try {
         restores.value[item.folder] = t('admin.backups.restoring');
-        const result = await axios.post(
-          `/api/v2/backup/${item.folder}/restore?backupFirst=${withBackup}`,
-          {},
-          TokenStorage.getAuthentication(),
-        );
+        const result = await axios.post(`/api/v2/backup/${item.folder}/restore?backupFirst=${withBackup}`, {});
         toast.success(result.data.message);
         adminMulti.value.loadItems();
       } catch (err) {
