@@ -22,6 +22,7 @@ import Helpers from '@/lib/Helpers';
 import { editorStyle } from '@/config/editorStyle';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
+import { formPath } from '@/lib/formsPath';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -152,7 +153,7 @@ async function save() {
  * Opens its form with these values filled in (the form page reads ?storedJob=).
  */
 function openInForm() {
-  router.push({ path: '/form', query: { form: stored.value.form_name, storedJob: stored.value.id } });
+  router.push({ path: formPath(stored.value.form_name), query: { storedJob: stored.value.id } });
 }
 
 // Delete asks first

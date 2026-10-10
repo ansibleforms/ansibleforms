@@ -17,6 +17,8 @@
 /*                                                                */
 /******************************************************************/
 
+import { formPath } from '@/lib/formsPath';
+
 // how many results the dropdown shows, and how many texts under each one
 const MAX_RESULTS = 20;
 const MAX_SNIPPETS = 3;
@@ -60,9 +62,9 @@ function buildIndex(forms, pages) {
       kind: 'form',
       title: form.name,
       section: categories[0] || '',
-      // shown under the title, so readable rather than url-encoded ; `to` is what is opened
-      path: '/form?form=' + form.name,
-      to: { path: '/form', query: { form: form.name } },
+      // shown under the title ; `to` is what is opened : its address (lib/formsPath.js)
+      path: formPath(form.name),
+      to: formPath(form.name),
       icon: form.icon || 'file-lines',
       texts: [form.description, ...categories].filter((x) => typeof x === 'string' && x.trim()),
     });

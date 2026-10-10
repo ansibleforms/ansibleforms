@@ -1,11 +1,13 @@
 /******************************************************************/
 /*                                                                */
-/*  The forms list's addresses : every form at /forms/all, the    */
-/*  forms of a category at /forms/<category>, a sub category      */
-/*  under its parent - /forms/demo, /forms/expressions/test1. A   */
-/*  category is named in the address as a page would be : lower   */
-/*  case, words joined by a dash ('Network Ops' is network-ops),  */
-/*  and read back against the categories of the forms config.     */
+/*  The forms' addresses : every form at /forms/all, the forms of */
+/*  a category at /forms/<category>, a sub category under its     */
+/*  parent - /forms/demo, /forms/expressions/test1 - and a form   */
+/*  at /form/<form>, whatever category it is opened from (a form  */
+/*  may be in several, or in none). A name is written in the      */
+/*  address as a page's would be : lower case, words joined by a  */
+/*  dash ('Network Ops' is network-ops), and read back against    */
+/*  the names of the forms config.                                */
 /*                                                                */
 /******************************************************************/
 
@@ -13,16 +15,16 @@
 export const ALL_FORMS = 'all';
 
 /**
- * A category's name as it reads in an address.
+ * A category's or a form's name as it reads in an address.
  *
  * Args:
- *   name (string): the category's name ('Network Ops').
+ *   name (string): the name ('Network Ops').
  *
  * Returns:
  *   string: lower case, every run of other characters a dash, none at either end
  *     ('network-ops').
  */
-export function categorySlug(name) {
+export function slugOf(name) {
   return String(name)
     .toLowerCase()
     .normalize('NFD')
@@ -42,7 +44,7 @@ export function categorySlug(name) {
  */
 export function formsPath(category) {
   if (!category) return `/forms/${ALL_FORMS}`;
-  return '/forms/' + category.split('/').map(categorySlug).join('/');
+  return '/forms/' + category.split('/').map(slugOf).join('/');
 }
 
 /**
@@ -62,10 +64,40 @@ export function categoryFromPath(slugs, categories) {
   const names = [];
   let level = categories || [];
   for (const part of parts) {
-    const found = level.find((c) => categorySlug(c.name) === part);
+    const found = level.find((c) => slugOf(c.name) === part);
     if (!found) return null;
     names.push(found.name);
     level = found.items || [];
   }
   return names.join('/');
+}
+
+/**
+ * A form's address.
+ *
+ * Args:
+ *   name (string): the form's name ('Approval demo').
+ *
+ * Returns:
+ *   string: /form/<its name in the address> (/form/approval-demo).
+ */
+export function formPath(name) {
+  return `/form/${slugOf(name)}`;
+}
+
+/**
+ * The form an address names, by the names of the forms the user may open.
+ *
+ * Args:
+ *   slug (string): the address after /form/ ('approval-demo').
+ *   forms (Array): the forms, each { name } (the forms list, /api/v2/config/formlist).
+ *
+ * Returns:
+ *   string|null: the form's name ('Approval demo'), its exact name first when two forms
+ *     read the same in an address ('Test 1', 'test-1') ; null when no form has it.
+ */
+export function formFromPath(slug, forms) {
+  const named = (forms || []).filter((f) => slugOf(f.name) === slug);
+  if (!named.length) return null;
+  return (named.find((f) => f.name === slug) || named[0]).name;
 }

@@ -3,7 +3,7 @@ import Profile from '@/lib/Profile';
 import Form from '@/lib/Form';
 import Helpers from '@/lib/Helpers';
 import { useRoute, useRouter } from 'vue-router';
-import { formsPath, categoryFromPath } from '@/lib/formsPath';
+import { formsPath, categoryFromPath, formPath } from '@/lib/formsPath';
 
 const { t } = useI18n();
 
@@ -230,7 +230,7 @@ onMounted(async () => {
                 <TransitionGroup>
                   <div class="col-md-6 col-lg-4 col-xxl-3" v-for="form in getForms" :key="form.name">
                     <router-link
-                      :to="'/form?form=' + encodeURIComponent(form.name)"
+                      :to="formPath(form.name)"
                       class="card h-100 p-4 text-reset text-decoration-none"
                       :class="getFormClass(form)"
                     >
@@ -279,7 +279,7 @@ onMounted(async () => {
                       v-for="form in getForms"
                       :key="form.name"
                       style="cursor: pointer"
-                      @click="$router.push({ path: '/form', query: { form: form.name } })"
+                      @click="$router.push(formPath(form.name))"
                     >
                       <td v-if="listHasIcons" class="af-icon-cell text-center" :class="getFormClass(form)">
                         <img v-if="form.image" :src="form.image" alt="" class="af-list-image" />

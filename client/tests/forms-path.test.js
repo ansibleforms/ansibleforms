@@ -1,7 +1,7 @@
 // lib/formsPath.js : the forms list's addresses, /forms/all and /forms/<category>, and the
 // category an address names, read back against the forms config's categories.
 import { describe, it, expect } from 'vitest';
-import { categorySlug, formsPath, categoryFromPath } from '../src/lib/formsPath.js';
+import { slugOf, formsPath, categoryFromPath, formPath, formFromPath } from '../src/lib/formsPath.js';
 
 const categories = [
   { name: 'Default' },
@@ -11,9 +11,9 @@ const categories = [
 
 describe('the forms list addresses', () => {
   it('name a category in lower case, its words joined by a dash', () => {
-    expect(categorySlug('Network Ops')).toBe('network-ops');
-    expect(categorySlug('Café Débâcle')).toBe('cafe-debacle');
-    expect(categorySlug('  A/B & C  ')).toBe('a-b-c');
+    expect(slugOf('Network Ops')).toBe('network-ops');
+    expect(slugOf('Café Débâcle')).toBe('cafe-debacle');
+    expect(slugOf('  A/B & C  ')).toBe('a-b-c');
   });
 
   it('are /forms/all for every form, and a sub category under its parent', () => {
@@ -38,5 +38,14 @@ describe('the forms list addresses', () => {
     for (const path of ['Default', 'Expressions/Test1', 'Network Ops/Café Débâcle']) {
       expect(categoryFromPath(formsPath(path).slice('/forms/'.length), categories)).toBe(path);
     }
+  });
+
+  it('give a form one address, whatever its categories', () => {
+    expect(formPath('Approval demo')).toBe('/form/approval-demo');
+    const forms = [{ name: 'Approval demo' }, { name: 'Test 1' }, { name: 'test-1' }];
+    expect(formFromPath('approval-demo', forms)).toBe('Approval demo');
+    expect(formFromPath('missing', forms)).toBeNull();
+    // two forms that read the same : the one named exactly so
+    expect(formFromPath('test-1', forms)).toBe('test-1');
   });
 });

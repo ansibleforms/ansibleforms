@@ -3,7 +3,7 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router';
 import { JOBS_STATUS_SLUGS } from '@/lib/jobsPath';
-import { formsPath } from '@/lib/formsPath';
+import { formsPath, formPath } from '@/lib/formsPath';
 import BaseUrl from '@/lib/BaseUrl';
 
 // Pages load on first visit rather than up front: each becomes its own chunk, so the first
@@ -76,7 +76,16 @@ const routes = [
   { path: '/forms', redirect: '/forms/all' },
   { path: '/forms/:category(.*)', name: '/forms', component: index },
   { path: '/designer', name: '/designer', component: designer, meta: { permission: 'showDesigner' } },
-  { path: '/form', name: '/form', component: form },
+  // a form : /form/<its name>, whatever category it is opened from (lib/formsPath.js) ; an
+  // address from before, /form?form=<name>, leads there
+  {
+    path: '/form',
+    redirect: (to) => {
+      const { form: name, ...query } = to.query;
+      return name ? { path: formPath(decodeURIComponent(name)), query } : formsPath('');
+    },
+  },
+  { path: '/form/:slug', name: '/form', component: form },
   { path: '/login', name: '/login', component: login },
   { path: '/change-password', name: '/change-password', component: changePassword },
   { path: '/profile', name: '/profile', component: profile },

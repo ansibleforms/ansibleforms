@@ -15,6 +15,7 @@ import { useFollowOutput } from '@/composables/useFollowOutput';
 import BsColumnPicker from '@/components/BsColumnPicker.vue';
 import { headerWidth } from '@/lib/tableCells';
 import { jobsPath, statusFromSlug } from '@/lib/jobsPath';
+import { formPath } from '@/lib/formsPath';
 
 // INIT
 
@@ -903,7 +904,7 @@ async function editAndRelaunchJob(id) {
     const result = await axios.get(`/api/v2/job/${id}`);
     const formName = result.data.form;
     // Navigate to form with prefillJobId parameter
-    router.push({ name: '/form', query: { form: formName, prefillJobId: id } });
+    router.push({ path: formPath(formName), query: { prefillJobId: id } });
     showRelaunch.value = false;
   } catch (err) {
     toast.error('Failed to load job data: ' + err.toString());

@@ -45,6 +45,7 @@ import {
   outdentCategory,
   movedCategoryPaths,
 } from '@/config/categories';
+import { formPath } from '@/lib/formsPath';
 
 dayjs.extend(relativeTime);
 
@@ -2549,7 +2550,7 @@ function preparePreview() {
     JSON.stringify({ form: yaml, subforms, constants: constantsObj.value || {} }),
   );
   // the app can be hosted under a subpath (BASE_URL), like the router does
-  return `${BaseUrl}/form?form=${encodeURIComponent(currentFormName.value)}&preview=1`;
+  return `${BaseUrl}${formPath(currentFormName.value)}?preview=1`;
 }
 
 /**

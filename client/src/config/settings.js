@@ -7,6 +7,7 @@ import i18n from '@/plugins/i18n';
 import { describeCron } from '@/config/cronDescribe';
 import { cronValidationMessage } from './cron';
 import { headerWidth, PILL } from '@/lib/tableCells';
+import { formPath } from '@/lib/formsPath';
 
 // A cron field is validated with the SAME check the editor uses (config/cron.js), which
 // is the only thing that keeps the two from disagreeing.
@@ -1030,7 +1031,7 @@ export default function getSettings(t) {
           title: t('settings.storedJobs.openInForm'),
           color: 'test',
           dividerBefore: true,
-          to: (j) => ({ path: '/form', query: { form: j.form_name, storedJob: j.id } }),
+          to: (j) => ({ path: formPath(j.form_name), query: { storedJob: j.id } }),
         },
         { name: 'delete', icon: 'trash', title: t('settings.storedJobs.deleteJob'), color: 'delete' },
       ],
