@@ -1094,7 +1094,7 @@ onMounted(async () => {
       </template>
     </BsModal>
     <!-- Modal - approval -->
-    <BsModal v-if="reviewJob" size="lg" @close="reviewJob = null">
+    <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
       <template #title>
         <!-- the title and the whole job (extravars, output) a click away, on one centred line -->
         <span class="af-review-head">
@@ -1111,29 +1111,14 @@ onMounted(async () => {
         </span>
       </template>
       <template #default>
-        <div v-if="reviewDecided" class="alert alert-info mt-3 mb-0">{{ t('jobs.alreadyDecided') }}</div>
-        <!-- who asks for what : the facts of the job's page -->
-        <dl class="af-review-facts">
-          <div>
-            <dt><FaIcon icon="pen-to-square" />{{ t('jobs.form') }}</dt>
-            <dd>{{ reviewJob.form || reviewJob.target || '–' }}</dd>
-          </div>
-          <div>
-            <dt><FaIcon icon="user" />{{ t('jobs.launchedBy') }}</dt>
-            <dd>
-              {{ reviewJob.user || '–'
-              }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt><FaIcon icon="play" />{{ t('jobs.startTime') }}</dt>
-            <dd>{{ reviewJob.start ? formatTime(reviewJob.start) : '–' }}</dd>
-          </div>
-        </dl>
-        <!-- the form's own approval title and message, its $(...) placeholders filled in with the
-             job's values, html-encoded (replacePlaceholders) -->
-        <h4 v-if="reviewJob.title" class="af-review-title" v-html="reviewJob.title"></h4>
-        <div v-if="reviewJob.message" class="af-review-message" v-html="reviewJob.message"></div>
+        <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
+        <!-- what is asked, and only that : the form's own approval title and message, its $(...)
+             placeholders filled in with the job's values, html-encoded (replacePlaceholders). Who
+             asked and the rest are behind Open job details -->
+        <div>
+          <h4 v-if="reviewJob.title" class="af-review-title" v-html="reviewJob.title"></h4>
+          <div v-if="reviewJob.message" class="af-review-message" v-html="reviewJob.message"></div>
+        </div>
       </template>
       <!-- nothing focused, and no Enter : approving runs a playbook, it takes a click -->
       <template #footer>
@@ -1789,35 +1774,14 @@ onMounted(async () => {
     font-weight: 400;
   }
 }
-/* the approval review (openReview) : who asks for what on one row, the facts of the job's page,
-   then the form's own approval title and message */
-.af-review-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 1rem;
-  margin: 1rem 0;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--bs-border-color);
-  dt {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--bs-secondary-color);
-    svg {
-      width: 0.8rem;
-      opacity: 0.8;
-    }
-  }
-  dd {
-    margin: 0;
-    font-weight: 500;
-    overflow-wrap: anywhere;
-  }
+/* the approval review (openReview) : what is asked, nothing else */
+.af-review-title {
+  margin-bottom: 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.af-review-message {
+  overflow-wrap: anywhere;
 }
 .af-review-head {
   display: inline-flex;
@@ -1830,14 +1794,6 @@ onMounted(async () => {
   font-size: var(--bs-body-font-size);
   font-weight: var(--bs-body-font-weight);
   line-height: var(--bs-body-line-height);
-}
-.af-review-title {
-  margin-bottom: 0.5rem;
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-.af-review-message {
-  overflow-wrap: anywhere;
 }
 /* the kind of user, after the name : a quiet tag */
 .af-job-fact-note {
