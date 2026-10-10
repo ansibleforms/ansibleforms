@@ -422,7 +422,7 @@ const nodeShown = ref(null);
  *   node (object): the node clicked on the graph.
  */
 function openNodeOutput(node) {
-  const html = mainOutput.value?.nodeOutput(node.name);
+  const html = mainOutput.value?.nodeOutput(node);
   if (!html) {
     toast.info(t('jobs.noNodeOutput', { node: node.name }));
     return;

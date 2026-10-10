@@ -150,6 +150,12 @@ export async function check(awx) {
   } catch (err) {
     const status = err?.response?.status;
     if (status === 401 || status === 403) throw new Errors.BadRequestError(`AWX at ${awx.uri} refused the credentials (${status})`);
+    // an Ansible Automation Platform 2.5 gateway serves the controller under /api/controller/v2 :
+    // say so, rather than a bare 404
+    if (status === 404 && apiPrefix(awx)) {
+      const controller = await axios.get(`${awx.uri}/api/controller/v2/ping/`, { ...getAuthorization(awx), timeout: 10000 }).then(() => true, () => false);
+      if (controller) throw new Errors.BadRequestError(`${awx.uri} is an Ansible Automation Platform 2.5+ gateway : set the uri to ${String(awx.uri).replace(/\/+$/, "")}/api/controller/v2`);
+    }
     if (status) throw new Errors.BadRequestError(`AWX at ${awx.uri} answered ${status} : ${err.message}`);
     throw new Errors.BadRequestError(`AWX at ${awx.uri} is unreachable : ${err.code || err.message}`);
   }
@@ -165,12 +171,17 @@ Awx.abortJob = async function (awx, id, isWorkflow = false) {
   const axiosConfig = getAuthorization(awxConfig);
   // workflow jobs have their own cancel endpoint
   const jobsPath = isWorkflow ? "/workflow_jobs/" : "/jobs/";
+  const cancel = (path) => axios.post(awxConfig.uri + apiPrefix(awxConfig) + path + id + "/cancel/", {}, axiosConfig);
   try {
-    const axiosResult = await axios.post(
-      awxConfig.uri + apiPrefix(awxConfig) + jobsPath + id + "/cancel/",
-      {},
-      axiosConfig
-    );
+    let axiosResult;
+    try {
+      axiosResult = await cancel(jobsPath);
+    } catch (err) {
+      // a workflow cancelled before its first poll is not known as one yet (jobs.awx_workflow is
+      // written by the tracker) : the jobs endpoint does not know its id, the workflow one does
+      if (isWorkflow || err?.response?.status !== 404) throw err;
+      axiosResult = await cancel("/workflow_jobs/");
+    }
     const job = axiosResult.data;
     return job;
   } catch (error) {
@@ -320,7 +331,9 @@ Awx.launchTemplate = async function (
   if (executionEnvironment) {
     postdata.execution_environment = executionEnvironment.id;
   }
-  if (instanceGroups) {
+  // only when the form names some : an empty list overrode the template's own instance groups
+  // (prompt on launch) with none
+  if (instanceGroupIds.length) {
     postdata.instance_groups = instanceGroupIds.map((x) => x.id);
   }
   if (inventory) {
@@ -675,8 +688,9 @@ Awx.trackJob = async function (
   }
 };
 // format a workflow (node) status line ; Helpers.formatOutput() colors these by status
-function workflowStatusLine(prefix, name, status, banner = false) {
-  var line = `${prefix} [${name}] (${status})`;
+// a node's line carries its id (#42) : two nodes of one name (one template run twice) stay apart
+function workflowStatusLine(prefix, name, status, banner = false, id = null) {
+  var line = `${prefix} [${name}] (${status})${id ? ` #${id}` : ""}`;
   if (banner) line += " " + "*".repeat(Math.max(5, 79 - line.length));
   return line;
 }
@@ -777,7 +791,8 @@ Awx.trackWorkflowJob = async function (
           "WORKFLOW NODE",
           node.name,
           node.status,
-          true
+          true,
+          node.id
         );
         await Job.printJobOutput(
           `${banner}\n${nodeOutput}`.trim(),
@@ -824,7 +839,7 @@ Awx.trackWorkflowJob = async function (
         // print a summary of all the nodes with their status
         var summary = [workflowStatusLine("WORKFLOW", j.name, j.status, true)];
         nodes.forEach((node) => {
-          summary.push(workflowStatusLine("WORKFLOW NODE", node.name, node.status));
+          summary.push(workflowStatusLine("WORKFLOW NODE", node.name, node.status, false, node.id));
         });
         await Job.printJobOutput(summary.join("\n"), "stdout", jobid, ++counter);
         if (j.status === "successful") {
