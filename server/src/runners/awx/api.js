@@ -73,6 +73,32 @@ const AWX_TIMEOUT_MS = 60000;
 // polls in a row that may fail before the job is given up
 const AWX_MAX_RETRIES = 10;
 
+/**
+ * How long AWX may fail to answer before a followed job is given up : AWX_LOST_MINUTES (5) of
+ * failures in a row, with a backoff between the tries (1, 2, 4 ... 30 seconds). A network blip,
+ * an AWX restart or a busy controller is no reason to end a job that is running there.
+ *
+ * Returns:
+ *   {failed: function, ok: function}: failed() counts a failure and answers { giveUp, waitMs } ;
+ *     ok() starts the count again.
+ */
+export function contactTolerance(lostMinutes = Math.max(0, parseFloat(process.env.AWX_LOST_MINUTES ?? 5) || 0), now = Date.now) {
+  let since = null;
+  let failures = 0;
+  return {
+    failed() {
+      failures++;
+      if (since === null) since = now();
+      const giveUp = failures >= AWX_MAX_RETRIES && now() - since >= lostMinutes * 60 * 1000;
+      return { giveUp, waitMs: Math.min(30000, 1000 * 2 ** Math.min(failures - 1, 5)), failures };
+    },
+    ok() {
+      since = null;
+      failures = 0;
+    },
+  };
+}
+
 // Above STDOUT_MAX_BYTES_DISPLAY (1 MB by default), AWX refuses the display formats of a
 // job's stdout : it answers 200 with this placeholder instead of the log (issue #733). The
 // stdout is read in a download format, which has no such limit ; the placeholder is still
@@ -442,7 +468,7 @@ Awx.trackJob = async function (
   previousoutput,
   previousoutput2 = undefined,
   lastrun = false,
-  retryCount = 0
+  _retryCount = 0
 ) {
   // workflow jobs have no stdout of their own, we track them node by node
   if (job.type === "workflow_job" || job.related?.workflow_nodes) {
@@ -458,6 +484,8 @@ Awx.trackJob = async function (
   const axiosConfig = getAuthorization(awxConfig);
   // the stdout of this job was too large to display : told the user once already
   var toldTooLarge = false;
+  // AWX failing to answer, in a row (contactTolerance)
+  const contact = contactTolerance();
   for (;;) {
   logger.info(`searching for job with id ${job.id}`);
   try {
@@ -551,7 +579,7 @@ Awx.trackJob = async function (
               previousoutput = o;
             }
             lastrun = j.finished;
-            retryCount = 0;
+            contact.ok();
             continue;
           }
         } else {
@@ -610,39 +638,39 @@ Awx.trackJob = async function (
               previousoutput = o;
             }
             lastrun = j.finished;
-            retryCount = 0;
+            contact.ok();
             continue;
           }
         }
       } catch (err) {
         message = err.toString();
         logger.error(message);
-        retryCount++;
-        if (retryCount >= AWX_MAX_RETRIES) {
-          return lostContact(jobid, counter + 1, job, message);
-        } else {
-          logger.warning(`Retrying jobid ${jobid} [${retryCount}]`);
-          await delay(1000);
-          // retry the SAME poll : job, counter and both outputs stay as they were
-          continue;
-        }
+        const r = contact.failed();
+        if (r.giveUp) return lostContact(jobid, counter + 1, job, message);
+        logger.warning(`Retrying jobid ${jobid} [${r.failures}] in ${r.waitMs / 1000}s`);
+        await delay(r.waitMs);
+        // retry the SAME poll : job, counter and both outputs stay as they were
+        continue;
       }
     } else {
       message = `could not find job with id ${job.id}`;
       logger.error(message);
-      retryCount++;
-      if (retryCount >= AWX_MAX_RETRIES) {
-        return lostContact(jobid, counter + 1, job, message);
-      } else {
-        logger.warning(`Retrying jobid ${jobid} [${retryCount}]`);
-        await delay(1000);
-        // retry the SAME poll, as above
-        continue;
-      }
+      const r = contact.failed();
+      if (r.giveUp) return lostContact(jobid, counter + 1, job, message);
+      logger.warning(`Retrying jobid ${jobid} [${r.failures}] in ${r.waitMs / 1000}s`);
+      await delay(r.waitMs);
+      // retry the SAME poll, as above
+      continue;
     }
   } catch (e) {
+    // the status itself did not come : the same tolerance - one failed request used to end a
+    // job that was running fine in AWX
     logger.error("Failed to track job : ", e);
-    return lostContact(jobid, counter + 1, job, e.message);
+    const r = contact.failed();
+    if (r.giveUp) return lostContact(jobid, counter + 1, job, e.message);
+    logger.warning(`AWX did not answer for jobid ${jobid} [${r.failures}], retrying in ${r.waitMs / 1000}s`);
+    await delay(r.waitMs);
+    continue;
   }
   }
 };
@@ -696,11 +724,13 @@ Awx.trackWorkflowJob = async function (
   counter,
   printedNodeIds = [],
   previousWorkflowJson = "",
-  retryCount = 0
+  _retryCount = 0
 ) {
   const awxConfig = awx;
   if (!awxConfig) throw new Errors.ApiError("No AWX runner given");
   const axiosConfig = getAuthorization(awxConfig);
+  // AWX failing to answer, in a row (contactTolerance)
+  const contact = contactTolerance();
   for (;;) {
     try {
       // get workflow job info
@@ -832,16 +862,14 @@ Awx.trackWorkflowJob = async function (
       job = j;
       counter++;
       previousWorkflowJson = workflowJson;
-      retryCount = 0;
+      contact.ok();
     } catch (err) {
       const message = err.toString();
       logger.error(message);
-      retryCount++;
-      if (retryCount >= AWX_MAX_RETRIES) {
-        return lostContact(jobid, counter + 1, job, message);
-      }
-      logger.warning(`Retrying jobid ${jobid} [${retryCount}]`);
-      await delay(1000);
+      const r = contact.failed();
+      if (r.giveUp) return lostContact(jobid, counter + 1, job, message);
+      logger.warning(`Retrying jobid ${jobid} [${r.failures}] in ${r.waitMs / 1000}s`);
+      await delay(r.waitMs);
     }
   }
 };
