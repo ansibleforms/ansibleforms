@@ -273,211 +273,207 @@ onMounted(async () => {
     @save="saveSecret"
     @close="changingSecret = false"
   />
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="rocket"
-        :title="runner?.name || runnerId"
-        :crumbs="crumbs"
-        :description="t('settings.runners.description')"
-      >
-        <template v-if="runner" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !runner" class="empty-state">
-            <FaIcon icon="rocket" class="empty-state-icon" />
-            <span>{{ t('settings.runners.notFound', { id: runnerId }) }}</span>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="rocket"
+      :title="runner?.name || runnerId"
+      :crumbs="crumbs"
+      :description="t('settings.runners.description')"
+    >
+      <template v-if="runner" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !runner" class="empty-state">
+          <FaIcon icon="rocket" class="empty-state-icon" />
+          <span>{{ t('settings.runners.notFound', { id: runnerId }) }}</span>
+        </div>
+        <div v-else-if="runner && edit" class="af-runner-tab">
+          <!-- a runner of the config seed : read only here -->
+          <div v-if="managed" class="alert alert-secondary py-2">
+            <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
           </div>
-          <div v-else-if="runner && edit" class="af-runner-tab">
-            <!-- a runner of the config seed : read only here -->
-            <div v-if="managed" class="alert alert-secondary py-2">
-              <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
-            </div>
-            <fieldset :disabled="readOnly">
-              <!-- Runner : what it is called, whether it is the default, its registration -->
-              <template v-if="activeTab === 'runner'">
-                <BsInput
-                  class="af-runner-field"
-                  v-model="edit.name"
-                  icon="heading"
-                  :isFloating="false"
-                  :required="true"
-                  :help="t('settings.runners.nameHelp')"
-                  :label="t('settings.fields.name')"
-                />
-                <BsInput
-                  class="af-runner-field"
-                  v-model="edit.description"
-                  icon="info-circle"
-                  :isFloating="false"
-                  :label="t('settings.fields.description')"
-                />
-                <div class="mb-3">
-                  <label class="form-label fw-bold d-block" for="af-runner-default">{{
-                    t('settings.runners.isDefault')
-                  }}</label>
-                  <!-- turned on, saved at once ; turned off by making another the default -->
-                  <div class="form-check form-switch mb-0">
-                    <input
-                      id="af-runner-default"
-                      class="form-check-input"
-                      type="checkbox"
-                      role="switch"
-                      :checked="!!runner.is_default"
-                      :disabled="!!runner.is_default"
-                      @change="makeDefault()"
-                    />
-                  </div>
-                  <div class="form-text">{{ t('settings.runners.defaultHelp', { forms: defaultFor }) }}</div>
-                </div>
-                <div class="mb-3">
-                  <div class="form-label fw-bold">{{ t('settings.runners.state') }}</div>
-                  <span v-html="registrationPill(t, runner.state)"></span>
-                </div>
-              </template>
-              <!-- Type : RTE, AWX, AAP or Ascender, each its label and a few grey words -->
-              <template v-else-if="activeTab === 'type'">
-                <div v-for="kind in RUNNER_KINDS" :key="kind" class="form-check af-short-check">
+          <fieldset :disabled="readOnly">
+            <!-- Runner : what it is called, whether it is the default, its registration -->
+            <template v-if="activeTab === 'runner'">
+              <BsInput
+                class="af-runner-field"
+                v-model="edit.name"
+                icon="heading"
+                :isFloating="false"
+                :required="true"
+                :help="t('settings.runners.nameHelp')"
+                :label="t('settings.fields.name')"
+              />
+              <BsInput
+                class="af-runner-field"
+                v-model="edit.description"
+                icon="info-circle"
+                :isFloating="false"
+                :label="t('settings.fields.description')"
+              />
+              <div class="mb-3">
+                <label class="form-label fw-bold d-block" for="af-runner-default">{{
+                  t('settings.runners.isDefault')
+                }}</label>
+                <!-- turned on, saved at once ; turned off by making another the default -->
+                <div class="form-check form-switch mb-0">
                   <input
-                    :id="'af-kind-' + kind"
-                    v-model="edit.kind"
+                    id="af-runner-default"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :checked="!!runner.is_default"
+                    :disabled="!!runner.is_default"
+                    @change="makeDefault()"
+                  />
+                </div>
+                <div class="form-text">{{ t('settings.runners.defaultHelp', { forms: defaultFor }) }}</div>
+              </div>
+              <div class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.state') }}</div>
+                <span v-html="registrationPill(t, runner.state)"></span>
+              </div>
+            </template>
+            <!-- Type : RTE, AWX, AAP or Ascender, each its label and a few grey words -->
+            <template v-else-if="activeTab === 'type'">
+              <div v-for="kind in RUNNER_KINDS" :key="kind" class="form-check af-short-check">
+                <input
+                  :id="'af-kind-' + kind"
+                  v-model="edit.kind"
+                  class="form-check-input"
+                  type="radio"
+                  name="af-runner-kind"
+                  :value="kind"
+                />
+                <label class="form-check-label" :for="'af-kind-' + kind">
+                  <span class="af-short-label">{{ t(`settings.runners.type_${kind}`) }}</span>
+                  <span class="text-body-secondary small">{{ t(`settings.runners.type_${kind}Hint`) }}</span>
+                </label>
+              </div>
+            </template>
+            <!-- Connection : where it is, and how its certificate is checked -->
+            <template v-else-if="activeTab === 'connection'">
+              <BsInput
+                class="af-runner-field"
+                v-model="edit.uri"
+                icon="globe"
+                :placeholder="URI_EXAMPLE[edit.kind]"
+                :isFloating="false"
+                :required="true"
+                :help="t(`settings.runners.uriHelp_${edit.kind}`)"
+                :label="t('settings.fields.uri')"
+              />
+              <div class="form-check form-switch mb-3">
+                <input
+                  id="af-runner-skip"
+                  v-model="edit.skip_verify"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  @change="edit.skip_verify && (edit.custom_ca = false)"
+                />
+                <label class="form-check-label" for="af-runner-skip">{{ t('settings.runners.skipVerify') }}</label>
+              </div>
+              <div v-if="!edit.skip_verify" class="form-check form-switch mb-3">
+                <input
+                  id="af-runner-ca"
+                  v-model="edit.custom_ca"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                />
+                <label class="form-check-label" for="af-runner-ca">{{ t('settings.runners.customCa') }}</label>
+              </div>
+              <BsInput
+                v-if="!edit.skip_verify && edit.custom_ca"
+                class="af-runner-field"
+                v-model="edit.ca_bundle"
+                type="textarea"
+                icon="certificate"
+                placeholder="-----BEGIN CERTIFICATE-----"
+                :isFloating="false"
+                :help="t('settings.runners.caBundleHelp')"
+                :label="t('settings.fields.caBundle')"
+              />
+            </template>
+            <!-- Authentication : an RTE's token ; an AWX's token, or a user and password -->
+            <template v-else>
+              <template v-if="!isRte">
+                <div
+                  v-for="opt in [
+                    {
+                      value: false,
+                      label: t('settings.runners.authToken'),
+                      hint: t('settings.runners.authTokenHint'),
+                    },
+                    { value: true, label: t('settings.runners.authUser'), hint: t('settings.runners.authUserHint') },
+                  ]"
+                  :key="String(opt.value)"
+                  class="form-check af-short-check"
+                >
+                  <input
+                    :id="'af-auth-' + opt.value"
+                    v-model="edit.use_credentials"
                     class="form-check-input"
                     type="radio"
-                    name="af-runner-kind"
-                    :value="kind"
+                    name="af-runner-auth"
+                    :value="opt.value"
                   />
-                  <label class="form-check-label" :for="'af-kind-' + kind">
-                    <span class="af-short-label">{{ t(`settings.runners.type_${kind}`) }}</span>
-                    <span class="text-body-secondary small">{{ t(`settings.runners.type_${kind}Hint`) }}</span>
+                  <label class="form-check-label" :for="'af-auth-' + opt.value">
+                    <span class="af-short-label">{{ opt.label }}</span>
+                    <span class="text-body-secondary small">{{ opt.hint }}</span>
                   </label>
                 </div>
               </template>
-              <!-- Connection : where it is, and how its certificate is checked -->
-              <template v-else-if="activeTab === 'connection'">
-                <BsInput
-                  class="af-runner-field"
-                  v-model="edit.uri"
-                  icon="globe"
-                  :placeholder="URI_EXAMPLE[edit.kind]"
-                  :isFloating="false"
-                  :required="true"
-                  :help="t(`settings.runners.uriHelp_${edit.kind}`)"
-                  :label="t('settings.fields.uri')"
-                />
-                <div class="form-check form-switch mb-3">
-                  <input
-                    id="af-runner-skip"
-                    v-model="edit.skip_verify"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    @change="edit.skip_verify && (edit.custom_ca = false)"
-                  />
-                  <label class="form-check-label" for="af-runner-skip">{{ t('settings.runners.skipVerify') }}</label>
-                </div>
-                <div v-if="!edit.skip_verify" class="form-check form-switch mb-3">
-                  <input
-                    id="af-runner-ca"
-                    v-model="edit.custom_ca"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                  />
-                  <label class="form-check-label" for="af-runner-ca">{{ t('settings.runners.customCa') }}</label>
-                </div>
-                <BsInput
-                  v-if="!edit.skip_verify && edit.custom_ca"
-                  class="af-runner-field"
-                  v-model="edit.ca_bundle"
-                  type="textarea"
-                  icon="certificate"
-                  placeholder="-----BEGIN CERTIFICATE-----"
-                  :isFloating="false"
-                  :help="t('settings.runners.caBundleHelp')"
-                  :label="t('settings.fields.caBundle')"
-                />
-              </template>
-              <!-- Authentication : an RTE's token ; an AWX's token, or a user and password -->
-              <template v-else>
-                <template v-if="!isRte">
-                  <div
-                    v-for="opt in [
-                      {
-                        value: false,
-                        label: t('settings.runners.authToken'),
-                        hint: t('settings.runners.authTokenHint'),
-                      },
-                      { value: true, label: t('settings.runners.authUser'), hint: t('settings.runners.authUserHint') },
-                    ]"
-                    :key="String(opt.value)"
-                    class="form-check af-short-check"
-                  >
-                    <input
-                      :id="'af-auth-' + opt.value"
-                      v-model="edit.use_credentials"
-                      class="form-check-input"
-                      type="radio"
-                      name="af-runner-auth"
-                      :value="opt.value"
-                    />
-                    <label class="form-check-label" :for="'af-auth-' + opt.value">
-                      <span class="af-short-label">{{ opt.label }}</span>
-                      <span class="text-body-secondary small">{{ opt.hint }}</span>
-                    </label>
-                  </div>
-                </template>
-                <BsInput
-                  v-if="usesCredentials"
-                  class="af-runner-field mt-3"
-                  v-model="edit.username"
-                  icon="user"
-                  :isFloating="false"
-                  :label="t('settings.fields.username')"
-                />
-                <p class="form-text mb-0" :class="{ 'mt-3': !isRte && !usesCredentials }">
-                  {{
-                    usesCredentials
-                      ? t('settings.runners.passwordOnPage')
-                      : t(`settings.runners.tokenOnPage_${isRte ? 'rte' : 'api'}`)
-                  }}
-                </p>
-              </template>
-            </fieldset>
-          </div>
-        </template>
-        <template v-if="runner" #actions>
-          <BsButton icon="plug" cssClass="text-nowrap" :disabled="testing" @click="testConnection()">{{
-            t('settings.common.testConnection')
+              <BsInput
+                v-if="usesCredentials"
+                class="af-runner-field mt-3"
+                v-model="edit.username"
+                icon="user"
+                :isFloating="false"
+                :label="t('settings.fields.username')"
+              />
+              <p class="form-text mb-0" :class="{ 'mt-3': !isRte && !usesCredentials }">
+                {{
+                  usesCredentials
+                    ? t('settings.runners.passwordOnPage')
+                    : t(`settings.runners.tokenOnPage_${isRte ? 'rte' : 'api'}`)
+                }}
+              </p>
+            </template>
+          </fieldset>
+        </div>
+      </template>
+      <template v-if="runner" #actions>
+        <BsButton icon="plug" cssClass="text-nowrap" :disabled="testing" @click="testConnection()">{{
+          t('settings.common.testConnection')
+        }}</BsButton>
+        <template v-if="!readOnly">
+          <BsButton icon="lock" cssClass="text-nowrap" @click="changingSecret = true">{{
+            usesCredentials ? t('settings.common.changePassword') : t('settings.runners.changeToken')
           }}</BsButton>
-          <template v-if="!readOnly">
-            <BsButton icon="lock" cssClass="text-nowrap" @click="changingSecret = true">{{
-              usesCredentials ? t('settings.common.changePassword') : t('settings.runners.changeToken')
-            }}</BsButton>
-            <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-            <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-              t('settings.common.save')
-            }}</BsButton>
-          </template>
+          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+            t('settings.common.save')
+          }}</BsButton>
         </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a user's and a repository's */

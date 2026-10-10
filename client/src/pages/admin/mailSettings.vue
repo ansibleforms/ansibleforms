@@ -28,16 +28,12 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <div v-if="authenticated" class="flex-grow-1 d-flex flex-column">
-        <div v-if="seeded" class="alert alert-secondary py-2 mx-4 mt-3 mb-0">
-          <FaIcon icon="lock" class="me-2" />{{ t('settings.mailServers.fromSeed') }}
-        </div>
-        <AppAdminMulti :settings="settings.mailServers" :apiVersion="2" />
+  <AppSettingsPage>
+    <div v-if="authenticated" class="flex-grow-1 d-flex flex-column">
+      <div v-if="seeded" class="alert alert-secondary py-2 mx-4 mt-3 mb-0">
+        <FaIcon icon="lock" class="me-2" />{{ t('settings.mailServers.fromSeed') }}
       </div>
-    </main>
-  </div>
+      <AppAdminMulti :settings="settings.mailServers" :apiVersion="2" />
+    </div>
+  </AppSettingsPage>
 </template>

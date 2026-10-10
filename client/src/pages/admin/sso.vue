@@ -46,75 +46,71 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <!-- PROVIDERS : the providers' list, the page's tabs above it -->
-      <AppAdminMulti
-        v-if="authenticated && activeTab === 'providers'"
-        :apiVersion="2"
-        :settings="settings.oauth2_providers"
-        :crumbs="crumbs"
-      >
-        <template #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-      </AppAdminMulti>
-      <!-- GENERAL : single sign-on on or off, as LDAP's switch -->
-      <AppSettings
-        v-else-if="authenticated"
-        icon="right-to-bracket"
-        :title="t('sidebar.oauth2')"
-        :crumbs="crumbs"
-        :description="t('settings.oauth2.description')"
-      >
-        <template #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="envRestartPending.length" class="alert alert-warning py-2">
-            <FaIcon icon="triangle-exclamation" class="me-2" />
-            {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
-          </div>
-          <AppEnvField v-for="e in envItems" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
-        </template>
-        <template #actions>
-          <BsButton
-            icon="save"
-            :colorClass="envDirty ? 'primary' : 'secondary'"
-            :disabled="!envDirty"
-            @click="saveEnvironmentVariables()"
-            >{{ t('settings.common.save') }}</BsButton
-          >
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+  <AppSettingsPage>
+    <!-- PROVIDERS : the providers' list, the page's tabs above it -->
+    <AppAdminMulti
+      v-if="authenticated && activeTab === 'providers'"
+      :apiVersion="2"
+      :settings="settings.oauth2_providers"
+      :crumbs="crumbs"
+    >
+      <template #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+    </AppAdminMulti>
+    <!-- GENERAL : single sign-on on or off, as LDAP's switch -->
+    <AppSettings
+      v-else-if="authenticated"
+      icon="right-to-bracket"
+      :title="t('sidebar.oauth2')"
+      :crumbs="crumbs"
+      :description="t('settings.oauth2.description')"
+    >
+      <template #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="envRestartPending.length" class="alert alert-warning py-2">
+          <FaIcon icon="triangle-exclamation" class="me-2" />
+          {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
+        </div>
+        <AppEnvField v-for="e in envItems" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
+      </template>
+      <template #actions>
+        <BsButton
+          icon="save"
+          :colorClass="envDirty ? 'primary' : 'secondary'"
+          :disabled="!envDirty"
+          @click="saveEnvironmentVariables()"
+          >{{ t('settings.common.save') }}</BsButton
+        >
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <route lang="yaml">
 meta:

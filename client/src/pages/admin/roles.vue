@@ -254,96 +254,92 @@ onMounted(async () => {
       <BsButton icon="save" @click="createRole()">{{ t('settings.common.save') }}</BsButton>
     </template>
   </BsModal>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="user-shield"
-        :title="t('settings.settingsPage.roles')"
-        :description="t('settings.settingsPage.rolesDescription')"
-      >
-        <!-- the table's search and columns, on the title line as the other lists have them -->
-        <template #headerActions>
-          <div :id="toolsId" class="af-title-flow"></div>
-        </template>
-        <template #default>
-          <div>
-            <div v-if="loadError" class="alert alert-danger" role="alert">
-              {{ t('settings.common.failedToLoad') }} : {{ loadError }}
-            </div>
-            <div v-if="roles.length === 0" class="empty-state">
-              <FaIcon icon="user-shield" class="empty-state-icon" />
-              <span>{{ t('settings.settingsPage.noRoles') }}</span>
-            </div>
-            <!-- the app's data table : checkboxes, Select all, Delete, search and columns on the
-                 title line ; a row opens its role's page -->
-            <BsDataTable
-              v-else
-              framed
-              :toolbarTo="'#' + toolsId"
-              :pagerTo="'#' + pagerId"
-              :items="tableItems"
-              :columns="columns"
-              idKey="id"
-              :selectedIds="selectedIds"
-              :selectable="!readOnly"
-              :rowSelectable="(row) => !row.required"
-              linkColumn="name"
-              :rowClickSelects="false"
-              :name="t('settings.settingsPage.roles')"
-              :exportName="t('settings.settingsPage.roles')"
-              @update:selectedIds="selectedIds = $event"
-              @row-click="openRow"
-            >
-              <template v-if="!readOnly" #bulk-actions="{ count }">
-                <BsButton v-if="count" icon="trash" @click="bulkDelete">
-                  {{ t('common.delete') }} ({{ count }})
-                </BsButton>
-              </template>
-              <template #row-actions="{ item }">
-                <div class="dropdown">
-                  <a
-                    role="button"
-                    class="bs-dt-row-menu px-2"
-                    data-bs-toggle="dropdown"
-                    data-bs-popper-config='{"strategy":"fixed"}'
-                    @click.stop
-                  >
-                    <font-awesome-icon icon="ellipsis-vertical" />
-                  </a>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                      <a class="dropdown-item" href="#" @click.prevent="openRow(item)">
-                        <font-awesome-icon icon="pencil" class="me-2" />{{ t('settings.settingsPage.editRole') }}
-                      </a>
-                    </li>
-                    <li><hr class="dropdown-divider" /></li>
-                    <li>
-                      <a
-                        class="dropdown-item"
-                        :class="item.required || readOnly ? 'disabled text-muted' : 'text-danger'"
-                        href="#"
-                        @click.prevent="deleteOne(item)"
-                      >
-                        <font-awesome-icon icon="trash" class="me-2" />{{ t('common.delete') }}
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </template>
-            </BsDataTable>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="user-shield"
+      :title="t('settings.settingsPage.roles')"
+      :description="t('settings.settingsPage.rolesDescription')"
+    >
+      <!-- the table's search and columns, on the title line as the other lists have them -->
+      <template #headerActions>
+        <div :id="toolsId" class="af-title-flow"></div>
+      </template>
+      <template #default>
+        <div>
+          <div v-if="loadError" class="alert alert-danger" role="alert">
+            {{ t('settings.common.failedToLoad') }} : {{ loadError }}
           </div>
-        </template>
-        <!-- the table's pager, under the card -->
-        <template #footer><div :id="pagerId"></div></template>
-        <template #actions>
-          <BsButton icon="plus" :disabled="readOnly" @click="addRole()">{{
-            t('settings.settingsPage.addRole')
-          }}</BsButton>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+          <div v-if="roles.length === 0" class="empty-state">
+            <FaIcon icon="user-shield" class="empty-state-icon" />
+            <span>{{ t('settings.settingsPage.noRoles') }}</span>
+          </div>
+          <!-- the app's data table : checkboxes, Select all, Delete, search and columns on the
+             title line ; a row opens its role's page -->
+          <BsDataTable
+            v-else
+            framed
+            :toolbarTo="'#' + toolsId"
+            :pagerTo="'#' + pagerId"
+            :items="tableItems"
+            :columns="columns"
+            idKey="id"
+            :selectedIds="selectedIds"
+            :selectable="!readOnly"
+            :rowSelectable="(row) => !row.required"
+            linkColumn="name"
+            :rowClickSelects="false"
+            :name="t('settings.settingsPage.roles')"
+            :exportName="t('settings.settingsPage.roles')"
+            @update:selectedIds="selectedIds = $event"
+            @row-click="openRow"
+          >
+            <template v-if="!readOnly" #bulk-actions="{ count }">
+              <BsButton v-if="count" icon="trash" @click="bulkDelete">
+                {{ t('common.delete') }} ({{ count }})
+              </BsButton>
+            </template>
+            <template #row-actions="{ item }">
+              <div class="dropdown">
+                <a
+                  role="button"
+                  class="bs-dt-row-menu px-2"
+                  data-bs-toggle="dropdown"
+                  data-bs-popper-config='{"strategy":"fixed"}'
+                  @click.stop
+                >
+                  <font-awesome-icon icon="ellipsis-vertical" />
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <a class="dropdown-item" href="#" @click.prevent="openRow(item)">
+                      <font-awesome-icon icon="pencil" class="me-2" />{{ t('settings.settingsPage.editRole') }}
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      :class="item.required || readOnly ? 'disabled text-muted' : 'text-danger'"
+                      href="#"
+                      @click.prevent="deleteOne(item)"
+                    >
+                      <font-awesome-icon icon="trash" class="me-2" />{{ t('common.delete') }}
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </template>
+          </BsDataTable>
+        </div>
+      </template>
+      <!-- the table's pager, under the card -->
+      <template #footer><div :id="pagerId"></div></template>
+      <template #actions>
+        <BsButton icon="plus" :disabled="readOnly" @click="addRole()">{{
+          t('settings.settingsPage.addRole')
+        }}</BsButton>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>

@@ -16,11 +16,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppAdminMulti v-if="authenticated" :settings="settings.users" :apiVersion="2" />
-    </main>
-  </div>
+  <AppSettingsPage>
+    <AppAdminMulti v-if="authenticated" :settings="settings.users" :apiVersion="2" />
+  </AppSettingsPage>
 </template>

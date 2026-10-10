@@ -52,32 +52,28 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppAdminSingle
-        v-if="authenticated"
-        apiVersion="2"
-        :settings="settings.chat"
-        :tabs="tabs"
-        :locked="!chatOn"
-        :extraDirty="envDirty"
-        @test="testProvider"
-        @saved="State.loadChatConfig()"
-        @saveExtra="saveSwitch()"
-      >
-        <!-- General : the switch first, as on the MCP page ; the settings wait for it -->
-        <template #tab-top-general>
-          <div v-if="envRestartPending.length" class="alert alert-warning py-2">
-            <FaIcon icon="triangle-exclamation" class="me-2" />
-            {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
-          </div>
-          <AppEnvField v-for="e in envItems" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
-        </template>
-      </AppAdminSingle>
-    </main>
-  </div>
+  <AppSettingsPage>
+    <AppAdminSingle
+      v-if="authenticated"
+      apiVersion="2"
+      :settings="settings.chat"
+      :tabs="tabs"
+      :locked="!chatOn"
+      :extraDirty="envDirty"
+      @test="testProvider"
+      @saved="State.loadChatConfig()"
+      @saveExtra="saveSwitch()"
+    >
+      <!-- General : the switch first, as on the MCP page ; the settings wait for it -->
+      <template #tab-top-general>
+        <div v-if="envRestartPending.length" class="alert alert-warning py-2">
+          <FaIcon icon="triangle-exclamation" class="me-2" />
+          {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
+        </div>
+        <AppEnvField v-for="e in envItems" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
+      </template>
+    </AppAdminSingle>
+  </AppSettingsPage>
 </template>
 <route lang="yaml">
 meta:

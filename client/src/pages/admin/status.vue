@@ -100,143 +100,131 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="heart-pulse"
-        :title="t('health.title')"
-        :description="t('health.description')"
-      >
-        <template #tabs>
-          <!-- same markup as admin/settings.vue : AppSettings adds tab-card-flush-card to
-               the card when this slot is filled, so the card joins the tabs -->
-          <ul class="nav nav-tabs mb-0">
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'checks' }"
-                href="#"
-                @click.prevent="activeTab = 'checks'"
-              >
-                <FaIcon icon="heart-pulse" class="me-1" />
-                {{ t('health.sectionChecks') }}
-                <span
-                  v-if="attention"
-                  class="badge ms-1"
-                  :class="summary.error ? 'text-bg-danger' : 'text-bg-warning'"
-                  >{{ attention }}</span
-                >
-              </a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'info' }"
-                href="#"
-                @click.prevent="activeTab = 'info'"
-              >
-                <FaIcon icon="circle-info" class="me-1" />
-                {{ t('health.sectionInfo') }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #feedback>
-          <span v-if="overall" class="badge ms-3" :class="badge[overall]">{{ t(statusText[overall]) }}</span>
-          <small v-if="checkedAt" class="text-muted ms-3">{{ t('health.checkedAt', { time: checkedAt }) }}</small>
-        </template>
-        <template #default>
-          <div v-if="loading && !result" class="spinner-border" role="status">
-            <span class="visually-hidden">{{ t('settings.common.loading') }}</span>
-          </div>
-          <table v-if="result && activeTab === 'checks'" class="table table-sm align-middle mb-0 health-table">
-            <tbody>
-              <template v-for="c in result.checks" :key="c.key">
-                <tr>
-                  <td style="width: 2.5rem">
-                    <span class="badge rounded-pill" :class="indicatorClass(c.status)">&nbsp;</span>
-                  </td>
-                  <td class="fw-bold" style="width: 16rem">{{ checkLabel(c.key) }}</td>
-                  <td>
-                    {{ displayValue(c.value) }}
-                    <!-- a percentage reads instantly as a bar and needs interpreting as text -->
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="heart-pulse"
+      :title="t('health.title')"
+      :description="t('health.description')"
+    >
+      <template #tabs>
+        <!-- same markup as admin/settings.vue : AppSettings adds tab-card-flush-card to
+           the card when this slot is filled, so the card joins the tabs -->
+        <ul class="nav nav-tabs mb-0">
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === 'checks' }"
+              href="#"
+              @click.prevent="activeTab = 'checks'"
+            >
+              <FaIcon icon="heart-pulse" class="me-1" />
+              {{ t('health.sectionChecks') }}
+              <span v-if="attention" class="badge ms-1" :class="summary.error ? 'text-bg-danger' : 'text-bg-warning'">{{
+                attention
+              }}</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'info' }" href="#" @click.prevent="activeTab = 'info'">
+              <FaIcon icon="circle-info" class="me-1" />
+              {{ t('health.sectionInfo') }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #feedback>
+        <span v-if="overall" class="badge ms-3" :class="badge[overall]">{{ t(statusText[overall]) }}</span>
+        <small v-if="checkedAt" class="text-muted ms-3">{{ t('health.checkedAt', { time: checkedAt }) }}</small>
+      </template>
+      <template #default>
+        <div v-if="loading && !result" class="spinner-border" role="status">
+          <span class="visually-hidden">{{ t('settings.common.loading') }}</span>
+        </div>
+        <table v-if="result && activeTab === 'checks'" class="table table-sm align-middle mb-0 health-table">
+          <tbody>
+            <template v-for="c in result.checks" :key="c.key">
+              <tr>
+                <td style="width: 2.5rem">
+                  <span class="badge rounded-pill" :class="indicatorClass(c.status)">&nbsp;</span>
+                </td>
+                <td class="fw-bold" style="width: 16rem">{{ checkLabel(c.key) }}</td>
+                <td>
+                  {{ displayValue(c.value) }}
+                  <!-- a percentage reads instantly as a bar and needs interpreting as text -->
+                  <div
+                    v-if="typeof c.detail?.usedPercent === 'number'"
+                    class="progress health-bar mt-1"
+                    role="presentation"
+                  >
                     <div
-                      v-if="typeof c.detail?.usedPercent === 'number'"
-                      class="progress health-bar mt-1"
-                      role="presentation"
-                    >
-                      <div
-                        class="progress-bar"
-                        :class="barClass(c.status)"
-                        :style="{ width: c.detail.usedPercent + '%' }"
-                      ></div>
-                    </div>
-                  </td>
+                      class="progress-bar"
+                      :class="barClass(c.status)"
+                      :style="{ width: c.detail.usedPercent + '%' }"
+                    ></div>
+                  </div>
+                </td>
+                <td class="text-end health-action" style="width: 3rem">
+                  <BsButton
+                    v-if="c.detail"
+                    :isIconButton="true"
+                    colorClass="secondary"
+                    cssClass="btn-sm"
+                    :icon="expanded[c.key] ? 'chevron-up' : 'chevron-down'"
+                    @click="toggle(c.key)"
+                  />
+                </td>
+              </tr>
+              <!-- the detail row has to sit inside this same v-for, or every
+                 expanded panel renders at the bottom of the table instead of
+                 under the check it belongs to -->
+              <tr v-if="expanded[c.key] && c.detail">
+                <td colspan="4" class="bg-body-tertiary">
+                  <pre class="mb-0 font-monospace fs-6 health-detail">{{ detailText(c.detail) }}</pre>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- Facts, not verdicts. Deliberately WITHOUT a status dot : a green dot beside
+           'MySQL 8.4.9' or 'file/repository' claims something was tested when nothing
+           was. These are things you look up. -->
+        <template v-if="result && activeTab === 'info' && info.length">
+          <table class="table table-sm align-middle mb-0 health-table">
+            <tbody>
+              <template v-for="i in info" :key="i.key">
+                <tr>
+                  <td class="fw-bold" style="width: 18.5rem">{{ infoLabel(i.key) }}</td>
+                  <td>{{ displayValue(i.value) }}</td>
                   <td class="text-end health-action" style="width: 3rem">
                     <BsButton
-                      v-if="c.detail"
+                      v-if="i.detail"
                       :isIconButton="true"
                       colorClass="secondary"
                       cssClass="btn-sm"
-                      :icon="expanded[c.key] ? 'chevron-up' : 'chevron-down'"
-                      @click="toggle(c.key)"
+                      :icon="expanded['i-' + i.key] ? 'chevron-up' : 'chevron-down'"
+                      @click="toggle('i-' + i.key)"
                     />
                   </td>
                 </tr>
-                <!-- the detail row has to sit inside this same v-for, or every
-                     expanded panel renders at the bottom of the table instead of
-                     under the check it belongs to -->
-                <tr v-if="expanded[c.key] && c.detail">
-                  <td colspan="4" class="bg-body-tertiary">
-                    <pre class="mb-0 font-monospace fs-6 health-detail">{{ detailText(c.detail) }}</pre>
+                <tr v-if="expanded['i-' + i.key] && i.detail">
+                  <td colspan="3" class="bg-body-tertiary">
+                    <pre class="mb-0 font-monospace fs-6 health-detail">{{ detailText(i.detail) }}</pre>
                   </td>
                 </tr>
               </template>
             </tbody>
           </table>
-
-          <!-- Facts, not verdicts. Deliberately WITHOUT a status dot : a green dot beside
-               'MySQL 8.4.9' or 'file/repository' claims something was tested when nothing
-               was. These are things you look up. -->
-          <template v-if="result && activeTab === 'info' && info.length">
-            <table class="table table-sm align-middle mb-0 health-table">
-              <tbody>
-                <template v-for="i in info" :key="i.key">
-                  <tr>
-                    <td class="fw-bold" style="width: 18.5rem">{{ infoLabel(i.key) }}</td>
-                    <td>{{ displayValue(i.value) }}</td>
-                    <td class="text-end health-action" style="width: 3rem">
-                      <BsButton
-                        v-if="i.detail"
-                        :isIconButton="true"
-                        colorClass="secondary"
-                        cssClass="btn-sm"
-                        :icon="expanded['i-' + i.key] ? 'chevron-up' : 'chevron-down'"
-                        @click="toggle('i-' + i.key)"
-                      />
-                    </td>
-                  </tr>
-                  <tr v-if="expanded['i-' + i.key] && i.detail">
-                    <td colspan="3" class="bg-body-tertiary">
-                      <pre class="mb-0 font-monospace fs-6 health-detail">{{ detailText(i.detail) }}</pre>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </template>
         </template>
-        <template #actions>
-          <BsButton cssClass="ms-3" :icon="loading ? 'spinner' : 'refresh'" @click="load()">{{
-            t('health.refresh')
-          }}</BsButton>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+      <template #actions>
+        <BsButton cssClass="ms-3" :icon="loading ? 'spinner' : 'refresh'" @click="load()">{{
+          t('health.refresh')
+        }}</BsButton>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 
 <style scoped>

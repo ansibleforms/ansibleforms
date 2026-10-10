@@ -41,19 +41,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppAdminMulti
-        v-if="authenticated"
-        ref="adminMulti"
-        :settings="settings.repositories"
-        :apiVersion="2"
-        @trigger="triggerClone"
-        @reset="triggerReset"
-        @sync="triggerSync"
-      />
-    </main>
-  </div>
+  <AppSettingsPage>
+    <AppAdminMulti
+      v-if="authenticated"
+      ref="adminMulti"
+      :settings="settings.repositories"
+      :apiVersion="2"
+      @trigger="triggerClone"
+      @reset="triggerReset"
+      @sync="triggerSync"
+    />
+  </AppSettingsPage>
 </template>

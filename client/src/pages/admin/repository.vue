@@ -322,201 +322,197 @@ onMounted(async () => {
     @save="savePassword"
     @close="changingPassword = false"
   />
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="fab,git"
-        :title="repo?.name || repoName"
-        :crumbs="crumbs"
-        :description="t('settings.repositories.description')"
-      >
-        <template v-if="repo" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !repo" class="empty-state">
-            <FaIcon icon="fab,git" class="empty-state-icon" />
-            <span>{{ t('settings.repositories.notFound', { name: repoName }) }}</span>
-          </div>
-          <div v-else-if="repo && edit" class="af-repo-tab">
-            <!-- Repository : what it is, and where it stands -->
-            <template v-if="activeTab === 'repository'">
-              <!-- where it stands : its status and head, each a field of the column, read only -->
-              <div class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.fields.status') }}</div>
-                <span v-html="statusPill(t, repo.status)"></span>
-              </div>
-              <div class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.fields.head') }}</div>
-                <span v-if="repo.head" class="font-monospace af-repo-head">{{ repo.head }}</span>
-                <span v-else>–</span>
-              </div>
-              <BsInput
-                class="af-repo-field"
-                v-model="edit.name"
-                icon="heading"
-                :isFloating="false"
-                :required="true"
-                :help="t('settings.repositories.helpName')"
-                :label="t('settings.fields.name')"
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="fab,git"
+      :title="repo?.name || repoName"
+      :crumbs="crumbs"
+      :description="t('settings.repositories.description')"
+    >
+      <template v-if="repo" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !repo" class="empty-state">
+          <FaIcon icon="fab,git" class="empty-state-icon" />
+          <span>{{ t('settings.repositories.notFound', { name: repoName }) }}</span>
+        </div>
+        <div v-else-if="repo && edit" class="af-repo-tab">
+          <!-- Repository : what it is, and where it stands -->
+          <template v-if="activeTab === 'repository'">
+            <!-- where it stands : its status and head, each a field of the column, read only -->
+            <div class="mb-3">
+              <div class="form-label fw-bold">{{ t('settings.fields.status') }}</div>
+              <span v-html="statusPill(t, repo.status)"></span>
+            </div>
+            <div class="mb-3">
+              <div class="form-label fw-bold">{{ t('settings.fields.head') }}</div>
+              <span v-if="repo.head" class="font-monospace af-repo-head">{{ repo.head }}</span>
+              <span v-else>–</span>
+            </div>
+            <BsInput
+              class="af-repo-field"
+              v-model="edit.name"
+              icon="heading"
+              :isFloating="false"
+              :required="true"
+              :help="t('settings.repositories.helpName')"
+              :label="t('settings.fields.name')"
+            />
+            <BsInput
+              class="af-repo-field"
+              v-model="edit.branch"
+              icon="code-branch"
+              placeholder="main"
+              :isFloating="false"
+              :label="t('settings.fields.branch')"
+            />
+            <BsInput
+              class="af-repo-field"
+              v-model="edit.uri"
+              icon="fab,git"
+              placeholder="https://github.com/account/repo.git"
+              :isFloating="false"
+              :required="true"
+              :help="t('settings.repositories.helpUri')"
+              :label="t('settings.fields.uri')"
+            />
+            <BsInput
+              class="af-repo-field"
+              v-model="edit.description"
+              icon="info-circle"
+              :isFloating="false"
+              :required="true"
+              :label="t('settings.fields.description')"
+            />
+          </template>
+          <!-- Credentials : the user and password git uses -->
+          <template v-else-if="activeTab === 'access'">
+            <BsInput
+              class="af-repo-field"
+              v-model="edit.credential"
+              type="select"
+              icon="key"
+              :isFloating="false"
+              :values="credentials"
+              valueKey="name"
+              labelKey="name"
+              :help="t('settings.repositories.helpCredential')"
+              :label="t('settings.repositories.credential')"
+            />
+            <p v-if="repo.user && !edit.credential" class="form-text mb-0">
+              {{ t('settings.repositories.ownUser', { user: repo.user }) }}
+            </p>
+          </template>
+          <!-- Usage : what the app reads from it ; a one-only usage another repository has is
+             greyed, who has it in the tooltip -->
+          <template v-else-if="activeTab === 'usage'">
+            <div
+              v-for="usage in USAGES"
+              :key="usage.key"
+              class="form-check af-short-check"
+              :class="{ 'af-taken': takenBy(usage) }"
+              :title="takenBy(usage) ? t('settings.common.takenBy', { name: takenBy(usage) }) : null"
+            >
+              <input
+                :id="'af-usage-' + usage.key"
+                v-model="edit[usage.key]"
+                class="form-check-input"
+                type="checkbox"
+                :disabled="!!takenBy(usage)"
               />
-              <BsInput
-                class="af-repo-field"
-                v-model="edit.branch"
-                icon="code-branch"
-                placeholder="main"
-                :isFloating="false"
-                :label="t('settings.fields.branch')"
+              <label class="form-check-label" :for="'af-usage-' + usage.key">
+                <span class="af-short-label">{{ usage.label }}</span>
+                <span class="text-body-secondary small">{{ usage.hint }}</span>
+              </label>
+            </div>
+          </template>
+          <!-- Schedule : the scheduled pull and its schedule, the clone on app start -->
+          <template v-else-if="activeTab === 'schedule'">
+            <div class="form-check form-switch mb-3">
+              <input
+                id="af-repo-scheduled"
+                v-model="edit.pull_scheduled"
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
               />
-              <BsInput
-                class="af-repo-field"
-                v-model="edit.uri"
-                icon="fab,git"
-                placeholder="https://github.com/account/repo.git"
-                :isFloating="false"
-                :required="true"
-                :help="t('settings.repositories.helpUri')"
-                :label="t('settings.fields.uri')"
+              <label class="form-check-label fw-bold" for="af-repo-scheduled">{{
+                t('settings.repositories.scheduledPull')
+              }}</label>
+              <div class="form-text mt-1">{{ t('settings.repositories.helpScheduledPull') }}</div>
+            </div>
+            <div v-if="edit.pull_scheduled" class="mb-3 af-repo-cron">
+              <BsCron v-model="edit.cron" icon="stopwatch" :hasError="!!cronError" />
+              <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input
+                id="af-repo-rebase"
+                v-model="edit.rebase_on_start"
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
               />
-              <BsInput
-                class="af-repo-field"
-                v-model="edit.description"
-                icon="info-circle"
-                :isFloating="false"
-                :required="true"
-                :label="t('settings.fields.description')"
-              />
-            </template>
-            <!-- Credentials : the user and password git uses -->
-            <template v-else-if="activeTab === 'access'">
-              <BsInput
-                class="af-repo-field"
-                v-model="edit.credential"
-                type="select"
-                icon="key"
-                :isFloating="false"
-                :values="credentials"
-                valueKey="name"
-                labelKey="name"
-                :help="t('settings.repositories.helpCredential')"
-                :label="t('settings.repositories.credential')"
-              />
-              <p v-if="repo.user && !edit.credential" class="form-text mb-0">
-                {{ t('settings.repositories.ownUser', { user: repo.user }) }}
-              </p>
-            </template>
-            <!-- Usage : what the app reads from it ; a one-only usage another repository has is
-                 greyed, who has it in the tooltip -->
-            <template v-else-if="activeTab === 'usage'">
-              <div
-                v-for="usage in USAGES"
-                :key="usage.key"
-                class="form-check af-short-check"
-                :class="{ 'af-taken': takenBy(usage) }"
-                :title="takenBy(usage) ? t('settings.common.takenBy', { name: takenBy(usage) }) : null"
-              >
-                <input
-                  :id="'af-usage-' + usage.key"
-                  v-model="edit[usage.key]"
-                  class="form-check-input"
-                  type="checkbox"
-                  :disabled="!!takenBy(usage)"
-                />
-                <label class="form-check-label" :for="'af-usage-' + usage.key">
-                  <span class="af-short-label">{{ usage.label }}</span>
-                  <span class="text-body-secondary small">{{ usage.hint }}</span>
-                </label>
+              <label class="form-check-label fw-bold" for="af-repo-rebase">{{
+                t('settings.repositories.cloneOnStart')
+              }}</label>
+              <div class="form-text mt-1">{{ t('settings.repositories.helpCloneOnStart') }}</div>
+            </div>
+          </template>
+          <!-- Output : what git said the last time -->
+          <template v-else>
+            <!-- as the server log shows its lines : each with its number in a grey column -->
+            <div v-if="repo.output" class="af-repo-output font-monospace" tabindex="0" role="region">
+              <div v-for="(line, i) in outputLines" :key="i" class="af-repo-output-line">
+                <span class="af-line-no af-repo-line-no">{{ i + 1 }}</span
+                ><span class="af-repo-line">{{ line }}</span>
               </div>
-            </template>
-            <!-- Schedule : the scheduled pull and its schedule, the clone on app start -->
-            <template v-else-if="activeTab === 'schedule'">
-              <div class="form-check form-switch mb-3">
-                <input
-                  id="af-repo-scheduled"
-                  v-model="edit.pull_scheduled"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                />
-                <label class="form-check-label fw-bold" for="af-repo-scheduled">{{
-                  t('settings.repositories.scheduledPull')
-                }}</label>
-                <div class="form-text mt-1">{{ t('settings.repositories.helpScheduledPull') }}</div>
-              </div>
-              <div v-if="edit.pull_scheduled" class="mb-3 af-repo-cron">
-                <BsCron v-model="edit.cron" icon="stopwatch" :hasError="!!cronError" />
-                <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
-              </div>
-              <div class="form-check form-switch mb-0">
-                <input
-                  id="af-repo-rebase"
-                  v-model="edit.rebase_on_start"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                />
-                <label class="form-check-label fw-bold" for="af-repo-rebase">{{
-                  t('settings.repositories.cloneOnStart')
-                }}</label>
-                <div class="form-text mt-1">{{ t('settings.repositories.helpCloneOnStart') }}</div>
-              </div>
-            </template>
-            <!-- Output : what git said the last time -->
-            <template v-else>
-              <!-- as the server log shows its lines : each with its number in a grey column -->
-              <div v-if="repo.output" class="af-repo-output font-monospace" tabindex="0" role="region">
-                <div v-for="(line, i) in outputLines" :key="i" class="af-repo-output-line">
-                  <span class="af-line-no af-repo-line-no">{{ i + 1 }}</span
-                  ><span class="af-repo-line">{{ line }}</span>
-                </div>
-              </div>
-              <p v-else class="text-body-secondary mb-0">{{ t('settings.repositories.noOutput') }}</p>
-            </template>
-          </div>
-        </template>
-        <template v-if="repo" #actions>
-          <!-- Pull, Push and Reset : git on the repository, as the designer's repository page -->
-          <BsButton icon="download" cssClass="text-nowrap" :disabled="running" @click="run('clone')">{{
-            t('settings.repositories.pull')
-          }}</BsButton>
-          <!-- Push : only a repository the app writes to (forms, settings), else greyed, why in the tooltip -->
-          <BsButton
-            icon="upload"
-            cssClass="text-nowrap"
-            :disabled="running || !canPush"
-            :title="canPush ? null : t('settings.repositories.pushHint')"
-            @click="run('sync')"
-            >{{ t('settings.repositories.push') }}</BsButton
-          >
-          <BsButton icon="redo" cssClass="text-nowrap" :disabled="running" @click="run('reset')">{{
-            t('settings.repositories.reset')
-          }}</BsButton>
-          <BsButton v-if="repo.user && !repo.credential" icon="lock" @click="changingPassword = true">{{
-            t('settings.common.changePassword')
-          }}</BsButton>
-          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-            t('settings.common.save')
-          }}</BsButton>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+            </div>
+            <p v-else class="text-body-secondary mb-0">{{ t('settings.repositories.noOutput') }}</p>
+          </template>
+        </div>
+      </template>
+      <template v-if="repo" #actions>
+        <!-- Pull, Push and Reset : git on the repository, as the designer's repository page -->
+        <BsButton icon="download" cssClass="text-nowrap" :disabled="running" @click="run('clone')">{{
+          t('settings.repositories.pull')
+        }}</BsButton>
+        <!-- Push : only a repository the app writes to (forms, settings), else greyed, why in the tooltip -->
+        <BsButton
+          icon="upload"
+          cssClass="text-nowrap"
+          :disabled="running || !canPush"
+          :title="canPush ? null : t('settings.repositories.pushHint')"
+          @click="run('sync')"
+          >{{ t('settings.repositories.push') }}</BsButton
+        >
+        <BsButton icon="redo" cssClass="text-nowrap" :disabled="running" @click="run('reset')">{{
+          t('settings.repositories.reset')
+        }}</BsButton>
+        <BsButton v-if="repo.user && !repo.credential" icon="lock" @click="changingPassword = true">{{
+          t('settings.common.changePassword')
+        }}</BsButton>
+        <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+        <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+          t('settings.common.save')
+        }}</BsButton>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a user's and an SSO provider's */

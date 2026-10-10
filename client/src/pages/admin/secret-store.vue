@@ -273,248 +273,242 @@ onMounted(async () => {
       @created="onCredentialCreated"
     />
   </div>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="vault"
-        :title="store?.name || storeId"
-        :crumbs="crumbs"
-        :description="t('settings.secretStores.description')"
-      >
-        <template v-if="store" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="vault"
+      :title="store?.name || storeId"
+      :crumbs="crumbs"
+      :description="t('settings.secretStores.description')"
+    >
+      <template v-if="store" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !store" class="empty-state">
+          <FaIcon icon="vault" class="empty-state-icon" />
+          <span>{{ t('settings.secretStores.notFound', { id: storeId }) }}</span>
+        </div>
+        <div v-else-if="store && edit" class="af-store-tab">
+          <!-- a store of the config seed : read only here -->
+          <div v-if="managed" class="alert alert-secondary py-2">
+            <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
+          </div>
+          <fieldset :disabled="managed">
+            <!-- Store : what it is called -->
+            <template v-if="activeTab === 'store'">
+              <BsInput
+                class="af-store-field"
+                v-model="edit.name"
+                icon="heading"
+                :isFloating="false"
+                :required="true"
+                :help="t('settings.secretStores.nameHelp')"
+                :label="t('settings.fields.name')"
+              />
+              <BsInput
+                class="af-store-field"
+                v-model="edit.description"
+                icon="info-circle"
+                :isFloating="false"
+                :label="t('settings.fields.description')"
+              />
+            </template>
+            <!-- Type : CyberArk CCP or HashiCorp Vault, a Vault's Enterprise switch under it -->
+            <template v-else-if="activeTab === 'type'">
+              <div v-for="type in TYPES" :key="type.value" class="form-check af-short-check">
+                <input
+                  :id="'af-type-' + type.value"
+                  v-model="edit.type"
+                  class="form-check-input"
+                  type="radio"
+                  name="af-store-type"
+                  :value="type.value"
+                />
+                <label class="form-check-label" :for="'af-type-' + type.value">
+                  <span class="af-short-label">{{ type.short || type.label }}</span>
+                  <span class="text-body-secondary small">{{ t(`settings.secretStores.type_${type.value}Hint`) }}</span>
+                </label>
+              </div>
+              <div v-if="isVault" class="form-check form-switch mt-3">
+                <input
+                  id="af-store-enterprise"
+                  v-model="edit.vault_enterprise"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                />
+                <label class="form-check-label" for="af-store-enterprise">{{
+                  t('settings.secretStores.enterprise')
+                }}</label>
+                <div class="form-text mt-1">{{ t('settings.secretStores.enterpriseHelp') }}</div>
+              </div>
+            </template>
+            <!-- Connection : where it is, and how its certificate is checked -->
+            <template v-else-if="activeTab === 'connection'">
+              <BsInput
+                class="af-store-field"
+                v-model="edit.url"
+                icon="globe"
+                :placeholder="isVault ? 'https://vault.example.com:8200' : 'https://ccp.example.com'"
+                :isFloating="false"
+                :required="true"
+                :label="t('settings.fields.uri')"
+              />
+              <div class="form-check form-switch mb-3">
+                <input
+                  id="af-store-skip"
+                  v-model="edit.skip_verify"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  @change="edit.skip_verify && (edit.custom_ca = false)"
+                />
+                <label class="form-check-label" for="af-store-skip">{{ t('settings.runners.skipVerify') }}</label>
+              </div>
+              <div v-if="!edit.skip_verify" class="form-check form-switch mb-3">
+                <input
+                  id="af-store-ca"
+                  v-model="edit.custom_ca"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                />
+                <label class="form-check-label" for="af-store-ca">{{ t('settings.runners.customCa') }}</label>
+              </div>
+              <BsInput
+                v-if="!edit.skip_verify && edit.custom_ca"
+                class="af-store-field"
+                v-model="edit.ca_bundle"
+                type="textarea"
+                icon="certificate"
+                placeholder="-----BEGIN CERTIFICATE-----"
+                :isFloating="false"
+                :help="t('settings.runners.caBundleHelp')"
+                :label="t('settings.fields.caBundle')"
+              />
+            </template>
+            <!-- Credentials : its credential, or a new one of its kind -->
+            <template v-else-if="activeTab === 'auth'">
+              <BsInput
+                class="af-store-field"
+                v-model="edit.credential"
+                type="select"
+                icon="key"
+                :isFloating="false"
+                :values="credentials"
+                valueKey="name"
+                labelKey="name"
+                :help="
+                  t(isVault ? 'settings.secretStores.helpCredential' : 'settings.secretStores.helpCredentialCyberark')
+                "
+                :label="t('settings.secretStores.credential')"
+              />
+              <BsButton
+                v-if="!managed"
+                icon="plus"
+                @click="creator?.newItem({ credential_type: isVault ? 'api' : 'cyberark' })"
+                >{{ t('settings.repositories.newCredential') }}</BsButton
               >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !store" class="empty-state">
-            <FaIcon icon="vault" class="empty-state-icon" />
-            <span>{{ t('settings.secretStores.notFound', { id: storeId }) }}</span>
-          </div>
-          <div v-else-if="store && edit" class="af-store-tab">
-            <!-- a store of the config seed : read only here -->
-            <div v-if="managed" class="alert alert-secondary py-2">
-              <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
-            </div>
-            <fieldset :disabled="managed">
-              <!-- Store : what it is called -->
-              <template v-if="activeTab === 'store'">
+              <!-- a store from before credentials : its own token or AppID, until one is chosen -->
+              <p v-if="(isVault ? store.token : store.app_id) && !edit.credential" class="form-text mt-3 mb-0">
+                {{ t(isVault ? 'settings.secretStores.ownToken' : 'settings.secretStores.ownLogin') }}
+              </p>
+            </template>
+            <!-- Options : a Vault's namespace, KV version and mount ; the cache and extra of both -->
+            <template v-else>
+              <template v-if="isVault">
                 <BsInput
+                  v-if="edit.vault_enterprise"
                   class="af-store-field"
-                  v-model="edit.name"
-                  icon="heading"
+                  v-model="edit.namespace"
+                  icon="folder"
                   :isFloating="false"
-                  :required="true"
-                  :help="t('settings.secretStores.nameHelp')"
-                  :label="t('settings.fields.name')"
+                  :help="t('settings.secretStores.namespaceHelp')"
+                  :label="t('settings.secretStores.namespace')"
                 />
-                <BsInput
-                  class="af-store-field"
-                  v-model="edit.description"
-                  icon="info-circle"
-                  :isFloating="false"
-                  :label="t('settings.fields.description')"
-                />
-              </template>
-              <!-- Type : CyberArk CCP or HashiCorp Vault, a Vault's Enterprise switch under it -->
-              <template v-else-if="activeTab === 'type'">
-                <div v-for="type in TYPES" :key="type.value" class="form-check af-short-check">
-                  <input
-                    :id="'af-type-' + type.value"
-                    v-model="edit.type"
-                    class="form-check-input"
-                    type="radio"
-                    name="af-store-type"
-                    :value="type.value"
-                  />
-                  <label class="form-check-label" :for="'af-type-' + type.value">
-                    <span class="af-short-label">{{ type.short || type.label }}</span>
-                    <span class="text-body-secondary small">{{
-                      t(`settings.secretStores.type_${type.value}Hint`)
-                    }}</span>
-                  </label>
-                </div>
-                <div v-if="isVault" class="form-check form-switch mt-3">
-                  <input
-                    id="af-store-enterprise"
-                    v-model="edit.vault_enterprise"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                  />
-                  <label class="form-check-label" for="af-store-enterprise">{{
-                    t('settings.secretStores.enterprise')
-                  }}</label>
-                  <div class="form-text mt-1">{{ t('settings.secretStores.enterpriseHelp') }}</div>
-                </div>
-              </template>
-              <!-- Connection : where it is, and how its certificate is checked -->
-              <template v-else-if="activeTab === 'connection'">
-                <BsInput
-                  class="af-store-field"
-                  v-model="edit.url"
-                  icon="globe"
-                  :placeholder="isVault ? 'https://vault.example.com:8200' : 'https://ccp.example.com'"
-                  :isFloating="false"
-                  :required="true"
-                  :label="t('settings.fields.uri')"
-                />
-                <div class="form-check form-switch mb-3">
-                  <input
-                    id="af-store-skip"
-                    v-model="edit.skip_verify"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    @change="edit.skip_verify && (edit.custom_ca = false)"
-                  />
-                  <label class="form-check-label" for="af-store-skip">{{ t('settings.runners.skipVerify') }}</label>
-                </div>
-                <div v-if="!edit.skip_verify" class="form-check form-switch mb-3">
-                  <input
-                    id="af-store-ca"
-                    v-model="edit.custom_ca"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                  />
-                  <label class="form-check-label" for="af-store-ca">{{ t('settings.runners.customCa') }}</label>
-                </div>
-                <BsInput
-                  v-if="!edit.skip_verify && edit.custom_ca"
-                  class="af-store-field"
-                  v-model="edit.ca_bundle"
-                  type="textarea"
-                  icon="certificate"
-                  placeholder="-----BEGIN CERTIFICATE-----"
-                  :isFloating="false"
-                  :help="t('settings.runners.caBundleHelp')"
-                  :label="t('settings.fields.caBundle')"
-                />
-              </template>
-              <!-- Credentials : its credential, or a new one of its kind -->
-              <template v-else-if="activeTab === 'auth'">
-                <BsInput
-                  class="af-store-field"
-                  v-model="edit.credential"
-                  type="select"
-                  icon="key"
-                  :isFloating="false"
-                  :values="credentials"
-                  valueKey="name"
-                  labelKey="name"
-                  :help="
-                    t(isVault ? 'settings.secretStores.helpCredential' : 'settings.secretStores.helpCredentialCyberark')
-                  "
-                  :label="t('settings.secretStores.credential')"
-                />
-                <BsButton
-                  v-if="!managed"
-                  icon="plus"
-                  @click="creator?.newItem({ credential_type: isVault ? 'api' : 'cyberark' })"
-                  >{{ t('settings.repositories.newCredential') }}</BsButton
-                >
-                <!-- a store from before credentials : its own token or AppID, until one is chosen -->
-                <p v-if="(isVault ? store.token : store.app_id) && !edit.credential" class="form-text mt-3 mb-0">
-                  {{ t(isVault ? 'settings.secretStores.ownToken' : 'settings.secretStores.ownLogin') }}
-                </p>
-              </template>
-              <!-- Options : a Vault's namespace, KV version and mount ; the cache and extra of both -->
-              <template v-else>
-                <template v-if="isVault">
-                  <BsInput
-                    v-if="edit.vault_enterprise"
-                    class="af-store-field"
-                    v-model="edit.namespace"
-                    icon="folder"
-                    :isFloating="false"
-                    :help="t('settings.secretStores.namespaceHelp')"
-                    :label="t('settings.secretStores.namespace')"
-                  />
-                  <div class="mb-3">
-                    <div class="form-label">{{ t('settings.secretStores.kvVersion') }}</div>
-                    <div
-                      v-for="opt in [
-                        { value: 2, label: 'KV v2', hint: t('settings.secretStores.kv2Hint') },
-                        { value: 1, label: 'KV v1', hint: t('settings.secretStores.kv1Hint') },
-                      ]"
-                      :key="opt.value"
-                      class="form-check af-short-check"
-                    >
-                      <input
-                        :id="'af-kv-' + opt.value"
-                        v-model="edit.kv_version"
-                        class="form-check-input"
-                        type="radio"
-                        name="af-store-kv"
-                        :value="opt.value"
-                      />
-                      <label class="form-check-label" :for="'af-kv-' + opt.value">
-                        <span class="af-short-label">{{ opt.label }}</span>
-                        <span class="text-body-secondary small">{{ opt.hint }}</span>
-                      </label>
-                    </div>
+                <div class="mb-3">
+                  <div class="form-label">{{ t('settings.secretStores.kvVersion') }}</div>
+                  <div
+                    v-for="opt in [
+                      { value: 2, label: 'KV v2', hint: t('settings.secretStores.kv2Hint') },
+                      { value: 1, label: 'KV v1', hint: t('settings.secretStores.kv1Hint') },
+                    ]"
+                    :key="opt.value"
+                    class="form-check af-short-check"
+                  >
+                    <input
+                      :id="'af-kv-' + opt.value"
+                      v-model="edit.kv_version"
+                      class="form-check-input"
+                      type="radio"
+                      name="af-store-kv"
+                      :value="opt.value"
+                    />
+                    <label class="form-check-label" :for="'af-kv-' + opt.value">
+                      <span class="af-short-label">{{ opt.label }}</span>
+                      <span class="text-body-secondary small">{{ opt.hint }}</span>
+                    </label>
                   </div>
-                  <BsInput
-                    class="af-store-field"
-                    v-model="edit.default_mount"
-                    icon="folder-open"
-                    placeholder="secret"
-                    :isFloating="false"
-                    :help="t('settings.secretStores.defaultMountHelp')"
-                    :label="t('settings.secretStores.defaultMount')"
-                  />
-                </template>
+                </div>
                 <BsInput
                   class="af-store-field"
-                  v-model="edit.cache_ttl_seconds"
-                  type="number"
-                  icon="clock"
+                  v-model="edit.default_mount"
+                  icon="folder-open"
+                  placeholder="secret"
                   :isFloating="false"
-                  :help="t('settings.secretStores.cacheTtlHelp')"
-                  :label="t('settings.secretStores.cacheTtl')"
-                />
-                <BsInput
-                  class="af-store-field"
-                  v-model="edit.extra"
-                  type="textarea"
-                  icon="code"
-                  placeholder="{}"
-                  :isFloating="false"
-                  :help="t('settings.secretStores.extraHelp')"
-                  :label="t('settings.secretStores.extra')"
+                  :help="t('settings.secretStores.defaultMountHelp')"
+                  :label="t('settings.secretStores.defaultMount')"
                 />
               </template>
-            </fieldset>
-          </div>
-        </template>
-        <template v-if="store" #actions>
-          <BsButton icon="plug" cssClass="text-nowrap" :disabled="testing" @click="testConnection()">{{
-            t('settings.common.testConnection')
+              <BsInput
+                class="af-store-field"
+                v-model="edit.cache_ttl_seconds"
+                type="number"
+                icon="clock"
+                :isFloating="false"
+                :help="t('settings.secretStores.cacheTtlHelp')"
+                :label="t('settings.secretStores.cacheTtl')"
+              />
+              <BsInput
+                class="af-store-field"
+                v-model="edit.extra"
+                type="textarea"
+                icon="code"
+                placeholder="{}"
+                :isFloating="false"
+                :help="t('settings.secretStores.extraHelp')"
+                :label="t('settings.secretStores.extra')"
+              />
+            </template>
+          </fieldset>
+        </div>
+      </template>
+      <template v-if="store" #actions>
+        <BsButton icon="plug" cssClass="text-nowrap" :disabled="testing" @click="testConnection()">{{
+          t('settings.common.testConnection')
+        }}</BsButton>
+        <template v-if="!managed">
+          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+            t('settings.common.save')
           }}</BsButton>
-          <template v-if="!managed">
-            <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-            <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-              t('settings.common.save')
-            }}</BsButton>
-          </template>
         </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a runner's and a repository's */

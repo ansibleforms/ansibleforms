@@ -193,150 +193,146 @@ onMounted(async () => {
     @save="saveSecret"
     @close="changingSecret = false"
   />
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="right-to-bracket"
-        :title="provider?.name || providerId"
-        :crumbs="crumbs"
-        :description="t('settings.oauth2.description')"
-      >
-        <template v-if="provider" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !provider" class="empty-state">
-            <FaIcon icon="right-to-bracket" class="empty-state-icon" />
-            <span>{{ t('settings.oauth2.providerNotFound', { id: providerId }) }}</span>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="right-to-bracket"
+      :title="provider?.name || providerId"
+      :crumbs="crumbs"
+      :description="t('settings.oauth2.description')"
+    >
+      <template v-if="provider" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !provider" class="empty-state">
+          <FaIcon icon="right-to-bracket" class="empty-state-icon" />
+          <span>{{ t('settings.oauth2.providerNotFound', { id: providerId }) }}</span>
+        </div>
+        <div v-else-if="provider" class="af-provider-tab">
+          <!-- the help of the tab, as in the dialog's step -->
+          <div v-for="(note, n) in notes" :key="'note-' + n" class="alert alert-info af-provider-note">
+            <div v-if="note.title" class="fw-bold">{{ note.title }}</div>
+            <div v-if="note.text">{{ note.text }}</div>
+            <ul v-if="note.items && note.items.length" class="mb-0">
+              <li v-for="(line, l) in note.items" :key="l">{{ line }}</li>
+            </ul>
           </div>
-          <div v-else-if="provider" class="af-provider-tab">
-            <!-- the help of the tab, as in the dialog's step -->
-            <div v-for="(note, n) in notes" :key="'note-' + n" class="alert alert-info af-provider-note">
-              <div v-if="note.title" class="fw-bold">{{ note.title }}</div>
-              <div v-if="note.text">{{ note.text }}</div>
-              <ul v-if="note.items && note.items.length" class="mb-0">
-                <li v-for="(line, l) in note.items" :key="l">{{ line }}</li>
-              </ul>
-            </div>
-            <!-- Details : its type (fixed : a provider does not change type), name, description -->
-            <template v-if="activeTab === 'details'">
-              <BsInput
-                class="af-provider-field"
-                :modelValue="TYPES[provider.provider] || provider.provider"
-                icon="cloud"
-                :isFloating="false"
-                :disabled="true"
-                :label="t('settings.oauth2.provider')"
-              />
-              <BsInput
-                class="af-provider-field"
-                v-model="edit.name"
-                icon="heading"
-                :isFloating="false"
-                :required="true"
-                :label="t('settings.fields.name')"
-              />
-              <BsInput
-                class="af-provider-field"
-                v-model="edit.description"
-                icon="info-circle"
-                :isFloating="false"
-                :label="t('settings.fields.description')"
-              />
-              <!-- whether users sign in with it : a switch, as LDAP's, saved at once -->
-              <div class="mb-0">
-                <label class="form-label fw-bold d-block" for="af-provider-active">{{
-                  t('settings.oauth2.active')
-                }}</label>
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-provider-active"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    :checked="!!provider.enable"
-                    @change="setActive($event.target.checked)"
-                  />
-                </div>
-                <div class="form-text">
-                  {{ t('settings.oauth2.activeHelp', { type: TYPES[provider.provider] || provider.provider }) }}
-                </div>
+          <!-- Details : its type (fixed : a provider does not change type), name, description -->
+          <template v-if="activeTab === 'details'">
+            <BsInput
+              class="af-provider-field"
+              :modelValue="TYPES[provider.provider] || provider.provider"
+              icon="cloud"
+              :isFloating="false"
+              :disabled="true"
+              :label="t('settings.oauth2.provider')"
+            />
+            <BsInput
+              class="af-provider-field"
+              v-model="edit.name"
+              icon="heading"
+              :isFloating="false"
+              :required="true"
+              :label="t('settings.fields.name')"
+            />
+            <BsInput
+              class="af-provider-field"
+              v-model="edit.description"
+              icon="info-circle"
+              :isFloating="false"
+              :label="t('settings.fields.description')"
+            />
+            <!-- whether users sign in with it : a switch, as LDAP's, saved at once -->
+            <div class="mb-0">
+              <label class="form-label fw-bold d-block" for="af-provider-active">{{
+                t('settings.oauth2.active')
+              }}</label>
+              <div class="form-check form-switch mb-0">
+                <input
+                  id="af-provider-active"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  :checked="!!provider.enable"
+                  @change="setActive($event.target.checked)"
+                />
               </div>
-            </template>
-            <!-- Sign-in : how the app signs in with it -->
-            <template v-else-if="activeTab === 'signin'">
-              <BsInput
-                v-if="provider.provider === 'azuread'"
-                class="af-provider-field"
-                v-model="edit.tenant_id"
-                icon="building"
-                :required="true"
-                :isFloating="false"
-                :help="t('settings.oauth2.tenantIdHelp')"
-                :label="t('settings.oauth2.tenantId')"
-              />
-              <BsInput
-                class="af-provider-field"
-                v-model="edit.client_id"
-                icon="key"
-                :isFloating="false"
-                :required="true"
-                :label="t('settings.oauth2.clientId')"
-              />
-              <BsInput
-                v-if="provider.provider === 'oidc'"
-                class="af-provider-field"
-                v-model="edit.issuer"
-                icon="globe"
-                :isFloating="false"
-                :required="true"
-                :label="t('settings.oauth2.issuer')"
-              />
-              <BsInput
-                class="af-provider-field"
-                v-model="edit.redirect_uri"
-                icon="link"
-                :isFloating="false"
-                :label="t('settings.oauth2.redirectUrl')"
-              />
-            </template>
-            <!-- Groups : which of the user's groups the app keeps -->
-            <template v-else>
-              <BsInput
-                class="af-provider-field"
-                v-model="edit.groupfilter"
-                icon="filter"
-                :isFloating="false"
-                :label="t('settings.oauth2.groupFilter')"
-              />
-            </template>
-          </div>
-        </template>
-        <template v-if="provider" #actions>
-          <BsButton icon="lock" @click="changingSecret = true">{{ t('settings.oauth2.changeSecret') }}</BsButton>
-          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-            t('settings.common.save')
-          }}</BsButton>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+              <div class="form-text">
+                {{ t('settings.oauth2.activeHelp', { type: TYPES[provider.provider] || provider.provider }) }}
+              </div>
+            </div>
+          </template>
+          <!-- Sign-in : how the app signs in with it -->
+          <template v-else-if="activeTab === 'signin'">
+            <BsInput
+              v-if="provider.provider === 'azuread'"
+              class="af-provider-field"
+              v-model="edit.tenant_id"
+              icon="building"
+              :required="true"
+              :isFloating="false"
+              :help="t('settings.oauth2.tenantIdHelp')"
+              :label="t('settings.oauth2.tenantId')"
+            />
+            <BsInput
+              class="af-provider-field"
+              v-model="edit.client_id"
+              icon="key"
+              :isFloating="false"
+              :required="true"
+              :label="t('settings.oauth2.clientId')"
+            />
+            <BsInput
+              v-if="provider.provider === 'oidc'"
+              class="af-provider-field"
+              v-model="edit.issuer"
+              icon="globe"
+              :isFloating="false"
+              :required="true"
+              :label="t('settings.oauth2.issuer')"
+            />
+            <BsInput
+              class="af-provider-field"
+              v-model="edit.redirect_uri"
+              icon="link"
+              :isFloating="false"
+              :label="t('settings.oauth2.redirectUrl')"
+            />
+          </template>
+          <!-- Groups : which of the user's groups the app keeps -->
+          <template v-else>
+            <BsInput
+              class="af-provider-field"
+              v-model="edit.groupfilter"
+              icon="filter"
+              :isFloating="false"
+              :label="t('settings.oauth2.groupFilter')"
+            />
+          </template>
+        </div>
+      </template>
+      <template v-if="provider" #actions>
+        <BsButton icon="lock" @click="changingSecret = true">{{ t('settings.oauth2.changeSecret') }}</BsButton>
+        <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+        <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+          t('settings.common.save')
+        }}</BsButton>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a user's and a group's */
