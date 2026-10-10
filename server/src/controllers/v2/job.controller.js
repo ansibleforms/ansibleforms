@@ -49,10 +49,13 @@ const getJob = async function(req, res) {
     }
   }
 };
+// the most jobs one list request returns, unless JOBS_LIST_SIZE asks for more
+const MAX_JOBS_LIST = 5000;
 const findAllJobs = async function(req, res) {
     var user = req?.user?.user || {}
-    // how many of the newest jobs : the page may ask, else Settings > Jobs (JOBS_LIST_SIZE)
-    var records = parseInt(req.query.records) || appConfig.jobsListSize || 1000
+    // how many of the newest jobs : the page may ask, else Settings > Jobs (JOBS_LIST_SIZE) - never
+    // more than MAX_JOBS_LIST, or ?records=10000000 read the whole table with its aggregates
+    var records = Math.min(Math.max(parseInt(req.query.records, 10) || appConfig.jobsListSize || 1000, 1), Math.max(MAX_JOBS_LIST, Number(appConfig.jobsListSize) || 0))
     try{
       const jobs = await Job.findAll(user,records)
       res.status(200).json(RestResultv2.list(jobs));
@@ -286,6 +289,7 @@ const rejectJob = async function(req, res) {
 
 };
 
+export { MAX_JOBS_LIST };
 export default {
   abortJob,
   getJob,
