@@ -80,7 +80,7 @@ const LIVE = {
   EXTRAVARS_USER_FIELDS: { key: 'extravarsUserFields', parse: v => (v || '').trim() },
   REGEX_FILTER_JOB_OUTPUT: { key: 'filterJobOutputRegex', parse: v => v },
   JOBS_LIST_SIZE: { key: 'jobsListSize', parse: v => jobsListSize(v) },
-  PROCESS_MAX_BUFFER: { key: 'processMaxBuffer', parse: v => parseInt(v, 10) || 1024 * 1024 },
+  PROCESS_MAX_BUFFER: { key: 'processMaxBuffer', parse: v => parseInt(v, 10) || 50 * 1024 * 1024 },
   AWX_API_PREFIX: { key: 'awxApiPrefix', parse: v => v },
   SHOW_DESIGNER: { key: 'showDesigner', parse: v => v == 1 },
   // the login reads it per request, through AzureAd.isEnabled and OIDC.isEnabled

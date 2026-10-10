@@ -187,17 +187,22 @@ describe("a playbook stops when its abort flag is set", () => {
     assert.equal(abortChecks, checksAtEnd, "no more polling after the playbook ended");
   });
 
-  test("output past PROCESS_MAX_BUFFER still stops it, as exec's maxBuffer did", async () => {
+  test("output past PROCESS_MAX_BUFFER is no longer stored, and the playbook goes on", async () => {
     const appConfig = (await import("./__mocks__/app.config.js")).default;
     const saved = appConfig.processMaxBuffer;
     appConfig.processMaxBuffer = 10;
     try {
       const result = run().then(() => "resolved", () => "rejected");
       child.stdout.emit("data", "0123456789ABC");
-      assert.equal(await result, "rejected");
-      assert.deepEqual(kills, [[-4242, "SIGTERM"]]);
-      assert.equal(jobRow.status, "failed", "not an operator abort");
-      assert.ok(outputs.some((o) => /aborted by the main process/.test(o.output)));
+      child.stdout.emit("data", "more that is never stored");
+      child.emit("exit", 0);
+      assert.equal(await result, "resolved");
+      assert.deepEqual(kills, [], "never stopped for its output");
+      assert.equal(jobRow.status, "success");
+      const stdout = outputs.filter((o) => o.output_type === "stdout").map((o) => o.output).join("");
+      assert.ok(stdout.startsWith("0123456789\n[WARNING]: the stdout of this job passed PROCESS_MAX_BUFFER (10 bytes)"));
+      assert.equal(stdout.includes("ABC"), false);
+      assert.equal(stdout.includes("never stored"), false);
     } finally {
       appConfig.processMaxBuffer = saved;
     }

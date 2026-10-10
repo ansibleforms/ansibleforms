@@ -132,7 +132,8 @@ var app_config = {
   uploadMaxGb: parseInt(process.env.UPLOAD_MAX_GB ?? "10", 10),
   enableDbQueryLogging: (process.env.ENABLE_DB_QUERY_LOGGING ?? 0) == 1,
   enableConfigInDatabase: (process.env.ENABLE_CONFIG_IN_DATABASE ?? 0) == 1,
-  processMaxBuffer: process.env.PROCESS_MAX_BUFFER || 1024 * 1024,
+  // the playbook output an RTE stores per stream at most ; the playbook goes on past it
+  processMaxBuffer: parseInt(process.env.PROCESS_MAX_BUFFER, 10) || 50 * 1024 * 1024,
   adminUsername: process.env.ADMIN_USERNAME || "admin",
   adminPassword: process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD,
   awxApiPrefix: process.env.AWX_API_PREFIX || "/api/v2",

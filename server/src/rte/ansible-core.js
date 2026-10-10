@@ -21,6 +21,7 @@ import Job from "../models/job.model.js";
 import { nodeId } from "../lib/role.js";
 import { registerJobSecrets, forgetJobSecrets, maskOutput } from "../lib/outputMask.js";
 import { playbookEnv } from "../lib/playbookEnv.js";
+import { createOutputBatcher } from "../lib/outputBatcher.js";
 
 /** this RTE's name, stored in jobs.host on the jobs it claims : rte-<hostname>-<port> (lib/role.js) */
 export function runnerIdentity() {
@@ -328,14 +329,14 @@ export function executeCommand(cmd, jobid, counter) {
       const stopIfAborted = (abortRequested) => {
         if (abortRequested) stopProcess("Abort requested");
       };
-      // exec stopped a process whose output on one stream passed maxBuffer ; kept, so a
-      // playbook with that much output still ends the way it did (the 'main process'
-      // message below, since nobody requested an abort)
-      const outputBytes = { stdout: 0, stderr: 0 };
-      const countOutput = (stream, data) => {
-        outputBytes[stream] += Buffer.byteLength(data);
-        if (outputBytes[stream] > appConfig.processMaxBuffer) stopProcess(`Output passed PROCESS_MAX_BUFFER (${appConfig.processMaxBuffer} bytes)`);
-      };
+      // the output, written in batches (lib/outputBatcher.js) : past PROCESS_MAX_BUFFER bytes on
+      // a stream it is no longer stored, and the playbook goes on
+      const output = createOutputBatcher({
+        write: (record) => Job.createOutput(record).catch((error) => logger.error("Failed to create output : ", error)),
+        jobId: jobid,
+        nextOrder: () => ++counter,
+        maxBytes: Number(appConfig.processMaxBuffer) || 0,
+      });
       // A playbook may write a log file of its own, .joblogs/job_log_<id>.log next to it,
       // which the job's Logfile panel shows. The app has no playbook folder, so the file is
       // stored on the job (jobs.job_log) : while the playbook runs, when it changed, and once
@@ -378,39 +379,15 @@ export function executeCommand(cmd, jobid, counter) {
       }
 
       // add output eventlistener to the process to save output
-      child.stdout.on("data", function (data) {
-        countOutput("stdout", data);
-        // save the output to database
-        Job.createOutput({
-          output: data,
-          output_type: "stdout",
-          job_id: jobid,
-          order: ++counter,
-        })
-          .then(stopIfAborted)
-          .catch((error) => {
-            logger.error("Failed to create output : ", error);
-          });
-      });
-      // add error eventlistener to the process to save output
-      child.stderr.on("data", async function (data) {
-        countOutput("stderr", data);
-        // save the output to database
-        try {
-          stopIfAborted(await Job.createOutput({
-            output: data,
-            output_type: "stderr",
-            job_id: jobid,
-            order: ++counter,
-          }));
-        } catch (error) {
-          logger.error("Failed to create output: ", error);
-        }
-      });
+      // the abort flag is polled every 2 seconds (abortPoll) : no check per chunk any more
+      child.stdout.on("data", (data) => output.add("stdout", data));
+      child.stderr.on("data", (data) => output.add("stderr", data));
 
       // add exit eventlistener to the process to handle status update
       child.on("exit", async function (data) {
         if (!settle()) return;
+        // what the playbook wrote last, before the end line
+        await output.flush();
         // first : ansible-playbook is gone, nothing reads them any more, and the database
         // calls below can stall or be cut short by a stop
         removeExtravarsFiles();
@@ -474,6 +451,7 @@ export function executeCommand(cmd, jobid, counter) {
       // add error eventlistener to the process; set failed
       child.on("error", async function (data) {
         if (!settle()) return;
+        await output.flush();
         removeExtravarsFiles();
         await syncJobLog(true);
         // Clear the PID and host from the database as the process has errored

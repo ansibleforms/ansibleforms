@@ -952,13 +952,14 @@
   - name: PROCESS_MAX_BUFFER
     type: number
     allowed: a valid number
-    short: Maximum playbook output per stream (RTE)
-    default: 1024 * 1024
+    short: The playbook output an RTE stores per stream
+    default: 50 * 1024 * 1024
     description: |
-      Read by an RTE (`AF_ROLE=rte`) : a playbook whose output on one stream passes this many
-      bytes is stopped. If you have large output, raise it. Since 7 the app runs no playbook
-      itself, so set this in the RTE container's environment ; it is not editable on the
-      Settings page.
+      Read by an RTE (`AF_ROLE=rte`) : past this many bytes on one stream (stdout, stderr), a
+      playbook's output is no longer stored - one line in the job says so - and the playbook goes
+      on to its end (until 7.0.0 it was stopped there, at 1 MiB by default). Since 7 the app runs
+      no playbook itself, so set this in the RTE container's environment ; it is not editable on
+      the Settings page.
     version: 5.0.8
   - name: LOG_LEVEL
     type: string
