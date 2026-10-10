@@ -84,6 +84,7 @@ import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue';
 import { watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { Popover } from 'bootstrap';
+import { disposeWhenHidden } from '@/lib/popoverDispose';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Helpers from '@/lib/Helpers';
@@ -1352,7 +1353,8 @@ onMounted(async () => {
 // an element with data-af-popover, and hovering it opens that text in the app's popover (the
 // look of the page title's info popover). Created on the first hover, so a table of a
 // thousand rows makes none until one is needed.
-const cellPopovers = new Set();
+// each with the element it is attached to, for disposeWhenHidden
+const cellPopovers = new Map();
 
 /**
  * Opens the popover of the element hovered, when it has one (data-af-popover).
@@ -1371,13 +1373,14 @@ function onCellHover(event) {
     html: false,
     customClass: 'af-info-popover',
   });
-  cellPopovers.add(popover);
+  cellPopovers.set(popover, el);
   popover.show();
 }
 
 onBeforeUnmount(() => {
-  // the table's rows go with the page : their popovers too
-  for (const popover of cellPopovers) popover.dispose();
+  // the table's rows go with the page : their popovers too, the one under the mouse after its
+  // fade (lib/popoverDispose.js)
+  for (const [popover, el] of cellPopovers) disposeWhenHidden(popover, el);
   cellPopovers.clear();
   if (interval.value) {
     clearInterval(interval.value);
