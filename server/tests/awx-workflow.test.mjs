@@ -310,8 +310,8 @@ test("successful workflow job: node outputs, summary and graph json", { timeout:
   assert.equal(jobRow.status, "success");
   const out = allOutput();
   // every node banner exactly once, with the output of the child job below it
-  assert.equal(out.match(/WORKFLOW NODE \[node one\] \(successful\) \*+/g).length, 1);
-  assert.equal(out.match(/WORKFLOW NODE \[node two\] \(successful\) \*+/g).length, 1);
+  assert.equal(out.match(/WORKFLOW NODE \[node one\] \(successful\) #\d+ \*+/g).length, 1);
+  assert.equal(out.match(/WORKFLOW NODE \[node two\] \(successful\) #\d+ \*+/g).length, 1);
   assert.match(out, /ok: \[localhost101\]/);
   assert.match(out, /ok: \[localhost102\]/);
   // the summary with all the nodes
@@ -339,7 +339,7 @@ test("failed workflow job: failed node and failed job status", { timeout: 30000 
   assert.match(result, /completed with status failed/);
   assert.equal(jobRow.status, "failed");
   const out = allOutput();
-  assert.equal(out.match(/WORKFLOW NODE \[node two\] \(failed\) \*+/g).length, 1);
+  assert.equal(out.match(/WORKFLOW NODE \[node two\] \(failed\) #\d+ \*+/g).length, 1);
   assert.match(out, /WORKFLOW \[my workflow\] \(failed\) \*+/);
   const graph = JSON.parse(jobRow.awx_workflow);
   assert.equal(graph.status, "failed");

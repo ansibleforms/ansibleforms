@@ -174,12 +174,17 @@ function toggle(i) {
  */
 function headerOf(line) {
   const text = plain(line.html);
-  const m = text.match(/^WORKFLOW( NODE)? \[(.*)\] \(([^)]*)\)/);
+  const m = text.match(/^WORKFLOW( NODE)? \[(.*)\] \(([^)]*)\)(?: #(\d+))?/);
   if (m) {
     // the summary at the end (WORKFLOW, not WORKFLOW NODE) : the whole workflow
     const summary = !m[1];
-    const graphNode = summary ? null : props.workflow?.nodes?.find((n) => n.name === m[2]);
+    // by its id (#42) : two nodes may share a name ; by name for a job from before 7.0.0
+    const id = m[4] ? Number(m[4]) : null;
+    const graphNode = summary
+      ? null
+      : props.workflow?.nodes?.find((n) => (id !== null ? Number(n.id) === id : n.name === m[2]));
     return {
+      id,
       name: m[2],
       kind: summary ? 'summary' : 'node',
       // AWX's words as the app's own (its pills' labels) : successful a success, canceled aborted
@@ -187,7 +192,7 @@ function headerOf(line) {
       elapsed: graphNode?.elapsed > 0 ? graphNode.elapsed : null,
     };
   }
-  return { name: text, kind: 'node', status: '', elapsed: null };
+  return { id: null, name: text, kind: 'node', status: '', elapsed: null };
 }
 
 /**
@@ -250,15 +255,19 @@ function expandAll() {
  * A workflow node's output, as the HTML its section holds : its banner and its lines.
  *
  * Args:
- *   name (string): the node's name.
+ *   node (object|string): the graph's node ({ id, name }), or a name.
  *
  * Returns:
  *   string|null: its lines (joined by <br>), or null when it has none.
  */
-function nodeOutput(name) {
-  const head = lines.value.find(
-    (l) => l.level === 1 && /^WORKFLOW NODE \[/.test(plain(l.html)) && headerOf(l).name === name,
-  );
+function nodeOutput(node) {
+  // a node of the graph ({ id, name }) : by its id when the output carries ids, else by name
+  const wanted = typeof node === 'object' && node ? node : { id: null, name: node };
+  const head = lines.value.find((l) => {
+    if (l.level !== 1 || !/^WORKFLOW NODE \[/.test(plain(l.html))) return false;
+    const h = headerOf(l);
+    return h.id !== null && wanted.id != null ? h.id === Number(wanted.id) : h.name === wanted.name;
+  });
   if (!head) return null;
   const i = lines.value.indexOf(head);
   return lines.value
