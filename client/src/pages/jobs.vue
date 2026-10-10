@@ -1797,7 +1797,9 @@ onMounted(async () => {
 /* the jobs table : the shared look (styles/tables.scss), plus every cell on one line (the
    action icons side by side, a date not broken in two) */
 .custom-table {
-  line-height: 1.2;
+  /* 20px lines : every row a whole 45px (12px padding twice, a 1px border). At 1.2 a row was
+     44.19px, and the browser rounding each row's edges made one row in five a pixel taller */
+  line-height: 1.25;
   /* the table fits its frame : the short columns their own width (columnDefs), the form and
      the user share the rest */
   table-layout: fixed;
