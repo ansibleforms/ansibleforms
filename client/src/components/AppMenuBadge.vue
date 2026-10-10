@@ -10,8 +10,9 @@
 /*      count: Number|String - what it shows                      */
 /*      active: Boolean - its entry is the one selected : the     */
 /*              colors swapped, on the entry's highlight          */
-/*      alert: Boolean - something to look at (jobs waiting for  */
-/*             approval) : red, unless its entry is selected      */
+/*      alert: Boolean - something to look at (jobs waiting for   */
+/*             approval) : orange, the approval status's colour,  */
+/*             unless its entry is selected                       */
 /*                                                                */
 /******************************************************************/
 defineProps({
@@ -45,8 +46,9 @@ defineProps({
   background-color: var(--af-text-badge);
   color: var(--af-bg-badge);
 }
+/* the colour of a job waiting for approval (.af-pill-orange, styles/tables.scss) */
 .af-menu-badge.is-alert:not(.active) {
-  background-color: var(--bs-danger);
+  background-color: #ef6009;
   color: #fff;
 }
 </style>

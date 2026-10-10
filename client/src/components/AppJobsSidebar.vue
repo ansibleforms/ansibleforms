@@ -113,7 +113,7 @@ const sections = computed(() => {
           title: m.label(),
           icon: m.icon,
           badge: count(m.status),
-          // a job waiting for approval needs someone : its count is red, like the header badge
+          // a job waiting for approval needs someone : its count stands out, in the orange of its status
           badgeAlert: m.status === 'approve' && count(m.status) > 0,
           active: isJobsList.value && props.status === m.status,
           action: () => pick(m.status),

@@ -1592,7 +1592,7 @@ export default {
       status: 'Stan',
       all: 'Wszystkie zadania',
       running: 'Uruchomione',
-      approve: 'Oczekujące na zatwierdzenie',
+      approve: 'Do zatwierdzenia',
       success: 'Zakończone powodzeniem',
       failed: 'Nieudane',
       aborted: 'Przerwane',
