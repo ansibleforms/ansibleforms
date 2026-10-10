@@ -36,6 +36,7 @@ the removals below, this is what a 6.5 install changes when it moves to 7.
 | Entra ID (Azure AD) signs in with OpenID Connect (PKCE, state, nonce) against your tenant only : an empty tenant id (the common endpoint) is refused, and a user of another tenant cannot sign in. The login asks for `openid profile email User.Read GroupMember.Read.All` | set the tenant id on the SSO provider (its GUID or a domain), give the app registration the delegated Graph permissions `User.Read` and `GroupMember.Read.All` with admin consent ; prefer `azuread/<object id>` over the group's name in roles |
 | a local password set through the application needs `PASSWORD_MIN_LENGTH` (12) characters, and cannot be the username or the default | choose longer passwords ; `PASSWORD_MIN_LENGTH=0` checks no length. Existing passwords keep working |
 | `PROCESS_MAX_BUFFER` (now 50 MB) no longer stops a playbook : past it, the output is no longer stored (the job says so) and the playbook goes on | nothing ; a value set to stop runaway playbooks no longer does |
+| an uncaught exception now ends the process (logged as `crit`) instead of leaving it running in an unknown state | run the containers with a restart policy (the compose example's `unless-stopped`, Kubernetes restarts by itself) |
 | optional : several app nodes | `AF_ROLE=app` nodes plus one `AF_ROLE=worker`, sharing the database and the persistent volume - see `examples/scale` |
 
 ## Removed in 7.0.0

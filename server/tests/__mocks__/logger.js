@@ -4,4 +4,5 @@ export default {
   warning: () => {},
   error: () => {},
   debug: () => {},
+  crit: () => {},
 };

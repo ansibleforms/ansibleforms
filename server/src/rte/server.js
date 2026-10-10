@@ -28,6 +28,7 @@ import { RTE_CONTRACT } from "./contract.js";
 import { openJobSecrets } from "../lib/sealedSecrets.js";
 import { readinessHandlers } from "../lib/readiness.js";
 import { requestContext } from "../lib/requestContext.js";
+import { installFatalHandlers } from "../lib/fatal.js";
 import { httpMetrics, metricsHandler, addScrapeGauge } from "../lib/metrics.js";
 import { onShutdown, stopWithin, isStopping } from "../lib/shutdown.js";
 import { appVersion as version } from "../lib/version.js";
@@ -180,8 +181,8 @@ export async function startRte() {
     console.error("RTE : set RTE_TOKEN (at least 16 characters) ; refusing to start");
     process.exit(1);
   }
-  process.on("unhandledRejection", (reason) => logger.error(`RTE : unhandled rejection : ${reason?.stack || reason}`));
-  process.on("uncaughtException", (err) => logger.error(`RTE : uncaught exception : ${err?.stack || err}`));
+  // an uncaught exception exits to restart clean ; its running playbooks end as abandoned
+  installFatalHandlers("RTE");
 
   // a job's secrets come sealed from the app : the key only stores this RTE's token when it
   // registers itself (RTE_REGISTER). Without registration it needs no ENCRYPTION_SECRET at all.
