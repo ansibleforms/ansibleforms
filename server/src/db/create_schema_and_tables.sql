@@ -416,5 +416,15 @@ CREATE TABLE `token_revocations` (
   PRIMARY KEY (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- the patches applied, and by which release : models/schema.model.js
+-- (keep in sync with src/db/create_schema_migrations_table.sql)
+DROP TABLE IF EXISTS `schema_migrations`;
+CREATE TABLE `schema_migrations` (
+  `name` varchar(64) NOT NULL,
+  `version` varchar(32) NOT NULL,
+  `applied_at` datetime NOT NULL,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- enable foreign key checks
 SET FOREIGN_KEY_CHECKS=1;

@@ -76,7 +76,7 @@ const envGroupOrder = [
     key: 'backups',
     label: () => t('settings.settingsPage.envGroupBackups'),
     icon: 'box-archive',
-    exact: ['MYSQLDUMP_COMMAND', 'MYSQL_COMMAND', 'BACKUP_PATH', 'FORMS_BACKUP_PATH', 'BACKUP_COMMAND_TIMEOUT_SECONDS'],
+    exact: ['MYSQLDUMP_COMMAND', 'MYSQL_COMMAND', 'BACKUP_PATH', 'FORMS_BACKUP_PATH', 'BACKUP_COMMAND_TIMEOUT_SECONDS', 'UPGRADE_BACKUP'],
   },
   {
     key: 'authentication',

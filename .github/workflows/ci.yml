@@ -188,16 +188,33 @@ jobs:
           node scripts/ci-database.mjs http://127.0.0.1:8000
           kill "$(cat /tmp/af.pid)"
 
+      - name: An upgrade - a backup first, then the patches
+        env:
+          BACKUP_PATH: /tmp/af-backups
+          FORMS_BACKUP_PATH: /tmp/af-backups/forms
+          # the runner's mysqldump is MySQL's : against MariaDB it must not ask for column statistics
+          MYSQLDUMP_COMMAND: ${{ startsWith(matrix.db, 'mariadb') && 'mysqldump --column-statistics=0' || 'mysqldump' }}
+        run: |
+          # a table 7.0.0 drops : the database looks like an install to upgrade
+          node -e "import('mysql2/promise').then(async (m) => { const c = await m.createConnection({ host: '127.0.0.1', user: 'root', password: process.env.DB_PASSWORD }); await c.query('CREATE TABLE AnsibleForms.staging (id int)'); await c.end(); })"
+          node ./index.js > /tmp/af-upgrade.log 2>&1 &
+          echo $! > /tmp/af.pid
+          node scripts/ci-database.mjs http://127.0.0.1:8000
+          kill "$(cat /tmp/af.pid)"
+          grep -q "Backed up the database before the upgrade" /tmp/af-upgrade.log || { echo "::error::no backup before the upgrade"; exit 1; }
+          test -n "$(ls /tmp/af-backups)" || { echo "::error::the backup folder is empty"; exit 1; }
+          node -e "import('mysql2/promise').then(async (m) => { const c = await m.createConnection({ host: '127.0.0.1', user: 'root', password: process.env.DB_PASSWORD }); const [r] = await c.query(\"SHOW TABLES FROM AnsibleForms LIKE 'staging'\"); await c.end(); if (r.length) { console.error('staging was not dropped'); process.exit(1); } })"
+
       - name: No error in the logs
         run: |
-          if grep -E " error:" /tmp/af-first.log /tmp/af-second.log; then
+          if grep -E " error:" /tmp/af-first.log /tmp/af-second.log /tmp/af-upgrade.log; then
             echo "::error::the app logged errors against ${{ matrix.db }}"
             exit 1
           fi
 
       - name: The logs, when it failed
         if: failure()
-        run: tail -n 200 /tmp/af-first.log /tmp/af-second.log || true
+        run: tail -n 200 /tmp/af-first.log /tmp/af-second.log /tmp/af-upgrade.log || true
 
   schema:
     name: Public schema is up to date

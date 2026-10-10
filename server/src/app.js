@@ -22,6 +22,7 @@ import { requestContext } from "./lib/requestContext.js";
 import { httpMetrics, metricsHandler, addScrapeGauge } from "./lib/metrics.js";
 import { NODE_DEAD_SECONDS } from "./lib/nodes.js";
 import mysql from "./models/db.model.js";
+import { SCHEMA_MANIFEST } from "./models/schema.model.js";
 import authConfig from "../config/auth.config.js";
 import logger from "./lib/logger.js";
 import appConfig from "../config/app.config.js";
@@ -192,7 +193,7 @@ const load = async (app) => {
 
   // liveness and readiness for a load balancer or kubernetes (no auth, lib/readiness.js) : ready
   // means the database answers and the schema is there
-  const probes = readinessHandlers(mysql);
+  const probes = readinessHandlers(mysql, SCHEMA_MANIFEST);
   app.get(`/api/v2/live`, probes.live);
   app.get(`/api/v2/ready`, probes.ready);
 

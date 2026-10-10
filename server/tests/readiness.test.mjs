@@ -18,3 +18,15 @@ describe("readiness", () => {
     expect(await readiness(db((sql) => (/information_schema/.test(sql) ? [{ n: 0 }] : [])))).toEqual({ ready: false, reason: "schema not provisioned" });
   });
 });
+
+describe("readiness against the schema manifest", () => {
+  test("an upgrade that stopped halfway is not ready", async () => {
+    const manifest = { base: { tables: ["jobs", "users", "settings", "runners"] }, patches: {} };
+    const answer = (sql) => {
+      if (/COUNT\(\*\) AS n FROM information_schema.tables/.test(sql)) return [{ n: 3 }];
+      if (/table_name AS t FROM information_schema.tables/.test(sql)) return [{ t: "jobs" }, { t: "users" }, { t: "settings" }];
+      return [];
+    };
+    expect(await readiness(db(answer), manifest)).toEqual({ ready: false, reason: "schema not upgraded" });
+  });
+});
