@@ -1685,7 +1685,7 @@ export default {
     viewAsYaml: 'Mostra com a YAML',
     viewAsJson: 'Mostra com a JSON',
     mainJob: 'Tasca principal',
-    currentStep: 'Pas actual',
+    stepN: 'Pas {n}',
     failedToLoad: "No s'han pogut carregar les tasques",
   },
   form: {

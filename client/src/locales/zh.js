@@ -1627,7 +1627,7 @@ export default {
     viewAsYaml: '以 YAML 查看',
     viewAsJson: '以 JSON 查看',
     mainJob: '主作业',
-    currentStep: '当前步骤',
+    stepN: '步骤 {n}',
     failedToLoad: '加载作业失败',
   },
   form: {

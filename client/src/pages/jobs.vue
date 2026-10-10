@@ -31,6 +31,8 @@ const jobs = ref([]);
 // the jobs loaded once : until then the menu shows the counts it had
 const jobsLoaded = ref(false);
 const job = ref(null);
+// a multistep job's steps, by id, as read with the job : each step's output under the main job's
+const stepJobs = ref({});
 const isLoading = ref(false);
 const jobId = ref(null);
 const displayedJobs = ref([]);
@@ -216,26 +218,18 @@ const canRelaunchJobs = computed(() => {
   return store?.profile?.options?.allowJobRelaunch;
 });
 
+// an output as shown : the low-verbosity lines left out while the filter is on
+function filterOutput(output) {
+  if (!hide.value) return output?.replace(/\r\n/g, '<br>') || '';
+  return (
+    output
+      ?.replace(/<span class='low[^<]*<\/span>/g, '')
+      .replace(/\r\n/g, '<br>')
+      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
+  );
+}
 // job output filtered
-const filteredJobOutput = computed(() => {
-  if (!hide.value) return job.value?.output?.replace(/\r\n/g, '<br>') || '';
-  return (
-    job.value?.output
-      ?.replace(/<span class='low[^<]*<\/span>/g, '')
-      .replace(/\r\n/g, '<br>')
-      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
-  );
-});
-// subjob output filtered
-const filteredSubJobOutput = computed(() => {
-  if (!hide.value) return subjob.value?.output?.replace(/\r\n/g, '<br>') || '';
-  return (
-    subjob.value?.output
-      ?.replace(/<span class='low[^<]*<\/span>/g, '')
-      .replace(/\r\n/g, '<br>')
-      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
-  );
-});
+const filteredJobOutput = computed(() => filterOutput(job.value?.output));
 // current job index, expressed in the pager's own index space (position
 // within parentJobs). A subjob resolves to its parent so deep-linking a
 // child still opens the page that holds its parent row.
@@ -373,14 +367,13 @@ const parentJobs = computed(() => {
 const subjobs = computed(() => {
   return job.value?.subjobs || [];
 });
-// the last subjob id
-const subjobId = computed(() => {
-  return subjobs.value.slice(-1)[0];
-});
-// current subjob, if any
-const subjob = computed(() => {
-  return jobs.value?.filter((x) => x.id == subjobId.value)[0] || null;
-});
+// every step read so far, in their order, each with its output as shown : one under the other
+const steps = computed(() =>
+  subjobs.value
+    .map((id) => stepJobs.value[id])
+    .filter(Boolean)
+    .map((step) => ({ ...step, shown: filterOutput(step.output) })),
+);
 
 // ─── the job at a glance (its page's summary) ─────────────────────────────────
 // the extravars or the artifacts, when one of them is shown (one at a time)
@@ -398,7 +391,7 @@ const subOutput = ref(null);
 const outputPanel = ref(null);
 useFollowOutput(
   outputPanel,
-  () => (filteredJobOutput.value?.length || 0) + (filteredSubJobOutput.value?.length || 0),
+  () => steps.value.reduce((n, step) => n + step.shown.length, filteredJobOutput.value?.length || 0),
   () => job.value?.status === 'running',
 );
 
@@ -636,12 +629,13 @@ async function loadOutput(id, sub = false) {
     const data = result.data;
     if (!sub) {
       job.value = data;
-      if (subjobId.value) {
-        await loadOutput(subjobId.value, true);
-      }
+      // every step, not only the last : a multistep job reads as its steps one after the other
+      await Promise.all(subjobs.value.map((stepId) => loadOutput(stepId, true)));
     } else {
+      stepJobs.value = { ...stepJobs.value, [id]: data };
+      // the list's own row of the step, when it holds one, keeps its status current
       const idx = getJobIndex(id);
-      jobs.value[idx] = data;
+      if (idx >= 0) jobs.value[idx] = data;
     }
   } else {
     toast.error(result.data?.error || 'Failed to load job output');
@@ -1626,19 +1620,25 @@ onMounted(async () => {
                     numbered
                   >
                     <template #title>
-                      <h3 v-if="subjob" class="af-job-title">
+                      <h3 v-if="steps.length" class="af-job-title">
                         {{ t('jobs.mainJob') }} (jobid {{ jobId }})
                         <AppStatusPill :status="job.status" />
                       </h3>
                     </template>
                   </AppAnsibleOutput>
-                </div>
-                <div class="col" v-if="subjob">
-                  <AppAnsibleOutput :output="filteredSubJobOutput" :jobLog="subjob?.job_log" numbered>
+                  <!-- a multistep job's steps under it, in their order : the whole run reads down -->
+                  <AppAnsibleOutput
+                    v-for="(step, i) in steps"
+                    :key="step.id"
+                    :output="step.shown"
+                    :jobLog="step.job_log"
+                    numbered
+                  >
                     <template #title>
                       <h3 class="af-job-title">
-                        {{ t('jobs.currentStep') }} (jobid {{ subjobId }})
-                        <AppStatusPill :status="subjob.status" />
+                        {{ t('jobs.stepN', { n: i + 1 })
+                        }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
+                        <AppStatusPill :status="step.status" />
                       </h3>
                     </template>
                   </AppAnsibleOutput>

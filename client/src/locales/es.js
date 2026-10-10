@@ -1678,7 +1678,7 @@ export default {
     viewAsYaml: 'Ver como YAML',
     viewAsJson: 'Ver como JSON',
     mainJob: 'Trabajo principal',
-    currentStep: 'Paso Actual',
+    stepN: 'Paso {n}',
     failedToLoad: 'Error al cargar los trabajos',
   },
   form: {

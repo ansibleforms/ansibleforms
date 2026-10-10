@@ -1703,7 +1703,7 @@ export default {
     viewAsYaml: 'Als YAML anzeigen',
     viewAsJson: 'Als JSON anzeigen',
     mainJob: 'Hauptjob',
-    currentStep: 'Aktueller Schritt',
+    stepN: 'Schritt {n}',
     failedToLoad: 'Jobs konnten nicht geladen werden',
   },
   form: {
