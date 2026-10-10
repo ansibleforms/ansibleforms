@@ -1116,6 +1116,8 @@ onMounted(async () => {
             {{ reviewJob.user || '–'
             }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
           </dd>
+          <dt>{{ t('jobs.startTime') }}</dt>
+          <dd>{{ reviewJob.start ? formatTime(reviewJob.start) : '–' }}</dd>
           <dt>{{ t('jobs.details') }}</dt>
           <dd class="af-review-link">
             <a
