@@ -190,7 +190,7 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="confirmDelete" size="md" @close="confirmDelete = false">
+  <BsModal v-if="confirmDelete" size="md" @close="confirmDelete = false" icon="trash">
     <template #title> {{ t('common.delete') }} {{ role?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
@@ -202,11 +202,9 @@ onMounted(async () => {
       <BsButton icon="trash" @click="deleteRole()">{{ t('common.delete') }}</BsButton>
     </template>
   </BsModal>
-  <BsModal v-if="adding" size="md" @close="adding = null">
+  <BsModal v-if="adding" size="md" @close="adding = null" :icon="adding.kind === 'users' ? 'user' : 'users'">
     <template #title>
-      <FaIcon :icon="adding.kind === 'users' ? 'user' : 'users'" class="me-2" />{{
-        adding.kind === 'users' ? t('settings.settingsPage.addUser') : t('settings.settingsPage.addGroup')
-      }}
+      {{ adding.kind === 'users' ? t('settings.settingsPage.addUser') : t('settings.settingsPage.addGroup') }}
     </template>
     <template #default>
       <label class="form-label fw-bold">{{ t('settings.settingsPage.provider') }}</label>

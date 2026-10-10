@@ -76,7 +76,7 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="showTestModal" @close="closeTestModal">
+  <BsModal v-if="showTestModal" @close="closeTestModal" icon="plug">
     <template #title>
       {{ t('admin.ldap.testTitle') }}
     </template>

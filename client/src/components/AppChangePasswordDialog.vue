@@ -45,8 +45,8 @@ function save() {
 </script>
 
 <template>
-  <BsModal size="md" dialogClass="af-password-dialog" @close="emit('close')">
-    <template #title> <FaIcon :icon="icon" class="me-2" />{{ title || t('settings.common.changePassword') }} </template>
+  <BsModal size="md" dialogClass="af-password-dialog" @close="emit('close')" :icon="icon">
+    <template #title> {{ title || t('settings.common.changePassword') }} </template>
     <template #default>
       <BsInput
         v-model="password"

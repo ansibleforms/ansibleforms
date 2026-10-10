@@ -996,7 +996,7 @@ onMounted(async () => {
        a single pane, so it must not be trapped in one inner scroller -->
   <div class="flex-shrink-0">
     <!-- Modal - delete verify -->
-    <BsModal v-if="showDelete" @close="showDelete = false">
+    <BsModal v-if="showDelete" @close="showDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
@@ -1016,7 +1016,7 @@ onMounted(async () => {
       >
     </BsModal>
     <!-- Modal - the ticked jobs deleted together -->
-    <BsModal v-if="showBulkDelete" @close="showBulkDelete = false">
+    <BsModal v-if="showBulkDelete" @close="showBulkDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteSelected', { count: selected.size }) }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
@@ -1028,7 +1028,7 @@ onMounted(async () => {
       >
     </BsModal>
     <!-- Modal - abort verify -->
-    <BsModal v-if="showAbort" @close="showAbort = false">
+    <BsModal v-if="showAbort" @close="showAbort = false" icon="ban">
       <template #title> {{ t('jobs.abortJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
@@ -1048,7 +1048,7 @@ onMounted(async () => {
       >
     </BsModal>
     <!-- Modal - relaunch verify -->
-    <BsModal v-if="showRelaunch" @close="showRelaunch = false">
+    <BsModal v-if="showRelaunch" @close="showRelaunch = false" icon="redo">
       <template #title> {{ t('jobs.relaunchJob') }} {{ tempJobId }} </template>
       <template #default>
         <p class="mt-3 fs-6 user-select-none">
@@ -1093,9 +1093,9 @@ onMounted(async () => {
       </template>
     </BsModal>
     <!-- Modal - approval -->
-    <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
+    <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null" icon="hourglass-half">
       <!-- the hourglass of a job that needs approval (the jobs menu) -->
-      <template #title><FaIcon icon="hourglass-half" class="me-2" />{{ t('jobs.reviewApproval') }}</template>
+      <template #title>{{ t('jobs.reviewApproval') }}</template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
         <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
@@ -1144,8 +1144,8 @@ onMounted(async () => {
     <!-- a workflow node's output, opened from the graph : over the full screen too -->
     <Teleport to="body">
       <div v-if="nodeShown" class="af-node-modal">
-        <BsModal size="xl" @close="nodeShown = null">
-          <template #title> <FaIcon icon="diagram-project" class="me-2" />{{ nodeShown.node.name }} </template>
+        <BsModal size="xl" @close="nodeShown = null" icon="diagram-project">
+          <template #title> {{ nodeShown.node.name }} </template>
           <template #default>
             <AppAnsibleOutput
               :output="nodeShown.html"

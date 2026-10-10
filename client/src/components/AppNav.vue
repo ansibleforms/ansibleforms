@@ -174,7 +174,7 @@ const buildMismatch = computed(() => {
 </script>
 
 <template>
-  <BsModal v-if="showVersion" @close="showVersion = false">
+  <BsModal v-if="showVersion" @close="showVersion = false" icon="circle-info">
     <template v-slot:title>
       {{ t('version.title') }} <badge class="badge rounded-pill text-bg-info">v{{ store.version }}</badge>
     </template>
