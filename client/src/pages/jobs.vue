@@ -1240,7 +1240,7 @@ onMounted(async () => {
                 <th
                   v-for="col in visibleColumns"
                   :key="col.key"
-                  :class="{ 'is-clickable': col.sortable, [col.key]: true, 'text-end': col.align === 'end' }"
+                  :class="{ 'is-clickable': col.sortable, [col.key]: true, 'text-end af-col-end': col.align === 'end' }"
                   :style="{ userSelect: 'none', whiteSpace: 'nowrap', width: col.width || null }"
                   @click="col.sortable ? toggleSort(col.key) : undefined"
                 >
@@ -1296,7 +1296,10 @@ onMounted(async () => {
                     <td
                       v-else
                       role="button"
-                      :class="[col.align === 'end' ? 'text-end' : 'text-start', { 'af-row-open': col.key === 'form' }]"
+                      :class="[
+                        col.align === 'end' ? 'text-end af-col-end' : 'text-start',
+                        { 'af-row-open': col.key === 'form' },
+                      ]"
                       @click="getJob(j.id)"
                       :title="cellText(j, col)"
                     >
@@ -1415,7 +1418,7 @@ onMounted(async () => {
                       <td
                         v-else
                         role="button"
-                        :class="col.align === 'end' ? 'text-end' : 'text-start'"
+                        :class="col.align === 'end' ? 'text-end af-col-end' : 'text-start'"
                         @click="getJob(c.id)"
                         :title="cellText(c, col)"
                       >
@@ -1822,6 +1825,12 @@ onMounted(async () => {
 .custom-table.af-table td:not(:first-child):not(:last-child) {
   padding-left: 0.6rem;
   padding-right: 0.6rem;
+}
+/* a column aligned to the right (the duration) : room before the next column's left-aligned
+   text, which would otherwise start right after it */
+.custom-table.af-table th.af-col-end:not(:first-child):not(:last-child),
+.custom-table.af-table td.af-col-end:not(:first-child):not(:last-child) {
+  padding-right: 1.5rem;
 }
 /* a value longer than its column : cut with an ellipsis, its full text in the tooltip */
 .custom-table tbody td:not(.bs-dt-row-actions),

@@ -729,18 +729,6 @@ function exportCsv() {
 .af-table td:first-child {
   padding-left: 1.25rem;
 }
-/* a right-aligned number sits against the next column's left-aligned text : keep them apart,
-   on both sides of the gap ; the last column keeps the same room on its right */
-th.text-end:has(+ th:not(.text-end)),
-td.text-end:has(+ td:not(.text-end)),
-th.text-end:last-child,
-td.text-end:last-child {
-  padding-right: 1.5rem;
-}
-.text-end + th:not(.text-end),
-.text-end + td:not(.text-end) {
-  padding-left: 1.5rem;
-}
 .bs-dt-sortable {
   cursor: pointer;
 }
