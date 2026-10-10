@@ -22,15 +22,12 @@
     "@fortawesome/free-regular-svg-icons": "^7.3.1",
     "@fortawesome/free-solid-svg-icons": "^7.3.1",
     "@fortawesome/vue-fontawesome": "^3.3.3",
-    "@mdi/font": "7.4.47",
     "@vuelidate/core": "^2.0.3",
     "@vuelidate/validators": "^2.0.4",
     "@vuepic/vue-datepicker": "^12.1.0",
     "ace-builds": "^1.44.0",
     "axios": "^1.20.0",
     "bootstrap": "^5.3.8",
-    "bootstrap-icons": "^1.13.1",
-    "core-js": "^3.50.0",
     "cronstrue": "^2.59.0",
     "dayjs": "^1.11.23",
     "dompurify": "^3.4.16",
@@ -72,7 +69,6 @@
   },
   "allowScripts": {
     "vue-demi": true,
-    "@parcel/watcher": true,
-    "core-js": false
+    "@parcel/watcher": true
   }
 }

@@ -1,7 +1,7 @@
 /**
  * main.js
  *
- * Bootstraps Vuetify and other plugins then mounts the App`
+ * Registers the plugins, then mounts the App
  */
 
 // Plugins
