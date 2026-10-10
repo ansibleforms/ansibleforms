@@ -12,6 +12,11 @@
 /*        width (no modal-* class).        */
 /*        Defaults to 'xl', which is what  */
 /*        every modal was hard-coded to.   */
+/*      footerClose: Boolean - the Close  */
+/*         button in the footer (default  */
+/*         true) ; false when the footer  */
+/*         holds the choices and the      */
+/*         header's cross closes          */
 /*                                        */
 /*  @slots:                               */
 /*      title: String                     */
@@ -34,6 +39,7 @@ const emit = defineEmits(['close']);
 const props = defineProps({
   size: { type: String, default: 'xl' },
   dialogClass: { type: String, default: '' },
+  footerClose: { type: Boolean, default: true },
 });
 
 // Bootstrap has modal-sm/-lg/-xl but no modal-md : the default width is the
@@ -78,7 +84,7 @@ function backdropClick(e) {
         </div>
         <div class="modal-footer">
           <slot name="footer"></slot>
-          <BsButton icon="times" @click="emit('close')">{{ t('common.close') }}</BsButton>
+          <BsButton v-if="footerClose" icon="times" @click="emit('close')">{{ t('common.close') }}</BsButton>
         </div>
       </div>
     </div>

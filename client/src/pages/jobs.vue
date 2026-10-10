@@ -44,15 +44,13 @@ const displayedJobs = ref([]);
 const showExtraVars = ref(false);
 const showArtifacts = ref(false);
 const viewAsYaml = ref(false);
-const approvalMessage = ref(null);
-const approvalTitle = ref(null);
 const hide = ref(false);
 const collapsed = ref({});
 const showDelete = ref(false);
 const showAbort = ref(false);
 const showRelaunch = ref(false);
-const showApprove = ref(false);
-const showReject = ref(false);
+// the job whose approval is being reviewed (openReview), with its title and message filled in
+const reviewJob = ref(null);
 const relaunchVerbose = ref(false);
 const relaunchWithEdit = ref(false);
 const tempJobId = ref(null);
@@ -706,28 +704,42 @@ function formatTime(t) {
 function getJobIndex(id) {
   return jobs.value.findIndex((x) => x.id === id);
 }
-// show approval (approve or reject)
-// The job is read for its approval text only : it is not selected (jobId, job), so closing
-// the modal without approving or rejecting leaves the page as it was, without the job output.
-// Confirming does open the output (jobAction), to follow the job that was just approved.
-async function showApproval(id, reject) {
+// The approval review : one modal to read what is asked, then approve or reject it, opened from
+// a row of a job waiting for approval, its menu, or the job's page. The job is read for its
+// approval only : it is not selected (jobId, job), so closing the modal leaves the page as it
+// was. Deciding goes through jobAction, which does open the job, to follow what was decided.
+async function openReview(id) {
   try {
     const result = await axios.get(`/api/v2/job/${id}`);
-    if (result.status === 200) {
-      const approvalJob = result.data;
-      approvalMessage.value = replacePlaceholders(approvalJob.approval?.message || '', approvalJob.extravars);
-      approvalTitle.value = replacePlaceholders(approvalJob.approval?.title, approvalJob.extravars) || 'Approve';
-      if (reject) {
-        showReject.value = true;
-      } else {
-        showApprove.value = true;
-      }
-    } else {
-      toast.error(result.data?.error || 'Failed to get job output');
-    }
+    const data = result.data;
+    tempJobId.value = id;
+    reviewJob.value = {
+      ...data,
+      message: replacePlaceholders(data.approval?.message || '', data.extravars),
+    };
   } catch (err) {
-    toast.error(`Failed to get job output: ${err.toString()}`);
+    toast.error(Helpers.parseAxiosResponseError(err) || `Failed to read job ${id}`);
   }
+}
+// someone else approved or rejected it while the review was open : the live list, or the job's
+// page, no longer has it waiting. The buttons are disabled instead of failing on the server.
+const reviewDecided = computed(() => {
+  const id = reviewJob.value?.id;
+  if (!id) return false;
+  const live = jobs.value.find((x) => x.id === id) || (job.value?.id === id ? job.value : null);
+  return !!live && live.status !== 'approve';
+});
+async function decide(approve) {
+  const id = reviewJob.value.id;
+  reviewJob.value = null;
+  if (approve) await approveJob(id);
+  else await rejectJob(id);
+}
+// a row of the list : a job waiting for an approval the user may give opens its review, any
+// other job its page
+function openRow(j) {
+  if (j.status === 'approve' && approvalAllowed(j)) openReview(j.id);
+  else getJob(j.id);
 }
 // replace placeholders in a string
 function replacePlaceholders(msg, extravars) {
@@ -1081,46 +1093,53 @@ onMounted(async () => {
       </template>
     </BsModal>
     <!-- Modal - approval -->
-    <BsModal v-if="showApprove" @close="showApprove = false">
-      <template #title> {{ t('jobs.approveJob') }} {{ tempJobId }} </template>
+    <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
+      <!-- the hourglass of a job that needs approval (the jobs menu) -->
+      <template #title><FaIcon icon="hourglass-half" class="me-2" />{{ t('jobs.reviewApproval') }}</template>
       <template #default>
-        <p class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.approveConfirm') }} <strong>{{ tempJobId }}</strong
-          >?
-        </p>
-        <BsDivider type="text" :text="t('jobs.approvalInfo')" />
-        <p v-html="approvalMessage"></p>
+        <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
+        <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
+             the job's values and html-encoded (replacePlaceholders) ; a generic line without one -->
+        <div v-if="reviewJob.message" class="af-review-ask" v-html="reviewJob.message"></div>
+        <div v-else class="af-review-ask">{{ t('jobs.reviewLead') }}</div>
+        <!-- the job asking, label and value, the labels of the job page's facts : its form, its
+             number (two requests from the same form share a name), who launched it -->
+        <dl class="af-review-facts">
+          <dt>{{ t('jobs.form') }}</dt>
+          <dd>{{ reviewJob.form || reviewJob.target || '–' }}</dd>
+          <dt>{{ t('jobs.jobId') }}</dt>
+          <dd>#{{ reviewJob.id }}</dd>
+          <dt>{{ t('jobs.launchedBy') }}</dt>
+          <dd>
+            {{ reviewJob.user || '–'
+            }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
+          </dd>
+          <dt>{{ t('jobs.startTime') }}</dt>
+          <dd>{{ reviewJob.start ? formatTime(reviewJob.start) : '–' }}</dd>
+          <dt>{{ t('jobs.details') }}</dt>
+          <dd class="af-review-link">
+            <a
+              href="#"
+              @click.prevent="
+                getJob(reviewJob.id);
+                reviewJob = null;
+              "
+              ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{
+                t('jobs.openJobDetails', { id: '#' + reviewJob.id })
+              }}</a
+            >
+          </dd>
+        </dl>
       </template>
-      <template #footer
-        ><BsButton
-          icon="circle-check"
-          @click="
-            approveJob(tempJobId);
-            showApprove = false;
-          "
-          >{{ t('jobs.approve') }}</BsButton
-        ></template
-      >
-    </BsModal>
-    <!-- Modal - reject -->
-    <BsModal v-if="showReject" @close="showReject = false">
-      <template #title> {{ t('jobs.rejectJob') }} {{ tempJobId }} </template>
-      <template #default
-        ><p class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.rejectConfirm') }} <strong>{{ tempJobId }}</strong
-          >?
-        </p></template
-      >
-      <template #footer
-        ><BsButton
-          icon="circle-xmark"
-          @click="
-            rejectJob(tempJobId);
-            showReject = false;
-          "
-          >{{ t('jobs.reject') }}</BsButton
-        ></template
-      >
+      <!-- nothing focused, and no Enter : approving runs a playbook, it takes a click -->
+      <template #footer>
+        <BsButton icon="circle-xmark" colorClass="danger" :disabled="reviewDecided" @click="decide(false)">{{
+          t('jobs.reject')
+        }}</BsButton>
+        <BsButton icon="circle-check" colorClass="success" :disabled="reviewDecided" @click="decide(true)">{{
+          t('jobs.approve')
+        }}</BsButton>
+      </template>
     </BsModal>
     <!-- a workflow node's output, opened from the graph : over the full screen too -->
     <Teleport to="body">
@@ -1179,23 +1198,10 @@ onMounted(async () => {
               >
               <BsButton
                 v-if="job.status == 'approve' && approvalAllowed(job)"
-                icon="circle-check"
+                icon="clipboard-check"
                 cssClass="text-nowrap"
-                @click="
-                  tempJobId = job.id;
-                  showApproval(job.id);
-                "
-                >{{ t('jobs.approveJob') }}</BsButton
-              >
-              <BsButton
-                v-if="job.status == 'approve' && approvalAllowed(job)"
-                icon="circle-xmark"
-                cssClass="text-nowrap"
-                @click="
-                  tempJobId = job.id;
-                  showApproval(job.id, true);
-                "
-                >{{ t('jobs.rejectJob') }}</BsButton
+                @click="openReview(job.id)"
+                >{{ t('jobs.reviewApproval') }}</BsButton
               >
             </template>
           </div>
@@ -1277,7 +1283,7 @@ onMounted(async () => {
                       v-if="col.key === 'id'"
                       role="button"
                       class="text-start"
-                      @click="j.job_type == 'multistep' ? toggleCollapse(j.id) : getJob(j.id)"
+                      @click="j.job_type == 'multistep' ? toggleCollapse(j.id) : openRow(j)"
                     >
                       <!-- one line : the number where every job's is, a multistep's caret at the cell's end -->
                       <span class="d-flex align-items-center">
@@ -1290,7 +1296,7 @@ onMounted(async () => {
                         />
                       </span>
                     </td>
-                    <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="getJob(j.id)">
+                    <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="openRow(j)">
                       <AppStatusPill :status="j.status" />
                     </td>
                     <!-- the form in the link blue, as a list's name : the row opens the job -->
@@ -1302,7 +1308,7 @@ onMounted(async () => {
                         col.align === 'end' ? 'text-end af-col-end' : 'text-start',
                         { 'af-row-open': col.key === 'form' },
                       ]"
-                      @click="getJob(j.id)"
+                      @click="openRow(j)"
                       :title="cellText(j, col)"
                     >
                       {{ cellText(j, col) }}
@@ -1359,30 +1365,11 @@ onMounted(async () => {
                             ><font-awesome-icon icon="ban" class="me-2" />{{ t('jobs.abortJob') }}</a
                           >
                         </li>
-                        <template v-if="j.status == 'approve' && approvalAllowed(j)">
-                          <li>
-                            <a
-                              class="dropdown-item"
-                              href="#"
-                              @click.prevent="
-                                tempJobId = j.id;
-                                showApproval(j.id);
-                              "
-                              ><font-awesome-icon icon="circle-check" class="me-2" />{{ t('jobs.approveJob') }}</a
-                            >
-                          </li>
-                          <li>
-                            <a
-                              class="dropdown-item"
-                              href="#"
-                              @click.prevent="
-                                tempJobId = j.id;
-                                showApproval(j.id, true);
-                              "
-                              ><font-awesome-icon icon="circle-xmark" class="me-2" />{{ t('jobs.rejectJob') }}</a
-                            >
-                          </li>
-                        </template>
+                        <li v-if="j.status == 'approve' && approvalAllowed(j)">
+                          <a class="dropdown-item" href="#" @click.prevent="openReview(j.id)"
+                            ><font-awesome-icon icon="clipboard-check" class="me-2" />{{ t('jobs.reviewApproval') }}</a
+                          >
+                        </li>
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <a
@@ -1795,6 +1782,40 @@ onMounted(async () => {
   }
   dd.font-monospace {
     font-size: 0.875rem;
+    font-weight: 400;
+  }
+}
+/* the approval review (openReview) : the question, then the job's facts as label and value */
+/* the question set apart : the orange of a job that needs approval, on its left edge */
+.af-review-ask {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #ef6009;
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, #ef6009 8%, transparent);
+  overflow-wrap: anywhere;
+}
+.af-review-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+  /* the labels of the job page's facts : small, upper case, quiet */
+  dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+  }
+  /* the values in bold, the link under them as a link */
+  dd {
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  dd.af-review-link {
     font-weight: 400;
   }
 }
