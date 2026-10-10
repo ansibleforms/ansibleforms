@@ -1124,7 +1124,9 @@ onMounted(async () => {
                 getJob(reviewJob.id);
                 reviewJob = null;
               "
-              ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
+              ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{
+                t('jobs.openJobDetails', { id: '#' + reviewJob.id })
+              }}</a
             >
           </dd>
         </dl>

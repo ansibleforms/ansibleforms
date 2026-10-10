@@ -1637,7 +1637,7 @@ export default {
     editRelaunch: 'Editar y Relanzar',
     reviewApproval: 'Revisar aprobación',
     reviewLead: 'Este trabajo espera su aprobación antes de ejecutarse:',
-    openJobDetails: 'Abrir detalles del trabajo',
+    openJobDetails: 'Abrir detalles del trabajo {id}',
     details: 'detalles',
     alreadyDecided: 'Este trabajo ya no necesita aprobación: se aprobó o rechazó mientras tanto.',
     approve: 'Aprobar',

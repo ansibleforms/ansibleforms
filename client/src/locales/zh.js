@@ -1586,7 +1586,7 @@ export default {
     editRelaunch: '编辑并重新运行',
     reviewApproval: '审核审批',
     reviewLead: '此作业在运行前等待您的审批：',
-    openJobDetails: '打开作业详情',
+    openJobDetails: '打开作业 {id} 的详情',
     details: '详情',
     alreadyDecided: '此作业已不再需要审批：其间已被批准或拒绝。',
     approve: '批准',

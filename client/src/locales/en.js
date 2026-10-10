@@ -1622,7 +1622,7 @@ export default {
     editRelaunch: 'Edit & Relaunch',
     reviewApproval: 'Review approval',
     reviewLead: 'This job is waiting for your approval before it runs:',
-    openJobDetails: 'Open job details',
+    openJobDetails: 'Open job {id} details',
     details: 'details',
     alreadyDecided: 'This job no longer needs approval: it was approved or rejected in the meantime.',
     approve: 'Approve',

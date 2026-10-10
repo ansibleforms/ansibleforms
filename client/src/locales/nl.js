@@ -1640,7 +1640,7 @@ export default {
     editRelaunch: 'Bewerken & Herstarten',
     reviewApproval: 'Goedkeuring beoordelen',
     reviewLead: 'Deze job wacht op je goedkeuring voordat hij wordt uitgevoerd:',
-    openJobDetails: 'Jobdetails openen',
+    openJobDetails: 'Details van job {id} openen',
     details: 'details',
     alreadyDecided: 'Deze job wacht niet meer op goedkeuring: hij is intussen goedgekeurd of afgewezen.',
     approve: 'Goedkeuren',

@@ -1644,7 +1644,7 @@ export default {
     editRelaunch: 'Edita i rellança',
     reviewApproval: "Revisar l'aprovació",
     reviewLead: "Aquesta feina espera la teva aprovació abans d'executar-se:",
-    openJobDetails: 'Obrir els detalls de la feina',
+    openJobDetails: 'Obrir els detalls de la feina {id}',
     details: 'detalls',
     alreadyDecided: "Aquesta feina ja no necessita aprovació: s'ha aprovat o rebutjat mentrestant.",
     approve: 'Aprova',
