@@ -715,7 +715,6 @@ async function openReview(id) {
     tempJobId.value = id;
     reviewJob.value = {
       ...data,
-      title: replacePlaceholders(data.approval?.title, data.extravars),
       message: replacePlaceholders(data.approval?.message || '', data.extravars),
     };
   } catch (err) {
@@ -1095,30 +1094,26 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
-      <template #title>
-        <!-- the title and the whole job (extravars, output) a click away, on one centred line -->
-        <span class="af-review-head">
-          <span>{{ t('jobs.reviewApproval') }} #{{ reviewJob.id }}</span>
-          <a
-            href="#"
-            class="af-review-open"
-            @click.prevent="
-              getJob(reviewJob.id);
-              reviewJob = null;
-            "
-            ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
-          >
-        </span>
-      </template>
+      <template #title>{{ t('jobs.reviewApproval') }}</template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
-        <!-- what is asked, and only that : the form's own approval title and message, its $(...)
-             placeholders filled in with the job's values, html-encoded (replacePlaceholders). Who
-             asked and the rest are behind Open job details -->
-        <div>
-          <h4 v-if="reviewJob.title" class="af-review-title" v-html="reviewJob.title"></h4>
-          <div v-if="reviewJob.message" class="af-review-message" v-html="reviewJob.message"></div>
-        </div>
+        <!-- the job asking, by its name : the rest (its approval message, values, output) is behind
+             Open job details -->
+        <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
+             the job's values and html-encoded (replacePlaceholders) ; a generic line without one -->
+        <p v-if="reviewJob.message" class="af-review-lead" v-html="reviewJob.message"></p>
+        <p v-else class="af-review-lead">{{ t('jobs.reviewLead') }}</p>
+        <!-- its name, and the whole job (extravars, output) a click away under it -->
+        <p class="af-review-name">{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}</p>
+        <a
+          href="#"
+          class="af-review-open"
+          @click.prevent="
+            getJob(reviewJob.id);
+            reviewJob = null;
+          "
+          ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
+        >
       </template>
       <!-- nothing focused, and no Enter : approving runs a playbook, it takes a click -->
       <template #footer>
@@ -1774,26 +1769,19 @@ onMounted(async () => {
     font-weight: 400;
   }
 }
-/* the approval review (openReview) : what is asked, nothing else */
-.af-review-title {
-  margin-bottom: 0.375rem;
+/* the approval review (openReview) : the job asking, by its name */
+.af-review-lead {
+  margin-bottom: 1.25rem;
+}
+.af-review-name {
+  margin: 0 0 1.25rem;
   font-size: 1.125rem;
   font-weight: 600;
-}
-.af-review-message {
   overflow-wrap: anywhere;
 }
-.af-review-head {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  column-gap: 1rem;
-}
-/* the link as body text, as the other links of a modal, not the title's size */
+/* the link on its own line under the name, as body text */
 .af-review-open {
-  font-size: var(--bs-body-font-size);
-  font-weight: var(--bs-body-font-weight);
-  line-height: var(--bs-body-line-height);
+  display: inline-block;
 }
 /* the kind of user, after the name : a quiet tag */
 .af-job-fact-note {

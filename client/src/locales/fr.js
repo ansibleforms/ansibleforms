@@ -1650,6 +1650,7 @@ export default {
     relaunch: 'Relancer',
     editRelaunch: 'Modifier et relancer',
     reviewApproval: "Examiner l'approbation",
+    reviewLead: "Ce job attend votre approbation avant de s'exécuter :",
     openJobDetails: 'Ouvrir les détails du job',
     alreadyDecided: "Ce job n'attend plus d'approbation : il a été approuvé ou rejeté entre-temps.",
     approve: 'Approuver',

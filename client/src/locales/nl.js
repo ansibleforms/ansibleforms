@@ -1639,6 +1639,7 @@ export default {
     relaunch: 'Herstarten',
     editRelaunch: 'Bewerken & Herstarten',
     reviewApproval: 'Goedkeuring beoordelen',
+    reviewLead: 'Deze job wacht op je goedkeuring voordat hij wordt uitgevoerd:',
     openJobDetails: 'Jobdetails openen',
     alreadyDecided: 'Deze job wacht niet meer op goedkeuring: hij is intussen goedgekeurd of afgewezen.',
     approve: 'Goedkeuren',

@@ -1661,6 +1661,7 @@ export default {
     relaunch: 'Neu starten',
     editRelaunch: 'Bearbeiten und neu starten',
     reviewApproval: 'Genehmigung prüfen',
+    reviewLead: 'Dieser Job wartet auf Ihre Genehmigung, bevor er ausgeführt wird:',
     openJobDetails: 'Jobdetails öffnen',
     alreadyDecided: 'Dieser Job braucht keine Genehmigung mehr: Er wurde inzwischen genehmigt oder abgelehnt.',
     approve: 'Freigeben',

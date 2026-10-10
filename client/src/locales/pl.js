@@ -1635,6 +1635,7 @@ export default {
     relaunch: 'Uruchom ponownie',
     editRelaunch: 'Edytuj i uruchom ponownie',
     reviewApproval: 'Rozpatrz zatwierdzenie',
+    reviewLead: 'To zadanie czeka na Twoje zatwierdzenie przed uruchomieniem:',
     openJobDetails: 'Otwórz szczegóły zadania',
     alreadyDecided: 'To zadanie nie wymaga już zatwierdzenia: w międzyczasie zostało zatwierdzone lub odrzucone.',
     approve: 'Zatwierdź',

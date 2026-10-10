@@ -1615,6 +1615,7 @@ export default {
     relaunch: '再起動',
     editRelaunch: '編集して再起動',
     reviewApproval: '承認を確認',
+    reviewLead: 'このジョブは実行前にあなたの承認を待っています：',
     openJobDetails: 'ジョブの詳細を開く',
     alreadyDecided: 'このジョブはもう承認待ちではありません：その間に承認または却下されました。',
     approve: '承認',
