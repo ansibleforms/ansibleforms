@@ -1681,7 +1681,7 @@ export default {
     viewAsYaml: 'Weergave als YAML',
     viewAsJson: 'Weergave als JSON',
     mainJob: 'Hoofd job',
-    currentStep: 'Huidige stap',
+    stepN: 'Stap {n}',
     failedToLoad: 'Jobs laden mislukt',
   },
   form: {

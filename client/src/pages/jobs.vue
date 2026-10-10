@@ -31,6 +31,13 @@ const jobs = ref([]);
 // the jobs loaded once : until then the menu shows the counts it had
 const jobsLoaded = ref(false);
 const job = ref(null);
+// a multistep job's steps, by id, as read with the job : each step's output under the main job's
+const stepJobs = ref({});
+// the outputs of a multistep job folded away by their title : 'main', or a step's id
+const foldedOutputs = ref({});
+function toggleOutput(key) {
+  foldedOutputs.value = { ...foldedOutputs.value, [key]: !foldedOutputs.value[key] };
+}
 const isLoading = ref(false);
 const jobId = ref(null);
 const displayedJobs = ref([]);
@@ -216,26 +223,18 @@ const canRelaunchJobs = computed(() => {
   return store?.profile?.options?.allowJobRelaunch;
 });
 
+// an output as shown : the low-verbosity lines left out while the filter is on
+function filterOutput(output) {
+  if (!hide.value) return output?.replace(/\r\n/g, '<br>') || '';
+  return (
+    output
+      ?.replace(/<span class='low[^<]*<\/span>/g, '')
+      .replace(/\r\n/g, '<br>')
+      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
+  );
+}
 // job output filtered
-const filteredJobOutput = computed(() => {
-  if (!hide.value) return job.value?.output?.replace(/\r\n/g, '<br>') || '';
-  return (
-    job.value?.output
-      ?.replace(/<span class='low[^<]*<\/span>/g, '')
-      .replace(/\r\n/g, '<br>')
-      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
-  );
-});
-// subjob output filtered
-const filteredSubJobOutput = computed(() => {
-  if (!hide.value) return subjob.value?.output?.replace(/\r\n/g, '<br>') || '';
-  return (
-    subjob.value?.output
-      ?.replace(/<span class='low[^<]*<\/span>/g, '')
-      .replace(/\r\n/g, '<br>')
-      .replace(/(<br>\s*){3,}/gi, '<br><br>') || ''
-  );
-});
+const filteredJobOutput = computed(() => filterOutput(job.value?.output));
 // current job index, expressed in the pager's own index space (position
 // within parentJobs). A subjob resolves to its parent so deep-linking a
 // child still opens the page that holds its parent row.
@@ -373,14 +372,13 @@ const parentJobs = computed(() => {
 const subjobs = computed(() => {
   return job.value?.subjobs || [];
 });
-// the last subjob id
-const subjobId = computed(() => {
-  return subjobs.value.slice(-1)[0];
-});
-// current subjob, if any
-const subjob = computed(() => {
-  return jobs.value?.filter((x) => x.id == subjobId.value)[0] || null;
-});
+// every step read so far, in their order, each with its output as shown : one under the other
+const steps = computed(() =>
+  subjobs.value
+    .map((id) => stepJobs.value[id])
+    .filter(Boolean)
+    .map((step) => ({ ...step, shown: filterOutput(step.output) })),
+);
 
 // ─── the job at a glance (its page's summary) ─────────────────────────────────
 // the extravars or the artifacts, when one of them is shown (one at a time)
@@ -398,7 +396,7 @@ const subOutput = ref(null);
 const outputPanel = ref(null);
 useFollowOutput(
   outputPanel,
-  () => (filteredJobOutput.value?.length || 0) + (filteredSubJobOutput.value?.length || 0),
+  () => steps.value.reduce((n, step) => n + step.shown.length, filteredJobOutput.value?.length || 0),
   () => job.value?.status === 'running',
 );
 
@@ -636,12 +634,13 @@ async function loadOutput(id, sub = false) {
     const data = result.data;
     if (!sub) {
       job.value = data;
-      if (subjobId.value) {
-        await loadOutput(subjobId.value, true);
-      }
+      // every step, not only the last : a multistep job reads as its steps one after the other
+      await Promise.all(subjobs.value.map((stepId) => loadOutput(stepId, true)));
     } else {
+      stepJobs.value = { ...stepJobs.value, [id]: data };
+      // the list's own row of the step, when it holds one, keeps its status current
       const idx = getJobIndex(id);
-      jobs.value[idx] = data;
+      if (idx >= 0) jobs.value[idx] = data;
     }
   } else {
     toast.error(result.data?.error || 'Failed to load job output');
@@ -1277,16 +1276,19 @@ onMounted(async () => {
                     <td
                       v-if="col.key === 'id'"
                       role="button"
-                      class="text-left"
+                      class="text-start"
                       @click="j.job_type == 'multistep' ? toggleCollapse(j.id) : getJob(j.id)"
                     >
-                      <span>{{ j.id }}</span>
-                      <template v-if="j.job_type == 'multistep'">
-                        <span class="mx-2 float-end" v-if="!collapsed[j.id]"
-                          ><font-awesome-icon icon="angle-right"
-                        /></span>
-                        <span class="mx-2 float-end" v-else><font-awesome-icon icon="angle-down" /></span>
-                      </template>
+                      <!-- one line : the number where every job's is, a multistep's caret at the cell's end -->
+                      <span class="d-flex align-items-center">
+                        <span>{{ j.id }}</span>
+                        <font-awesome-icon
+                          v-if="j.job_type == 'multistep'"
+                          :icon="collapsed[j.id] ? 'angle-down' : 'angle-right'"
+                          fixed-width
+                          class="ms-auto"
+                        />
+                      </span>
                     </td>
                     <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="getJob(j.id)">
                       <AppStatusPill :status="j.status" />
@@ -1621,33 +1623,60 @@ onMounted(async () => {
               </div>
               <div class="row g-0 af-output-body">
                 <div class="col">
-                  <AppAnsibleOutput
-                    ref="mainOutput"
-                    :copyLabel="t('jobs.copy')"
-                    @copy="(text) => clip(text, true)"
-                    :output="filteredJobOutput"
-                    :jobLog="job?.job_log"
-                    :workflow="job?.awx_workflow"
-                    :title="job.job_type == 'awx' ? job.target : jobPlaybook || job.form"
-                    numbered
+                  <!-- a multistep job's titles fold their output (click, Enter, Space), as the
+                       output's own section heads do -->
+                  <h3
+                    v-if="steps.length"
+                    class="af-job-title"
+                    role="button"
+                    tabindex="0"
+                    :aria-expanded="!foldedOutputs.main"
+                    :class="{ 'is-folded': foldedOutputs.main }"
+                    @click="toggleOutput('main')"
+                    @keydown.enter.self.prevent="toggleOutput('main')"
+                    @keydown.space.self.prevent="toggleOutput('main')"
                   >
-                    <template #title>
-                      <h3 v-if="subjob" class="af-job-title">
-                        {{ t('jobs.mainJob') }} (jobid {{ jobId }})
-                        <AppStatusPill :status="job.status" />
-                      </h3>
-                    </template>
-                  </AppAnsibleOutput>
-                </div>
-                <div class="col" v-if="subjob">
-                  <AppAnsibleOutput :output="filteredSubJobOutput" :jobLog="subjob?.job_log" numbered>
-                    <template #title>
-                      <h3 class="af-job-title">
-                        {{ t('jobs.currentStep') }} (jobid {{ subjobId }})
-                        <AppStatusPill :status="subjob.status" />
-                      </h3>
-                    </template>
-                  </AppAnsibleOutput>
+                    <FaIcon :icon="foldedOutputs.main ? 'chevron-right' : 'chevron-down'" class="af-job-chevron" />
+                    {{ t('jobs.mainJob') }} (jobid {{ jobId }})
+                    <AppStatusPill :status="job.status" />
+                  </h3>
+                  <!-- a wrapper to fold : the output has more than one root, v-show cannot reach it -->
+                  <div v-show="!foldedOutputs.main">
+                    <AppAnsibleOutput
+                      ref="mainOutput"
+                      :copyLabel="t('jobs.copy')"
+                      @copy="(text) => clip(text, true)"
+                      :output="filteredJobOutput"
+                      :jobLog="job?.job_log"
+                      :workflow="job?.awx_workflow"
+                      :title="job.job_type == 'awx' ? job.target : jobPlaybook || job.form"
+                      numbered
+                    />
+                  </div>
+                  <!-- a multistep job's steps under it, in their order : the whole run reads down -->
+                  <div v-for="(step, i) in steps" :key="step.id" class="af-job-step">
+                    <h3
+                      class="af-job-title"
+                      role="button"
+                      tabindex="0"
+                      :aria-expanded="!foldedOutputs[step.id]"
+                      :class="{ 'is-folded': foldedOutputs[step.id] }"
+                      @click="toggleOutput(step.id)"
+                      @keydown.enter.self.prevent="toggleOutput(step.id)"
+                      @keydown.space.self.prevent="toggleOutput(step.id)"
+                    >
+                      <FaIcon
+                        :icon="foldedOutputs[step.id] ? 'chevron-right' : 'chevron-down'"
+                        class="af-job-chevron"
+                      />
+                      {{ t('jobs.stepN', { n: i + 1 })
+                      }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
+                      <AppStatusPill :status="step.status" />
+                    </h3>
+                    <div v-show="!foldedOutputs[step.id]">
+                      <AppAnsibleOutput :output="step.shown" :jobLog="step.job_log" numbered />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1678,15 +1707,19 @@ onMounted(async () => {
 .af-job-output :deep(.ansible:last-child) {
   margin-bottom: 0;
 }
-/* a job's titles : the type and status badges sit on the middle of the words, and the
-   buttons under the title look as far from it as from the output under them (mt-4) : the
-   title's line box has room under its letters, so its margin is the smaller one */
+/* "Main job (jobid 97)", "Step 1 · ... (jobid 98)" : a header bar over its output, the grey
+   and the divider of the output's own section heads (AppAnsibleOutput's .af-node-head) */
 .af-job-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1.125rem;
+  margin: 0;
+  padding: 0.625rem 1.25rem;
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--af-field-border);
+  cursor: pointer;
+  user-select: none;
   .badge {
     font-size: 0.5em;
   }
@@ -1802,8 +1835,23 @@ onMounted(async () => {
 }
 /* the jobs table : the shared look (styles/tables.scss), plus every cell on one line (the
    action icons side by side, a date not broken in two) */
+/* a multistep job's step under the output before it : a line where one ends and the next begins */
+/* folded, nothing under it to divide from : the next step's own line is the only one */
+.af-job-title.is-folded {
+  border-bottom: 0;
+}
+/* the fold chevron of a title : as the output's own section heads' (.af-node-chevron) */
+.af-job-chevron {
+  width: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+.af-job-step {
+  border-top: 1px solid var(--af-field-border);
+}
 .custom-table {
-  line-height: 1.2;
+  /* 20px lines : every row a whole 45px (12px padding twice, a 1px border). At 1.2 a row was
+     44.19px, and the browser rounding each row's edges made one row in five a pixel taller */
+  line-height: 1.25;
   /* the table fits its frame : the short columns their own width (columnDefs), the form and
      the user share the rest */
   table-layout: fixed;

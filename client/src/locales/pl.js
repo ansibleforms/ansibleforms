@@ -1677,7 +1677,7 @@ export default {
     viewAsYaml: 'Pokaż jako YAML',
     viewAsJson: 'Pokaż jako JSON',
     mainJob: 'Zadanie główne',
-    currentStep: 'Bieżący krok',
+    stepN: 'Krok {n}',
     failedToLoad: 'Nie udało się wczytać zadań',
   },
   form: {

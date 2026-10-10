@@ -1692,7 +1692,7 @@ export default {
     viewAsYaml: 'Afficher en YAML',
     viewAsJson: 'Afficher en JSON',
     mainJob: 'Job principal',
-    currentStep: 'Etape actuelle',
+    stepN: 'Étape {n}',
     failedToLoad: 'Echec du chargement des jobs',
   },
   form: {

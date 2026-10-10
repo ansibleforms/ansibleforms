@@ -1657,7 +1657,7 @@ export default {
     viewAsYaml: 'YAML で表示',
     viewAsJson: 'JSON で表示',
     mainJob: 'メインジョブ',
-    currentStep: '現在のステップ',
+    stepN: 'ステップ {n}',
     failedToLoad: 'ジョブの読み込みに失敗しました',
   },
   form: {
