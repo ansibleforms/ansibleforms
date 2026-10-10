@@ -28,6 +28,7 @@ import { RTE_CONTRACT } from "./contract.js";
 import { openJobSecrets } from "../lib/sealedSecrets.js";
 import { readinessHandlers } from "../lib/readiness.js";
 import { requestContext } from "../lib/requestContext.js";
+import { httpMetrics, metricsHandler, addScrapeGauge } from "../lib/metrics.js";
 import { onShutdown, stopWithin, isStopping } from "../lib/shutdown.js";
 import { appVersion as version } from "../lib/version.js";
 import { startHeartbeat } from "../lib/nodes.js";
@@ -217,6 +218,7 @@ export async function startRte() {
   app.disable("x-powered-by");
   // the request's id in the response and the log lines (lib/requestContext.js)
   app.use(requestContext);
+  app.use(httpMetrics);
   app.use(express.json({ limit: "100kb" }));
   const api = express.Router();
   api.use(bearer(token));
@@ -242,6 +244,10 @@ export async function startRte() {
   const probes = readinessHandlers(mysql);
   app.get("/live", probes.live);
   app.get("/ready", probes.ready);
+  // Prometheus metrics, with METRICS_TOKEN only (lib/metrics.js)
+  addScrapeGauge("af_rte_running_jobs", "The playbooks this RTE runs now", [], async (g) => g.set(activeJobs.size));
+  addScrapeGauge("af_rte_max_jobs", "How many playbooks this RTE runs at once (RTE_MAX_JOBS, 0 : no limit)", [], async (g) => g.set(maxJobs()));
+  app.get("/metrics", metricsHandler());
 
   const port = appConfig.port;
   const server = httpsConfig.https

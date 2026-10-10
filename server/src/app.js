@@ -19,6 +19,8 @@ import { authRateLimit } from "./lib/authRateLimit.js";
 import { cspDirectives } from "./lib/csp.js";
 import { readinessHandlers } from "./lib/readiness.js";
 import { requestContext } from "./lib/requestContext.js";
+import { httpMetrics, metricsHandler, addScrapeGauge } from "./lib/metrics.js";
+import { NODE_DEAD_SECONDS } from "./lib/nodes.js";
 import mysql from "./models/db.model.js";
 import authConfig from "../config/auth.config.js";
 import logger from "./lib/logger.js";
@@ -95,6 +97,8 @@ const load = async (app) => {
   // the request's id, in the response and in every log line written while it is served
   // (lib/requestContext.js) : first, so everything after it is followed
   app.use(requestContext);
+  // requests counted and timed for /api/v2/metrics (lib/metrics.js)
+  app.use(httpMetrics);
 
   // security headers with helmet, the Content-Security-Policy included (lib/csp.js) : scripts
   // from the app only, no framing by another site. CONTENT_SECURITY_POLICY=0 sends it report
@@ -191,6 +195,22 @@ const load = async (app) => {
   const probes = readinessHandlers(mysql);
   app.get(`/api/v2/live`, probes.live);
   app.get(`/api/v2/ready`, probes.ready);
+
+  // Prometheus metrics, with METRICS_TOKEN only (lib/metrics.js) : what the database says, read
+  // at each scrape
+  addScrapeGauge("af_jobs", "Jobs running or awaiting approval now", ["status"], async (g) => {
+    const rows = await mysql.do("SELECT status, COUNT(*) AS n FROM AnsibleForms.`jobs` WHERE status IN ('running','approve') GROUP BY status");
+    for (const st of ["running", "approve"]) g.set({ status: st }, Number(rows.find((r) => r.status === st)?.n || 0));
+  });
+  addScrapeGauge("af_jobs_ended_24h", "Jobs that ended in the last 24 hours, by status", ["status"], async (g) => {
+    const rows = await mysql.do("SELECT status, COUNT(*) AS n FROM AnsibleForms.`jobs` WHERE `end` > NOW() - INTERVAL 1 DAY AND status NOT IN ('running','approve') GROUP BY status");
+    for (const r of rows) g.set({ status: r.status }, Number(r.n));
+  });
+  addScrapeGauge("af_nodes", "The processes on the database, by role, alive or not", ["role", "alive"], async (g) => {
+    const rows = await mysql.do("SELECT role, (last_seen > NOW() - INTERVAL ? SECOND) AS alive, COUNT(*) AS n FROM AnsibleForms.`nodes` GROUP BY role, alive", [NODE_DEAD_SECONDS]);
+    for (const r of rows) g.set({ role: String(r.role || "unknown"), alive: r.alive ? "true" : "false" }, Number(r.n));
+  });
+  app.get(`/api/v2/metrics`, metricsHandler());
 
   // api route for profile
   app.use(`/api/v2/profile`, cors(), authobj, profileRoutesv2);
