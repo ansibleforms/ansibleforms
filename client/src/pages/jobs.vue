@@ -1094,7 +1094,8 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
-      <template #title>{{ t('jobs.reviewApproval') }}</template>
+      <!-- which job, by its number : two requests from the same form look alike by their name -->
+      <template #title>{{ t('jobs.reviewApproval') }} · {{ t('jobs.jobTitle', { id: '#' + reviewJob.id }) }}</template>
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
         <!-- the job asking, by its name : the rest (its approval message, values, output) is behind
