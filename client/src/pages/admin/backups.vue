@@ -99,7 +99,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <BsModal v-if="action == 'restore'" @close="restoreClose">
+  <BsModal v-if="action == 'restore'" @close="restoreClose" icon="undo">
     <template #title> {{ t('admin.backups.restoreTitle') }} {{ currentBackup.folder }} </template>
     <template #default>
       <div v-if="currentBackup && !currentBackup.valid" class="alert alert-warning mt-3 mb-0" role="alert">

@@ -13,9 +13,15 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <BsModal v-if="unsavedPrompt.open" size="md" @close="answerUnsaved(false)">
+  <BsModal
+    v-if="unsavedPrompt.open"
+    size="md"
+    @close="answerUnsaved(false)"
+    icon="triangle-exclamation"
+    iconClass="text-warning"
+  >
     <template #title>
-      <FaIcon icon="triangle-exclamation" class="me-2 text-warning" />{{ t('settings.common.unsavedTitle') }}
+      {{ t('settings.common.unsavedTitle') }}
     </template>
     <template #default>
       <p class="mb-0 fs-6">{{ unsavedPrompt.message }}</p>

@@ -237,8 +237,8 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="newRole" size="lg" @close="newRole = null">
-    <template #title> <FaIcon icon="user-shield" class="me-2" />{{ t('settings.settingsPage.newRole') }} </template>
+  <BsModal v-if="newRole" size="lg" @close="newRole = null" icon="user-shield">
+    <template #title> {{ t('settings.settingsPage.newRole') }} </template>
     <template #default>
       <AppRoleEditor
         v-model:role="newRole"

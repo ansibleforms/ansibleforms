@@ -4722,7 +4722,7 @@ onBeforeUnmount(() => {
            the settings pages, listed once the designer is started -->
       <BsSidebar :sections="sidebarSections" storageKey="af_designer_sidebar_collapsed" />
       <!-- Modal - delete verify -->
-      <BsModal v-if="action == 'delete'" @close="resetAction()">
+      <BsModal v-if="action == 'delete'" @close="resetAction()" icon="trash">
         <template #title> {{ t('designer.deleteForm') }} {{ currentFormName }} </template>
         <template #default>
           <p class="mt-3 fs-6 user-select-none">
@@ -4742,6 +4742,7 @@ onBeforeUnmount(() => {
           resetAction();
           fileToDelete = null;
         "
+        icon="trash"
       >
         <template #title> {{ t('designer.deleteFile') }} </template>
         <template #default>
@@ -4762,6 +4763,7 @@ onBeforeUnmount(() => {
           resetAction();
           fileToDelete = null;
         "
+        icon="trash"
       >
         <template #title> {{ t('designer.deleteFolder') }} </template>
         <template #default>
@@ -4776,7 +4778,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - new file -->
-      <BsModal v-if="showNewFile" @close="showNewFile = false">
+      <BsModal v-if="showNewFile" @close="showNewFile = false" icon="file-circle-plus">
         <template #title> {{ t('designer.newFileTitle') }} </template>
         <template #default>
           <BsInput
@@ -4795,7 +4797,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - import a yaml file -->
-      <BsModal v-if="showImportModal" @close="showImportModal = false" size="lg">
+      <BsModal v-if="showImportModal" @close="showImportModal = false" size="lg" icon="file-import">
         <template #title> {{ t('designer.importTitle') }} </template>
         <template #default>
           <p class="text-muted small mb-3">{{ t('designer.importHelp') }}</p>
@@ -4832,7 +4834,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - choose repository to push -->
-      <BsModal v-if="showPushModal" @close="showPushModal = false">
+      <BsModal v-if="showPushModal" @close="showPushModal = false" icon="code-branch">
         <template #title> {{ t('designer.pushChooseTitle') }} </template>
         <template #default>
           <BsInput
@@ -4854,7 +4856,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - choose repository to load -->
-      <BsModal v-if="showLoadModal" @close="showLoadModal = false">
+      <BsModal v-if="showLoadModal" @close="showLoadModal = false" icon="cloud-arrow-down">
         <template #title> {{ t('designer.loadChooseTitle') }} </template>
         <template #default>
           <BsInput
@@ -4874,7 +4876,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - force unlock-->
-      <BsModal v-if="action == 'forceUnlock'" @close="resetAction()">
+      <BsModal v-if="action == 'forceUnlock'" @close="resetAction()" icon="unlock">
         <template #title> {{ t('designer.forceUnlock') }} </template>
         <template #default>
           <p class="mt-3 fs-6 user-select-none">
@@ -4889,7 +4891,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- modal - dirty -->
-      <BsModal v-if="action == 'dirty'" @close="resetAction()">
+      <BsModal v-if="action == 'dirty'" @close="resetAction()" icon="triangle-exclamation" iconClass="text-warning">
         <template #title> {{ t('designer.unsavedChanges') }} </template>
         <template #default>
           <p class="mt-3 fs-6 user-select-none">
@@ -4908,7 +4910,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- modal - confirm reload (discards unsaved changes) -->
-      <BsModal v-if="action == 'confirmReload'" @close="nextAction(false)">
+      <BsModal v-if="action == 'confirmReload'" @close="nextAction(false)" icon="download">
         <template #title> {{ t('designer.reloadTitle') }} </template>
         <template #default>
           <p class="mt-3 fs-6 user-select-none">{{ t('designer.reloadConfirm') }}</p>
@@ -4919,7 +4921,7 @@ onBeforeUnmount(() => {
         </template>
       </BsModal>
 
-      <BsModal v-if="action == 'restore'" @close="resetAction()">
+      <BsModal v-if="action == 'restore'" @close="resetAction()" icon="undo">
         <template #title> {{ t('designer.restoreBackup') }} </template>
         <template #default>
           <div v-if="repoConfigMode" class="text-muted mb-2">{{ t('designer.restoreConfigOnly') }}</div>
@@ -4953,7 +4955,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - rename file -->
-      <BsModal v-if="showRenameModal" @close="showRenameModal = false">
+      <BsModal v-if="showRenameModal" @close="showRenameModal = false" icon="pen">
         <template #title> {{ t('designer.renameFile') }} </template>
         <template #default>
           <BsInput
@@ -4970,7 +4972,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - move form to file -->
-      <BsModal v-if="showMoveModal" @close="showMoveModal = false">
+      <BsModal v-if="showMoveModal" @close="showMoveModal = false" icon="arrow-right-arrow-left">
         <template #title> {{ t('designer.moveToFile') }} </template>
         <template #default>
           <BsInput
@@ -4988,7 +4990,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - move file to folder -->
-      <BsModal v-if="showMoveFileModal" @close="showMoveFileModal = false">
+      <BsModal v-if="showMoveFileModal" @close="showMoveFileModal = false" icon="folder-open">
         <template #title> {{ t('designer.moveFileToFolder') }} </template>
         <template #default>
           <p class="fs-6 user-select-none mb-3">{{ moveFileSource }}</p>
@@ -5007,7 +5009,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - diff -->
-      <BsModal v-if="showDiffModal" @close="showDiffModal = false">
+      <BsModal v-if="showDiffModal" @close="showDiffModal = false" icon="code-compare">
         <template #title> {{ t('designer.diff') }} </template>
         <template #default>
           <div class="diff-view">
@@ -5021,7 +5023,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - icon picker -->
-      <BsModal v-if="showIconPicker" @close="showIconPicker = false">
+      <BsModal v-if="showIconPicker" @close="showIconPicker = false" icon="icons">
         <template #title> {{ t('designer.chooseIcon') }} </template>
         <template #default>
           <!-- Preview -->
@@ -5189,7 +5191,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - add category -->
-      <BsModal v-if="showAddCategory" @close="showAddCategory = false">
+      <BsModal v-if="showAddCategory" @close="showAddCategory = false" icon="sitemap">
         <template #title> {{ t('designer.addCategory') }} </template>
         <template #default>
           <BsInput
@@ -5249,7 +5251,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - edit categories -->
-      <BsModal v-if="showEditCategories" @close="showEditCategories = false">
+      <BsModal v-if="showEditCategories" @close="showEditCategories = false" icon="sitemap">
         <template #title> {{ t('designer.editCategories') }} </template>
         <template #default>
           <div v-if="editCats.length === 0" class="text-muted text-center py-3">{{ t('designer.noCategories') }}</div>
@@ -5410,7 +5412,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - add role -->
-      <BsModal v-if="showAddRole" @close="showAddRole = false">
+      <BsModal v-if="showAddRole" @close="showAddRole = false" icon="user-shield">
         <template #title> {{ t('designer.addRole') }} </template>
         <template #default>
           <BsInput :isFloating="false" v-model="newRole.name" :label="t('designer.roleName')" icon="tag" class="mb-3" />
@@ -5487,7 +5489,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - edit roles -->
-      <BsModal v-if="showEditRoles" @close="showEditRoles = false">
+      <BsModal v-if="showEditRoles" @close="showEditRoles = false" icon="user-shield">
         <template #title> {{ t('designer.editRoles') }} </template>
         <template #default>
           <div v-if="editRoles.length === 0" class="text-muted text-center py-3">{{ t('designer.noRoles') }}</div>
@@ -5626,7 +5628,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - add constant -->
-      <BsModal v-if="showAddConstant" @close="showAddConstant = false">
+      <BsModal v-if="showAddConstant" @close="showAddConstant = false" icon="sliders">
         <template #title> {{ t('designer.addConstant') }} </template>
         <template #default>
           <div class="mb-3">
@@ -5662,7 +5664,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - edit constants -->
-      <BsModal v-if="showEditConstants" @close="showEditConstants = false">
+      <BsModal v-if="showEditConstants" @close="showEditConstants = false" icon="sliders">
         <template #title> {{ t('designer.editConstants') }} </template>
         <template #default>
           <div v-if="editConsts.length === 0" class="text-muted text-center py-3">
@@ -5735,7 +5737,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - tile background picker -->
-      <BsModal v-if="showTilePicker" @close="showTilePicker = false">
+      <BsModal v-if="showTilePicker" @close="showTilePicker = false" icon="image">
         <template #title> {{ t('designer.chooseBackground') }} </template>
         <template #default>
           <div class="tile-grid">
@@ -5759,7 +5761,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - image picker -->
-      <BsModal v-if="showImagePicker" @close="showImagePicker = false">
+      <BsModal v-if="showImagePicker" @close="showImagePicker = false" icon="image">
         <template #title> {{ t('designer.chooseImage') }} </template>
         <template #default>
           <BsInput
@@ -5783,7 +5785,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - form settings -->
-      <BsModal v-if="showFormSettings" @close="showFormSettings = false" size="lg">
+      <BsModal v-if="showFormSettings" @close="showFormSettings = false" size="lg" icon="gear">
         <template #title> {{ t('designer.formSettings') }} </template>
         <template #default>
           <div class="row g-3">
@@ -6016,7 +6018,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - categories picker -->
-      <BsModal v-if="showCatPicker" @close="showCatPicker = false" size="lg">
+      <BsModal v-if="showCatPicker" @close="showCatPicker = false" size="lg" icon="sitemap">
         <template #title> {{ t('designer.assignCategories') }} </template>
         <template #default>
           <div v-if="flatCategoriesForPicker && flatCategoriesForPicker.length" class="d-flex flex-column gap-2">
@@ -6053,7 +6055,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - insert a constant reference into the form -->
-      <BsModal v-if="showInsertConstant" @close="showInsertConstant = false" size="lg">
+      <BsModal v-if="showInsertConstant" @close="showInsertConstant = false" size="lg" icon="sliders">
         <template #title> {{ t('designer.insertConstant') }} </template>
         <template #default>
           <p class="text-muted small mb-3">{{ t('designer.insertConstantHelp') }}</p>
@@ -6077,7 +6079,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - roles picker -->
-      <BsModal v-if="showRolePicker" @close="showRolePicker = false" size="lg">
+      <BsModal v-if="showRolePicker" @close="showRolePicker = false" size="lg" icon="user-shield">
         <template #title> {{ t('designer.assignRoles') }} </template>
         <template #default>
           <div v-if="rolesObj && rolesObj.length" class="d-flex flex-column gap-2">
@@ -6105,7 +6107,7 @@ onBeforeUnmount(() => {
       </BsModal>
 
       <!-- Modal - field properties editor -->
-      <BsModal v-if="showFieldEditor" @close="showFieldEditor = false" size="xl">
+      <BsModal v-if="showFieldEditor" @close="showFieldEditor = false" size="xl" icon="pen-to-square">
         <template #title> {{ t('designer.fieldProperties') }} </template>
         <template #default>
           <div class="table-responsive">

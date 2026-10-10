@@ -181,8 +181,8 @@ function removeCategory(cat, list = categories.value) {
 defineExpose({ add: addCategory, locked });
 </script>
 <template>
-  <BsModal v-if="newCategory" size="lg" @close="newCategory = null">
-    <template #title> <FaIcon icon="sitemap" class="me-2" />{{ t('settings.settingsPage.newCategory') }} </template>
+  <BsModal v-if="newCategory" size="lg" @close="newCategory = null" icon="sitemap">
+    <template #title> {{ t('settings.settingsPage.newCategory') }} </template>
     <template #default>
       <BsInput :isFloating="false" v-model="newCategory.name" :label="t('settings.settingsPage.name')" />
       <label class="form-label fw-bold">{{ t('settings.settingsPage.icon') }}</label>

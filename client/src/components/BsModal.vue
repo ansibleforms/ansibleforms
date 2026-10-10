@@ -4,6 +4,12 @@
 /*  Bootstrap modal component             */
 /*                                        */
 /*  @props:                               */
+/*      icon: String - the icon before    */
+/*         the title, every modal has one */
+/*         : the icon of the action that  */
+/*         opened it (tests/modal-icons)  */
+/*      iconClass: String - a class on    */
+/*         that icon (text-warning ...)   */
 /*      size: String                      */
 /*      dialogClass: String - a class on  */
 /*         the dialog box itself          */
@@ -37,6 +43,8 @@ const { t } = useI18n();
 const { uid } = getCurrentInstance();
 const emit = defineEmits(['close']);
 const props = defineProps({
+  icon: { type: String, default: '' },
+  iconClass: { type: String, default: '' },
   size: { type: String, default: 'xl' },
   dialogClass: { type: String, default: '' },
   footerClose: { type: Boolean, default: true },
@@ -70,7 +78,9 @@ function backdropClick(e) {
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" :class="[sizeClass, dialogClass]">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title"><slot name="title"></slot></h5>
+          <h5 class="modal-title">
+            <FaIcon v-if="icon" :icon="icon" class="me-2" :class="iconClass" /><slot name="title"></slot>
+          </h5>
           <button
             type="button"
             class="btn-close"

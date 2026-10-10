@@ -188,8 +188,8 @@ function removeConstant(target, list = constants.value) {
 defineExpose({ add: addConstant, locked });
 </script>
 <template>
-  <BsModal v-if="newConstant" size="lg" @close="newConstant = null">
-    <template #title> <FaIcon icon="sliders-h" class="me-2" />{{ t('settings.settingsPage.newConstant') }} </template>
+  <BsModal v-if="newConstant" size="lg" @close="newConstant = null" icon="sliders-h">
+    <template #title> {{ t('settings.settingsPage.newConstant') }} </template>
     <template #default>
       <BsInput :isFloating="false" v-model="newConstant.key" :label="t('settings.settingsPage.key')" />
       <label class="form-label fw-bold">{{ t('settings.settingsPage.value') }}</label>

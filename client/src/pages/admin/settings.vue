@@ -600,7 +600,7 @@ onMounted(async () => {
     </AppSettings>
 
     <!-- Modal - confirm import config.yaml to database -->
-    <BsModal v-if="showImportConfirm" @close="showImportConfirm = false">
+    <BsModal v-if="showImportConfirm" @close="showImportConfirm = false" icon="file-import">
       <template #title> {{ t('settings.settingsPage.importConfirmTitle') }} </template>
       <template #default>
         <p class="mt-3 fs-6 user-select-none">
@@ -613,7 +613,7 @@ onMounted(async () => {
     </BsModal>
 
     <!-- Modal - confirm export database to config.yaml -->
-    <BsModal v-if="showExportConfirm" @close="showExportConfirm = false">
+    <BsModal v-if="showExportConfirm" @close="showExportConfirm = false" icon="file-export">
       <template #title> {{ t('settings.settingsPage.exportConfirmTitle') }} </template>
       <template #default>
         <p class="mt-3 fs-6 user-select-none">

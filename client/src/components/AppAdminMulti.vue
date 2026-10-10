@@ -1393,7 +1393,7 @@ defineExpose({
 });
 </script>
 <template>
-  <BsModal v-if="action == 'delete'" size="md" @close="unselectItem">
+  <BsModal v-if="action == 'delete'" size="md" @close="unselectItem" icon="trash">
     <template #title> {{ t('common.delete') }} {{ objectLabel }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
@@ -1504,8 +1504,8 @@ defineExpose({
     </template>
   </AppSettings>
   <!-- the defaults (settings.defaultPicker) : a choice per group, Save sets them -->
-  <BsModal v-if="defaultPicker && defaultsOpen" size="lg" @close="cancelDefaults">
-    <template #title> <FaIcon :icon="objectIcon" class="me-2" />{{ defaultPicker.title }} </template>
+  <BsModal v-if="defaultPicker && defaultsOpen" size="lg" @close="cancelDefaults" :icon="objectIcon">
+    <template #title> {{ defaultPicker.title }} </template>
     <template #default>
       <!-- 16px between two groups, none after the last : the dialog's padding ends it -->
       <div

@@ -171,7 +171,7 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="confirmDelete" size="md" @close="confirmDelete = false">
+  <BsModal v-if="confirmDelete" size="md" @close="confirmDelete = false" icon="trash">
     <template #title> {{ t('common.delete') }} {{ provider?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
