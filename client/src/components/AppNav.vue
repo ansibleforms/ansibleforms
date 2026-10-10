@@ -26,8 +26,6 @@ function setLanguage(code) {
 }
 
 // ENV-BASED HOME MENU LABEL/ICON
-const navHomeLabel = ref('Forms');
-const navHomeIcon = ref('rectangle-list');
 
 import axios from 'axios';
 import Time from '@/lib/Time';
@@ -37,8 +35,8 @@ import { jobsPath } from '@/lib/jobsPath';
 onMounted(async () => {
   try {
     const res = await axios.get('/api/v2/app/config');
-    navHomeLabel.value = res.data?.navHomeLabel || navHomeLabel.value;
-    navHomeIcon.value = res.data?.navHomeIcon || navHomeIcon.value;
+    store.navHomeLabel = res.data?.navHomeLabel || store.navHomeLabel;
+    store.navHomeIcon = res.data?.navHomeIcon || store.navHomeIcon;
     // Apply server default language if user hasn't chosen one
     if (res.data?.defaultLanguage) {
       applyDefaultLanguage(res.data.defaultLanguage);
@@ -137,11 +135,11 @@ const menu = computed(() => {
 
   // Add home menu item
   m.unshift({
-    title: navHomeLabel.value,
+    title: store.navHomeLabel,
     link: '/',
     // a form is one of the forms : the link stays active on it
     also: ['/form'],
-    icon: navHomeIcon.value,
+    icon: store.navHomeIcon,
     target: '_self',
   });
 

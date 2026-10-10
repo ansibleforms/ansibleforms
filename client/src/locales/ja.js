@@ -1283,7 +1283,6 @@ export default {
   },
   designer: {
     title: 'デザイナー',
-    lockTitle: '非アクティブ',
     offDescription:
       'カテゴリ、定数、フォーム、ロールを編集します。編集中に設定をロックするには、デザイナーを開始してください。',
     formsDescription:

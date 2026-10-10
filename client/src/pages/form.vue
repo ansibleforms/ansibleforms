@@ -1800,6 +1800,10 @@ onBeforeUnmount(() => {
                its buttons at the right ; the divider under it, as on the other pages -->
           <div class="d-flex flex-wrap align-items-center border-bottom mb-3 pb-2 af-page-head">
             <h3 class="mb-0 me-3">
+              <!-- the section first, as every page's title (lib/sections.js) : Forms › the form -->
+              <router-link to="/" class="af-crumb-link"
+                ><span class="me-2"><FaIcon :icon="store.navHomeIcon" /></span>{{ store.navHomeLabel }}</router-link
+              ><span class="mx-2 text-body-secondary af-crumb-separator">›</span>
               {{ activeEntry ? activeEntry.subtitle || activeEntry.title : currentForm.name }}
               <AppInfoPopover
                 v-if="activeEntry ? activeEntry.subform?.help : currentForm.help"

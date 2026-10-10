@@ -1286,7 +1286,6 @@ export default {
   },
   designer: {
     title: 'Designer',
-    lockTitle: 'Inactive',
     offDescription:
       'Edit the categories, constants, forms and roles. Start the designer to lock the configuration while you edit it.',
     formsDescription:

@@ -3543,11 +3543,12 @@ function selectTab(name) {
 }
 
 // the page title : the open view's name and icon once the designer is started ; before that,
-// inactive and an open lock - free for whoever starts it
+// the designer alone, as the header names it (the section, so the title is not Designer ›
+// Designer)
 const pageTitle = computed(() => {
-  if (!lock.value || lock.value.free) return { title: t('designer.lockTitle'), icon: 'unlock' };
+  if (!lock.value || lock.value.free) return { title: t('nav.designer'), icon: 'pen-to-square' };
   const tab = tabs.find((x) => x.name === currentTab.value);
-  return tab ? { title: tab.label(), icon: tab.icon } : { title: t('designer.title'), icon: 'pen-to-square' };
+  return tab ? { title: tab.label(), icon: tab.icon } : { title: t('nav.designer'), icon: 'pen-to-square' };
 });
 
 // the line under the title describes the open view once the designer is started, and
