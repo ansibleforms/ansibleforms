@@ -100,20 +100,14 @@ const password = ref({ currentPassword: '', password: '', password2: '' });
 const saving = ref(false);
 
 // the open view, from the address (/profile/<view>) so a view can be linked to ; /profile alone,
-// a view the user may not open, or an address from before (/profile?view=<view>) opens the
-// right one, at its own address
+// or a view the user may not open, opens the first of the menu, at its own address
 const viewFromPath = (v) => (menuViews.value.some((x) => x.name === v) ? v : menuViews.value[0].name);
-const currentView = ref(viewFromPath(route.params.view || route.query.view));
+const currentView = ref(viewFromPath(route.params.view));
 watch(
-  () => [route.params.view, route.query.view],
-  ([pathView, queryView]) => {
-    currentView.value = viewFromPath(pathView || queryView);
-    if (pathView !== currentView.value || queryView !== undefined) {
-      // the old ?view= left out of the address
-      const query = { ...route.query };
-      delete query.view;
-      router.replace({ path: `/profile/${currentView.value}`, query }).catch(() => {});
-    }
+  () => route.params.view,
+  (pathView) => {
+    currentView.value = viewFromPath(pathView);
+    if (pathView !== currentView.value) router.replace(`/profile/${currentView.value}`).catch(() => {});
   },
   { immediate: true },
 );

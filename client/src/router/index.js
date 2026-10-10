@@ -3,7 +3,6 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router';
 import { JOBS_STATUS_SLUGS, ALL_JOBS } from '@/lib/jobsPath';
-import { formsPath, formPath } from '@/lib/formsPath';
 import BaseUrl from '@/lib/BaseUrl';
 
 // Pages load on first visit rather than up front: each becomes its own chunk, so the first
@@ -64,27 +63,18 @@ import TokenStorage from '@/lib/TokenStorage.js';
 const routes = [
   // root routes
   // the forms list : every form at /forms/all, a category at /forms/<category> (lib/formsPath.js) ;
-  // / and an address from before, /?category=<names>, lead there
-  {
-    path: '/',
-    name: '/',
-    redirect: (to) => {
-      const { category, ...query } = to.query;
-      return { path: formsPath(category ? decodeURIComponent(category) : ''), query };
-    },
-  },
+  // the app's start page is every form
+  { path: '/', name: '/', redirect: '/forms/all' },
   { path: '/forms', redirect: '/forms/all' },
   { path: '/forms/:category(.*)', name: '/forms', component: index },
-  { path: '/designer', name: '/designer', component: designer, meta: { permission: 'showDesigner' } },
-  // a form : /form/<its name>, whatever category it is opened from (lib/formsPath.js) ; an
-  // address from before, /form?form=<name>, leads there
+  // a view at /designer/<view>, the form edited at /designer/forms/<form> (pages/designer.vue)
   {
-    path: '/form',
-    redirect: (to) => {
-      const { form: name, ...query } = to.query;
-      return name ? { path: formPath(decodeURIComponent(name)), query } : formsPath('');
-    },
+    path: '/designer/:view?/:form?',
+    name: '/designer',
+    component: designer,
+    meta: { permission: 'showDesigner' },
   },
+  // a form : /form/<its name>, whatever category it is opened from (lib/formsPath.js)
   { path: '/form/:slug', name: '/form', component: form },
   { path: '/login', name: '/login', component: login },
   { path: '/change-password', name: '/change-password', component: changePassword },

@@ -71,14 +71,14 @@ export function searchPages(t, options) {
       title: t('sidebar.categories'),
       section: t('nav.designer'),
       icon: 'sitemap',
-      link: '/designer?view=Categories&tab=visual',
+      link: '/designer/categories?tab=visual',
     },
     // edited in the designer (its Visual tab), no longer a settings page
     {
       title: t('sidebar.constants'),
       section: t('nav.designer'),
       icon: 'sliders-h',
-      link: '/designer?view=Constants&tab=visual',
+      link: '/designer/constants?tab=visual',
     },
     { title: t('sidebar.users'), section: settings, icon: 'user', link: '/settings/users' },
     {
