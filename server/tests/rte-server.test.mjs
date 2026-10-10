@@ -1,6 +1,6 @@
 // The RTE's API (server/src/rte/server.js) : who may call it, which jobs it takes, and what it
 // answers about them. The jobs table is faked ; the playbook run itself is rte-ansible.test.mjs.
-import { test, describe, beforeEach, vi } from "vitest";
+import { test, describe, beforeEach, vi, expect } from "vitest";
 import assert from "node:assert/strict";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
@@ -49,7 +49,7 @@ vi.mock("../src/rte/ansible-core.js", () => ({
   runAnsibleJob: ({ jobId, secrets }) => new Promise((resolve) => { runs.push({ jobId, secrets, resolve }); }),
 }));
 
-const { acceptJob, jobStatus, cancelJob, activeJobs, bearer } = await import("../src/rte/server.js");
+const { acceptJob, jobStatus, cancelJob, activeJobs, bearer, drainJobs } = await import("../src/rte/server.js");
 const { RTE_CONTRACT } = await import("../src/rte/contract.js");
 const { sealJobSecrets } = await import("../src/lib/sealedSecrets.js");
 
@@ -126,6 +126,24 @@ describe("the jobs it takes", () => {
     assert.equal(jobs[11].host, null);
   });
 
+  test("a full RTE (RTE_MAX_JOBS) answers 503 busy and claims nothing ; a slot freed takes the next", async () => {
+    process.env.RTE_MAX_JOBS = "1";
+    try {
+      jobs[15] = { status: "running", job_type: "ansible", host: null };
+      expect((await call(acceptJob, { body: job(11) })).status).toBe(202);
+      const busy = await call(acceptJob, { body: job(15) });
+      expect(busy.status).toBe(503);
+      expect(busy.data.busy).toBe(true);
+      expect(jobs[15].host).toBe(null);
+      // the running one asked again is not refused
+      expect((await call(acceptJob, { body: job(11) })).status).toBe(202);
+      activeJobs.delete(11);
+      expect((await call(acceptJob, { body: job(15) })).status).toBe(202);
+    } finally {
+      delete process.env.RTE_MAX_JOBS;
+    }
+  });
+
   test("a job without its sealed secrets, or sealed for another job or token, is refused before anything is claimed", async () => {
     for (const body of [
       { jobId: 11, contract: RTE_CONTRACT },
@@ -157,5 +175,25 @@ describe("what it says about a job", () => {
     await call(acceptJob, { body: job(11) });
     assert.equal((await call(cancelJob, { params: { id: "11" } })).status, 202);
     assert.equal(jobs[11].abort_requested, 1);
+  });
+});
+
+describe("a stop", () => {
+  test("waits for the running playbooks, and no longer than RTE_DRAIN_SECONDS", async () => {
+    process.env.RTE_DRAIN_SECONDS = "1";
+    try {
+      activeJobs.add(11);
+      setTimeout(() => activeJobs.delete(11), 200);
+      let t = Date.now();
+      await drainJobs();
+      expect(Date.now() - t).toBeLessThan(900);
+      activeJobs.add(12);
+      t = Date.now();
+      await drainJobs();
+      expect(Date.now() - t).toBeGreaterThanOrEqual(900);
+    } finally {
+      delete process.env.RTE_DRAIN_SECONDS;
+      activeJobs.clear();
+    }
   });
 });

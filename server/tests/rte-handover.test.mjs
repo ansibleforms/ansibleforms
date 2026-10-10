@@ -52,11 +52,14 @@ vi.mock("../src/models/credential.model.v2.js", () => ({
 }));
 
 const ended = [];
+const printed = [];
+let abortWanted = false;
 let abortResets;
 vi.mock("../src/models/job.model.js", () => ({
   default: {
     lastOrder: async () => 0,
-    printJobOutput: async () => {},
+    printJobOutput: async (line) => { printed.push(line); },
+    isAbortRequested: async () => abortWanted,
     endJobStatus: async (id, order, type, status, line) => { ended.push({ status, line }); row.status = status; },
     resetAbortRequested: async () => { abortResets++; },
   },
@@ -74,6 +77,8 @@ beforeEach(() => {
   credentialError = null;
   getStatus = "running";
   claimerAlive = false;
+  printed.length = 0;
+  abortWanted = false;
   ended.length = 0;
   posted.length = 0;
   abortResets = 0;
@@ -176,6 +181,42 @@ describe("replicas behind one address", () => {
       expect(await done).toBe(false);
       expect(ended.length).toBe(1);
       expect(ended[0].line).toMatch(/lost job 7/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("a busy RTE", () => {
+  const busy = () => Promise.reject(Object.assign(new Error("busy"), { response: { status: 503, data: { error: "this RTE runs 10 jobs already (RTE_MAX_JOBS)", busy: true } } }));
+
+  test("the job waits, says so once, and is handed over when a slot frees", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      postAnswer = () => (++calls < 3 ? busy() : (row.host = "rte-1-8000", setTimeout(() => { row.status = "success"; }, 100), Promise.resolve({ status: 202 })));
+      const done = rte.launch({ jobId: 7, runner });
+      await vi.advanceTimersByTimeAsync(25000);
+      expect(await done).toBe(true);
+      expect(calls).toBe(3);
+      expect(printed.filter((l) => /Waiting for a free slot/.test(l))).toHaveLength(1);
+      expect(ended).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("an abort ends the wait : aborted, never handed over", async () => {
+    vi.useFakeTimers();
+    try {
+      postAnswer = busy;
+      const done = rte.launch({ jobId: 7, runner });
+      await vi.advanceTimersByTimeAsync(1000);
+      abortWanted = true;
+      await vi.advanceTimersByTimeAsync(11000);
+      expect(await done).toBe(false);
+      expect(ended).toHaveLength(1);
+      expect(ended[0].status).toBe("aborted");
     } finally {
       vi.useRealTimers();
     }

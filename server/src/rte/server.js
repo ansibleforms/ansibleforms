@@ -26,7 +26,7 @@ import appConfig from "../../config/app.config.js";
 import { runAnsibleJob, runnerIdentity } from "./ansible-core.js";
 import { RTE_CONTRACT } from "./contract.js";
 import { openJobSecrets } from "../lib/sealedSecrets.js";
-import { onShutdown } from "../lib/shutdown.js";
+import { onShutdown, stopWithin, isStopping } from "../lib/shutdown.js";
 import { appVersion as version } from "../lib/version.js";
 import { startHeartbeat } from "../lib/nodes.js";
 import { registerSelf } from "./register.js";
@@ -34,6 +34,26 @@ import { registerSelf } from "./register.js";
 
 // the jobs this process is running ; a job is only ever run by the RTE that claimed it
 const activeJobs = new Set();
+
+// how many playbooks run at once (RTE_MAX_JOBS, 0 : no limit), and how long a stop waits for
+// the running ones (RTE_DRAIN_SECONDS)
+const maxJobs = () => Math.max(0, parseInt(process.env.RTE_MAX_JOBS ?? 10, 10) || 0);
+const drainSeconds = () => Math.max(0, parseInt(process.env.RTE_DRAIN_SECONDS ?? 25, 10) || 0);
+
+/**
+ * Waits for the running playbooks to end, for RTE_DRAIN_SECONDS at most : a stop (a rolling
+ * update, a scale down) lets them finish instead of cutting them off. New jobs are refused
+ * meanwhile (acceptJob answers 503), so the app sends them to another RTE or waits.
+ *
+ * Returns:
+ *   Promise<void>: settles when none runs, or the time is up.
+ */
+async function drainJobs() {
+  const until = Date.now() + drainSeconds() * 1000;
+  if (activeJobs.size) logger.notice(`RTE : stopping, waiting up to ${drainSeconds()} seconds for ${activeJobs.size} running job(s)`);
+  while (activeJobs.size && Date.now() < until) await new Promise((r) => setTimeout(r, 500));
+  if (activeJobs.size) logger.warning(`RTE : stopping with ${activeJobs.size} job(s) still running : they end as abandoned`);
+}
 
 function ansibleVersion() {
   return new Promise((resolve) => {
@@ -87,6 +107,11 @@ async function acceptJob(req, res) {
   // read and write the job differently, so the job is refused rather than run half right
   if (req.body?.contract !== undefined && req.body.contract !== RTE_CONTRACT) {
     return res.status(409).json({ error: `this RTE speaks contract ${RTE_CONTRACT}, the app contract ${req.body.contract} : run the same contract on both` });
+  }
+  // stopping, or full : not claimed, the app tries again (runners/rte.js)
+  if (isStopping()) return res.status(503).json({ error: "this RTE is stopping", busy: true });
+  if (maxJobs() && activeJobs.size >= maxJobs() && !activeJobs.has(jobId)) {
+    return res.status(503).json({ error: `this RTE runs ${activeJobs.size} jobs already (RTE_MAX_JOBS)`, busy: true });
   }
   const rows = await mysql.do("SELECT status, job_type FROM AnsibleForms.`jobs` WHERE id=?", [jobId]);
   if (!rows.length) return res.status(404).json({ error: `job ${jobId} does not exist` });
@@ -144,7 +169,7 @@ async function cancelJob(req, res) {
 }
 
 // the handlers, for the tests
-export { acceptJob, jobStatus, cancelJob, activeJobs, bearer };
+export { acceptJob, jobStatus, cancelJob, activeJobs, bearer, drainJobs };
 
 export async function startRte() {
   const token = process.env.RTE_TOKEN || "";
@@ -162,6 +187,9 @@ export async function startRte() {
   }
   await waitForDatabase();
   onShutdown("database", () => mysql.end());
+  // registered after the database : run before it closes, the running playbooks still write
+  stopWithin((drainSeconds() + 8) * 1000);
+  onShutdown("running jobs", drainJobs);
   await abandonOwnJobs();
   // its row in `nodes` : the Status page lists it, and when it stops answering the worker ends
   // the jobs it was running (Job.abandonDeadNodes) - a pod replaced under a new name included
@@ -198,6 +226,8 @@ export async function startRte() {
     contract: RTE_CONTRACT,
     ansible: await ansibleVersion(),
     running: [...activeJobs],
+    maxJobs: maxJobs(),
+    stopping: isStopping(),
   })));
   api.post("/jobs", wrap(acceptJob));
   api.get("/jobs/:id", wrap(jobStatus));
