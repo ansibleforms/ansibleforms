@@ -33,6 +33,11 @@ const jobsLoaded = ref(false);
 const job = ref(null);
 // a multistep job's steps, by id, as read with the job : each step's output under the main job's
 const stepJobs = ref({});
+// the outputs of a multistep job folded away by their title : 'main', or a step's id
+const foldedOutputs = ref({});
+function toggleOutput(key) {
+  foldedOutputs.value = { ...foldedOutputs.value, [key]: !foldedOutputs.value[key] };
+}
 const isLoading = ref(false);
 const jobId = ref(null);
 const displayedJobs = ref([]);
@@ -1609,34 +1614,59 @@ onMounted(async () => {
               </div>
               <div class="row g-0 af-output-body">
                 <div class="col">
-                  <AppAnsibleOutput
-                    ref="mainOutput"
-                    :copyLabel="t('jobs.copy')"
-                    @copy="(text) => clip(text, true)"
-                    :output="filteredJobOutput"
-                    :jobLog="job?.job_log"
-                    :workflow="job?.awx_workflow"
-                    :title="job.job_type == 'awx' ? job.target : jobPlaybook || job.form"
-                    numbered
+                  <!-- a multistep job's titles fold their output (click, Enter, Space), as the
+                       output's own section heads do -->
+                  <h3
+                    v-if="steps.length"
+                    class="af-job-title"
+                    role="button"
+                    tabindex="0"
+                    :aria-expanded="!foldedOutputs.main"
+                    :class="{ 'is-folded': foldedOutputs.main }"
+                    @click="toggleOutput('main')"
+                    @keydown.enter.self.prevent="toggleOutput('main')"
+                    @keydown.space.self.prevent="toggleOutput('main')"
                   >
-                    <template #title>
-                      <h3 v-if="steps.length" class="af-job-title">
-                        {{ t('jobs.mainJob') }} (jobid {{ jobId }})
-                        <AppStatusPill :status="job.status" />
-                      </h3>
-                    </template>
-                  </AppAnsibleOutput>
+                    <FaIcon :icon="foldedOutputs.main ? 'chevron-right' : 'chevron-down'" class="af-job-chevron" />
+                    {{ t('jobs.mainJob') }} (jobid {{ jobId }})
+                    <AppStatusPill :status="job.status" />
+                  </h3>
+                  <!-- a wrapper to fold : the output has more than one root, v-show cannot reach it -->
+                  <div v-show="!foldedOutputs.main">
+                    <AppAnsibleOutput
+                      ref="mainOutput"
+                      :copyLabel="t('jobs.copy')"
+                      @copy="(text) => clip(text, true)"
+                      :output="filteredJobOutput"
+                      :jobLog="job?.job_log"
+                      :workflow="job?.awx_workflow"
+                      :title="job.job_type == 'awx' ? job.target : jobPlaybook || job.form"
+                      numbered
+                    />
+                  </div>
                   <!-- a multistep job's steps under it, in their order : the whole run reads down -->
                   <div v-for="(step, i) in steps" :key="step.id" class="af-job-step">
-                    <AppAnsibleOutput :output="step.shown" :jobLog="step.job_log" numbered>
-                      <template #title>
-                        <h3 class="af-job-title">
-                          {{ t('jobs.stepN', { n: i + 1 })
-                          }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
-                          <AppStatusPill :status="step.status" />
-                        </h3>
-                      </template>
-                    </AppAnsibleOutput>
+                    <h3
+                      class="af-job-title"
+                      role="button"
+                      tabindex="0"
+                      :aria-expanded="!foldedOutputs[step.id]"
+                      :class="{ 'is-folded': foldedOutputs[step.id] }"
+                      @click="toggleOutput(step.id)"
+                      @keydown.enter.self.prevent="toggleOutput(step.id)"
+                      @keydown.space.self.prevent="toggleOutput(step.id)"
+                    >
+                      <FaIcon
+                        :icon="foldedOutputs[step.id] ? 'chevron-right' : 'chevron-down'"
+                        class="af-job-chevron"
+                      />
+                      {{ t('jobs.stepN', { n: i + 1 })
+                      }}<template v-if="step.target"> · {{ step.target }}</template> (jobid {{ step.id }})
+                      <AppStatusPill :status="step.status" />
+                    </h3>
+                    <div v-show="!foldedOutputs[step.id]">
+                      <AppAnsibleOutput :output="step.shown" :jobLog="step.job_log" numbered />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1679,6 +1709,8 @@ onMounted(async () => {
   padding: 0.625rem 1.25rem;
   background: var(--bs-tertiary-bg);
   border-bottom: 1px solid var(--af-field-border);
+  cursor: pointer;
+  user-select: none;
   .badge {
     font-size: 0.5em;
   }
@@ -1795,6 +1827,15 @@ onMounted(async () => {
 /* the jobs table : the shared look (styles/tables.scss), plus every cell on one line (the
    action icons side by side, a date not broken in two) */
 /* a multistep job's step under the output before it : a line where one ends and the next begins */
+/* folded, nothing under it to divide from : the next step's own line is the only one */
+.af-job-title.is-folded {
+  border-bottom: 0;
+}
+/* the fold chevron of a title : as the output's own section heads' (.af-node-chevron) */
+.af-job-chevron {
+  width: 0.75rem;
+  color: var(--bs-secondary-color);
+}
 .af-job-step {
   border-top: 1px solid var(--af-field-border);
 }
