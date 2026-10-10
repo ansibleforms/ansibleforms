@@ -33,6 +33,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import init from "../init/index.js";
 import { holdsWorkerLock } from "../lib/workerLock.js";
+import { missingFromManifest } from "../lib/schemaCompleteness.js";
+import { appVersion } from "../lib/version.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -503,7 +505,7 @@ const SCHEMA_MANIFEST = {
   base: {
     tables: ['groups', 'users', 'tokens', 'credentials', 'ldap', 'jobs', 'job_output',
              'settings', 'repositories', 'schedule', 'audit', 'chat_settings', 'secret_stores', 'runners',
-             'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'mail_servers', 'login_failures', 'token_revocations'],
+             'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'mail_servers', 'login_failures', 'token_revocations', 'schema_migrations'],
   },
   patches: {
     patchVersion4: { columns: ['ldap.groups_search_base', 'ldap.groups_attribute', 'ldap.group_class',
@@ -540,7 +542,7 @@ const SCHEMA_MANIFEST = {
     // dropped), and the job log a playbook writes is stored on the job
     // and the worker and several app nodes : the processes on the database, what changed
     // between them, the designer lock, and the node that follows a job
-    patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'mail_servers', 'login_failures', 'token_revocations'],
+    patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'mail_servers', 'login_failures', 'token_revocations', 'schema_migrations'],
                      columns: ['schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'jobs.runner',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
@@ -887,6 +889,9 @@ async function patchVersion7(messages, success, failed) {
   // failed logins, for the account lockout (lib/loginThrottle.js)
   const loginFailures = fs.readFileSync(`${__dirname}/../db/create_login_failures_table.sql`);
   await checkPromise(addTable("login_failures", loginFailures.toString()), messages, success, failed);
+  // the patches applied, and by which release (recordMigrations)
+  const migrations = fs.readFileSync(`${__dirname}/../db/create_schema_migrations_table.sql`);
+  await checkPromise(addTable("schema_migrations", migrations.toString()), messages, success, failed);
   // revoked tokens : logouts and password changes (lib/tokenRevocation.js)
   const tokenRevocations = fs.readFileSync(`${__dirname}/../db/create_token_revocations_table.sql`);
   await checkPromise(addTable("token_revocations", tokenRevocations.toString()), messages, success, failed);
@@ -995,6 +1000,78 @@ export async function copyMailSettingsToServers() {
   return "Copied the mail settings to the mail server 'default'" + (credential ? ", its login to the credential 'mail-login'" : "");
 }
 
+// the tables 7.0.0 drops : their presence means an upgrade is pending
+const LEGACY_TABLES = ["staging", "datasource", "datasource_schemas", "awx", "azuread", "oidc"];
+
+/**
+ * Whether the patches have something to change : the schema lacks what the manifest says, or
+ * still holds a table an upgrade drops.
+ *
+ * Returns:
+ *   Promise<string[]>: what is pending, for the log ; empty when nothing is.
+ */
+async function pendingUpgrade() {
+  const legacy = await mysql.do(
+    "SELECT table_name AS t FROM information_schema.tables WHERE table_schema='AnsibleForms' AND table_name IN (?)",
+    [LEGACY_TABLES]
+  );
+  const { missingTables, missingColumns, missingIndexes } = await missingFromManifest(SCHEMA_MANIFEST, mysql);
+  return [
+    ...legacy.map((r) => `drop ${r.t}`),
+    ...missingTables.map((t) => `add table ${t}`),
+    ...missingColumns.map((c) => `add column ${c}`),
+    ...missingIndexes.map((i) => `add index ${i}`),
+  ];
+}
+
+/**
+ * A backup of the database before an upgrade changes it : the patches drop tables and alter
+ * others, and there was no way back. The regular backup (Backups page), named after the release.
+ * A failed backup stops the upgrade, unless UPGRADE_BACKUP=0.
+ *
+ * Returns:
+ *   Promise<string|null>: what was done, for the patch messages ; null when nothing is pending.
+ *
+ * Raises:
+ *   Error: the backup failed (and UPGRADE_BACKUP is not 0).
+ */
+async function backupBeforeUpgrade() {
+  const pending = await pendingUpgrade();
+  if (!pending.length) return null;
+  logger.notice(`The database needs upgrading (${pending.slice(0, 8).join(", ")}${pending.length > 8 ? ", ..." : ""})`);
+  if (String(process.env.UPGRADE_BACKUP ?? "1").trim() === "0") {
+    logger.warning("UPGRADE_BACKUP=0 : upgrading the database without a backup first");
+    return "Upgrading without a backup (UPGRADE_BACKUP=0)";
+  }
+  const { default: Backup } = await import("./backup.model.js");
+  try {
+    const { backupFolder } = await Backup.doBackup(`Before the upgrade to ${appVersion}`);
+    logger.notice(`Backed up the database before the upgrade : ${backupFolder}`);
+    return `Backed up the database before the upgrade (${backupFolder})`;
+  } catch (err) {
+    // not the backup's own message : it can carry the dump command, and the backup logged why
+    // it failed already (masked)
+    throw new Error("The database needs upgrading, and the backup before it failed (the backup's error is logged above). Fix the backup (MYSQLDUMP_COMMAND, BACKUP_PATH), or set UPGRADE_BACKUP=0 to upgrade without one", { cause: err });
+  }
+}
+
+/**
+ * Records the patches this release applied : the first release that applied each, and the
+ * release the schema is at now (row 'schema').
+ *
+ * Returns:
+ *   Promise<void>: settles once recorded.
+ */
+async function recordMigrations() {
+  for (const name of Object.keys(SCHEMA_MANIFEST.patches || {})) {
+    await mysql.do("INSERT IGNORE INTO AnsibleForms.`schema_migrations` (name, version, applied_at) VALUES (?, ?, NOW())", [name, appVersion]);
+  }
+  await mysql.do(
+    "INSERT INTO AnsibleForms.`schema_migrations` (name, version, applied_at) VALUES ('schema', ?, NOW()) ON DUPLICATE KEY UPDATE applied_at = IF(version = VALUES(version), applied_at, NOW()), version = VALUES(version)",
+    [appVersion]
+  );
+}
+
 // PATCHING : Patch All
 async function patchAll(messages, success, failed) {
   await checkPromise(patchVersion4(messages, success, failed), messages, success, failed);
@@ -1053,8 +1130,21 @@ async function checkAll({ patch = true } = {}) {
     throw err;
   }
 
-  // patch the tables
-  if (patch) await checkPromise(patchAll(messages, success, failed), messages, success, failed);
+  // patch the tables : a backup first when they have something to change, and what was applied
+  // recorded after
+  if (patch) {
+    try {
+      const done = await backupBeforeUpgrade();
+      if (done) { messages.push(done); success.push(done); }
+    } catch (err) {
+      const why = err.message || String(err);
+      messages.push(why);
+      failed.push(why);
+      logger.error(why);
+    }
+    if (failed.length === 0) await checkPromise(patchAll(messages, success, failed), messages, success, failed);
+    if (failed.length === 0) await checkPromise(recordMigrations().then(() => null), messages, success, failed);
+  }
 
   if (failed.length > 0) {
     // some of the patches failed // throw now

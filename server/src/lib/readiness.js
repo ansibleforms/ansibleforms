@@ -9,17 +9,25 @@
 /*                                                                */
 /******************************************************************/
 import { isStopping } from "./shutdown.js";
+import { missingFromManifest } from "./schemaCompleteness.js";
 
 /**
  * Whether this process can serve.
  *
  * Args:
  *   mysql (object): the database layer (do(sql)).
+ *   manifest (object): the schema manifest (models/schema.model.js) : given, the whole schema
+ *     must be there.
  *
  * Returns:
  *   Promise<{ready: boolean, reason?: string}>: ready, or why not.
  */
-export async function readiness(mysql) {
+// the schema's completeness is read at most every 30 seconds : a probe every few seconds must not
+// query information_schema each time
+const SCHEMA_TTL_MS = 30000;
+let schemaChecked = { at: 0, reason: null };
+
+export async function readiness(mysql, manifest = null) {
   if (isStopping()) return { ready: false, reason: "stopping" };
   try {
     await mysql.do("SELECT 1");
@@ -32,6 +40,19 @@ export async function readiness(mysql) {
   } catch {
     return { ready: false, reason: "schema unreadable" };
   }
+  // all of the schema manifest : an upgrade that stopped halfway (its backup failed) is not ready
+  if (manifest) {
+    if (Date.now() - schemaChecked.at > SCHEMA_TTL_MS) {
+      try {
+        const { missingTables, missingColumns, missingIndexes } = await missingFromManifest(manifest, mysql);
+        const missing = missingTables.length + missingColumns.length + missingIndexes.length;
+        schemaChecked = { at: Date.now(), reason: missing ? "schema not upgraded" : null };
+      } catch {
+        schemaChecked = { at: Date.now(), reason: "schema unreadable" };
+      }
+    }
+    if (schemaChecked.reason) return { ready: false, reason: schemaChecked.reason };
+  }
   return { ready: true };
 }
 
@@ -40,15 +61,16 @@ export async function readiness(mysql) {
  *
  * Args:
  *   mysql (object): the database layer.
+ *   manifest (object): the schema manifest, or null for the three core tables only.
  *
  * Returns:
  *   {live: function, ready: function}: the handlers.
  */
-export function readinessHandlers(mysql) {
+export function readinessHandlers(mysql, manifest = null) {
   return {
     live: (req, res) => res.status(200).json({ status: "live" }),
     ready: async (req, res) => {
-      const r = await readiness(mysql);
+      const r = await readiness(mysql, manifest);
       res.status(r.ready ? 200 : 503).json(r.ready ? { status: "ready" } : { status: "not ready", reason: r.reason });
     },
   };
