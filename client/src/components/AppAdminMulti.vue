@@ -87,7 +87,6 @@ import { Popover } from 'bootstrap';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Helpers from '@/lib/Helpers';
-import TokenStorage from '@/lib/TokenStorage';
 import { useVuelidate } from '@vuelidate/core';
 import yaml from 'yaml';
 import { required, helpers, email, sameAs } from '@vuelidate/validators';
@@ -332,7 +331,7 @@ function flatRow(value) {
 async function loadList(type, isFlat = false, version = undefined) {
   const apiVersion = version || props.apiVersion;
   try {
-    const result = await axios.get(`/api/v${apiVersion}/${type}/`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v${apiVersion}/${type}/`);
     if (apiVersion == 2) {
       if (isFlat) {
         const records = Array.isArray(result.data.records) ? result.data.records : [];
@@ -382,10 +381,7 @@ async function loadItem() {
         // list of objects, where loadList sets id from the record's own idKey.
         item.value = itemList.value.find((r) => r[idKey] === itemId.value);
       } else {
-        result = await axios.get(
-          `/api/v${props.apiVersion}/${objectType}/${itemId.value}`,
-          TokenStorage.getAuthentication(),
-        );
+        result = await axios.get(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
         item.value = result.data;
         for (const field of fields.value) {
           if (field.type == 'checkbox') {
@@ -542,7 +538,7 @@ async function createItem() {
   var invalid = isInvalid.value;
   if (!invalid) {
     try {
-      await axios.post(`/api/v${props.apiVersion}/${objectType}/`, savePayload(), TokenStorage.getAuthentication());
+      await axios.post(`/api/v${props.apiVersion}/${objectType}/`, savePayload());
       toast.success(objectTitle('', t('settings.common.isCreated')));
       // the dialog that asked for it (a dropdown's New button) selects what was created
       emit('created', item.value.name ?? item.value[idKey]);
@@ -567,7 +563,6 @@ async function updateItem(passwordOnly = false) {
       await axios.put(
         `/api/v${props.apiVersion}/${objectType}/${itemId.value}`,
         passwordOnly ? item.value : savePayload(),
-        TokenStorage.getAuthentication(),
       );
       toast.success(objectTitle('', t('settings.common.isUpdated')));
       loadItems();
@@ -581,12 +576,9 @@ async function updateItem(passwordOnly = false) {
 async function removeItem() {
   try {
     if (isFlat) {
-      await axios.delete(
-        `/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`,
-        TokenStorage.getAuthentication(),
-      );
+      await axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`);
     } else {
-      await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`, TokenStorage.getAuthentication());
+      await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
     }
     toast.success(objectTitle('', t('settings.common.isDeleted')));
     unselectItem();
@@ -682,7 +674,7 @@ fields.value.forEach((field) => {
 // Load config (AnsibleForms URL) on mount
 onMounted(async () => {
   try {
-    const result = await axios.get(`/api/v2/settings`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v2/settings`);
     config.value = result.data;
   } catch (err) {
     // fallback: leave config empty
@@ -1241,11 +1233,7 @@ async function saveDefaults() {
   for (const [, id] of changed) {
     const row = (itemList.value || []).find((r) => r[idKey] === id);
     try {
-      await axios.put(
-        `/api/v${props.apiVersion}/${objectType}/${id}`,
-        { [defaultPicker.value.key]: true },
-        TokenStorage.getAuthentication(),
-      );
+      await axios.put(`/api/v${props.apiVersion}/${objectType}/${id}`, { [defaultPicker.value.key]: true });
       toast.success(t('settings.common.defaultSaved', { name: row?.name ?? id }));
     } catch (err) {
       toast.error(Helpers.parseAxiosResponseError(err, 'Failed to set the default'));
@@ -1264,7 +1252,7 @@ async function saveDefaults() {
  */
 async function quickUpdate(item, data) {
   try {
-    await axios.put(`/api/v${props.apiVersion}/${objectType}/${item[idKey]}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v${props.apiVersion}/${objectType}/${item[idKey]}`, data);
     toast.success(objectTitle(item.name || '', t('settings.common.isUpdated')));
     await loadItems();
   } catch (err) {
@@ -1332,12 +1320,9 @@ async function bulkDelete() {
           // "3" - a wrong request rather than an error. The row is guaranteed
           // present now, so there is nothing to fall back to.
           const name = present.get(id).name;
-          return axios.delete(
-            `/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(name)}`,
-            TokenStorage.getAuthentication(),
-          );
+          return axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(name)}`);
         }
-        return axios.delete(`/api/v${props.apiVersion}/${objectType}/${id}`, TokenStorage.getAuthentication());
+        return axios.delete(`/api/v${props.apiVersion}/${objectType}/${id}`);
       }),
     );
     toast.success(t('settings.common.isDeleted'));

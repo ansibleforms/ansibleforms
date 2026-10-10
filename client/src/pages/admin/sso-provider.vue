@@ -18,7 +18,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import getSettings from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -49,10 +48,7 @@ useUnsavedGuard(dirty, () => t('settings.common.unsavedChanges'));
  */
 async function load() {
   try {
-    const res = await axios.get(
-      `/api/v2/oauth2/${encodeURIComponent(providerId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     provider.value = record || null;
     edit.value = record ? Object.fromEntries(EDITED.map((k) => [k, record[k] ?? ''])) : null;
@@ -73,7 +69,7 @@ async function load() {
  */
 async function update(data) {
   try {
-    await axios.put(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -161,7 +157,7 @@ const confirmDelete = ref(false);
 async function deleteProvider() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`);
     router.push({ path: '/settings/sso', query: { tab: 'providers' } });
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);

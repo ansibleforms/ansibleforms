@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import yaml from 'yaml';
 import { useI18n } from 'vue-i18n';
@@ -107,7 +106,7 @@ export function useFormsConfig() {
   async function load() {
     try {
       loadError.value = '';
-      const result = await axios.get('/api/v2/settings/config', TokenStorage.getAuthentication());
+      const result = await axios.get('/api/v2/settings/config');
       item.value = result.data;
       baseHash.value = result.data.baseHash || null;
       // ytt-templated configs are read-only here: a section merge would still
@@ -160,7 +159,7 @@ export function useFormsConfig() {
       // document (comments and untouched sections included). baseHash is NOT
       // refreshed from this read : it must stay the hash of what the user
       // started editing, otherwise the server could never detect a conflict.
-      const current = await axios.get('/api/v2/settings/config', TokenStorage.getAuthentication());
+      const current = await axios.get('/api/v2/settings/config');
       const rawYaml = current.data.forms_yaml || '';
 
       // Defense in depth: never section-merge into a ytt template.
@@ -190,7 +189,7 @@ export function useFormsConfig() {
 
       const payload = { forms_yaml: doc.toString() };
       if (baseHash.value) payload.baseHash = baseHash.value;
-      await axios.put('/api/v2/settings/config', payload, TokenStorage.getAuthentication());
+      await axios.put('/api/v2/settings/config', payload);
       toast.success((successLabel || t('settings.settingsPage.label')) + ' ' + t('settings.common.isUpdated'));
       await load();
       return true;
@@ -205,7 +204,7 @@ export function useFormsConfig() {
       // and informs, the second overwrites on purpose.
       if (err.response?.status === 409) {
         try {
-          const fresh = await axios.get('/api/v2/settings/config', TokenStorage.getAuthentication());
+          const fresh = await axios.get('/api/v2/settings/config');
           baseHash.value = fresh.data.baseHash || '';
           toast.error(t('settings.common.configChangedElsewhereRetry'));
         } catch {

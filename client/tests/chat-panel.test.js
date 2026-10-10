@@ -23,7 +23,7 @@ describe('the chat panel', () => {
 
   it('approves with the plan id only - never a payload the page could have changed', () => {
     expect(src).toMatch(
-      /axios\.post\(\s*'\/api\/v2\/chat\/approve',\s*\{ sessionId, planId: proposal\.planId \},\s*TokenStorage\.getAuthentication\(\),?\s*\)/,
+      /axios\.post\(\s*'\/api\/v2\/chat\/approve',\s*\{ sessionId, planId: proposal\.planId \},?\s*\)/,
     );
     expect(src).not.toMatch(/approve[^\n]*extravars/);
   });

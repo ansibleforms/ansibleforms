@@ -23,7 +23,6 @@ import Helpers from '@/lib/Helpers';
 import TokenStorage from '@/lib/TokenStorage';
 import Profile from '@/lib/Profile';
 import { languages, fallbackLanguage } from '@/config/languages';
-import { jwtDecode } from 'jwt-decode';
 import Time from '@/lib/Time';
 
 // INIT
@@ -231,7 +230,7 @@ async function createToken() {
     );
     const token = result.data?.token;
     if (!token) throw new Error('no token');
-    const exp = jwtDecode(token).exp;
+    const exp = TokenStorage.decode(token).exp;
     tokenResult.value = { token, expires: Time.format(exp * 1000) };
   } catch {
     toast.error(t('profilePage.token.failed'));
@@ -313,7 +312,7 @@ async function changePassword() {
   if (!canSavePassword.value) return;
   saving.value = true;
   try {
-    await axios.put(`/api/v2/profile`, password.value, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/profile`, password.value);
     // a new password ends every session of the user, this one too : sign in again with it
     toast.success(t('profilePage.changedSignIn'));
     password.value = { currentPassword: '', password: '', password2: '' };

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import TokenStorage from './TokenStorage';
 
 // Helper to extract API v2 error shape { error: message }
 function extractError(err) {
@@ -13,13 +12,13 @@ function extractError(err) {
 const Lock = {
   // GET lock status (API v2 preferred). Returns pure object on success, throws on error.
   async get() {
-    const res = await axios.get(`/api/v2/lock`, TokenStorage.getAuthentication());
+    const res = await axios.get(`/api/v2/lock`);
     // v2 returns the object directly from RestResult.single
     return res.data; // { lock, match, free } OR { free: true }
   },
   async set() {
     try {
-      const res = await axios.post(`/api/v2/lock`, {}, TokenStorage.getAuthentication());
+      const res = await axios.post(`/api/v2/lock`, {});
       return res.data; // { message: 'Lock added' }
     } catch (err) {
       throw new Error(`Lock set failed: ${extractError(err)}`, { cause: err });
@@ -27,7 +26,7 @@ const Lock = {
   },
   async release() {
     try {
-      const res = await axios.delete(`/api/v2/lock`, TokenStorage.getAuthentication());
+      const res = await axios.delete(`/api/v2/lock`);
       return res.data; // { message: 'Lock deleted' } or { message: 'Lock not present', deleted:false }
     } catch (err) {
       throw new Error(`Lock release failed: ${extractError(err)}`, { cause: err });

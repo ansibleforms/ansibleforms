@@ -4,7 +4,6 @@ import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores/app';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import State from '@/lib/State';
 import Helpers from '@/lib/Helpers';
 import dayjs from 'dayjs';
@@ -569,8 +568,9 @@ async function loadJobs() {
   if (!isLoading.value) {
     try {
       isLoading.value = true;
-      const result = await // as many of the newest jobs as Settings > Jobs says (JOBS_LIST_SIZE)
-      axios.get('/api/v2/job', TokenStorage.getAuthentication());
+      const result =
+        await // as many of the newest jobs as Settings > Jobs says (JOBS_LIST_SIZE)
+        axios.get('/api/v2/job');
       if (result.status === 200) {
         jobs.value = result.data.records;
         jobsLoaded.value = true;
@@ -629,7 +629,7 @@ async function loadOutput(id, sub = false) {
   if (!sub) {
     jobId.value = id;
   }
-  const result = await axios.get(`/api/v2/job/${id}`, TokenStorage.getAuthentication());
+  const result = await axios.get(`/api/v2/job/${id}`);
   if (result.status === 200) {
     const data = result.data;
     if (!sub) {
@@ -656,8 +656,9 @@ async function refreshLive() {
     return;
   }
   try {
-    const result = await // as many of the newest jobs as Settings > Jobs says (JOBS_LIST_SIZE)
-    axios.get('/api/v2/job', TokenStorage.getAuthentication());
+    const result =
+      await // as many of the newest jobs as Settings > Jobs says (JOBS_LIST_SIZE)
+      axios.get('/api/v2/job');
     if (result.status === 200) jobs.value = result.data.records;
   } catch {
     // the next change, or the stream opening again, re-reads
@@ -677,7 +678,7 @@ async function downloadWithAxios(url, headers) {
 // download a job
 async function download(id) {
   try {
-    await downloadWithAxios(`/api/v2/job/${id}/download`, TokenStorage.getAuthentication());
+    await downloadWithAxios(`/api/v2/job/${id}/download`);
   } catch (err) {
     toast.error(err.toString());
   }
@@ -710,7 +711,7 @@ function getJobIndex(id) {
 // Confirming does open the output (jobAction), to follow the job that was just approved.
 async function showApproval(id, reject) {
   try {
-    const result = await axios.get(`/api/v2/job/${id}`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v2/job/${id}`);
     if (result.status === 200) {
       const approvalJob = result.data;
       approvalMessage.value = replacePlaceholders(approvalJob.approval?.message || '', approvalJob.extravars);
@@ -762,18 +763,18 @@ async function jobAction(id, action, method = 'post', uri_suffix = '') {
     const uri = `/api/v2/job/${id}${uri_suffix}`;
     switch (method) {
       case 'get':
-        result = await axios.get(uri, TokenStorage.getAuthentication());
+        result = await axios.get(uri);
         break;
       case 'post':
-        result = await axios.post(uri, {}, TokenStorage.getAuthentication());
+        result = await axios.post(uri, {});
         break;
       case 'delete':
-        result = await axios.delete(uri, TokenStorage.getAuthentication());
+        result = await axios.delete(uri);
         id = undefined; // reset id after delete
         jobId.value = undefined;
         break;
       case 'patch':
-        result = await axios.patch(uri, {}, TokenStorage.getAuthentication());
+        result = await axios.patch(uri, {});
         break;
       default:
         throw new Error('Invalid method');
@@ -855,7 +856,7 @@ async function deleteSelected() {
   let done = 0;
   for (const id of ids) {
     try {
-      await axios.delete(`/api/v2/job/${id}`, TokenStorage.getAuthentication());
+      await axios.delete(`/api/v2/job/${id}`);
       done++;
     } catch (err) {
       toast.error(Helpers.parseAxiosResponseError(err) || `Failed to delete job ${id}`);
@@ -886,7 +887,7 @@ async function editAndRelaunchJob(id) {
   relaunchWithEdit.value = false;
   // Get the job to find the form name
   try {
-    const result = await axios.get(`/api/v2/job/${id}`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v2/job/${id}`);
     const formName = result.data.form;
     // Navigate to form with prefillJobId parameter
     router.push({ name: '/form', query: { form: formName, prefillJobId: id } });

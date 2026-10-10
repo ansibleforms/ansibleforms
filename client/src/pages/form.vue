@@ -1331,7 +1331,7 @@ async function createSchedule() {
       scheduleData.run_at = scheduleForm.value.run_at;
     }
 
-    await axios.post('/api/v2/schedule', scheduleData, TokenStorage.getAuthentication());
+    await axios.post('/api/v2/schedule', scheduleData);
 
     const successMessage =
       scheduleAction.value === 'schedule'
@@ -1388,7 +1388,7 @@ async function createStoredJob() {
       expires_at: storeForm.value.expires_at || null,
     };
 
-    await axios.post('/api/v2/stored-jobs', storedJobData, TokenStorage.getAuthentication());
+    await axios.post('/api/v2/stored-jobs', storedJobData);
 
     toast.success(`Form data saved as "${storeForm.value.name}"`);
     closeStoreOffcanvas();
@@ -1414,10 +1414,7 @@ async function openLoadOffcanvas() {
   loadSubmitting.value = true;
 
   try {
-    const response = await axios.get(
-      `/api/v2/stored-jobs?form_name=${encodeURIComponent(ctx.formName)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const response = await axios.get(`/api/v2/stored-jobs?form_name=${encodeURIComponent(ctx.formName)}`);
     storedJobs.value = response.data.records || [];
   } catch (error) {
     console.error('Error fetching stored jobs:', error);
@@ -1474,7 +1471,7 @@ async function abortJob(id) {
   if (!id) return;
   toast.warning('Aborting job ' + id);
   try {
-    const result = await axios.post(`/api/v2/job/${id}/abort`, {}, TokenStorage.getAuthentication());
+    const result = await axios.post(`/api/v2/job/${id}/abort`, {});
     if (result.status == 200) {
       abortTriggered.value = true;
     }
@@ -1495,7 +1492,7 @@ async function downloadWithAxios(url, headers) {
 // download a job
 async function download(id) {
   try {
-    await downloadWithAxios(`/api/v2/job/${id}/download`, TokenStorage.getAuthentication());
+    await downloadWithAxios(`/api/v2/job/${id}/download`);
   } catch (err) {
     toast.error(err.toString());
   }
@@ -1504,7 +1501,7 @@ async function download(id) {
 async function getJob(id, final) {
   try {
     // get the job result
-    const result = await axios.get(`/api/v2/job/${id}`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v2/job/${id}`);
     pollFailures.value = 0; // a poll got through : forget earlier blips
     // store the job result
     job.value = result.data;
@@ -1513,7 +1510,7 @@ async function getJob(id, final) {
     if (job.value.job_type == 'multistep' && job.value.subjobs.length > 0) {
       const lastsubjob = job.value.subjobs.slice(-1)[0];
       try {
-        const subjobresult = await axios.get(`/api/v2/job/${lastsubjob}`, TokenStorage.getAuthentication());
+        const subjobresult = await axios.get(`/api/v2/job/${lastsubjob}`);
         subjob.value = subjobresult.data;
       } catch (e) {
         console.error('Error getting job : ' + lastsubjob);
@@ -1598,7 +1595,7 @@ async function launchForm(postdata) {
   abortTriggered.value = false;
   try {
     status.value = 'running';
-    const result = await axios.post(`/api/v2/job/`, postdata, TokenStorage.getAuthentication());
+    const result = await axios.post(`/api/v2/job/`, postdata);
     jobId.value = result.data.id;
     if (currentForm.value.onSubmit) {
       currentForm.value.onSubmit.forEach((action) => {
@@ -1666,10 +1663,7 @@ async function loadForm() {
     if (route.query.prefillJobId) {
       try {
         console.log('Loading pre-fill data from job:', route.query.prefillJobId);
-        const result = await axios.get(
-          `/api/v2/job/${route.query.prefillJobId}/rawformdata`,
-          TokenStorage.getAuthentication(),
-        );
+        const result = await axios.get(`/api/v2/job/${route.query.prefillJobId}/rawformdata`);
         if (result.data) {
           initialFormData.value = result.data;
           toast.info(`Form pre-filled with data from previous job #${route.query.prefillJobId}`);
@@ -1726,10 +1720,7 @@ async function loadForm() {
     // own Load button does - a wizard's per-step drafts too
     if (route.query.storedJob) {
       try {
-        const res = await axios.get(
-          `/api/v2/stored-jobs/${encodeURIComponent(route.query.storedJob)}`,
-          TokenStorage.getAuthentication(),
-        );
+        const res = await axios.get(`/api/v2/stored-jobs/${encodeURIComponent(route.query.storedJob)}`);
         const stored = res.data?.records ? res.data.records[0] : res.data;
         if (stored?.form_data) {
           buildMainStoreCtx().onLoad(JSON.parse(stored.form_data));

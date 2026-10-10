@@ -8,7 +8,6 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
-import TokenStorage from '@/lib/TokenStorage';
 
 const authenticated = ref(false);
 const tests = ref({});
@@ -18,7 +17,7 @@ async function test_connection(item) {
     if (!tests.value[item.id]) {
       try {
         tests.value[item.id] = t('admin.testing');
-        const result = await axios.get(`/api/v2/credential/testdb/${item.id}`, TokenStorage.getAuthentication());
+        const result = await axios.get(`/api/v2/credential/testdb/${item.id}`);
         toast.success(result.data.message);
       } catch (err) {
         toast.error(Helpers.parseAxiosResponseError(err, t('admin.connectionFailed')));

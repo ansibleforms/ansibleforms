@@ -11,7 +11,6 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import Helpers from '@/lib/Helpers';
 import BaseUrl from '@/lib/BaseUrl';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { availableIcons } from '@/config/icons';
@@ -836,7 +835,7 @@ const sortedLocalUsers = computed(() => [...localUsers.value].sort());
 
 async function loadLocalGroups() {
   try {
-    const result = await axios.get('/api/v2/group/', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/group/');
     localGroups.value = (result.data.records || result.data).map((g) => g.name);
   } catch {
     localGroups.value = [];
@@ -845,7 +844,7 @@ async function loadLocalGroups() {
 
 async function loadLocalUsers() {
   try {
-    const result = await axios.get('/api/v2/user/', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/user/');
     localUsers.value = (result.data.records || result.data).map((u) => u.username);
   } catch {
     localUsers.value = [];
@@ -4339,7 +4338,7 @@ const busyOrTemplated = computed(() => busy.value || configTemplated.value);
 
 async function loadFormsRepos() {
   try {
-    const result = await axios.get(`/api/v2/forms-repos`, TokenStorage.getAuthentication());
+    const result = await axios.get(`/api/v2/forms-repos`);
     formsRepos.value = result.data?.repositories || [];
     configRepo.value = result.data?.configRepo || '';
     stagedForms.value = !!result.data?.staged;
@@ -4351,7 +4350,7 @@ async function loadFormsRepos() {
 
 async function loadConfigMode() {
   try {
-    const result = await axios.get('/api/v2/config/mode', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/config/mode');
     configInDatabase.value = !!result.data?.configInDatabase;
   } catch (err) {
     // non-critical; default to false
@@ -4373,7 +4372,7 @@ async function loadConfigTemplated() {
     // access, so a designer without it got a 403 here, the catch answered "not
     // templated", and their next save wrote the ytt EXPANSION over the template and
     // destroyed it. This one is designer-accessible and returns only the boolean.
-    const result = await axios.get('/api/v2/config/templated', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/config/templated');
     configTemplated.value = !!result.data?.templated;
     if (configTemplated.value) toast.warning(t('settings.settingsPage.configTemplated'));
   } catch (err) {
@@ -4438,7 +4437,7 @@ function pullAndReload(name) {
     loadingRepos.value = true;
     try {
       const url = name ? `/api/v2/forms-repos/pull/${encodeURIComponent(name)}` : `/api/v2/forms-repos/pull`;
-      await axios.post(url, {}, TokenStorage.getAuthentication());
+      await axios.post(url, {});
       stagedForms.value = false;
       await reloadFromDisk();
       toast.success(t('designer.loadDone'));
@@ -4476,7 +4475,7 @@ async function syncRepos(name) {
   syncing.value = true;
   try {
     const url = name ? `/api/v2/forms-repos/sync/${encodeURIComponent(name)}` : `/api/v2/forms-repos/sync`;
-    await axios.post(url, {}, TokenStorage.getAuthentication());
+    await axios.post(url, {});
     toast.success(t('designer.syncDone'));
   } catch (err) {
     const error = err.response?.data?.error || err.message;

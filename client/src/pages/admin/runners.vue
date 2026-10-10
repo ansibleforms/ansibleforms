@@ -7,7 +7,6 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import { useAppStore } from '@/stores/app';
 
@@ -23,7 +22,7 @@ async function test_connection(item) {
     if (!tests.value[item.id]) {
       try {
         tests.value[item.id] = t('admin.testing');
-        const result = await axios.post(`/api/v2/runner/${item.id}/check`, {}, TokenStorage.getAuthentication());
+        const result = await axios.post(`/api/v2/runner/${item.id}/check`, {});
         toast.success(result.data.result);
       } catch (err) {
         toast.error(Helpers.parseAxiosResponseError(err, t('admin.connectionFailed')));

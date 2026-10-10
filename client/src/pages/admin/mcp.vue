@@ -4,7 +4,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import BaseUrl from '@/lib/BaseUrl';
 import { useEnvVars } from '@/composables/useEnvVars';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -115,7 +114,7 @@ onMounted(async () => {
   if (!authenticated.value) return;
   await loadEnvironmentVariables();
   try {
-    publicUrl.value = (await axios.get('/api/v2/settings/', TokenStorage.getAuthentication())).data?.url || '';
+    publicUrl.value = (await axios.get('/api/v2/settings/')).data?.url || '';
   } catch {
     // no public url : the page's own address stands in
   }

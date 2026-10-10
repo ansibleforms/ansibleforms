@@ -11,7 +11,6 @@ import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import Theme from '@/lib/Theme';
-import { jwtDecode } from 'jwt-decode';
 import { useAppStore } from '@/stores/app';
 
 // plugins
@@ -64,8 +63,8 @@ function getGroupsAndLogin(token, url, type = 'azuread') {
     tokenLogin(token, []);
   } else {
     // OIDC branch for now => specify type in the future?
-    // decode token with "jwt-decode"
-    const payload = jwtDecode(token);
+    // decode the token (TokenStorage.decode)
+    const payload = TokenStorage.decode(token);
 
     if (!payload) {
       toast.error('Failed to decode login token');

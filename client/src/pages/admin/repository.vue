@@ -226,7 +226,7 @@ async function save() {
     return;
   }
   try {
-    await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
     toast.success(`${data.name} ${t('settings.common.isUpdated')}`);
     if (data.name !== repoName.value) {
       // the saved values first, so the unsaved guard lets the page go
@@ -250,11 +250,7 @@ async function save() {
 async function run(what) {
   repo.value.status = 'running';
   try {
-    await axios.post(
-      `/api/v2/repository/${encodeURIComponent(repoName.value)}/${what}`,
-      {},
-      TokenStorage.getAuthentication(),
-    );
+    await axios.post(`/api/v2/repository/${encodeURIComponent(repoName.value)}/${what}`, {});
   } catch (err) {
     fail(err);
   }
@@ -273,11 +269,7 @@ const changingPassword = ref(false);
  */
 async function savePassword(password) {
   try {
-    await axios.put(
-      `/api/v2/repository/${encodeURIComponent(repoName.value)}`,
-      { password },
-      TokenStorage.getAuthentication(),
-    );
+    await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, { password });
     changingPassword.value = false;
     toast.success(`${repo.value.name} ${t('settings.common.isUpdated')}`);
   } catch (err) {
@@ -294,7 +286,7 @@ const confirmDelete = ref(false);
 async function deleteRepo() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`);
     edit.value = null;
     repo.value = null;
     router.push('/settings/repositories');

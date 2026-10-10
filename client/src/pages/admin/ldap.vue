@@ -16,7 +16,6 @@ const tabs = computed(() => [
   { key: 'users', label: t('settings.ldap.tabUsers'), icon: 'user' },
   { key: 'groups', label: t('settings.ldap.tabGroups'), icon: 'users' },
 ]);
-import TokenStorage from '@/lib/TokenStorage';
 import yaml from 'yaml';
 
 const authenticated = ref(false);
@@ -53,7 +52,7 @@ async function performTest() {
       testuser: testUser.value,
       testpassword: testPassword.value,
     };
-    const result = await axios.post(`/api/v2/ldap/check`, testData, TokenStorage.getAuthentication());
+    const result = await axios.post(`/api/v2/ldap/check`, testData);
     testResult.value = result.data;
     toast.success(t('admin.ldap.connectionSuccessful'));
   } catch (err) {

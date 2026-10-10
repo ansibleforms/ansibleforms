@@ -31,7 +31,6 @@ import { jobsPath } from '@/lib/jobsPath';
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import TokenStorage from '@/lib/TokenStorage';
 import { useAppStore } from '@/stores/app';
 import { remembered } from '@/lib/menuMemory';
 import { useLiveEvent } from '@/composables/useLiveEvent';
@@ -135,7 +134,7 @@ const sections = computed(() => {
 async function loadCounts() {
   if (isJobsList.value || !can('showJobs')) return;
   try {
-    const result = await axios.get('/api/v2/job', TokenStorage.getAuthentication());
+    const result = await axios.get('/api/v2/job');
     ownJobs.value = result.data?.records || [];
   } catch (err) {
     // the counts are a hint : without them the menu still works

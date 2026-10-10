@@ -6,28 +6,27 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
-import TokenStorage from '@/lib/TokenStorage';
 
 const adminMulti = ref(null);
 const authenticated = ref(false);
 
 async function triggerClone(repo) {
   adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
-  await axios.post(`/api/v2/repository/${repo.name}/clone`, {}, TokenStorage.getAuthentication());
+  await axios.post(`/api/v2/repository/${repo.name}/clone`, {});
   // wait 1 second to visually see the change
   await new Promise((r) => setTimeout(r, 1000));
   adminMulti.value.loadItems();
 }
 async function triggerSync(repo) {
   adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
-  await axios.post(`/api/v2/repository/${repo.name}/sync`, {}, TokenStorage.getAuthentication()).catch(() => {});
+  await axios.post(`/api/v2/repository/${repo.name}/sync`, {}).catch(() => {});
   // wait 1 second to visually see the change
   await new Promise((r) => setTimeout(r, 1000));
   adminMulti.value.loadItems();
 }
 async function triggerReset(repo) {
   adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
-  await axios.post(`/api/v2/repository/${repo.name}/reset`, {}, TokenStorage.getAuthentication());
+  await axios.post(`/api/v2/repository/${repo.name}/reset`, {});
   // wait 1 second to visually see the change
   await new Promise((r) => setTimeout(r, 1000));
   adminMulti.value.loadItems();

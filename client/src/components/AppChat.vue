@@ -14,7 +14,6 @@
 import axios from 'axios';
 import showdown from 'showdown';
 import { useI18n } from 'vue-i18n';
-import TokenStorage from '@/lib/TokenStorage';
 import { sanitize } from '@/lib/HtmlSanitizer';
 import { useAppStore } from '@/stores/app';
 import { useRoute } from 'vue-router';
@@ -78,7 +77,7 @@ function writeSession(id) {
 
 async function ensureSession() {
   if (sessionId) return sessionId;
-  const res = await axios.post('/api/v2/chat/session', {}, TokenStorage.getAuthentication());
+  const res = await axios.post('/api/v2/chat/session', {});
   writeSession(res.data.sessionId);
   return sessionId;
 }
@@ -115,21 +114,13 @@ async function send(text, selection) {
     await ensureSession();
     let res;
     try {
-      res = await axios.post(
-        '/api/v2/chat/message',
-        { sessionId, message, selection },
-        TokenStorage.getAuthentication(),
-      );
+      res = await axios.post('/api/v2/chat/message', { sessionId, message, selection });
     } catch (err) {
       // the server forgot the conversation (a restart) : one new one, same message
       if (err?.response?.data?.error?.code !== 'session_not_found') throw err;
       writeSession('');
       await ensureSession();
-      res = await axios.post(
-        '/api/v2/chat/message',
-        { sessionId, message, selection },
-        TokenStorage.getAuthentication(),
-      );
+      res = await axios.post('/api/v2/chat/message', { sessionId, message, selection });
     }
     const d = res.data || {};
     entries.value.push({
@@ -162,11 +153,7 @@ async function approve(proposal) {
   if (proposal.state !== 'open') return;
   proposal.state = 'busy';
   try {
-    const res = await axios.post(
-      '/api/v2/chat/approve',
-      { sessionId, planId: proposal.planId },
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.post('/api/v2/chat/approve', { sessionId, planId: proposal.planId });
     proposal.state = 'done';
     proposal.jobId = res.data?.job?.id ?? null;
     if (proposal.jobId) track(proposal);
@@ -184,7 +171,7 @@ function track(proposal, failures = 0) {
   const timer = setTimeout(async () => {
     timers.delete(timer);
     try {
-      const res = await axios.get(`/api/v2/job/${proposal.jobId}`, TokenStorage.getAuthentication());
+      const res = await axios.get(`/api/v2/job/${proposal.jobId}`);
       const job = res.data || {};
       proposal.jobStatus = job.status;
       if (!FINAL.includes(job.status)) track(proposal);
@@ -213,7 +200,7 @@ async function newConversation() {
   writeSession('');
   entries.value = [];
   input.value = '';
-  if (old) axios.post('/api/v2/chat/reset', { sessionId: old }, TokenStorage.getAuthentication()).catch(() => {});
+  if (old) axios.post('/api/v2/chat/reset', { sessionId: old }).catch(() => {});
   nextTick(() => inputBox.value?.focus());
 }
 
@@ -230,7 +217,7 @@ const jobStatus = ref(false);
 const examples = ref([]); // a few of this user's chat forms, named in the welcome
 async function loadConfig() {
   try {
-    const res = await axios.get('/api/v2/chat/config', TokenStorage.getAuthentication());
+    const res = await axios.get('/api/v2/chat/config');
     if (!res.data?.enabled) store.chatEnabled = false;
     jobStatus.value = !!res.data?.jobStatus;
     examples.value = Array.isArray(res.data?.examples) ? res.data.examples : [];

@@ -18,7 +18,6 @@ import YAML from 'yaml';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import Helpers from '@/lib/Helpers';
 import { editorStyle } from '@/config/editorStyle';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -97,10 +96,7 @@ const valuesError = computed(() => {
  */
 async function load() {
   try {
-    const res = await axios.get(
-      `/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const res = await axios.get(`/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`);
     const record = res.data?.records ? res.data.records[0] : res.data;
     stored.value = record?.id ? record : null;
     edit.value = stored.value ? editable(record) : null;
@@ -144,11 +140,7 @@ async function save() {
     form_data: JSON.stringify(YAML.parse(e.values || '{}') || {}),
   };
   try {
-    await axios.put(
-      `/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`,
-      data,
-      TokenStorage.getAuthentication(),
-    );
+    await axios.put(`/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`, data);
     toast.success(`${data.name} ${t('settings.common.isUpdated')}`);
     await load();
   } catch (err) {
@@ -172,7 +164,7 @@ const confirmDelete = ref(false);
 async function deleteStored() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`);
     stored.value = null;
     router.push('/jobs/stored');
   } catch (err) {

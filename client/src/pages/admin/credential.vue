@@ -140,11 +140,7 @@ async function load() {
  */
 async function update(data) {
   try {
-    await axios.put(
-      `/api/v2/credential/${encodeURIComponent(credentialId.value)}`,
-      data,
-      TokenStorage.getAuthentication(),
-    );
+    await axios.put(`/api/v2/credential/${encodeURIComponent(credentialId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -228,10 +224,7 @@ const testing = ref(false);
 async function testConnection() {
   testing.value = true;
   try {
-    const result = await axios.get(
-      `/api/v2/credential/testdb/${encodeURIComponent(credentialId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    const result = await axios.get(`/api/v2/credential/testdb/${encodeURIComponent(credentialId.value)}`);
     toast.success(result.data.message);
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err, t('admin.connectionFailed')));
@@ -265,10 +258,7 @@ const confirmDelete = ref(false);
 async function deleteCredential() {
   confirmDelete.value = false;
   try {
-    await axios.delete(
-      `/api/v2/credential/${encodeURIComponent(credentialId.value)}`,
-      TokenStorage.getAuthentication(),
-    );
+    await axios.delete(`/api/v2/credential/${encodeURIComponent(credentialId.value)}`);
     credential.value = null;
     router.push('/settings/credentials');
   } catch (err) {

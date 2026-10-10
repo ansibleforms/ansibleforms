@@ -1,13 +1,9 @@
 import axios from 'axios';
-import TokenStorage from './TokenStorage';
 
 const Backup = {
   async load() {
     try {
-      const result = await axios.get(
-        `/api/v2/config/backups?timestamp=${new Date().getTime()}`,
-        TokenStorage.getAuthentication(),
-      );
+      const result = await axios.get(`/api/v2/config/backups?timestamp=${new Date().getTime()}`);
       return result.data;
     } catch (err) {
       if (err.response?.status == 401) {
@@ -21,11 +17,7 @@ const Backup = {
   },
   async restore(backupName, backupBeforeRestore) {
     try {
-      await axios.post(
-        `/api/v2/config/restore/${backupName}?backupBeforeRestore=${backupBeforeRestore}`,
-        {},
-        TokenStorage.getAuthentication(),
-      );
+      await axios.post(`/api/v2/config/restore/${backupName}?backupBeforeRestore=${backupBeforeRestore}`, {});
       return true;
     } catch (err) {
       if (err.response?.status == 401) {

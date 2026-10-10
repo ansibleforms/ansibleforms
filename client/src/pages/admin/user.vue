@@ -15,7 +15,6 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
-import TokenStorage from '@/lib/TokenStorage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 
@@ -55,8 +54,8 @@ const userGroups = computed(() => {
 async function load() {
   try {
     const [u, g] = await Promise.all([
-      axios.get(`/api/v2/user/${encodeURIComponent(userId.value)}`, TokenStorage.getAuthentication()),
-      axios.get('/api/v2/group/', TokenStorage.getAuthentication()),
+      axios.get(`/api/v2/user/${encodeURIComponent(userId.value)}`),
+      axios.get('/api/v2/group/'),
     ]);
     const record = u.data.records ? u.data.records[0] : u.data;
     user.value = record || null;
@@ -82,7 +81,7 @@ async function load() {
  */
 async function update(data) {
   try {
-    await axios.put(`/api/v2/user/${encodeURIComponent(userId.value)}`, data, TokenStorage.getAuthentication());
+    await axios.put(`/api/v2/user/${encodeURIComponent(userId.value)}`, data);
     return true;
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
@@ -142,11 +141,7 @@ const freeGroups = computed(() => groups.value.filter((g) => !userGroups.value.s
  */
 async function saveAddGroup() {
   try {
-    await axios.post(
-      `/api/v2/user/${encodeURIComponent(userId.value)}/groups`,
-      { group_id: addingGroup.value },
-      TokenStorage.getAuthentication(),
-    );
+    await axios.post(`/api/v2/user/${encodeURIComponent(userId.value)}/groups`, { group_id: addingGroup.value });
     addingGroup.value = null;
     await load();
   } catch (err) {
@@ -163,10 +158,7 @@ async function saveAddGroup() {
 async function removeGroups(ids) {
   for (const gid of ids) {
     try {
-      await axios.delete(
-        `/api/v2/user/${encodeURIComponent(userId.value)}/groups/${gid}`,
-        TokenStorage.getAuthentication(),
-      );
+      await axios.delete(`/api/v2/user/${encodeURIComponent(userId.value)}/groups/${gid}`);
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
       break;
@@ -213,7 +205,7 @@ const confirmDelete = ref(false);
 async function deleteUser() {
   confirmDelete.value = false;
   try {
-    await axios.delete(`/api/v2/user/${encodeURIComponent(userId.value)}`, TokenStorage.getAuthentication());
+    await axios.delete(`/api/v2/user/${encodeURIComponent(userId.value)}`);
     router.push('/settings/users');
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
