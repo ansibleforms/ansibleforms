@@ -27,6 +27,7 @@ import { runAnsibleJob, runnerIdentity } from "./ansible-core.js";
 import { RTE_CONTRACT } from "./contract.js";
 import { openJobSecrets } from "../lib/sealedSecrets.js";
 import { readinessHandlers } from "../lib/readiness.js";
+import { requestContext } from "../lib/requestContext.js";
 import { onShutdown, stopWithin, isStopping } from "../lib/shutdown.js";
 import { appVersion as version } from "../lib/version.js";
 import { startHeartbeat } from "../lib/nodes.js";
@@ -214,6 +215,8 @@ export async function startRte() {
 
   const app = express();
   app.disable("x-powered-by");
+  // the request's id in the response and the log lines (lib/requestContext.js)
+  app.use(requestContext);
   app.use(express.json({ limit: "100kb" }));
   const api = express.Router();
   api.use(bearer(token));

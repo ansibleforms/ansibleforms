@@ -961,6 +961,22 @@
       no playbook itself, so set this in the RTE container's environment ; it is not editable on
       the Settings page.
     version: 5.0.8
+  - name: LOG_FORMAT
+    version: 7.0.0
+    type: string
+    allowed: text, json
+    default: text
+    short: The format of the log lines
+    hint: json writes one JSON object a line ; needs a restart
+    description: |
+      `text` (default) : `<time> <level>: <message>`, colored in the console and the log file.
+      `json` : one JSON object a line - `time` (ISO), `level`, `message`, `requestId`, `role` and
+      `host` - for a log collector (Loki, ELK, Splunk...). Syslog keeps its own format.
+
+      Every request gets an id : the X-Request-Id a reverse proxy sent, or a new one. It is
+      returned in the response's X-Request-Id header and carried by every line written while the
+      request is served (`[req <id>]` in text), so a request can be followed through the log and
+      matched with the proxy's.
   - name: LOG_LEVEL
     type: string
     allowed: emerg, alert, crit, error, warning, notice, info, debug
