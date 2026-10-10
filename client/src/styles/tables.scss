@@ -167,6 +167,21 @@
   flex-shrink: 0;
 }
 
+/* a right-aligned number sits against the next column's left-aligned text : keep them apart,
+   on both sides of the gap ; the last column keeps the same room on its right. Here, not in
+   BsDataTable, so a table drawn by hand (the jobs list) keeps the same room ; every
+   BsDataTable is .bs-dt-table, a framed one .af-table too */
+:is(.af-table, .bs-dt-table) th.text-end:has(+ th:not(.text-end)),
+:is(.af-table, .bs-dt-table) td.text-end:has(+ td:not(.text-end)),
+:is(.af-table, .bs-dt-table) th.text-end:last-child,
+:is(.af-table, .bs-dt-table) td.text-end:last-child {
+  padding-right: 1.5rem;
+}
+:is(.af-table, .bs-dt-table) .text-end + th:not(.text-end),
+:is(.af-table, .bs-dt-table) .text-end + td:not(.text-end) {
+  padding-left: 1.5rem;
+}
+
 /* a pill in a cell : a box of fixed height centring its label's capitals, whatever the
    font's ascent and descent. An odd height : a 9px-high label (Segoe UI) gets 5px on either
    side */
