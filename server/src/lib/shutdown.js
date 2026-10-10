@@ -7,9 +7,30 @@
 // before the orchestrator's own SIGKILL.
 import logger from "./logger.js";
 
-const STOP_WITHIN_MS = 8000;
+let STOP_WITHIN_MS = 8000;
 const closers = [];
 let stopping = false;
+
+/**
+ * Gives the stop more time : an RTE draining its running playbooks needs longer than the
+ * default 8 seconds (RTE_DRAIN_SECONDS).
+ *
+ * Args:
+ *   ms (number): the most a stop may take.
+ */
+export function stopWithin(ms) {
+  STOP_WITHIN_MS = Math.max(STOP_WITHIN_MS, Number(ms) || 0);
+}
+
+/**
+ * Whether the process is stopping (SIGTERM or SIGINT received).
+ *
+ * Returns:
+ *   boolean: true once a stop began.
+ */
+export function isStopping() {
+  return stopping;
+}
 
 export function onShutdown(name, fn) {
   closers.push({ name, fn });

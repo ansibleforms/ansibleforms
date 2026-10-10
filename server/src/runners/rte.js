@@ -152,6 +152,53 @@ async function check(runner) {
   return details;
 }
 
+// how long a job waits for a free RTE (RTE_QUEUE_MINUTES), and how often it asks again
+const queueMinutes = () => Math.max(0, parseInt(process.env.RTE_QUEUE_MINUTES ?? 60, 10) || 0);
+const RETRY_MS = 10000;
+
+/**
+ * Hands a job to the RTE. A full or stopping RTE (503) does not claim it : the job waits, with
+ * one line saying so, and asks again every 10 seconds - for RTE_QUEUE_MINUTES at most, until
+ * the RTE takes it, the job is aborted, or it ended otherwise.
+ *
+ * Args:
+ *   rte (object): the client (client()).
+ *   jobId (number): the job.
+ *   sealed (object): its secrets, sealed for this RTE.
+ *
+ * Returns:
+ *   Promise<void>: settles once the RTE took it.
+ *
+ * Raises:
+ *   Error: the RTE refused it (other than busy), the wait ran out, or the job was aborted.
+ */
+async function handOver(rte, jobId, sealed) {
+  const until = Date.now() + queueMinutes() * 60 * 1000;
+  let said = false;
+  for (;;) {
+    try {
+      await rte.http.post("/jobs", { jobId, contract: RTE_CONTRACT, sealed });
+      return;
+    } catch (err) {
+      if (err?.response?.status !== 503) throw err;
+      if (Date.now() >= until) {
+        throw Object.assign(new Error(`the RTE '${rte.name}' stayed busy for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES)`), { response: { status: 503, data: { error: "busy" } } });
+      }
+      if (!said) {
+        said = true;
+        await Job.printJobOutput(`ok: [Waiting for a free slot on RTE ${rte.name} : ${err.response.data?.error || "busy"}]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
+      }
+      if (await Job.isAbortRequested(jobId).catch(() => false)) {
+        await Job.endJobStatus(jobId, (await Job.lastOrder(jobId)) + 1, "stderr", "aborted", "Playbook was aborted by the operator while it waited for the RTE");
+        await Job.resetAbortRequested(jobId).catch(() => {});
+        throw Object.assign(new Error("aborted while waiting"), { aborted: true, response: { status: 499 } });
+      }
+      if ((await dbStatus(jobId).catch(() => "running")) !== "running") throw Object.assign(new Error("ended while waiting"), { aborted: true, response: { status: 499 } });
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
+  }
+}
+
 export default {
   type: "rte",
   capabilities: { playbook: true, template: false },
@@ -172,15 +219,17 @@ export default {
       return failJob(jobId, `could not prepare the job's credentials for the RTE : ${err.message}`);
     }
     try {
-      await rte.http.post("/jobs", { jobId, contract: RTE_CONTRACT, sealed });
+      await handOver(rte, jobId, sealed);
     } catch (err) {
       // the RTE refused it (4xx) : it is not running. No answer at all (a timeout, a reset
       // connection) may come after the RTE claimed and started it : then follow it, never
       // fail a job that is running
       // The RTE clears jobs.host when the playbook ends, so a job that ran and finished
       // within the wait looks unclaimed : its status says it ran (failJob leaves it alone)
+      // aborted or ended while it waited for a slot : ended already
+      if (err?.aborted) return false;
       if (err?.response || !(await claimedBy(jobId).catch(() => null))) {
-        return failJob(jobId, describe(err, rte.url));
+        return failJob(jobId, err?.response?.status === 503 ? err.message : describe(err, rte.url));
       }
       logger.warning(`Job ${jobId} : no answer from the RTE at ${rte.url}, but it claimed the job : following it`);
     }

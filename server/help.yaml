@@ -407,6 +407,41 @@
       yours (its token follows `RTE_TOKEN`) ; one from the config seed is never touched.
 
       0 : the RTE does not register itself ; add it under Connections > Runners or in the seed.
+  - name: RTE_MAX_JOBS
+    version: 7.0.0
+    type: number
+    allowed: 0 or a positive integer
+    default: 10
+    short: How many playbooks an RTE runs at once
+    hint: Read by an RTE ; 0 sets no limit
+    description: |
+      Read by an RTE (`AF_ROLE=rte`). A full RTE does not take another job : the job waits, says
+      so in its output, and is handed over as soon as a playbook ends (see RTE_QUEUE_MINUTES).
+      Size it to the RTE's cpu and memory : every playbook is an ansible-playbook process with its
+      forks. Run more RTE replicas to run more at once.
+  - name: RTE_DRAIN_SECONDS
+    version: 7.0.0
+    type: number
+    allowed: 0 or a positive integer
+    default: 25
+    short: How long a stopping RTE waits for its running playbooks
+    hint: Read by an RTE ; keep it below the container's stop timeout
+    description: |
+      Read by an RTE. On a stop (SIGTERM : a rolling update, a scale down) it takes no new job and
+      waits this long for the running playbooks to end ; those still running then end as
+      abandoned. Keep it below what the platform waits before it kills the container :
+      Kubernetes' terminationGracePeriodSeconds (30 by default), docker stop's --time (10).
+  - name: RTE_QUEUE_MINUTES
+    version: 7.0.0
+    type: number
+    allowed: 0 or a positive integer
+    default: 60
+    short: How long a job waits for a busy RTE
+    hint: Read by the app nodes and the worker
+    description: |
+      A job handed to an RTE that is full (RTE_MAX_JOBS) or stopping waits for it, asking again
+      every 10 seconds, for this many minutes ; then it fails and says why. An abort ends the
+      wait at once.
   - name: RTE_URL
     version: 7.0.0
     type: string
