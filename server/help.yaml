@@ -961,6 +961,23 @@
       no playbook itself, so set this in the RTE container's environment ; it is not editable on
       the Settings page.
     version: 5.0.8
+  - name: METRICS_TOKEN
+    version: 7.0.0
+    type: string
+    allowed: a long random string
+    default: none (metrics off)
+    short: The bearer token of the Prometheus metrics
+    hint: Unset, /api/v2/metrics answers 404 ; needs a restart
+    description: |
+      Set, an app node or the worker serves Prometheus metrics at `/api/v2/metrics` and an RTE at
+      `/metrics`, to a scraper that sends `Authorization: Bearer <METRICS_TOKEN>`. Unset, they
+      answer 404.
+
+      - the process : cpu, memory, event loop lag, garbage collection (`af_process_*`, `af_nodejs_*`) ;
+      - `af_http_requests_total{route,method,status}`, `af_http_request_duration_seconds{route}` ;
+      - `af_jobs{status}` running and awaiting approval now, `af_jobs_ended_24h{status}` ;
+      - `af_nodes{role,alive}` ; `af_login_failures_total`, `af_login_lockouts_total` ;
+      - an RTE : `af_rte_running_jobs`, `af_rte_max_jobs`.
   - name: LOG_FORMAT
     version: 7.0.0
     type: string

@@ -13,6 +13,7 @@
 import mysql from "../models/db.model.js";
 import appConfig from "../../config/app.config.js";
 import logger from "./logger.js";
+import { loginFailures, loginLockouts } from "./metrics.js";
 
 /**
  * The keys an attempt counts under : the account (lower case, so case variants share one
@@ -83,6 +84,7 @@ export async function loginFailed(username, ip) {
   const max = appConfig.loginMaxFailures;
   const window = appConfig.loginLockoutMinutes;
   if ((!max && !appConfig.loginMaxFailuresPerIp) || !window) return false;
+  loginFailures.inc();
   const { user, ip: ipKey } = keysFor(username, ip);
   let locked = false;
   for (const key of [user, ipKey].filter(Boolean)) {
@@ -105,6 +107,7 @@ export async function loginFailed(username, ip) {
       logger.debug(`Could not count a failed login : ${err.message || err}`);
     }
   }
+  if (locked) loginLockouts.inc();
   if (locked) logger.warning(`Login : account '${String(username)}' locked for ${window} minutes after ${max} failed logins`);
   return locked;
 }
