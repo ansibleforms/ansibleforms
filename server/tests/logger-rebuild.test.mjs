@@ -48,7 +48,8 @@ vi.mock("winston", () => {
   };
   return {
     default: {
-      format: { printf },
+      // winston.format is a function (a custom format) with printf and combine on it
+      format: Object.assign(() => () => ({}), { printf, combine: () => ({}) }),
       config: { syslog: { levels: { emerg: 0, alert: 1, crit: 2, error: 3, warning: 4, notice: 5, info: 6, debug: 7 } } },
       createLogger: (opts) => { (opts.transports || []).forEach((t) => piped.add(t)); return logger; },
       transports: { Console: FakeTransport, DailyRotateFile: FakeDailyRotateFile, Syslog: FakeSyslog },

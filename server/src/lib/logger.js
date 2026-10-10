@@ -3,6 +3,8 @@ import 'winston-daily-rotate-file';
 import 'winston-syslog';
 import loggerConfig from '../../config/log.config.js';
 import moment from 'moment-timezone';
+import os from 'os';
+import { currentRequest } from './requestContext.js';
 
 const color = {
 'info': process.env.LOG_COLOR_INFO || "\x1b[32m",
@@ -17,19 +19,42 @@ const getTimestamp = () => {
   return moment().tz(tz).format('YYYY-MM-DD HH:mm:ss:ms');
 };
 
-const formatColor = winston.format.printf(
-  (info) => {
-    const timestamp = getTimestamp();
-    return `${timestamp} ${color[info.level] || ''}${info.level}: ${info.message}\x1b[0m`;
-  }
+// the request a line belongs to (lib/requestContext.js), added to the line
+const withRequest = winston.format((info) => {
+  const ctx = currentRequest();
+  if (ctx?.requestId) info.requestId = ctx.requestId;
+  return info;
+});
+const requestSuffix = (info) => (info.requestId ? ` [req ${info.requestId}]` : '');
+
+// LOG_FORMAT=json : one JSON object a line, for a log collector (Loki, ELK, Splunk...) - its time
+// in ISO, its level, its message, the request and the process it comes from
+const jsonLines = process.env.LOG_FORMAT === 'json';
+const PROCESS_FIELDS = { role: process.env.AF_ROLE || 'all', host: os.hostname() };
+const formatJson = winston.format.combine(
+  withRequest(),
+  winston.format.printf((info) => JSON.stringify({
+    time: new Date().toISOString(),
+    level: info.level,
+    message: info.message,
+    ...(info.requestId ? { requestId: info.requestId } : {}),
+    ...PROCESS_FIELDS,
+  })),
 );
 
-const formatNoColor = winston.format.printf(
+const formatColor = jsonLines ? formatJson : winston.format.combine(withRequest(), winston.format.printf(
   (info) => {
     const timestamp = getTimestamp();
-    return `${timestamp} ${info.level}: ${info.message}`;
+    return `${timestamp} ${color[info.level] || ''}${info.level}: ${info.message}${requestSuffix(info)}\x1b[0m`;
   }
-);
+));
+
+const formatNoColor = jsonLines ? formatJson : winston.format.combine(withRequest(), winston.format.printf(
+  (info) => {
+    const timestamp = getTimestamp();
+    return `${timestamp} ${info.level}: ${info.message}${requestSuffix(info)}`;
+  }
+));
 
 // how long the log files are kept (LOG_RETENTION_DAYS, Settings > Retention) : '<n>d' for the
 // rotating transports, none (every file kept) for 0 ; read when a transport is built, so a new

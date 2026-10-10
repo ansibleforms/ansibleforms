@@ -18,6 +18,7 @@ import Middleware from "./lib/middleware.js";
 import { authRateLimit } from "./lib/authRateLimit.js";
 import { cspDirectives } from "./lib/csp.js";
 import { readinessHandlers } from "./lib/readiness.js";
+import { requestContext } from "./lib/requestContext.js";
 import mysql from "./models/db.model.js";
 import authConfig from "../config/auth.config.js";
 import logger from "./lib/logger.js";
@@ -90,6 +91,10 @@ const load = async (app) => {
   // Set on this app, not on the one index.js wraps it in for BASE_URL : req.ip asks the app
   // handling the request, and with a base url that is still this one (see lib/trustProxy.js)
   applyTrustProxy(app);
+
+  // the request's id, in the response and in every log line written while it is served
+  // (lib/requestContext.js) : first, so everything after it is followed
+  app.use(requestContext);
 
   // security headers with helmet, the Content-Security-Policy included (lib/csp.js) : scripts
   // from the app only, no framing by another site. CONTENT_SECURITY_POLICY=0 sends it report
