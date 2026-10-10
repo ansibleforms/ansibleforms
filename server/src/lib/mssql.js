@@ -29,9 +29,12 @@ Mssql.query = async function (connection_name, query) {
     delete config.database
   }
 
+  // a pool of its own : client.connect() hands back the library's GLOBAL pool once one is open,
+  // whatever the config - so two queries with different credentials at once shared one pool, and
+  // one could run on the other credential's server, while the first close() cut the other off
   var conn
   try{
-    conn = await client.connect(config)
+    conn = await new client.ConnectionPool(config).connect()
   }catch(err){
     logger.error(`[${connection_name}] connection error`,err)
     throw err
@@ -46,7 +49,7 @@ Mssql.query = async function (connection_name, query) {
     throw err
   }finally{
     try{
-      conn.close()
+      await conn.close()
     }catch(e){
       logger.error(`[${connection_name}] connection error`,e)
       //throw e
