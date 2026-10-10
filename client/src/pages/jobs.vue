@@ -1094,35 +1094,39 @@ onMounted(async () => {
     </BsModal>
     <!-- Modal - approval -->
     <BsModal v-if="reviewJob" size="md" :footerClose="false" @close="reviewJob = null">
-      <template #title>{{ t('jobs.reviewApproval') }}</template>
+      <!-- the hourglass and the orange of a job that needs approval (jobs menu, status pill) -->
+      <template #title
+        ><FaIcon icon="hourglass-half" class="af-review-icon me-2" />{{ t('jobs.reviewApproval') }}</template
+      >
       <template #default>
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
-        <!-- the job asking, by its name : the rest (its approval message, values, output) is behind
-             Open job details -->
-        <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
-             the job's values and html-encoded (replacePlaceholders) ; a generic line without one -->
-        <p v-if="reviewJob.message" class="af-review-lead" v-html="reviewJob.message"></p>
-        <p v-else class="af-review-lead">{{ t('jobs.reviewLead') }}</p>
-        <!-- its name, and the whole job (extravars, output) a click away under it -->
-        <!-- the job, with the icon of a job's own page title (Jobs › Job #73) -->
-        <p class="af-review-name">
-          <FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}
-        </p>
-        <!-- which job, by its number (two requests from the same form share a name), and who asked -->
-        <p class="af-review-meta">{{ t('jobs.jobTitle', { id: '#' + reviewJob.id }) }}</p>
-        <p class="af-review-meta">
-          {{ t('jobs.launchedBy') }} {{ reviewJob.user || '–'
-          }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
-        </p>
-        <a
-          href="#"
-          class="af-review-open"
-          @click.prevent="
-            getJob(reviewJob.id);
-            reviewJob = null;
-          "
-          ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
-        >
+        <!-- what is asked, first and set apart : the form's own approval message, its $(...)
+             placeholders filled in with the job's values and html-encoded (replacePlaceholders) ;
+             a generic line without one -->
+        <div v-if="reviewJob.message" class="af-review-ask" v-html="reviewJob.message"></div>
+        <div v-else class="af-review-ask">{{ t('jobs.reviewLead') }}</div>
+        <!-- the job asking, as one card : its name, its number (two requests from the same form
+             share a name), who launched it, and the whole job a click away -->
+        <div class="af-review-job">
+          <FaIcon icon="file-lines" class="af-review-job-icon" />
+          <div class="af-review-job-body">
+            <div class="af-review-name">{{ reviewJob.form || reviewJob.target || `#${reviewJob.id}` }}</div>
+            <div class="af-review-meta">{{ t('jobs.jobTitle', { id: '#' + reviewJob.id }) }}</div>
+            <div class="af-review-meta">
+              {{ t('jobs.launchedBy') }} {{ reviewJob.user || '–'
+              }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
+            </div>
+            <a
+              href="#"
+              class="af-review-open"
+              @click.prevent="
+                getJob(reviewJob.id);
+                reviewJob = null;
+              "
+              ><FaIcon icon="arrow-up-right-from-square" class="me-1" />{{ t('jobs.openJobDetails') }}</a
+            >
+          </div>
+        </div>
       </template>
       <!-- nothing focused, and no Enter : approving runs a playbook, it takes a click -->
       <template #footer>
@@ -1778,31 +1782,53 @@ onMounted(async () => {
     font-weight: 400;
   }
 }
-/* the approval review (openReview) : the job asking, by its name */
-.af-review-lead {
-  margin-bottom: 1.25rem;
+/* the approval review (openReview) : the question set apart, then the job as one card */
+.af-review-icon {
+  color: #ef6009; /* the orange of a job that needs approval (.af-pill-orange) */
+}
+.af-review-ask {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #ef6009;
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, #ef6009 8%, transparent);
+  overflow-wrap: anywhere;
+}
+.af-review-job {
+  display: flex;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+}
+/* the text beside the icon may shrink, so a long name wraps instead of widening the card */
+.af-review-job-body {
+  min-width: 0;
+}
+.af-review-job-icon {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+  color: var(--bs-secondary-color);
 }
 .af-review-name {
-  margin: 0 0 0.5rem;
-  font-size: 1.125rem;
+  margin-bottom: 0.25rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-/* the job's number and who launched it, a line each under the name */
 .af-review-meta {
-  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
   color: var(--bs-secondary-color);
 }
 /* "launched by" is lower case in the translations (the job page's labels are upper case) */
 .af-review-meta::first-letter {
   text-transform: uppercase;
 }
-.af-review-meta:last-of-type {
-  margin-bottom: 1.25rem;
-}
-/* the link on its own line under the name, as body text */
 .af-review-open {
   display: inline-block;
+  margin-top: 0.625rem;
+  font-size: 0.875rem;
 }
 /* the kind of user, after the name : a quiet tag */
 .af-job-fact-note {
