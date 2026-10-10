@@ -1102,15 +1102,13 @@ onMounted(async () => {
         <div v-if="reviewDecided" class="alert alert-info mb-3">{{ t('jobs.alreadyDecided') }}</div>
         <!-- what is asked : the form's own approval message, its $(...) placeholders filled in with
              the job's values and html-encoded (replacePlaceholders) ; a generic line without one -->
-        <p v-if="reviewJob.message" class="af-review-ask" v-html="reviewJob.message"></p>
-        <p v-else class="af-review-ask">{{ t('jobs.reviewLead') }}</p>
+        <div v-if="reviewJob.message" class="af-review-ask" v-html="reviewJob.message"></div>
+        <div v-else class="af-review-ask">{{ t('jobs.reviewLead') }}</div>
         <!-- the job asking, label and value, the labels of the job page's facts : its form, its
              number (two requests from the same form share a name), who launched it -->
         <dl class="af-review-facts">
           <dt>{{ t('jobs.form') }}</dt>
-          <dd class="af-review-name">
-            <FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || '–' }}
-          </dd>
+          <dd><FaIcon icon="file-lines" class="me-2" />{{ reviewJob.form || reviewJob.target || '–' }}</dd>
           <dt>{{ t('jobs.id') }}</dt>
           <dd>#{{ reviewJob.id }}</dd>
           <dt>{{ t('jobs.launchedBy') }}</dt>
@@ -1119,7 +1117,7 @@ onMounted(async () => {
             }}<span v-if="reviewJob.user_type" class="af-job-fact-note">{{ reviewJob.user_type }}</span>
           </dd>
           <dt></dt>
-          <dd>
+          <dd class="af-review-link">
             <a
               href="#"
               @click.prevent="
@@ -1789,8 +1787,13 @@ onMounted(async () => {
 .af-review-icon {
   color: #ef6009; /* the orange of a job that needs approval (.af-pill-orange) */
 }
+/* the question set apart : the orange of a job that needs approval, on its left edge */
 .af-review-ask {
   margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #ef6009;
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, #ef6009 8%, transparent);
   overflow-wrap: anywhere;
 }
 .af-review-facts {
@@ -1807,13 +1810,15 @@ onMounted(async () => {
     text-transform: uppercase;
     color: var(--bs-secondary-color);
   }
+  /* the values in bold, the link under them as a link */
   dd {
     margin: 0;
+    font-weight: 600;
     overflow-wrap: anywhere;
   }
-}
-.af-review-name {
-  font-weight: 600;
+  dd.af-review-link {
+    font-weight: 400;
+  }
 }
 /* the kind of user, after the name : a quiet tag */
 .af-job-fact-note {
