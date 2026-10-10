@@ -121,115 +121,111 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="robot"
-        :title="t('sidebar.mcp')"
-        :description="t('settings.settingsPage.mcpDescription')"
-      >
-        <template #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="robot"
+      :title="t('sidebar.mcp')"
+      :description="t('settings.settingsPage.mcpDescription')"
+    >
+      <template #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in pageTabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <!-- Save : the switches of the General tab only -->
+      <template v-if="activeTab === 'general'" #actions>
+        <BsButton
+          icon="save"
+          :colorClass="envDirty ? 'primary' : 'secondary'"
+          :disabled="!envDirty"
+          @click="saveEnvironmentVariables()"
+          >{{ t('settings.common.save') }}</BsButton
+        >
+      </template>
+      <template #default>
+        <!-- GENERAL : the switch, and the options waiting for it while the server is off -->
+        <div v-show="activeTab === 'general'">
+          <div v-if="envRestartPending.length" class="alert alert-warning py-2">
+            <FaIcon icon="triangle-exclamation" class="me-2" />
+            {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
+          </div>
+          <template v-for="(e, i) in envItems" :key="e.name">
+            <div v-if="i > 0" class="mt-4"></div>
+            <AppEnvField
+              v-model="envEdits[e.name]"
+              :e="e"
+              :asSwitch="true"
+              :disabled="e.name !== 'ENABLE_MCP' && !mcpOn"
+            />
+          </template>
+        </div>
+
+        <!-- CLIENT CONFIGURATION : the endpoint, and each client's configuration -->
+        <div v-show="activeTab === 'clients'">
+          <!-- as wide as the endpoint and the configuration under it -->
+          <div v-if="!mcpOn" class="alert alert-warning py-2 af-mcp-config">
+            <FaIcon icon="triangle-exclamation" class="me-2" />{{ t('settings.settingsPage.mcpOffNote') }}
+          </div>
+          <label class="form-label fw-bold">{{ t('settings.settingsPage.mcpEndpoint') }}</label>
+          <div class="input-group af-mcp-endpoint">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="link" /></span>
+            <input class="form-control font-monospace" readonly :value="mcpEndpoint" />
+            <BsButton icon="copy" @click="copy(mcpEndpoint)">{{ t('profilePage.token.copy') }}</BsButton>
+          </div>
+          <div class="form-text mb-4">{{ t('settings.settingsPage.mcpConnectHelp') }}</div>
+          <label class="form-label fw-bold">{{ t('settings.settingsPage.mcpClientConfig') }}</label>
+          <!-- a tab per client : its file, its format -->
+          <ul class="nav nav-tabs af-mcp-tabs af-mcp-config mb-0">
+            <li v-for="c in mcpClients" :key="c.key" class="nav-item">
               <a
                 class="nav-link"
-                :class="{ active: activeTab === tab.key }"
+                :class="{ active: mcpClient === c.key }"
                 href="#"
-                @click.prevent="activeTab = tab.key"
+                @click.prevent="mcpClient = c.key"
+                >{{ c.label }}</a
               >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
             </li>
           </ul>
-        </template>
-        <!-- Save : the switches of the General tab only -->
-        <template v-if="activeTab === 'general'" #actions>
-          <BsButton
-            icon="save"
-            :colorClass="envDirty ? 'primary' : 'secondary'"
-            :disabled="!envDirty"
-            @click="saveEnvironmentVariables()"
-            >{{ t('settings.common.save') }}</BsButton
-          >
-        </template>
-        <template #default>
-          <!-- GENERAL : the switch, and the options waiting for it while the server is off -->
-          <div v-show="activeTab === 'general'">
-            <div v-if="envRestartPending.length" class="alert alert-warning py-2">
-              <FaIcon icon="triangle-exclamation" class="me-2" />
-              {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
-            </div>
-            <template v-for="(e, i) in envItems" :key="e.name">
-              <div v-if="i > 0" class="mt-4"></div>
-              <AppEnvField
-                v-model="envEdits[e.name]"
-                :e="e"
-                :asSwitch="true"
-                :disabled="e.name !== 'ENABLE_MCP' && !mcpOn"
-              />
-            </template>
+          <div class="position-relative af-mcp-config">
+            <pre class="form-control font-monospace mb-0">{{ mcpCurrent.text }}</pre>
+            <BsButton icon="copy" cssClass="position-absolute top-0 end-0 m-2" @click="copy(mcpCurrent.text)">{{
+              t('profilePage.token.copy')
+            }}</BsButton>
           </div>
-
-          <!-- CLIENT CONFIGURATION : the endpoint, and each client's configuration -->
-          <div v-show="activeTab === 'clients'">
-            <!-- as wide as the endpoint and the configuration under it -->
-            <div v-if="!mcpOn" class="alert alert-warning py-2 af-mcp-config">
-              <FaIcon icon="triangle-exclamation" class="me-2" />{{ t('settings.settingsPage.mcpOffNote') }}
-            </div>
-            <label class="form-label fw-bold">{{ t('settings.settingsPage.mcpEndpoint') }}</label>
-            <div class="input-group af-mcp-endpoint">
-              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="link" /></span>
-              <input class="form-control font-monospace" readonly :value="mcpEndpoint" />
-              <BsButton icon="copy" @click="copy(mcpEndpoint)">{{ t('profilePage.token.copy') }}</BsButton>
-            </div>
-            <div class="form-text mb-4">{{ t('settings.settingsPage.mcpConnectHelp') }}</div>
-            <label class="form-label fw-bold">{{ t('settings.settingsPage.mcpClientConfig') }}</label>
-            <!-- a tab per client : its file, its format -->
-            <ul class="nav nav-tabs af-mcp-tabs af-mcp-config mb-0">
-              <li v-for="c in mcpClients" :key="c.key" class="nav-item">
-                <a
-                  class="nav-link"
-                  :class="{ active: mcpClient === c.key }"
-                  href="#"
-                  @click.prevent="mcpClient = c.key"
-                  >{{ c.label }}</a
-                >
-              </li>
-            </ul>
-            <div class="position-relative af-mcp-config">
-              <pre class="form-control font-monospace mb-0">{{ mcpCurrent.text }}</pre>
-              <BsButton icon="copy" cssClass="position-absolute top-0 end-0 m-2" @click="copy(mcpCurrent.text)">{{
-                t('profilePage.token.copy')
-              }}</BsButton>
-            </div>
-            <div class="form-text">
-              {{ t('settings.settingsPage.mcpConfigFile') }} <code>{{ mcpCurrent.file }}</code>
-              <template v-if="mcpCurrent.note"> {{ mcpCurrent.note }}</template>
-            </div>
-            <!-- the command alternative : a field as the endpoint's, the Copy button beside it -->
-            <template v-if="mcpCurrent.extra">
-              <div class="form-text mt-2">{{ t('settings.settingsPage.mcpNoteClaude') }}</div>
-              <div class="input-group af-mcp-endpoint mt-1">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="terminal" /></span>
-                <input class="form-control font-monospace" readonly :value="mcpCurrent.extra" />
-                <BsButton icon="copy" @click="copy(mcpCurrent.extra)">{{ t('profilePage.token.copy') }}</BsButton>
-              </div>
-            </template>
-            <div class="form-text mt-3">
-              {{ t('settings.settingsPage.mcpTokenHint') }}
-              <router-link :to="{ path: '/profile', query: { view: 'token' } }">{{
-                t('settings.settingsPage.mcpCreateToken')
-              }}</router-link>
-            </div>
+          <div class="form-text">
+            {{ t('settings.settingsPage.mcpConfigFile') }} <code>{{ mcpCurrent.file }}</code>
+            <template v-if="mcpCurrent.note"> {{ mcpCurrent.note }}</template>
           </div>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+          <!-- the command alternative : a field as the endpoint's, the Copy button beside it -->
+          <template v-if="mcpCurrent.extra">
+            <div class="form-text mt-2">{{ t('settings.settingsPage.mcpNoteClaude') }}</div>
+            <div class="input-group af-mcp-endpoint mt-1">
+              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="terminal" /></span>
+              <input class="form-control font-monospace" readonly :value="mcpCurrent.extra" />
+              <BsButton icon="copy" @click="copy(mcpCurrent.extra)">{{ t('profilePage.token.copy') }}</BsButton>
+            </div>
+          </template>
+          <div class="form-text mt-3">
+            {{ t('settings.settingsPage.mcpTokenHint') }}
+            <router-link :to="{ path: '/profile', query: { view: 'token' } }">{{
+              t('settings.settingsPage.mcpCreateToken')
+            }}</router-link>
+          </div>
+        </div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the endpoint and the configuration as wide as the wide fields (a path, a command) */

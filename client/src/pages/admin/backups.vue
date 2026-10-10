@@ -172,70 +172,66 @@ onMounted(async () => {
       }}</BsButton>
     </template>
   </BsModal>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppAdminMulti
-        v-if="authenticated"
-        ref="adminMulti"
-        :settings="settings.backups"
-        apiVersion="2"
-        @trigger="restoreOpen"
-        @preview="previewDetails"
-        @reset="null"
-      />
-      <BsOffCanvas :title="t('admin.backups.backupDetails')" :show="showBackupDetails" @close="offcanvasClose">
-        <div v-if="currentBackup">
-          <div v-if="!currentBackup.valid" class="alert alert-warning" role="alert">
-            <strong>{{ t('admin.backups.incomplete') }}</strong
-            ><br />
-            {{ t('admin.backups.incompleteDetail') }}
-          </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <strong>{{ t('admin.backups.folder') }}:</strong> {{ currentBackup.folder }}
-            </li>
-            <li class="list-group-item">
-              <strong>{{ t('admin.backups.date') }}:</strong> {{ Helpers.formatServerDate(currentBackup.date) }}
-            </li>
-            <li class="list-group-item" v-if="currentBackup.description">
-              <strong>{{ t('admin.backups.description') }}:</strong> {{ currentBackup.description }}
-            </li>
-            <li class="list-group-item">
-              <strong>{{ t('admin.backups.backupFile') }}:</strong>
-              <span v-if="currentBackup.backupFileExists">
-                {{ t('admin.backups.exists') }} ({{ Helpers.humanFileSize(currentBackup.backupFileSize) }})
-              </span>
-              <span v-else>
-                {{ t('admin.backups.notFound') }}
-              </span>
-            </li>
-            <li class="list-group-item">
-              <strong>{{ t('admin.backups.configYaml') }}:</strong>
-              <span v-if="currentBackup.configYamlExists">
-                {{ t('admin.backups.exists') }} ({{ Helpers.humanFileSize(currentBackup.configYamlSize) }})
-              </span>
-              <span v-else>
-                {{ t('admin.backups.notFound') }}
-              </span>
-            </li>
-            <li class="list-group-item">
-              <strong>{{ t('admin.backups.formsDirectory') }}:</strong>
-              <span v-if="currentBackup.formsDirExists">
-                {{ t('admin.backups.exists') }} ({{ t('admin.backups.fileCount', currentBackup.formsDirFileCount) }},
-                {{ Helpers.humanFileSize(currentBackup.formsDirTotalSize) }})
-              </span>
-              <span v-else>
-                {{ t('admin.backups.notFound') }}
-              </span>
-            </li>
-          </ul>
+  <AppSettingsPage>
+    <AppAdminMulti
+      v-if="authenticated"
+      ref="adminMulti"
+      :settings="settings.backups"
+      apiVersion="2"
+      @trigger="restoreOpen"
+      @preview="previewDetails"
+      @reset="null"
+    />
+    <BsOffCanvas :title="t('admin.backups.backupDetails')" :show="showBackupDetails" @close="offcanvasClose">
+      <div v-if="currentBackup">
+        <div v-if="!currentBackup.valid" class="alert alert-warning" role="alert">
+          <strong>{{ t('admin.backups.incomplete') }}</strong
+          ><br />
+          {{ t('admin.backups.incompleteDetail') }}
         </div>
-        <div v-else>
-          {{ t('admin.loading') }}
-        </div>
-      </BsOffCanvas>
-    </main>
-  </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">
+            <strong>{{ t('admin.backups.folder') }}:</strong> {{ currentBackup.folder }}
+          </li>
+          <li class="list-group-item">
+            <strong>{{ t('admin.backups.date') }}:</strong> {{ Helpers.formatServerDate(currentBackup.date) }}
+          </li>
+          <li class="list-group-item" v-if="currentBackup.description">
+            <strong>{{ t('admin.backups.description') }}:</strong> {{ currentBackup.description }}
+          </li>
+          <li class="list-group-item">
+            <strong>{{ t('admin.backups.backupFile') }}:</strong>
+            <span v-if="currentBackup.backupFileExists">
+              {{ t('admin.backups.exists') }} ({{ Helpers.humanFileSize(currentBackup.backupFileSize) }})
+            </span>
+            <span v-else>
+              {{ t('admin.backups.notFound') }}
+            </span>
+          </li>
+          <li class="list-group-item">
+            <strong>{{ t('admin.backups.configYaml') }}:</strong>
+            <span v-if="currentBackup.configYamlExists">
+              {{ t('admin.backups.exists') }} ({{ Helpers.humanFileSize(currentBackup.configYamlSize) }})
+            </span>
+            <span v-else>
+              {{ t('admin.backups.notFound') }}
+            </span>
+          </li>
+          <li class="list-group-item">
+            <strong>{{ t('admin.backups.formsDirectory') }}:</strong>
+            <span v-if="currentBackup.formsDirExists">
+              {{ t('admin.backups.exists') }} ({{ t('admin.backups.fileCount', currentBackup.formsDirFileCount) }},
+              {{ Helpers.humanFileSize(currentBackup.formsDirTotalSize) }})
+            </span>
+            <span v-else>
+              {{ t('admin.backups.notFound') }}
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div v-else>
+        {{ t('admin.loading') }}
+      </div>
+    </BsOffCanvas>
+  </AppSettingsPage>
 </template>

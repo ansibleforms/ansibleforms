@@ -43,18 +43,14 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppAdminMulti
-        v-if="authenticated"
-        :settings="settings.runners"
-        @test="test_connection"
-        :busyItems="tests"
-        :apiVersion="2"
-        :readOnly="!store.isAdmin"
-      />
-    </main>
-  </div>
+  <AppSettingsPage>
+    <AppAdminMulti
+      v-if="authenticated"
+      :settings="settings.runners"
+      @test="test_connection"
+      :busyItems="tests"
+      :apiVersion="2"
+      :readOnly="!store.isAdmin"
+    />
+  </AppSettingsPage>
 </template>

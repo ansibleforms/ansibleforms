@@ -90,61 +90,57 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings v-if="authenticated" icon="image" :title="t('sidebar.logo')" :description="t('logo.description')">
-        <template #actions>
-          <BsButton
-            icon="upload"
-            :colorClass="!selectedFile || busy ? 'secondary' : 'primary'"
-            :disabled="!selectedFile || busy"
-            @click="upload()"
-            >{{ t('logo.uploadButton') }}</BsButton
-          >
-          <BsButton
-            v-if="store.customLogo && !store.logoIsDefault"
-            cssClass="ms-3"
-            icon="trash"
-            :disabled="busy"
-            @click="removeLogo()"
-            >{{ t('logo.remove') }}</BsButton
-          >
-        </template>
-        <template #default>
-          <div class="row">
-            <div class="col-md-6">
-              <label class="form-label fw-bold mb-2">{{ t('logo.current') }}</label>
-              <div class="logo-display-box">
-                <img v-if="store.customLogo" :src="store.customLogo" class="logo-preview" />
-                <span v-else class="text-muted fst-italic">{{ t('logo.default') }}</span>
-              </div>
-            </div>
-            <div v-if="preview" class="col-md-6">
-              <label class="form-label fw-bold mb-2">{{ t('logo.newLogo') }}</label>
-              <div class="logo-display-box position-relative">
-                <button type="button" class="btn-close btn-close-preview" @click="clearPreview"></button>
-                <img :src="preview" class="logo-preview" />
-              </div>
+  <AppSettingsPage>
+    <AppSettings v-if="authenticated" icon="image" :title="t('sidebar.logo')" :description="t('logo.description')">
+      <template #actions>
+        <BsButton
+          icon="upload"
+          :colorClass="!selectedFile || busy ? 'secondary' : 'primary'"
+          :disabled="!selectedFile || busy"
+          @click="upload()"
+          >{{ t('logo.uploadButton') }}</BsButton
+        >
+        <BsButton
+          v-if="store.customLogo && !store.logoIsDefault"
+          cssClass="ms-3"
+          icon="trash"
+          :disabled="busy"
+          @click="removeLogo()"
+          >{{ t('logo.remove') }}</BsButton
+        >
+      </template>
+      <template #default>
+        <div class="row">
+          <div class="col-md-6">
+            <label class="form-label fw-bold mb-2">{{ t('logo.current') }}</label>
+            <div class="logo-display-box">
+              <img v-if="store.customLogo" :src="store.customLogo" class="logo-preview" />
+              <span v-else class="text-muted fst-italic">{{ t('logo.default') }}</span>
             </div>
           </div>
-          <hr class="my-3" />
-          <div>
-            <input
-              ref="fileInput"
-              class="form-control"
-              style="max-width: 400px"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-              @change="onFileChange"
-            />
+          <div v-if="preview" class="col-md-6">
+            <label class="form-label fw-bold mb-2">{{ t('logo.newLogo') }}</label>
+            <div class="logo-display-box position-relative">
+              <button type="button" class="btn-close btn-close-preview" @click="clearPreview"></button>
+              <img :src="preview" class="logo-preview" />
+            </div>
           </div>
-          <div class="form-text mt-3">{{ t('logo.constraints') }}</div>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+        </div>
+        <hr class="my-3" />
+        <div>
+          <input
+            ref="fileInput"
+            class="form-control"
+            style="max-width: 400px"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+            @change="onFileChange"
+          />
+        </div>
+        <div class="form-text mt-3">{{ t('logo.constraints') }}</div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped lang="scss">
 .logo-preview {

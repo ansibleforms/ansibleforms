@@ -248,169 +248,159 @@ onMounted(async () => {
       @created="onCredentialCreated"
     />
   </div>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="envelope"
-        :title="server?.name || serverId"
-        :crumbs="crumbs"
-        :description="t('settings.mailServers.description')"
-      >
-        <template v-if="server" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !server" class="empty-state">
-            <FaIcon icon="envelope" class="empty-state-icon" />
-            <span>{{ t('settings.mailServers.notFound', { id: serverId }) }}</span>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="envelope"
+      :title="server?.name || serverId"
+      :crumbs="crumbs"
+      :description="t('settings.mailServers.description')"
+    >
+      <template v-if="server" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !server" class="empty-state">
+          <FaIcon icon="envelope" class="empty-state-icon" />
+          <span>{{ t('settings.mailServers.notFound', { id: serverId }) }}</span>
+        </div>
+        <div v-else-if="server && edit" class="af-mail-tab">
+          <!-- a server of the config seed : read only here -->
+          <div v-if="managed" class="alert alert-secondary py-2">
+            <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
           </div>
-          <div v-else-if="server && edit" class="af-mail-tab">
-            <!-- a server of the config seed : read only here -->
-            <div v-if="managed" class="alert alert-secondary py-2">
-              <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
-            </div>
-            <!-- Test : a mail through the server as saved -->
-            <template v-if="activeTab === 'test'">
+          <!-- Test : a mail through the server as saved -->
+          <template v-if="activeTab === 'test'">
+            <BsInput
+              class="af-mail-field"
+              v-model="testTo"
+              type="email"
+              icon="envelope"
+              placeholder="you@example.com"
+              :isFloating="false"
+              :required="true"
+              :label="t('admin.mail.mailTo')"
+            />
+            <BsButton icon="paper-plane" :disabled="testing || dirty" @click="sendTest()">{{
+              t('settings.mailServers.sendTest')
+            }}</BsButton>
+          </template>
+          <fieldset v-else :disabled="managed">
+            <!-- Server : what it is called, and whether the app sends with it -->
+            <template v-if="activeTab === 'server'">
               <BsInput
                 class="af-mail-field"
-                v-model="testTo"
-                type="email"
-                icon="envelope"
-                placeholder="you@example.com"
+                v-model="edit.name"
+                icon="heading"
                 :isFloating="false"
                 :required="true"
-                :label="t('admin.mail.mailTo')"
+                :label="t('settings.fields.name')"
               />
-              <BsButton icon="paper-plane" :disabled="testing || dirty" @click="sendTest()">{{
-                t('settings.mailServers.sendTest')
-              }}</BsButton>
-            </template>
-            <fieldset v-else :disabled="managed">
-              <!-- Server : what it is called, and whether the app sends with it -->
-              <template v-if="activeTab === 'server'">
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.name"
-                  icon="heading"
-                  :isFloating="false"
-                  :required="true"
-                  :label="t('settings.fields.name')"
-                />
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.description"
-                  icon="info-circle"
-                  :isFloating="false"
-                  :label="t('settings.fields.description')"
-                />
-                <div class="mb-3">
-                  <label class="form-label fw-bold d-block" for="af-mail-active">{{
-                    t('settings.mailServers.active')
-                  }}</label>
-                  <!-- turned on, saved at once ; turned off by making another the active one -->
-                  <div class="form-check form-switch mb-0">
-                    <input
-                      id="af-mail-active"
-                      class="form-check-input"
-                      type="checkbox"
-                      role="switch"
-                      :checked="!!server.is_active"
-                      :disabled="!!server.is_active"
-                      @change="makeActive()"
-                    />
-                  </div>
-                  <div class="form-text">{{ t('settings.mailServers.activeHelp') }}</div>
-                </div>
-              </template>
-              <!-- Connection : its host, port and TLS -->
-              <template v-else-if="activeTab === 'connection'">
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.server"
-                  icon="server"
-                  placeholder="smtp.example.com"
-                  :isFloating="false"
-                  :required="true"
-                  :help="t('settings.mail.mailServerHelp')"
-                  :label="t('settings.mail.mailServer')"
-                />
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.port"
-                  type="number"
-                  icon="arrows-alt-v"
-                  :isFloating="false"
-                  :help="t('settings.mail.mailPortHelp')"
-                  :label="t('settings.mail.mailPort')"
-                />
-                <div class="form-check form-switch mb-3">
+              <BsInput
+                class="af-mail-field"
+                v-model="edit.description"
+                icon="info-circle"
+                :isFloating="false"
+                :label="t('settings.fields.description')"
+              />
+              <div class="mb-3">
+                <label class="form-label fw-bold d-block" for="af-mail-active">{{
+                  t('settings.mailServers.active')
+                }}</label>
+                <!-- turned on, saved at once ; turned off by making another the active one -->
+                <div class="form-check form-switch mb-0">
                   <input
-                    id="af-mail-tls"
-                    v-model="edit.secure"
+                    id="af-mail-active"
                     class="form-check-input"
                     type="checkbox"
                     role="switch"
+                    :checked="!!server.is_active"
+                    :disabled="!!server.is_active"
+                    @change="makeActive()"
                   />
-                  <label class="form-check-label" for="af-mail-tls">{{ t('settings.mail.useTls') }}</label>
-                  <div class="form-text mt-1">{{ t('settings.mail.useTlsHelp') }}</div>
                 </div>
-              </template>
-              <!-- Sender : the from address and the login -->
-              <template v-else>
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.from_address"
-                  type="email"
-                  icon="envelope"
-                  placeholder="noreply@example.com"
-                  :isFloating="false"
-                  :required="true"
-                  :help="t('settings.mail.mailFromHelp')"
-                  :label="t('settings.mail.mailFrom')"
-                />
-                <BsInput
-                  class="af-mail-field"
-                  v-model="edit.credential"
-                  type="select"
-                  icon="key"
-                  :isFloating="false"
-                  :values="credentials"
-                  valueKey="name"
-                  labelKey="name"
-                  :help="t('settings.mailServers.helpCredential')"
-                  :label="t('settings.mailServers.credential')"
-                />
-                <BsButton v-if="!managed" icon="plus" @click="creator?.newItem({ credential_type: 'smtp' })">{{
-                  t('settings.repositories.newCredential')
-                }}</BsButton>
-              </template>
-            </fieldset>
-          </div>
-        </template>
-        <template v-if="server && !managed" #actions>
-          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-            t('settings.common.save')
-          }}</BsButton>
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+                <div class="form-text">{{ t('settings.mailServers.activeHelp') }}</div>
+              </div>
+            </template>
+            <!-- Connection : its host, port and TLS -->
+            <template v-else-if="activeTab === 'connection'">
+              <BsInput
+                class="af-mail-field"
+                v-model="edit.server"
+                icon="server"
+                placeholder="smtp.example.com"
+                :isFloating="false"
+                :required="true"
+                :help="t('settings.mail.mailServerHelp')"
+                :label="t('settings.mail.mailServer')"
+              />
+              <BsInput
+                class="af-mail-field"
+                v-model="edit.port"
+                type="number"
+                icon="arrows-alt-v"
+                :isFloating="false"
+                :help="t('settings.mail.mailPortHelp')"
+                :label="t('settings.mail.mailPort')"
+              />
+              <div class="form-check form-switch mb-3">
+                <input id="af-mail-tls" v-model="edit.secure" class="form-check-input" type="checkbox" role="switch" />
+                <label class="form-check-label" for="af-mail-tls">{{ t('settings.mail.useTls') }}</label>
+                <div class="form-text mt-1">{{ t('settings.mail.useTlsHelp') }}</div>
+              </div>
+            </template>
+            <!-- Sender : the from address and the login -->
+            <template v-else>
+              <BsInput
+                class="af-mail-field"
+                v-model="edit.from_address"
+                type="email"
+                icon="envelope"
+                placeholder="noreply@example.com"
+                :isFloating="false"
+                :required="true"
+                :help="t('settings.mail.mailFromHelp')"
+                :label="t('settings.mail.mailFrom')"
+              />
+              <BsInput
+                class="af-mail-field"
+                v-model="edit.credential"
+                type="select"
+                icon="key"
+                :isFloating="false"
+                :values="credentials"
+                valueKey="name"
+                labelKey="name"
+                :help="t('settings.mailServers.helpCredential')"
+                :label="t('settings.mailServers.credential')"
+              />
+              <BsButton v-if="!managed" icon="plus" @click="creator?.newItem({ credential_type: 'smtp' })">{{
+                t('settings.repositories.newCredential')
+              }}</BsButton>
+            </template>
+          </fieldset>
+        </div>
+      </template>
+      <template v-if="server && !managed" #actions>
+        <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+        <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+          t('settings.common.save')
+        }}</BsButton>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a runner's and a credential's */

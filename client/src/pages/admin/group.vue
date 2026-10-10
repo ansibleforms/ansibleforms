@@ -221,168 +221,161 @@ onMounted(async () => {
       <BsButton icon="save" :disabled="!addingUser" @click="saveAddUser()">{{ t('settings.common.save') }}</BsButton>
     </template>
   </BsModal>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="users"
-        :title="group?.name || groupId"
-        :crumbs="crumbs"
-        :description="t('settings.groups.description')"
-      >
-        <template v-if="group" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-                <span v-if="tab.key === 'users'" class="badge af-tab-count ms-1">{{ members.length }}</span>
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !group" class="empty-state">
-            <FaIcon icon="users" class="empty-state-icon" />
-            <span>{{ t('settings.groups.groupNotFound', { id: groupId }) }}</span>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="users"
+      :title="group?.name || groupId"
+      :crumbs="crumbs"
+      :description="t('settings.groups.description')"
+    >
+      <template v-if="group" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+              <span v-if="tab.key === 'users'" class="badge af-tab-count ms-1">{{ members.length }}</span>
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !group" class="empty-state">
+          <FaIcon icon="users" class="empty-state-icon" />
+          <span>{{ t('settings.groups.groupNotFound', { id: groupId }) }}</span>
+        </div>
+        <!-- Details : the name and the description -->
+        <div v-else-if="group && activeTab === 'details'" class="af-group-details">
+          <BsInput
+            class="af-group-field"
+            v-model="edit.name"
+            icon="users"
+            :isFloating="false"
+            :required="true"
+            :disabled="isAdmins"
+            :label="t('settings.fields.name')"
+          />
+          <BsInput
+            class="af-group-field"
+            v-model="edit.description"
+            icon="info-circle"
+            :isFloating="false"
+            :label="t('settings.fields.description')"
+          />
+        </div>
+        <!-- Users : the users in the group, as the app's other tables -->
+        <template v-else-if="group">
+          <p v-if="!members.length" class="text-muted small mb-0">{{ t('settings.groups.noUsers') }}</p>
+          <div v-else class="af-table-frame">
+            <table class="table af-table">
+              <thead>
+                <tr>
+                  <th class="text-center bs-dt-select">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      :disabled="!removable.length"
+                      :checked="removable.length > 0 && removable.every((u) => selectedUsers.includes(u.id))"
+                      @change="
+                        selectedUsers = removable.every((u) => selectedUsers.includes(u.id))
+                          ? []
+                          : removable.map((u) => u.id)
+                      "
+                    />
+                  </th>
+                  <th>{{ t('settings.fields.username') }}</th>
+                  <th>{{ t('settings.fields.description') }}</th>
+                  <th>{{ t('settings.fields.email') }}</th>
+                  <th class="af-group-menu-col"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="u in members" :key="u.id" :class="{ 'bs-dt-selected': selectedUsers.includes(u.id) }">
+                  <td class="text-center bs-dt-select">
+                    <!-- this group is the user's only one : it stays (a user keeps one group) -->
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      :disabled="onlyGroup(u)"
+                      :title="onlyGroup(u) ? t('settings.users.keepOneGroup') : null"
+                      :checked="selectedUsers.includes(u.id)"
+                      @change="toggleUser(u.id)"
+                    />
+                  </td>
+                  <td>
+                    <router-link :to="`/settings/users/${u.id}`" class="af-group-user-link">{{
+                      u.username
+                    }}</router-link>
+                  </td>
+                  <td>{{ u.description || '–' }}</td>
+                  <td>{{ u.email || '–' }}</td>
+                  <td class="bs-dt-row-actions">
+                    <div class="dropdown">
+                      <a
+                        role="button"
+                        class="bs-dt-row-menu px-2"
+                        data-bs-toggle="dropdown"
+                        data-bs-popper-config='{"strategy":"fixed"}'
+                      >
+                        <FaIcon icon="ellipsis-vertical" />
+                      </a>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a
+                            class="dropdown-item"
+                            :class="onlyGroup(u) ? 'disabled text-muted' : 'text-danger'"
+                            href="#"
+                            @click.prevent="removeUsers([u.id])"
+                          >
+                            <FaIcon icon="trash" class="me-2" />{{ t('settings.groups.removeFromGroup') }}
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <!-- Details : the name and the description -->
-          <div v-else-if="group && activeTab === 'details'" class="af-group-details">
-            <BsInput
-              class="af-group-field"
-              v-model="edit.name"
-              icon="users"
-              :isFloating="false"
-              :required="true"
-              :disabled="isAdmins"
-              :label="t('settings.fields.name')"
-            />
-            <BsInput
-              class="af-group-field"
-              v-model="edit.description"
-              icon="info-circle"
-              :isFloating="false"
-              :label="t('settings.fields.description')"
-            />
-          </div>
-          <!-- Users : the users in the group, as the app's other tables -->
-          <template v-else-if="group">
-            <p v-if="!members.length" class="text-muted small mb-0">{{ t('settings.groups.noUsers') }}</p>
-            <div v-else class="af-table-frame">
-              <table class="table af-table">
-                <thead>
-                  <tr>
-                    <th class="text-center bs-dt-select">
-                      <input
-                        type="checkbox"
-                        class="form-check-input"
-                        :disabled="!removable.length"
-                        :checked="removable.length > 0 && removable.every((u) => selectedUsers.includes(u.id))"
-                        @change="
-                          selectedUsers = removable.every((u) => selectedUsers.includes(u.id))
-                            ? []
-                            : removable.map((u) => u.id)
-                        "
-                      />
-                    </th>
-                    <th>{{ t('settings.fields.username') }}</th>
-                    <th>{{ t('settings.fields.description') }}</th>
-                    <th>{{ t('settings.fields.email') }}</th>
-                    <th class="af-group-menu-col"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="u in members" :key="u.id" :class="{ 'bs-dt-selected': selectedUsers.includes(u.id) }">
-                    <td class="text-center bs-dt-select">
-                      <!-- this group is the user's only one : it stays (a user keeps one group) -->
-                      <input
-                        type="checkbox"
-                        class="form-check-input"
-                        :disabled="onlyGroup(u)"
-                        :title="onlyGroup(u) ? t('settings.users.keepOneGroup') : null"
-                        :checked="selectedUsers.includes(u.id)"
-                        @change="toggleUser(u.id)"
-                      />
-                    </td>
-                    <td>
-                      <router-link :to="`/settings/users/${u.id}`" class="af-group-user-link">{{
-                        u.username
-                      }}</router-link>
-                    </td>
-                    <td>{{ u.description || '–' }}</td>
-                    <td>{{ u.email || '–' }}</td>
-                    <td class="bs-dt-row-actions">
-                      <div class="dropdown">
-                        <a
-                          role="button"
-                          class="bs-dt-row-menu px-2"
-                          data-bs-toggle="dropdown"
-                          data-bs-popper-config='{"strategy":"fixed"}'
-                        >
-                          <FaIcon icon="ellipsis-vertical" />
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                          <li>
-                            <a
-                              class="dropdown-item"
-                              :class="onlyGroup(u) ? 'disabled text-muted' : 'text-danger'"
-                              href="#"
-                              @click.prevent="removeUsers([u.id])"
-                            >
-                              <FaIcon icon="trash" class="me-2" />{{ t('settings.groups.removeFromGroup') }}
-                            </a>
-                          </li>
-                        </ul>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </template>
         </template>
-        <template v-if="group" #actions>
-          <!-- the users ticked : removed from the group -->
-          <BsButton
-            v-if="activeTab === 'users' && selectedUsers.length"
-            icon="trash"
-            @click="removeUsers(selectedUsers)"
-            >{{ t('settings.groups.removeFromGroup') }} ({{ selectedUsers.length }})</BsButton
-          >
-          <BsButton
-            v-if="activeTab === 'users'"
-            icon="plus"
-            :disabled="!others.length"
-            @click="addingUser = others[0]?.id ?? null"
-            >{{ t('settings.settingsPage.addUser') }}</BsButton
-          >
-          <!-- admins is never deleted, nor a group that still has users (the server refuses both) -->
-          <BsButton
-            icon="trash"
-            :disabled="isAdmins || members.length > 0"
-            :title="!isAdmins && members.length > 0 ? t('settings.groups.stillHasUsers') : null"
-            @click="confirmDelete = true"
-            >{{ t('common.delete') }}</BsButton
-          >
-          <BsButton
-            v-if="activeTab === 'details'"
-            icon="save"
-            :colorClass="dirty ? 'primary' : 'secondary'"
-            :disabled="!dirty"
-            @click="saveDetails()"
-            >{{ t('settings.common.save') }}</BsButton
-          >
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+      <template v-if="group" #actions>
+        <!-- the users ticked : removed from the group -->
+        <BsButton v-if="activeTab === 'users' && selectedUsers.length" icon="trash" @click="removeUsers(selectedUsers)"
+          >{{ t('settings.groups.removeFromGroup') }} ({{ selectedUsers.length }})</BsButton
+        >
+        <BsButton
+          v-if="activeTab === 'users'"
+          icon="plus"
+          :disabled="!others.length"
+          @click="addingUser = others[0]?.id ?? null"
+          >{{ t('settings.settingsPage.addUser') }}</BsButton
+        >
+        <!-- admins is never deleted, nor a group that still has users (the server refuses both) -->
+        <BsButton
+          icon="trash"
+          :disabled="isAdmins || members.length > 0"
+          :title="!isAdmins && members.length > 0 ? t('settings.groups.stillHasUsers') : null"
+          @click="confirmDelete = true"
+          >{{ t('common.delete') }}</BsButton
+        >
+        <BsButton
+          v-if="activeTab === 'details'"
+          icon="save"
+          :colorClass="dirty ? 'primary' : 'secondary'"
+          :disabled="!dirty"
+          @click="saveDetails()"
+          >{{ t('settings.common.save') }}</BsButton
+        >
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a user's and a role's */

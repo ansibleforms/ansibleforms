@@ -170,125 +170,119 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="clipboard-list"
-        :title="t('audit.title')"
-        :description="t('audit.description')"
-      >
-        <!-- the filters on the title line, as the other tables have their search and columns -->
-        <template #headerActions>
-          <div class="d-flex align-items-center gap-2">
-            <select v-model="filterActor" class="form-select" style="width: auto" @change="applyFilters">
-              <option value="">{{ t('audit.allActors') }}</option>
-              <option v-for="a in facets.actors" :key="'ac-' + a" :value="a">{{ a }}</option>
-            </select>
-            <select v-model="filterAction" class="form-select" style="width: auto" @change="applyFilters">
-              <option value="">{{ t('audit.allActions') }}</option>
-              <option v-for="a in facets.actions" :key="'an-' + a" :value="a">{{ actionLabel(a) }}</option>
-            </select>
-            <select v-model="filterOutcome" class="form-select" style="width: auto" @change="applyFilters">
-              <option value="">{{ t('audit.allOutcomes') }}</option>
-              <option value="success">{{ t('audit.outcomeSuccess') }}</option>
-              <option value="failure">{{ t('audit.outcomeFailure') }}</option>
-              <option value="denied">{{ t('audit.outcomeDenied') }}</option>
-            </select>
-            <!-- after the filters, as the server log has its Refresh on the title line -->
-            <BsButton cssClass="text-nowrap" :icon="loading ? 'spinner' : 'refresh'" @click="load()">{{
-              t('audit.refresh')
-            }}</BsButton>
-          </div>
-        </template>
-        <template #default>
-          <div v-if="loading && records.length === 0" class="spinner-border" role="status">
-            <span class="visually-hidden">{{ t('settings.common.loading') }}</span>
-          </div>
-          <div v-else-if="loadFailed" class="text-center text-muted py-4">
-            <div class="fw-bold">{{ t('audit.failedLoad') }}</div>
-          </div>
-          <div v-else-if="records.length === 0" class="text-center text-muted py-4">
-            <div class="fw-bold">{{ t('audit.empty') }}</div>
-            <small>{{ t('audit.emptyHint') }}</small>
-          </div>
-          <template v-else>
-            <!-- the shared look of the tables (styles/tables.scss) : running to the card's
-                 edges, a grey header bar, the pager in a footer bar -->
-            <div class="af-table-frame">
-              <div class="table-responsive" style="overflow: visible">
-                <table class="table table-sm table-hover mb-0 af-table audit-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 14rem">{{ t('audit.time') }}</th>
-                      <th style="width: 15rem">{{ t('audit.actor') }}</th>
-                      <th>{{ t('audit.action') }}</th>
-                      <th style="width: 18rem">{{ t('audit.target') }}</th>
-                      <th style="width: 7rem">{{ t('audit.outcome') }}</th>
-                      <th style="width: 10rem">{{ t('audit.ip') }}</th>
-                      <th style="width: 3rem"></th>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="clipboard-list"
+      :title="t('audit.title')"
+      :description="t('audit.description')"
+    >
+      <!-- the filters on the title line, as the other tables have their search and columns -->
+      <template #headerActions>
+        <div class="d-flex align-items-center gap-2">
+          <select v-model="filterActor" class="form-select" style="width: auto" @change="applyFilters">
+            <option value="">{{ t('audit.allActors') }}</option>
+            <option v-for="a in facets.actors" :key="'ac-' + a" :value="a">{{ a }}</option>
+          </select>
+          <select v-model="filterAction" class="form-select" style="width: auto" @change="applyFilters">
+            <option value="">{{ t('audit.allActions') }}</option>
+            <option v-for="a in facets.actions" :key="'an-' + a" :value="a">{{ actionLabel(a) }}</option>
+          </select>
+          <select v-model="filterOutcome" class="form-select" style="width: auto" @change="applyFilters">
+            <option value="">{{ t('audit.allOutcomes') }}</option>
+            <option value="success">{{ t('audit.outcomeSuccess') }}</option>
+            <option value="failure">{{ t('audit.outcomeFailure') }}</option>
+            <option value="denied">{{ t('audit.outcomeDenied') }}</option>
+          </select>
+          <!-- after the filters, as the server log has its Refresh on the title line -->
+          <BsButton cssClass="text-nowrap" :icon="loading ? 'spinner' : 'refresh'" @click="load()">{{
+            t('audit.refresh')
+          }}</BsButton>
+        </div>
+      </template>
+      <template #default>
+        <div v-if="loading && records.length === 0" class="spinner-border" role="status">
+          <span class="visually-hidden">{{ t('settings.common.loading') }}</span>
+        </div>
+        <div v-else-if="loadFailed" class="text-center text-muted py-4">
+          <div class="fw-bold">{{ t('audit.failedLoad') }}</div>
+        </div>
+        <div v-else-if="records.length === 0" class="text-center text-muted py-4">
+          <div class="fw-bold">{{ t('audit.empty') }}</div>
+          <small>{{ t('audit.emptyHint') }}</small>
+        </div>
+        <template v-else>
+          <!-- the shared look of the tables (styles/tables.scss) : running to the card's
+             edges, a grey header bar, the pager in a footer bar -->
+          <div class="af-table-frame">
+            <div class="table-responsive" style="overflow: visible">
+              <table class="table table-sm table-hover mb-0 af-table audit-table">
+                <thead>
+                  <tr>
+                    <th style="width: 14rem">{{ t('audit.time') }}</th>
+                    <th style="width: 15rem">{{ t('audit.actor') }}</th>
+                    <th>{{ t('audit.action') }}</th>
+                    <th style="width: 18rem">{{ t('audit.target') }}</th>
+                    <th style="width: 7rem">{{ t('audit.outcome') }}</th>
+                    <th style="width: 10rem">{{ t('audit.ip') }}</th>
+                    <th style="width: 3rem"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="r in records" :key="r.id">
+                    <tr class="audit-row">
+                      <td class="font-monospace">{{ Helpers.formatServerDate(r.created_at) }}</td>
+                      <td>
+                        <span v-if="r.actor">{{ r.actor }}</span>
+                        <span v-else class="text-muted fst-italic">{{ t('audit.system') }}</span>
+                      </td>
+                      <td>{{ actionLabel(r.action) }}</td>
+                      <td class="audit-target">{{ r.target }}</td>
+                      <td>
+                        <span class="badge rounded-pill fw-semibold af-pill" :class="badgeClass(r.outcome)"
+                          ><span class="af-pill-label">{{ outcomeText(r.outcome) }}</span></span
+                        >
+                      </td>
+                      <td class="font-monospace small text-muted">{{ r.ip }}</td>
+                      <td class="text-end">
+                        <!-- a plain icon : a button would make the rows with a detail taller -->
+                        <a
+                          v-if="r.detail"
+                          href="#"
+                          class="text-body-secondary af-audit-toggle"
+                          @click.prevent="toggle(r.id)"
+                          ><FaIcon :icon="expanded[r.id] ? 'chevron-up' : 'chevron-down'"
+                        /></a>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    <template v-for="r in records" :key="r.id">
-                      <tr class="audit-row">
-                        <td class="font-monospace">{{ Helpers.formatServerDate(r.created_at) }}</td>
-                        <td>
-                          <span v-if="r.actor">{{ r.actor }}</span>
-                          <span v-else class="text-muted fst-italic">{{ t('audit.system') }}</span>
-                        </td>
-                        <td>{{ actionLabel(r.action) }}</td>
-                        <td class="audit-target">{{ r.target }}</td>
-                        <td>
-                          <span class="badge rounded-pill fw-semibold af-pill" :class="badgeClass(r.outcome)"
-                            ><span class="af-pill-label">{{ outcomeText(r.outcome) }}</span></span
-                          >
-                        </td>
-                        <td class="font-monospace small text-muted">{{ r.ip }}</td>
-                        <td class="text-end">
-                          <!-- a plain icon : a button would make the rows with a detail taller -->
-                          <a
-                            v-if="r.detail"
-                            href="#"
-                            class="text-body-secondary af-audit-toggle"
-                            @click.prevent="toggle(r.id)"
-                            ><FaIcon :icon="expanded[r.id] ? 'chevron-up' : 'chevron-down'"
-                          /></a>
-                        </td>
-                      </tr>
-                      <tr v-if="expanded[r.id] && r.detail">
-                        <td colspan="7" class="bg-body-tertiary">
-                          <pre class="mb-0 font-monospace fs-6 audit-detail">{{
-                            JSON.stringify(r.detail, null, 2)
-                          }}</pre>
-                        </td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
+                    <tr v-if="expanded[r.id] && r.detail">
+                      <td colspan="7" class="bg-body-tertiary">
+                        <pre class="mb-0 font-monospace fs-6 audit-detail">{{ JSON.stringify(r.detail, null, 2) }}</pre>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
-          </template>
-        </template>
-        <!-- the pager : the rows shown, the page size and boxes, under the card as every table's -->
-        <template #footer>
-          <div class="af-table-pager">
-            <span class="af-table-count">{{ pageRange }}</span>
-            <BsPagination
-              :key="filterVersion"
-              :dataList="pageIndexes"
-              :perPage="25"
-              :buttonsShown="7"
-              name="audit"
-              @change="onPageChange"
-            />
           </div>
         </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+      <!-- the pager : the rows shown, the page size and boxes, under the card as every table's -->
+      <template #footer>
+        <div class="af-table-pager">
+          <span class="af-table-count">{{ pageRange }}</span>
+          <BsPagination
+            :key="filterVersion"
+            :dataList="pageIndexes"
+            :perPage="25"
+            :buttonsShown="7"
+            name="audit"
+            @change="onPageChange"
+          />
+        </div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 
 <style scoped>

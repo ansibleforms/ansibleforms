@@ -243,93 +243,89 @@ onMounted(async () => {
       }}</BsButton>
     </template>
   </BsModal>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="user-shield"
-        :title="role?.name || roleName"
-        :crumbs="crumbs"
-        :description="t('settings.settingsPage.rolesDescription')"
-      >
-        <template v-if="role" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-                <span v-if="tab.key !== 'general' && !role._public" class="badge af-tab-count ms-1">{{
-                  tab.key === 'users' ? userCount : role.groups.length
-                }}</span>
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loadError" class="alert alert-danger" role="alert">
-            {{ t('settings.common.failedToLoad') }} : {{ loadError }}
-          </div>
-          <div v-else-if="loaded && !role" class="empty-state">
-            <FaIcon icon="user-shield" class="empty-state-icon" />
-            <span>{{ t('settings.settingsPage.roleNotFound', { name: roleName }) }}</span>
-          </div>
-          <AppRoleEditor
-            v-else-if="role"
-            v-model:role="roles[roleIndex]"
-            :tab="activeTab"
-            v-model:selected="selected"
-            @removed="saveRoles()"
-            :throughGroups="throughGroups"
-            :readOnly="readOnly"
-            :authProviders="authProviders"
-            :localGroups="sortedLocalGroups"
-            :localUsers="sortedLocalUsers"
-            :optionKeys="roleOptionKeys"
-            :optionLabel="roleOptionLabel"
-            :nextUid="nextUid"
-          />
-        </template>
-        <template v-if="role" #actions>
-          <!-- what is ticked in the table : removed from the role -->
-          <BsButton v-if="selected.length" icon="trash" :disabled="readOnly" @click="removeSelected()"
-            >{{ t('settings.settingsPage.removeFromRole') }} ({{ selected.length }})</BsButton
-          >
-          <!-- the tab's own add, top right as on the other pages -->
-          <BsButton
-            v-if="activeTab === 'users' && !role._public"
-            icon="plus"
-            :disabled="readOnly"
-            @click="openAdd('users')"
-            >{{ t('settings.settingsPage.addUser') }}</BsButton
-          >
-          <BsButton
-            v-if="activeTab === 'groups' && !role._public"
-            icon="plus"
-            :disabled="readOnly"
-            @click="openAdd('groups')"
-            >{{ t('settings.settingsPage.addGroup') }}</BsButton
-          >
-          <BsButton v-if="!role._required" icon="trash" :disabled="readOnly" @click="confirmDelete = true">{{
-            t('common.delete')
-          }}</BsButton>
-          <BsButton
-            icon="save"
-            :colorClass="isRolesDirty ? 'primary' : 'secondary'"
-            :disabled="!isRolesDirty || readOnly"
-            @click="saveRole()"
-            >{{ t('settings.common.save') }}</BsButton
-          >
-        </template>
-      </AppSettings>
-    </main>
-  </div>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="user-shield"
+      :title="role?.name || roleName"
+      :crumbs="crumbs"
+      :description="t('settings.settingsPage.rolesDescription')"
+    >
+      <template v-if="role" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === tab.key }"
+              href="#"
+              @click.prevent="activeTab = tab.key"
+            >
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+              <span v-if="tab.key !== 'general' && !role._public" class="badge af-tab-count ms-1">{{
+                tab.key === 'users' ? userCount : role.groups.length
+              }}</span>
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loadError" class="alert alert-danger" role="alert">
+          {{ t('settings.common.failedToLoad') }} : {{ loadError }}
+        </div>
+        <div v-else-if="loaded && !role" class="empty-state">
+          <FaIcon icon="user-shield" class="empty-state-icon" />
+          <span>{{ t('settings.settingsPage.roleNotFound', { name: roleName }) }}</span>
+        </div>
+        <AppRoleEditor
+          v-else-if="role"
+          v-model:role="roles[roleIndex]"
+          :tab="activeTab"
+          v-model:selected="selected"
+          @removed="saveRoles()"
+          :throughGroups="throughGroups"
+          :readOnly="readOnly"
+          :authProviders="authProviders"
+          :localGroups="sortedLocalGroups"
+          :localUsers="sortedLocalUsers"
+          :optionKeys="roleOptionKeys"
+          :optionLabel="roleOptionLabel"
+          :nextUid="nextUid"
+        />
+      </template>
+      <template v-if="role" #actions>
+        <!-- what is ticked in the table : removed from the role -->
+        <BsButton v-if="selected.length" icon="trash" :disabled="readOnly" @click="removeSelected()"
+          >{{ t('settings.settingsPage.removeFromRole') }} ({{ selected.length }})</BsButton
+        >
+        <!-- the tab's own add, top right as on the other pages -->
+        <BsButton
+          v-if="activeTab === 'users' && !role._public"
+          icon="plus"
+          :disabled="readOnly"
+          @click="openAdd('users')"
+          >{{ t('settings.settingsPage.addUser') }}</BsButton
+        >
+        <BsButton
+          v-if="activeTab === 'groups' && !role._public"
+          icon="plus"
+          :disabled="readOnly"
+          @click="openAdd('groups')"
+          >{{ t('settings.settingsPage.addGroup') }}</BsButton
+        >
+        <BsButton v-if="!role._required" icon="trash" :disabled="readOnly" @click="confirmDelete = true">{{
+          t('common.delete')
+        }}</BsButton>
+        <BsButton
+          icon="save"
+          :colorClass="isRolesDirty ? 'primary' : 'secondary'"
+          :disabled="!isRolesDirty || readOnly"
+          @click="saveRole()"
+          >{{ t('settings.common.save') }}</BsButton
+        >
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the count of a tab : small and grey, as the menus' badges */

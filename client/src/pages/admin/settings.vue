@@ -431,208 +431,200 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <!-- titled like its menu entry, "General" : the header link and the menu are "Settings" already -->
-      <AppSettings
-        v-if="authenticated"
-        icon="toolbox"
-        :title="t('sidebar.ansibleForms')"
-        :description="t('settings.settingsPage.description')"
-      >
-        <template #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="group in envGroups" :key="group.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'env_' + group.key }"
-                href="#"
-                @click.prevent="activeTab = 'env_' + group.key"
-              >
-                <FaIcon :icon="group.icon" class="me-1" />
-                {{ group.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <!-- Environment Variable tabs -->
-          <template v-for="group in envGroups" :key="group.key">
-            <div v-show="activeTab === 'env_' + group.key">
-              <!-- The editable, database-backed settings live with their subject rather than
-                   in a general tab: the public url is a server property, the language and
-                   theme defaults are UI ones. They save through saveSettings(), the fields
-                   below through the env endpoint - the one Save button covers both. -->
-              <template v-if="group.key === 'server'">
+  <AppSettingsPage>
+    <!-- titled like its menu entry, "General" : the header link and the menu are "Settings" already -->
+    <AppSettings
+      v-if="authenticated"
+      icon="toolbox"
+      :title="t('sidebar.ansibleForms')"
+      :description="t('settings.settingsPage.description')"
+    >
+      <template #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="group in envGroups" :key="group.key" class="nav-item">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === 'env_' + group.key }"
+              href="#"
+              @click.prevent="activeTab = 'env_' + group.key"
+            >
+              <FaIcon :icon="group.icon" class="me-1" />
+              {{ group.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <!-- Environment Variable tabs -->
+        <template v-for="group in envGroups" :key="group.key">
+          <div v-show="activeTab === 'env_' + group.key">
+            <!-- The editable, database-backed settings live with their subject rather than
+               in a general tab: the public url is a server property, the language and
+               theme defaults are UI ones. They save through saveSettings(), the fields
+               below through the env endpoint - the one Save button covers both. -->
+            <template v-if="group.key === 'server'">
+              <BsInput
+                :isFloating="false"
+                icon="globe"
+                v-model="$v.item.url.$model"
+                :label="t('settings.settingsPage.publicRootUrl')"
+                :required="true"
+                :help="t('settings.settingsPage.publicRootUrlHelp')"
+                :hasError="$v.item.url.$invalid && $v.item.url.$dirty"
+                :errors="$v.item.url.$errors"
+              />
+              <div class="mt-4"></div>
+            </template>
+            <template v-if="group.key === 'ui'">
+              <!-- no language field here : DEFAULT_LANGUAGE below is the one control for it.
+                 Theme and colour have no environment variable, so they stay database
+                 backed. -->
+              <BsInput
+                :isFloating="false"
+                type="select"
+                icon="palette"
+                v-model="effectiveTheme"
+                :values="themeOptions"
+                valueKey="value"
+                labelKey="label"
+                :label="t('settings.settingsPage.defaultTheme')"
+                :help="t('settings.settingsPage.defaultThemeHelp')"
+              />
+              <div v-if="effectiveTheme === 'color'" class="mt-2 ms-1">
+                <div class="d-flex flex-wrap gap-2">
+                  <button
+                    v-for="c in colorPalette"
+                    :key="c.hex"
+                    type="button"
+                    class="settings-color-swatch"
+                    :style="{ backgroundColor: c.hex }"
+                    :class="{ 'settings-color-swatch-active': effectiveThemeColor === c.hex }"
+                    :title="c.label"
+                    @click="effectiveThemeColor = c.hex"
+                  >
+                    <FaIcon v-if="effectiveThemeColor === c.hex" icon="check" class="settings-swatch-check" />
+                  </button>
+                </div>
+              </div>
+              <div class="mt-4"></div>
+            </template>
+            <div v-if="envRestartPending.length" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />
+              {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
+            </div>
+            <!-- The same rhythm as the Settings tab - label, value, help text below -
+               but deliberately NOT BsInput. These are read-only: they come from the
+               process environment and there is no endpoint that writes them, so an
+               input (even disabled) would promise an edit that cannot happen. The
+               value sits in a plain bordered block instead. -->
+            <template v-for="(e, i) in group.items" :key="e.name">
+              <div v-if="i > 0" class="mt-4"></div>
+              <!-- Same structure as a BsInput on the Settings tab: mb-3 wrapper,
+                 form-label fw-bold, an input-group with a leading icon, then the
+                 help text. The value is a DIV carrying .form-control rather than an
+                 <input>: it looks like the fields beside it, but nothing writes these
+                 - they come from the process environment - so an input would promise
+                 an edit that cannot happen. -->
+              <div class="mb-3">
+                <!-- an editable variable gets a real BsInput, so it is identical to the
+                   Settings tab. One that cannot be written keeps the read-only box and
+                   says why, rather than offering an edit that would not take. -->
                 <BsInput
+                  v-if="envEditable(e)"
                   :isFloating="false"
-                  icon="globe"
-                  v-model="$v.item.url.$model"
-                  :label="t('settings.settingsPage.publicRootUrl')"
-                  :required="true"
-                  :help="t('settings.settingsPage.publicRootUrlHelp')"
-                  :hasError="$v.item.url.$invalid && $v.item.url.$dirty"
-                  :errors="$v.item.url.$errors"
-                />
-                <div class="mt-4"></div>
-              </template>
-              <template v-if="group.key === 'ui'">
-                <!-- no language field here : DEFAULT_LANGUAGE below is the one control for it.
-                     Theme and colour have no environment variable, so they stay database
-                     backed. -->
-                <BsInput
-                  :isFloating="false"
-                  type="select"
-                  icon="palette"
-                  v-model="effectiveTheme"
-                  :values="themeOptions"
+                  :icon="e.type === 'number' ? 'hashtag' : 'font'"
+                  :type="envOptions(e) ? 'select' : e.secret ? 'password' : e.type === 'number' ? 'number' : 'text'"
+                  :values="envOptions(e) || []"
                   valueKey="value"
                   labelKey="label"
-                  :label="t('settings.settingsPage.defaultTheme')"
-                  :help="t('settings.settingsPage.defaultThemeHelp')"
+                  :placeholder="e.secret && e.set ? t('settings.settingsPage.envSecretUnchanged') : ''"
+                  :label="e.short || e.name"
+                  :help="envHelp(e)"
+                  v-model="envEdits[e.name]"
                 />
-                <div v-if="effectiveTheme === 'color'" class="mt-2 ms-1">
-                  <div class="d-flex flex-wrap gap-2">
-                    <button
-                      v-for="c in colorPalette"
-                      :key="c.hex"
-                      type="button"
-                      class="settings-color-swatch"
-                      :style="{ backgroundColor: c.hex }"
-                      :class="{ 'settings-color-swatch-active': effectiveThemeColor === c.hex }"
-                      :title="c.label"
-                      @click="effectiveThemeColor = c.hex"
-                    >
-                      <FaIcon v-if="effectiveThemeColor === c.hex" icon="check" class="settings-swatch-check" />
-                    </button>
-                  </div>
-                </div>
-                <div class="mt-4"></div>
-              </template>
-              <div v-if="envRestartPending.length" class="alert alert-warning py-2">
-                <FaIcon icon="triangle-exclamation" class="me-2" />
-                {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
-              </div>
-              <!-- The same rhythm as the Settings tab - label, value, help text below -
-                   but deliberately NOT BsInput. These are read-only: they come from the
-                   process environment and there is no endpoint that writes them, so an
-                   input (even disabled) would promise an edit that cannot happen. The
-                   value sits in a plain bordered block instead. -->
-              <template v-for="(e, i) in group.items" :key="e.name">
-                <div v-if="i > 0" class="mt-4"></div>
-                <!-- Same structure as a BsInput on the Settings tab: mb-3 wrapper,
-                     form-label fw-bold, an input-group with a leading icon, then the
-                     help text. The value is a DIV carrying .form-control rather than an
-                     <input>: it looks like the fields beside it, but nothing writes these
-                     - they come from the process environment - so an input would promise
-                     an edit that cannot happen. -->
-                <div class="mb-3">
-                  <!-- an editable variable gets a real BsInput, so it is identical to the
-                       Settings tab. One that cannot be written keeps the read-only box and
-                       says why, rather than offering an edit that would not take. -->
-                  <BsInput
-                    v-if="envEditable(e)"
-                    :isFloating="false"
-                    :icon="e.type === 'number' ? 'hashtag' : 'font'"
-                    :type="envOptions(e) ? 'select' : e.secret ? 'password' : e.type === 'number' ? 'number' : 'text'"
-                    :values="envOptions(e) || []"
-                    valueKey="value"
-                    labelKey="label"
-                    :placeholder="e.secret && e.set ? t('settings.settingsPage.envSecretUnchanged') : ''"
-                    :label="e.short || e.name"
-                    :help="envHelp(e)"
-                    v-model="envEdits[e.name]"
-                  />
-                  <template v-else>
-                    <label class="form-label fw-bold">{{ e.short || e.name }}</label>
-                    <div>
-                      <div class="input-group">
-                        <span class="input-group-text text-gray-500">
-                          <FaIcon :fixedwidth="true" :icon="e.editable === 'refused' ? 'lock' : 'shield-halved'" />
-                        </span>
-                        <div class="form-control env-value" :title="e.name">
-                          {{ e.value === null || e.value === '' ? '—' : e.value }}
-                        </div>
+                <template v-else>
+                  <label class="form-label fw-bold">{{ e.short || e.name }}</label>
+                  <div>
+                    <div class="input-group">
+                      <span class="input-group-text text-gray-500">
+                        <FaIcon :fixedwidth="true" :icon="e.editable === 'refused' ? 'lock' : 'shield-halved'" />
+                      </span>
+                      <div class="form-control env-value" :title="e.name">
+                        {{ e.value === null || e.value === '' ? '—' : e.value }}
                       </div>
                     </div>
-                    <div v-if="envHelp(e)" class="form-text">{{ envHelp(e) }}</div>
-                    <div class="form-text env-locked">
-                      {{ e.overridden ? t('settings.settingsPage.envOverridden') : e.refusedReason || '' }}
-                    </div>
-                  </template>
-                  <div v-if="envEditable(e) && e.editable === 'restart'" class="form-text env-restart">
-                    {{ t('settings.settingsPage.envRestartRequired') }}
-                    <!-- for a path, 'takes effect after a restart' is true but misses the
-                         part that matters: whatever is already on disk does not move -->
-                    <template v-if="e.relocates"> {{ t('settings.settingsPage.envRelocates') }}</template>
                   </div>
+                  <div v-if="envHelp(e)" class="form-text">{{ envHelp(e) }}</div>
+                  <div class="form-text env-locked">
+                    {{ e.overridden ? t('settings.settingsPage.envOverridden') : e.refusedReason || '' }}
+                  </div>
+                </template>
+                <div v-if="envEditable(e) && e.editable === 'restart'" class="form-text env-restart">
+                  {{ t('settings.settingsPage.envRestartRequired') }}
+                  <!-- for a path, 'takes effect after a restart' is true but misses the
+                     part that matters: whatever is already on disk does not move -->
+                  <template v-if="e.relocates"> {{ t('settings.settingsPage.envRelocates') }}</template>
                 </div>
-              </template>
-              <!-- After the fields, not before them: these move the whole configuration
-                   between disk and database, so they read as an action on the settings
-                   above rather than a heading over them. mt-4 to separate them from the last
-                   field, and a small mb-2 so they do not sit hard against the card edge -
-                   deliberately smaller than a field's mb-3, which the :last-child rule below
-                   zeroes precisely because it stacks on the card's own padding. -->
-              <template v-if="group.key === 'configuration'">
-                <div class="mt-4 mb-2 d-flex align-items-center">
-                  <BsButton icon="file-import" colorClass="secondary" @click="showImportConfirm = true">{{
-                    t('settings.settingsPage.importToDatabase')
-                  }}</BsButton>
-                  <BsButton
-                    icon="file-export"
-                    colorClass="secondary"
-                    cssClass="ms-3"
-                    @click="showExportConfirm = true"
-                    >{{ t('settings.settingsPage.exportToFile') }}</BsButton
-                  >
-                </div>
-              </template>
-            </div>
-          </template>
+              </div>
+            </template>
+            <!-- After the fields, not before them: these move the whole configuration
+               between disk and database, so they read as an action on the settings
+               above rather than a heading over them. mt-4 to separate them from the last
+               field, and a small mb-2 so they do not sit hard against the card edge -
+               deliberately smaller than a field's mb-3, which the :last-child rule below
+               zeroes precisely because it stacks on the card's own padding. -->
+            <template v-if="group.key === 'configuration'">
+              <div class="mt-4 mb-2 d-flex align-items-center">
+                <BsButton icon="file-import" colorClass="secondary" @click="showImportConfirm = true">{{
+                  t('settings.settingsPage.importToDatabase')
+                }}</BsButton>
+                <BsButton icon="file-export" colorClass="secondary" cssClass="ms-3" @click="showExportConfirm = true">{{
+                  t('settings.settingsPage.exportToFile')
+                }}</BsButton>
+              </div>
+            </template>
+          </div>
         </template>
-        <template #actions>
-          <!-- one button : a tab can now hold both database-backed settings and environment
-               variables, so Save applies whichever of the two is pending -->
-          <BsButton
-            icon="save"
-            :colorClass="anyDirty ? 'primary' : 'secondary'"
-            :disabled="!anyDirty"
-            @click="saveActiveTab()"
-            >{{ t('settings.common.save') }}</BsButton
-          >
-        </template>
-      </AppSettings>
+      </template>
+      <template #actions>
+        <!-- one button : a tab can now hold both database-backed settings and environment
+           variables, so Save applies whichever of the two is pending -->
+        <BsButton
+          icon="save"
+          :colorClass="anyDirty ? 'primary' : 'secondary'"
+          :disabled="!anyDirty"
+          @click="saveActiveTab()"
+          >{{ t('settings.common.save') }}</BsButton
+        >
+      </template>
+    </AppSettings>
 
-      <!-- Modal - confirm import config.yaml to database -->
-      <BsModal v-if="showImportConfirm" @close="showImportConfirm = false">
-        <template #title> {{ t('settings.settingsPage.importConfirmTitle') }} </template>
-        <template #default>
-          <p class="mt-3 fs-6 user-select-none">
-            {{ t('settings.settingsPage.importConfirmText') }}
-          </p>
-        </template>
-        <template #footer>
-          <BsButton icon="file-import" @click="importConfigToDatabase()">{{ t('common.confirm') }}</BsButton>
-        </template>
-      </BsModal>
+    <!-- Modal - confirm import config.yaml to database -->
+    <BsModal v-if="showImportConfirm" @close="showImportConfirm = false">
+      <template #title> {{ t('settings.settingsPage.importConfirmTitle') }} </template>
+      <template #default>
+        <p class="mt-3 fs-6 user-select-none">
+          {{ t('settings.settingsPage.importConfirmText') }}
+        </p>
+      </template>
+      <template #footer>
+        <BsButton icon="file-import" @click="importConfigToDatabase()">{{ t('common.confirm') }}</BsButton>
+      </template>
+    </BsModal>
 
-      <!-- Modal - confirm export database to config.yaml -->
-      <BsModal v-if="showExportConfirm" @close="showExportConfirm = false">
-        <template #title> {{ t('settings.settingsPage.exportConfirmTitle') }} </template>
-        <template #default>
-          <p class="mt-3 fs-6 user-select-none">
-            {{ t('settings.settingsPage.exportConfirmText') }}
-          </p>
-        </template>
-        <template #footer>
-          <BsButton icon="file-export" @click="exportConfigToFile()">{{ t('common.confirm') }}</BsButton>
-        </template>
-      </BsModal>
-    </main>
-  </div>
+    <!-- Modal - confirm export database to config.yaml -->
+    <BsModal v-if="showExportConfirm" @close="showExportConfirm = false">
+      <template #title> {{ t('settings.settingsPage.exportConfirmTitle') }} </template>
+      <template #default>
+        <p class="mt-3 fs-6 user-select-none">
+          {{ t('settings.settingsPage.exportConfirmText') }}
+        </p>
+      </template>
+      <template #footer>
+        <BsButton icon="file-export" @click="exportConfigToFile()">{{ t('common.confirm') }}</BsButton>
+      </template>
+    </BsModal>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the card body padding of a tabbed AppSettings card is set globally

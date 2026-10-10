@@ -286,240 +286,231 @@ onMounted(async () => {
     </template>
   </BsModal>
   <AppChangePasswordDialog v-if="changingPassword" icon="lock" @save="savePassword" @close="changingPassword = false" />
-  <AppNav />
-  <div class="flex-shrink-0">
-    <main class="d-flex flex-nowrap af-settings-layout">
-      <AppSidebar />
-      <AppSettings
-        v-if="authenticated"
-        icon="lock"
-        :title="credential?.name || credentialId"
-        :crumbs="crumbs"
-        :description="t('settings.credentials.description')"
-      >
-        <template v-if="credential" #tabs>
-          <ul class="nav nav-tabs mb-0">
-            <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: shownTab === tab.key }"
-                href="#"
-                @click.prevent="activeTab = tab.key"
-              >
-                <FaIcon :icon="tab.icon" class="me-1" />
-                {{ tab.label }}
-              </a>
-            </li>
-          </ul>
-        </template>
-        <template #default>
-          <div v-if="loaded && !credential" class="empty-state">
-            <FaIcon icon="lock" class="empty-state-icon" />
-            <span>{{ t('settings.credentials.notFound', { id: credentialId }) }}</span>
+  <AppSettingsPage>
+    <AppSettings
+      v-if="authenticated"
+      icon="lock"
+      :title="credential?.name || credentialId"
+      :crumbs="crumbs"
+      :description="t('settings.credentials.description')"
+    >
+      <template v-if="credential" #tabs>
+        <ul class="nav nav-tabs mb-0">
+          <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+            <a class="nav-link" :class="{ active: shownTab === tab.key }" href="#" @click.prevent="activeTab = tab.key">
+              <FaIcon :icon="tab.icon" class="me-1" />
+              {{ tab.label }}
+            </a>
+          </li>
+        </ul>
+      </template>
+      <template #default>
+        <div v-if="loaded && !credential" class="empty-state">
+          <FaIcon icon="lock" class="empty-state-icon" />
+          <span>{{ t('settings.credentials.notFound', { id: credentialId }) }}</span>
+        </div>
+        <div v-else-if="credential && edit" class="af-credential-tab">
+          <!-- a credential of the config seed : read only here -->
+          <div v-if="managed" class="alert alert-secondary py-2">
+            <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
           </div>
-          <div v-else-if="credential && edit" class="af-credential-tab">
-            <!-- a credential of the config seed : read only here -->
-            <div v-if="managed" class="alert alert-secondary py-2">
-              <FaIcon icon="lock" class="me-2" />{{ t('settings.common.seedManagedNotice') }}
-            </div>
-            <fieldset :disabled="managed">
-              <!-- Credential : what it is called -->
-              <template v-if="shownTab === 'credential'">
-                <BsInput
-                  class="af-credential-field"
-                  v-model="edit.name"
-                  icon="lock"
-                  :isFloating="false"
-                  :required="true"
-                  :label="t('settings.fields.name')"
+          <fieldset :disabled="managed">
+            <!-- Credential : what it is called -->
+            <template v-if="shownTab === 'credential'">
+              <BsInput
+                class="af-credential-field"
+                v-model="edit.name"
+                icon="lock"
+                :isFloating="false"
+                :required="true"
+                :label="t('settings.fields.name')"
+              />
+              <BsInput
+                class="af-credential-field"
+                v-model="edit.description"
+                icon="info-circle"
+                :isFloating="false"
+                :required="true"
+                :label="t('settings.fields.description')"
+              />
+            </template>
+            <!-- Type : what it is for, each its label and a few grey words -->
+            <template v-else-if="shownTab === 'type'">
+              <div v-for="kind in CREDENTIAL_TYPES" :key="kind" class="form-check af-short-check">
+                <input
+                  :id="'af-ctype-' + kind"
+                  v-model="edit.credential_type"
+                  class="form-check-input"
+                  type="radio"
+                  name="af-credential-type"
+                  :value="kind"
                 />
-                <BsInput
-                  class="af-credential-field"
-                  v-model="edit.description"
-                  icon="info-circle"
-                  :isFloating="false"
-                  :required="true"
-                  :label="t('settings.fields.description')"
-                />
-              </template>
-              <!-- Type : what it is for, each its label and a few grey words -->
-              <template v-else-if="shownTab === 'type'">
-                <div v-for="kind in CREDENTIAL_TYPES" :key="kind" class="form-check af-short-check">
-                  <input
-                    :id="'af-ctype-' + kind"
-                    v-model="edit.credential_type"
-                    class="form-check-input"
-                    type="radio"
-                    name="af-credential-type"
-                    :value="kind"
-                  />
-                  <label class="form-check-label" :for="'af-ctype-' + kind">
-                    <span class="af-short-label">{{ t(`settings.credentials.type_${kind}`) }}</span>
-                    <span class="text-body-secondary small">{{ t(`settings.credentials.type_${kind}Hint`) }}</span>
-                  </label>
-                </div>
-              </template>
-              <!-- Login : its user (read from a store : nothing here) ; a CyberArk's AppID,
-                   client certificate and key -->
-              <template v-else-if="shownTab === 'login'">
-                <p v-if="fromStore" class="form-text mb-0">{{ t('settings.credentials.loginFromStore') }}</p>
-                <template v-else>
-                  <BsInput
-                    class="af-credential-field"
-                    v-model="edit.user"
-                    icon="user"
-                    :isFloating="false"
-                    :help="isCyberark ? t('settings.secretStores.appIdHelp') : ''"
-                    :label="isCyberark ? t('settings.secretStores.appId') : t('settings.fields.user')"
-                  />
-                  <template v-if="isCyberark">
-                    <BsInput
-                      class="af-credential-field"
-                      v-model="edit.client_cert"
-                      type="textarea"
-                      icon="certificate"
-                      placeholder="-----BEGIN CERTIFICATE-----"
-                      :isFloating="false"
-                      :help="t('settings.secretStores.clientCertHelp')"
-                      :label="t('settings.secretStores.clientCert')"
-                    />
-                    <BsInput
-                      class="af-credential-field"
-                      v-model="edit.client_key"
-                      type="textarea"
-                      icon="key"
-                      placeholder="-----BEGIN PRIVATE KEY-----"
-                      :isFloating="false"
-                      :help="t('settings.credentials.clientKeyKeep')"
-                      :label="t('settings.secretStores.clientKey')"
-                    />
-                  </template>
-                  <p v-else class="form-text mb-0">{{ t('settings.runners.passwordOnPage') }}</p>
-                </template>
-              </template>
-              <!-- Store : the app's database, or a secret store and the place in it -->
-              <template v-else-if="shownTab === 'store'">
-                <div
-                  v-for="opt in [
-                    {
-                      value: 'local',
-                      label: t('settings.credentials.secretLocal'),
-                      hint: t('settings.credentials.secretLocalHint'),
-                    },
-                    {
-                      value: 'store',
-                      label: t('settings.credentials.secretFromStore'),
-                      hint: t('settings.credentials.secretFromStoreHint'),
-                    },
-                  ]"
-                  :key="opt.value"
-                  class="form-check af-short-check"
-                >
-                  <input
-                    :id="'af-source-' + opt.value"
-                    v-model="edit.secret_source"
-                    class="form-check-input"
-                    type="radio"
-                    name="af-credential-source"
-                    :value="opt.value"
-                  />
-                  <label class="form-check-label" :for="'af-source-' + opt.value">
-                    <span class="af-short-label">{{ opt.label }}</span>
-                    <span class="text-body-secondary small">{{ opt.hint }}</span>
-                  </label>
-                </div>
-                <template v-if="fromStore">
-                  <BsInput
-                    class="af-credential-field mt-3"
-                    v-model="edit.secret_store"
-                    type="select"
-                    icon="vault"
-                    :isFloating="false"
-                    :values="secretStores"
-                    valueKey="name"
-                    labelKey="name"
-                    :help="t('settings.credentials.secretStoreHelp')"
-                    :label="t('settings.credentials.secretStore')"
-                  />
-                  <BsInput
-                    class="af-credential-field"
-                    v-model="edit.secret_ref"
-                    icon="shield-alt"
-                    :placeholder="t('settings.credentials.secretRefPlaceholder')"
-                    :isFloating="false"
-                    :help="t('settings.credentials.secretRefHelp')"
-                    :label="t('settings.credentials.secretRef')"
-                  />
-                </template>
-              </template>
-              <!-- Connection : a host and port ; a database's type and name -->
+                <label class="form-check-label" :for="'af-ctype-' + kind">
+                  <span class="af-short-label">{{ t(`settings.credentials.type_${kind}`) }}</span>
+                  <span class="text-body-secondary small">{{ t(`settings.credentials.type_${kind}Hint`) }}</span>
+                </label>
+              </div>
+            </template>
+            <!-- Login : its user (read from a store : nothing here) ; a CyberArk's AppID,
+               client certificate and key -->
+            <template v-else-if="shownTab === 'login'">
+              <p v-if="fromStore" class="form-text mb-0">{{ t('settings.credentials.loginFromStore') }}</p>
               <template v-else>
                 <BsInput
                   class="af-credential-field"
-                  v-model="edit.host"
-                  icon="server"
+                  v-model="edit.user"
+                  icon="user"
                   :isFloating="false"
-                  :label="t('settings.fields.host')"
+                  :help="isCyberark ? t('settings.secretStores.appIdHelp') : ''"
+                  :label="isCyberark ? t('settings.secretStores.appId') : t('settings.fields.user')"
+                />
+                <template v-if="isCyberark">
+                  <BsInput
+                    class="af-credential-field"
+                    v-model="edit.client_cert"
+                    type="textarea"
+                    icon="certificate"
+                    placeholder="-----BEGIN CERTIFICATE-----"
+                    :isFloating="false"
+                    :help="t('settings.secretStores.clientCertHelp')"
+                    :label="t('settings.secretStores.clientCert')"
+                  />
+                  <BsInput
+                    class="af-credential-field"
+                    v-model="edit.client_key"
+                    type="textarea"
+                    icon="key"
+                    placeholder="-----BEGIN PRIVATE KEY-----"
+                    :isFloating="false"
+                    :help="t('settings.credentials.clientKeyKeep')"
+                    :label="t('settings.secretStores.clientKey')"
+                  />
+                </template>
+                <p v-else class="form-text mb-0">{{ t('settings.runners.passwordOnPage') }}</p>
+              </template>
+            </template>
+            <!-- Store : the app's database, or a secret store and the place in it -->
+            <template v-else-if="shownTab === 'store'">
+              <div
+                v-for="opt in [
+                  {
+                    value: 'local',
+                    label: t('settings.credentials.secretLocal'),
+                    hint: t('settings.credentials.secretLocalHint'),
+                  },
+                  {
+                    value: 'store',
+                    label: t('settings.credentials.secretFromStore'),
+                    hint: t('settings.credentials.secretFromStoreHint'),
+                  },
+                ]"
+                :key="opt.value"
+                class="form-check af-short-check"
+              >
+                <input
+                  :id="'af-source-' + opt.value"
+                  v-model="edit.secret_source"
+                  class="form-check-input"
+                  type="radio"
+                  name="af-credential-source"
+                  :value="opt.value"
+                />
+                <label class="form-check-label" :for="'af-source-' + opt.value">
+                  <span class="af-short-label">{{ opt.label }}</span>
+                  <span class="text-body-secondary small">{{ opt.hint }}</span>
+                </label>
+              </div>
+              <template v-if="fromStore">
+                <BsInput
+                  class="af-credential-field mt-3"
+                  v-model="edit.secret_store"
+                  type="select"
+                  icon="vault"
+                  :isFloating="false"
+                  :values="secretStores"
+                  valueKey="name"
+                  labelKey="name"
+                  :help="t('settings.credentials.secretStoreHelp')"
+                  :label="t('settings.credentials.secretStore')"
                 />
                 <BsInput
                   class="af-credential-field"
-                  v-model="edit.port"
-                  type="number"
-                  icon="arrows-alt-v"
+                  v-model="edit.secret_ref"
+                  icon="shield-alt"
+                  :placeholder="t('settings.credentials.secretRefPlaceholder')"
                   :isFloating="false"
-                  :label="t('settings.fields.port')"
+                  :help="t('settings.credentials.secretRefHelp')"
+                  :label="t('settings.credentials.secretRef')"
                 />
-                <template v-if="isDatabase">
-                  <BsInput
-                    class="af-credential-field"
-                    v-model="edit.db_type"
-                    type="select"
-                    icon="database"
-                    :isFloating="false"
-                    :values="DB_TYPES"
-                    valueKey="value"
-                    labelKey="label"
-                    :required="true"
-                    :label="t('settings.credentials.databaseType')"
-                  />
-                  <BsInput
-                    class="af-credential-field"
-                    v-model="edit.db_name"
-                    icon="database"
-                    :isFloating="false"
-                    :label="t('settings.credentials.database')"
-                  />
-                </template>
               </template>
-            </fieldset>
-          </div>
-        </template>
-        <template v-if="credential" #actions>
+            </template>
+            <!-- Connection : a host and port ; a database's type and name -->
+            <template v-else>
+              <BsInput
+                class="af-credential-field"
+                v-model="edit.host"
+                icon="server"
+                :isFloating="false"
+                :label="t('settings.fields.host')"
+              />
+              <BsInput
+                class="af-credential-field"
+                v-model="edit.port"
+                type="number"
+                icon="arrows-alt-v"
+                :isFloating="false"
+                :label="t('settings.fields.port')"
+              />
+              <template v-if="isDatabase">
+                <BsInput
+                  class="af-credential-field"
+                  v-model="edit.db_type"
+                  type="select"
+                  icon="database"
+                  :isFloating="false"
+                  :values="DB_TYPES"
+                  valueKey="value"
+                  labelKey="label"
+                  :required="true"
+                  :label="t('settings.credentials.databaseType')"
+                />
+                <BsInput
+                  class="af-credential-field"
+                  v-model="edit.db_name"
+                  icon="database"
+                  :isFloating="false"
+                  :label="t('settings.credentials.database')"
+                />
+              </template>
+            </template>
+          </fieldset>
+        </div>
+      </template>
+      <template v-if="credential" #actions>
+        <BsButton
+          v-if="credential.is_database"
+          icon="plug"
+          cssClass="text-nowrap"
+          :disabled="testing"
+          @click="testConnection()"
+          >{{ t('settings.common.testConnection') }}</BsButton
+        >
+        <template v-if="!managed">
           <BsButton
-            v-if="credential.is_database"
-            icon="plug"
+            v-if="!isCyberark && !fromStore"
+            icon="lock"
             cssClass="text-nowrap"
-            :disabled="testing"
-            @click="testConnection()"
-            >{{ t('settings.common.testConnection') }}</BsButton
+            @click="changingPassword = true"
+            >{{ t('settings.common.changePassword') }}</BsButton
           >
-          <template v-if="!managed">
-            <BsButton
-              v-if="!isCyberark && !fromStore"
-              icon="lock"
-              cssClass="text-nowrap"
-              @click="changingPassword = true"
-              >{{ t('settings.common.changePassword') }}</BsButton
-            >
-            <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
-            <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
-              t('settings.common.save')
-            }}</BsButton>
-          </template>
+          <BsButton icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+          <BsButton icon="save" :colorClass="dirty ? 'primary' : 'secondary'" :disabled="!dirty" @click="save()">{{
+            t('settings.common.save')
+          }}</BsButton>
         </template>
-      </AppSettings>
-    </main>
-  </div>
+      </template>
+    </AppSettings>
+  </AppSettingsPage>
 </template>
 <style scoped>
 /* the wide fields' width of the settings pages, as a runner's and a secret store's */
