@@ -1049,7 +1049,9 @@ async function backupBeforeUpgrade() {
     logger.notice(`Backed up the database before the upgrade : ${backupFolder}`);
     return `Backed up the database before the upgrade (${backupFolder})`;
   } catch (err) {
-    throw new Error(`The database needs upgrading, and the backup before it failed : ${err.message || err}. Fix the backup (MYSQLDUMP_COMMAND, BACKUP_PATH), or set UPGRADE_BACKUP=0 to upgrade without one`, { cause: err });
+    // not the backup's own message : it can carry the dump command, and the backup logged why
+    // it failed already (masked)
+    throw new Error("The database needs upgrading, and the backup before it failed (the backup's error is logged above). Fix the backup (MYSQLDUMP_COMMAND, BACKUP_PATH), or set UPGRADE_BACKUP=0 to upgrade without one", { cause: err });
   }
 }
 
