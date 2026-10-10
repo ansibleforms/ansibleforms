@@ -1668,15 +1668,17 @@ onMounted(async () => {
 .af-job-output :deep(.ansible:last-child) {
   margin-bottom: 0;
 }
-/* a job's titles : the type and status badges sit on the middle of the words, and the
-   buttons under the title look as far from it as from the output under them (mt-4) : the
-   title's line box has room under its letters, so its margin is the smaller one */
+/* "Main job (jobid 97)", "Step 1 · ... (jobid 98)" : a header bar over its output, the grey
+   and the divider of the output's own section heads (AppAnsibleOutput's .af-node-head) */
 .af-job-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1.125rem;
+  margin: 0;
+  padding: 0.625rem 1.25rem;
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--af-field-border);
   .badge {
     font-size: 0.5em;
   }
@@ -1794,7 +1796,7 @@ onMounted(async () => {
    action icons side by side, a date not broken in two) */
 /* a multistep job's step under the output before it : a line where one ends and the next begins */
 .af-job-step {
-  border-top: 1px solid var(--bs-border-color);
+  border-top: 1px solid var(--af-field-border);
 }
 .custom-table {
   /* 20px lines : every row a whole 45px (12px padding twice, a 1px border). At 1.2 a row was
