@@ -4,9 +4,9 @@
 /*  A job's status as the app's standard pill (styles/tables.scss,*/
 /*  .af-pill) : the same colours wherever a job shows its status  */
 /*  - the jobs list, a job's page, a form's running job, an AWX   */
-/*  workflow. Running blue, success green, failed red, waiting or */
-/*  stopped amber, anything else grey ; the label as the jobs'    */
-/*  menu says it, else the status itself.                         */
+/*  workflow. Running blue, success green, failed red, waiting    */
+/*  for an approval purple, stopped amber, anything else grey ;   */
+/*  the label as the jobs' menu says it, else the status itself.  */
 /*                                                                */
 /*  @props:                                                       */
 /*      status: String - the job's status (AWX's too)             */
@@ -35,7 +35,8 @@ const STATUS_TONE = {
   successful: 'green',
   failed: 'red',
   error: 'red',
-  approve: 'amber',
+  // waiting on a person, not stopped : its own colour, apart from aborted's amber
+  approve: 'purple',
   warning: 'amber',
   aborted: 'amber',
   rejected: 'amber',

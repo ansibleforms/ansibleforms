@@ -11,6 +11,7 @@
 export const PILL = {
   blue: 'af-pill-blue',
   amber: 'af-pill-amber',
+  purple: 'af-pill-purple',
   green: 'af-pill-green',
   red: 'af-pill-red',
   cyan: 'af-pill-cyan',
