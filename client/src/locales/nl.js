@@ -401,7 +401,6 @@ export default {
     info: 'Info',
     yes: 'Ja',
     no: 'Nee',
-    search: 'Zoeken',
     noData: 'Geen gegevens beschikbaar',
     actions: 'Acties',
     pageSize: 'Rijen per pagina',
@@ -1291,7 +1290,6 @@ export default {
     categories: 'Categorie\u00ebn',
     allForms: 'Alle formulieren',
     search: 'Zoeken',
-    filter: 'Filter',
     name: 'Naam',
     description: 'Beschrijving',
     list: 'Lijst',
@@ -1774,6 +1772,5 @@ export default {
       'Het eigen log van de AnsibleForms-server: aanmeldingen, het laden van de configuratie, verzoeken en fouten. De nieuwste regels staan onderaan.',
     autoRefresh: 'Automatisch vernieuwen',
     download: 'Downloaden',
-    filterPlaceholder: 'regex',
   },
 };

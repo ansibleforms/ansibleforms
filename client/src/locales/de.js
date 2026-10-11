@@ -405,7 +405,6 @@ export default {
     info: 'Info',
     yes: 'Ja',
     no: 'Nein',
-    search: 'Suchen',
     noData: 'Keine Daten verfuegbar',
     actions: 'Aktionen',
     pageSize: 'Zeilen pro Seite',
@@ -1310,7 +1309,6 @@ export default {
     categories: 'Kategorien',
     allForms: 'Alle Formulare',
     search: 'Suchen',
-    filter: 'Filtern',
     name: 'Name',
     description: 'Beschreibung',
     list: 'Liste',
@@ -1796,6 +1794,5 @@ export default {
       'Das eigene Protokoll des AnsibleForms-Servers: Anmeldungen, Laden der Konfiguration, Anfragen und Fehler. Die neuesten Zeilen stehen unten.',
     autoRefresh: 'Automatisch aktualisieren',
     download: 'Herunterladen',
-    filterPlaceholder: 'Regex',
   },
 };

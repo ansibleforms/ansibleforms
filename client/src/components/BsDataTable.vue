@@ -537,14 +537,14 @@ function exportCsv() {
       >
         <!-- Global search -->
         <!-- framed : the search of the Forms page (grey icon box, clear button) -->
-        <BsSearch v-if="framed" v-model="globalFilter" class="af-table-search" :placeholder="t('common.filter')" />
+        <BsSearch v-if="framed" v-model="globalFilter" class="af-table-search" />
         <input
           v-else
           v-model="globalFilter"
           type="search"
           class="form-control form-control-sm"
           style="max-width: 220px"
-          :placeholder="t('common.search')"
+          :placeholder="t('common.filter')"
         />
 
         <!-- Selection info + bulk helpers -->

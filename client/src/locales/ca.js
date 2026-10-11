@@ -403,7 +403,6 @@ export default {
     info: 'Informació',
     yes: 'Sí',
     no: 'No',
-    search: 'Cerca',
     noData: 'No hi ha dades disponibles',
     actions: 'Accions',
     pageSize: 'Files per pàgina',
@@ -1296,7 +1295,6 @@ export default {
     categories: 'Categories',
     allForms: 'Tots els formularis',
     search: 'Cerca',
-    filter: 'Filtre',
     name: 'Nom',
     description: 'Descripció',
     list: 'Llista',
@@ -1778,6 +1776,5 @@ export default {
       "El registre propi del servidor d'AnsibleForms: inicis de sessió, càrregues de configuració, peticions i errors. Les línies més noves són a baix.",
     autoRefresh: 'Actualització automàtica',
     download: 'Baixa',
-    filterPlaceholder: 'regex',
   },
 };

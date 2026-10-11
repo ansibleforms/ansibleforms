@@ -401,7 +401,6 @@ export default {
     info: 'Información',
     yes: 'Sí',
     no: 'No',
-    search: 'Buscar',
     noData: 'No hay datos disponibles',
     actions: 'Acciones',
     pageSize: 'Filas por página',
@@ -1289,7 +1288,6 @@ export default {
     categories: 'Categorías',
     allForms: 'Todos los formularios',
     search: 'Buscar',
-    filter: 'Filtro',
     name: 'Nombre',
     description: 'Descripción',
     list: 'Lista',
@@ -1771,6 +1769,5 @@ export default {
       'El registro propio del servidor AnsibleForms: inicios de sesión, cargas de la configuración, peticiones y errores. Las líneas más recientes están abajo.',
     autoRefresh: 'Actualización automática',
     download: 'Descargar',
-    filterPlaceholder: 'regex',
   },
 };

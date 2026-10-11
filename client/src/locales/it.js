@@ -404,7 +404,6 @@ export default {
     info: 'Info',
     yes: 'Si',
     no: 'No',
-    search: 'Cerca',
     noData: 'Nessun dato disponibile',
     actions: 'Azioni',
     pageSize: 'Righe per pagina',
@@ -1287,7 +1286,6 @@ export default {
     categories: 'Categorie',
     allForms: 'Tutti i moduli',
     search: 'Cerca',
-    filter: 'Filtra',
     name: 'Nome',
     description: 'Descrizione',
     list: 'Lista',
@@ -1771,6 +1769,5 @@ export default {
       'Il log del server AnsibleForms: accessi, caricamenti della configurazione, richieste ed errori. Le righe più recenti sono in fondo.',
     autoRefresh: 'Aggiornamento automatico',
     download: 'Scarica',
-    filterPlaceholder: 'regex',
   },
 };

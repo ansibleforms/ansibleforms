@@ -400,7 +400,6 @@ export default {
     info: '情報',
     yes: 'はい',
     no: 'いいえ',
-    search: '検索',
     noData: 'データがありません',
     actions: '操作',
     pageSize: '1 ページの行数',
@@ -1271,7 +1270,6 @@ export default {
     categories: 'カテゴリ',
     allForms: 'すべてのフォーム',
     search: '検索',
-    filter: 'フィルター',
     name: '名前',
     description: '説明',
     list: 'リスト',
@@ -1750,6 +1748,5 @@ export default {
       'AnsibleForms サーバー自身のログです。ログイン、設定の読み込み、リクエスト、エラーが記録されます。最新の行は一番下にあります。',
     autoRefresh: '自動更新',
     download: 'ダウンロード',
-    filterPlaceholder: 'regex',
   },
 };

@@ -1208,7 +1208,7 @@ onMounted(async () => {
           </div>
           <div v-else class="d-flex justify-content-end align-items-center">
             <!-- the search, as every table's on the title line -->
-            <BsSearch v-model="search" class="af-table-search me-2" :placeholder="t('common.filter')" />
+            <BsSearch v-model="search" class="af-table-search me-2" />
             <!-- the ticked jobs, deleted together -->
             <BsButton v-if="selected.size" icon="trash" cssClass="me-2 text-nowrap" @click="showBulkDelete = true">{{
               t('jobs.deleteSelected', { count: selected.size })

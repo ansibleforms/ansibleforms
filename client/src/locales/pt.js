@@ -403,7 +403,6 @@ export default {
     info: 'Informação',
     yes: 'Sim',
     no: 'Não',
-    search: 'Pesquisar',
     noData: 'Sem dados disponíveis',
     actions: 'Ações',
     pageSize: 'Linhas por página',
@@ -1295,7 +1294,6 @@ export default {
     categories: 'Categorias',
     allForms: 'Todos os formulários',
     search: 'Pesquisar',
-    filter: 'Filtrar',
     name: 'Nome',
     description: 'Descrição',
     list: 'Lista',
@@ -1779,6 +1777,5 @@ export default {
       'O registo do próprio servidor do AnsibleForms: inícios de sessão, carregamentos da configuração, pedidos e erros. As linhas mais recentes estão no fundo.',
     autoRefresh: 'Atualização automática',
     download: 'Transferir',
-    filterPlaceholder: 'regex',
   },
 };

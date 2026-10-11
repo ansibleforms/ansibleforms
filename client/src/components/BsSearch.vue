@@ -9,7 +9,8 @@
 /*  @model: String - the search text                              */
 /*                                                                */
 /*  @props:                                                       */
-/*      placeholder: String                                       */
+/*      placeholder: String - "Filter" when none : every search   */
+/*                   box in a page filters what the page shows    */
 /*                                                                */
 /******************************************************************/
 
@@ -20,7 +21,7 @@ import { useI18n } from 'vue-i18n';
 
 const search = defineModel({ type: String, default: '' });
 
-defineProps({
+const props = defineProps({
   placeholder: { type: String, default: '' },
 });
 
@@ -49,7 +50,7 @@ function clear() {
       type="text"
       class="form-control"
       :class="{ 'af-search-has-clear': search }"
-      :placeholder="placeholder"
+      :placeholder="props.placeholder || t('common.filter')"
       @keydown.esc="clear"
     />
     <button

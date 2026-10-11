@@ -400,7 +400,6 @@ export default {
     info: 'Info',
     yes: 'Yes',
     no: 'No',
-    search: 'Search',
     noData: 'No data available',
     actions: 'Actions',
     pageSize: 'Rows per page',
@@ -1274,7 +1273,6 @@ export default {
     categories: 'Categories',
     allForms: 'All forms',
     search: 'Search',
-    filter: 'Filter',
     name: 'Name',
     description: 'Description',
     list: 'List',
@@ -1755,6 +1753,5 @@ export default {
       "The AnsibleForms server's own log: logins, configuration loads, requests and errors. The newest lines are at the bottom.",
     autoRefresh: 'Auto refresh',
     download: 'Download',
-    filterPlaceholder: 'regex',
   },
 };

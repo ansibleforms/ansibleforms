@@ -406,7 +406,6 @@ export default {
     info: 'Info',
     yes: 'Oui',
     no: 'Non',
-    search: 'Rechercher',
     noData: 'Aucune donnee disponible',
     actions: 'Actions',
     pageSize: 'Lignes par page',
@@ -1301,7 +1300,6 @@ export default {
     categories: 'Categories',
     allForms: 'Tous les formulaires',
     search: 'Rechercher',
-    filter: 'Filtrer',
     name: 'Nom',
     description: 'Description',
     list: 'Liste',
@@ -1785,6 +1783,5 @@ export default {
       'Le journal propre du serveur AnsibleForms : connexions, chargements de la configuration, requêtes et erreurs. Les lignes les plus récentes sont en bas.',
     autoRefresh: 'Actualisation automatique',
     download: 'Telecharger',
-    filterPlaceholder: 'regex',
   },
 };

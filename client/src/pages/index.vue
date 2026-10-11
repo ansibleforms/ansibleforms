@@ -202,7 +202,7 @@ onMounted(async () => {
             >
               <template #headerActions>
                 <div class="d-flex align-items-center gap-2 af-forms-toolbar">
-                  <BsSearch v-model="search" style="width: 320px" :placeholder="t('forms.filter')" />
+                  <BsSearch v-model="search" style="width: 320px" />
                   <button
                     v-if="formConfig?.warnings?.length > 0 || formConfig?.errors?.length > 0"
                     @click="showWarnings = !showWarnings"
