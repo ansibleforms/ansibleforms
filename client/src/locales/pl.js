@@ -401,7 +401,6 @@ export default {
     info: 'Informacja',
     yes: 'Tak',
     no: 'Nie',
-    search: 'Szukaj',
     noData: 'Brak dostępnych danych',
     actions: 'Akcje',
     pageSize: 'Wierszy na stronę',
@@ -1286,7 +1285,6 @@ export default {
     categories: 'Kategorie',
     allForms: 'Wszystkie formularze',
     search: 'Szukaj',
-    filter: 'Filtr',
     name: 'Nazwa',
     description: 'Opis',
     list: 'Lista',
@@ -1770,6 +1768,5 @@ export default {
       'Własny dziennik serwera AnsibleForms: logowania, wczytania konfiguracji, żądania i błędy. Najnowsze wiersze są na dole.',
     autoRefresh: 'Automatyczne odświeżanie',
     download: 'Pobierz',
-    filterPlaceholder: 'regex',
   },
 };

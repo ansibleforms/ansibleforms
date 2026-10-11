@@ -395,7 +395,6 @@ export default {
     info: '信息',
     yes: '是',
     no: '否',
-    search: '搜索',
     noData: '暂无数据',
     actions: '操作',
     pageSize: '每页行数',
@@ -1247,7 +1246,6 @@ export default {
     categories: '类别',
     allForms: '所有表单',
     search: '搜索',
-    filter: '筛选',
     name: '名称',
     description: '描述',
     list: '列表',
@@ -1717,6 +1715,5 @@ export default {
     description: 'AnsibleForms 服务器自身的日志：登录、配置加载、请求和错误。最新的行位于底部。',
     autoRefresh: '自动刷新',
     download: '下载',
-    filterPlaceholder: 'regex',
   },
 };

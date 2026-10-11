@@ -9,7 +9,8 @@
 /*  @model: String - the search text                              */
 /*                                                                */
 /*  @props:                                                       */
-/*      placeholder: String                                       */
+/*      placeholder: String - "Filter" when none : every search   */
+/*                   box in a page filters what the page shows    */
 /*                                                                */
 /******************************************************************/
 
@@ -20,10 +21,8 @@ import { useI18n } from 'vue-i18n';
 
 const search = defineModel({ type: String, default: '' });
 
-defineProps({
+const props = defineProps({
   placeholder: { type: String, default: '' },
-  // the icon in the grey box at the left : a magnifier, or a filter for a regex
-  icon: { type: String, default: 'search' },
 });
 
 // INIT
@@ -43,15 +42,15 @@ function clear() {
 <template>
   <div class="input-group af-search">
     <span class="input-group-text">
-      <FaIcon :icon="icon" />
+      <FaIcon icon="search" />
     </span>
     <input
       ref="input"
       v-model="search"
       type="text"
       class="form-control"
-      :class="{ 'border-end-0': search }"
-      :placeholder="placeholder"
+      :class="{ 'af-search-has-clear': search }"
+      :placeholder="props.placeholder || t('common.filter')"
       @keydown.esc="clear"
     />
     <button
@@ -77,19 +76,28 @@ function clear() {
 .form-control:focus::placeholder {
   color: transparent !important;
 }
-/* the X sits inside the box, on its right edge, with the input's border around it */
+/* the X inside the input, over its right padding, with no border of its own : the input's border
+   goes around the whole box in every theme and state (resting, focused, typed in), so the X can
+   never show another border than the input's */
+.af-search-has-clear {
+  padding-right: 2.25rem;
+  /* the end of the box : its round corners, which Bootstrap takes from a field followed by
+     something in its group (here the X, laid over it) */
+  border-top-right-radius: var(--bs-border-radius) !important;
+  border-bottom-right-radius: var(--bs-border-radius) !important;
+}
 .af-search-clear {
-  border: var(--bs-border-width) solid var(--bs-border-color);
-  border-left: 0;
-  background-color: var(--bs-body-bg);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  border: 0;
+  background: transparent;
   color: var(--bs-secondary-color);
   padding: 0 0.75rem;
 }
 .af-search-clear:hover {
   color: var(--bs-body-color);
-}
-/* while the input is focused, its focus outline continues around the X */
-.form-control:focus + .af-search-clear {
-  border-color: var(--bs-focus-ring-color, #86b7fe);
 }
 </style>

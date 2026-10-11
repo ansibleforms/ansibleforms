@@ -158,8 +158,7 @@
   // Bootstrap's, so a field's edge shows on the white page
   .form-control,
   .form-select,
-  .input-group-text,
-  .af-search-clear {
+  .input-group-text {
     border-color: var(--af-field-border);
   }
   // the cards (a table, the server log, a settings page) framed in that grey as well, and the
