@@ -92,13 +92,13 @@ const tabs = [
 // the views in the menu, alphabetically by their (translated) label
 const sortedTabs = computed(() => [...tabs].sort((a, b) => a.label().localeCompare(b.label(), locale.value)));
 // The designer's addresses : a view at /designer/<view> (/designer/categories), the form being
-// edited at /designer/forms/<form> (/designer/forms/approval-demo), then the editor shown when
-// it is not the YAML (/designer/categories/visual, /designer/forms/approval-demo/preview),
-// names written as in every address (lib/formsPath.js). The designer opens on what its
-// address names, else on the first view of the menu, in its YAML.
+// edited at /designer/forms/<form> (/designer/forms/approval-demo), then the editor shown
+// (/designer/categories/yaml, /designer/categories/visual, /designer/forms/approval-demo/preview),
+// names written as in every address (lib/formsPath.js). The designer opens on what its address
+// names, else on the first view of the menu, in its YAML.
 const tabOfSlug = (slug) => tabs.find((x) => slugOf(x.name) === slug)?.name;
-// the editors besides the YAML, by their name in the address
-const EDITORS = ['visual', 'preview'];
+// the editors, by their name in the address
+const EDITORS = ['yaml', 'visual', 'preview'];
 /**
  * What an address of the designer names.
  *
@@ -123,12 +123,13 @@ function addressOf(params) {
  * Args:
  *   tab (string): the view (Categories, Roles, Constants, Forms).
  *   formName (string): the form being edited, in the forms view.
- *   editor (string): the editor shown : 'yaml' (none in the address), 'visual' or 'preview'.
+ *   editor (string): the editor shown : 'yaml', 'visual' or 'preview' ; none, the view itself
+ *     (it opens on its YAML).
  *
  * Returns:
  *   string: /designer/<view>[/<form>][/<editor>].
  */
-function designerPath(tab, formName, editor = 'yaml') {
+function designerPath(tab, formName, editor) {
   let path = `/designer/${slugOf(tab)}`;
   if (tab === 'Forms' && formName) path += `/${slugOf(formName)}`;
   if (EDITORS.includes(editor)) path += `/${editor}`;
