@@ -228,6 +228,30 @@ function truncate(s, len = 20) {
   return s && s.length > len ? s.slice(0, len - 1) + '…' : s;
 }
 
+// ─── the node under the pointer : its card, the full name ─────────────────────
+// A node shows its name cut to its width ; hovered, a card over it shows the whole name, as
+// wide as the name needs (at least the node's), measured in the node's own font. It ignores
+// the pointer, so the node under it keeps its hover and its click.
+const hovered = ref(null);
+// the hidden text the name is measured with, and the card's width
+const measure = ref(null);
+const cardWidth = ref(NODE_W);
+const CARD_PAD = 26 + 14; // the name's left offset (the status dot before it), and room after it
+watch(hovered, async (n) => {
+  if (!n) return;
+  await nextTick();
+  const nameWidth = measure.value?.getComputedTextLength?.() || 0;
+  cardWidth.value = Math.max(NODE_W, Math.ceil(nameWidth) + CARD_PAD);
+});
+// the card where the node is, moved left as far as it must to stay inside the graph
+const card = computed(() => {
+  const n = hovered.value;
+  if (!n) return null;
+  const right = graph.value.width - MARGIN;
+  const x = Math.max(MARGIN, Math.min(n.x, right - cardWidth.value));
+  return { ...n, cx: x, w: cardWidth.value };
+});
+
 // compute the graph layout (layered DAG, like the awx workflow visualizer)
 const graph = computed(() => {
   const nodes = props.workflow?.nodes || [];
@@ -435,6 +459,8 @@ const graph = computed(() => {
                 class="awx-node"
                 :class="{ 'awx-node-open': hasOutput(n) }"
                 @click="openNode(n)"
+                @mouseenter="hovered = n"
+                @mouseleave="hovered = null"
               >
                 <rect
                   :x="n.x"
@@ -458,7 +484,31 @@ const graph = computed(() => {
                   {{ n.status }}
                   <template v-if="n.elapsed > 0">· {{ Math.round(n.elapsed) }}s</template>
                 </text>
-                <title>{{ n.name }} ({{ n.status }})</title>
+              </g>
+              <!-- the hovered node's card : its whole name, over it (the last drawn, so on top) -->
+              <text ref="measure" class="awx-node-name awx-measure" x="0" y="0">{{ hovered?.name }}</text>
+              <g v-if="card" class="awx-node-card">
+                <rect
+                  :x="card.cx"
+                  :y="card.y"
+                  :width="card.w"
+                  :height="NODE_H"
+                  rx="6"
+                  class="awx-node-rect"
+                  :style="{ stroke: statusColor(card.status) }"
+                  :stroke-dasharray="card.status == 'skipped' || card.do_not_run ? '4 3' : null"
+                />
+                <circle :cx="card.cx + 14" :cy="card.y + NODE_H / 2" r="5" :fill="statusColor(card.status)" />
+                <text :x="card.cx + 26" :y="card.y + 22" class="awx-node-name">{{ card.name }}</text>
+                <text
+                  :x="card.cx + 26"
+                  :y="card.y + 40"
+                  class="awx-node-status"
+                  :style="{ fill: statusColor(card.status) }"
+                >
+                  {{ card.status }}
+                  <template v-if="card.elapsed > 0">· {{ Math.round(card.elapsed) }}s</template>
+                </text>
               </g>
             </g>
           </svg>
@@ -468,6 +518,17 @@ const graph = computed(() => {
   </Teleport>
 </template>
 <style lang="scss" scoped>
+/* a hovered node's card : over the graph, lifted by a shadow, the pointer passing through it to
+   the node under it */
+.awx-node-card {
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
+}
+/* the text a name is measured with : laid out, never seen */
+.awx-measure {
+  visibility: hidden;
+  pointer-events: none;
+}
 /* full screen : the window's width and height but a margin, over a dimmed page */
 .awx-workflow-backdrop {
   position: fixed;
