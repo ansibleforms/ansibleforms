@@ -133,7 +133,9 @@ const settings = async function(req, res) {
       azureGraphUrl: authConfig.azureGraphUrl,
       oidcEnabled: oidc.enabled,
       oidcIssuer: oidc.issuer,
-      oidcGroupfilter: oidc.groupfilter
+      oidcGroupfilter: oidc.groupfilter,
+      // the login page goes straight to the provider when it is the only one active (SSO_AUTO_LOGIN)
+      ssoAutoLogin: !!appConfig.ssoAutoLogin && (azure.enable !== oidc.enabled)
     };
     res.json(RestResult.single(settings));
   } catch (err) {

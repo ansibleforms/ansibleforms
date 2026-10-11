@@ -85,6 +85,8 @@ const LIVE = {
   SHOW_DESIGNER: { key: 'showDesigner', parse: v => v == 1 },
   // the login reads it per request, through AzureAd.isEnabled and OIDC.isEnabled
   ENABLE_SSO: { key: 'enableSso', parse: v => v == 1 },
+  // the login page reads it per request, through /api/v2/auth/settings
+  SSO_AUTO_LOGIN: { key: 'ssoAutoLogin', parse: v => v == 1 },
   // app.js mounts the MCP server always, behind a gate reading this per request
   ENABLE_MCP: { key: 'enableMcp', parse: v => v == 1 },
   // the chat route's gate, the chat button and the chat service read it per request

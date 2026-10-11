@@ -43,6 +43,11 @@ const azureAdEnabled = ref(false);
 const azureGraphUrl = ref('');
 const oidcEnabled = ref(false);
 const oidcIssuer = ref('');
+// SSO_AUTO_LOGIN, on with exactly one provider active (the server says so) : this page goes
+// straight to that provider instead of showing its form
+const ssoAutoLogin = ref(false);
+// the flag logout.vue leaves for this tab : just signed out, the page stays
+const SIGNED_OUT = 'af_signed_out';
 
 // validation
 const $v = useVuelidate(rules, { user });
@@ -97,6 +102,14 @@ async function getSettings(token) {
 
     oidcEnabled.value = !!result.data.oidcEnabled;
     oidcIssuer.value = result.data.oidcIssuer;
+    ssoAutoLogin.value = !!result.data.ssoAutoLogin;
+    // not on the way back from the provider (a handoff), and only where going there cannot
+    // lock anyone out or loop : the form at /login?local, after signing out, after an SSO error
+    if (!token && ssoAutoLogin.value && mayGoStraightToSso()) {
+      loading.value = true;
+      if (azureAdEnabled.value) authAzureAd();
+      else if (oidcEnabled.value) authOidc();
+    }
 
     if (token && azureAdEnabled.value) {
       if (localStorage.getItem('authIssuer') == 'azuread')
@@ -112,7 +125,30 @@ async function getSettings(token) {
     toast.error(Helpers.parseAxiosResponseError(err, 'Failed to get settings'));
   }
 }
+/**
+ * Whether the login page may send the user straight to the SSO provider (SSO_AUTO_LOGIN).
+ *
+ * Returns:
+ *   boolean: false on /login?local (the form, for the local admin or a provider that fails),
+ *     right after signing out in this tab (the provider's session would sign them back in), and
+ *     when an SSO sign-in came back with an error (it would only fail again, in a loop).
+ */
+function mayGoStraightToSso() {
+  if (route.query.local !== undefined || route.query.error) return false;
+  try {
+    return !sessionStorage.getItem(SIGNED_OUT);
+  } catch {
+    return true;
+  }
+}
+
 function processLogin(data) {
+  // signed in : the next visit to the login page may go straight to SSO again
+  try {
+    sessionStorage.removeItem(SIGNED_OUT);
+  } catch {
+    // no storage (a private window) : nothing was kept
+  }
   TokenStorage.storeToken(data.token);
   TokenStorage.storeRefreshToken(data.refreshtoken);
 

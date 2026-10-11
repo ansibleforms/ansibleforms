@@ -4,6 +4,8 @@
 /*  Settings > SSO, in two tabs, the tab kept in the url :        */
 /*  General - single sign-on switched on or off as a whole        */
 /*            (ENABLE_SSO, applied without a restart), as LDAP's  */
+/*            ; and the login straight to the only active         */
+/*            provider (SSO_AUTO_LOGIN)                           */
 /*  Providers - the SSO providers (Entra ID, OpenID Connect) ;    */
 /*            the active one of each type is the one users sign   */
 /*            in with (Use for sign-in in its row menu)           */
@@ -37,7 +39,7 @@ const crumbs = computed(() => {
 
 // ─── General : the switch ─────────────────────────────────────────────────────
 const { envItems, envEdits, envDirty, envRestartPending, loadEnvironmentVariables, saveEnvironmentVariables } =
-  useEnvVars(['ENABLE_SSO']);
+  useEnvVars(['ENABLE_SSO', 'SSO_AUTO_LOGIN']);
 
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
