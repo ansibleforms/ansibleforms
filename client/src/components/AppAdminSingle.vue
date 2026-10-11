@@ -9,7 +9,7 @@
 /*      tabs: Array of { key, label, icon } - the form in tabs :  */
 /*            each field names its tab (field.tab, the first tab  */
 /*            when it names none) ; a slot tab-top-<key> above a  */
-/*            tab's fields. The tab is kept in the url (?tab=)    */
+/*            tab's fields. The tab is kept in the address        */
 /*      locked: Boolean - every field read only (the feature the  */
 /*            form configures is switched off)                    */
 /*      extraDirty: Boolean - more to save with the form (the     */
@@ -63,15 +63,15 @@ const props = defineProps({
 
 const emit = defineEmits(['test', 'import', 'saved', 'saveExtra']);
 
-// the tab shown, kept in the url (?tab=) ; without tabs the url's ?tab is the page's
+// the tab shown, kept in the address (/settings/ldap/server, composables/useRouteTab.js)
 const firstTab = computed(() => props.tabs[0]?.key || '');
 const route = useRoute();
-const { activeTab } = props.tabs.length
+const { activeTab, tabLink } = props.tabs.length
   ? useRouteTab(
       () => firstTab.value,
       (key) => props.tabs.some((x) => x.key === key),
     )
-  : { activeTab: ref('') };
+  : { activeTab: ref(''), tabLink: () => route.path };
 // a page in tabs says its tab in the title : LDAP › Server, each step a link (the page to its
 // plain address, the tab to itself)
 const crumbs = computed(() => {
@@ -79,8 +79,8 @@ const crumbs = computed(() => {
   if (!tab) return [];
   const title = props.settings.pageTitle || objectLabel.value;
   return [
-    { title, icon: objectIcon.value, to: route.path },
-    { title: tab.label, icon: tab.icon, to: { path: route.path, query: { ...route.query, tab: tab.key } } },
+    { title, icon: objectIcon.value, to: tabLink(firstTab.value) },
+    { title: tab.label, icon: tab.icon, to: tabLink(tab.key) },
   ];
 });
 // the tab a field is in : the one it names, or the first

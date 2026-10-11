@@ -60,6 +60,8 @@ import TokenStorage from '@/lib/TokenStorage.js';
 // Every route that needs a role option says which, as `meta.permission` : the one guard below
 // checks it, and the left menus and the header search read it from the route a link resolves to
 // (lib/routePermission.js) - one declaration, where it used to be restated in three places.
+// a page in tabs ends in /:tab? : its tab is the last part of its address
+// (composables/useRouteTab.js), the first tab none
 const routes = [
   // root routes
   // the forms list : every form at /forms/all, a category at /forms/<category> (lib/formsPath.js) ;
@@ -97,13 +99,18 @@ const routes = [
     meta: { permission: 'allowScheduledJobs' },
   },
   {
-    path: '/jobs/schedules/:id',
+    path: '/jobs/schedules/:id(\\d+)/:tab?',
     name: '/jobs/schedules/:id',
     component: schedule,
     meta: { permission: 'allowScheduledJobs' },
   },
   { path: '/jobs/stored', name: '/jobs/stored', component: storedJobs, meta: { permission: 'allowStoredJobs' } },
-  { path: '/jobs/stored/:id', name: '/jobs/stored/:id', component: storedJob, meta: { permission: 'allowStoredJobs' } },
+  {
+    path: '/jobs/stored/:id(\\d+)/:tab?',
+    name: '/jobs/stored/:id',
+    component: storedJob,
+    meta: { permission: 'allowStoredJobs' },
+  },
   // the jobs of a status (/jobs/running, /jobs/approval ...) ; a job's page by its number only,
   // so a status's name is never read as a job
   {
@@ -114,7 +121,12 @@ const routes = [
   },
   { path: '/jobs/:id(\\d+)', name: '/jobs/:id', component: jobs, meta: { permission: 'showJobs' } },
   // the server log : a settings page, under /settings as the others
-  { path: '/settings/logs', name: '/settings/logs', component: logs, meta: { permission: 'showLogs' } },
+  {
+    path: '/settings/server-log/:tab?',
+    name: '/settings/server-log',
+    component: logs,
+    meta: { permission: 'showLogs' },
+  },
   { path: '/schema', name: '/schema', component: schema },
   { path: '/error', name: '/error', component: error },
   { path: '/api-docs', name: '/api-docs', component: apidocs },
@@ -128,15 +140,15 @@ const routes = [
     meta: { permission: 'showSettings' },
   },
   {
-    path: '/settings/credentials/:id',
+    path: '/settings/credentials/:id(\\d+)/:tab?',
     name: '/settings/credentials/:id',
     component: credential,
     meta: { permission: 'showSettings' },
   },
-  { path: '/settings/sso', name: '/settings/sso', component: sso, meta: { permission: 'showSettings' } },
+  { path: '/settings/sso/:tab?', name: '/settings/sso', component: sso, meta: { permission: 'showSettings' } },
   // an SSO provider's page : its Details, Sign-in and Groups tabs
   {
-    path: '/settings/sso/:id',
+    path: '/settings/sso/:id(\\d+)/:tab?',
     name: '/settings/sso/:id',
     component: ssoProvider,
     meta: { permission: 'showSettings' },
@@ -144,33 +156,38 @@ const routes = [
   { path: '/settings/groups', name: '/settings/groups', component: groups, meta: { permission: 'showSettings' } },
   // a group's page : its Details and Users tabs
   {
-    path: '/settings/groups/:id',
+    path: '/settings/groups/:id(\\d+)/:tab?',
     name: '/settings/groups/:id',
     component: group,
     meta: { permission: 'showSettings' },
   },
   {
-    path: '/settings/knownHosts',
-    name: '/settings/knownHosts',
+    path: '/settings/known-hosts/:tab?',
+    name: '/settings/known-hosts',
     component: knownHosts,
     meta: { permission: 'showSettings' },
   },
-  { path: '/settings/ldap', name: '/settings/ldap', component: ldap, meta: { permission: 'showSettings' } },
-  { path: '/settings/chat', name: '/settings/chat', component: chatSettings, meta: { permission: 'showSettings' } },
-  { path: '/settings/mcp', name: '/settings/mcp', component: mcpSettings, meta: { permission: 'showSettings' } },
+  { path: '/settings/ldap/:tab?', name: '/settings/ldap', component: ldap, meta: { permission: 'showSettings' } },
   {
-    path: '/settings/mailSettings',
-    name: '/settings/mailSettings',
+    path: '/settings/chat/:tab?',
+    name: '/settings/chat',
+    component: chatSettings,
+    meta: { permission: 'showSettings' },
+  },
+  { path: '/settings/mcp/:tab?', name: '/settings/mcp', component: mcpSettings, meta: { permission: 'showSettings' } },
+  {
+    path: '/settings/mail',
+    name: '/settings/mail',
     component: mailSettings,
     meta: { permission: 'showSettings' },
   },
   {
-    path: '/settings/mailSettings/:id',
-    name: '/settings/mailSettings/:id',
+    path: '/settings/mail/:id(\\d+)/:tab?',
+    name: '/settings/mail/:id',
     component: mailServer,
     meta: { permission: 'showSettings' },
   },
-  { path: '/settings/logo', name: '/settings/logo', component: logo, meta: { permission: 'showSettings' } },
+  { path: '/settings/logo/:tab?', name: '/settings/logo', component: logo, meta: { permission: 'showSettings' } },
   {
     path: '/settings/repositories',
     name: '/settings/repositories',
@@ -178,53 +195,73 @@ const routes = [
     meta: { permission: 'showSettings' },
   },
   {
-    path: '/settings/repositories/:name',
-    name: '/settings/repositories/:name',
+    path: '/settings/repositories/:id(\\d+)/:tab?',
+    name: '/settings/repositories/:id',
     component: repository,
     meta: { permission: 'showSettings' },
   },
-  { path: '/settings/general', name: '/settings/general', component: settings, meta: { permission: 'showSettings' } },
+  {
+    path: '/settings/general/:tab?',
+    name: '/settings/general',
+    component: settings,
+    meta: { permission: 'showSettings' },
+  },
   { path: '/settings/roles', name: '/settings/roles', component: roles, meta: { permission: 'showSettings' } },
   // a role's page : its General, Users and Groups tabs
   {
-    path: '/settings/roles/:name',
+    path: '/settings/roles/:name/:tab?',
     name: '/settings/roles/:name',
     component: role,
     meta: { permission: 'showSettings' },
   },
-  { path: '/settings/ssh', name: '/settings/ssh', component: ssh, meta: { permission: 'showSettings' } },
+  { path: '/settings/ssh/:tab?', name: '/settings/ssh', component: ssh, meta: { permission: 'showSettings' } },
   { path: '/settings/users', name: '/settings/users', component: users, meta: { permission: 'showSettings' } },
   // a user's page : its Details and Groups tabs
-  { path: '/settings/users/:id', name: '/settings/users/:id', component: user, meta: { permission: 'showSettings' } },
-  { path: '/settings/backups', name: '/settings/backups', component: backups, meta: { permission: 'allowBackupOps' } },
+  {
+    path: '/settings/users/:id(\\d+)/:tab?',
+    name: '/settings/users/:id',
+    component: user,
+    meta: { permission: 'showSettings' },
+  },
+  {
+    path: '/settings/backups/:tab?',
+    name: '/settings/backups',
+    component: backups,
+    meta: { permission: 'allowBackupOps' },
+  },
   // GET /api/v2/health is mounted behind checkSettingsMiddleware, so the guard
   // matches the permission the endpoint actually requires. The endpoint keeps the
   // 'health' name (it is the conventional one for a monitor to poll); the PAGE is
   // called Status because it states facts as well as verdicts.
-  { path: '/settings/status', name: '/settings/status', component: status, meta: { permission: 'showSettings' } },
+  { path: '/settings/status/:tab?', name: '/settings/status', component: status, meta: { permission: 'showSettings' } },
   // /api/v2/secretstore is behind checkSettingsMiddleware, so the guard matches
   {
-    path: '/settings/secretStores',
-    name: '/settings/secretStores',
+    path: '/settings/secret-stores',
+    name: '/settings/secret-stores',
     component: secretStores,
     meta: { permission: 'showSettings' },
   },
   {
-    path: '/settings/secretStores/:id',
-    name: '/settings/secretStores/:id',
+    path: '/settings/secret-stores/:id(\\d+)/:tab?',
+    name: '/settings/secret-stores/:id',
     component: secretStore,
     meta: { permission: 'showSettings' },
   },
   // /api/v2/runner is behind checkSettingsMiddleware, so the guard matches
   { path: '/settings/runners', name: '/settings/runners', component: runners, meta: { permission: 'showSettings' } },
   {
-    path: '/settings/runners/:id',
+    path: '/settings/runners/:id(\\d+)/:tab?',
     name: '/settings/runners/:id',
     component: runner,
     meta: { permission: 'showSettings' },
   },
   // GET /api/v2/audit is mounted behind checkSettingsMiddleware, so the guard matches
-  { path: '/settings/audit', name: '/settings/audit', component: audit, meta: { permission: 'showSettings' } },
+  {
+    path: '/settings/audit-log/:tab?',
+    name: '/settings/audit-log',
+    component: audit,
+    meta: { permission: 'showSettings' },
+  },
 ];
 
 const router = createRouter({

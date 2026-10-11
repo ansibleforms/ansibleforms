@@ -34,7 +34,7 @@ describe('the routes declare who may see a page', () => {
   it('each page has the role option its api needs', () => {
     expect(routePermission('/settings/users')).toBe('showSettings');
     expect(routePermission('/settings/backups')).toBe('allowBackupOps');
-    expect(routePermission('/settings/logs')).toBe('showLogs');
+    expect(routePermission('/settings/server-log')).toBe('showLogs');
     expect(routePermission('/jobs/schedules')).toBe('allowScheduledJobs');
     expect(routePermission('/jobs/stored')).toBe('allowStoredJobs');
     expect(routePermission('/designer')).toBe('showDesigner');

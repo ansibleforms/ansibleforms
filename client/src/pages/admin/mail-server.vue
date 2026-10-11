@@ -1,7 +1,7 @@
 <script setup>
 /******************************************************************/
 /*                                                                */
-/*  A mail server's page (/settings/mailSettings/<id>), opened from  */
+/*  A mail server's page (/settings/mail/<id>), opened from  */
 /*  the mail servers' list : the steps of its dialog as tabs, and */
 /*  a test mail, the tab kept in the url -                        */
 /*    Server      its name, description, and whether it is the    */
@@ -136,13 +136,18 @@ const tabs = computed(() => [
   { key: 'sender', label: t('settings.mailServers.stepSender'), icon: 'key' },
   { key: 'test', label: t('settings.mailServers.stepTest'), icon: 'paper-plane' },
 ]);
-const { activeTab } = useRouteTab('server', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('server', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Mail › <name>, each step a link
-const crumbs = computed(() => [
-  { title: t('sidebar.mail'), icon: 'envelope', to: '/settings/mailSettings' },
-  { title: server.value?.name || serverId.value, icon: 'envelope', to: `/settings/mailSettings/${serverId.value}` },
+const pageCrumbs = computed(() => [
+  { title: t('sidebar.mail'), icon: 'envelope', to: '/settings/mail' },
+  { title: server.value?.name || serverId.value, icon: 'envelope', to: `/settings/mail/${serverId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
@@ -213,7 +218,7 @@ async function deleteServer() {
   try {
     await axios.delete(`/api/v2/mailserver/${encodeURIComponent(serverId.value)}`);
     server.value = null;
-    router.push('/settings/mailSettings');
+    router.push('/settings/mail');
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
   }

@@ -199,7 +199,7 @@ export default function getSettings(t) {
           icon: 'users',
           color: 'edit',
           dividerBefore: true,
-          to: (u) => ({ path: `/settings/users/${u.id}`, query: { tab: 'groups', add: '1' } }),
+          to: (u) => ({ path: `/settings/users/${u.id}/groups`, query: { add: '1' } }),
         },
         {
           name: 'change_password',
@@ -326,7 +326,7 @@ export default function getSettings(t) {
           icon: 'user',
           color: 'edit',
           dividerBefore: true,
-          to: (g) => ({ path: `/settings/groups/${g.id}`, query: { tab: 'users', add: '1' } }),
+          to: (g) => ({ path: `/settings/groups/${g.id}/users`, query: { add: '1' } }),
         },
         {
           name: 'delete',
@@ -397,14 +397,14 @@ export default function getSettings(t) {
       idKey: 'name',
       selectable: false,
       // a row opens the repository's page
-      openPage: (item) => `/settings/repositories/${encodeURIComponent(item.name)}`,
+      openPage: (item) => `/settings/repositories/${item.id}`,
       // Scheduled pull off : no schedule ; the switch itself is not stored
       beforeSave: ({ pull_scheduled, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
       // the dialog in steps : what the repository is, the credentials to reach it, what it is used
       // for, when it syncs
       steps: [
         { key: 'repository', label: t('settings.repositories.stepRepository') },
-        { key: 'access', label: t('settings.repositories.stepCredentials') },
+        { key: 'credentials', label: t('settings.repositories.stepCredentials') },
         { key: 'usage', label: t('settings.repositories.stepUsage') },
         { key: 'schedule', label: t('settings.repositories.stepSchedule') },
       ],
@@ -435,7 +435,7 @@ export default function getSettings(t) {
           title: t('settings.repositories.changeCredentials'),
           color: 'change',
           dividerBefore: true,
-          to: (r) => ({ path: `/settings/repositories/${encodeURIComponent(r.name)}`, query: { tab: 'access' } }),
+          to: (r) => `/settings/repositories/${r.id}/credentials`,
         },
         {
           // what git said the last time : its page's Last Output tab
@@ -444,7 +444,7 @@ export default function getSettings(t) {
           title: t('settings.common.showOutput'),
           color: 'preview',
           dividerBefore: true,
-          to: (r) => ({ path: `/settings/repositories/${encodeURIComponent(r.name)}`, query: { tab: 'output' } }),
+          to: (r) => `/settings/repositories/${r.id}/last-output`,
         },
         { name: 'delete', icon: 'trash', title: t('settings.repositories.deleteRepository'), color: 'delete' },
       ],
@@ -491,7 +491,7 @@ export default function getSettings(t) {
           // a credential of Connections > Credentials, or a New one : the user and password git
           // uses
           key: 'credential',
-          step: 'access',
+          step: 'credentials',
           icon: 'key',
           label: t('settings.repositories.credential'),
           help: t('settings.repositories.helpCredential'),
@@ -661,7 +661,7 @@ export default function getSettings(t) {
       steps: [
         { key: 'provider', label: t('settings.oauth2.stepProvider') },
         {
-          key: 'signin',
+          key: 'sign-in',
           label: t('settings.oauth2.stepSignIn'),
           notes: (item) => [
             item.provider === 'azuread' && {
@@ -732,7 +732,7 @@ export default function getSettings(t) {
         { key: 'description', label: t('settings.fields.description'), required: false, icon: 'info-circle' },
         {
           key: 'tenant_id',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.tenantId'),
           // required for Entra ID, checked by the server (the field only shows for azuread)
           required: false,
@@ -744,7 +744,7 @@ export default function getSettings(t) {
         },
         {
           key: 'client_id',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.clientId'),
           required: true,
           icon: 'key',
@@ -754,7 +754,7 @@ export default function getSettings(t) {
         },
         {
           key: 'issuer',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.issuer'),
           required: true,
           icon: 'globe',
@@ -764,7 +764,7 @@ export default function getSettings(t) {
         },
         {
           key: 'redirect_uri',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.redirectUrl'),
           readonly: false,
           dependency: 'provider',
@@ -777,7 +777,7 @@ export default function getSettings(t) {
         },
         {
           key: 'client_secret',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.clientSecret'),
           type: 'password',
           required: true,
@@ -794,7 +794,7 @@ export default function getSettings(t) {
         },
         {
           key: 'scope',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.scope'),
           required: false,
           icon: 'list',
@@ -804,7 +804,7 @@ export default function getSettings(t) {
         },
         {
           key: 'auth_url',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.authUrl'),
           required: false,
           icon: 'globe',
@@ -814,7 +814,7 @@ export default function getSettings(t) {
         },
         {
           key: 'token_url',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.tokenUrl'),
           required: false,
           icon: 'globe',
@@ -824,7 +824,7 @@ export default function getSettings(t) {
         },
         {
           key: 'userinfo_url',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.userinfoUrl'),
           required: false,
           icon: 'globe',
@@ -834,7 +834,7 @@ export default function getSettings(t) {
         },
         {
           key: 'extra',
-          step: 'signin',
+          step: 'sign-in',
           label: t('settings.oauth2.extra'),
           type: 'textarea',
           required: false,
@@ -862,7 +862,7 @@ export default function getSettings(t) {
         // as its page's tabs : Details, then Schedule (once at a time, or a cron)
         { key: 'schedule', label: t('settings.common.tabDetails') },
         { key: 'when', label: t('settings.schedules.stepSchedule') },
-        { key: 'vars', label: t('settings.schedules.stepExtraVars') },
+        { key: 'extra-vars', label: t('settings.schedules.stepExtraVars') },
       ],
       actions: [
         // in the row menu, as every list's : editing, running it now, then Delete last, each
@@ -987,7 +987,7 @@ export default function getSettings(t) {
         },
         {
           key: 'extra_vars',
-          step: 'vars',
+          step: 'extra-vars',
           type: 'editor',
           label: t('settings.fields.extraVars'),
           hidden: true,
@@ -1684,7 +1684,7 @@ export default function getSettings(t) {
       fields: [
         {
           key: 'provider',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'robot',
           line: 0,
           type: 'select',
@@ -1704,7 +1704,7 @@ export default function getSettings(t) {
         },
         {
           key: 'model',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'microchip',
           line: 0,
           label: t('settings.chat.model'),
@@ -1715,7 +1715,7 @@ export default function getSettings(t) {
         },
         {
           key: 'base_url',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'link',
           line: 1,
           label: t('settings.chat.baseUrl'),
@@ -1727,7 +1727,7 @@ export default function getSettings(t) {
           // the key : the password of an api credential of Connections > Credentials (a key
           // saved before credentials keeps working while none is chosen)
           key: 'credential',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'key',
           line: 1,
           type: 'select',
@@ -1738,7 +1738,7 @@ export default function getSettings(t) {
         },
         {
           key: 'auth_type',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'id-card',
           line: 2,
           type: 'select',
@@ -1755,7 +1755,7 @@ export default function getSettings(t) {
         },
         {
           key: 'api_version',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'code-branch',
           line: 2,
           label: t('settings.chat.apiVersion'),
@@ -1765,7 +1765,7 @@ export default function getSettings(t) {
         },
         {
           key: 'request_user',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'user',
           line: 2,
           label: t('settings.chat.user'),
@@ -1774,7 +1774,7 @@ export default function getSettings(t) {
         },
         {
           key: 'extra_headers',
-          tab: 'provider',
+          tab: 'model-provider',
           icon: 'list',
           line: 3,
           type: 'textarea',
@@ -1815,7 +1815,7 @@ export default function getSettings(t) {
         },
         {
           key: 'ignore_certs',
-          tab: 'provider',
+          tab: 'model-provider',
           line: 5,
           type: 'checkbox',
           label: t('settings.chat.ignoreCerts'),
@@ -1874,7 +1874,7 @@ export default function getSettings(t) {
         { key: 'runner', label: t('settings.runners.stepRunner') },
         { key: 'type', label: t('settings.runners.stepType') },
         { key: 'connection', label: t('settings.runners.stepConnection') },
-        { key: 'auth', label: t('settings.runners.stepAuth') },
+        { key: 'authentication', label: t('settings.runners.stepAuth') },
       ],
       // the kind chosen is stored as a type and a flavour : an RTE, or an awx runner that is an
       // AWX, an AAP or an Ascender. What the api adds or the RTE writes (state, node_id) is
@@ -1910,7 +1910,7 @@ export default function getSettings(t) {
           icon: 'key',
           color: 'change',
           dividerBefore: true,
-          to: (r) => ({ path: `/settings/runners/${r.id}`, query: { tab: 'auth' } }),
+          to: (r) => `/settings/runners/${r.id}/authentication`,
         },
         { name: 'delete', title: t('settings.runners.deleteRunner'), icon: 'trash', color: 'delete' },
       ],
@@ -2008,7 +2008,7 @@ export default function getSettings(t) {
         {
           // an AWX, AAP or Ascender : an API token, or a user and password - radio buttons
           key: 'use_credentials',
-          step: 'auth',
+          step: 'authentication',
           label: t('settings.runners.stepAuth'),
           type: 'radio',
           options: [
@@ -2027,7 +2027,7 @@ export default function getSettings(t) {
         },
         {
           key: 'token',
-          step: 'auth',
+          step: 'authentication',
           // shown when editing too, as ******** : left empty, the stored one stays
           onEdit: true,
           keepHelp: t('settings.common.tokenKeep'),
@@ -2044,7 +2044,7 @@ export default function getSettings(t) {
         },
         {
           key: 'username',
-          step: 'auth',
+          step: 'authentication',
           icon: 'user',
           line: 2,
           label: t('settings.fields.username'),
@@ -2054,7 +2054,7 @@ export default function getSettings(t) {
         },
         {
           key: 'password',
-          step: 'auth',
+          step: 'authentication',
           onEdit: true,
           icon: 'lock',
           line: 2,
@@ -2124,7 +2124,7 @@ export default function getSettings(t) {
       selectable: false,
       // a server has its own page (pages/admin/mail-server.vue) : its row and Edit open it, New
       // the wizard
-      openPage: (item) => `/settings/mailSettings/${item.id}`,
+      openPage: (item) => `/settings/mail/${item.id}`,
       // the dialog in steps : the server, how the app reaches it, who the mail is from and the
       // login
       steps: [
@@ -2152,7 +2152,7 @@ export default function getSettings(t) {
           icon: 'paper-plane',
           color: 'test',
           dividerBefore: true,
-          to: (m) => ({ path: `/settings/mailSettings/${m.id}`, query: { tab: 'test' } }),
+          to: (m) => `/settings/mail/${m.id}/test`,
         },
         { name: 'delete', title: t('settings.mailServers.deleteServer'), icon: 'trash', color: 'delete' },
       ],
@@ -2244,7 +2244,7 @@ export default function getSettings(t) {
         { key: 'store', label: t('settings.secretStores.stepStore') },
         { key: 'type', label: t('settings.secretStores.stepType') },
         { key: 'connection', label: t('settings.secretStores.stepConnection') },
-        { key: 'auth', label: t('settings.secretStores.stepAuth') },
+        { key: 'credentials', label: t('settings.secretStores.stepAuth') },
         { key: 'options', label: t('settings.secretStores.stepOptions') },
       ],
       // the switches are not stored : ignore_certs, a CA bundle and a namespace are
@@ -2257,7 +2257,7 @@ export default function getSettings(t) {
       }),
       // a store has its own page (pages/admin/secret-store.vue) : its row and Edit open it, New the
       // wizard
-      openPage: (item) => `/settings/secretStores/${item.id}`,
+      openPage: (item) => `/settings/secret-stores/${item.id}`,
       // in the row menu, as the runners' : editing, the test, its credentials (on its page), then
       // Delete last, each apart
       actions: [
@@ -2276,7 +2276,7 @@ export default function getSettings(t) {
           icon: 'key',
           color: 'change',
           dividerBefore: true,
-          to: (r) => ({ path: `/settings/secretStores/${r.id}`, query: { tab: 'auth' } }),
+          to: (r) => `/settings/secret-stores/${r.id}/credentials`,
         },
         { name: 'delete', title: t('settings.secretStores.deleteStore'), icon: 'trash', color: 'delete' },
       ],
@@ -2358,7 +2358,7 @@ export default function getSettings(t) {
           // password is its token, a CyberArk's is a cyberark credential (its AppID, client
           // certificate and key)
           key: 'credential',
-          step: 'auth',
+          step: 'credentials',
           icon: 'key',
           label: t('settings.secretStores.credential'),
           help: (r) =>

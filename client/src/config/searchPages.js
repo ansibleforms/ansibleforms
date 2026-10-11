@@ -109,7 +109,7 @@ export function searchPages(t, options) {
       title: t('sidebar.mail'),
       section: settings,
       icon: 'envelope',
-      link: '/settings/mailSettings',
+      link: '/settings/mail',
     },
     {
       title: t('sidebar.credentials'),
@@ -121,14 +121,14 @@ export function searchPages(t, options) {
       title: t('sidebar.secretStores'),
       section: settings,
       icon: 'vault',
-      link: '/settings/secretStores',
+      link: '/settings/secret-stores',
     },
     { title: t('sidebar.ssh'), section: settings, icon: 'key', link: '/settings/ssh' },
     {
       title: t('sidebar.knownHosts'),
       section: settings,
       icon: 'server',
-      link: '/settings/knownHosts',
+      link: '/settings/known-hosts',
     },
     {
       title: t('sidebar.runners'),
@@ -153,9 +153,9 @@ export function searchPages(t, options) {
       title: t('sidebar.audit'),
       section: settings,
       icon: 'clipboard-list',
-      link: '/settings/audit',
+      link: '/settings/audit-log',
     },
-    { title: t('sidebar.logs'), section: settings, icon: 'file-lines', link: '/settings/logs' },
+    { title: t('sidebar.logs'), section: settings, icon: 'file-lines', link: '/settings/server-log' },
   ];
   return pages.filter((p) => mayOpen(p.link, options));
 }

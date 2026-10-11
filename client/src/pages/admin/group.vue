@@ -5,7 +5,7 @@
 /*  groups list : its Details tab (name, description) and its     */
 /*  Users tab (the users in it : Add user, and a row's menu or    */
 /*  the checkboxes remove one, never from its only group), the    */
-/*  tab kept in the url (?tab=users). Delete top right, off for   */
+/*  tab kept in the address (/users). Delete top right, off for   */
 /*  admins and while the group has users (the server refuses).    */
 /*                                                                */
 /******************************************************************/
@@ -83,13 +83,18 @@ const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'users', label: t('settings.settingsPage.users'), icon: 'user' },
 ]);
-const { activeTab } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Groups › <name>, each step a link : Groups back to the list, the name to this page
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('sidebar.groups'), icon: 'users', to: '/settings/groups' },
   { title: group.value?.name || groupId.value, icon: 'users', to: `/settings/groups/${groupId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── Details ──────────────────────────────────────────────────────────────────
 /**

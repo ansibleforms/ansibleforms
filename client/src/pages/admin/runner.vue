@@ -140,15 +140,20 @@ const tabs = computed(() => [
   { key: 'runner', label: t('settings.runners.stepRunner'), icon: 'rocket' },
   { key: 'type', label: t('settings.runners.stepType'), icon: 'shapes' },
   { key: 'connection', label: t('settings.runners.stepConnection'), icon: 'globe' },
-  { key: 'auth', label: t('settings.runners.stepAuth'), icon: 'key' },
+  { key: 'authentication', label: t('settings.runners.stepAuth'), icon: 'key' },
 ]);
-const { activeTab } = useRouteTab('runner', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('runner', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Runners › <name>, each step a link
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('sidebar.runners'), icon: 'rocket', to: '/settings/runners' },
   { title: runner.value?.name || runnerId.value, icon: 'rocket', to: `/settings/runners/${runnerId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // the forms it is the default for : playbook forms (an RTE), template forms (the others)
 const defaultFor = computed(() =>

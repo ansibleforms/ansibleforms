@@ -25,13 +25,13 @@ const pageTabs = computed(() => [
   { key: 'general', label: t('settings.common.tabGeneral'), icon: 'sliders' },
   { key: 'providers', label: t('settings.oauth2.tabProviders'), icon: 'right-to-bracket' },
 ]);
-const { activeTab } = useRouteTab('general', (key) => ['general', 'providers'].includes(key));
+const { activeTab, tabLink } = useRouteTab('general', (key) => ['general', 'providers'].includes(key));
 // the title says the tab : SSO › General, SSO › Providers, each step a link
 const crumbs = computed(() => {
   const tab = pageTabs.value.find((x) => x.key === activeTab.value);
   return [
     { title: t('sidebar.oauth2'), icon: 'right-to-bracket', to: '/settings/sso' },
-    { title: tab.label, icon: tab.icon, to: { path: '/settings/sso', query: { tab: tab.key } } },
+    { title: tab.label, icon: tab.icon, to: tabLink(tab.key) },
   ];
 });
 

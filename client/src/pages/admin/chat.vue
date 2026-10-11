@@ -17,7 +17,7 @@ const testing = ref(false);
 // and the limits of a conversation ; each field of settings.chat names its tab
 const tabs = computed(() => [
   { key: 'general', label: t('settings.chat.tabGeneral'), icon: 'sliders' },
-  { key: 'provider', label: t('settings.chat.tabProvider'), icon: 'robot' },
+  { key: 'model-provider', label: t('settings.chat.tabProvider'), icon: 'robot' },
   { key: 'limits', label: t('settings.chat.tabLimits'), icon: 'gauge' },
 ]);
 

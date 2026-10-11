@@ -3,7 +3,7 @@
 /*                                                                */
 /*  A role's page (/settings/roles/<name>), opened from the roles    */
 /*  list : its General tab (name and options), its Users and its  */
-/*  Groups, the tab kept in the url (?tab=users). Saving writes   */
+/*  Groups, the tab kept in the address (/users). Saving writes   */
 /*  the forms config, as the list does ; a renamed role's page    */
 /*  follows its new name.                                         */
 /*                                                                */
@@ -67,10 +67,10 @@ const tabs = computed(() => [
   { key: 'users', label: t('settings.settingsPage.users'), icon: 'user' },
   { key: 'groups', label: t('settings.settingsPage.groups'), icon: 'users' },
 ]);
-const { activeTab } = useRouteTab('general', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('general', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Roles › <name>, each step a link : Roles back to the list, the name to this page
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('settings.settingsPage.roles'), icon: 'user-shield', to: '/settings/roles' },
   // the role : a link to its own page too, its plain address (the first tab)
   {
@@ -79,6 +79,11 @@ const crumbs = computed(() => [
     to: `/settings/roles/${encodeURIComponent(roleName.value)}`,
   },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
