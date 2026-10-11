@@ -642,8 +642,8 @@
     version: 7.0.0
     type: boolean
     allowed: 0, 1
-    short: Sign in automatically with SSO
-    hint: The login page goes straight to the only active SSO provider
+    short: Skip the login page
+    hint: With one SSO provider active, users go straight to it
     default: 0
     description: |
       When exactly one SSO provider is active (Entra ID or OpenID Connect, Settings > SSO), the
