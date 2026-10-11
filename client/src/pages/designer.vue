@@ -92,26 +92,50 @@ const tabs = [
 // the views in the menu, alphabetically by their (translated) label
 const sortedTabs = computed(() => [...tabs].sort((a, b) => a.label().localeCompare(b.label(), locale.value)));
 // The designer's addresses : a view at /designer/<view> (/designer/categories), the form being
-// edited at /designer/forms/<form> (/designer/forms/approval-demo), names written as in every
-// address (lib/formsPath.js). The designer opens on the view its address names, else on the
-// first of the menu ; ?tab=visual opens a view on its Visual tab (the search's links).
+// edited at /designer/forms/<form> (/designer/forms/approval-demo), then the editor shown when
+// it is not the YAML (/designer/categories/visual, /designer/forms/approval-demo/preview),
+// names written as in every address (lib/formsPath.js). The designer opens on what its
+// address names, else on the first view of the menu, in its YAML.
 const tabOfSlug = (slug) => tabs.find((x) => slugOf(x.name) === slug)?.name;
+// the editors besides the YAML, by their name in the address
+const EDITORS = ['visual', 'preview'];
 /**
- * The address of a view, and of a form in the forms view.
+ * What an address of the designer names.
+ *
+ * Args:
+ *   params (object): the route's params : view, item, editor (/designer/:view?/:item?/:editor?).
+ *
+ * Returns:
+ *   object: { view (Categories, Forms ...) or undefined, form (its name in the address) or
+ *     undefined, editor ('yaml', 'visual' or 'preview') }.
+ */
+function addressOf(params) {
+  const view = tabOfSlug(params.view);
+  const rest = [params.item, params.editor].filter(Boolean);
+  // the forms view : the form, then the editor ; the other views : the editor
+  const form = view === 'Forms' && rest[0] && !EDITORS.includes(rest[0]) ? rest[0] : undefined;
+  const editor = (form ? rest[1] : rest[0]) || 'yaml';
+  return { view, form, editor: EDITORS.includes(editor) ? editor : 'yaml' };
+}
+/**
+ * The address of a view, of a form in the forms view, and of the editor shown.
  *
  * Args:
  *   tab (string): the view (Categories, Roles, Constants, Forms).
  *   formName (string): the form being edited, in the forms view.
+ *   editor (string): the editor shown : 'yaml' (none in the address), 'visual' or 'preview'.
  *
  * Returns:
- *   string: /designer/<view>, or /designer/forms/<form>.
+ *   string: /designer/<view>[/<form>][/<editor>].
  */
-function designerPath(tab, formName) {
-  const base = `/designer/${slugOf(tab)}`;
-  return tab === 'Forms' && formName ? `${base}/${slugOf(formName)}` : base;
+function designerPath(tab, formName, editor = 'yaml') {
+  let path = `/designer/${slugOf(tab)}`;
+  if (tab === 'Forms' && formName) path += `/${slugOf(formName)}`;
+  if (EDITORS.includes(editor)) path += `/${editor}`;
+  return path;
 }
 const startRoute = useRoute();
-const currentTab = ref(tabOfSlug(startRoute.params.view) || sortedTabs.value[0].name);
+const currentTab = ref(addressOf(startRoute.params).view || sortedTabs.value[0].name);
 const showWarnings = ref(false);
 const action = ref(null);
 const lock = ref(false);
@@ -2584,7 +2608,10 @@ const visualEditor = ref(null);
 // which tab shows : 'yaml' (the editor and its toolbar), 'visual' (the categories or constants
 // as a table) or 'preview' (the form, rendered) ; a link may open the visual one (?tab=visual)
 const hasVisual = (view) => view === 'Categories' || view === 'Constants';
-const editorView = ref(useRoute().query.tab === 'visual' && hasVisual(currentTab.value) ? 'visual' : 'yaml');
+// the editor shown : the YAML until the designer has read its config, then what the address
+// names (applyEditor)
+const editorView = ref('yaml');
+const hasPreview = (view) => view === 'Forms' || view === 'Categories';
 // the preview's address, and its key : a new key reloads it with the YAML as it is now
 const previewUrl = ref('');
 const previewKey = ref(0);
@@ -2654,36 +2681,27 @@ const menuPreview = computed(() => ({
     ),
 }));
 
-// a link to a view's Visual tab (the search's /designer/categories?tab=visual) : applied when
-// the designer opens (editorView, above) and when it is already open (the page is reused), then
-// taken out of the address - left in, a second click on the same link would be no navigation
 /**
- * Removes the link's tab from the address, the rest of it kept.
+ * Shows the editor an address names, when the view has it ; else the YAML.
+ *
+ * Args:
+ *   editor (string): 'yaml', 'visual' or 'preview'.
  */
-function dropTabQuery() {
-  if (route.query.tab === undefined) return;
-  const { tab, ...rest } = route.query; // eslint-disable-line no-unused-vars
-  router.replace({ path: route.path, query: rest });
+function applyEditor(editor) {
+  const view = currentTab.value;
+  const want = (editor === 'visual' && hasVisual(view)) || (editor === 'preview' && hasPreview(view)) ? editor : 'yaml';
+  if (want !== editorView.value) showView(want);
 }
+// another designer address while it is open (the header search, a link, Back) : its view, then
+// its editor once that view is shown (another view resets the editor to the YAML first)
 watch(
-  () => `${route.params.view ?? ''}|${route.query.tab ?? ''}`,
+  () => route.path,
   () => {
-    const view = tabOfSlug(route.params.view);
-    if (!view || route.query.tab === undefined) return;
-    currentTab.value = view;
+    const address = addressOf(route.params);
+    if (address.view && address.view !== currentTab.value) currentTab.value = address.view;
     nextTick(() => {
-      editorView.value = route.query.tab === 'visual' && hasVisual(view) ? 'visual' : 'yaml';
-      dropTabQuery();
+      if (loaded.value) applyEditor(address.editor);
     });
-  },
-);
-onMounted(dropTabQuery);
-// another designer address while it is open (the header search, a link) : that view
-watch(
-  () => route.params.view,
-  (slug) => {
-    const tab = tabOfSlug(slug);
-    if (tab && tab !== currentTab.value) currentTab.value = tab;
   },
 );
 // another view opens on its YAML ; the preview is a form's : no form goes back to the YAML,
@@ -3547,7 +3565,7 @@ async function loadBackups() {
 function selectDefaultForm() {
   currentForm.value = idmapping.value[0]?.id || null;
   // the form the address names (/designer/forms/<form>)
-  const slug = route.params.form;
+  const slug = addressOf(route.params).form;
   const f = slug ? idmapping.value.find((x) => slugOf(x.name) === slug) : null;
   if (f) {
     currentForm.value = f.id;
@@ -3569,6 +3587,26 @@ const pageTitle = computed(() => {
   if (!lock.value || lock.value.free) return { title: t('nav.designer'), icon: 'pen-to-square' };
   const tab = tabs.find((x) => x.name === currentTab.value);
   return tab ? { title: tab.label(), icon: tab.icon } : { title: t('nav.designer'), icon: 'pen-to-square' };
+});
+
+// once it runs, the title names everything its address does, each step a link : the view, the
+// form in the forms view, the editor - Designer › Forms › Approval demo › Preview (the section
+// first, AppSettings)
+const titleCrumbs = computed(() => {
+  if (!lock.value || lock.value.free) return [];
+  const tab = tabs.find((x) => x.name === currentTab.value);
+  if (!tab) return [];
+  const formName = currentTab.value === 'Forms' ? currentFormName.value : '';
+  const steps = [{ title: tab.label(), icon: tab.icon, to: designerPath(tab.name) }];
+  if (formName) steps.push({ title: formName, icon: 'file-lines', to: designerPath(tab.name, formName) });
+  const editor = {
+    yaml: ['YAML', 'code'],
+    visual: [t('designer.visual'), 'table-list'],
+    preview: [t('designer.preview'), 'eye'],
+  };
+  const [label, icon] = editor[editorView.value] || editor.yaml;
+  steps.push({ title: label, icon, to: designerPath(tab.name, formName, editorView.value) });
+  return steps;
 });
 
 // the line under the title describes the open view once the designer is started, and
@@ -3605,22 +3643,30 @@ function selectForm(id) {
   currentForm.value = id;
   // get the name and update the route
   if (currentFormName.value) {
-    // its address, the rest of it kept but a link's tab (it would pull it back)
-    const { tab, ...query } = route.query; // eslint-disable-line no-unused-vars
-    router.push({ path: designerPath('Forms', currentFormName.value), query });
+    // its address, the rest of it kept
+    const query = { ...route.query };
+    router.push({ path: designerPath('Forms', currentFormName.value, editorView.value), query });
   }
 }
 
-// the address follows the open view and form, once the designer runs and its forms are read :
-// until then it keeps the one it was opened with, to open there when it starts
-watch(
-  [currentTab, currentFormName, loaded, () => !!lock.value && !lock.value.free],
-  ([tab, formName, isLoaded, started]) => {
-    if (!started || !isLoaded) return;
-    const path = designerPath(tab, formName);
-    if (route.path !== path) router.replace({ path, query: route.query }).catch(() => {});
-  },
-);
+// once the designer runs and its forms are read : first the editor its address names, then the
+// address follows the open view, form and editor - in that order, or the address would be
+// rewritten to the YAML before its own editor was shown
+const addressApplied = ref(false);
+watch([loaded, () => !!lock.value && !lock.value.free], ([isLoaded, started]) => {
+  if (!isLoaded || !started) {
+    addressApplied.value = false;
+    return;
+  }
+  if (addressApplied.value) return;
+  applyEditor(addressOf(route.params).editor);
+  addressApplied.value = true;
+});
+watch([currentTab, currentFormName, editorView, addressApplied], ([tab, formName, editor, applied]) => {
+  if (!applied) return;
+  const path = designerPath(tab, formName, editor);
+  if (route.path !== path) router.replace({ path, query: route.query }).catch(() => {});
+});
 function deleteForm(id) {
   selectForm(id);
   action.value = 'delete';
@@ -6436,7 +6482,13 @@ onBeforeUnmount(() => {
       </BsOffCanvas>
       <!-- titled after the open view, like the jobs and profile pages ; until the designer is
            started (nothing can be opened yet) after the lock it needs -->
-      <AppSettings v-if="authenticated" :title="pageTitle.title" :description="tabDescription" :icon="pageTitle.icon">
+      <AppSettings
+        v-if="authenticated"
+        :title="pageTitle.title"
+        :crumbs="titleCrumbs"
+        :description="tabDescription"
+        :icon="pageTitle.icon"
+      >
         <!-- the item's views, on top of its card, once the designer runs : its YAML ; the categories
              and constants as tables (Visual) ; a form's preview -->
         <template v-if="lock && !lock.free && loaded" #tabs>

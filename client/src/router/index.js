@@ -69,9 +69,10 @@ const routes = [
   { path: '/', name: '/', redirect: '/forms/all' },
   { path: '/forms', redirect: '/forms/all' },
   { path: '/forms/:category(.*)', name: '/forms', component: index },
-  // a view at /designer/<view>, the form edited at /designer/forms/<form> (pages/designer.vue)
+  // a view at /designer/<view>, the form edited at /designer/forms/<form>, then the editor shown
+  // (/visual, /preview ; pages/designer.vue)
   {
-    path: '/designer/:view?/:form?',
+    path: '/designer/:view?/:item?/:editor?',
     name: '/designer',
     component: designer,
     meta: { permission: 'showDesigner' },
