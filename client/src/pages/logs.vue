@@ -157,7 +157,7 @@ onUnmounted(() => {
           </div>
           <div class="ms-2">
             <!-- the search box of the other pages : the placeholder goes on click, an X clears it -->
-            <BsSearch v-model="filter" icon="filter" style="width: 16rem" :placeholder="t('logs.filterPlaceholder')" />
+            <BsSearch v-model="filter" style="width: 16rem" :placeholder="t('logs.filterPlaceholder')" />
           </div>
           <!-- view controls only : these decide WHAT the card shows. Refresh re-reads the same
                view, it does not act on anything ; the download follows, with the page's buttons -->

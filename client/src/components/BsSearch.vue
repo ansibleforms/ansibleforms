@@ -22,8 +22,6 @@ const search = defineModel({ type: String, default: '' });
 
 defineProps({
   placeholder: { type: String, default: '' },
-  // the icon in the grey box at the left : a magnifier, or a filter for a regex
-  icon: { type: String, default: 'search' },
 });
 
 // INIT
@@ -43,7 +41,7 @@ function clear() {
 <template>
   <div class="input-group af-search">
     <span class="input-group-text">
-      <FaIcon :icon="icon" />
+      <FaIcon icon="search" />
     </span>
     <input
       ref="input"
