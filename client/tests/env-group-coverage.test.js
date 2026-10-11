@@ -99,7 +99,7 @@ describe('the environment settings tabs', () => {
   });
 
   it('keeps the two former Other variables with the feature they serve', () => {
-    expect(groupsOf(groups, 'FORMS_STAGING_PATH')).toEqual(['formsConfig']);
+    expect(groupsOf(groups, 'FORMS_STAGING_PATH')).toEqual(['forms']);
     expect(groupsOf(groups, 'BACKUP_COMMAND_TIMEOUT_SECONDS')).toEqual(['backups']);
   });
 

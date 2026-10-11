@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue';
 import Form from '@/lib/Form';
+import { slugOf } from '@/lib/formsPath';
 import Lock from '@/lib/Lock';
 import { useAppStore } from '@/stores/app';
 import Backup from '@/lib/Backup';
@@ -45,6 +46,7 @@ import {
   outdentCategory,
   movedCategoryPaths,
 } from '@/config/categories';
+import { formPath } from '@/lib/formsPath';
 
 dayjs.extend(relativeTime);
 
@@ -89,15 +91,27 @@ const tabs = [
 ];
 // the views in the menu, alphabetically by their (translated) label
 const sortedTabs = computed(() => [...tabs].sort((a, b) => a.label().localeCompare(b.label(), locale.value)));
-// the designer opens on the first view of the menu ; a link to a form (?form=) opens that form
-// a link from the old settings pages (?view=Categories) opens that view
-const currentTab = ref(
-  useRoute().query.form
-    ? 'Forms'
-    : tabs.some((x) => x.name === useRoute().query.view)
-      ? useRoute().query.view
-      : sortedTabs.value[0].name,
-);
+// The designer's addresses : a view at /designer/<view> (/designer/categories), the form being
+// edited at /designer/forms/<form> (/designer/forms/approval-demo), names written as in every
+// address (lib/formsPath.js). The designer opens on the view its address names, else on the
+// first of the menu ; ?tab=visual opens a view on its Visual tab (the search's links).
+const tabOfSlug = (slug) => tabs.find((x) => slugOf(x.name) === slug)?.name;
+/**
+ * The address of a view, and of a form in the forms view.
+ *
+ * Args:
+ *   tab (string): the view (Categories, Roles, Constants, Forms).
+ *   formName (string): the form being edited, in the forms view.
+ *
+ * Returns:
+ *   string: /designer/<view>, or /designer/forms/<form>.
+ */
+function designerPath(tab, formName) {
+  const base = `/designer/${slugOf(tab)}`;
+  return tab === 'Forms' && formName ? `${base}/${slugOf(formName)}` : base;
+}
+const startRoute = useRoute();
+const currentTab = ref(tabOfSlug(startRoute.params.view) || sortedTabs.value[0].name);
 const showWarnings = ref(false);
 const action = ref(null);
 const lock = ref(false);
@@ -2549,7 +2563,7 @@ function preparePreview() {
     JSON.stringify({ form: yaml, subforms, constants: constantsObj.value || {} }),
   );
   // the app can be hosted under a subpath (BASE_URL), like the router does
-  return `${BaseUrl}/form?form=${encodeURIComponent(currentFormName.value)}&preview=1`;
+  return `${BaseUrl}${formPath(currentFormName.value)}?preview=1`;
 }
 
 /**
@@ -2640,31 +2654,38 @@ const menuPreview = computed(() => ({
     ),
 }));
 
-// a link to a view (the search's ?view=...&tab=...) : applied when the designer opens (above)
-// and when it is already open (the page is reused), then taken out of the address - left in,
-// it would be carried into a form's link and pull the designer back to that view, and a second
-// click on the same link would be no navigation at all
+// a link to a view's Visual tab (the search's /designer/categories?tab=visual) : applied when
+// the designer opens (editorView, above) and when it is already open (the page is reused), then
+// taken out of the address - left in, a second click on the same link would be no navigation
 /**
- * Removes the link's view and tab from the address, the rest of it kept.
+ * Removes the link's tab from the address, the rest of it kept.
  */
-function dropViewQuery() {
-  if (route.query.view === undefined && route.query.tab === undefined) return;
-  const { view, tab, ...rest } = route.query; // eslint-disable-line no-unused-vars
-  router.replace({ query: rest });
+function dropTabQuery() {
+  if (route.query.tab === undefined) return;
+  const { tab, ...rest } = route.query; // eslint-disable-line no-unused-vars
+  router.replace({ path: route.path, query: rest });
 }
 watch(
-  () => `${route.query.view ?? ''}|${route.query.tab ?? ''}`,
+  () => `${route.params.view ?? ''}|${route.query.tab ?? ''}`,
   () => {
-    const { view, tab } = route.query;
-    if (!tabs.some((x) => x.name === view)) return;
+    const view = tabOfSlug(route.params.view);
+    if (!view || route.query.tab === undefined) return;
     currentTab.value = view;
     nextTick(() => {
-      editorView.value = tab === 'visual' && hasVisual(view) ? 'visual' : 'yaml';
-      dropViewQuery();
+      editorView.value = route.query.tab === 'visual' && hasVisual(view) ? 'visual' : 'yaml';
+      dropTabQuery();
     });
   },
 );
-onMounted(dropViewQuery);
+onMounted(dropTabQuery);
+// another designer address while it is open (the header search, a link) : that view
+watch(
+  () => route.params.view,
+  (slug) => {
+    const tab = tabOfSlug(slug);
+    if (tab && tab !== currentTab.value) currentTab.value = tab;
+  },
+);
 // another view opens on its YAML ; the preview is a form's : no form goes back to the YAML,
 // another form is previewed in its place (the visual tab is not a form's : left as it is)
 watch(currentTab, () => (editorView.value = 'yaml'));
@@ -3525,12 +3546,11 @@ async function loadBackups() {
 
 function selectDefaultForm() {
   currentForm.value = idmapping.value[0]?.id || null;
-  if (route.query.form) {
-    // find form in forms by name
-    const f = idmapping.value.find((x) => x.name == route.query.form);
-    if (f) {
-      currentForm.value = f.id;
-    }
+  // the form the address names (/designer/forms/<form>)
+  const slug = route.params.form;
+  const f = slug ? idmapping.value.find((x) => slugOf(x.name) === slug) : null;
+  if (f) {
+    currentForm.value = f.id;
   }
 }
 
@@ -3543,11 +3563,12 @@ function selectTab(name) {
 }
 
 // the page title : the open view's name and icon once the designer is started ; before that,
-// inactive and an open lock - free for whoever starts it
+// the designer alone, as the header names it (the section, so the title is not Designer ›
+// Designer)
 const pageTitle = computed(() => {
-  if (!lock.value || lock.value.free) return { title: t('designer.lockTitle'), icon: 'unlock' };
+  if (!lock.value || lock.value.free) return { title: t('nav.designer'), icon: 'pen-to-square' };
   const tab = tabs.find((x) => x.name === currentTab.value);
-  return tab ? { title: tab.label(), icon: tab.icon } : { title: t('designer.title'), icon: 'pen-to-square' };
+  return tab ? { title: tab.label(), icon: tab.icon } : { title: t('nav.designer'), icon: 'pen-to-square' };
 });
 
 // the line under the title describes the open view once the designer is started, and
@@ -3584,13 +3605,22 @@ function selectForm(id) {
   currentForm.value = id;
   // get the name and update the route
   if (currentFormName.value) {
-    // the rest of the address kept, not a link's view and tab (they would pull it back)
-    const { view, tab, ...query } = route.query; // eslint-disable-line no-unused-vars
-    query.form = currentFormName.value;
-    router.push({ query });
+    // its address, the rest of it kept but a link's tab (it would pull it back)
+    const { tab, ...query } = route.query; // eslint-disable-line no-unused-vars
+    router.push({ path: designerPath('Forms', currentFormName.value), query });
   }
 }
 
+// the address follows the open view and form, once the designer runs and its forms are read :
+// until then it keeps the one it was opened with, to open there when it starts
+watch(
+  [currentTab, currentFormName, loaded, () => !!lock.value && !lock.value.free],
+  ([tab, formName, isLoaded, started]) => {
+    if (!started || !isLoaded) return;
+    const path = designerPath(tab, formName);
+    if (route.path !== path) router.replace({ path, query: route.query }).catch(() => {});
+  },
+);
 function deleteForm(id) {
   selectForm(id);
   action.value = 'delete';

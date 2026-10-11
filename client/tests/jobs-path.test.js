@@ -3,10 +3,10 @@ import { jobsPath, statusFromSlug, JOBS_STATUS_SLUGS } from '../src/lib/jobsPath
 
 describe('jobsPath', () => {
   it('names a status in the address as a page', () => {
-    expect(jobsPath(null)).toBe('/jobs');
+    expect(jobsPath(null)).toBe('/jobs/all');
     expect(jobsPath('running')).toBe('/jobs/running');
     expect(jobsPath('approve')).toBe('/jobs/approval');
-    expect(jobsPath('nonsense')).toBe('/jobs');
+    expect(jobsPath('nonsense')).toBe('/jobs/all');
   });
 
   it('reads the status back from the address', () => {

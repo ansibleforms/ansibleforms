@@ -34,7 +34,8 @@ describe('Search.search', () => {
 
   it('finds the pages, and links forms to the form page', () => {
     expect(Search.search(index, 'users')[0]).toMatchObject({ kind: 'page', to: '/settings/users' });
-    expect(Search.search(index, 'hello')[0].to).toEqual({ path: '/form', query: { form: 'HelloWorld' } });
+    // its address : /form/<its name> (lib/formsPath.js)
+    expect(Search.search(index, 'hello')[0].to).toBe('/form/helloworld');
   });
 
   it('shows the texts that match under a result', () => {
@@ -76,7 +77,7 @@ describe('searchPages', () => {
 
   it('hides the pages the user may not open', () => {
     const links = searchPages(t, { showJobs: true }).map((p) => p.link);
-    expect(links).toContain('/jobs');
+    expect(links).toContain('/jobs/all');
     expect(links).toContain('/profile');
     expect(links).not.toContain('/settings/users');
     expect(links).not.toContain('/designer');

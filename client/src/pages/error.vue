@@ -26,7 +26,7 @@ const errorMessageHtml = computed(() => store.errorMessage?.replaceAll('\n', '<b
               </li>
               <li>
                 Check the logfiles.
-                <router-link class="btn btn-sm btn-secondary ms-2" to="/settings/logs">Logs</router-link>
+                <router-link class="btn btn-sm btn-secondary ms-2" to="/settings/server-log">Logs</router-link>
               </li>
               <li>
                 Make sure you have a valid config.yaml file.<br />

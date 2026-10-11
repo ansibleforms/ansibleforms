@@ -22,12 +22,21 @@ const { t } = useI18n();
 
 const authenticated = ref(false);
 
-// the tab shown, kept in the url (?tab=) : a link can open the client configuration directly
-const { activeTab } = useRouteTab('general', (key) => ['general', 'clients'].includes(key));
+// the tab shown, kept in the address : a link can open the client configuration directly
+const { activeTab, tabLink } = useRouteTab('general', (key) => ['general', 'client-configuration'].includes(key));
 const pageTabs = computed(() => [
   { key: 'general', label: t('settings.settingsPage.mcpTabGeneral'), icon: 'sliders' },
-  { key: 'clients', label: t('settings.settingsPage.mcpClientConfig'), icon: 'plug' },
+  { key: 'client-configuration', label: t('settings.settingsPage.mcpClientConfig'), icon: 'plug' },
 ]);
+// the title names the tab : MCP › Clients, each step a link (the page to its plain address)
+const titleCrumbs = computed(() => {
+  const tab = pageTabs.value.find((x) => x.key === activeTab.value);
+  if (!tab) return [];
+  return [
+    { title: t('sidebar.mcp'), icon: 'robot', to: tabLink('general') },
+    { title: tab.label, icon: tab.icon, to: tabLink(tab.key) },
+  ];
+});
 
 // the variables of the page : the switch first, then what it decides while on
 const { envItems, envEdits, envDirty, envRestartPending, loadEnvironmentVariables, saveEnvironmentVariables } =
@@ -126,6 +135,7 @@ onMounted(async () => {
       v-if="authenticated"
       icon="robot"
       :title="t('sidebar.mcp')"
+      :crumbs="titleCrumbs"
       :description="t('settings.settingsPage.mcpDescription')"
     >
       <template #tabs>
@@ -172,7 +182,7 @@ onMounted(async () => {
         </div>
 
         <!-- CLIENT CONFIGURATION : the endpoint, and each client's configuration -->
-        <div v-show="activeTab === 'clients'">
+        <div v-show="activeTab === 'client-configuration'">
           <!-- as wide as the endpoint and the configuration under it -->
           <div v-if="!mcpOn" class="alert alert-warning py-2 af-mcp-config">
             <FaIcon icon="triangle-exclamation" class="me-2" />{{ t('settings.settingsPage.mcpOffNote') }}
@@ -218,9 +228,7 @@ onMounted(async () => {
           </template>
           <div class="form-text mt-3">
             {{ t('settings.settingsPage.mcpTokenHint') }}
-            <router-link :to="{ path: '/profile', query: { view: 'token' } }">{{
-              t('settings.settingsPage.mcpCreateToken')
-            }}</router-link>
+            <router-link to="/profile/token">{{ t('settings.settingsPage.mcpCreateToken') }}</router-link>
           </div>
         </div>
       </template>

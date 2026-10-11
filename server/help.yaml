@@ -1367,24 +1367,6 @@
       The prefix of the AWX / AAP API on the runners of type awx, typically `/api/v2`.
       It is added only to a runner whose uri has no API path of its own : a runner's uri may
       carry it, as `https://aap.example.com/api/controller/v2` for AAP 2.5 and later.
-  - name: NAV_HOME_LABEL
-    type: string
-    version: 5.1.0
-    allowed: a suiting label
-    short: The label of home navigation link
-    hint: Text of the home link in the navigation bar.
-    default: Forms
-    description: |
-      In the navigation bar, A home link is shown.  You can set the label/name of this link with this variable, for example `Services`.  Use in combination with `VUE_APP_NAV_HOME_ICON`.
-  - name: NAV_HOME_ICON
-    type: string
-    version: 5.1.0
-    allowed: a valid free fontawesome icon
-    short: The icon of navigation home link
-    hint: Icon of the home link in the navigation bar.
-    default: rectangle-list
-    description: |
-      In the navigation bar, A home link is shown.  You can set the icon of this link with this variable, for example `play` or `house`.  Use in combination with `VUE_APP_NAV_HOME_LABEL`.
   - name: MYSQLDUMP_COMMAND
     short: Database dump command
     hint: Command used to dump the database for a backup.

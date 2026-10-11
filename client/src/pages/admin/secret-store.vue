@@ -1,7 +1,7 @@
 <script setup>
 /******************************************************************/
 /*                                                                */
-/*  A secret store's page (/settings/secretStores/<id>), opened from */
+/*  A secret store's page (/settings/secret-stores/<id>), opened from */
 /*  the secret stores' list : the steps of its dialog as tabs,    */
 /*  the tab kept in the url -                                     */
 /*    Store       its name and description                        */
@@ -168,16 +168,21 @@ const tabs = computed(() => [
   { key: 'store', label: t('settings.secretStores.stepStore'), icon: 'vault' },
   { key: 'type', label: t('settings.secretStores.stepType'), icon: 'shapes' },
   { key: 'connection', label: t('settings.secretStores.stepConnection'), icon: 'globe' },
-  { key: 'auth', label: t('settings.secretStores.stepAuth'), icon: 'key' },
+  { key: 'credentials', label: t('settings.secretStores.stepAuth'), icon: 'key' },
   { key: 'options', label: t('settings.secretStores.stepOptions'), icon: 'sliders' },
 ]);
-const { activeTab } = useRouteTab('store', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('store', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Secret stores › <name>, each step a link
-const crumbs = computed(() => [
-  { title: t('sidebar.secretStores'), icon: 'vault', to: '/settings/secretStores' },
-  { title: store.value?.name || storeId.value, icon: 'vault', to: `/settings/secretStores/${storeId.value}` },
+const pageCrumbs = computed(() => [
+  { title: t('sidebar.secretStores'), icon: 'vault', to: '/settings/secret-stores' },
+  { title: store.value?.name || storeId.value, icon: 'vault', to: `/settings/secret-stores/${storeId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
@@ -238,7 +243,7 @@ async function deleteStore() {
   try {
     await axios.delete(`/api/v2/secretstore/${encodeURIComponent(storeId.value)}`);
     store.value = null;
-    router.push('/settings/secretStores');
+    router.push('/settings/secret-stores');
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
   }
@@ -401,7 +406,7 @@ onMounted(async () => {
               />
             </template>
             <!-- Credentials : its credential, or a new one of its kind -->
-            <template v-else-if="activeTab === 'auth'">
+            <template v-else-if="activeTab === 'credentials'">
               <BsInput
                 class="af-store-field"
                 v-model="edit.credential"

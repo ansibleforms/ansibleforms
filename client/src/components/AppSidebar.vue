@@ -68,11 +68,11 @@ const sections = computed(() =>
       // repositories, and it has the same 'test the connection' action.
       title: t('sidebar.sections.connections'),
       items: [
-        { title: t('sidebar.mail'), icon: 'envelope', link: '/settings/mailSettings' },
+        { title: t('sidebar.mail'), icon: 'envelope', link: '/settings/mail' },
         { title: t('sidebar.credentials'), icon: 'lock', link: '/settings/credentials' },
-        { title: t('sidebar.secretStores'), icon: 'vault', link: '/settings/secretStores' },
+        { title: t('sidebar.secretStores'), icon: 'vault', link: '/settings/secret-stores' },
         { title: t('sidebar.ssh'), icon: 'key', link: '/settings/ssh' },
-        { title: t('sidebar.knownHosts'), icon: 'server', link: '/settings/knownHosts' },
+        { title: t('sidebar.knownHosts'), icon: 'server', link: '/settings/known-hosts' },
         { title: t('sidebar.runners'), icon: 'rocket', link: '/settings/runners' },
         {
           title: t('sidebar.repositories'),
@@ -89,8 +89,8 @@ const sections = computed(() =>
       // sections above are what you set up, these are read afterwards.
       title: t('sidebar.sections.logs'),
       items: [
-        { title: t('sidebar.audit'), icon: 'clipboard-list', link: '/settings/audit' },
-        { title: t('sidebar.logs'), icon: 'file-lines', link: '/settings/logs' },
+        { title: t('sidebar.audit'), icon: 'clipboard-list', link: '/settings/audit-log' },
+        { title: t('sidebar.logs'), icon: 'file-lines', link: '/settings/server-log' },
       ],
     },
   ]

@@ -32,7 +32,10 @@ const authenticated = ref(false);
 const loaded = ref(false);
 
 // ─── the repository ───────────────────────────────────────────────────────────
-const repoName = computed(() => String(route.params.name || ''));
+// the repository by its number in the address (/settings/repositories/1), as every record ; the
+// api works by its name (its folder on disk), read from the list once (resolveName)
+const repoId = computed(() => String(route.params.id || ''));
+const repoName = ref('');
 const repo = ref(null); // as saved
 const edit = ref(null); // as edited
 const others = ref([]); // the other repositories : who already has a one-only usage
@@ -148,8 +151,22 @@ function takenBy(usage) {
  * Args:
  *   keepEdits (boolean): keep what is being edited (a status refresh while running).
  */
+/**
+ * Reads the name of the repository the address numbers, from the repositories list.
+ *
+ * Returns:
+ *   Promise<void>: repoName set, or left empty when no repository has that number.
+ */
+async function resolveName() {
+  const auth = TokenStorage.getAuthentication();
+  const res = await axios.get('/api/v2/repository/', auth).catch(() => null);
+  const records = res?.data?.records || res?.data || [];
+  repoName.value = records.find((r) => String(r.id) === repoId.value)?.name || '';
+}
+
 async function load(keepEdits = false) {
   const auth = TokenStorage.getAuthentication();
+  if (!repoName.value) await resolveName();
   try {
     const res = await axios.get(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, auth);
     const record = res.data.records ? res.data.records[0] : res.data;
@@ -184,22 +201,27 @@ onBeforeUnmount(() => clearInterval(poll));
 // the dialog's steps, and the last output
 const tabs = computed(() => [
   { key: 'repository', label: t('settings.repositories.stepRepository'), icon: 'fab,git' },
-  { key: 'access', label: t('settings.repositories.stepCredentials'), icon: 'key' },
+  { key: 'credentials', label: t('settings.repositories.stepCredentials'), icon: 'key' },
   { key: 'usage', label: t('settings.repositories.stepUsage'), icon: 'list-check' },
   { key: 'schedule', label: t('settings.repositories.stepSchedule'), icon: 'stopwatch' },
-  { key: 'output', label: t('admin.lastOutput'), icon: 'terminal' },
+  { key: 'last-output', label: t('admin.lastOutput'), icon: 'terminal' },
 ]);
-const { activeTab } = useRouteTab('repository', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('repository', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Repositories › <name>, each step a link
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('settings.repositories.labelPlural'), icon: 'fab,git', to: '/settings/repositories' },
   {
     title: repo.value?.name || repoName.value,
     icon: 'fab,git',
-    to: `/settings/repositories/${encodeURIComponent(repoName.value)}`,
+    to: `/settings/repositories/${repoId.value}`,
   },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
@@ -228,12 +250,8 @@ async function save() {
   try {
     await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
     toast.success(`${data.name} ${t('settings.common.isUpdated')}`);
-    if (data.name !== repoName.value) {
-      // the saved values first, so the unsaved guard lets the page go
-      edit.value = null;
-      repo.value = null;
-      await router.replace({ path: `/settings/repositories/${encodeURIComponent(data.name)}`, query: route.query });
-    }
+    // renamed : the api knows it by its new name from now on ; its address, its number, stays
+    if (data.name !== repoName.value) repoName.value = data.name;
     await load();
   } catch (err) {
     fail(err);
@@ -348,7 +366,7 @@ onMounted(async () => {
       <template #default>
         <div v-if="loaded && !repo" class="empty-state">
           <FaIcon icon="fab,git" class="empty-state-icon" />
-          <span>{{ t('settings.repositories.notFound', { name: repoName }) }}</span>
+          <span>{{ t('settings.repositories.notFound', { name: repoName || '#' + repoId }) }}</span>
         </div>
         <div v-else-if="repo && edit" class="af-repo-tab">
           <!-- Repository : what it is, and where it stands -->
@@ -400,7 +418,7 @@ onMounted(async () => {
             />
           </template>
           <!-- Credentials : the user and password git uses -->
-          <template v-else-if="activeTab === 'access'">
+          <template v-else-if="activeTab === 'credentials'">
             <BsInput
               class="af-repo-field"
               v-model="edit.credential"

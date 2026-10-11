@@ -11,6 +11,7 @@ import axios from 'axios';
 import State from '@/lib/State';
 import Navigate from '@/lib/Navigate';
 import TokenStorage from '@/lib/TokenStorage';
+import { formsPath, formFromPath } from '@/lib/formsPath';
 import YAML from 'yaml';
 import { useFollowOutput } from '@/composables/useFollowOutput';
 import Time from '@/lib/Time';
@@ -933,7 +934,7 @@ const menuCategory = computed(() => {
  *   category (string): the category ; empty for All Forms.
  */
 function openCategory(category) {
-  router.push(category ? { path: '/', query: { category: encodeURIComponent(category) } } : { path: '/' });
+  router.push(formsPath(category));
 }
 
 function toggleShowExtraVars() {
@@ -1613,10 +1614,32 @@ async function launchForm(postdata) {
   pauseJsonOutput.value = false;
 }
 
+/**
+ * The form an address names : /form/<its name as an address> (lib/formsPath.js), read back
+ * against the forms the user may open.
+ *
+ * Args:
+ *   slug (string): the address after /form/.
+ *
+ * Returns:
+ *   Promise<string|null>: the form's name, or null when the user has no form of that address.
+ */
+async function formNameOf(slug) {
+  return formFromPath(slug, (await Form.list())?.forms);
+}
+
 async function loadForm() {
-  const formName = route.query.form ? decodeURIComponent(route.query.form) : undefined;
-  if (!formName) {
+  const slug = route.params.slug;
+  if (!slug) {
     console.error('No form name provided in the URL');
+    formNotFound.value = true;
+    return;
+  }
+  // a preview carries the designer's copy of the form, perhaps not saved yet : its name is only
+  // needed when that copy is missing
+  const formName = await formNameOf(slug);
+  if (!formName && !route.query.preview) {
+    console.error('No form with the address ' + slug);
     formNotFound.value = true;
     return;
   }
@@ -1648,6 +1671,10 @@ async function loadForm() {
       }
     }
     if (!previewLoaded) {
+      if (!formName) {
+        formNotFound.value = true;
+        return;
+      }
       formConfig.value = await Form.load(formName);
     }
   } else {
@@ -1753,12 +1780,11 @@ onMounted(async () => {
   resetResult();
 });
 
-// Watch for route changes to reload form when navigating with different query params
+// another form's address (a form opened from this one's menu, the search) : that form
 watch(
-  () => route.query.form,
+  () => route.params.slug,
   async (newForm, oldForm) => {
     if (newForm && newForm !== oldForm) {
-      console.log('Form query parameter changed, reloading form:', newForm);
       await reloadForm();
     }
   },
@@ -1800,6 +1826,10 @@ onBeforeUnmount(() => {
                its buttons at the right ; the divider under it, as on the other pages -->
           <div class="d-flex flex-wrap align-items-center border-bottom mb-3 pb-2 af-page-head">
             <h3 class="mb-0 me-3">
+              <!-- the section first, as every page's title (lib/sections.js) : Forms › the form -->
+              <router-link :to="formsPath('')" class="af-crumb-link"
+                ><span class="me-2"><FaIcon icon="rectangle-list" /></span>{{ t('nav.forms') }}</router-link
+              ><span class="mx-2 text-body-secondary af-crumb-separator">›</span>
               {{ activeEntry ? activeEntry.subtitle || activeEntry.title : currentForm.name }}
               <AppInfoPopover
                 v-if="activeEntry ? activeEntry.subform?.help : currentForm.help"

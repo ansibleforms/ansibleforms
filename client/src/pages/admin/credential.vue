@@ -163,14 +163,14 @@ const tabs = computed(() =>
     },
   ].filter(Boolean),
 );
-const { activeTab } = useRouteTab('credential', (key) =>
+const { activeTab, tabLink } = useRouteTab('credential', (key) =>
   ['credential', 'type', 'login', 'store', 'connection'].includes(key),
 );
 // a tab the type does not have (Connection of an API credential) : its first
 const shownTab = computed(() => (tabs.value.some((x) => x.key === activeTab.value) ? activeTab.value : 'credential'));
 
 // the title : Credentials › <name>, each step a link
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('sidebar.credentials'), icon: 'lock', to: '/settings/credentials' },
   {
     title: credential.value?.name || credentialId.value,
@@ -178,6 +178,11 @@ const crumbs = computed(() => [
     to: `/settings/credentials/${credentialId.value}`,
   },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === shownTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**

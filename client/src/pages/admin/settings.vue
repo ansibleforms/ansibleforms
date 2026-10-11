@@ -13,9 +13,6 @@ import { useRouteTab } from '@/composables/useRouteTab';
 
 const { t } = useI18n();
 
-// the tab shown, kept in the url (?tab=) : a link or a bookmark opens it, Back returns to the last
-const { activeTab } = useRouteTab('env_configuration', (key) => key.startsWith('env_'));
-
 const env = ref({});
 
 // Grouped by what an operator is trying to DO, not by the variable's name prefix. Two
@@ -121,7 +118,7 @@ const envGroupOrder = [
     ],
   },
   {
-    key: 'formsConfig',
+    key: 'forms',
     label: () => t('settings.settingsPage.envGroupFormsConfig'),
     icon: 'file-code',
     exact: ['CONFIG_PATH', 'FORMS_FOLDER_PATH', 'FORMS_STAGING_PATH'],
@@ -144,7 +141,6 @@ const envGroupOrder = [
     key: 'ui',
     label: () => t('settings.settingsPage.envGroupUi'),
     icon: 'palette',
-    prefix: ['NAV_HOME_'],
     exact: ['DEFAULT_LANGUAGE', 'SHOW_DESIGNER'],
   },
   // LOG_RETENTION_DAYS is Retention's, with the other retentions
@@ -158,6 +154,19 @@ const envGroupOrder = [
 ];
 
 // exact name or declared prefix - no regex, so no anchor to get wrong
+// the tab shown, kept in the address (/settings/general/server) : a link or a bookmark opens it,
+// Back returns to the last
+const { activeTab, tabLink } = useRouteTab('configuration', (key) => envGroupOrder.some((g) => g.key === key));
+// the title names the tab : General › Server, each step a link (the page to its plain address)
+const titleCrumbs = computed(() => {
+  const group = envGroupOrder.find((g) => g.key === activeTab.value);
+  if (!group) return [];
+  return [
+    { title: t('sidebar.ansibleForms'), icon: 'toolbox', to: tabLink('configuration') },
+    { title: group.label(), icon: group.icon, to: tabLink(group.key) },
+  ];
+});
+
 function envInGroup(group, name) {
   // a name a prefix group leaves to another (LOG_RETENTION_DAYS : Retention, not Logging)
   if ((group.except || []).includes(name)) return false;
@@ -437,6 +446,7 @@ onMounted(async () => {
       v-if="authenticated"
       icon="toolbox"
       :title="t('sidebar.ansibleForms')"
+      :crumbs="titleCrumbs"
       :description="t('settings.settingsPage.description')"
     >
       <template #tabs>
@@ -444,9 +454,9 @@ onMounted(async () => {
           <li v-for="group in envGroups" :key="group.key" class="nav-item">
             <a
               class="nav-link"
-              :class="{ active: activeTab === 'env_' + group.key }"
+              :class="{ active: activeTab === group.key }"
               href="#"
-              @click.prevent="activeTab = 'env_' + group.key"
+              @click.prevent="activeTab = group.key"
             >
               <FaIcon :icon="group.icon" class="me-1" />
               {{ group.label }}
@@ -457,7 +467,7 @@ onMounted(async () => {
       <template #default>
         <!-- Environment Variable tabs -->
         <template v-for="group in envGroups" :key="group.key">
-          <div v-show="activeTab === 'env_' + group.key">
+          <div v-show="activeTab === group.key">
             <!-- The editable, database-backed settings live with their subject rather than
                in a general tab: the public url is a server property, the language and
                theme defaults are UI ones. They save through saveSettings(), the fields

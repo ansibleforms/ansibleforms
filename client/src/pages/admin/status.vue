@@ -17,8 +17,15 @@ const checkedAt = ref(null);
 const expanded = ref({});
 // Checks is the default : a failure must be what you land on. The count of anything
 // non-ok rides on the tab label, so a user sitting on the other tab still sees it.
-// the tab shown, kept in the url (?tab=) : a link or a bookmark opens it, Back returns to the last
-const { activeTab } = useRouteTab('checks', (key) => ['checks', 'info'].includes(key));
+// the tab shown, kept in the address : a link or a bookmark opens it, Back returns to the last
+const { activeTab, tabLink } = useRouteTab('checks', (key) => ['checks', 'information'].includes(key));
+// the title names the tab : Status › Checks, each step a link (the page to its plain address)
+const titleCrumbs = computed(() => [
+  { title: t('health.title'), icon: 'heart-pulse', to: tabLink('checks') },
+  activeTab.value === 'information'
+    ? { title: t('health.sectionInfo'), icon: 'circle-info', to: tabLink('information') }
+    : { title: t('health.sectionChecks'), icon: 'heart-pulse', to: tabLink('checks') },
+]);
 
 // the check keys come from the server (see health.model.js) and are turned into
 // locale keys by concatenation, so 'health.checkDatabase' and friends look
@@ -105,6 +112,7 @@ onMounted(async () => {
       v-if="authenticated"
       icon="heart-pulse"
       :title="t('health.title')"
+      :crumbs="titleCrumbs"
       :description="t('health.description')"
     >
       <template #tabs>
@@ -126,7 +134,12 @@ onMounted(async () => {
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" :class="{ active: activeTab === 'info' }" href="#" @click.prevent="activeTab = 'info'">
+            <a
+              class="nav-link"
+              :class="{ active: activeTab === 'information' }"
+              href="#"
+              @click.prevent="activeTab = 'information'"
+            >
               <FaIcon icon="circle-info" class="me-1" />
               {{ t('health.sectionInfo') }}
             </a>
@@ -190,7 +203,7 @@ onMounted(async () => {
         <!-- Facts, not verdicts. Deliberately WITHOUT a status dot : a green dot beside
            'MySQL 8.4.9' or 'file/repository' claims something was tested when nothing
            was. These are things you look up. -->
-        <template v-if="result && activeTab === 'info' && info.length">
+        <template v-if="result && activeTab === 'information' && info.length">
           <table class="table table-sm align-middle mb-0 health-table">
             <tbody>
               <template v-for="i in info" :key="i.key">

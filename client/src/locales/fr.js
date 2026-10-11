@@ -1313,7 +1313,6 @@ export default {
   },
   designer: {
     title: 'Concepteur',
-    lockTitle: 'Inactif',
     offDescription:
       "Modifiez les catégories, constantes, formulaires et rôles. Démarrez le designer pour verrouiller la configuration pendant l'édition.",
     formsDescription:
@@ -1412,10 +1411,10 @@ export default {
     selectFormFirst: "Sélectionnez d'abord un formulaire",
     preview: 'Aperçu',
     noIconSelected: 'Aucune icône sélectionnée',
-    colorAndSize: 'Couleur & Taille',
+    colorAndSize: 'Couleur & taille',
     iconColor: "Couleur de l'icône",
     iconSize: "Taille de l'icône",
-    overlaySettings: 'Superposition / Badge',
+    overlaySettings: 'Superposition / badge',
     overlayIcon: 'Icône de superposition',
     overlayColor: 'Couleur de superposition',
     overlayCircle: 'Fond en cercle',
@@ -1763,7 +1762,7 @@ export default {
     scheduleRecurring: 'Planifier (recurrent)',
     runLaterOneTime: 'Executer plus tard (une seule fois)',
     store: 'Enregistrer',
-    copyExtravars: 'Copier les ExtraVars',
+    copyExtravars: 'Copier les extravars',
     unevaluated: "{fields} n'est pas evalue... | {fields} ne sont pas evalues...",
     itemCount: '{n} élément | {n} éléments',
     copiedToClipboard: 'Copie dans le presse-papiers',

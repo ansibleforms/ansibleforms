@@ -12,6 +12,11 @@
 /*      crumbs: Array of { title, icon, to } - a title in steps,  */
 /*              each a link when it has a route (to) ; a title of */
 /*              one step links to the page itself                 */
+/*                                                                */
+/*  Every title starts with the page's section, as the header     */
+/*  names it (lib/sections.js) : Jobs › Running, Settings ›       */
+/*  Users › admin. A page whose steps already start with it does  */
+/*  not get it twice.                                             */
 /*      bare: Boolean - the content without the card around it    */
 /*                                                                */
 /*  @slots:                                                       */
@@ -30,12 +35,16 @@
 /*  filters, columns), the buttons act on it.                     */
 /*                                                                */
 /******************************************************************/
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { sectionOf } from '@/lib/sections';
 
 // a title of one step links to the page itself : its plain address, without a tab or a filter
 const route = useRoute();
+const { t } = useI18n();
 
-defineProps({
+const props = defineProps({
   icon: {
     type: String,
     required: true,
@@ -60,13 +69,21 @@ defineProps({
     default: false,
   },
 });
+
+// the title's steps : the page's section first, then its own (its crumbs, or its title)
+const steps = computed(() => {
+  const own = props.crumbs.length ? props.crumbs : [{ title: props.title, icon: props.icon, to: route.path }];
+  const section = sectionOf(route.path, t);
+  if (!section || own[0]?.title === section.title) return own;
+  return [section, ...own];
+});
 </script>
 <template>
   <section class="section w-100" :class="{ 'mt-3': title }">
     <div class="container-fluid">
       <div v-if="title" class="d-flex align-items-center border-bottom mb-3 pb-2 af-title-line">
-        <h3 v-if="crumbs.length" :aria-label="title">
-          <template v-for="(c, i) in crumbs" :key="i">
+        <h3 v-if="steps.length > 1" :aria-label="steps.map((c) => c.title).join(' › ')">
+          <template v-for="(c, i) in steps" :key="i">
             <span v-if="i > 0" class="mx-2 text-body-secondary af-crumb-separator">›</span>
             <!-- a step with a route : a link, in the title's own look -->
             <router-link v-if="c.to" :to="c.to" class="af-crumb-link"
@@ -111,20 +128,6 @@ defineProps({
 /* the page title never wraps (its icon above the word) : the actions next to it give way */
 h3 {
   white-space: nowrap;
-}
-/* the › between the steps of a title is a small glyph at text size : larger, centered on the
-   words, and with no line height of its own, so the title is no taller than one without it
-   and the divider under it does not move */
-.af-crumb-link,
-.af-crumb-link:hover,
-.af-crumb-link:focus {
-  color: inherit;
-  text-decoration: none;
-}
-.af-crumb-separator {
-  font-size: 1.5em;
-  line-height: 0;
-  vertical-align: -0.05em;
 }
 /* without the page's card, the content's own cards end the page : leave the same 16px under
    the last one as under the designer's card and the forms tiles */

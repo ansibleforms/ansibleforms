@@ -126,15 +126,20 @@ onBeforeUnmount(() => clearInterval(poll));
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'schedule', label: t('settings.schedules.stepSchedule'), icon: 'stopwatch' },
-  { key: 'vars', label: t('settings.schedules.stepExtraVars'), icon: 'code' },
+  { key: 'extra-vars', label: t('settings.schedules.stepExtraVars'), icon: 'code' },
 ]);
-const { activeTab } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Schedules › <name>, each step a link
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('settings.schedules.labelPlural'), icon: 'clock', to: '/jobs/schedules' },
   { title: schedule.value?.name || scheduleId.value, icon: 'clock', to: `/jobs/schedules/${scheduleId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**

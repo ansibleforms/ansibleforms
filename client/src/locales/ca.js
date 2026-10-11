@@ -1308,7 +1308,6 @@ export default {
   },
   designer: {
     title: 'Dissenyador',
-    lockTitle: 'Inactiu',
     offDescription:
       "Edita les categories, les constants, els formularis i els rols. Inicia el dissenyador per bloquejar la configuració mentre l'edites.",
     formsDescription:
@@ -1408,7 +1407,7 @@ export default {
     colorAndSize: 'Color i mida',
     iconColor: 'Color de la icona',
     iconSize: 'Mida de la icona',
-    overlaySettings: 'Superposició / Insígnia',
+    overlaySettings: 'Superposició / insígnia',
     overlayIcon: 'Icona superposada',
     overlayColor: 'Color de la superposició',
     overlayCircle: 'Fons circular',

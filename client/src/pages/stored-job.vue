@@ -22,6 +22,7 @@ import Helpers from '@/lib/Helpers';
 import { editorStyle } from '@/config/editorStyle';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
+import { formPath } from '@/lib/formsPath';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -111,13 +112,18 @@ const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'values', label: t('settings.storedJobs.tabValues'), icon: 'code' },
 ]);
-const { activeTab } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Stored Jobs › <name>, each step a link
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('settings.storedJobs.labelPlural'), icon: 'floppy-disk', to: '/jobs/stored' },
   { title: stored.value?.name || storedId.value, icon: 'floppy-disk', to: `/jobs/stored/${storedId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
@@ -152,7 +158,7 @@ async function save() {
  * Opens its form with these values filled in (the form page reads ?storedJob=).
  */
 function openInForm() {
-  router.push({ path: '/form', query: { form: stored.value.form_name, storedJob: stored.value.id } });
+  router.push({ path: formPath(stored.value.form_name), query: { storedJob: stored.value.id } });
 }
 
 // Delete asks first

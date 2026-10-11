@@ -26,8 +26,6 @@ function setLanguage(code) {
 }
 
 // ENV-BASED HOME MENU LABEL/ICON
-const navHomeLabel = ref('Forms');
-const navHomeIcon = ref('rectangle-list');
 
 import axios from 'axios';
 import Time from '@/lib/Time';
@@ -37,8 +35,6 @@ import { jobsPath } from '@/lib/jobsPath';
 onMounted(async () => {
   try {
     const res = await axios.get('/api/v2/app/config');
-    navHomeLabel.value = res.data?.navHomeLabel || navHomeLabel.value;
-    navHomeIcon.value = res.data?.navHomeIcon || navHomeIcon.value;
     // Apply server default language if user hasn't chosen one
     if (res.data?.defaultLanguage) {
       applyDefaultLanguage(res.data.defaultLanguage);
@@ -98,7 +94,8 @@ watch(
   },
 );
 const menuOptions = computed(() => [
-  { title: t('nav.jobs'), link: '/jobs', icon: 'history' },
+  // every job ; a status, a job, the scheduled and stored jobs are the jobs too : the link stays active on them
+  { title: t('nav.jobs'), link: '/jobs/all', also: ['/jobs'], icon: 'history' },
   // every settings page (all under /settings) keeps Settings active, not its General page alone
   { title: t('nav.settings'), link: '/settings/general', also: ['/settings'], icon: 'gear' },
   { title: t('nav.designer'), link: '/designer', icon: 'pen-to-square' },
@@ -137,11 +134,11 @@ const menu = computed(() => {
 
   // Add home menu item
   m.unshift({
-    title: navHomeLabel.value,
-    link: '/',
-    // a form is one of the forms : the link stays active on it
-    also: ['/form'],
-    icon: navHomeIcon.value,
+    title: t('nav.forms'),
+    link: '/forms/all',
+    // a category of forms, and a form, are the forms too : the link stays active on them
+    also: ['/forms', '/form'],
+    icon: 'rectangle-list',
     target: '_self',
   });
 

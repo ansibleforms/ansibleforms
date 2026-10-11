@@ -5,7 +5,7 @@
 /*  users list : its Details tab (username, description, email)  */
 /*  and its Groups tab (the groups it belongs to : Add group, and */
 /*  a row's menu or the checkboxes remove one, never the last),   */
-/*  the tab kept in the url (?tab=groups). Change password and    */
+/*  the tab kept in the address (/groups). Change password and    */
 /*  Delete top right, as the list's row menu has them.            */
 /*                                                                */
 /******************************************************************/
@@ -95,13 +95,18 @@ const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'groups', label: t('settings.settingsPage.groups'), icon: 'users' },
 ]);
-const { activeTab } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Users › <username>, each step a link : Users back to the list, the name to this page
-const crumbs = computed(() => [
+const pageCrumbs = computed(() => [
   { title: t('settings.users.labelPlural'), icon: 'user', to: '/settings/users' },
   { title: user.value?.username || userId.value, icon: 'user', to: `/settings/users/${userId.value}` },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── Details ──────────────────────────────────────────────────────────────────
 const emailValid = computed(() => !edit.value?.email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(edit.value.email));

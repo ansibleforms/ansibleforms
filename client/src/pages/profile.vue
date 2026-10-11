@@ -99,12 +99,17 @@ const formsView = ref(Helpers.getCookie('forms_view_mode') === 'list' ? 'list' :
 const password = ref({ currentPassword: '', password: '', password2: '' });
 const saving = ref(false);
 
-// the open view, from ?view= so a view can be linked to ; an unknown one opens the first
-const viewFromQuery = (v) => (menuViews.value.some((x) => x.name === v) ? v : menuViews.value[0].name);
-const currentView = ref(viewFromQuery(route.query.view));
+// the open view, from the address (/profile/<view>) so a view can be linked to ; /profile alone,
+// or a view the user may not open, opens the first of the menu, at its own address
+const viewFromPath = (v) => (menuViews.value.some((x) => x.name === v) ? v : menuViews.value[0].name);
+const currentView = ref(viewFromPath(route.params.view));
 watch(
-  () => route.query.view,
-  (v) => (currentView.value = viewFromQuery(v)),
+  () => route.params.view,
+  (pathView) => {
+    currentView.value = viewFromPath(pathView);
+    if (pathView !== currentView.value) router.replace(`/profile/${currentView.value}`).catch(() => {});
+  },
+  { immediate: true },
 );
 
 // COMPUTED
@@ -252,7 +257,7 @@ async function copyToken() {
 // METHODS
 
 function openView(name) {
-  router.replace({ query: { ...route.query, view: name } }).catch(() => {});
+  router.replace(`/profile/${name}`).catch(() => {});
 }
 
 function setLanguage(code) {

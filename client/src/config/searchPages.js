@@ -22,8 +22,8 @@ export function searchPages(t, options) {
     // ---------------------------------------------------------------
     // the header menu
     // ---------------------------------------------------------------
-    { title: t('nav.forms'), section: '', icon: 'rectangle-list', link: '/' },
-    { title: t('nav.jobs'), section: '', icon: 'history', link: '/jobs' },
+    { title: t('nav.forms'), section: '', icon: 'rectangle-list', link: '/forms/all' },
+    { title: t('nav.jobs'), section: '', icon: 'history', link: '/jobs/all' },
     { title: t('nav.designer'), section: '', icon: 'pen-to-square', link: '/designer' },
     { title: t('nav.profile'), section: '', icon: 'user-gear', link: '/profile' },
     { title: t('nav.apiDocs'), section: '', icon: 'code', link: '/api-docs' },
@@ -71,14 +71,14 @@ export function searchPages(t, options) {
       title: t('sidebar.categories'),
       section: t('nav.designer'),
       icon: 'sitemap',
-      link: '/designer?view=Categories&tab=visual',
+      link: '/designer/categories?tab=visual',
     },
     // edited in the designer (its Visual tab), no longer a settings page
     {
       title: t('sidebar.constants'),
       section: t('nav.designer'),
       icon: 'sliders-h',
-      link: '/designer?view=Constants&tab=visual',
+      link: '/designer/constants?tab=visual',
     },
     { title: t('sidebar.users'), section: settings, icon: 'user', link: '/settings/users' },
     {
@@ -109,7 +109,7 @@ export function searchPages(t, options) {
       title: t('sidebar.mail'),
       section: settings,
       icon: 'envelope',
-      link: '/settings/mailSettings',
+      link: '/settings/mail',
     },
     {
       title: t('sidebar.credentials'),
@@ -121,14 +121,14 @@ export function searchPages(t, options) {
       title: t('sidebar.secretStores'),
       section: settings,
       icon: 'vault',
-      link: '/settings/secretStores',
+      link: '/settings/secret-stores',
     },
     { title: t('sidebar.ssh'), section: settings, icon: 'key', link: '/settings/ssh' },
     {
       title: t('sidebar.knownHosts'),
       section: settings,
       icon: 'server',
-      link: '/settings/knownHosts',
+      link: '/settings/known-hosts',
     },
     {
       title: t('sidebar.runners'),
@@ -153,9 +153,9 @@ export function searchPages(t, options) {
       title: t('sidebar.audit'),
       section: settings,
       icon: 'clipboard-list',
-      link: '/settings/audit',
+      link: '/settings/audit-log',
     },
-    { title: t('sidebar.logs'), section: settings, icon: 'file-lines', link: '/settings/logs' },
+    { title: t('sidebar.logs'), section: settings, icon: 'file-lines', link: '/settings/server-log' },
   ];
   return pages.filter((p) => mayOpen(p.link, options));
 }

@@ -480,6 +480,20 @@
 // step aside (display: contents), so each control is an item of this one box.
 // The title line wraps : when the controls do not fit beside the title, they go on a line of
 // their own under it, as a whole, rather than squeezing into rows beside it
+/* a page title's steps (Jobs › Running) : AppSettings' titles and the form page's. The › is a
+   small glyph at text size : larger, centered on the words, and with no line height of its
+   own, so the title is no taller than one without it and the divider under it does not move */
+.af-crumb-link,
+.af-crumb-link:hover,
+.af-crumb-link:focus {
+  color: inherit;
+  text-decoration: none;
+}
+.af-crumb-separator {
+  font-size: 1.5em;
+  line-height: 0;
+  vertical-align: -0.05em;
+}
 .af-title-line {
   flex-wrap: wrap;
   row-gap: 0.5rem;

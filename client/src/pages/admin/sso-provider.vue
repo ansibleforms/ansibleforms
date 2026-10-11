@@ -81,10 +81,10 @@ async function update(data) {
 // the dialog's steps : Details (its Provider step), Sign-in, Groups
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
-  { key: 'signin', label: t('settings.oauth2.stepSignIn'), icon: 'right-to-bracket' },
+  { key: 'sign-in', label: t('settings.oauth2.stepSignIn'), icon: 'right-to-bracket' },
   { key: 'groups', label: t('settings.oauth2.stepGroups'), icon: 'users' },
 ]);
-const { activeTab } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
+const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the help of a tab, as the dialog's step shows it (the permissions of an Entra ID app...)
 const notes = computed(() => {
@@ -93,14 +93,19 @@ const notes = computed(() => {
 });
 
 // the title : SSO › <name>, each step a link : SSO back to the providers, the name to this page
-const crumbs = computed(() => [
-  { title: t('sidebar.oauth2'), icon: 'right-to-bracket', to: { path: '/settings/sso', query: { tab: 'providers' } } },
+const pageCrumbs = computed(() => [
+  { title: t('sidebar.oauth2'), icon: 'right-to-bracket', to: '/settings/sso/providers' },
   {
     title: provider.value?.name || providerId.value,
     icon: 'right-to-bracket',
     to: `/settings/sso/${providerId.value}`,
   },
 ]);
+// and the open tab last, as every page in tabs names it : Users › admin › Groups
+const crumbs = computed(() => {
+  const tab = tabs.value.find((x) => x.key === activeTab.value);
+  return tab ? [...pageCrumbs.value, { title: tab.label, icon: tab.icon, to: tabLink(tab.key) }] : pageCrumbs.value;
+});
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
@@ -158,7 +163,7 @@ async function deleteProvider() {
   confirmDelete.value = false;
   try {
     await axios.delete(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`);
-    router.push({ path: '/settings/sso', query: { tab: 'providers' } });
+    router.push('/settings/sso/providers');
   } catch (err) {
     toast.error(err.response?.data?.message || err.response?.data?.error || err.message);
   }
@@ -276,7 +281,7 @@ onMounted(async () => {
             </div>
           </template>
           <!-- Sign-in : how the app signs in with it -->
-          <template v-else-if="activeTab === 'signin'">
+          <template v-else-if="activeTab === 'sign-in'">
             <BsInput
               v-if="provider.provider === 'azuread'"
               class="af-provider-field"

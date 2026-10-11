@@ -14,6 +14,7 @@
 
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { formsPath } from '@/lib/formsPath';
 
 // INIT
 
@@ -59,11 +60,7 @@ const isHighLighted = computed(() => {
 // METHODS
 
 function goto(path) {
-  if (path) {
-    router.replace({ path: '/', query: { category: encodeURIComponent(path) } }).catch((_e) => {});
-  } else {
-    router.replace({ path: '/' }).catch((_e) => {});
-  }
+  router.replace(formsPath(path)).catch((_e) => {});
 }
 
 function filterAllowedForms(category) {

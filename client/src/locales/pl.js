@@ -15,7 +15,7 @@ export default {
   },
   nav: {
     // the lock on the Designer link while someone holds the designer, in its tooltip
-    designerLockedByMe: 'Projektant jest zablokowany przez Ciebie',
+    designerLockedByMe: 'Projektant jest zablokowany przez ciebie',
     designerLockedBy: 'Projektant jest zablokowany przez użytkownika {user}',
     forms: 'Formularze',
     jobs: 'Zadania',
@@ -703,7 +703,7 @@ export default {
       tenantId: 'Tenant ID',
       tenantIdHelp: 'Identyfikator dzierżawy (GUID) lub jedna z jej domen : logują się tylko jej użytkownicy. Wymagane',
       clientId: 'Client ID',
-      clientSecret: 'Client Secret',
+      clientSecret: 'Client secret',
       groupFilter: 'Filtr grup',
       redirectUrl: 'Adres URL przekierowania',
       issuer: 'Wystawca',
@@ -1298,7 +1298,6 @@ export default {
   },
   designer: {
     title: 'Projektant',
-    lockTitle: 'Nieaktywny',
     offDescription:
       'Edytuj kategorie, stałe, formularze i role. Uruchom projektanta, aby zablokować konfigurację na czas edycji.',
     formsDescription:
@@ -1748,7 +1747,7 @@ export default {
     scheduleRecurring: 'Harmonogram (cykliczny)',
     runLaterOneTime: 'Uruchom później (jednorazowo)',
     store: 'Zapisz',
-    copyExtravars: 'Kopiuj ExtraVars',
+    copyExtravars: 'Kopiuj extravars',
     unevaluated: 'Nie obliczono: {fields}...',
     itemCount: '{n} element | {n} elementy | {n} elementów',
     copiedToClipboard: 'Skopiowano do schowka',
