@@ -6472,6 +6472,76 @@
       ```
       
       All forms appear together in the UI, automatically merged!
+  - name: Schedules kept in a git repository
+    short: Schedules in YAML, one file per schedule
+    version: v7.4.0
+    description: |
+      The scheduler always runs from the database; a git repository is an optional source kept in step with it.
+      One repository at most has the **Schedules** usage (`use_for_schedules`, Settings > Connections >
+      Repositories); a second one is refused, by the API and by the config seed. It holds one schedule per YAML file
+      in a folder named `schedules` at its root (`<repository>/schedules/<file>.yaml` or `.yml`). Nothing else in
+      the repository is read as a schedule. Without a schedules repository, schedules live in the database only and
+      recurring ones run on a cron.
+
+      **The file** is a single schedule, its template, inventory and credentials named by name or by natural key:
+      ```yaml
+      name: Nightly log rotation
+      description: ''
+      rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
+      enabled: true
+      unified_job_template:
+        name: Nightly Workflow          # the AnsibleForms form it runs
+        type: workflow_job_template     # accepted, informational
+        organization: { name: Default } # accepted, ignored
+      extra_data:                       # the form's values (its extra vars)
+        retention_days: 14
+      limit: webservers                 # a prompt, see below
+      ```
+      `unified_job_template` may also be a plain name (the module's form), and a file may hold its one schedule in a
+      `schedules:` or `controller_schedules:` list of one item.
+
+      **The prompts** become the reserved extra vars the job reads: `limit` (`__limit__`), `job_tags`
+      (`__tags__`), `skip_tags` (`__skipTags__`), `verbosity` (`__verbosity__`), `diff_mode` (`__diff__`),
+      `job_type: check` (`__check__`), `inventory` (`__inventory__`), `scm_branch` (`__scmBranch__`),
+      `execution_environment` (`__executionEnvironment__`), `instance_groups` (`__instanceGroups__`) and
+      `credentials` (each by its own name in `__credentials__`). `forks`, `timeout`, `job_slice_count` and `labels`
+      are checked and kept in the file, AnsibleForms has nothing to give them to. Any other key
+      (`natural_key`, `related`, `organization`, your own) is kept as it is when the app writes the file.
+
+      **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (or a UTC time
+      ending in `Z`), one or more `RRULE`, and `EXRULE`. Refused: no or several `DTSTART`, a
+      naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL`, `SECONDLY`, `BYDAY` with a number (`5MO`), `COUNT`
+      with `UNTIL`, `COUNT` above 999. A time a DST change skips is skipped. Schedules kept in the app keep their cron.
+
+      **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
+      files are read in; a file named as a recurring schedule of the app replaces that schedule's definition (git
+      wins, its runs and history stay). Every other recurring schedule of the app is written to the repository as a
+      new file (`schedules/<name>.yaml`, a number added when the name is taken), waiting for the repository's Push:
+      its cron becomes the rrule that fires at the same moments, in the scheduler's time zone (`LOG_TZ`). A cron that
+      restricts both the day of the month and the day of the week (a cron fires on either, a rrule only on both), or
+      that uses `L`, `W`, `#` or `?`, stays an app schedule, as do the one-time "Run later" jobs. The result is shown
+      and logged.
+
+      **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
+      the worker, its files are read into Jobs > Scheduled: a new
+      file makes a schedule, a changed one changes it, a removed one removes it (its past jobs stay). A file with no
+      name, no rrule or a refused one, no `unified_job_template.name`, a form that does not exist, or a name another
+      schedule has, is refused alone: the repository's pull output and the server log name it and say why, a
+      schedule it made before stays as it was, and the other files still sync. When and how a schedule ran stays in
+      the database, never in the file.
+
+      **The app: back to git.** While the repository is used, every new recurring schedule is saved and written to it
+      as a new file named after it (`nightly-log-rotation.yaml`, in the export's form), edited with the rrule
+      editor; editing a repository schedule (its name, description, form, enabled, rrule, extra vars) writes its
+      file, only the fields changed; deleting one deletes its file. One-time "Run later" jobs stay in the database. As for the
+      designer's forms, the change waits in the repository's working tree (its Push column says so) until the
+      repository is pushed.
+
+      **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and its
+      files read in (skipped, and said, when it cannot be reached), then its schedules are unlinked. They stay in
+      the app with their name, form, rrule, values, enabled and job options, and keep running on their rrule; the
+      files in git are left as they are. Turning it on again goes through the same steps as the first time.
+      Repository schedules run as the Schedule Service, as every recurring schedule.
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
     version: v6.0.3

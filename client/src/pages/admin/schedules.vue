@@ -5,6 +5,7 @@ import Helpers from '@/lib/Helpers';
 import Profile from '@/lib/Profile';
 import getSettings from '@/config/settings';
 import { useI18n } from 'vue-i18n';
+import { loadScheduleRepository } from '@/config/rrule';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
@@ -37,6 +38,8 @@ onMounted(async () => {
   if (!authenticated.value) {
     return;
   }
+  // a schedules repository : a new recurring schedule is written to it, edited as a rrule
+  await loadScheduleRepository();
 });
 </script>
 

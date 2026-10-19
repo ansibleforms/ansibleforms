@@ -681,6 +681,8 @@ const SCHEMA_MANIFEST = {
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
                                'runners.credential', 'ldap.description', 'settings.disclaimer_version', 'announcements.enabled',
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
+                               'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
+                               'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
                                'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
                      indexes: ['jobs.idx_jobs_stored_job'] },
   },
@@ -1241,6 +1243,16 @@ async function patchVersion7(messages, success, failed) {
   const databases = fs.readFileSync(`${__dirname}/../db/create_databases_table.sql`);
   await checkPromise(addTable("databases", databases.toString()), messages, success, failed);
   await checkPromise(addDatabasesForCredentials(), messages, success, failed);
+  // schedules kept in a git repository (use_for_schedules), one per file in its schedules
+  // folder, one YAML file each, timed by their iCal rrule (models/scheduleRepo.model.js).
+  // A schedule says where it comes from (repository, repo_file) ; its file's prompts are kept as
+  // the reserved extra vars a job reads (launch_options) ; any schedule may have a description
+  await checkPromise(addColumn("repositories", "use_for_schedules", "tinyint(4)", true, "0"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "description", "text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "rrule", "text", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "repository", "varchar(250)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "launch_options", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
   // a secret store a credential's secret may be written to (secrets/providers write) : off, and
   // only below its write prefix
   await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);

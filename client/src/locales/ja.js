@@ -1314,6 +1314,34 @@ export default {
       usePlaybooksShort: 'Playbook',
       useWorkflowsHint: 'デザイナーで作るワークフロー。デザイナーで編集してプッシュします',
       useWorkflowsShort: 'ワークフロー',
+      useForSchedules: 'スケジュールに使用しますか?',
+      helpUseForSchedules:
+        'schedules フォルダーにスケジュールを 1 つずつ YAML ファイルで置きます。プルのたびに読み込まれ、ジョブ > スケジュール済みで編集すると書き戻されます。使えるリポジトリは 1 つだけです。',
+      schedulesOnTitle: 'スケジュールに使用',
+      schedulesOnQuestion: '{name} をスケジュールに使用しますか？',
+      schedulesOnButton: 'スケジュールに使用',
+      schedulesOnWritten:
+        '{name} の schedules フォルダーに YAML ファイルとして 1 つずつ書き込まれる、このアプリの定期スケジュール: {count} 件。',
+      schedulesOnGitWins:
+        'git とこのアプリに同じ名前のスケジュールがある場合は、git の版が優先され、アプリのものを置き換えます。',
+      schedulesOnClashes: 'git とこのアプリで同じ名前のため、git の版がアプリのものを置き換えます: {names}。',
+      schedulesOnKept: '次の cron は rrule で表せないため、このアプリのスケジュールのまま残ります: {names}。',
+      schedulesOnPlanned: '1 回だけの「後で実行」ジョブはこのアプリに残ります。',
+      schedulesOnAfter: '以後、プルで git の変更が取り込まれ、ここでの変更はリポジトリのプッシュで git に送られます。',
+      schedulesOnDone:
+        'スケジュール: {written} 件をリポジトリに書き込み (プッシュ待ち)、{matched} 件を git で置き換え、{kept} 件をこのアプリに保持しました。',
+      schedulesOffTitle: 'スケジュールへの使用をやめる',
+      schedulesOffQuestion: '{name} をスケジュールに使用するのをやめますか？',
+      schedulesOffButton: 'スケジュールへの使用をやめる',
+      schedulesOffKept:
+        'その {count} 件のスケジュールはこのアプリに残り、git とのリンクは外れますが、rrule どおりに実行され続けます。',
+      schedulesOffPull: '最新のファイルに合わせるため、先にもう一度プルします。git のファイルはそのまま残ります。',
+      schedulesOffUnpushed: '注意: まだプッシュされていない変更があります。それらは git に送られません。',
+      schedulesOffDone: '{count} 件のスケジュールを git から切り離しました。このアプリに残ります。',
+      schedulesNotPulled: 'リポジトリはプルされませんでした ({reason})。',
+      schedulesFailed: 'スケジュールが変更に追従できませんでした: {error}',
+      useSchedulesHint: 'YAML のスケジュール。schedules フォルダーに 1 ファイル 1 つ',
+      useSchedulesShort: 'スケジュール',
       notPushed: '保留中の変更',
       notPushedHint: '未プッシュの変更があります: デザイナーまたはプッシュで送信してください。',
       useForInventories: 'インベントリに使用しますか?',
@@ -1411,6 +1439,21 @@ export default {
       startedJobTitle: '開始したジョブ',
       startedJob: 'ジョブ #{id}',
       startedJobHelp: '前回の実行で開始されたジョブ：開くと結果を確認できます。',
+      source: 'ソース',
+      sourceRepository: 'リポジトリ: {name}',
+      sourceRepositoryHelp:
+        'リポジトリ {name} のファイルに保存されています。保存するとファイルに書き込まれ、リポジトリのプッシュで git に送られます。',
+      rrule: '繰り返しルール (rrule)',
+      rruleHelp:
+        'iCal rrule: タイムゾーン (TZID) 付きの DTSTART、続いて RRULE、実行を除外する EXRULE。rrule 自身のタイムゾーンで実行されます。',
+      rruleInvalid: 'この rrule は拒否されました: {reason}',
+      rruleNoRuns: 'この rrule には今後の実行がありません。',
+      enabledHelp: 'オフにするとスケジュールどおりには実行されません (今すぐ実行では実行されます)。',
+      launchOptions: 'ファイルから',
+      launchOptionsHelp:
+        'ファイルのプロンプト (limit、job_tags、inventory など)。これらの追加変数としてジョブに送られます。ファイルで編集します。',
+      deleteFileHint:
+        'ファイル {file} もリポジトリ {name} から削除されます。git から取り除くにはリポジトリをプッシュしてください。',
     },
     disclaimer: {
       description: '全員が一度同意する条件。誰がどの版にいつ同意したかを記録します。',

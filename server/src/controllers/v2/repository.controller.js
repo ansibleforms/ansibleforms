@@ -8,6 +8,7 @@ import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
+import ScheduleRepo from '../../models/scheduleRepo.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import Form from '../../models/form.model.js';
 
@@ -83,8 +84,9 @@ async function guardRepositoryCredential(req, existing) {
 // ---------------------------------------------------------------------------------------------
 
 // the flags that make a repository's content what AnsibleForms loads and runs : its configuration
-// (roles, and with them who is an admin), its forms, playbooks, workflows and inventories
-const USE_FOR_FLAGS = ['use_for_config', 'use_for_forms', 'use_for_playbooks', 'use_for_workflows', 'use_for_inventories'];
+// (roles, and with them who is an admin), its forms, playbooks, workflows, inventories and
+// schedules (which run as the Schedule Service, with the admin role)
+const USE_FOR_FLAGS = ['use_for_config', 'use_for_forms', 'use_for_playbooks', 'use_for_workflows', 'use_for_inventories', 'use_for_schedules'];
 
 // where its content comes from : the remote and the branch it pulls
 const SOURCE_FIELDS = ['uri', 'branch'];
@@ -192,7 +194,9 @@ const update = async function(req, res) {
     // its address, branch and use_for_* flags : an admin's (the rest is the connections user's too)
     assertRepositoryAdminFields(req, existing);
     const { dropPassword } = await guardRepositoryCredential(req, existing);
-    await Repository.update(req.body, req.params.name, { dropPassword });
+    // what turning its Schedules usage on or off did (Repository.afterUsageChange), for the answer
+    const report = {};
+    await Repository.update(req.body, req.params.name, { dropPassword, report });
     // The record may have been RENAMED : `name` is an editable field on the repositories
     // page. Reading it back by req.params.name found nothing and threw, so a rename that
     // had already committed was reported as a 500 - and neither cron call below ran, so
@@ -213,7 +217,7 @@ const update = async function(req, res) {
       logger.info(`Removing repository '${updated.name}' from cron service (no schedule)`);
       cronService.removeRepository(updated.name);
     }
-    res.json(RestResult.single(null));
+    res.json(RestResult.single(report.schedules ? { schedules: report.schedules } : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateRepository'), err.message || String(err)));
   }
@@ -223,13 +227,39 @@ const deleteRepository = async function(req, res) {
   try {
     // deleting one takes away what the configuration, the forms or the playbooks load : an admin's
     assertRepositoryAdminFields(req, null);
-    await Repository.delete(req.params.name);
+    const report = {};
+    await Repository.delete(req.params.name, { report });
     // Remove from cron service
     logger.info(`Removing repository '${req.params.name}' from cron service`);
     cronService.removeRepository(req.params.name);
-    res.json(RestResult.single(null));
+    res.json(RestResult.single(report.schedules ? { schedules: report.schedules } : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedDeleteRepository'), err.message || String(err)));
+  }
+};
+
+/**
+ * What making a repository the schedules repository (or no longer) would do, changing nothing :
+ * the app's recurring schedules it would write to it, the crons that stay in the app, the files
+ * whose name an app's schedule has, the one-time jobs, the schedules it holds now, and whether it
+ * has changes not pushed yet. For the question its dialog and page ask before the flag is saved.
+ *
+ * Args:
+ *   req (object): the request, /:name (one not made yet may be named too : its files are none).
+ *   res (object): the response.
+ */
+const schedulesPreview = async function(req, res) {
+  try {
+    const name = req.params.name ? String(req.params.name) : null;
+    const preview = await ScheduleRepo.preview(name);
+    let unpushed = false;
+    if (name) {
+      const [withState] = await Repository.withUnpushed([{ name }]);
+      unpushed = !!withState?.unpushed;
+    }
+    res.json(RestResult.single({ ...preview, unpushed }));
+  } catch(err) {
+    res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepository'), err.message || String(err)));
   }
 };
 
@@ -263,8 +293,7 @@ const pull = async function(req, res) {
 const sync = async function(req, res) {
   try {
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    // without the lines naming files, to a user some are hidden from
-    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
+    res.json(RestResult.single({ output }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -289,8 +318,7 @@ const formsRepoSync = async function(req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.noFormsRepositories')));
     }
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    // without the lines naming files, to a user some are hidden from
-    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
+    res.json(RestResult.single({ output }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -308,7 +336,7 @@ const formsRepoSyncAll = async function(req, res) {
     for (const repo of repositories) {
       try {
         const output = await Repository.sync(repo.name, req.user?.user?.username);
-        results.push({ name: repo.name, status: "success", output: designerGitOutput(output, req.user?.user) });
+        results.push({ name: repo.name, status: "success", output });
       } catch (e) {
         failed = true;
         results.push({ name: repo.name, status: "failed", output: e.message });
@@ -378,6 +406,7 @@ export default {
     update,
     "delete": deleteRepository,
     clone,
+    schedulesPreview,
     reset,
     pull,
     sync,

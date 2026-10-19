@@ -295,6 +295,8 @@ const crudConfigs = {
       { name: 'use_for_playbooks', isBoolean: true },
       { name: 'use_for_workflows', isBoolean: true },
       { name: 'use_for_inventories', isBoolean: true },
+      // the schedules in its schedules folder, one YAML file each (models/scheduleRepo.model.js)
+      { name: 'use_for_schedules', isBoolean: true },
       // a credential of Connections > Credentials : the user and password git uses
       { name: 'credential' },
       { name: 'rebase_on_start', isBoolean: true },
@@ -373,6 +375,17 @@ const crudConfigs = {
       // fires. Missing here, it was dropped on insert and never read back, and a planned run
       // of a form under 'enforce' failed with "no rawFormData was sent" (#1063)
       { name: 'raw_form_data' },
+      // what it is for, in a few words
+      { name: 'description' },
+      // a schedule of a schedules repository : timed by its iCal rrule, not a cron
+      { name: 'rrule' },
+      // the schedules repository and the file it comes from : set by models/scheduleRepo.model.js
+      // alone, never from a request body (Schedule.create and update drop them)
+      { name: 'repository' },
+      { name: 'repo_file' },
+      // its file's prompts as the reserved extra vars a job reads (JSON) : the file's, never a
+      // request body's
+      { name: 'launch_options' },
       // the stored job a planned run's values came from (Schedule.plan, checked by
       // lib/storedJobUse.js) : its last use is written when the run fires. Set ONLY by
       // Schedule.plan, never by a schedule's create or update (a schedule keeps its own copy)

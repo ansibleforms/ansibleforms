@@ -1312,6 +1312,36 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows the designer builds, edited and pushed back by the designer',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Use for schedules ?',
+      helpUseForSchedules:
+        'Its schedules folder holds the schedules, one YAML file each: read in after each pull, and written back when they are edited in Jobs > Scheduled. One repository at most.',
+      schedulesOnTitle: 'Use for schedules',
+      schedulesOnQuestion: 'Use {name} for the schedules?',
+      schedulesOnButton: 'Use for schedules',
+      schedulesOnWritten:
+        'Recurring schedules of this app written to {name}, one YAML file each in its schedules folder: {count}.',
+      schedulesOnGitWins:
+        'When a schedule has the same name in git and in this app, the version in git wins and replaces the one in the app.',
+      schedulesOnClashes: 'Same name in git and in this app, the version in git replaces the one in the app: {names}.',
+      schedulesOnKept: 'These crons cannot be written as an rrule and stay schedules of this app: {names}.',
+      schedulesOnPlanned: 'One-time "Run later" jobs stay in this app.',
+      schedulesOnAfter:
+        "From then on, a pull brings the changes made in git, and the changes made here go to git with the repository's Push.",
+      schedulesOnDone:
+        'Schedules: {written} written to the repository (waiting for Push), {matched} replaced by git, {kept} kept in this app.',
+      schedulesOffTitle: 'Stop using for schedules',
+      schedulesOffQuestion: 'Stop using {name} for the schedules?',
+      schedulesOffButton: 'Stop using for schedules',
+      schedulesOffKept:
+        'Its {count} schedules stay in this app and keep running on their rrule, no longer linked to git.',
+      schedulesOffPull:
+        'It is pulled once more first, so they match its latest files. The files in git are left as they are.',
+      schedulesOffUnpushed: 'Warning: it has changes that are not pushed yet. They are not sent to git.',
+      schedulesOffDone: '{count} schedules unlinked from git: they stay in this app.',
+      schedulesNotPulled: 'The repository was not pulled ({reason}).',
+      schedulesFailed: 'The schedules could not follow the change: {error}',
+      useSchedulesHint: 'Schedules in YAML, one per file in its schedules folder',
+      useSchedulesShort: 'Schedules',
       notPushed: 'Pending changes',
       notPushedHint: 'Changes not pushed to the remote yet: push them from the designer, or with Push.',
       useForInventories: 'Use for inventories ?',
@@ -1408,6 +1438,21 @@ export default {
       startedJobTitle: 'Started job',
       startedJob: 'Job #{id}',
       startedJobHelp: 'The job the last run started: open it to see how it ended.',
+      source: 'Source',
+      sourceRepository: 'Repository: {name}',
+      sourceRepositoryHelp:
+        "Kept in a file of repository {name}: a save writes the file, the repository's Push sends it to git.",
+      rrule: 'Recurrence rule (rrule)',
+      rruleHelp:
+        'An iCal rrule: DTSTART with its time zone (TZID), then RRULE, and EXRULE to leave runs out. It runs in its own time zone.',
+      rruleInvalid: 'This rrule is refused: {reason}',
+      rruleNoRuns: 'This rrule has no run ahead.',
+      enabledHelp: 'Turned off, it does not run on its schedule (Run now still runs it).',
+      launchOptions: 'From the file',
+      launchOptionsHelp:
+        "The file's prompts (limit, job_tags, inventory ...), sent to the job as these extra vars. They are edited in the file.",
+      deleteFileHint:
+        'Its file {file} is deleted from repository {name} too: push the repository to remove it from git.',
     },
     runners: {
       pending: 'Waiting for approval',

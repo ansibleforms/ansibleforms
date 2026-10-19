@@ -1327,6 +1327,37 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Für Zeitpläne verwenden?',
+      helpUseForSchedules:
+        'Sein Ordner schedules enthält die Zeitpläne, je einer pro YAML-Datei: nach jedem Pull eingelesen und zurückgeschrieben, wenn sie unter Jobs > Geplant bearbeitet werden. Höchstens ein Repository.',
+      schedulesOnTitle: 'Für Zeitpläne verwenden',
+      schedulesOnQuestion: '{name} für die Zeitpläne verwenden?',
+      schedulesOnButton: 'Für Zeitpläne verwenden',
+      schedulesOnWritten:
+        'Wiederkehrende Zeitpläne dieser App, die nach {name} geschrieben werden, je eine YAML-Datei im Ordner schedules: {count}.',
+      schedulesOnGitWins:
+        'Hat ein Zeitplan in git und in dieser App denselben Namen, gewinnt die Version in git und ersetzt die der App.',
+      schedulesOnClashes: 'Gleicher Name in git und in dieser App, die Version in git ersetzt die der App: {names}.',
+      schedulesOnKept: 'Diese Crons lassen sich nicht als rrule schreiben und bleiben Zeitpläne dieser App: {names}.',
+      schedulesOnPlanned: 'Einmalige Jobs von „Später ausführen“ bleiben in dieser App.',
+      schedulesOnAfter:
+        'Ab dann bringt ein Pull die Änderungen aus git, und die hier gemachten Änderungen gehen mit dem Push des Repositorys nach git.',
+      schedulesOnDone:
+        'Zeitpläne: {written} ins Repository geschrieben (warten auf den Push), {matched} durch git ersetzt, {kept} in dieser App behalten.',
+      schedulesOffTitle: 'Nicht mehr für Zeitpläne verwenden',
+      schedulesOffQuestion: '{name} nicht mehr für die Zeitpläne verwenden?',
+      schedulesOffButton: 'Nicht mehr für Zeitpläne verwenden',
+      schedulesOffKept:
+        'Seine {count} Zeitpläne bleiben in dieser App und laufen weiter nach ihrer rrule, nicht mehr mit git verbunden.',
+      schedulesOffPull:
+        'Es wird zuerst noch einmal gepullt, damit sie seinen neuesten Dateien entsprechen. Die Dateien in git bleiben, wie sie sind.',
+      schedulesOffUnpushed:
+        'Achtung: Es hat Änderungen, die noch nicht gepusht sind. Sie werden nicht an git gesendet.',
+      schedulesOffDone: '{count} Zeitpläne von git gelöst: Sie bleiben in dieser App.',
+      schedulesNotPulled: 'Das Repository wurde nicht gepullt ({reason}).',
+      schedulesFailed: 'Die Zeitpläne konnten der Änderung nicht folgen: {error}',
+      useSchedulesHint: 'Zeitpläne in YAML, einer pro Datei im Ordner schedules',
+      useSchedulesShort: 'Zeitpläne',
       notPushed: 'Ausstehende Änderungen',
       notPushedHint: 'Änderungen noch nicht zum Remote gepusht: pushe sie im Designer oder mit Push.',
       useForInventories: 'Für Inventare verwenden?',
@@ -1427,6 +1458,21 @@ export default {
       startedJobTitle: 'Gestarteter Job',
       startedJob: 'Job #{id}',
       startedJobHelp: 'Der Job, den der letzte Lauf gestartet hat: öffnen Sie ihn, um zu sehen, wie er endete.',
+      source: 'Quelle',
+      sourceRepository: 'Repository: {name}',
+      sourceRepositoryHelp:
+        'In einer Datei des Repositorys {name} gespeichert: Speichern schreibt die Datei, der Push des Repositorys sendet sie an git.',
+      rrule: 'Wiederholungsregel (rrule)',
+      rruleHelp:
+        'Eine iCal-rrule: DTSTART mit seiner Zeitzone (TZID), dann RRULE und EXRULE, um Läufe auszulassen. Sie läuft in ihrer eigenen Zeitzone.',
+      rruleInvalid: 'Diese rrule wird abgelehnt: {reason}',
+      rruleNoRuns: 'Diese rrule hat keinen kommenden Lauf.',
+      enabledHelp: 'Ausgeschaltet läuft er nicht nach seinem Zeitplan (Jetzt ausführen startet ihn trotzdem).',
+      launchOptions: 'Aus der Datei',
+      launchOptionsHelp:
+        'Die Prompts der Datei (limit, job_tags, inventory ...), als diese Extra-Vars an den Job gesendet. Sie werden in der Datei bearbeitet.',
+      deleteFileHint:
+        'Seine Datei {file} wird auch aus dem Repository {name} gelöscht: pushen Sie das Repository, um sie aus git zu entfernen.',
     },
     runners: {
       pending: 'Wartet auf Freigabe',

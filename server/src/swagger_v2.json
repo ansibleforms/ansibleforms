@@ -23,6 +23,7 @@
     { "name": "ssh", "description": "SSH key management" },
     { "name": "log", "description": "Application log access and download" },
     { "name": "repository", "description": "Git repository management" },
+    { "name": "schedule", "description": "Scheduled jobs (Jobs > Scheduled) : kept in the app (a cron, or once) or in a schedules repository (one YAML file each, an iCal rrule)" },
     { "name": "query", "description": "Database query execution" },
     { "name": "expression", "description": "JavaScript expression evaluation" },
     { "name": "job", "description": "Job management and operations" },
@@ -716,6 +717,600 @@
         }
       }
     },
+    "/schedule": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List schedules",
+        "description": "Lists every schedule, each with its next run and where it comes from (repository, repo_file). Requires allowScheduledJobs.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "form": {
+                            "type": "string",
+                            "description": "The form it runs"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "one_time_run": {
+                            "type": "boolean",
+                            "description": "Kept in the app : runs once, at run_at"
+                          },
+                          "cron": {
+                            "type": "string",
+                            "description": "Kept in the app : its cron, in the scheduler's time zone"
+                          },
+                          "run_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "rrule": {
+                            "type": "string",
+                            "description": "Kept in a schedules repository : its iCal rrule, on one line",
+                            "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                          },
+                          "extra_vars": {
+                            "type": "string",
+                            "description": "The extra vars it sends the form (YAML)"
+                          },
+                          "repository": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The schedules repository it comes from ; null for one kept in the app"
+                          },
+                          "repo_file": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "schedules/nightly-log-rotation.yaml"
+                          },
+                          "launch_options": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Its file's prompts as the reserved extra vars a job reads (JSON, read only)"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "last_run": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "next_run": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Computed : its cron's, rrule's or one time run's next run"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Create a schedule",
+        "description": "Creates a schedule. While a schedules repository is used, a recurring schedule is saved and written to it as a new YAML file (waiting for the repository's Push), timed by its rrule (a cron sent instead is written as the rrule that fires at the same moments) ; otherwise it is kept in the app, on a cron. A one time run always stays in the app. A user with allowPlannedJobs only plans a one-time run of a form they may run.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "form": {
+                    "type": "string",
+                    "description": "The form it runs"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "one_time_run": {
+                    "type": "boolean",
+                    "description": "Kept in the app : runs once, at run_at"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "description": "Kept in the app : its cron, in the scheduler's time zone"
+                  },
+                  "run_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rrule": {
+                    "type": "string",
+                    "description": "Kept in a schedules repository : its iCal rrule, on one line",
+                    "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                  },
+                  "extra_vars": {
+                    "type": "string",
+                    "description": "The extra vars it sends the form (YAML)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Schedule created"
+          },
+          "400": {
+            "description": "A value refused (a refused rrule, a form that does not exist)"
+          },
+          "409": {
+            "description": "Another schedule has that name"
+          }
+        }
+      }
+    },
+    "/schedule/repositories": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List the schedules repositories",
+        "description": "The schedules repository (use_for_schedules), when there is one : new recurring schedules are written to it.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules repositories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/rrule": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Check a rrule and preview its next runs",
+        "description": "Checks an iCal rrule and gives its next ten runs, in UTC, worked out in the rrule's own time zone.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rrule",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The check and the next runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "next": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/{id}": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Get a schedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "form": {
+                      "type": "string",
+                      "description": "The form it runs"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "one_time_run": {
+                      "type": "boolean",
+                      "description": "Kept in the app : runs once, at run_at"
+                    },
+                    "cron": {
+                      "type": "string",
+                      "description": "Kept in the app : its cron, in the scheduler's time zone"
+                    },
+                    "run_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "description": "Kept in a schedules repository : its iCal rrule, on one line",
+                      "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                    },
+                    "extra_vars": {
+                      "type": "string",
+                      "description": "The extra vars it sends the form (YAML)"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The schedules repository it comes from ; null for one kept in the app"
+                    },
+                    "repo_file": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "schedules/nightly-log-rotation.yaml"
+                    },
+                    "launch_options": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Its file's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "last_run": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "next_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Computed : its cron's, rrule's or one time run's next run"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such schedule"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Update a schedule",
+        "description": "Updates a schedule. A repository's schedule is saved into its file (only the fields changed ; the rest of the file kept) for the repository's Push ; it is timed by its rrule, never a cron.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "form": {
+                    "type": "string",
+                    "description": "The form it runs"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "one_time_run": {
+                    "type": "boolean",
+                    "description": "Kept in the app : runs once, at run_at"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "description": "Kept in the app : its cron, in the scheduler's time zone"
+                  },
+                  "run_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rrule": {
+                    "type": "string",
+                    "description": "Kept in a schedules repository : its iCal rrule, on one line",
+                    "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                  },
+                  "extra_vars": {
+                    "type": "string",
+                    "description": "The extra vars it sends the form (YAML)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The schedule as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "form": {
+                      "type": "string",
+                      "description": "The form it runs"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "one_time_run": {
+                      "type": "boolean",
+                      "description": "Kept in the app : runs once, at run_at"
+                    },
+                    "cron": {
+                      "type": "string",
+                      "description": "Kept in the app : its cron, in the scheduler's time zone"
+                    },
+                    "run_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "description": "Kept in a schedules repository : its iCal rrule, on one line",
+                      "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                    },
+                    "extra_vars": {
+                      "type": "string",
+                      "description": "The extra vars it sends the form (YAML)"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The schedules repository it comes from ; null for one kept in the app"
+                    },
+                    "repo_file": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "schedules/nightly-log-rotation.yaml"
+                    },
+                    "launch_options": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Its file's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "last_run": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "next_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Computed : its cron's, rrule's or one time run's next run"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value refused"
+          },
+          "409": {
+            "description": "Another schedule has that name"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Delete a schedule",
+        "description": "Deletes a schedule ; a repository's schedule loses its file too (pushed with the repository's Push). Its past jobs stay.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule deleted"
+          }
+        }
+      }
+    },
+    "/schedule/{id}/launch": {
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Run a schedule now",
+        "description": "Queues the schedule and launches it, as the Schedule Service (or, for a planned job, as the user who planned it).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule launched"
+          }
+        }
+      }
+    },
     "/repository": {
       "get": {
         "tags": ["repository"],
@@ -748,6 +1343,7 @@
                           "use_for_playbooks": { "type": "boolean" },
                           "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
                           "rebase_on_start": { "type": "boolean" },
                           "cron": { "type": "string" },
                           "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -793,6 +1389,7 @@
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -816,6 +1413,96 @@
           },
           "400": { "description": "Missing required fields" },
           "500": { "description": "Failed to create repository" }
+        }
+      }
+    },
+    "/repository/{name}/schedules-preview": {
+      "get": {
+        "tags": [
+          "repository"
+        ],
+        "summary": "Preview its Schedules usage",
+        "description": "What turning the repository's Schedules usage on (or off) would do, changing nothing : the app's recurring schedules it would write as files, the crons that cannot be written as a rrule (they stay in the app), the files whose name an app schedule has (the file wins), the one-time jobs that stay in the app, the schedules it holds now, and whether it has changes not pushed yet.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "repository": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The schedules repository now"
+                    },
+                    "recurring": {
+                      "type": "integer"
+                    },
+                    "written": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "kept": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "cron": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "clashes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "files": {
+                      "type": "integer"
+                    },
+                    "planned": {
+                      "type": "integer"
+                    },
+                    "linked": {
+                      "type": "integer"
+                    },
+                    "unpushed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -853,6 +1540,7 @@
                     "use_for_playbooks": { "type": "boolean" },
                     "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
                     "rebase_on_start": { "type": "boolean" },
                     "cron": { "type": "string" },
                     "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -901,6 +1589,7 @@
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }

@@ -1324,6 +1324,38 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows creados, editados y enviados de vuelta por el diseñador',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: '¿Usar para programaciones?',
+      helpUseForSchedules:
+        'Su carpeta schedules contiene las programaciones, un archivo YAML cada una: se leen tras cada pull y se vuelven a escribir cuando se editan en Jobs > Programados. Como mucho un repositorio.',
+      schedulesOnTitle: 'Usar para programaciones',
+      schedulesOnQuestion: '¿Usar {name} para las programaciones?',
+      schedulesOnButton: 'Usar para programaciones',
+      schedulesOnWritten:
+        'Programaciones recurrentes de esta aplicación escritas en {name}, un archivo YAML cada una en su carpeta schedules: {count}.',
+      schedulesOnGitWins:
+        'Cuando una programación tiene el mismo nombre en git y en esta aplicación, gana la versión de git y sustituye a la de la aplicación.',
+      schedulesOnClashes:
+        'Mismo nombre en git y en esta aplicación, la versión de git sustituye a la de la aplicación: {names}.',
+      schedulesOnKept:
+        'Estos crons no se pueden escribir como rrule y siguen siendo programaciones de esta aplicación: {names}.',
+      schedulesOnPlanned: 'Los jobs únicos de "Ejecutar más tarde" se quedan en esta aplicación.',
+      schedulesOnAfter:
+        'A partir de entonces, un pull trae los cambios hechos en git, y los cambios hechos aquí van a git con el Push del repositorio.',
+      schedulesOnDone:
+        'Programaciones: {written} escritas en el repositorio (esperando el Push), {matched} sustituidas por git, {kept} conservadas en esta aplicación.',
+      schedulesOffTitle: 'Dejar de usar para programaciones',
+      schedulesOffQuestion: '¿Dejar de usar {name} para las programaciones?',
+      schedulesOffButton: 'Dejar de usar para programaciones',
+      schedulesOffKept:
+        'Sus {count} programaciones se quedan en esta aplicación y siguen con su rrule, ya sin enlace con git.',
+      schedulesOffPull:
+        'Antes se hace un último pull, para que coincidan con sus archivos más recientes. Los archivos en git se quedan como están.',
+      schedulesOffUnpushed: 'Atención: tiene cambios que aún no se han enviado con push. No se envían a git.',
+      schedulesOffDone: '{count} programaciones desvinculadas de git: se quedan en esta aplicación.',
+      schedulesNotPulled: 'No se hizo pull del repositorio ({reason}).',
+      schedulesFailed: 'Las programaciones no pudieron seguir el cambio: {error}',
+      useSchedulesHint: 'Programaciones en YAML, una por archivo en su carpeta schedules',
+      useSchedulesShort: 'Programaciones',
       notPushed: 'Cambios pendientes',
       notPushedHint: 'Cambios aún no enviados al remoto: envíalos desde el diseñador o con Push.',
       useForInventories: '¿Usar para inventarios?',
@@ -1424,6 +1456,21 @@ export default {
       startedJobTitle: 'Job iniciado',
       startedJob: 'Job #{id}',
       startedJobHelp: 'El job que inició la última ejecución: ábrelo para ver cómo terminó.',
+      source: 'Origen',
+      sourceRepository: 'Repositorio: {name}',
+      sourceRepositoryHelp:
+        'Guardada en un archivo del repositorio {name}: al guardar se escribe el archivo, el Push del repositorio lo envía a git.',
+      rrule: 'Regla de recurrencia (rrule)',
+      rruleHelp:
+        'Una rrule iCal: DTSTART con su zona horaria (TZID), luego RRULE, y EXRULE para excluir ejecuciones. Se ejecuta en su propia zona horaria.',
+      rruleInvalid: 'Esta rrule se rechaza: {reason}',
+      rruleNoRuns: 'Esta rrule no tiene más ejecuciones por delante.',
+      enabledHelp: 'Desactivada, no se ejecuta según su programación (Ejecutar ahora la lanza igualmente).',
+      launchOptions: 'Del archivo',
+      launchOptionsHelp:
+        'Los prompts del archivo (limit, job_tags, inventory ...), enviados al job como estas extra vars. Se editan en el archivo.',
+      deleteFileHint:
+        'Su archivo {file} también se elimina del repositorio {name}: haga push del repositorio para quitarlo de git.',
     },
     runners: {
       pending: 'Pendiente de aprobación',

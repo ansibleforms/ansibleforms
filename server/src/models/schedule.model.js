@@ -13,13 +13,20 @@ import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 const LAUNCH_MAX_MINUTES = 10;
 import Form from './form.model.js';
 import Errors from '../lib/errors.js';
+import ScheduleRepo from './scheduleRepo.model.js';
+import { nextRun as rruleNextRun, validateRrule, normalizeRrule } from '../lib/scheduleRrule.js';
+
+// where a schedule comes from and what its file says : the schedules repository's to write
+// (models/scheduleRepo.model.js), never a request body's
+const REPOSITORY_FIELDS = ['repository', 'repo_file', 'launch_options'];
 import Audit from './audit.model.js';
 import { storedJobOfLaunch } from '../lib/storedJobUse.js';
 
 /**
  * Adds when a schedule runs next (next_run, an ISO string or null) : its cron's next occurrence,
- * in the scheduler's timezone, or its one time run while that is still ahead. Computed, never
- * stored - the schedules table shows it.
+ * in the scheduler's timezone, a repository schedule's next rrule occurrence, in the rrule's own
+ * zone, or its one time run while that is still ahead. Computed, never stored - the schedules
+ * table shows it.
  *
  * Args:
  *   row (object): a schedule as read from the table.
@@ -34,6 +41,8 @@ function withNextRun(row) {
   try {
     if (row.one_time_run) {
       if (row.run_at && new Date(row.run_at) > new Date()) next = new Date(row.run_at);
+    } else if (row.rrule) {
+      next = rruleNextRun(row.rrule);
     } else if (row.cron) {
       const cron = new Cron(row.cron, { paused: true, timezone: cronService.timezone });
       next = cron.nextRun();
@@ -80,6 +89,30 @@ function isLaunchRefusal(err) {
   return err?.name === 'AccessDeniedError' || err?.name === 'ForbiddenError';
 }
 
+/**
+ * Checks the rrule a schedule kept in the app is given (one a schedules repository it came from
+ * left it, or one typed for it) : refused when it is not a valid rrule ; with one, it runs on it,
+ * not on a cron. None given, nothing changes.
+ *
+ * Args:
+ *   data (object): the request body (changed in place).
+ *
+ * Raises:
+ *   Errors.BadRequestError: the rrule is refused.
+ */
+function checkAppRrule(data) {
+  if (data.rrule === undefined) return;
+  const rrule = normalizeRrule(data.rrule);
+  if (!rrule) {
+    data.rrule = null;
+    return;
+  }
+  const errors = validateRrule(rrule);
+  if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
+  data.rrule = rrule;
+  data.cron = null;
+  data.one_time_run = 0;
+}
 
 /**
  * Writes a scheduled launch to the audit log. No request launches it, so the audit middleware
@@ -125,6 +158,17 @@ class Schedule extends CrudModel {
 
   static async create(data) {
     logger.info(`Creating schedule ${data.name}`);
+    // where it comes from is never a request body's
+    for (const key of REPOSITORY_FIELDS) delete data[key];
+    // a recurring schedule while a schedules repository is used : saved, and written there as a
+    // new file waiting for its Push, timed by its rrule. A one time run stays in the app
+    const once = data.one_time_run === true || Number(data.one_time_run) === 1;
+    if (!once) {
+      const active = await ScheduleRepo.activeRepository();
+      if (active) return ScheduleRepo.create(active, data);
+    }
+    // kept in the app : a cron, a rrule (checked) or a one time run
+    checkAppRrule(data);
     // `owner` is written by plan() alone. A request body that carries one is somebody
     // choosing which user a schedule runs as - drop it, like the internal fields below.
     delete data.owner
@@ -266,10 +310,25 @@ class Schedule extends CrudModel {
     // nor the stored job it was planned from : set by plan() alone (a schedule never has one)
     delete data.stored_job_id
     logger.info(`Updating schedule ${(data.name) ? data.name : id}`);
+    // where it comes from is never changed by an edit
+    for (const key of REPOSITORY_FIELDS) delete data[key];
+    // (an id that is not there is answered by the update below)
+    const current = await super.findById(this.modelName, id).catch(() => null);
+    // a repository's : its file is written (only what changed), then its row
+    if (current?.repository) {
+      return ScheduleRepo.update(current, data);
+    }
+    // an app's : timed by a cron, a rrule (one a repository left it, checked) or once
+    checkAppRrule(data);
     return super.update(this.modelName, data, id);
   }
   static async delete(id) {
     logger.info(`Deleting schedule ${id}`);
+    const current = await super.findById(this.modelName, id).catch(() => null);
+    // a repository's : its file goes too (the repository's Push sends the removal to git)
+    if (current?.repository) {
+      return ScheduleRepo.delete(current);
+    }
     return super.delete(this.modelName, id);
   }
   static async findAll() {
@@ -364,6 +423,18 @@ class Schedule extends CrudModel {
       if (typeof extravars !== 'object' || extravars === null || Array.isArray(extravars)) {
         throw new Error("Extra vars is not a valid dictionary.");
       }
+      // a repository schedule's prompts (its file's limit, job_tags, inventory ...) as the
+      // reserved extra vars the job reads ; over the extra data, as the prompts are apart
+      // from its extra vars
+      if (schedule.launch_options) {
+        let options;
+        try {
+          options = JSON.parse(schedule.launch_options);
+        } catch (e) {
+          throw new Error(`The launch options of this schedule cannot be read: ${e.message}`, { cause: e });
+        }
+        if (options && typeof options === 'object' && !Array.isArray(options)) extravars = { ...extravars, ...options };
+      }
       // A planned job (Schedule.plan) runs as the user who planned it ; anything else is
       // an admin-level schedule and runs as the Schedule Service. A planned job whose
       // owner cannot be read FAILS - falling back to the admin user would hand it exactly
@@ -390,6 +461,8 @@ class Schedule extends CrudModel {
       delete scheduleInfo.state;
       delete scheduleInfo.last_run;
       delete scheduleInfo.cron;
+      delete scheduleInfo.rrule;
+      delete scheduleInfo.launch_options;
       delete scheduleInfo.extra_vars;
       delete scheduleInfo.raw_form_data;
       delete scheduleInfo.stored_job_id;

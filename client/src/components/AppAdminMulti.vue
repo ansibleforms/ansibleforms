@@ -78,6 +78,17 @@
 /*      gets `created` with its name                              */
 /*  canCreateChoices (prop): a dialogOnly dialog that keeps its   */
 /*      dropdowns' New buttons (a page opens it, not a dialog)    */
+/*  field.emptyLabel: the label of a clearable dropdown's empty   */
+/*      choice, '' when not given                                 */
+/*  settings.confirmSave: async (body, original) => Boolean - a   */
+/*      question before a create (original null) or an update ;   */
+/*      false saves nothing (a repository's Schedules usage)      */
+/*  settings.afterSave: (answer) => void - after a create, an     */
+/*      update or a delete, with the server's answer              */
+/*  settings.confirmDelete: async (item) => Boolean|null - a      */
+/*      question of its own before a delete ; null asks the usual */
+/*  field.type 'rrule': an iCal rrule, its next runs under it      */
+/*      (BsRrule : a schedule kept in a schedules repository)     */
 /*  field.emptyText: what a dropdown with nothing to choose says, */
 /*      disabled, over its New button, or (item) => that ('' :    */
 /*      its New button only)                                      */
@@ -388,7 +399,7 @@ async function loadItems(force = true) {
       // an optional reference (a credential's secret store) must be clearable : a
       // select has no way back to "nothing" without an empty option
       parentLists.value[field.parent] = field.clearable
-        ? [{ [field.valueKey]: '', [field.labelKey]: '' }, ...list]
+        ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }, ...list]
         : list;
     }
     if (field.parent && field.values && Array.isArray(field.values)) {
@@ -569,6 +580,17 @@ async function changePasswordItem(value) {
   removeUnwantedProperties();
 }
 async function deleteItem(value) {
+  // a question of its own (a schedules repository's : its schedules stay in the app) : asked
+  // instead of the usual one, Cancel deletes nothing
+  if (typeof props.settings.confirmDelete === 'function') {
+    const answer = await props.settings.confirmDelete(value);
+    if (answer === false) return;
+    if (answer === true) {
+      itemId.value = value[idKey];
+      await loadItem();
+      return removeItem();
+    }
+  }
   itemId.value = value[idKey];
   await loadItem();
   action.value = 'delete';
@@ -632,9 +654,13 @@ function newItem(defaults = {}) {
 async function createItem() {
   var invalid = isInvalid.value;
   if (!invalid) {
+    const body = savePayload();
+    // a question before it is saved (a new schedules repository : what it will take)
+    if (typeof props.settings.confirmSave === 'function' && !(await props.settings.confirmSave(body, null))) return;
     try {
-      await axios.post(`/api/v${props.apiVersion}/${objectType}/`, savePayload());
+      const res = await axios.post(`/api/v${props.apiVersion}/${objectType}/`, body);
       toast.success(t('settings.common.nameCreated', { name: objectTitle('') }));
+      props.settings.afterSave?.(res.data);
       // the dialog that asked for it (a dropdown's New button) selects what was created
       emit('created', item.value.name ?? item.value[idKey]);
       if (props.dialogOnly) unselectItem();
@@ -654,12 +680,20 @@ async function updateItem(passwordOnly = false) {
     invalid = isInvalid.value;
   }
   if (!invalid) {
+    const body = passwordOnly ? item.value : savePayload();
+    // a question before it is saved, the record as it was beside it
+    const original = itemList.value.find((r) => String(r[idKey]) === String(itemId.value)) || null;
+    if (
+      !passwordOnly &&
+      typeof props.settings.confirmSave === 'function' &&
+      !(await props.settings.confirmSave(body, original))
+    ) {
+      return;
+    }
     try {
-      await axios.put(
-        `/api/v${props.apiVersion}/${objectType}/${itemId.value}`,
-        passwordOnly ? item.value : savePayload(),
-      );
+      const res = await axios.put(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`, body);
       toast.success(t('settings.common.nameUpdated', { name: objectTitle('') }));
+      props.settings.afterSave?.(res.data);
       loadItems();
     } catch (err) {
       toast.error(Helpers.parseAxiosResponseError(err, 'Failed to update item'));
@@ -670,12 +704,14 @@ async function updateItem(passwordOnly = false) {
 }
 async function removeItem() {
   try {
+    let res;
     if (isFlat) {
-      await axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`);
+      res = await axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`);
     } else {
-      await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
+      res = await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
     }
     toast.success(t('settings.common.nameDeleted', { name: objectTitle('') }));
+    props.settings.afterSave?.(res?.data);
     unselectItem();
     loadItems();
   } catch (err) {
@@ -929,7 +965,9 @@ function emptyTextOf(field) {
  */
 async function onCreated(field, name) {
   const list = await loadList(field.values, false, field.valuesApiVersion);
-  parentLists.value[field.parent] = field.clearable ? [{ [field.valueKey]: '', [field.labelKey]: '' }, ...list] : list;
+  parentLists.value[field.parent] = field.clearable
+    ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }, ...list]
+    : list;
   if (name !== undefined && name !== null) item.value[field.key] = name;
 }
 
@@ -1881,6 +1919,26 @@ defineExpose({
           </div>
         </div>
 
+        <!-- RRULE FIELD : the iCal rrule of a repository schedule, its next runs under it -->
+        <div v-if="showField(field) && field.type === 'rrule'" class="row mb-3">
+          <label class="col-sm-2 col-form-label fw-bold">
+            {{ field.label }}
+            <span v-if="field.required" class="text-danger">*</span>
+          </label>
+          <div class="col-sm-10">
+            <BsRrule
+              v-model="$v.item[field.key].$model"
+              :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
+            />
+            <small v-if="field.help" class="form-text text-muted d-block mt-1">{{ textOf(field.help) }}</small>
+            <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
+              <div v-for="error in $v.item[field.key].$errors" :key="error.$uid">
+                {{ error.$message }}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- A SHORT CHECKBOX (shortLabel) : at the left edge, its label and a few grey words
              (shortHint) on one line ; one only (oneOnly) and already ticked on another record :
              greyed out, and who has it in the tooltip -->
@@ -2039,7 +2097,13 @@ defineExpose({
 
         <!-- ALL OTHER FIELD TYPES -->
         <BsInput
-          v-else-if="showField(field) && field.type !== 'datetime' && field.type !== 'cron' && !field.listWhen?.(item)"
+          v-else-if="
+            showField(field) &&
+            field.type !== 'datetime' &&
+            field.type !== 'cron' &&
+            field.type !== 'rrule' &&
+            !field.listWhen?.(item)
+          "
           :isHorizontal="true"
           :type="field.type"
           :placeholder="action == 'edit' && field.onEdit ? '********' : textOf(field.placeholder)"

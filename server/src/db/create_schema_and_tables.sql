@@ -473,6 +473,8 @@ CREATE TABLE `repositories` (
   `use_for_workflows` tinyint(4) DEFAULT 0,
   -- the inventories the playbook forms name (inventory: <name>)
   `use_for_inventories` tinyint(4) DEFAULT 0,
+  -- the schedules in its schedules folder, one per file (models/scheduleRepo.model.js)
+  `use_for_schedules` tinyint(4) DEFAULT 0,
   `credential` varchar(250) DEFAULT NULL,
   `cron` varchar(50) DEFAULT NULL,
   `status` varchar(50) DEFAULT NULL,
@@ -520,6 +522,16 @@ CREATE TABLE `schedule` (
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- what it is for, in a few words
+  `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- a schedule of a schedules repository is timed by its iCal rrule, not a cron
+  `rrule` TEXT DEFAULT NULL,
+  -- the schedules repository and the file (schedules/<file>.yaml) it comes from ; NULL for one
+  -- kept in the app only
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
+  -- its file's prompts as the reserved extra vars a job reads (__limit__, __tags__ ...), JSON
+  `launch_options` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- the stored job a planned job's values came from (lib/storedJobUse.js) : its last use is
   -- written when the run fires ; NULL for a schedule, which keeps its own copy of the values
   `stored_job_id` int(11) DEFAULT NULL,

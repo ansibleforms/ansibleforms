@@ -1321,6 +1321,36 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows die de designer bouwt, bewerkt en teruggepusht door de designer',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Gebruiken voor planners?',
+      helpUseForSchedules:
+        'De map schedules bevat de planners, één YAML-bestand per planner: na elke pull ingelezen, en teruggeschreven wanneer ze onder Jobs > Gepland worden bewerkt. Hoogstens één repository.',
+      schedulesOnTitle: 'Gebruiken voor planners',
+      schedulesOnQuestion: '{name} gebruiken voor de planners?',
+      schedulesOnButton: 'Gebruiken voor planners',
+      schedulesOnWritten:
+        'Terugkerende planners van deze app die naar {name} geschreven worden, één YAML-bestand elk in de map schedules: {count}.',
+      schedulesOnGitWins:
+        'Heeft een planner dezelfde naam in git en in deze app, dan wint de versie in git en vervangt die van de app.',
+      schedulesOnClashes: 'Dezelfde naam in git en in deze app, de versie in git vervangt die van de app: {names}.',
+      schedulesOnKept: 'Deze crons kunnen niet als rrule geschreven worden en blijven planners van deze app: {names}.',
+      schedulesOnPlanned: 'Eenmalige jobs van "Later uitvoeren" blijven in deze app.',
+      schedulesOnAfter:
+        'Vanaf dan brengt een pull de wijzigingen uit git binnen, en gaan de wijzigingen die hier gemaakt worden naar git met de Push van de repository.',
+      schedulesOnDone:
+        'Planners: {written} naar de repository geschreven (wachten op de Push), {matched} vervangen door git, {kept} in deze app gehouden.',
+      schedulesOffTitle: 'Niet meer gebruiken voor planners',
+      schedulesOffQuestion: '{name} niet meer gebruiken voor de planners?',
+      schedulesOffButton: 'Niet meer gebruiken voor planners',
+      schedulesOffKept:
+        'Zijn {count} planners blijven in deze app en lopen verder op hun rrule, niet meer gekoppeld aan git.',
+      schedulesOffPull:
+        'Eerst wordt er nog één keer gepulld, zodat ze overeenkomen met de nieuwste bestanden. De bestanden in git blijven zoals ze zijn.',
+      schedulesOffUnpushed: 'Let op: er zijn wijzigingen die nog niet gepusht zijn. Ze worden niet naar git gestuurd.',
+      schedulesOffDone: '{count} planners losgekoppeld van git: ze blijven in deze app.',
+      schedulesNotPulled: 'De repository is niet gepulld ({reason}).',
+      schedulesFailed: 'De planners konden de wijziging niet volgen: {error}',
+      useSchedulesHint: 'Planners in YAML, één per bestand in de map schedules',
+      useSchedulesShort: 'Planners',
       notPushed: 'Openstaande wijzigingen',
       notPushedHint: 'Wijzigingen nog niet naar de remote gepusht: push ze vanuit de designer, of met Push.',
       useForInventories: 'Gebruiken voor inventarissen?',
@@ -1422,6 +1452,21 @@ export default {
       startedJobTitle: 'Gestarte job',
       startedJob: 'Job #{id}',
       startedJobHelp: 'De job die de laatste uitvoering startte: open hem om te zien hoe hij eindigde.',
+      source: 'Bron',
+      sourceRepository: 'Repository: {name}',
+      sourceRepositoryHelp:
+        'Bewaard in een bestand van repository {name}: opslaan schrijft het bestand, de Push van de repository stuurt het naar git.',
+      rrule: 'Herhalingsregel (rrule)',
+      rruleHelp:
+        'Een iCal-rrule: DTSTART met zijn tijdzone (TZID), dan RRULE, en EXRULE om runs over te slaan. Hij loopt in zijn eigen tijdzone.',
+      rruleInvalid: 'Deze rrule wordt geweigerd: {reason}',
+      rruleNoRuns: 'Deze rrule heeft geen komende run meer.',
+      enabledHelp: 'Uitgeschakeld loopt hij niet volgens zijn planning (Nu uitvoeren start hem wel).',
+      launchOptions: 'Uit het bestand',
+      launchOptionsHelp:
+        'De prompts van het bestand (limit, job_tags, inventory ...), als deze extra vars naar de job gestuurd. Ze worden in het bestand bewerkt.',
+      deleteFileHint:
+        'Zijn bestand {file} wordt ook uit repository {name} verwijderd: push de repository om het uit git te halen.',
     },
     runners: {
       pending: 'Wacht op goedkeuring',

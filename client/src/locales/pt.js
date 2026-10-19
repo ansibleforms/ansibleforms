@@ -1323,6 +1323,37 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows construídos, editados e enviados de volta pelo designer',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Usar para agendamentos?',
+      helpUseForSchedules:
+        'A sua pasta schedules contém os agendamentos, um ficheiro YAML cada: lidos após cada pull e reescritos quando são editados em Tarefas > Agendados. No máximo um repositório.',
+      schedulesOnTitle: 'Usar para agendamentos',
+      schedulesOnQuestion: 'Usar {name} para os agendamentos?',
+      schedulesOnButton: 'Usar para agendamentos',
+      schedulesOnWritten:
+        'Agendamentos recorrentes desta aplicação escritos em {name}, um ficheiro YAML cada na sua pasta schedules: {count}.',
+      schedulesOnGitWins:
+        'Quando um agendamento tem o mesmo nome no git e nesta aplicação, a versão do git prevalece e substitui a da aplicação.',
+      schedulesOnClashes: 'Mesmo nome no git e nesta aplicação, a versão do git substitui a da aplicação: {names}.',
+      schedulesOnKept:
+        'Estes crons não podem ser escritos como rrule e continuam a ser agendamentos desta aplicação: {names}.',
+      schedulesOnPlanned: 'As tarefas únicas de "Executar mais tarde" ficam nesta aplicação.',
+      schedulesOnAfter:
+        'A partir daí, um pull traz as alterações feitas no git, e as alterações feitas aqui vão para o git com o Push do repositório.',
+      schedulesOnDone:
+        'Agendamentos: {written} escritos no repositório (à espera do Push), {matched} substituídos pelo git, {kept} mantidos nesta aplicação.',
+      schedulesOffTitle: 'Deixar de usar para agendamentos',
+      schedulesOffQuestion: 'Deixar de usar {name} para os agendamentos?',
+      schedulesOffButton: 'Deixar de usar para agendamentos',
+      schedulesOffKept:
+        'Os seus {count} agendamentos ficam nesta aplicação e continuam a correr na sua rrule, já sem ligação ao git.',
+      schedulesOffPull:
+        'Antes é feito um último pull, para que correspondam aos ficheiros mais recentes. Os ficheiros no git ficam como estão.',
+      schedulesOffUnpushed: 'Atenção: tem alterações ainda não enviadas com push. Não são enviadas para o git.',
+      schedulesOffDone: '{count} agendamentos desligados do git: ficam nesta aplicação.',
+      schedulesNotPulled: 'Não foi feito pull do repositório ({reason}).',
+      schedulesFailed: 'Os agendamentos não puderam acompanhar a alteração: {error}',
+      useSchedulesHint: 'Agendamentos em YAML, um por ficheiro na sua pasta schedules',
+      useSchedulesShort: 'Agendamentos',
       notPushed: 'Alterações pendentes',
       notPushedHint: 'Alterações ainda não enviadas para o remoto: envie-as a partir do designer, ou com Push.',
       useForInventories: 'Usar para inventários?',
@@ -1423,6 +1454,21 @@ export default {
       startedJobTitle: 'Tarefa iniciada',
       startedJob: 'Tarefa #{id}',
       startedJobHelp: 'A tarefa que a última execução iniciou: abra-a para ver como terminou.',
+      source: 'Origem',
+      sourceRepository: 'Repositório: {name}',
+      sourceRepositoryHelp:
+        'Guardado num ficheiro do repositório {name}: guardar escreve o ficheiro, o Push do repositório envia-o para o git.',
+      rrule: 'Regra de recorrência (rrule)',
+      rruleHelp:
+        'Uma rrule iCal: DTSTART com o seu fuso horário (TZID), depois RRULE, e EXRULE para excluir execuções. Corre no seu próprio fuso horário.',
+      rruleInvalid: 'Esta rrule é recusada: {reason}',
+      rruleNoRuns: 'Esta rrule não tem mais execuções pela frente.',
+      enabledHelp: 'Desativado, não corre segundo o seu agendamento (Executar agora lança-o na mesma).',
+      launchOptions: 'Do ficheiro',
+      launchOptionsHelp:
+        'Os prompts do ficheiro (limit, job_tags, inventory ...), enviados ao job como estas extra vars. Editam-se no ficheiro.',
+      deleteFileHint:
+        'O seu ficheiro {file} também é eliminado do repositório {name}: faça push do repositório para o remover do git.',
     },
     disclaimer: {
       description: 'Condições que todos aceitam uma vez, registando quem aceitou que versão e quando.',

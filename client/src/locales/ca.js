@@ -1323,6 +1323,38 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows del dissenyador, editats i enviats de tornada pel dissenyador',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Fer servir per a programacions?',
+      helpUseForSchedules:
+        "La seva carpeta schedules conté les programacions, un fitxer YAML cadascuna: es llegeixen després de cada pull i es tornen a escriure quan s'editen a Tasques > Programats. Com a molt un repositori.",
+      schedulesOnTitle: 'Fer servir per a programacions',
+      schedulesOnQuestion: 'Fer servir {name} per a les programacions?',
+      schedulesOnButton: 'Fer servir per a programacions',
+      schedulesOnWritten:
+        "Programacions recurrents d'aquesta aplicació escrites a {name}, un fitxer YAML cadascuna a la seva carpeta schedules: {count}.",
+      schedulesOnGitWins:
+        "Quan una programació té el mateix nom a git i en aquesta aplicació, guanya la versió de git i substitueix la de l'aplicació.",
+      schedulesOnClashes:
+        "Mateix nom a git i en aquesta aplicació, la versió de git substitueix la de l'aplicació: {names}.",
+      schedulesOnKept:
+        "Aquests crons no es poden escriure com a rrule i continuen sent programacions d'aquesta aplicació: {names}.",
+      schedulesOnPlanned: 'Les tasques úniques de "Executa més tard" es queden en aquesta aplicació.',
+      schedulesOnAfter:
+        "A partir d'aleshores, un pull porta els canvis fets a git, i els canvis fets aquí van a git amb el Push del repositori.",
+      schedulesOnDone:
+        'Programacions: {written} escrites al repositori (esperant el Push), {matched} substituïdes per git, {kept} conservades en aquesta aplicació.',
+      schedulesOffTitle: 'Deixar de fer servir per a programacions',
+      schedulesOffQuestion: 'Deixar de fer servir {name} per a les programacions?',
+      schedulesOffButton: 'Deixar de fer servir per a programacions',
+      schedulesOffKept:
+        'Les seves {count} programacions es queden en aquesta aplicació i continuen amb la seva rrule, ja sense enllaç amb git.',
+      schedulesOffPull:
+        "Abans se'n fa un últim pull, perquè coincideixin amb els seus fitxers més recents. Els fitxers de git es queden com estan.",
+      schedulesOffUnpushed: "Atenció: té canvis que encara no s'han enviat amb push. No s'envien a git.",
+      schedulesOffDone: '{count} programacions desenllaçades de git: es queden en aquesta aplicació.',
+      schedulesNotPulled: "No s'ha fet pull del repositori ({reason}).",
+      schedulesFailed: 'Les programacions no han pogut seguir el canvi: {error}',
+      useSchedulesHint: 'Programacions en YAML, una per fitxer a la seva carpeta schedules',
+      useSchedulesShort: 'Programacions',
       notPushed: 'Canvis pendents',
       notPushedHint: "Canvis encara no enviats al remot: envia'ls des del dissenyador o amb Push.",
       useForInventories: 'Fer servir per a inventaris?',
@@ -1424,6 +1456,21 @@ export default {
       startedJobTitle: 'Tasca iniciada',
       startedJob: 'Tasca #{id}',
       startedJobHelp: "La tasca que va iniciar l'última execució: obre-la per veure com va acabar.",
+      source: 'Origen',
+      sourceRepository: 'Repositori: {name}',
+      sourceRepositoryHelp:
+        "Desada en un fitxer del repositori {name}: en desar s'escriu el fitxer, el Push del repositori l'envia a git.",
+      rrule: 'Regla de recurrència (rrule)',
+      rruleHelp:
+        "Una rrule iCal: DTSTART amb el seu fus horari (TZID), després RRULE, i EXRULE per excloure execucions. S'executa en el seu propi fus horari.",
+      rruleInvalid: 'Aquesta rrule es rebutja: {reason}',
+      rruleNoRuns: 'Aquesta rrule no té cap execució per davant.',
+      enabledHelp: "Desactivada, no s'executa segons la seva programació (Executa ara la llança igualment).",
+      launchOptions: 'Del fitxer',
+      launchOptionsHelp:
+        "Els prompts del fitxer (limit, job_tags, inventory ...), enviats al job com aquestes extra vars. S'editen al fitxer.",
+      deleteFileHint:
+        "El seu fitxer {file} també s'elimina del repositori {name}: feu push del repositori per treure'l de git.",
     },
     disclaimer: {
       description: 'Condicions que tothom accepta un cop, registrant qui ha acceptat quina versió i quan.',

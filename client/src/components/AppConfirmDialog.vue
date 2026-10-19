@@ -14,6 +14,7 @@ import { confirmPrompt, answerConfirm, confirmLines } from '@/lib/confirmPrompt'
 const { t } = useI18n();
 // the question and what follows it, each on a line of its own
 const lines = computed(() => confirmLines(confirmPrompt.message));
+const details = computed(() => confirmPrompt.details || []);
 </script>
 
 <template>
@@ -26,7 +27,18 @@ const lines = computed(() => confirmLines(confirmPrompt.message));
   >
     <template #title>{{ confirmPrompt.title || t('common.confirm') }}</template>
     <template #default>
-      <p v-for="(line, i) in lines" :key="i" :class="{ 'mb-0': i === lines.length - 1 }">{{ line }}</p>
+      <p v-for="(line, i) in lines" :key="i" :class="{ 'mb-0': i === lines.length - 1 && !details.length }">
+        {{ line }}
+      </p>
+      <!-- what the action will do, a paragraph each -->
+      <p
+        v-for="(line, i) in details"
+        :key="`d${i}`"
+        class="af-confirm-detail"
+        :class="{ 'mb-0': i === details.length - 1 }"
+      >
+        {{ line }}
+      </p>
     </template>
     <template #footer>
       <BsButton icon="times" @click="answerConfirm(false)">{{ t('common.cancel') }}</BsButton>
@@ -36,3 +48,10 @@ const lines = computed(() => confirmLines(confirmPrompt.message));
     </template>
   </BsModal>
 </template>
+<style scoped>
+/* the details under the question : a size smaller, in the secondary text colour */
+.af-confirm-detail {
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+}
+</style>

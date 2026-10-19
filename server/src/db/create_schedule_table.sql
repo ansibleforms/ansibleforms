@@ -21,6 +21,16 @@ CREATE TABLE `schedule` (
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- what it is for, in a few words
+  `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- a schedule of a schedules repository is timed by its iCal rrule, not a cron
+  `rrule` TEXT DEFAULT NULL,
+  -- the schedules repository and the file (schedules/<file>.yaml) it comes from ; NULL for one
+  -- kept in the app only
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
+  -- its file's prompts as the reserved extra vars a job reads (__limit__, __tags__ ...), JSON
+  `launch_options` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- the stored job a planned job's values came from ; NULL for a schedule
   `stored_job_id` int(11) DEFAULT NULL,
   UNIQUE KEY `uk_schedule_natural_key` (`name`)

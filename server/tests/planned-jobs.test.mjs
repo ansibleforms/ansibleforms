@@ -225,6 +225,36 @@ describe("Schedule.plan", () => {
     assert.equal(created.raw_form_data, undefined);
   });
 
+  test("while a schedules repository is used, a new recurring schedule goes to it ; a one time run stays in the app", async () => {
+    const { default: ScheduleRepo } = await import("../src/models/scheduleRepo.model.js");
+    const original = { active: ScheduleRepo.activeRepository, create: ScheduleRepo.create };
+    const sent = [];
+    ScheduleRepo.activeRepository = async () => "ops";
+    ScheduleRepo.create = async (repo, data) => { sent.push([repo, data.name]); return 99; };
+    try {
+      assert.equal(await Schedule.create({ name: "nightly", form: "Demo Form", cron: "0 2 * * *", one_time_run: 0 }), 99);
+      await Schedule.create({ name: "once", form: "Demo Form", one_time_run: 1, run_at: "2030-01-01 00:00:00" });
+      assert.deepEqual(sent, [["ops", "nightly"]]);
+      assert.equal(created.name, "once");
+    } finally {
+      Object.assign(ScheduleRepo, { activeRepository: original.active, create: original.create });
+    }
+  });
+
+  test("a schedule kept in the app may run on a rrule (one a repository left it), checked", async () => {
+    let updated = null;
+    const original = CrudModel.update;
+    CrudModel.update = async (_m, data) => { updated = { ...data }; return {}; };
+    try {
+      await Schedule.update({ rrule: "DTSTART;TZID=UTC:20300101T000000  RRULE:FREQ=DAILY;INTERVAL=1", cron: "0 1 * * *" }, 7);
+      assert.equal(updated.rrule, "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1");
+      assert.equal(updated.cron, null);
+      await assert.rejects(Schedule.update({ rrule: "DTSTART:20300101T000000Z RRULE:FREQ=SECONDLY;INTERVAL=1" }, 7), { name: "BadRequestError" });
+    } finally {
+      CrudModel.update = original;
+    }
+  });
+
   test("an update changes neither the owner nor the values a run was planned with", async () => {
     let updated = null;
     const original = CrudModel.update;
@@ -272,6 +302,22 @@ describe("Schedule.launch", () => {
     assert.equal(launched.user.username, "Schedule Service");
     assert.deepEqual(launched.user.roles, ["admin"]);
     assert.equal(launched.fromClient, false);
+  });
+
+  test("a repository schedule runs as the Schedule Service, its file's prompts as the job's reserved extra vars", async () => {
+    Object.assign(row, {
+      one_time_run: 0,
+      rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1",
+      repository: "ops",
+      repo_file: "schedules/n.yaml",
+      launch_options: JSON.stringify({ __limit__: "web", __tags__: "rotate" }),
+    });
+    await Schedule.launch(1);
+    assert.equal(launched.user.username, "Schedule Service");
+    assert.deepEqual(launched.extravars, { a: 1, __limit__: "web", __tags__: "rotate" });
+    assert.equal(launched.serverExtravars.schedule.repository, "ops");
+    assert.equal(launched.serverExtravars.schedule.launch_options, undefined);
+    assert.equal(launched.serverExtravars.schedule.rrule, undefined);
   });
 
   test("an unreadable owner fails the run instead of falling back to admin", async () => {

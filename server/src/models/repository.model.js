@@ -113,6 +113,17 @@ function removeEmptyFolders(dir, keepSelf = false) {
 }
 
 /**
+ * The schedules of the schedules repositories (models/scheduleRepo.model.js), loaded when first
+ * needed : it imports this model, so a static import would be a cycle.
+ *
+ * Returns:
+ *   Promise<object>: the ScheduleRepo model.
+ */
+async function scheduleRepo() {
+  return (await import("./scheduleRepo.model.js")).default
+}
+
+/**
  * The forms model, loaded when first needed : it imports this model, so a static import would be
  * a cycle.
  *
@@ -187,6 +198,8 @@ class Repository extends CrudModel {
     if (!opts.fromSeed && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
+    // one schedules repository at most
+    if (Repository.flagOn(data.use_for_schedules)) await Repository.assertOneSchedulesRepository(data.name);
     const insertId = await super.create(this.modelName, data, opts);
     // Don't await - clone happens in background (it can take minutes and the API has to
     // answer the create now). But the rejection must not escape: clone() throws before it
@@ -200,6 +213,14 @@ class Repository extends CrudModel {
         await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
       } catch (e2) {
         logger.error(`...and the failure could not be recorded on the repository either: ${helpers.getError(e2)}`)
+      }
+    }).then(async () => {
+      // made the schedules repository : once cloned, it takes the app's schedules (activate)
+      if (!Repository.flagOn(data.use_for_schedules)) return
+      try {
+        await (await scheduleRepo()).activate(data.name, { pull: false })
+      } catch (e) {
+        logger.error(`Repository '${data.name}' could not take the schedules: ${helpers.getError(e)}`)
       }
     });
     return insertId;
@@ -217,6 +238,10 @@ class Repository extends CrudModel {
     // a new name is a new folder name (Repo.rename) : checked as on create
     if (data.name !== undefined && data.name !== name && !Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
+    }
+    // one schedules repository at most : turned on here while another one has it, refused
+    if (Repository.flagOn(data.use_for_schedules) && !Repository.flagOn(repo.use_for_schedules)) {
+      await Repository.assertOneSchedulesRepository(name);
     }
 
     // Remove empty fields - but a field the dialog can clear, sent empty, is cleared : its
@@ -257,6 +282,9 @@ class Repository extends CrudModel {
         const res = await super.update(this.modelName, data, repo.id, opts);
         // release the claim under the NEW name - the row carries it now
         await Repository.writeState("update AnsibleForms.`repositories` set status = ? where name = ?", [repo.status ?? null, newName])
+        // its schedules say they come from it under its new name
+        await (await scheduleRepo()).renameRepository(name, newName).catch((e) => logger.error(`The schedules of repository '${name}' still name it so: ${helpers.getError(e)}`))
+        await Repository.afterUsageChange(repo, newName, opts)
         return res;
       } catch (e) {
         // Put the tree back. The row keeps the old name from here on, so a tree left at
@@ -275,7 +303,70 @@ class Repository extends CrudModel {
       }
     }
 
-    return super.update(this.modelName, data, repo.id, opts);
+    const res = await super.update(this.modelName, data, repo.id, opts);
+    await Repository.afterUsageChange(repo, name, opts);
+    return res;
+  }
+
+  /**
+   * Whether a usage flag is on, whatever it is sent as (true, 1, '1', 'true').
+   *
+   * Args:
+   *   v (any): the flag.
+   *
+   * Returns:
+   *   boolean: true when it is on.
+   */
+  static flagOn(v) {
+    return v === true || v === 1 || v === "1" || v === "true"
+  }
+
+  /**
+   * Refuses a second schedules repository : the schedules are written back to one repository.
+   *
+   * Args:
+   *   name (string): the repository being made one.
+   *
+   * Raises:
+   *   Errors.BadRequestError: another repository is used for schedules, named.
+   */
+  static async assertOneSchedulesRepository(name) {
+    const rows = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_schedules AND name <> ?", [name])
+    if (rows?.length) {
+      throw new Errors.BadRequestError(`Repository '${rows[0].name}' is already used for schedules: only one repository can hold the schedules.`)
+    }
+  }
+
+  /**
+   * Follows a repository made, or no longer, the schedules repository (use_for_schedules) : made
+   * one, it takes the app's schedules (ScheduleRepo.activate : pulled, its files read in, the
+   * app's recurring schedules written to it) ; no longer one, its schedules are unlinked and stay
+   * in the app (ScheduleRepo.deactivate). What it did is put in opts.report.schedules, for the
+   * answer. A failure is logged, never thrown : the repository itself was saved.
+   *
+   * Args:
+   *   before (object): the repository as it was.
+   *   name (string): its name now.
+   *   opts (object): { report (an object the result is written to) }.
+   *
+   * Returns:
+   *   Promise<object|null>: what it did, null when the flag did not change.
+   */
+  static async afterUsageChange(before, name, opts = {}) {
+    try {
+      const rows = await mysql.do("SELECT use_for_schedules FROM AnsibleForms.`repositories` WHERE name = ?", [name])
+      const now = !!Number(rows?.[0]?.use_for_schedules)
+      const was = !!Number(before?.use_for_schedules)
+      if (now === was) return null
+      const schedules = await scheduleRepo()
+      const report = now ? { activated: await schedules.activate(name) } : { deactivated: await schedules.deactivate(name) }
+      if (opts.report) opts.report.schedules = report
+      return report
+    } catch (e) {
+      logger.error(`The schedules of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
+      if (opts.report) opts.report.schedules = { error: helpers.getError(e) }
+      return null
+    }
   }
 
   // Override delete to cleanup disk
@@ -288,6 +379,13 @@ class Repository extends CrudModel {
     // managed guard has to be asked for explicitly - otherwise a seeded repository
     // would be refused an edit but still be deletable, which is worse than either.
     if (!opts.fromSeed) await CrudModel.assertNotManaged(this.modelName, repo.id);
+
+    // the schedules repository : pulled once more, its files read in, and its schedules unlinked
+    // - they stay in the app, on their rrule (the files in git are not touched)
+    if (repo.use_for_schedules) {
+      const report = await (await scheduleRepo()).deactivate(name)
+      if (opts.report) opts.report.schedules = { deactivated: report }
+    }
 
     // Claim the repo BEFORE deleting the tree, exactly as reset() does and for the same
     // reason: this rm -rf's the working tree, which must not race a pull or a sync
@@ -315,7 +413,8 @@ class Repository extends CrudModel {
     // findByName above populated `name:<name>` in the shared cache, and without the
     // eviction GET /api/v2/repository/<name> kept answering 200 with a deleted
     // repository.
-    return await Repository.writeState("DELETE FROM AnsibleForms.`repositories` WHERE name = ?", [name], { name, id: repo?.id });
+    const deleted = await Repository.writeState("DELETE FROM AnsibleForms.`repositories` WHERE name = ?", [name], { name, id: repo?.id });
+    return deleted;
   }
 
   static async findById(id) {
@@ -689,6 +788,10 @@ class Repository extends CrudModel {
         // a form name it shares with another forms repository : which copy is used, which skipped
         output += await (await formModel()).duplicateLines(name)
       }
+      // its schedules folder read into the schedule table, still under the claim
+      if (repo.use_for_schedules) {
+        output += await (await scheduleRepo()).afterGit(name)
+      }
       status = "success"
     } catch (e) {
       output = e.message
@@ -755,6 +858,11 @@ class Repository extends CrudModel {
       // its credential : what the pull signs in with, and the password masked in the output
       if (pullRepo) pullRepo = await Repository.withCredential(pullRepo).catch(() => pullRepo)
       output = await Repo.pull(name, Repository.gitAuth(pullRepo), pullRepo?.uri)
+      // its schedules folder read into the schedule table, still under the claim : what changed
+      // is said under git's output
+      if (pullRepo?.use_for_schedules) {
+        output += await (await scheduleRepo()).afterGit(name)
+      }
       // a form name it shares with another forms repository : which copy is used, which skipped
       if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
       status = "success"
@@ -1023,8 +1131,8 @@ class Repository extends CrudModel {
       syncRepo = await Repository.withCredential(await Repository.findByName(name))
       // a forms repo (read+write forms) or the config-origin repo (so config
       // edits can be committed even when config lives in a separate repo)
-      if (!syncRepo.use_for_forms && !syncRepo.use_for_config && !syncRepo.use_for_playbooks && !syncRepo.use_for_workflows && !syncRepo.use_for_inventories) {
-        throw new Error(`Repository '${name}' is not a forms, config, playbooks, workflows or inventories repository`)
+      if (!syncRepo.use_for_forms && !syncRepo.use_for_config && !syncRepo.use_for_playbooks && !syncRepo.use_for_workflows && !syncRepo.use_for_inventories && !syncRepo.use_for_schedules) {
+        throw new Error(`Repository '${name}' is not a forms, config, playbooks, workflows, inventories or schedules repository`)
       }
       const repoDir = Repo.folderOf(name)
       if (!fs.existsSync(repoDir)) {
@@ -1034,7 +1142,9 @@ class Repository extends CrudModel {
       // bind the new staged forms to this repository before committing (only a
       // forms repo receives staged forms ; a config-only repo just pushes config)
       if (syncRepo.use_for_forms) Repository.flushStagingInto(name)
-      output = await Repo.sync(name, message || `Forms sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
+      // a repository that only holds schedules says so in its commit
+      const what = !syncRepo.use_for_forms && syncRepo.use_for_schedules ? "Schedules" : "Forms"
+      output = await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
       status = "success"
     } catch (e) {
       output = e.message

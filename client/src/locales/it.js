@@ -1321,6 +1321,38 @@ export default {
       usePlaybooksShort: 'Playbook',
       useWorkflowsHint: 'Workflow che il designer costruisce, modificati e reinviati dal designer',
       useWorkflowsShort: 'Workflow',
+      useForSchedules: 'Usare per le pianificazioni?',
+      helpUseForSchedules:
+        'La sua cartella schedules contiene le pianificazioni, un file YAML ciascuna: lette dopo ogni pull e riscritte quando vengono modificate in Job > Pianificati. Al massimo un repository.',
+      schedulesOnTitle: 'Usare per le pianificazioni',
+      schedulesOnQuestion: 'Usare {name} per le pianificazioni?',
+      schedulesOnButton: 'Usare per le pianificazioni',
+      schedulesOnWritten:
+        'Pianificazioni ricorrenti di questa app scritte in {name}, un file YAML ciascuna nella sua cartella schedules: {count}.',
+      schedulesOnGitWins:
+        "Quando una pianificazione ha lo stesso nome in git e in questa app, vince la versione in git e sostituisce quella dell'app.",
+      schedulesOnClashes:
+        "Stesso nome in git e in questa app, la versione in git sostituisce quella dell'app: {names}.",
+      schedulesOnKept:
+        'Questi cron non si possono scrivere come rrule e restano pianificazioni di questa app: {names}.',
+      schedulesOnPlanned: 'I job una tantum "Esegui più tardi" restano in questa app.',
+      schedulesOnAfter:
+        'Da quel momento un pull porta le modifiche fatte in git, e le modifiche fatte qui vanno in git con il Push del repository.',
+      schedulesOnDone:
+        'Pianificazioni: {written} scritte nel repository (in attesa del Push), {matched} sostituite da git, {kept} mantenute in questa app.',
+      schedulesOffTitle: 'Non usare più per le pianificazioni',
+      schedulesOffQuestion: 'Non usare più {name} per le pianificazioni?',
+      schedulesOffButton: 'Non usare più per le pianificazioni',
+      schedulesOffKept:
+        'Le sue {count} pianificazioni restano in questa app e continuano con la loro rrule, non più collegate a git.',
+      schedulesOffPull:
+        'Prima viene eseguito un ultimo pull, perché corrispondano ai suoi file più recenti. I file in git restano come sono.',
+      schedulesOffUnpushed: 'Attenzione: ha modifiche non ancora inviate con push. Non vengono inviate a git.',
+      schedulesOffDone: '{count} pianificazioni scollegate da git: restano in questa app.',
+      schedulesNotPulled: 'Il pull del repository non è stato eseguito ({reason}).',
+      schedulesFailed: 'Le pianificazioni non hanno potuto seguire la modifica: {error}',
+      useSchedulesHint: 'Pianificazioni in YAML, una per file nella sua cartella schedules',
+      useSchedulesShort: 'Pianificazioni',
       notPushed: 'Modifiche in sospeso',
       notPushedHint: 'Modifiche non ancora inviate al remoto: inviale dal designer o con Push.',
       useForInventories: 'Usare per gli inventari?',
@@ -1420,6 +1452,21 @@ export default {
       startedJobTitle: 'Job avviato',
       startedJob: 'Job #{id}',
       startedJobHelp: "Il job avviato dall'ultima esecuzione: aprilo per vedere come è finito.",
+      source: 'Origine',
+      sourceRepository: 'Repository: {name}',
+      sourceRepositoryHelp:
+        'Conservata in un file del repository {name}: un salvataggio scrive il file, il Push del repository lo invia a git.',
+      rrule: 'Regola di ricorrenza (rrule)',
+      rruleHelp:
+        'Una rrule iCal: DTSTART con il suo fuso orario (TZID), poi RRULE, ed EXRULE per escludere delle esecuzioni. Viene eseguita nel suo fuso orario.',
+      rruleInvalid: 'Questa rrule è rifiutata: {reason}',
+      rruleNoRuns: 'Questa rrule non ha più esecuzioni in programma.',
+      enabledHelp: 'Disattivata, non viene eseguita secondo la pianificazione (Esegui ora la avvia comunque).',
+      launchOptions: 'Dal file',
+      launchOptionsHelp:
+        'I prompt del file (limit, job_tags, inventory ...), inviati al job come queste extra vars. Si modificano nel file.',
+      deleteFileHint:
+        'Anche il suo file {file} viene eliminato dal repository {name}: esegui il push del repository per rimuoverlo da git.',
     },
     runners: {
       pending: 'In attesa di approvazione',

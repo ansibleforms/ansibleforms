@@ -1325,6 +1325,38 @@ export default {
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows que construit le designer, modifiés et repoussés par le designer',
       useWorkflowsShort: 'Workflows',
+      useForSchedules: 'Utiliser pour les planifications ?',
+      helpUseForSchedules:
+        'Son dossier schedules contient les planifications, un fichier YAML chacune : lues après chaque pull, et réécrites quand elles sont modifiées dans Jobs > Planifiés. Un seul dépôt au plus.',
+      schedulesOnTitle: 'Utiliser pour les planifications',
+      schedulesOnQuestion: 'Utiliser {name} pour les planifications ?',
+      schedulesOnButton: 'Utiliser pour les planifications',
+      schedulesOnWritten:
+        'Planifications récurrentes de cette application écrites dans {name}, un fichier YAML chacune dans son dossier schedules : {count}.',
+      schedulesOnGitWins:
+        "Quand une planification porte le même nom dans git et dans cette application, la version de git l'emporte et remplace celle de l'application.",
+      schedulesOnClashes:
+        "Même nom dans git et dans cette application, la version de git remplace celle de l'application : {names}.",
+      schedulesOnKept:
+        "Ces crons ne peuvent pas s'écrire en rrule et restent des planifications de cette application : {names}.",
+      schedulesOnPlanned: 'Les jobs ponctuels « Exécuter plus tard » restent dans cette application.',
+      schedulesOnAfter:
+        'Dès lors, un pull apporte les changements faits dans git, et les changements faits ici vont dans git avec le Push du dépôt.',
+      schedulesOnDone:
+        'Planifications : {written} écrites dans le dépôt (en attente du Push), {matched} remplacées par git, {kept} gardées dans cette application.',
+      schedulesOffTitle: 'Ne plus utiliser pour les planifications',
+      schedulesOffQuestion: 'Ne plus utiliser {name} pour les planifications ?',
+      schedulesOffButton: 'Ne plus utiliser pour les planifications',
+      schedulesOffKept:
+        'Ses {count} planifications restent dans cette application et continuent sur leur rrule, sans lien avec git.',
+      schedulesOffPull:
+        "Il est d'abord tiré une dernière fois, pour qu'elles correspondent à ses derniers fichiers. Les fichiers dans git restent tels quels.",
+      schedulesOffUnpushed: 'Attention : il a des changements pas encore poussés. Ils ne sont pas envoyés à git.',
+      schedulesOffDone: '{count} planifications détachées de git : elles restent dans cette application.',
+      schedulesNotPulled: "Le dépôt n'a pas été tiré ({reason}).",
+      schedulesFailed: "Les planifications n'ont pas pu suivre le changement : {error}",
+      useSchedulesHint: 'Planifications en YAML, une par fichier dans son dossier schedules',
+      useSchedulesShort: 'Planifications',
       notPushed: 'Modifications en attente',
       notPushedHint: 'Changements pas encore poussés : poussez-les depuis le designer, ou avec Push.',
       useForInventories: 'Utiliser pour les inventaires ?',
@@ -1424,6 +1456,22 @@ export default {
       startedJobTitle: 'Job lancé',
       startedJob: 'Job #{id}',
       startedJobHelp: "Le job lancé par la dernière exécution : ouvrez-le pour voir comment il s'est terminé.",
+      source: 'Source',
+      sourceRepository: 'Dépôt : {name}',
+      sourceRepositoryHelp:
+        "Gardée dans un fichier du dépôt {name} : un enregistrement écrit le fichier, le Push du dépôt l'envoie à git.",
+      rrule: 'Règle de récurrence (rrule)',
+      rruleHelp:
+        "Une rrule iCal : DTSTART avec son fuseau horaire (TZID), puis RRULE, et EXRULE pour retirer des exécutions. Elle s'exécute dans son propre fuseau horaire.",
+      rruleInvalid: 'Cette rrule est refusée : {reason}',
+      rruleNoRuns: "Cette rrule n'a plus d'exécution à venir.",
+      enabledHelp:
+        "Désactivée, elle ne s'exécute pas selon sa planification (Exécuter maintenant la lance quand même).",
+      launchOptions: 'Depuis le fichier',
+      launchOptionsHelp:
+        'Les prompts du fichier (limit, job_tags, inventory ...), envoyés au job comme ces extra vars. Ils se modifient dans le fichier.',
+      deleteFileHint:
+        'Son fichier {file} est aussi supprimé du dépôt {name} : poussez le dépôt pour le retirer de git.',
     },
     runners: {
       pending: "En attente d'approbation",

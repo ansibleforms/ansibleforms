@@ -1317,6 +1317,36 @@ export default {
       usePlaybooksShort: 'Playbooki',
       useWorkflowsHint: 'Workflowy budowane, edytowane i wypychane przez projektanta',
       useWorkflowsShort: 'Workflowy',
+      useForSchedules: 'Używać do harmonogramów?',
+      helpUseForSchedules:
+        'Jego folder schedules zawiera harmonogramy, każdy w osobnym pliku YAML: wczytywane po każdym pull i zapisywane z powrotem, gdy są edytowane w Zadania > Zaplanowane. Najwyżej jedno repozytorium.',
+      schedulesOnTitle: 'Używaj do harmonogramów',
+      schedulesOnQuestion: 'Używać {name} do harmonogramów?',
+      schedulesOnButton: 'Używaj do harmonogramów',
+      schedulesOnWritten:
+        'Cykliczne harmonogramy tej aplikacji zapisywane w {name}, każdy jako plik YAML w jego folderze schedules: {count}.',
+      schedulesOnGitWins:
+        'Gdy harmonogram ma tę samą nazwę w gicie i w tej aplikacji, wygrywa wersja z gita i zastępuje tę z aplikacji.',
+      schedulesOnClashes: 'Ta sama nazwa w gicie i w tej aplikacji, wersja z gita zastępuje tę z aplikacji: {names}.',
+      schedulesOnKept: 'Tych cronów nie da się zapisać jako rrule i pozostają harmonogramami tej aplikacji: {names}.',
+      schedulesOnPlanned: 'Jednorazowe zadania „Uruchom później” pozostają w tej aplikacji.',
+      schedulesOnAfter:
+        'Od tej chwili pull przynosi zmiany z gita, a zmiany zrobione tutaj trafiają do gita przez Push repozytorium.',
+      schedulesOnDone:
+        'Harmonogramy: {written} zapisane w repozytorium (czekają na Push), {matched} zastąpione przez gita, {kept} zachowane w tej aplikacji.',
+      schedulesOffTitle: 'Przestań używać do harmonogramów',
+      schedulesOffQuestion: 'Przestać używać {name} do harmonogramów?',
+      schedulesOffButton: 'Przestań używać do harmonogramów',
+      schedulesOffKept:
+        'Jego {count} harmonogramy pozostają w tej aplikacji i działają dalej według swojej rrule, już bez powiązania z gitem.',
+      schedulesOffPull:
+        'Najpierw wykonywany jest jeszcze jeden pull, aby odpowiadały najnowszym plikom. Pliki w gicie pozostają bez zmian.',
+      schedulesOffUnpushed: 'Uwaga: ma zmiany, które nie zostały jeszcze wypchnięte. Nie są wysyłane do gita.',
+      schedulesOffDone: '{count} harmonogramów odłączonych od gita: pozostają w tej aplikacji.',
+      schedulesNotPulled: 'Repozytorium nie zostało pobrane ({reason}).',
+      schedulesFailed: 'Harmonogramy nie mogły nadążyć za zmianą: {error}',
+      useSchedulesHint: 'Harmonogramy w YAML, jeden na plik w folderze schedules',
+      useSchedulesShort: 'Harmonogramy',
       notPushed: 'Oczekujące zmiany',
       notPushedHint: 'Zmiany jeszcze nie wypchnięte do zdalnego repo: wypchnij je z projektanta lub przez Push.',
       useForInventories: 'Używać do inwentarzy?',
@@ -1415,6 +1445,21 @@ export default {
       startedJobTitle: 'Uruchomione zadanie',
       startedJob: 'Zadanie #{id}',
       startedJobHelp: 'Zadanie uruchomione przez ostatni przebieg: otwórz je, aby zobaczyć, jak się zakończyło.',
+      source: 'Źródło',
+      sourceRepository: 'Repozytorium: {name}',
+      sourceRepositoryHelp:
+        'Przechowywany w pliku repozytorium {name}: zapis zapisuje plik, Push repozytorium wysyła go do gita.',
+      rrule: 'Reguła powtarzania (rrule)',
+      rruleHelp:
+        'Reguła iCal rrule: DTSTART ze strefą czasową (TZID), potem RRULE oraz EXRULE, aby pominąć uruchomienia. Działa we własnej strefie czasowej.',
+      rruleInvalid: 'Ta reguła rrule jest odrzucona: {reason}',
+      rruleNoRuns: 'Ta reguła rrule nie ma już żadnego uruchomienia.',
+      enabledHelp: 'Wyłączony nie uruchamia się według harmonogramu (Uruchom teraz nadal go uruchamia).',
+      launchOptions: 'Z pliku',
+      launchOptionsHelp:
+        'Prompty z pliku (limit, job_tags, inventory ...), wysyłane do zadania jako te dodatkowe zmienne. Edytuje się je w pliku.',
+      deleteFileHint:
+        'Jego plik {file} jest również usuwany z repozytorium {name}: wypchnij repozytorium, aby usunąć go z gita.',
     },
     disclaimer: {
       description: 'Warunki akceptowane raz przez każdego, z zapisem, kto przyjął którą wersję i kiedy.',

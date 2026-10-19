@@ -408,6 +408,7 @@ const repositoryItem = {
     use_for_playbooks: bool,
     use_for_workflows: bool,
     use_for_inventories: bool,
+    use_for_schedules: bool,
     rebase_on_start: bool,
     cron: str,
     // status, pull_status, push_status, pull_output, push_output, pulled_at, pushed_at and head
@@ -678,6 +679,11 @@ function assertSingletonFlags(doc) {
     if (names.length > 1) {
       throw new Error(`Seed file enables more than one '${provider}' oauth2 provider: ${names.sort().join(", ")}`);
     }
+  }
+  // one schedules repository : the schedules are written back to it, they cannot go to two
+  const schedules = (doc.repositories?.items || []).filter((item) => item.use_for_schedules).map((item) => item.name);
+  if (schedules.length > 1) {
+    throw new Error(`Seed file declares use_for_schedules on more than one repository: ${schedules.sort().join(", ")}`);
   }
 }
 

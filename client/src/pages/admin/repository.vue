@@ -25,6 +25,7 @@ import Profile from '@/lib/Profile';
 import TokenStorage from '@/lib/TokenStorage';
 import { repositoryPullPill, repositoryPushPill } from '@/config/settings';
 import { cronValidationMessage } from '@/config/cron';
+import { confirmScheduleUsage, confirmScheduleDelete, scheduleUsageToast } from '@/lib/scheduleUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -66,6 +67,7 @@ const EDITED = [
   'use_for_playbooks',
   'use_for_workflows',
   'use_for_inventories',
+  'use_for_schedules',
   'cron',
   'rebase_on_start',
 ];
@@ -99,6 +101,13 @@ const USAGES = computed(() =>
       label: t('settings.repositories.useWorkflowsShort'),
       hint: t('settings.repositories.useWorkflowsHint'),
     },
+    {
+      key: 'use_for_schedules',
+      label: t('settings.repositories.useSchedulesShort'),
+      hint: t('settings.repositories.useSchedulesHint'),
+      // one repository holds the schedules
+      oneOnly: true,
+    },
   ].sort((a, b) => a.label.localeCompare(b.label)),
 );
 
@@ -120,6 +129,7 @@ function editable(record) {
     'use_for_playbooks',
     'use_for_workflows',
     'use_for_inventories',
+    'use_for_schedules',
     'rebase_on_start',
   ]) {
     out[u] = !!record[u];
@@ -205,7 +215,8 @@ function emptyOutput(key) {
   if (key !== 'push-output') return t('settings.repositories.noOutput');
   return t(canPush.value ? 'settings.repositories.noPushOutput' : 'settings.repositories.noPushTarget');
 }
-// pushed back : only what the designer writes to it, its forms, settings, playbooks, workflows or inventories
+// pushed back : only what the app writes to it, its forms, settings, playbooks, workflows, inventories
+// or schedules
 // (and, on the button, only when it has changes not pushed yet)
 const canPush = computed(
   () =>
@@ -214,7 +225,8 @@ const canPush = computed(
       repo.value?.use_for_config ||
       repo.value?.use_for_playbooks ||
       repo.value?.use_for_workflows ||
-      repo.value?.use_for_inventories
+      repo.value?.use_for_inventories ||
+      repo.value?.use_for_schedules
     ),
 );
 const cronError = computed(() => (edit.value?.pull_scheduled ? cronValidationMessage(t, edit.value.cron) : null));
@@ -398,9 +410,14 @@ async function save() {
     toast.warning(cronError.value);
     return;
   }
+  // its Schedules usage turned on or off : asked first (Cancel saves nothing)
+  if (!(await confirmScheduleUsage(t, repoName.value, !!repo.value?.use_for_schedules, !!data.use_for_schedules)))
+    return;
   try {
-    await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
+    const res = await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
+    // and what it did to the schedules
+    scheduleUsageToast(t, res.data);
     // renamed : the api knows it by its new name from now on ; its address, its number, stays
     if (data.name !== repoName.value) repoName.value = data.name;
     await load();
@@ -429,8 +446,18 @@ async function run(what) {
   if (running.value) watchRun();
 }
 
-// Delete asks first
+// Delete asks first ; a schedules repository says its schedules stay in the app
 const confirmDelete = ref(false);
+
+/**
+ * Asks before the delete : the schedules repository's own question (its schedules stay in the
+ * app), or the usual one.
+ */
+async function askDelete() {
+  const answer = await confirmScheduleDelete(t, repo.value);
+  if (answer === null) confirmDelete.value = true;
+  else if (answer) await deleteRepo();
+}
 
 /**
  * Deletes the repository, then goes back to the repositories.
@@ -439,10 +466,11 @@ async function deleteRepo() {
   confirmDelete.value = false;
   try {
     const name = repoName.value;
-    await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`);
+    const res = await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`);
     edit.value = null;
     repo.value = null;
     toast.success(t('settings.common.nameDeleted', { name }));
+    scheduleUsageToast(t, res.data);
     router.push('/settings/repositories');
   } catch (err) {
     fail(err);
@@ -740,7 +768,7 @@ onMounted(async () => {
         <BsButton icon="redo" cssClass="text-nowrap" :disabled="running" @click="run('reset')">{{
           t('settings.repositories.reset')
         }}</BsButton>
-        <BsButton v-if="appStore.isAdmin" icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+        <BsButton v-if="appStore.isAdmin" icon="trash" @click="askDelete()">{{ t('common.delete') }}</BsButton>
         <BsButton icon="save" :disabled="!dirty" @click="save()">{{ t('settings.common.save') }}</BsButton>
       </template>
       <!-- the record loading : its buttons as grey placeholders, so the title line keeps its

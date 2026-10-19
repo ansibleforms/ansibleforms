@@ -652,6 +652,15 @@ textarea:focus::placeholder {
   font-weight: 600;
 }
 
+// the Repository badge of a schedule kept in a schedules repository (Jobs > Scheduled, its page) :
+// the shape of the other row badges, in the info tone, its file in the tooltip
+.af-source-badge {
+  background-color: var(--bs-info-bg-subtle);
+  border: 1px solid var(--bs-info-border-subtle);
+  color: var(--bs-info-text-emphasis);
+  font-weight: 600;
+}
+
 // the Sign-in blocked badge of an LDAP or SSO user an admin blocked : the same shape, in the
 // danger tone
 .af-blocked-badge {

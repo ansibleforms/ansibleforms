@@ -6,6 +6,8 @@ import axios from 'axios';
 import Helpers from '@/lib/Helpers';
 import { cronCell } from '@/lib/cronCell';
 import { cronValidationMessage } from './cron';
+import { rruleValidationMessage, defaultRrule, rruleCell, scheduleRepository } from './rrule';
+import { confirmScheduleUsage, confirmScheduleDelete, scheduleUsageToast } from '@/lib/scheduleUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
@@ -24,6 +26,10 @@ import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
 // The server refuses a bad expression too (lib/cronValidate.js, called from CrudModel), so
 // this is the early, explanatory answer rather than the only line of defence.
 const cronValidator = (t) => (value) => cronValidationMessage(t, value);
+
+// a repository schedule's rrule, checked on its text (config/rrule.js) ; the server
+// parses it and works out its runs
+const rruleValidator = (t) => (value) => rruleValidationMessage(t, value);
 
 // a runner's or a secret store's credential with its server : its TLS is asked for
 const credentialServer = (r) => SERVER_CREDENTIAL_TYPES.includes(r?.credential_type) && !!String(r?.url || '').trim();
@@ -995,6 +1001,12 @@ export default function getSettings(t) {
       openPage: (item) => `/settings/repositories/${item.id}`,
       // Scheduled pull off : no schedule ; the switch itself is not stored
       beforeSave: ({ pull_scheduled, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
+      // its Schedules usage turned on or off asks first (what it will take, or that its schedules
+      // stay in the app), and says after what it did ; deleting a schedules repository asks the same
+      confirmSave: (body, original) =>
+        confirmScheduleUsage(t, body.name, original?.use_for_schedules, body.use_for_schedules),
+      afterSave: (answer) => scheduleUsageToast(t, answer),
+      confirmDelete: (item) => confirmScheduleDelete(t, item),
       // the dialog in steps : what the repository is, the credentials to reach it, what it is used
       // for, when it syncs
       steps: [
@@ -1015,8 +1027,8 @@ export default function getSettings(t) {
           dividerBefore: true,
         },
         {
-          // only a repository the designer writes to (forms, settings, playbooks, workflows) is pushed
-          // back, and only when it has changes not pushed yet
+          // only a repository the app writes to (forms, settings, playbooks, workflows, inventories,
+          // schedules) is pushed back, and only when it has changes not pushed yet
           name: 'sync',
           enabledWhen: (r) => !!r.unpushed,
           icon: 'upload',
@@ -1028,6 +1040,7 @@ export default function getSettings(t) {
             'use_for_playbooks',
             'use_for_workflows',
             'use_for_inventories',
+            'use_for_schedules',
           ],
         },
         { name: 'reset', icon: 'redo', title: t('settings.repositories.reset'), color: 'refresh' },
@@ -1272,6 +1285,21 @@ export default function getSettings(t) {
           help: t('settings.repositories.helpUseForWorkflows'),
           hidden: true,
         },
+        {
+          key: 'use_for_schedules',
+          step: 'usage',
+          // one repository holds the schedules (the server refuses a second)
+          oneOnly: true,
+          shortLabel: t('settings.repositories.useSchedulesShort'),
+          shortHint: t('settings.repositories.useSchedulesHint'),
+          isSwitch: false,
+          type: 'checkbox',
+          label: t('settings.repositories.useForSchedules'),
+          // the column : its short name, as on the Usage step
+          columnLabel: t('settings.repositories.useSchedulesShort'),
+          help: t('settings.repositories.helpUseForSchedules'),
+          hidden: true,
+        },
       ],
     },
     oauth2_providers: {
@@ -1499,6 +1527,10 @@ export default function getSettings(t) {
       // a schedule has its own page (pages/schedule.vue) : its row and Edit open it, New the
       // wizard
       openPage: (item) => `/jobs/scheduled/${item.id}`,
+      // a recurring schedule while a schedules repository is used : its rrule (the server writes it
+      // to the repository) ; otherwise its cron, or its one time run
+      beforeSave: ({ rrule, ...item }) =>
+        scheduleRepository.value && !item.one_time_run ? { ...item, rrule, cron: '', run_at: null } : item,
       // the dialog in steps : what runs (its name, the form), when (once at a time, or on a cron
       // schedule), the extra vars it sends to the form
       steps: [
@@ -1544,6 +1576,13 @@ export default function getSettings(t) {
           help: t('settings.repositories.helpName'),
         },
         {
+          // what it is for, in a few words : on its page, not a column (still in Columns)
+          key: 'description',
+          icon: 'info-circle',
+          label: t('settings.fields.description'),
+          hidden: true,
+        },
+        {
           // the form it runs
           key: 'form',
           icon: 'pen-to-square',
@@ -1555,6 +1594,14 @@ export default function getSettings(t) {
           labelKey: 'name',
           readonly: false,
           required: true,
+        },
+        {
+          // where it comes from (set by the server, never chosen) : no column in the list, the
+          // schedule's page says it for one kept in the schedules repository
+          key: 'repository',
+          label: t('settings.schedules.source'),
+          noInput: true,
+          noTable: true,
         },
         {
           key: 'one_time_run',
@@ -1576,11 +1623,31 @@ export default function getSettings(t) {
           // a recurring schedule needs its cron ; hidden (one time run), it is not checked
           required: true,
           // in the table : hovering the cron says it in words, in the app's language ; a one-time
-          // run has none, it runs once
-          render: (v, row) => (row?.one_time_run ? escapeHtml(t('settings.schedules.oneTimeRun')) : cronCell(v)),
+          // run has none, it runs once ; a repository's schedule shows its rrule
+          render: (v, row) =>
+            row?.one_time_run
+              ? escapeHtml(t('settings.schedules.oneTimeRun'))
+              : row?.rrule
+                ? rruleCell(row.rrule)
+                : cronCell(v),
           validator: cronValidator(t),
-          negateDependency: true,
-          dependency: 'one_time_run',
+          // recurring, without a schedules repository : a cron
+          showWhen: (item) => !scheduleRepository.value && !item.one_time_run,
+        },
+        {
+          // recurring, while a schedules repository is used : its iCal rrule, its next runs under it
+          // (the server writes it to the repository as a new file)
+          key: 'rrule',
+          step: 'when',
+          label: t('settings.schedules.rrule'),
+          type: 'rrule',
+          help: t('settings.schedules.rruleHelp'),
+          hidden: true,
+          noTable: true,
+          required: true,
+          initial: (item) => item?.rrule || defaultRrule(Intl.DateTimeFormat().resolvedOptions().timeZone),
+          validator: rruleValidator(t),
+          showWhen: (item) => !!scheduleRepository.value && !item.one_time_run,
         },
         {
           key: 'run_at',
@@ -1596,7 +1663,7 @@ export default function getSettings(t) {
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
           // a one time run needs its time ; hidden (a cron schedule), it is not checked
           required: true,
-          dependency: 'one_time_run',
+          showWhen: (item) => !!item.one_time_run,
         },
         // when it last ran, then when it runs next
         {

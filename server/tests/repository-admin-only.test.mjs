@@ -93,6 +93,8 @@ describe("a connections user", () => {
     ["use_for_playbooks on", { use_for_playbooks: "1" }],
     ["use_for_inventories on", { use_for_inventories: 1 }],
     ["use_for_workflows on", { use_for_workflows: true }],
+    // its schedules run as the Schedule Service, with the admin role
+    ["use_for_schedules on", { use_for_schedules: 1 }],
     ["use_for_forms off", { use_for_forms: false }],
   ])("may not change %s", async (_label, body) => {
     expect((await call(controller.update, ops, { body })).status).toBe(403);
