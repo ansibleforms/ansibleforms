@@ -1382,6 +1382,8 @@ export default {
       usageOnWithoutSecret:
         'Geschreven zonder hun geheimen, die in de database blijven (git bevat nooit een geheim in klare tekst): {names}.',
       usageOnSkipped: 'In git al afgelopen, niet geïmporteerd: {count}.',
+      formDuplicate:
+        "Formulier '{name}' is twee keer gedefinieerd: {used} wordt gebruikt, {skipped} wordt overgeslagen (formuliernamen moeten uniek zijn over alle formulierrepositories)",
       configDeprecated:
         '{key} gelezen uit config.yaml: verouderd, verplaats ze naar {file} (config.yaml wordt vanaf 8.0.0 niet meer gelezen)',
       usageOnAfter:
@@ -1419,7 +1421,6 @@ export default {
       showPullOutput: 'Uitvoer van laatste pull tonen',
       showPushOutput: 'Uitvoer van laatste push tonen',
       notFound: "Er is geen repository met id '{id}'.",
-      formDuplicate: "Formulier '{name}' is twee keer gedefinieerd: {used} wordt gebruikt, {skipped} overgeslagen",
       ownUser: 'Het heeft nog een eigen gebruiker ({user}): kies een referentie om die te vervangen.',
       pull: 'Pull',
       pullAll: 'Alles pullen',

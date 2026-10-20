@@ -1380,6 +1380,8 @@ export default {
       usageOnWithoutSecret:
         'Zapisane bez sekretów, które zostają w bazie danych (git nigdy nie przechowuje sekretu jawnym tekstem): {names}.',
       usageOnSkipped: 'Już zakończone w git, niezaimportowane: {count}.',
+      formDuplicate:
+        "Formularz '{name}' jest zdefiniowany dwukrotnie: używany jest {used}, pominięty {skipped} (nazwy formularzy muszą być unikalne we wszystkich repozytoriach formularzy)",
       configDeprecated:
         '{key} czytane z config.yaml: przestarzałe, przenieś je do {file} (config.yaml nie jest czytany od 8.0.0)',
       usageOnAfter:
@@ -1417,7 +1419,6 @@ export default {
       showPullOutput: 'Pokaż wynik ostatniego pull',
       showPushOutput: 'Pokaż wynik ostatniego push',
       notFound: "Nie ma repozytorium o id '{id}'.",
-      formDuplicate: "Formularz '{name}' jest zdefiniowany dwukrotnie: używany {used}, pominięty {skipped}",
       ownUser: 'Ma jeszcze własnego użytkownika ({user}): wybierz poświadczenie, aby go zastąpić.',
       pull: 'Pull',
       pullAll: 'Pull wszystkich',

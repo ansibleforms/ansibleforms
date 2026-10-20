@@ -556,3 +556,17 @@ describe('the repositories : a list in one repositories.yaml', () => {
     );
   });
 });
+
+describe('a form name defined in two forms repositories', () => {
+  it("each repository's page says which copy is used and which skipped, in every language", async () => {
+    const page = read('pages/admin/repository.vue');
+    expect(page).toContain('v-for="d in repo.formDuplicates || []"');
+    expect(page).toContain(
+      "t('settings.repositories.formDuplicate', { name: d.name, used: d.used.place, skipped: d.skipped.place })",
+    );
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      for (const p of ['{name}', '{used}', '{skipped}']) expect(r.formDuplicate, lang).toContain(p);
+    }
+  });
+});

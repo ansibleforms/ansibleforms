@@ -1375,6 +1375,8 @@ export default {
       usageOnWithoutSecret:
         'シークレットなしで書き込まれ、シークレットはデータベースに残ります（git に平文のシークレットが入ることはありません）：{names}。',
       usageOnSkipped: 'git ですでに終了しており、インポートされません：{count}。',
+      formDuplicate:
+        "フォーム '{name}' が 2 回定義されています: {used} を使用し、{skipped} はスキップします (フォーム名はフォームリポジトリ全体で一意である必要があります)",
       configDeprecated:
         '{key} を config.yaml から読み込み：非推奨です。{file} に移動してください（8.0.0 では config.yaml は読まれません）',
       usageOnAfter: '以後、プルで git の変更が取り込まれ、ここでの変更はリポジトリのプッシュで git に送られます。',
@@ -1410,7 +1412,6 @@ export default {
       showPullOutput: '前回のプルの出力を表示',
       showPushOutput: '前回のプッシュの出力を表示',
       notFound: "ID '{id}' のリポジトリはありません。",
-      formDuplicate: "フォーム '{name}' が 2 回定義されています: {used} を使用、{skipped} はスキップ",
       ownUser: 'まだ独自のユーザー ({user}) があります：置き換える認証情報を選択してください。',
       pull: 'プル',
       pullAll: 'すべてプル',

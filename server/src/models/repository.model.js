@@ -141,6 +141,26 @@ async function formModel() {
 }
 
 /**
+ * Repositories in one fixed order : by name, as the database's ORDER BY name compares them (case
+ * left aside), then exactly. Where several repositories of one usage are read in turn (the forms
+ * folders, the first config file, the first vars folder ...) the first one wins, so the order is
+ * fixed here too : whatever order the rows come in, the same repository wins every time.
+ *
+ * Args:
+ *   rows (object[]): the repositories ({ name, ... }).
+ *
+ * Returns:
+ *   object[]: a sorted copy.
+ */
+export function sortedByName(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    const x = String(a?.name ?? "")
+    const y = String(b?.name ?? "")
+    return x.localeCompare(y, "en", { sensitivity: "base" }) || (x < y ? -1 : x > y ? 1 : 0)
+  })
+}
+
+/**
  * Repositories in the order they were added : by id, whatever order the rows come in - where
  * several of one usage are read in turn and the first one wins (the playbooks, the forms folders
  * - and with them a form name defined twice - and the first config.yaml of a forms repository).
@@ -512,12 +532,12 @@ class Repository extends CrudModel {
     // The roles, the categories and the constants : each from its own repository (use_for_roles,
     // use_for_categories, use_for_constants, lib/configKeys.js), laid over the base configuration -
     // which then is the local CONFIG_PATH (or the database copy), never a repository's file
-    const keyRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants")
+    const keyRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY name")
     if (keyRepositories.length > 0) return ""
 
-    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility) ;
-    // in the order they were added : the first one holding a config.yaml wins, the same one every time
-    var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
+    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility)
+    // by name : the first one holding a config.yaml wins, the same one every time
+    var repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
   }
   
   if(repositories.length === 0){
@@ -565,10 +585,8 @@ class Repository extends CrudModel {
     //
     // Failing loudly is the only honest answer, and it is the rule this codebase already
     // applies to health.model's authenticationFacts.
-    //
-    // In the order they were added (sortedById) : a form name defined in two of them resolves to
-    // the first one's copy, every time - the query had no ORDER BY, so it was the database's.
-    const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
+    // by name : a form name defined in two of them resolves to the first one's, every time
+    const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
 
     return repositories.map(repo => {
       const repoPath = Repo.folderOf(repo.name)
@@ -667,7 +685,7 @@ class Repository extends CrudModel {
   static async getInventoryRoots() {
     const local = { repository: null, root: appConfig.inventoryPath }
     try {
-      const repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name")
+      const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name"))
       return [local, ...repositories.filter((repo) => Repo.isValidName(repo.name)).map((repo) => ({ repository: repo.name, root: Repo.folderOf(repo.name) }))]
     } catch (e) {
       logger.error("Failed to get the inventories repositories: ", e)
@@ -681,7 +699,7 @@ class Repository extends CrudModel {
   static async getWorkflowsRoots() {
     const local = { repository: null, root: appConfig.workflowsPath }
     try {
-      const repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_workflows ORDER BY name")
+      const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_workflows ORDER BY name"))
       return [local, ...repositories.filter((repo) => Repo.isValidName(repo.name)).map((repo) => ({ repository: repo.name, root: Repo.folderOf(repo.name) }))]
     } catch (e) {
       logger.error("Failed to get the workflows repositories: ", e)
@@ -748,6 +766,8 @@ class Repository extends CrudModel {
       }
       // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
       output += await deprecationLines(name)
+      // a form name it shares with another forms repository : which copy is used, which skipped
+      output += await (await formModel()).duplicateLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -822,7 +842,7 @@ class Repository extends CrudModel {
       // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
       output += await deprecationLines(name)
       // a form name it shares with another forms repository : which copy is used, which skipped
-      if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
+      output += await (await formModel()).duplicateLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -862,8 +882,8 @@ class Repository extends CrudModel {
 
   static async findFormsRepositories() {
     try {
-      // in the order they were added, as the forms folders are read (getFormsFolders)
-      return sortedById(await mysql.do("SELECT id,name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
+      // by name, as the forms folders are read (getFormsFolders)
+      return sortedByName(await mysql.do("SELECT name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
     } catch (e) {
       logger.error("Failed to get forms repositories: ", e)
       return []

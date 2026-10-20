@@ -1388,6 +1388,8 @@ export default {
       usageOnWithoutSecret:
         'Escritos sin sus secretos, que se quedan en la base de datos (git nunca guarda un secreto en claro): {names}.',
       usageOnSkipped: 'Ya terminados en git, no importados: {count}.',
+      formDuplicate:
+        "El formulario '{name}' está definido dos veces: se usa {used} y se omite {skipped} (los nombres de formulario deben ser únicos entre los repositorios de formularios)",
       configDeprecated: '{key} leídos de config.yaml: obsoleto, muévelos a {file} (config.yaml ya no se lee en 8.0.0)',
       usageOnAfter:
         'A partir de entonces, un pull trae los cambios hechos en git, y los cambios hechos aquí van a git con el Push del repositorio.',
@@ -1425,7 +1427,6 @@ export default {
       showPullOutput: 'Mostrar salida del último pull',
       showPushOutput: 'Mostrar salida del último push',
       notFound: "No hay ningún repositorio con el id '{id}'.",
-      formDuplicate: "El formulario '{name}' está definido dos veces: se usa {used}, se omite {skipped}",
       ownUser: 'Todavía tiene su propio usuario ({user}): elige una credencial para reemplazarlo.',
       pull: 'Pull',
       pullAll: 'Pull de todos',

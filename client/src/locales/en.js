@@ -1372,6 +1372,8 @@ export default {
       usageOnWithoutSecret:
         'Written without their secrets, which stay in the database (git never holds a plain secret): {names}.',
       usageOnSkipped: 'Already ended in git, not imported: {count}.',
+      formDuplicate:
+        "Form '{name}' is defined twice: {used} is used, {skipped} is skipped (form names must be unique across forms repositories)",
       configDeprecated:
         '{key} read from config.yaml: deprecated, move them to {file} (config.yaml is no longer read in 8.0.0)',
       usageOnAfter:
@@ -1409,7 +1411,6 @@ export default {
       showPullOutput: 'Show last pull output',
       showPushOutput: 'Show last push output',
       notFound: "There is no repository with the id '{id}'.",
-      formDuplicate: "Form '{name}' is defined twice: {used} is used, {skipped} is skipped",
       ownUser: 'It still has its own user ({user}): choose a credential to replace it.',
       pull: 'Pull',
       pullAll: 'Pull all',

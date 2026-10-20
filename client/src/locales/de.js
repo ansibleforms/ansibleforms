@@ -1388,6 +1388,8 @@ export default {
       usageOnWithoutSecret:
         'Ohne ihre Geheimnisse geschrieben, die in der Datenbank bleiben (git enthält nie ein Geheimnis im Klartext): {names}.',
       usageOnSkipped: 'In git bereits beendet, nicht importiert: {count}.',
+      formDuplicate:
+        "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",
       configDeprecated:
         '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie nach {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
       usageOnAfter:
@@ -1425,7 +1427,6 @@ export default {
       showPullOutput: 'Ausgabe des letzten Pulls anzeigen',
       showPushOutput: 'Ausgabe des letzten Pushs anzeigen',
       notFound: "Es gibt kein Repository mit der ID '{id}'.",
-      formDuplicate: "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} übersprungen",
       ownUser: 'Es hat noch einen eigenen Benutzer ({user}): wählen Sie Anmeldedaten, um ihn zu ersetzen.',
       pull: 'Pull',
       pullAll: 'Alle pullen',

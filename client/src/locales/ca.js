@@ -1387,6 +1387,8 @@ export default {
       usageOnWithoutSecret:
         'Escrits sense els seus secrets, que es queden a la base de dades (git mai no guarda un secret en clar): {names}.',
       usageOnSkipped: 'Ja acabats a git, no importats: {count}.',
+      formDuplicate:
+        "El formulari '{name}' està definit dues vegades: s'utilitza {used} i s'omet {skipped} (els noms de formulari han de ser únics entre els repositoris de formularis)",
       configDeprecated:
         '{key} llegits de config.yaml: obsolet, mou-los a {file} (config.yaml ja no es llegeix a la 8.0.0)',
       usageOnAfter:
@@ -1425,7 +1427,6 @@ export default {
       showPullOutput: "Mostra la sortida de l'últim pull",
       showPushOutput: "Mostra la sortida de l'últim push",
       notFound: "No hi ha cap repositori amb l'id '{id}'.",
-      formDuplicate: "El formulari '{name}' està definit dues vegades: s'utilitza {used}, s'omet {skipped}",
       ownUser: 'Encara té el seu propi usuari ({user}): tria una credencial per substituir-lo.',
       pull: 'Pull',
       pullAll: 'Pull de tots',

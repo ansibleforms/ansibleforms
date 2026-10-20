@@ -1384,6 +1384,8 @@ export default {
       usageOnWithoutSecret:
         'Scritti senza i loro segreti, che restano nel database (git non contiene mai un segreto in chiaro): {names}.',
       usageOnSkipped: 'Già terminati in git, non importati: {count}.',
+      formDuplicate:
+        "Il modulo '{name}' è definito due volte: viene usato {used}, {skipped} viene ignorato (i nomi dei moduli devono essere unici tra i repository dei moduli)",
       configDeprecated:
         '{key} letti da config.yaml: deprecato, spostali in {file} (config.yaml non viene più letto dalla 8.0.0)',
       usageOnAfter:
@@ -1422,7 +1424,6 @@ export default {
       showPullOutput: "Mostra output dell'ultimo pull",
       showPushOutput: "Mostra output dell'ultimo push",
       notFound: "Non esiste alcun repository con l'id '{id}'.",
-      formDuplicate: "Il modulo '{name}' è definito due volte: viene usato {used}, ignorato {skipped}",
       ownUser: 'Ha ancora un proprio utente ({user}): scegli una credenziale per sostituirlo.',
       pull: 'Pull',
       pullAll: 'Pull di tutti',
