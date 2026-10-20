@@ -1348,9 +1348,9 @@ export default {
         secret_stores:
           'Magatzems de secrets en YAML, un per fitxer a la seva carpeta secret-stores, que nomenen la seva credencial',
         runners: 'Runners en YAML, un per fitxer a la seva carpeta runners, que nomenen la seva credencial',
-        notification_channels: 'Notificacions en YAML, una per fitxer a la seva carpeta notification-channels',
+        notifications: 'Notificacions en YAML, una per fitxer a la seva carpeta notifications',
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
-        chat: "L'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
+        chat_assistant: "L'assistent de xat al seu chat-assistant.yaml, la clau només com a referència d'entorn",
         mcp: "Els ajustos de MCP pel seu nom d'entorn, al seu mcp.yaml",
         branding:
           "El nom, els valors per defecte, l'idioma, el logotip i la icona al seu branding.yaml i les imatges al costat",

@@ -1345,9 +1345,9 @@ export default {
           'Inloggegevens in YAML, één per bestand in zijn map credentials, geheimen alleen als omgevingsverwijzingen',
         secret_stores: 'Secret stores in YAML, één per bestand in zijn map secret-stores, die hun inloggegevens noemen',
         runners: 'Runners in YAML, één per bestand in zijn map runners, die hun inloggegevens noemen',
-        notification_channels: 'Meldingen in YAML, één per bestand in zijn map notification-channels',
+        notifications: 'Meldingen in YAML, één per bestand in zijn map notifications',
         syslog: 'Syslog-servers in YAML, één per bestand in zijn map syslog',
-        chat: 'De chat-assistent in zijn chat.yaml, de sleutel alleen als omgevingsverwijzing',
+        chat_assistant: 'De chat-assistent in zijn chat-assistant.yaml, de sleutel alleen als omgevingsverwijzing',
         mcp: 'De MCP-instellingen op hun omgevingsnaam, in zijn mcp.yaml',
         branding:
           'De naam, standaardwaarden, taal, het logo en het pictogram in zijn branding.yaml en de afbeeldingen ernaast',

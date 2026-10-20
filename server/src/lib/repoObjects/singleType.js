@@ -1,6 +1,6 @@
 'use strict';
 // The descriptor of an object type kept in ONE file of its repository instead of a folder : the
-// chat assistant's settings (chat.yaml), the System > General settings (general.yaml), the
+// chat assistant's settings (chat-assistant.yaml), the System > General settings (general.yaml), the
 // branding (branding.yaml and its images). The app has one such object ; the file holds it, in
 // the config seed's format, checked, its secrets ${ENV} references only (lib/repoObjects/fields.js).
 // The engine's single-file mode (lib/repoObjects/engine.js) reads it in, writes the app's values to
@@ -19,7 +19,7 @@ import { typeOf } from "./types.js";
  * Args:
  *   spec (object):
  *     key (string): the type (chat).
- *     file (string): its file at the root of its repository (chat.yaml).
+ *     file (string): its file at the root of its repository (chat-assistant.yaml).
  *     section (string|object): the schema of its file (lib/seed-schema.js).
  *     title, noun (string): how the pull output names it.
  *     secrets, skip, keepFalse, canonical : as lib/repoObjects/fields.js reads them.

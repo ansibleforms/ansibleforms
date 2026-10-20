@@ -607,7 +607,7 @@ export const ldapDirectoryItem = {
   },
 };
 
-// The chat assistant's settings as a repository holds them (lib/repoObjects/chat.js, chat.yaml) :
+// The chat assistant's settings as a repository holds them (lib/repoObjects/chatAssistant.js, chat-assistant.yaml) :
 // the chat section's fields, none required - a file declares what it owns, its api key left out
 // when the app's stays in the database
 export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);

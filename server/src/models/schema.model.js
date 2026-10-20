@@ -683,7 +683,7 @@ const SCHEMA_MANIFEST = {
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
                                'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
-                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_repositories', 'repositories.repository', 'repositories.repo_file', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_general', 'repositories.use_for_mcp',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notifications', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat_assistant', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_repositories', 'repositories.repository', 'repositories.repo_file', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_general', 'repositories.use_for_mcp',
                                'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
                                'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.branding_managed',
                                'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
@@ -1262,7 +1262,7 @@ async function patchVersion7(messages, success, failed) {
   // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
   // YAML file per object in the type's folder ; the objects of the types built say where they come
   // from (repository, repo_file), the other types' tables will in the version that brings them
-  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "links", "labels", "announcements", "general", "roles", "categories", "constants", "repositories", "mcp"]) {
+  for (const type of ["credentials", "secret_stores", "runners", "notifications", "sso", "ldap", "syslog", "chat_assistant", "disclaimer", "branding", "links", "labels", "announcements", "general", "roles", "categories", "constants", "repositories", "mcp"]) {
     await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
   }
   // the Config usage split into Roles, Categories and Constants (the three columns added just above)

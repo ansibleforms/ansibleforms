@@ -102,10 +102,10 @@ const update = async function (req, res) {
       // a setting that cannot be sent as it is (extra headers) : say which, do not store it
       return res.status(400).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.message));
     }
-    // the chat repository's chat.yaml, before : its changed fields written into it after
-    const before = await RepoObjects.snapshot('chat');
+    // the chat assistant repository's chat-assistant.yaml, before : its changed fields written into it after
+    const before = await RepoObjects.snapshot('chat_assistant');
     await ChatSettings.update(record);
-    await RepoObjects.appUpdated('chat', before);
+    await RepoObjects.appUpdated('chat_assistant', before);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.chatSettingsUpdated') }));
   } catch (err) {
     logger.error("Error updating chat settings: ", err);

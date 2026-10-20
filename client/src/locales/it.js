@@ -1346,9 +1346,9 @@ export default {
         secret_stores:
           'Archivi di segreti in YAML, uno per file nella sua cartella secret-stores, che nominano la loro credenziale',
         runners: 'Runner in YAML, uno per file nella sua cartella runners, che nominano la loro credenziale',
-        notification_channels: 'Notifiche in YAML, una per file nella sua cartella notification-channels',
+        notifications: 'Notifiche in YAML, una per file nella sua cartella notifications',
         syslog: 'Server syslog in YAML, uno per file nella sua cartella syslog',
-        chat: "L'assistente chat nel suo chat.yaml, la chiave solo come riferimento di ambiente",
+        chat_assistant: "L'assistente chat nel suo chat-assistant.yaml, la chiave solo come riferimento di ambiente",
         mcp: 'Le impostazioni MCP per nome di ambiente, nel suo mcp.yaml',
         branding:
           "Il nome, i valori predefiniti, la lingua, il logo e l'icona nel suo branding.yaml e le immagini accanto",

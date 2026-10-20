@@ -1,6 +1,6 @@
 'use strict';
-// The Notification channels type of the repository-backed objects (lib/repoObjects/engine.js) : one
-// channel per YAML file in a repository's `notification-channels` folder, in the config seed's
+// The Notifications type of the repository-backed objects (lib/repoObjects/engine.js) : one
+// notification channel per YAML file in a repository's `notifications` folder, in the config seed's
 // format (an item of its notification_channels section). A mail channel names its smtp credential,
 // a webhook or a telegram one the credential of its token, by name : a channel whose credential is
 // not there yet waits, and is read again when the credentials are next pulled. A Slack or Teams
@@ -9,12 +9,12 @@ import NotificationChannel from "../../models/notificationChannel.model.js";
 import { seedType } from "./seedType.js";
 
 export default seedType({
-  key: "notification_channels",
-  folder: "notification-channels",
+  key: "notifications",
+  folder: "notifications",
   section: "notification_channels",
   model: "notificationchannel",
   Model: NotificationChannel,
-  title: "Notification channels",
+  title: "Notifications",
   noun: "notification channel",
   // a Slack or Teams incoming webhook's address is its secret
   secrets: ["webhook_url"],

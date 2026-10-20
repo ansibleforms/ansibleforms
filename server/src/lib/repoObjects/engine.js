@@ -1102,7 +1102,7 @@ export async function appDeleted(desc, before) {
 // THE TYPES KEPT IN ONE FILE
 // ===========================================================================
 // The chat assistant's settings, the System > General settings, the branding : the app has one
-// object of each, its repository one file of it (desc.file, at its root : chat.yaml), and the
+// object of each, its repository one file of it (desc.file, at its root : chat-assistant.yaml), and the
 // files the YAML names beside it (the branding's images). The same rules as the folder types :
 // a pull applies the file (git wins), turning the type on writes the app's values to it when it
 // has none (and applies it when it has one), an app edit writes only the changed fields, the

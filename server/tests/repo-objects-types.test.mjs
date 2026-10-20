@@ -49,8 +49,8 @@ const TYPES = [
     edit: ["description", "the main vault"],
   },
   {
-    key: "notification_channels",
-    folder: "notification-channels",
+    key: "notifications",
+    folder: "notifications",
     table: "notification_channels",
     file: { name: "mail", type: "mail", credential: "smtp-login", from_address: "af@example.com" },
     check: (r) => assert.equal(r.from_address, "af@example.com"),

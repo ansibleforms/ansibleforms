@@ -33,7 +33,7 @@ export const USAGE_CATEGORIES = ['designer', 'jobs', 'system', 'appearance', 'ac
 //             asks first (what it will take, or let go)
 //   oneOnly   one repository at most : greyed on the others, with who has it
 //   folder    its folder in the repository (an object type), or
-//   file      its one file at the repository's root (a type the app has one of : chat.yaml)
+//   file      its one file at the repository's root (a type the app has one of : chat-assistant.yaml)
 //   list      its one file holding its objects as a list (repositories.yaml)
 //   labelKey  its label's translation when it is its menu item's (settings.repositories.usageTypes.<key>
 //             when not given)
@@ -171,24 +171,24 @@ export const USAGE_TYPES = [
     folder: 'runners',
   },
   {
-    key: 'notification_channels',
-    flag: 'use_for_notification_channels',
+    key: 'notifications',
+    flag: 'use_for_notifications',
     category: 'connections',
     // named as its menu item names it (Notifications)
     labelKey: 'sidebar.notifications',
     objects: true,
     oneOnly: true,
-    folder: 'notification-channels',
+    folder: 'notifications',
   },
   // named as its menu item names it (Chat assistant)
   {
-    key: 'chat',
-    flag: 'use_for_chat',
+    key: 'chat_assistant',
+    flag: 'use_for_chat_assistant',
     category: 'connections',
     labelKey: 'sidebar.chat',
     objects: true,
     oneOnly: true,
-    file: 'chat.yaml',
+    file: 'chat-assistant.yaml',
   },
   // named as its menu item names it (MCP)
   {
@@ -223,9 +223,9 @@ export const APPLY_ORDER = [
   'runners',
   'sso',
   'ldap',
-  'notification_channels',
+  'notifications',
   'syslog',
-  'chat',
+  'chat_assistant',
   'schedules',
   'disclaimer',
   'branding',

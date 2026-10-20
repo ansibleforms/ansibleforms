@@ -1342,9 +1342,10 @@ export default {
         secret_stores:
           'Magazyny sekretów w YAML, jeden na plik w folderze secret-stores, wskazujące swoje poświadczenie',
         runners: 'Runnery w YAML, jeden na plik w folderze runners, wskazujące swoje poświadczenie',
-        notification_channels: 'Powiadomienia w YAML, jedno na plik w folderze notification-channels',
+        notifications: 'Powiadomienia w YAML, jedno na plik w folderze notifications',
         syslog: 'Serwery syslog w YAML, jeden na plik w folderze syslog',
-        chat: 'Asystent czatu w jego chat.yaml, klucz tylko jako odwołanie do zmiennej środowiskowej',
+        chat_assistant:
+          'Asystent czatu w jego chat-assistant.yaml, klucz tylko jako odwołanie do zmiennej środowiskowej',
         mcp: 'Ustawienia MCP według nazw zmiennych środowiskowych, w jego mcp.yaml',
         branding: 'Nazwa, wartości domyślne, język, logo i ikona w jego branding.yaml i obrazach obok',
         links: 'Linki nagłówka i link do projektanta, w jego links.yaml',

@@ -160,18 +160,26 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.deepEqual(readList(), []);
   });
 
-  test("the order : the credentials, then the repositories, then every other type", () => {
+  test("the order : the credentials, then the repositories, then every other type", async () => {
     assert.deepEqual(types.APPLY_ORDER.slice(0, 2), ["credentials", "repositories"]);
     assert.deepEqual(types.USAGE_TYPES.filter((t) => t.category === "connections").map((t) => t.key), [
       "repositories",
       "credentials",
       "secret_stores",
       "runners",
-      "notification_channels",
-      "chat",
+      "notifications",
+      "chat_assistant",
       "mcp",
       "syslog",
     ]);
     assert.equal(types.USAGE_FLAGS.length, 24);
+    // the files follow the labels ; the seed's sections keep their names, one format for both
+    const chat = await RepoObjects.descriptorOf("chat_assistant");
+    const notifications = await RepoObjects.descriptorOf("notifications");
+    assert.equal(chat.file, "chat-assistant.yaml");
+    assert.equal(notifications.folder, "notifications");
+    const { itemValidator, chatFileItem } = await import("../src/lib/seed-schema.js");
+    assert.deepEqual(notifications.keyOrder, itemValidator("notification_channels").keys);
+    assert.deepEqual(chat.keyOrder, itemValidator(chatFileItem).keys);
   });
 });

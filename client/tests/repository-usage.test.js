@@ -94,8 +94,8 @@ describe('the usage types', () => {
       'credentials',
       'secret_stores',
       'runners',
-      'notification_channels',
-      'chat',
+      'notifications',
+      'chat_assistant',
       'mcp',
       'syslog',
     ]);
@@ -125,7 +125,7 @@ describe('the usage types', () => {
       roles: 'sidebar.roles',
       categories: 'sidebar.categories',
       constants: 'sidebar.constants',
-      chat: 'sidebar.chat',
+      chat_assistant: 'sidebar.chat',
     });
     expect(read('pages/admin/repository.vue')).toContain(
       "t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })",
@@ -173,8 +173,8 @@ describe('a group box ticks every type of it that can be ticked', () => {
       'use_for_repositories',
       'use_for_secret_stores',
       'use_for_runners',
-      'use_for_notification_channels',
-      'use_for_chat',
+      'use_for_notifications',
+      'use_for_chat_assistant',
       'use_for_mcp',
       'use_for_syslog',
     ]);
@@ -236,9 +236,9 @@ describe('one question when a save turns several object types on or off', () => 
       'repositories',
       'secret_stores',
       'runners',
-      'notification_channels',
+      'notifications',
       'syslog',
-      'chat',
+      'chat_assistant',
       'mcp',
     ];
     expect(usageChanges(was, now)).toEqual({ on: all, off: [] });
@@ -382,8 +382,8 @@ describe('Pull all, and a linked object', () => {
 
 describe('the types kept in one file : the chat, the settings, the branding', () => {
   it('say their file : the app written to it, or the one in git applied', () => {
-    expect(activationLines(t, 'chat', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
-      'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat.yaml"}',
+    expect(activationLines(t, 'chat_assistant', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
+      'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat-assistant.yaml"}',
     );
     expect(activationLines(t, 'branding', 'cfg', { written: [], clashes: ['Branding'] })[0]).toBe(
       'settings.repositories.usageOnReadFile {"type":"settings.repositories.usageTypes.branding","name":"cfg","file":"branding.yaml"}',
@@ -396,7 +396,7 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     expect(await singleTypeSource('branding')).toEqual({ repository: 'cfg', repo_file: 'branding.yaml' });
     expect(await singleTypeSource('forms')).toBeNull();
     for (const [page, type] of [
-      ['pages/admin/chat.vue', 'chat'],
+      ['pages/admin/chat.vue', 'chat_assistant'],
       ['pages/admin/settings.vue', 'general'],
       ['pages/admin/mcp.vue', 'mcp'],
       ['pages/admin/name.vue', 'branding'],
@@ -466,7 +466,7 @@ describe('the header links : their own type, after Branding', () => {
 
   it('the Usage step names Notifications and Links as their menu items do', () => {
     const tt = (key) => key;
-    expect(usageBadges(tt, { use_for_notification_channels: 1, use_for_links: 1 })).toBe(
+    expect(usageBadges(tt, { use_for_notifications: 1, use_for_links: 1 })).toBe(
       '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
         '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
     );
@@ -509,6 +509,29 @@ describe('the MCP settings : one mcp.yaml, in Connections', () => {
       expect(r.usageHints.mcp, lang).toContain('mcp.yaml');
       expect(r.usageHints.general, lang).toContain('general.yaml');
       expect(r.usageTypes.settings, lang).toBeUndefined();
+    }
+  });
+});
+
+describe('the files and folders follow the labels', () => {
+  it('Chat assistant in chat-assistant.yaml, Notifications in notifications/, as on both sides', async () => {
+    expect(USAGE_TYPES.find((u) => u.key === 'chat_assistant')).toMatchObject({
+      flag: 'use_for_chat_assistant',
+      labelKey: 'sidebar.chat',
+      file: 'chat-assistant.yaml',
+    });
+    expect(USAGE_TYPES.find((u) => u.key === 'notifications')).toMatchObject({
+      flag: 'use_for_notifications',
+      labelKey: 'sidebar.notifications',
+      folder: 'notifications',
+    });
+    expect(server.USAGE_FLAGS).toEqual(expect.arrayContaining(['use_for_chat_assistant', 'use_for_notifications']));
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      expect(r.usageHints.chat_assistant, lang).toContain('chat-assistant.yaml');
+      expect(r.usageHints.notifications, lang).toContain('notifications');
+      expect(r.usageHints.chat, lang).toBeUndefined();
+      expect(r.usageHints.notification_channels, lang).toBeUndefined();
     }
   });
 });

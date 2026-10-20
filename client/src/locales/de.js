@@ -1351,9 +1351,9 @@ export default {
         secret_stores:
           'Secret Stores in YAML, je eine Datei in seinem Ordner secret-stores, die ihre Anmeldedaten benennen',
         runners: 'Runner in YAML, je eine Datei in seinem Ordner runners, die ihre Anmeldedaten benennen',
-        notification_channels: 'Benachrichtigungen in YAML, je eine Datei in seinem Ordner notification-channels',
+        notifications: 'Benachrichtigungen in YAML, je eine Datei in seinem Ordner notifications',
         syslog: 'Syslog-Server in YAML, je eine Datei in seinem Ordner syslog',
-        chat: 'Der Chat-Assistent in seiner chat.yaml, der Schlüssel nur als Umgebungsverweis',
+        chat_assistant: 'Der Chat-Assistent in seiner chat-assistant.yaml, der Schlüssel nur als Umgebungsverweis',
         mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, in seiner mcp.yaml',
         branding: 'Name, Standardwerte, Sprache, Logo und Symbol in seiner branding.yaml und den Bildern daneben',
         links: 'Die Links der Kopfzeile und der Link zum Designer, in seiner links.yaml',

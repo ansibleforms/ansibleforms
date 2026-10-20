@@ -1,7 +1,7 @@
 'use strict';
-// The Chat type of the repository-backed objects (lib/repoObjects/engine.js, its single-file mode) :
-// the chat assistant's settings in a repository's chat.yaml, in the config seed's format (its chat
-// section, every field optional : what the file does not declare is left alone). Its api key is an
+// The Chat assistant type of the repository-backed objects (lib/repoObjects/engine.js, its
+// single-file mode) : the chat assistant's settings in a repository's chat-assistant.yaml, in the
+// config seed's format (its chat section, every field optional : what the file does not declare is left alone). Its api key is an
 // ${ENV} reference only, or left out (the database's stays) ; a credential it names (an api one,
 // whose password is the key) waits when it is not there yet. A pull applies it as the chat page's
 // save does : the credential checked, the fields converted by the model.
@@ -11,8 +11,8 @@ import { differs } from "../seedCompare.js";
 import { singleType } from "./singleType.js";
 
 export default singleType({
-  key: "chat",
-  file: "chat.yaml",
+  key: "chat_assistant",
+  file: "chat-assistant.yaml",
   section: chatFileItem,
   title: "Chat assistant",
   noun: "chat assistant",

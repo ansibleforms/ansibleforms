@@ -1350,9 +1350,10 @@ export default {
         secret_stores:
           'Coffres de secrets en YAML, un par fichier dans son dossier secret-stores, qui nomment leur identifiant',
         runners: 'Runners en YAML, un par fichier dans son dossier runners, qui nomment leur identifiant',
-        notification_channels: 'Notifications en YAML, une par fichier dans son dossier notification-channels',
+        notifications: 'Notifications en YAML, une par fichier dans son dossier notifications',
         syslog: 'Serveurs syslog en YAML, un par fichier dans son dossier syslog',
-        chat: "L'assistant de chat dans son chat.yaml, la clé uniquement en référence d'environnement",
+        chat_assistant:
+          "L'assistant de chat dans son chat-assistant.yaml, la clé uniquement en référence d'environnement",
         mcp: "Les paramètres MCP par leur nom d'environnement, dans son mcp.yaml",
         branding:
           "Le nom, les valeurs par défaut, la langue, le logo et l'icône dans son branding.yaml et les images à côté",

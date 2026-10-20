@@ -136,7 +136,7 @@ CREATE TABLE `notification_channels` (
   `verify_tls` tinyint(4) DEFAULT 1,
   `payload` text DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
-  -- the repository and the file (notification-channels/<file>.yaml) it comes from ; NULL for one kept in the
+  -- the repository and the file (notifications/<file>.yaml) it comes from ; NULL for one kept in the
   -- app only (lib/repoObjects)
   `repository` varchar(250) DEFAULT NULL,
   `repo_file` varchar(500) DEFAULT NULL,
@@ -521,11 +521,11 @@ CREATE TABLE `repositories` (
   `use_for_credentials` tinyint(4) DEFAULT 0,
   `use_for_secret_stores` tinyint(4) DEFAULT 0,
   `use_for_runners` tinyint(4) DEFAULT 0,
-  `use_for_notification_channels` tinyint(4) DEFAULT 0,
+  `use_for_notifications` tinyint(4) DEFAULT 0,
   `use_for_sso` tinyint(4) DEFAULT 0,
   `use_for_ldap` tinyint(4) DEFAULT 0,
   `use_for_syslog` tinyint(4) DEFAULT 0,
-  `use_for_chat` tinyint(4) DEFAULT 0,
+  `use_for_chat_assistant` tinyint(4) DEFAULT 0,
   `use_for_mcp` tinyint(4) DEFAULT 0,
   `use_for_disclaimer` tinyint(4) DEFAULT 0,
   `use_for_branding` tinyint(4) DEFAULT 0,

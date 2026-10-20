@@ -67,7 +67,7 @@ function clampInt(v, min, max, dflt) {
 }
 
 /**
- * The fields a declaration gives (the config seed's chat section, a repository's chat.yaml),
+ * The fields a declaration gives (the config seed's chat section, a repository's chat-assistant.yaml),
  * converted as a save from the app converts them (the constructor : the key encrypted, the numbers
  * clamped) - only those it declares : the constructor materialises every field it knows.
  *

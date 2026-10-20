@@ -1,5 +1,5 @@
 // The last object types on the engine (lib/repoObjects) : the ones kept in ONE file of their
-// repository - the chat assistant (chat.yaml), the System > General settings (general.yaml), the
+// repository - the chat assistant (chat-assistant.yaml), the System > General settings (general.yaml), the
 // branding (branding.yaml and its images) - and the announcements and the disclaimer versions, one
 // file each. On the shared fixture :
 //   single-file mode  a pull applies the file (git wins), turning the type on writes the app's
@@ -98,7 +98,7 @@ beforeEach(() => {
   acceptances = { 1: 5 };
   fx.reset({
     repositories: [
-      { id: 1, name: "cfg", use_for_chat: 1, use_for_general: 1, use_for_branding: 1, use_for_links: 1, use_for_mcp: 1 },
+      { id: 1, name: "cfg", use_for_chat_assistant: 1, use_for_general: 1, use_for_branding: 1, use_for_links: 1, use_for_mcp: 1 },
       { id: 2, name: "news", use_for_announcements: 1, use_for_disclaimer: 1 },
     ],
     credentials: [{ id: 1, name: "chat-key", credential_type: "api", password: "enc:k" }],
@@ -112,60 +112,60 @@ beforeEach(() => {
 // ─── the single-file mode ──────────────────────────────────────────────────────
 describe("a type kept in one file : the chat assistant", () => {
   test("a pull applies its file, its ${ENV} key resolved ; an unchanged file changes nothing", async () => {
-    writeRaw("cfg", "chat.yaml", "provider: openai\nmodel: gpt-5\napi_key: ${CHAT_KEY}\n");
-    const summary = await RepoObjects.syncRepository(await desc("chat"), "cfg");
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\nmodel: gpt-5\napi_key: ${CHAT_KEY}\n");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.equal(summary.updated, 1, JSON.stringify(summary));
     const row = fx.state.tables.chat_settings[0];
     assert.equal(row.provider, "openai");
     assert.equal(row.model, "gpt-5");
     assert.equal(row.api_key, "enc:sk-from-env");
-    assert.equal((await RepoObjects.syncRepository(await desc("chat"), "cfg")).unchanged, 1);
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).unchanged, 1);
   });
 
   test("a plain key is refused, the app left as it is ; a credential not there yet waits", async () => {
-    writeRaw("cfg", "chat.yaml", "provider: openai\napi_key: sk-plain\n");
-    const refused = await RepoObjects.syncRepository(await desc("chat"), "cfg");
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\napi_key: sk-plain\n");
+    const refused = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.match(refused.refused[0].reasons[0], /api_key must be an \$\{ENV\} reference/);
     assert.equal(fx.state.tables.chat_settings[0].provider, "");
-    writeRaw("cfg", "chat.yaml", "provider: openai\ncredential: missing-key\n");
-    const waiting = await RepoObjects.syncRepository(await desc("chat"), "cfg");
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\ncredential: missing-key\n");
+    const waiting = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.match(waiting.waiting[0].reasons[0], /waits for the credential 'missing-key'/);
   });
 
   test("no file : turning it on writes the app's values, without the key ; an edit rewrites what changed", async () => {
     fx.cloneEmpty("cfg");
     Object.assign(fx.state.tables.chat_settings[0], { provider: "openai", model: "gpt-5" });
-    const p = await RepoObjects.preview(await desc("chat"), "cfg");
+    const p = await RepoObjects.preview(await desc("chat_assistant"), "cfg");
     assert.deepEqual(p.written, ["Chat assistant"]);
     assert.deepEqual(p.withoutSecret, ["Chat assistant"]);
-    const report = await RepoObjects.activate(await desc("chat"), "cfg", { pull: false });
+    const report = await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
     assert.deepEqual(report.written, ["Chat assistant"]);
-    assert.deepEqual(fx.readObject("cfg", ".", "chat.yaml"), { provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
+    assert.deepEqual(fx.readObject("cfg", ".", "chat-assistant.yaml"), { provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
     // edited in the app : only the model rewritten
-    const before = await RepoObjects.snapshot("chat");
+    const before = await RepoObjects.snapshot("chat_assistant");
     fx.state.tables.chat_settings[0].model = "gpt-6";
-    assert.equal(await RepoObjects.appUpdated("chat", before), true);
-    assert.equal(fx.readObject("cfg", ".", "chat.yaml").model, "gpt-6");
+    assert.equal(await RepoObjects.appUpdated("chat_assistant", before), true);
+    assert.equal(fx.readObject("cfg", ".", "chat-assistant.yaml").model, "gpt-6");
     // and a pull says its key stays the database's
-    const summary = await RepoObjects.syncRepository(await desc("chat"), "cfg");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.deepEqual(summary.secretsKept, ["Chat assistant"]);
   });
 
   test("a file there when it is turned on : git wins, the app's values not written", async () => {
-    writeRaw("cfg", "chat.yaml", "model: from-git\n");
-    const report = await RepoObjects.activate(await desc("chat"), "cfg", { pull: false });
+    writeRaw("cfg", "chat-assistant.yaml", "model: from-git\n");
+    const report = await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
     assert.deepEqual(report.matched, ["Chat assistant"]);
     assert.deepEqual(report.written, []);
     assert.equal(fx.state.tables.chat_settings[0].model, "from-git");
-    assert.equal(fx.readText("cfg", ".", "chat.yaml"), "model: from-git\n");
+    assert.equal(fx.readText("cfg", ".", "chat-assistant.yaml"), "model: from-git\n");
   });
 
   test("turned off : read once more, the app keeps its values, the file stays", async () => {
-    writeRaw("cfg", "chat.yaml", "model: last\n");
-    const report = await RepoObjects.deactivate(await desc("chat"), "cfg");
+    writeRaw("cfg", "chat-assistant.yaml", "model: last\n");
+    const report = await RepoObjects.deactivate(await desc("chat_assistant"), "cfg");
     assert.equal(report.unlinked, 1);
     assert.equal(fx.state.tables.chat_settings[0].model, "last");
-    assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "chat.yaml")));
+    assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "chat-assistant.yaml")));
   });
 });
 

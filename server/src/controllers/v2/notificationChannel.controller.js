@@ -127,7 +127,7 @@ const create = async (req, res) => {
     await guardChannelCredentials(req, null);
     const id = await NotificationChannel.create(req.body);
     // the notification channels repository, when there is one : written to it as a new file
-    await RepoObjects.appCreated("notification_channels", id);
+    await RepoObjects.appCreated("notifications", id);
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Notification channel" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -155,7 +155,7 @@ const update = async (req, res) => {
     await guardChannelCredentials(req, existing);
     await NotificationChannel.update(req.body, req.params.id);
     // one of the notification channels repository : its changed fields written to its file
-    if (existing.repository) await RepoObjects.appUpdated("notification_channels", existing, req.params.id);
+    if (existing.repository) await RepoObjects.appUpdated("notifications", existing, req.params.id);
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -167,7 +167,7 @@ const deleteChannel = async (req, res) => {
     const before = await NotificationChannel.findById(req.params.id).catch(() => null);
     await NotificationChannel.delete(req.params.id);
     // one of the notification channels repository : its file goes too, for the repository's Push
-    if (before?.repository) await RepoObjects.appDeleted("notification_channels", before);
+    if (before?.repository) await RepoObjects.appDeleted("notifications", before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
