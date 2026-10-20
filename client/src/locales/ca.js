@@ -1329,7 +1329,6 @@ export default {
         credentials: 'Credencials',
         secret_stores: 'Magatzems de secrets',
         runners: 'Runners',
-        notification_channels: 'Canals de notificació',
         syslog: 'Syslog',
         chat: 'Xat',
         branding: 'Marca',
@@ -1352,11 +1351,12 @@ export default {
         secret_stores:
           'Magatzems de secrets en YAML, un per fitxer a la seva carpeta secret-stores, que nomenen la seva credencial',
         runners: 'Runners en YAML, un per fitxer a la seva carpeta runners, que nomenen la seva credencial',
-        notification_channels: 'Canals de notificació en YAML, un per fitxer a la seva carpeta notification-channels',
+        notification_channels: 'Notificacions en YAML, una per fitxer a la seva carpeta notification-channels',
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
         chat: "Els ajustos de l'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
         branding:
-          'El nom, els enllaços, els valors per defecte, el logotip i la icona al seu branding.yaml i les imatges al costat',
+          "El nom, els valors per defecte, l'idioma, el logotip i la icona al seu branding.yaml i les imatges al costat",
+        links: 'Els enllaços de la capçalera i el del dissenyador, al seu links.yaml',
         labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
         announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',
         settings: "Els ajustos de Sistema > General pel seu nom d'entorn, al seu settings.yaml",

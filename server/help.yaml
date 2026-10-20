@@ -6556,7 +6556,7 @@
       | Designer | Forms (`use_for_forms`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Inventories (`use_for_inventories`), Schedules (`use_for_schedules`) |
       | Access | Config (`use_for_config`), SSO (`use_for_sso`), LDAP (`use_for_ldap`), Disclaimer (`use_for_disclaimer`) |
       | Connections | Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notification channels (`use_for_notification_channels`), Syslog (`use_for_syslog`), Chat (`use_for_chat`) |
-      | Appearance | Branding (`use_for_branding`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
+      | Appearance | Branding (`use_for_branding`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | Settings (`use_for_settings`) |
 
       Forms, Playbooks, Workflows, Inventories and Config work as before (several repositories may hold forms,
@@ -6564,7 +6564,7 @@
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
       `notification-channels/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
       what the app has one of, one file at the repository's root (`chat.yaml`, `settings.yaml`, `branding.yaml`
-      and its images).
+      and its images, `links.yaml`).
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
@@ -6655,13 +6655,14 @@
       notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
       is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
       then what names them; Pull all pulls the repositories in the same order.
-  - name: Settings, chat, branding, announcements and the disclaimer kept in a git repository
-    short: The last usage types, three of them one file each
+  - name: Settings, chat, branding, links, announcements and the disclaimer kept in a git repository
+    short: The last usage types, four of them one file each
     version: v7.4.0
     description: |
-      The last five usage types work as the others (two ways, the same question before turning them on or off,
+      The last six usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
-      Three are things the app has one of: each is **one file** at the repository's root. Turning the type on
+      Four are things the app has one of (chat, settings, branding, links): each is **one file** at the
+      repository's root. Turning the type on
       writes the app's values to that file when the repository has none, or applies the file when it has one (git
       wins); a pull applies it; a save in the app rewrites only the fields it changed; turning it off reads it once
       more and the app keeps its values. A file removed from git changes nothing in the app.
@@ -6689,18 +6690,12 @@
       DB_PASSWORD: ${DB_PASSWORD}
       ```
 
-      **Branding** (`branding.yaml` and its images): the name, the header's links (`header_links`) and the
-      Designer's (`show_designer`), the defaults (`default_theme`, `default_theme_color`, `forms_view`,
-      `default_timezone`, `default_date_format`, `default_language`) and the logo and the website icon as image
-      files beside it, named by their path. The images are read and written as binary and checked as an upload is
-      (an image type sniffed from its bytes; the logo at most 900 KB, the icon 256 KB); an empty value restores the
-      bundled one. The config seed has a `branding:` section in the same format, its images relative to the seed
-      file. As every seed section, it locks what it declares, field by field: those fields are read only on the
-      Appearance pages (a notice says so, a seeded logo or icon cannot be uploaded nor removed) and the API refuses
-      their change (403); a field it no longer declares is released, and all are when the seed is turned off. A
-      Branding repository and the seed never own the same field: the seed keeps the fields it declares (listed as
-      staying in the app when the repository is made the branding's, never written to `branding.yaml`, and not
-      applied from it, said in the pull output); the repository holds the others.
+      **Branding** (`branding.yaml` and its images): the name and the defaults (`default_theme`,
+      `default_theme_color`, `forms_view`, `default_timezone`, `default_date_format`, `default_language`) and the
+      logo and the website icon as image files beside it, named by their path. The images are read and written as
+      binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
+      256 KB); an empty value restores the bundled one. The config seed has a `branding:` section in the same
+      format, its images relative to the seed file.
       ```yaml
       app_name: ACME Automation
       default_theme: dark
@@ -6708,6 +6703,22 @@
       logo: logo.png
       icon: icon.svg
       ```
+
+      **Links** (`links.yaml`): Settings > Appearance > Links, its own usage type: the header's links
+      (`header_links`, each `id`, `label`, `url`, `icon`, `newTab` and `parent`) and whether the Designer's link
+      shows (`show_designer`). The config seed has a `links:` section in the same format.
+      ```yaml
+      show_designer: true
+      header_links:
+        - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
+      ```
+
+      As every seed section, the seed's `branding:` and `links:` lock what they declare, field by field: those
+      fields are read only on the Appearance pages (a notice says so, a seeded logo or icon cannot be uploaded nor
+      removed) and the API refuses their change (403); a field no longer declared is released, and all are when the
+      seed is turned off. A Branding or Links repository and the seed never own the same field: the seed keeps the
+      fields it declares (listed as staying in the app when the repository is made the type's, never written to its
+      file, and not applied from it, said in the pull output); the repository holds the others.
 
       **Announcements** (`announcements/`, one file each): named (what a pull finds them by), with their
       `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,

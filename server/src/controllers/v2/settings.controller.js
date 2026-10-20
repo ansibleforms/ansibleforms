@@ -219,14 +219,14 @@ const update = async function(req, res) {
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
           }
-          // the branding repository's file, before : its changed fields written into it after
-          const before = await RepoObjects.snapshot('branding');
+          // the branding and links repositories' files, before : their changed fields written after
+          const before = await RepoObjects.snapshots(['branding', 'links']);
           // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
           // with no field the model knows is refused
           if (!(await saveSettingsFields(body))) {
             return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
           }
-          await RepoObjects.appUpdated('branding', before);
+          await RepoObjects.appUpdatedAll(before);
           res.json(RestResult.single(null));
         } catch(err) {
           // a branding field the config seed manages : 403, as every seeded object

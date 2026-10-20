@@ -809,16 +809,17 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("chat");
   }
 
-  // the branding, the announcements and the disclaimer versions : read through the descriptors a
+  // the branding, the links, the announcements and the disclaimer versions : read through the descriptors a
   // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted
   const sections = [
     ["branding", "branding", "branding"],
+    ["links", "links", "links"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
   ];
-  // the branding fields it declares are its own from now on (read only in the app) ; one it no
-  // longer declares, or a section gone, released (lib/brandingManaged.js)
-  const brandingReleased = await setSeedManagedBranding(Object.keys(doc.branding || {}));
+  // the appearance fields its branding and links sections declare are its own from now on (read
+  // only in the app) ; one it no longer declares, or a section gone, released (lib/brandingManaged.js)
+  const brandingReleased = await setSeedManagedBranding([...Object.keys(doc.branding || {}), ...Object.keys(doc.links || {})]);
   summary.released.push(...brandingReleased.map((field) => `branding:${field}`));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");

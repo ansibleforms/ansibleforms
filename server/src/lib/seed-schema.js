@@ -584,9 +584,9 @@ export const ldapDirectoryItem = {
 // when the app's stays in the database
 export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);
 
-// The branding (Settings > Appearance : Name, Links, Defaults, Logo, Icon) : the app's name, the
-// header's links and whether the Designer's shows, the defaults (theme, colour, forms view, time
-// zone, date format, language), and the logo and the website icon as image files named by their
+// The branding (Settings > Appearance : Defaults, Name, Logo, Icon) : the app's name, the defaults
+// (theme, colour, forms view, time zone, date format, language), and the logo and the website icon
+// as image files named by their
 // path, relative to the seed file (or the repository's branding.yaml), read as binary and checked
 // as an upload is. Every field optional : what is not declared is left alone. What the seed declares
 // is its own, field by field : read only in the app (lib/brandingManaged.js), released when it is no
@@ -596,9 +596,6 @@ export const brandingSection = {
   additionalProperties: false,
   properties: {
     app_name: str,
-    // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
-    header_links: { type: ["array", "string"] },
-    show_designer: bool,
     default_theme: { type: "string", enum: ["system", "light", "dark"] },
     default_theme_color: str,
     forms_view: str,
@@ -608,6 +605,19 @@ export const brandingSection = {
     // an image file's path ; empty : the default (the bundled logo, the bundled icon)
     logo: str,
     icon: str,
+  },
+};
+
+// The header's links (Settings > Appearance > Links) : its own links and whether the Designer's
+// shows. Every field optional ; what the seed declares is its own, field by field, as the branding's
+// (lib/brandingManaged.js).
+export const linksSection = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
+    header_links: { type: ["array", "string"] },
+    show_designer: bool,
   },
 };
 
@@ -725,6 +735,7 @@ export const seedSchema = {
     settings: settingsSection,
     chat: chatSection,
     branding: brandingSection,
+    links: linksSection,
     announcements: itemsSection(announcementItem),
     disclaimer: itemsSection(disclaimerItem),
   },

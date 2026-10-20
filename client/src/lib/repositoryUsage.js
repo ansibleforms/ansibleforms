@@ -34,6 +34,8 @@ export const USAGE_CATEGORIES = ['designer', 'system', 'appearance', 'access', '
 //   oneOnly   one repository at most : greyed on the others, with who has it
 //   folder    its folder in the repository (an object type), or
 //   file      its one file at the repository's root (a type the app has one of : chat.yaml)
+//   labelKey  its label's translation when it is its menu item's (settings.repositories.usageTypes.<key>
+//             when not given)
 export const USAGE_TYPES = [
   { key: 'forms', flag: 'use_for_forms', category: 'designer' },
   { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
@@ -63,6 +65,16 @@ export const USAGE_TYPES = [
     objects: true,
     oneOnly: true,
     file: 'branding.yaml',
+  },
+  // named as its menu item names it (Links)
+  {
+    key: 'links',
+    flag: 'use_for_links',
+    category: 'appearance',
+    labelKey: 'sidebar.links',
+    objects: true,
+    oneOnly: true,
+    file: 'links.yaml',
   },
   {
     key: 'labels',
@@ -124,7 +136,8 @@ export const USAGE_TYPES = [
     key: 'notification_channels',
     flag: 'use_for_notification_channels',
     category: 'connections',
-
+    // named as its menu item names it (Notifications)
+    labelKey: 'sidebar.notifications',
     objects: true,
     oneOnly: true,
     folder: 'notification-channels',
@@ -158,6 +171,7 @@ export const APPLY_ORDER = [
   'schedules',
   'disclaimer',
   'branding',
+  'links',
   'labels',
   'announcements',
   'settings',
@@ -189,7 +203,7 @@ export const usageType = (key) => USAGE_TYPES.find((u) => u.key === key);
  * Returns:
  *   string: the label (Credentials).
  */
-export const usageLabel = (t, key) => t(`settings.repositories.usageTypes.${key}`);
+export const usageLabel = (t, key) => t(usageType(key)?.labelKey || `settings.repositories.usageTypes.${key}`);
 
 /**
  * A type's few grey words : what the repository holds for it.

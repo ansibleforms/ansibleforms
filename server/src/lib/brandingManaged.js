@@ -1,15 +1,16 @@
 'use strict';
-// The branding fields the config seed manages (its branding section) : read only in the app, as
-// every seeded object is - refused with a 403 by the helpers that save them (lib/appearance.js,
-// lib/envSave.js, lib/brandImages.js), whatever page or request calls them ; the seed itself
-// writes them (opts.fromSeed). The branding lives in the settings row and in two environment
-// settings, so the seed's hold is kept per field : the names of the fields its section declares,
-// in the settings row's branding_managed (JSON). A field it stops declaring is released, and all
+// The appearance fields the config seed manages (its branding and links sections) : read only in
+// the app, as every seeded object is - refused with a 403 by the helpers that save them
+// (lib/appearance.js, lib/envSave.js, lib/brandImages.js), whatever page or request calls them ;
+// the seed itself writes them (opts.fromSeed). They live in the settings row and in two environment
+// settings, so the seed's hold is kept per field, one list for both sections : the names of the
+// fields they declare, in the settings row's branding_managed (JSON). A field it stops declaring is released, and all
 // are when the seed is turned off (lib/seed.js).
 import mysql from "../models/db.model.js";
 import Errors from "./errors.js";
 
-// the branding's fields (lib/repoObjects/branding.js, the seed's branding section)
+// the appearance fields : the branding's (lib/repoObjects/branding.js) and the links'
+// (lib/repoObjects/links.js), the seed's branding and links sections
 export const BRANDING_FIELDS = [
   "app_name",
   "header_links",

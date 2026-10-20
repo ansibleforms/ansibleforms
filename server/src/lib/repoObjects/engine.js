@@ -1073,6 +1073,7 @@ async function syncSingle(desc, name) {
     return summary;
   }
   const current = await desc.current();
+  summary.notes.push(...desc.notesOf(checked.object, current));
   const secrets = desc.secretsOf ? desc.secretsOf(current) : desc.secrets || [];
   if (secrets.some((s) => !given(raw[s]) && given(current?.[s]))) summary.secretsKept.push(desc.title);
   if (!desc.changed(checked.object, current)) {

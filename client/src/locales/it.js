@@ -1327,7 +1327,6 @@ export default {
         credentials: 'Credenziali',
         secret_stores: 'Archivi di segreti',
         runners: 'Runner',
-        notification_channels: 'Canali di notifica',
         syslog: 'Syslog',
         chat: 'Chat',
         branding: 'Branding',
@@ -1350,11 +1349,12 @@ export default {
         secret_stores:
           'Archivi di segreti in YAML, uno per file nella sua cartella secret-stores, che nominano la loro credenziale',
         runners: 'Runner in YAML, uno per file nella sua cartella runners, che nominano la loro credenziale',
-        notification_channels: 'Canali di notifica in YAML, uno per file nella sua cartella notification-channels',
+        notification_channels: 'Notifiche in YAML, una per file nella sua cartella notification-channels',
         syslog: 'Server syslog in YAML, uno per file nella sua cartella syslog',
         chat: "Le impostazioni dell'assistente chat nel suo chat.yaml, la chiave solo come riferimento di ambiente",
         branding:
-          "Il nome, i link, i valori predefiniti, il logo e l'icona nel suo branding.yaml e le immagini accanto",
+          "Il nome, i valori predefiniti, la lingua, il logo e l'icona nel suo branding.yaml e le immagini accanto",
+        links: "I link dell'intestazione e quello del designer, nel suo links.yaml",
         labels: 'Le etichette accanto al logo in YAML, una per file nella sua cartella labels, nel loro ordine',
         announcements: 'Annunci in YAML, uno per file nella sua cartella announcements',
         settings: 'Le impostazioni di Sistema > Generale per nome di ambiente, nel suo settings.yaml',

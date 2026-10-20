@@ -130,9 +130,9 @@ const saveEnv = async function(req,res){
     if(outside.length){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`))
     }
-    // the settings and branding repositories' files, before (the language and the Designer's link
-    // are the branding's) : their changed variables written into them after
-    const before = await RepoObjects.snapshots(['settings', 'branding'])
+    // the settings, branding and links repositories' files, before (the language is the branding's,
+    // the Designer's link the links') : their changed variables written into them after
+    const before = await RepoObjects.snapshots(['settings', 'branding', 'links'])
     // checked, written, applied, audited : as a settings repository's pull (lib/envSave.js)
     const { restartRequired: restart } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
     await RepoObjects.appUpdatedAll(before)

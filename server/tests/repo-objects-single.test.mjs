@@ -95,7 +95,7 @@ beforeEach(() => {
   acceptances = { 1: 5 };
   fx.reset({
     repositories: [
-      { id: 1, name: "cfg", use_for_chat: 1, use_for_settings: 1, use_for_branding: 1 },
+      { id: 1, name: "cfg", use_for_chat: 1, use_for_settings: 1, use_for_branding: 1, use_for_links: 1 },
       { id: 2, name: "news", use_for_announcements: 1, use_for_disclaimer: 1 },
     ],
     credentials: [{ id: 1, name: "chat-key", credential_type: "api", password: "enc:k" }],
@@ -224,7 +224,7 @@ describe("the branding and its images", () => {
     writeRaw("cfg", "branding.yaml", "icon: icon.png\n");
     assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /larger than 256 KB/);
     writeRaw("cfg", "branding.yaml", "logo: ../elsewhere.png\n");
-    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /not a file beside the branding/);
+    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /not a file beside it/);
   });
 
   test("turned on : the app's branding written, its logo beside it as binary ; a new logo rewrites it", async () => {
@@ -252,6 +252,56 @@ describe("the branding and its images", () => {
     assert.deepEqual(done.updated, ["branding"]);
     assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
     assert.equal(fx.state.tables.settings[0].logo, dataUrl(PNG));
+  });
+});
+
+// ─── the header's links ────────────────────────────────────────────────────────
+describe("the header's links, in their own links.yaml", () => {
+  const LINK = { id: "a", label: "Docs", url: "https://docs.example.com", icon: "book", newTab: true, parent: null };
+
+  test("turned on : written to links.yaml, never to branding.yaml ; a pull applies it ; an edit rewrites it", async () => {
+    fx.cloneEmpty("cfg");
+    fx.state.tables.settings[0].header_links = JSON.stringify([LINK]);
+    const report = await RepoObjects.activate(await desc("links"), "cfg", { pull: false });
+    assert.deepEqual(report.written, ["Links"]);
+    const file = fx.readObject("cfg", ".", "links.yaml");
+    assert.equal(file.header_links[0].label, "Docs");
+    assert.equal(file.show_designer, true);
+    // the branding holds no link any more
+    await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
+    const branding = fx.readObject("cfg", ".", "branding.yaml");
+    assert.equal(branding.header_links, undefined);
+    assert.equal(branding.show_designer, undefined);
+    writeRaw("cfg", "branding.yaml", "header_links: []\n");
+    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /'header_links'/);
+    // a pull of links.yaml : the links follow it
+    writeRaw("cfg", "links.yaml", "header_links:\n  - { id: b, label: Wiki, url: 'https://wiki' }\n");
+    const summary = await RepoObjects.syncRepository(await desc("links"), "cfg");
+    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    assert.equal(JSON.parse(fx.state.tables.settings[0].header_links)[0].label, "Wiki");
+    // an edit in the app rewrites the file
+    const before = await RepoObjects.snapshot("links");
+    fx.state.tables.settings[0].header_links = JSON.stringify([LINK]);
+    await RepoObjects.appUpdated("links", before);
+    assert.equal(fx.readObject("cfg", ".", "links.yaml").header_links[0].label, "Docs");
+    // turned off : the app keeps its links, the file stays
+    assert.equal((await RepoObjects.deactivate(await desc("links"), "cfg")).unlinked, 1);
+    assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "links.yaml")));
+  });
+
+  test("the seed's links are its own : refused in the app, kept out of the repository's file", async () => {
+    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { saveSettingsFields } = await import("../src/lib/appearance.js");
+    await setSeedManagedBranding(["header_links"]);
+    await assert.rejects(saveSettingsFields({ header_links: [LINK] }), { status: 403 });
+    writeRaw("cfg", "links.yaml", "header_links: []\n");
+    const summary = await RepoObjects.syncRepository(await desc("links"), "cfg");
+    assert.match(RepoObjects.summaryText(await desc("links"), summary), /Kept by the config seed, not applied: header_links/);
+    assert.deepEqual((await RepoObjects.preview(await desc("links"), "cfg")).kept.map((k) => k.name), ["header_links"]);
+    // the seed's own section applies them
+    const done = await RepoObjects.applyDeclared(await desc("links"), { header_links: [LINK] }, {});
+    assert.deepEqual(done.updated, ["links"]);
+    assert.equal(JSON.parse(fx.state.tables.settings[0].header_links)[0].label, "Docs");
   });
 });
 

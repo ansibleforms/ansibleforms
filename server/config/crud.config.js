@@ -338,6 +338,7 @@ const crudConfigs = {
       { name: 'use_for_chat', isBoolean: true },
       { name: 'use_for_disclaimer', isBoolean: true },
       { name: 'use_for_branding', isBoolean: true },
+      { name: 'use_for_links', isBoolean: true },
       { name: 'use_for_labels', isBoolean: true },
       { name: 'use_for_announcements', isBoolean: true },
       { name: 'use_for_settings', isBoolean: true },

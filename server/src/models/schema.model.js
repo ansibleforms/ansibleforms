@@ -683,7 +683,7 @@ const SCHEMA_MANIFEST = {
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
                                'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
-                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_links', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
                                'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
                                'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.branding_managed',
                                'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
@@ -1262,7 +1262,7 @@ async function patchVersion7(messages, success, failed) {
   // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
   // YAML file per object in the type's folder ; the objects of the types built say where they come
   // from (repository, repo_file), the other types' tables will in the version that brings them
-  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "labels", "announcements", "settings"]) {
+  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "links", "labels", "announcements", "settings"]) {
     await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
   }
   // an announcement is found by its name (a seed's, a repository's)

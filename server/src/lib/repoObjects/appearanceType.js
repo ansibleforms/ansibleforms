@@ -1,0 +1,171 @@
+'use strict';
+// The appearance types of the repository-backed objects (lib/repoObjects/engine.js, its
+// single-file mode) : what Settings > Appearance's pages save, in one file of a repository - the
+// branding (branding.yaml : the name, the defaults, the language, the logo and the icon, the images
+// as files beside it) and the header's links (links.yaml : the links and the Designer's). One way
+// for both, written once : a file applied as the pages save (the settings row's fields through
+// lib/appearance.js, the environment settings through lib/envSave.js, the images through
+// lib/brandImages.js), the images read and written as binary and checked as an upload is. The
+// config seed's branding and links sections are read the same way, its images relative to the seed
+// file.
+//
+// The seed and a repository never own the same field : a field the seed declares stays the seed's
+// (read only in the app, lib/brandingManaged.js) - never written to the repository's file, never
+// applied from it (said in the pull output), listed as staying in the app when the repository is
+// made the type's. The repository holds the other fields.
+import fs from "fs";
+import path from "path";
+import Settings, { validHeaderLinks } from "../../models/settings.model.js";
+import appConfig from "../../../config/app.config.js";
+import { saveSettingsFields } from "../appearance.js";
+import { saveEnvValues } from "../envSave.js";
+import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
+import { seedManagedBranding } from "../brandingManaged.js";
+import { same } from "./yamlFile.js";
+import { singleType } from "./singleType.js";
+
+// the environment settings among the appearance fields, by field : their variable, and how the app
+// reads them now
+const ENV = {
+  default_language: { name: "DEFAULT_LANGUAGE", read: () => process.env.DEFAULT_LANGUAGE || null, write: (v) => v ?? "" },
+  show_designer: { name: "SHOW_DESIGNER", read: () => !!appConfig.showDesigner, write: (v) => (v ? "1" : "0") },
+};
+
+/**
+ * A field's value as two are compared : a list as its JSON, a yes or no as true or false, no
+ * value as ''.
+ *
+ * Args:
+ *   v (any): the value.
+ *
+ * Returns:
+ *   any: the value compared.
+ */
+const comparable = (v) => (Array.isArray(v) ? JSON.stringify(v) : typeof v === "boolean" ? v : v === null || v === undefined ? "" : String(v));
+
+/**
+ * An image file a file names, read as binary : inside the folder it is named from.
+ *
+ * Args:
+ *   dir (string): the folder (the repository's root, the seed file's folder).
+ *   name (string): its path, relative to it.
+ *
+ * Returns:
+ *   Buffer: its bytes.
+ *
+ * Raises:
+ *   Error: a path that leads outside the folder, or a file that cannot be read.
+ */
+function readImage(dir, name) {
+  const base = path.resolve(dir || ".");
+  const abs = path.resolve(base, String(name));
+  if (!abs.startsWith(base + path.sep)) throw new Error(`'${name}' is not a file beside it`);
+  try {
+    return fs.readFileSync(abs);
+  } catch (e) {
+    throw new Error(`'${name}' cannot be read: ${e.code || e.message}`, { cause: e });
+  }
+}
+
+/**
+ * The descriptor of an appearance type.
+ *
+ * Args:
+ *   spec (object):
+ *     key, file, title, noun (string): as lib/repoObjects/singleType.js reads them.
+ *     section (object): the schema of its file (lib/seed-schema.js).
+ *     rowFields (string[]): its fields of the settings row (app_name, header_links ...).
+ *     envFields (string[]): its environment settings, by field (default_language, show_designer).
+ *     images (string[]): its images (logo, icon), files beside its YAML.
+ *     keepFalse (string[]): its yes or no fields written when off.
+ *
+ * Returns:
+ *   object: the descriptor.
+ */
+export function appearanceType(spec) {
+  const { rowFields = [], envFields = [], images = [] } = spec;
+  const fields = [...rowFields, ...envFields, ...images];
+  // the fields of this type the config seed manages
+  const seededOf = (current) => (current?._seedManaged || []).filter((f) => fields.includes(f));
+
+  /**
+   * The fields a declaration changes : those whose value is not the app's - the ones the config
+   * seed manages left out, unless the seed itself applies them.
+   *
+   * Args:
+   *   declared (object): the declaration (a file's, the seed's).
+   *   current (object): the app's values (current).
+   *   opts (object): { fromSeed (true : the seed's own declaration) }.
+   *
+   * Returns:
+   *   string[]: the fields.
+   */
+  function changedFields(declared, current, opts = {}) {
+    const seeded = opts.fromSeed ? [] : seededOf(current);
+    return Object.keys(declared).filter((k) => !seeded.includes(k) && !same(comparable(declared[k]), comparable(current?.[k])));
+  }
+
+  return singleType({
+    key: spec.key,
+    file: spec.file,
+    section: spec.section,
+    title: spec.title,
+    noun: spec.noun,
+    keepFalse: spec.keepFalse || [],
+    // as the Appearance pages show them : the images as data urls, none for the bundled ones
+    current: async () => {
+      const row = await Settings.find();
+      const out = Object.fromEntries(rowFields.map((k) => [k, row[k] ?? null]));
+      if (rowFields.includes("header_links")) {
+        out.header_links = validHeaderLinks(row.header_links || "[]");
+        if (!out.header_links.length) out.header_links = null;
+      }
+      for (const field of envFields) out[field] = ENV[field].read();
+      for (const kind of images) out[kind] = await BRAND_IMAGES[kind].get();
+      // the fields the config seed manages : the seed's, never the repository's
+      out._seedManaged = await seedManagedBranding();
+      return out;
+    },
+    // the fields the seed manages stay in the app (a seed-managed object stays with the seed)
+    kept: (current) => seededOf(current).map((field) => ({ name: field, code: "seed", reason: "managed by the config seed" })),
+    // its YAML names its images by the file they are written as ; the seed's fields left out
+    toFile: (current) => {
+      const out = { ...current, ...Object.fromEntries(images.map((k) => [k, imageFile(k, current[k])?.name])) };
+      for (const field of seededOf(current)) delete out[field];
+      return out;
+    },
+    extraFiles: (current) => images.filter((k) => !seededOf(current).includes(k)).map((k) => imageFile(k, current[k])).filter(Boolean),
+    // the images it names read and checked ; its links as the model keeps them
+    fromFile: async (declared, { dir } = {}) => {
+      const out = { ...declared };
+      for (const kind of images) {
+        if (declared[kind] === undefined) continue;
+        out[kind] = declared[kind] ? imageDataUrl(kind, readImage(dir, declared[kind])) : null;
+      }
+      if (declared.header_links !== undefined) out.header_links = validHeaderLinks(declared.header_links);
+      return out;
+    },
+    changed: (declared, current, opts = {}) => changedFields(declared, current, opts).length > 0,
+    apply: async (declared, current, opts = {}) => {
+      const changed = changedFields(declared, current, opts);
+      // the settings row's fields, as the pages save them
+      const row = Object.fromEntries(changed.filter((k) => rowFields.includes(k)).map((k) => [k, declared[k]]));
+      if (Object.keys(row).length) await saveSettingsFields(row, opts);
+      // the environment settings, as their pages save them
+      const env = Object.fromEntries(changed.filter((k) => envFields.includes(k)).map((k) => [ENV[k].name, ENV[k].write(declared[k])]));
+      const notes = [];
+      if (Object.keys(env).length) {
+        const { restartRequired } = await saveEnvValues(env, { user: opts.fromSeed ? "config seed" : "repository" }, opts);
+        if (restartRequired.length) notes.push(`Saved ; applied at the next restart: ${restartRequired.join(", ")}`);
+      }
+      // the images : the one named, or the bundled one
+      for (const kind of images) if (changed.includes(kind)) await BRAND_IMAGES[kind].set(declared[kind], opts);
+      return notes;
+    },
+    // a repository's file declaring a field the seed manages : not applied, said
+    notesOf: (declared, current) => {
+      const seeded = Object.keys(declared).filter((k) => seededOf(current).includes(k));
+      return seeded.length ? [`Kept by the config seed, not applied: ${seeded.join(", ")}`] : [];
+    },
+  });
+}

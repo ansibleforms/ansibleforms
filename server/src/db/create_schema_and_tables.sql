@@ -522,6 +522,7 @@ CREATE TABLE `repositories` (
   `use_for_chat` tinyint(4) DEFAULT 0,
   `use_for_disclaimer` tinyint(4) DEFAULT 0,
   `use_for_branding` tinyint(4) DEFAULT 0,
+  `use_for_links` tinyint(4) DEFAULT 0,
   `use_for_labels` tinyint(4) DEFAULT 0,
   `use_for_announcements` tinyint(4) DEFAULT 0,
   `use_for_settings` tinyint(4) DEFAULT 0,

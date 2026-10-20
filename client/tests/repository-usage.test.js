@@ -44,6 +44,7 @@ import {
   repositorySourceFields,
   activationLines,
   singleTypeSource,
+  usageLabel,
 } from '../src/lib/repositoryUsage.js';
 import * as server from '../../server/src/lib/repoObjects/types.js';
 
@@ -62,7 +63,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 19 types of the server, in five groups, each flag once', () => {
+  it('are the 20 types of the server, in five groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -74,7 +75,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(19);
+    expect(new Set(USAGE_FLAGS).size).toBe(20);
     expect(typesOf('connections').map((u) => u.key)).toEqual([
       'credentials',
       'secret_stores',
@@ -99,9 +100,12 @@ describe('the usage types', () => {
 
   it('every type has its label and its hint, every group its name, in every language', async () => {
     for (const lang of LANGS) {
-      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      const locale = (await import(`../src/locales/${lang}.js`)).default;
+      const r = locale.settings.repositories;
       for (const u of USAGE_TYPES) {
-        expect(r.usageTypes[u.key], `${lang} ${u.key}`).toBeTruthy();
+        // its own label, or its menu item's (Notifications, Links)
+        const label = u.labelKey ? u.labelKey.split('.').reduce((o, k) => o?.[k], locale) : r.usageTypes[u.key];
+        expect(label, `${lang} ${u.key}`).toBeTruthy();
         expect(r.usageHints[u.key], `${lang} ${u.key}`).toBeTruthy();
       }
       for (const c of USAGE_CATEGORIES) expect(r.usageCategories[c], `${lang} ${c}`).toBeTruthy();
@@ -202,7 +206,7 @@ describe('one question when a save turns several object types on or off', () => 
     const d = confirmPrompt.details;
     const headings = d.filter((x) => x.heading).map((x) => x.heading);
     expect(headings).toEqual(
-      all.map((key) => `settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.${key}"}`),
+      all.map((key) => `settings.repositories.usageOnHeading {"type":"${usageLabel(t, key).split(' ')[0]}"}`),
     );
     const text = d.map((x) => x.heading || x).join('\n');
     expect(text).toContain('"folder":"credentials","count":2');
@@ -350,7 +354,7 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
       ['pages/admin/chat.vue', 'chat'],
       ['pages/admin/settings.vue', 'settings'],
       ['pages/admin/name.vue', 'branding'],
-      ['pages/admin/links.vue', 'branding'],
+      ['pages/admin/links.vue', 'links'],
       ['pages/admin/defaults.vue', 'branding'],
       ['pages/admin/logo.vue', 'branding'],
       ['pages/admin/favicon.vue', 'branding'],
@@ -397,5 +401,28 @@ describe('the branding the config seed manages : read only on the Appearance pag
       expect(read(page)).toContain(`<AppSeedNotice v-if="seeded('${field}')" />`);
     }
     expect(read('components/AppSeedNotice.vue')).toContain("t('settings.common.seedManagedNotice')");
+  });
+});
+
+describe('the header links : their own type, after Branding', () => {
+  it('Links is a one-file type of Appearance, after Branding, in both lists and the apply order', () => {
+    const appearance = typesOf('appearance').map((u) => u.key);
+    expect(appearance).toEqual(['branding', 'links', 'labels', 'announcements']);
+    expect(server.USAGE_TYPES.filter((u) => u.category === 'appearance').map((u) => u.key)).toEqual(appearance);
+    expect(USAGE_TYPES.find((u) => u.key === 'links')).toMatchObject({
+      file: 'links.yaml',
+      oneOnly: true,
+      objects: true,
+    });
+    expect(server.APPLY_ORDER.indexOf('links')).toBe(server.APPLY_ORDER.indexOf('branding') + 1);
+    expect(read('pages/admin/links.vue')).toContain('<AppRepositorySource v-show="!searching" type="links" />');
+  });
+
+  it('the Usage step names Notifications and Links as their menu items do', () => {
+    const tt = (key) => key;
+    expect(usageBadges(tt, { use_for_notification_channels: 1, use_for_links: 1 })).toBe(
+      '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
+        '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
+    );
   });
 });

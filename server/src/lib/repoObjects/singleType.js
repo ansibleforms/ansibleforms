@@ -32,6 +32,8 @@ import { typeOf } from "./types.js";
  *       the seed compares when not given.
  *     kept (function): (current) => [{ name, code, reason }] - the parts that stay in the app (the
  *       branding fields the config seed manages), said before the type is turned on.
+ *     notesOf (function): (declared, current) => lines for the pull output about a file, whether it
+ *       changes anything or not (the fields of it the config seed keeps).
  *     fromFile (function): async (object, { dir }) => the object as the app reads it, the files
  *       beside the YAML read (the branding's images) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
@@ -89,6 +91,7 @@ export function singleType(spec) {
     apply: spec.apply,
     changed: spec.changed || ((declared, current) => differs(declared, current || {})),
     kept: spec.kept || (() => []),
+    notesOf: spec.notesOf || (() => []),
 
     /**
      * The app's object as its file : its YAML (its secrets left out) and the files beside it.

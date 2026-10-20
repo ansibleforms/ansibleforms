@@ -16,6 +16,7 @@ const LOADERS = {
   chat: () => import("./chat.js"),
   settings: () => import("./settings.js"),
   branding: () => import("./branding.js"),
+  links: () => import("./links.js"),
   announcements: () => import("./announcements.js"),
   disclaimer: () => import("./disclaimer.js"),
 };

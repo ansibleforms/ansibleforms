@@ -413,7 +413,7 @@ onMounted(async () => {
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
           <!-- kept in a repository's branding.yaml : which one -->
-          <AppRepositorySource v-show="!searching" type="branding" />
+          <AppRepositorySource v-show="!searching" type="links" />
           <AppSeedNotice v-if="seeded('header_links', 'show_designer')" />
           <div v-if="envRestartPending.length" class="alert alert-warning py-2">
             <FaIcon icon="triangle-exclamation" class="me-2" />
