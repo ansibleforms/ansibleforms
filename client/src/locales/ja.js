@@ -1349,6 +1349,7 @@ export default {
         roles: 'roles.yaml にロール（config.yaml もまだ読まれますが非推奨）',
         categories: 'categories.yaml にカテゴリ（config.yaml もまだ読まれますが非推奨）',
         constants: 'constants.yaml に定数（config.yaml もまだ読まれますが非推奨）',
+        repositories: 'repositories.yaml に他のリポジトリ',
       },
       usageOnTitle: '{type} をオンにする',
       usageOnQuestion: '{name} を {type} に使用しますか？',
@@ -1364,6 +1365,7 @@ export default {
       usageOnWritten:
         '{name} に書き込まれるこのアプリの {type}（{folder} フォルダーに 1 件ずつ YAML ファイル）：{count}。',
       usageOnWrittenFile: 'このアプリの {type} を {file} として {name} に書き込みました（Push 待ち）。',
+      usageOnWrittenList: 'このアプリの {type} を {name} の {file} に書き込み：{count}。',
       usageOnReadFile:
         '{name} にはすでに {file} があります：git のバージョンが優先され、このアプリの {type} を置き換えます。',
       usageOnGitWins:
@@ -1384,7 +1386,12 @@ export default {
       usageOffDone: '{type}：{count} 件の git とのリンクを解除しました。このアプリに残ります。',
       usageNotPulled: 'リポジトリはプルされませんでした ({reason})。',
       usageFailed: '{type} は変更に追従できませんでした：{error}',
-      usageKeptWhy: { seed: '構成シードで管理', registered: 'RTE によって登録', pending: '承認待ち' },
+      usageKeptWhy: {
+        seed: '構成シードで管理',
+        registered: 'RTE によって登録',
+        pending: '承認待ち',
+        holder: 'リポジトリを保持するリポジトリ自身のため、自身のファイルには書き込まれません',
+      },
       source: 'ソース',
       sourceRepository: 'リポジトリ: {name}',
       sourceRepositoryHelp:

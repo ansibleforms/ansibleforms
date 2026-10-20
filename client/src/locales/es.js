@@ -1362,6 +1362,7 @@ export default {
         roles: 'Los roles, en su roles.yaml (config.yaml aún se lee, obsoleto)',
         categories: 'Las categorías, en su categories.yaml (config.yaml aún se lee, obsoleto)',
         constants: 'Las constantes, en su constants.yaml (config.yaml aún se lee, obsoleto)',
+        repositories: 'Los demás repositorios, en su repositories.yaml',
       },
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: '¿Usar {name} para {type}?',
@@ -1377,6 +1378,7 @@ export default {
       usageOnWritten:
         '{type} de esta aplicación escritos en {name}, un archivo YAML cada uno en su carpeta {folder}: {count}.',
       usageOnWrittenFile: '{type} de esta aplicación escritos en {name} como {file}, a la espera del Push.',
+      usageOnWrittenList: '{type} de esta aplicación escritos en {name}, en su {file}: {count}.',
       usageOnReadFile: '{name} ya tiene {file}: gana la versión de git y sustituye a {type} de esta aplicación.',
       usageOnGitWins:
         'Cuando el mismo nombre está en git y en esta aplicación, gana la versión de git y sustituye a la de la aplicación.',
@@ -1402,6 +1404,7 @@ export default {
         seed: 'gestionado por el seed de configuración',
         registered: 'registrado por su RTE',
         pending: 'pendiente de aprobación',
+        holder: 'contiene los repositorios, nunca en su propio archivo',
       },
       source: 'Origen',
       sourceRepository: 'Repositorio: {name}',

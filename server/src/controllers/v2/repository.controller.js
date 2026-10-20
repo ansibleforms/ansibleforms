@@ -155,6 +155,8 @@ const create = async function(req, res) {
     assertRepositoryAdminFields(req, null);
     await guardRepositoryCredential(req, null);
     const insertId = await Repository.create(req.body);
+    // the repositories repository, when there is one : written to its repositories.yaml
+    await RepoObjects.appCreated('repositories', insertId);
     // Fetch the created record to get all fields including cron
     const created = await Repository.findByName(req.body.name);
     // Add to cron service if cron expression exists
@@ -203,6 +205,8 @@ const update = async function(req, res) {
     // answer
     const report = {};
     await Repository.update(req.body, req.params.name, { dropPassword, report });
+    // one of the repositories repository : its entry of repositories.yaml rewritten where it changed
+    if (existing.repository) await RepoObjects.appUpdated('repositories', existing, existing.id);
     // The record may have been RENAMED : `name` is an editable field on the repositories
     // page. Reading it back by req.params.name found nothing and threw, so a rename that
     // had already committed was reported as a 500 - and neither cron call below ran, so
@@ -234,7 +238,10 @@ const deleteRepository = async function(req, res) {
     // deleting one takes away what the configuration, the forms or the playbooks load : an admin's
     assertRepositoryAdminFields(req, null);
     const report = {};
+    const before = await Repository.findByName(req.params.name).catch(() => null);
     await Repository.delete(req.params.name, { report });
+    // one of the repositories repository : its entry removed from repositories.yaml
+    if (before?.repository) await RepoObjects.appDeleted('repositories', before);
     // Remove from cron service
     logger.info(`Removing repository '${req.params.name}' from cron service`);
     cronService.removeRepository(req.params.name);

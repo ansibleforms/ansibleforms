@@ -6,6 +6,7 @@
 const LOADERS = {
   schedules: () => import("./schedules.js"),
   credentials: () => import("./credentials.js"),
+  repositories: () => import("./repositories.js"),
   runners: () => import("./runners.js"),
   secret_stores: () => import("./secretStores.js"),
   notification_channels: () => import("./notificationChannels.js"),

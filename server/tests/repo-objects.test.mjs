@@ -170,7 +170,7 @@ describe("a runner names its credential by name", () => {
     await RepoObjects.syncAll();
     assert.ok(fx.rowNamed("runners", "a"), "the runner found its credential");
     assert.deepEqual(fx.state.calls, ["claim:creds", "release:creds", "claim:ops", "release:ops"]);
-    assert.deepEqual(types.APPLY_ORDER.slice(0, 3), ["credentials", "secret_stores", "runners"]);
+    assert.deepEqual(types.APPLY_ORDER.slice(0, 4), ["credentials", "repositories", "secret_stores", "runners"]);
   });
 });
 
@@ -283,7 +283,7 @@ describe("the rules of the usages", () => {
 
   test("the types and their descriptors agree : what a runner names, every category, every flag once", () => {
     assert.deepEqual(runners.references.map((r) => r.type), types.typeOf("runners").references);
-    assert.equal(new Set(types.USAGE_FLAGS).size, 22);
+    assert.equal(new Set(types.USAGE_FLAGS).size, 23);
     for (const t of types.USAGE_TYPES) assert.ok(types.CATEGORIES.includes(t.category), t.key);
     // every object type has its descriptor : none is of a later version
     assert.deepEqual(

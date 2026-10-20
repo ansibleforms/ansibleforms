@@ -6555,7 +6555,7 @@
       | --- | --- |
       | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
       | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
-      | Connections | Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notification_channels`), Chat assistant (`use_for_chat`), Syslog (`use_for_syslog`) |
+      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notification_channels`), Chat assistant (`use_for_chat`), Syslog (`use_for_syslog`) |
       | Appearance | Branding (`use_for_branding`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | Settings (`use_for_settings`) |
 
@@ -6580,7 +6580,7 @@
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
       `notification-channels/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
       what the app has one of, one file at the repository's root (`chat.yaml`, `settings.yaml`, `branding.yaml`
-      and its images, `links.yaml`).
+      and its images, `links.yaml`). The repositories are a list in one file, `repositories.yaml`.
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
@@ -6671,6 +6671,45 @@
       notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
       is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
       then what names them; Pull all pulls the repositories in the same order.
+  - name: Repositories kept in a git repository
+    short: The other repositories, in one repositories.yaml
+    version: v7.4.0
+    description: |
+      A repository with the **Repositories** usage (`use_for_repositories`, one repository at most) holds the other
+      repositories in its `repositories.yaml`: a `repositories:` list, each item in the config seed's format for
+      its `repositories:` section (name, uri, branch, description, `credential` by name, the `use_for_*` flags, the
+      pull schedule `cron`, `rebase_on_start`).
+      ```yaml
+      repositories:
+        - name: forms
+          uri: https://git.example.com/forms.git
+          branch: main
+          credential: git-bot
+          use_for_forms: true
+          cron: "*/15 * * * *"
+      ```
+      It works as the other usage types (the same question before turning it on or off, the same pull output, a
+      linked repository's page shows **Repository: <name>**), with these guard rails:
+
+      - **The holder is never in its own file**: an entry named as the repository holding the file is not
+        imported (said in the pull output), and turning the usage on never writes the holder to it.
+      - **No chains**: a file never sets `use_for_repositories` on another repository: refused, said, the
+        entry's other fields applied.
+      - **Credentials and order**: a repository names its credential by name and waits while it is missing. At
+        the worker's start and in one pull the credentials are read first, then the repositories, then every
+        other type (a repository made from the file may hold any of them).
+      - **A repository made from the file** is cloned as one made in the app, and its usage types take their
+        objects as if they were ticked (git wins, no question: the file is the decision). A usage another
+        repository holds already is refused for it, said; its other usages apply.
+      - **An entry removed** deletes its repository as the app's delete does: its objects unlinked, they stay in
+        the app; its working copy removed. Never the holder, and never a repository with changes not pushed
+        yet: refused, kept, said in the pull output.
+      - **The config seed's** repositories stay the seed's, listed as staying in the app.
+      - **Secrets**: a credential by name only. An entry with a `user` or a `password`, or a user and token in
+        its `uri` (`https://user:token@...`), is refused.
+
+      A missing `repositories.yaml`, or one whose `repositories:` is not a list, changes nothing in the app.
+
   - name: Settings, chat, branding, links, announcements and the disclaimer kept in a git repository
     short: The last usage types, four of them one file each
     version: v7.4.0

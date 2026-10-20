@@ -1361,6 +1361,7 @@ export default {
         roles: 'As funções, no seu roles.yaml (config.yaml ainda lido, obsoleto)',
         categories: 'As categorias, no seu categories.yaml (config.yaml ainda lido, obsoleto)',
         constants: 'As constantes, no seu constants.yaml (config.yaml ainda lido, obsoleto)',
+        repositories: 'Os outros repositórios, no seu repositories.yaml',
       },
       usageOnTitle: 'Ativar {type}',
       usageOnQuestion: 'Usar {name} para {type}?',
@@ -1376,6 +1377,7 @@ export default {
       usageOnWritten:
         '{type} desta aplicação escritos em {name}, um ficheiro YAML cada na sua pasta {folder}: {count}.',
       usageOnWrittenFile: '{type} desta aplicação escritos em {name} como {file}, à espera do Push.',
+      usageOnWrittenList: '{type} desta aplicação escritos em {name}, no seu {file}: {count}.',
       usageOnReadFile: '{name} já tem {file}: ganha a versão do git e substitui {type} desta aplicação.',
       usageOnGitWins:
         'Quando o mesmo nome está no git e nesta aplicação, ganha a versão do git e substitui a da aplicação.',
@@ -1401,6 +1403,7 @@ export default {
         seed: 'gerido pelo seed de configuração',
         registered: 'registado pelo seu RTE',
         pending: 'à espera de aprovação',
+        holder: 'contém os repositórios, nunca no seu próprio ficheiro',
       },
       source: 'Origem',
       sourceRepository: 'Repositório: {name}',

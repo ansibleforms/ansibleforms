@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 22 types of the server, in six groups, each flag once', () => {
+  it('are the 23 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -75,7 +75,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(22);
+    expect(new Set(USAGE_FLAGS).size).toBe(23);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -90,6 +90,7 @@ describe('the usage types', () => {
     // Roles where Config was : Disclaimer, Roles, LDAP, SSO
     expect(typesOf('access').map((u) => u.key)).toEqual(['disclaimer', 'roles', 'ldap', 'sso']);
     expect(typesOf('connections').map((u) => u.key)).toEqual([
+      'repositories',
       'credentials',
       'secret_stores',
       'runners',
@@ -168,6 +169,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
     });
     setCategory('connections', record, others, true);
     expect(USAGE_FLAGS.filter((f) => record[f])).toEqual([
+      'use_for_repositories',
       'use_for_secret_stores',
       'use_for_runners',
       'use_for_notification_channels',
@@ -227,7 +229,7 @@ describe('one question when a save turns several object types on or off', () => 
     const was = { name: 'ops' };
     const now = { name: 'ops' };
     setCategory('connections', now, [], true);
-    const all = ['credentials', 'secret_stores', 'runners', 'notification_channels', 'syslog', 'chat'];
+    const all = ['credentials', 'repositories', 'secret_stores', 'runners', 'notification_channels', 'syslog', 'chat'];
     expect(usageChanges(was, now)).toEqual({ on: all, off: [] });
     const answer = confirmUsageChange(t, 'ops', was, now);
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
@@ -455,6 +457,27 @@ describe('the header links : their own type, after Branding', () => {
     expect(usageBadges(tt, { use_for_notification_channels: 1, use_for_links: 1 })).toBe(
       '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
         '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
+    );
+  });
+});
+
+describe('the repositories : a list in one repositories.yaml', () => {
+  it('first of Connections, named as its menu item, its question says the list file', () => {
+    expect(USAGE_TYPES.find((u) => u.key === 'repositories')).toMatchObject({
+      labelKey: 'sidebar.repositories',
+      list: 'repositories.yaml',
+      oneOnly: true,
+    });
+    expect(
+      activationLines(t, 'repositories', 'hub', { written: ['a', 'b'], kept: [{ name: 'hub', code: 'holder' }] }),
+    ).toEqual(
+      expect.arrayContaining([
+        'settings.repositories.usageOnWrittenList {"type":"sidebar.repositories","name":"hub","file":"repositories.yaml","count":2}',
+        'settings.repositories.usageOnKept {"names":"hub (settings.repositories.usageKeptWhy.holder)"}',
+      ]),
+    );
+    expect(read('pages/admin/repository.vue')).toContain(
+      '<AppRepositorySource v-show="fieldShown(\'source\')" :record="repo" />',
     );
   });
 });

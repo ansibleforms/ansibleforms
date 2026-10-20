@@ -35,7 +35,7 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
-import { filesIn, fileIn, fileNameFor, parseMapFile } from "./yamlFile.js";
+import { filesIn, fileIn, fileNameFor, parseMapFile, parseListFile, appendListEntries, updateListEntry, removeListEntry } from "./yamlFile.js";
 import { given } from "./secrets.js";
 import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
@@ -117,6 +117,24 @@ export function fileOf(desc, repository, repoFile) {
   } catch {
     throw new Error(`'${repoFile}' is not a ${desc.noun} file of repository '${repository}'`);
   }
+}
+
+/**
+ * Adds a new object's entry to its type's list file (the list mode : repositories.yaml).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   entry (object): the entry.
+ *
+ * Returns:
+ *   string: the list file, relative to the repository (repositories.yaml).
+ */
+export function writeListEntry(desc, repository, entry) {
+  const abs = path.join(Repo.folderOf(repository), desc.listFile);
+  const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  fs.writeFileSync(abs, appendListEntries(text, desc.listKey, [entry], desc.keyOrder), "utf8");
+  return desc.listFile;
 }
 
 /**
@@ -225,7 +243,8 @@ async function namesOf(key) {
  */
 async function readFiles(desc, name, ctx) {
   const repoDir = Repo.folderOf(name);
-  const files = filesIn(repoDir, desc.folder).map((file) => {
+  // a type kept as a list in one file : its entries, each as a file of its own would be
+  const files = desc.listFile ? readListFile(desc, name) : filesIn(repoDir, desc.folder).map((file) => {
     let text;
     try {
       text = fs.readFileSync(path.join(repoDir, file), "utf8");
@@ -234,10 +253,11 @@ async function readFiles(desc, name, ctx) {
     }
     return { file, ...desc.parse(text, ctx) };
   });
+  if (files === null) return null;
   // a file the type does not import (an announcement already ended : descriptor.notImported) : not
   // refused, said on a line of its own ; its object, if the app has it, goes
   for (const f of files) {
-    const reason = f.object && desc.notImported ? desc.notImported(f.object) : null;
+    const reason = f.object && desc.notImported ? desc.notImported(f.object, name) : null;
     if (reason) {
       f.skipped = { name: f.object.name, reason };
       f.object = null;
@@ -255,6 +275,46 @@ async function readFiles(desc, name, ctx) {
   }
   return files;
 }
+
+/**
+ * The entries of a type kept as a list in one file (desc.listFile : repositories.yaml, its
+ * desc.listKey list), each read and checked on its own as a file of its own would be : its "file"
+ * the list file and its name (repositories.yaml#forms). A file that cannot be read as a list is one
+ * refusal of the whole (whole : nothing of it changes the app).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   object[]|null: { file, repoFile, errors, absent, object, raw } each ; null when the repository
+ *     has no such file (the app keeps its objects).
+ */
+function readListFile(desc, name) {
+  const abs = path.join(Repo.folderOf(name), desc.listFile);
+  if (!fs.existsSync(abs)) return null;
+  const { errors, items } = parseListFile(fs.readFileSync(abs, "utf8"), desc.listKey);
+  if (errors.length) return [{ file: desc.listFile, errors, object: null, absent: false, whole: true }];
+  return items.map((raw, i) => {
+    const label = raw && typeof raw === "object" && raw.name !== undefined ? String(raw.name) : `#${i + 1}`;
+    const file = `${desc.listFile}#${label}`;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { file, repoFile: desc.listFile, errors: ["an entry must be a dictionary"], object: null, absent: false };
+    return { file, repoFile: desc.listFile, ...desc.check(raw), raw, absent: false };
+  });
+}
+
+/**
+ * Where an object of the app is linked to, as its type's files are known : its file, or its entry
+ * of a list file (repositories.yaml#forms).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   row (object): the object.
+ *
+ * Returns:
+ *   string: its file's key.
+ */
+const linkKeyOf = (desc, row) => (desc.listFile ? `${desc.listFile}#${row.name}` : row.repo_file);
 
 /**
  * What an object names that is not there yet (its references, by name) : it waits for them.
@@ -306,6 +366,11 @@ export async function syncRepository(desc, name, opts = {}) {
   const ctx = opts.context !== undefined ? opts.context : await desc.context?.();
   // step 1 : the files, read and checked on their own, and what they name
   const files = await readFiles(desc, name, ctx);
+  // a type kept as a list in one file, the repository without that file : the app keeps its objects
+  if (files === null) {
+    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps its ${desc.title.toLowerCase()}`);
+    return summary;
+  }
   // step 2 : the objects there are : this repository's by file, the names of the others
   const rows = await desc.store.rows();
   const own = new Map();
@@ -314,12 +379,13 @@ export async function syncRepository(desc, name, opts = {}) {
   const adoptable = new Map();
   for (const row of rows || []) {
     const kind = desc.store.classify(row, name);
-    if (kind === "own") own.set(row.repo_file, row);
+    if (kind === "own") own.set(linkKeyOf(desc, row), row);
     else if (kind === "adoptable") adoptable.set(nameKey(row.name), row);
     else taken.set(nameKey(row.name), kind);
   }
-  // a refused or waiting file that is still there keeps its object, and that object its name
-  const kept = new Set();
+  // a refused or waiting file that is still there keeps its object, and that object its name ; a
+  // list file refused whole keeps them all
+  const kept = new Set(files.some((f) => f.whole) ? own.keys() : []);
   for (const f of files) {
     if (!f.object && !f.absent && !f.skipped && own.has(f.file)) {
       kept.add(f.file);
@@ -348,11 +414,11 @@ export async function syncRepository(desc, name, opts = {}) {
   }
   // step 4 : the objects whose file is gone (or absent) go first - not one something uses -
   // then the changed, then the new
-  const present = new Set(files.filter((f) => f.object || kept.has(f.file)).map((f) => f.file));
+  const present = new Set([...files.filter((f) => f.object).map((f) => f.file), ...kept]);
   for (const [file, row] of own) {
     if (present.has(file)) continue;
     // one that can never be deleted (the main LDAP directory) : kept, said
-    const never = desc.undeletable ? desc.undeletable(row) : null;
+    const never = desc.undeletable ? await desc.undeletable(row) : null;
     if (never) {
       summary.refused.push({ file, reasons: [`its file is gone, but ${never}: kept, and still linked to it`] });
       logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${never}`);
@@ -383,6 +449,12 @@ export async function syncRepository(desc, name, opts = {}) {
       continue;
     }
     if (f.ignored?.length) summary.ignored.push({ file: f.file, keys: f.ignored });
+    // what the file may not set taken out, each said (a usage another repository holds)
+    if (desc.adjust) {
+      const adjusted = await desc.adjust(f.object, name);
+      f.object = adjusted.object;
+      summary.notes.push(...adjusted.notes.map((n) => `${f.file}: ${n}`));
+    }
     const row = own.get(f.file);
     // a secret the file does not give : the database's stays, said in the pull output
     const before = f.adopt || row;
@@ -390,7 +462,7 @@ export async function syncRepository(desc, name, opts = {}) {
     try {
       if (f.adopt) {
         // git's version replaces the app's definition ; what runs it stays
-        await desc.store.adopt(f.adopt, f.object, name, f.file);
+        await desc.store.adopt(f.adopt, f.object, name, f.repoFile ?? f.file);
         summary.matched.push(f.object.name);
         logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' of the app now follows ${name}/${f.file}: git's version replaced it`);
       } else if (row) {
@@ -401,7 +473,7 @@ export async function syncRepository(desc, name, opts = {}) {
         await desc.store.update(row, f.object);
         summary.updated++;
       } else {
-        await desc.store.insert(f.object, name, f.file);
+        await desc.store.insert(f.object, name, f.repoFile ?? f.file);
         summary.created++;
       }
     } catch (e) {
@@ -662,11 +734,20 @@ export async function preview(desc, name) {
   let skipped = 0;
   if (cloned(name)) {
     const ctx = await desc.previewContext?.();
-    for (const file of filesIn(Repo.folderOf(name), desc.folder)) {
+    // a list file's entries, or each file of the folder
+    const parsedFiles = desc.listFile
+      ? readListFile(desc, name) || []
+      : filesIn(Repo.folderOf(name), desc.folder).map((file) => {
+          try {
+            return desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
+          } catch {
+            return {};
+          }
+        });
+    for (const parsed of parsedFiles) {
       try {
-        const parsed = desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
         // one the type does not import (an announcement already ended) : counted apart
-        if (parsed.object && desc.notImported?.(parsed.object)) skipped++;
+        if (parsed.object && desc.notImported?.(parsed.object, name)) skipped++;
         else if (parsed.object) {
           files++;
           fileNames.add(nameKey(parsed.object.name));
@@ -755,6 +836,21 @@ export async function activate(desc, name, { pull = true } = {}) {
   // step 3 : the app's other objects, each a new file
   const list = await candidates(desc);
   await withWriteClaim(name, async () => {
+    // a type kept as a list in one file : every candidate an entry of it, added at its end
+    if (desc.listFile) {
+      for (const c of list.filter((x) => x.reason)) report.kept.push(keptOf(desc, c));
+      const written = list.filter((x) => !x.reason);
+      if (!written.length) return;
+      const abs = path.join(Repo.folderOf(name), desc.listFile);
+      const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+      fs.writeFileSync(abs, appendListEntries(text, desc.listKey, written.map((c) => c.object), desc.keyOrder), "utf8");
+      for (const c of written) {
+        await desc.linkCandidate(c, name, desc.listFile);
+        report.written.push(c.row.name);
+        if (c.withoutSecret) report.withoutSecret.push(c.row.name);
+      }
+      return;
+    }
     for (const c of list) {
       if (c.reason) {
         report.kept.push(keptOf(desc, c));
@@ -924,7 +1020,7 @@ export async function appCreated(desc, id) {
   const c = await desc.candidateOf(row);
   if (c.reason) return null;
   return withWriteClaim(repository, async () => {
-    const file = writeNewFile(desc, repository, row.name, desc.newFileText(c));
+    const file = desc.listFile ? writeListEntry(desc, repository, c.object) : writeNewFile(desc, repository, row.name, desc.newFileText(c));
     await desc.linkCandidate(c, repository, file);
     CrudModel.changed(desc.model);
     logger.info(`Wrote ${desc.noun} '${row.name}' to ${repository}/${file}${c.withoutSecret ? ", without its secret (kept in the database)" : ""}`);
@@ -952,6 +1048,19 @@ export async function appUpdated(desc, before, id) {
   if (!before?.repository || !before.repo_file) return false;
   const row = await desc.store.byId(id);
   if (!row) return false;
+  // a type kept as a list in one file : its entry edited, field by field (added when it is gone)
+  if (desc.listFile) {
+    return withWriteClaim(before.repository, async () => {
+      const abs = path.join(Repo.folderOf(before.repository), desc.listFile);
+      const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+      const whole = (await desc.candidateOf({ ...row, repository: null })).object;
+      const next = updateListEntry(text, desc.listKey, before.name, desc.entryEdits(row, before), desc.keyOrder, whole);
+      if (next === text) return false;
+      fs.writeFileSync(abs, next, "utf8");
+      logger.info(`Saved ${desc.noun} '${row.name}' into ${before.repository}/${desc.listFile}`);
+      return true;
+    });
+  }
   return withWriteClaim(before.repository, async () => {
     const abs = fileOf(desc, before.repository, before.repo_file);
     const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
@@ -976,6 +1085,13 @@ export async function appUpdated(desc, before, id) {
 export async function appDeleted(desc, before) {
   if (!before?.repository || !before.repo_file) return false;
   return withWriteClaim(before.repository, async () => {
+    // a type kept as a list in one file : its entry removed, the others kept
+    if (desc.listFile) {
+      const abs = path.join(Repo.folderOf(before.repository), desc.listFile);
+      if (fs.existsSync(abs)) fs.writeFileSync(abs, removeListEntry(fs.readFileSync(abs, "utf8"), desc.listKey, before.name), "utf8");
+      logger.info(`Removed ${desc.noun} '${before.name}' from ${before.repository}/${desc.listFile}`);
+      return true;
+    }
     fs.rmSync(fileOf(desc, before.repository, before.repo_file), { force: true });
     logger.info(`Deleted the file ${before.repository}/${before.repo_file} of ${desc.noun} '${before.name}'`);
     return true;

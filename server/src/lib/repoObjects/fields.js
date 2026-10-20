@@ -108,6 +108,26 @@ export function fieldSet(spec) {
    *   string: the file's new text (the same text when nothing changed).
    */
   function editText(text, after, before) {
+    const edits = editsOf(after, before);
+    const next = toFile(after).object;
+    if (!Object.keys(edits).length) return text;
+    // a file that is not a map any more : written again, whole
+    if (!parseMapFile(text).object) return newText(next);
+    return updateMapFile(text, edits, fileKeys);
+  }
+
+  /**
+   * The edits an app edit makes to its file's fields : each field it changed (the object before
+   * and after it, as a file gives them), a field emptied undefined (removed) ; the secrets never.
+   *
+   * Args:
+   *   after (object): the object as saved.
+   *   before (object): the object before the edit.
+   *
+   * Returns:
+   *   object: { field: value } ; none when nothing changed.
+   */
+  function editsOf(after, before) {
     const next = toFile(after).object;
     const prev = toFile(before || {}).object;
     const edits = {};
@@ -116,16 +136,13 @@ export function fieldSet(spec) {
       // emptied in the app : no longer declared (a yes or no off is its default)
       edits[k] = next[k];
     }
-    if (!Object.keys(edits).length) return text;
-    // a file that is not a map any more : written again, whole
-    if (!parseMapFile(text).object) return newText(next);
-    return updateMapFile(text, edits, fileKeys);
+    return edits;
   }
 
   // a new file : the seed's fields in the seed's order
   const newText = (obj) => newMapFile(obj, fileKeys);
 
-  return { keys: fileKeys, booleans, check, parse, toFile, newText, editText };
+  return { keys: fileKeys, booleans, check, parse, toFile, newText, editText, editsOf };
 }
 
 /**

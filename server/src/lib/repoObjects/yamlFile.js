@@ -235,3 +235,147 @@ export function fileIn(repoDir, folder, repoFile, pattern = YAML_FILE) {
   }
   return abs;
 }
+
+// ===========================================================================
+// A LIST IN ONE FILE
+// ===========================================================================
+// A type whose objects are kept as a list in one file (the repositories, repositories.yaml : a
+// `repositories:` list of items, each found by its name) : an entry read, edited field by field,
+// added and removed, the rest of the file - the other entries, their comments - kept.
+
+/**
+ * The list of a list file, its document and its sequence.
+ *
+ * Args:
+ *   text (string): the file's text ('' for a new one).
+ *   key (string): its list's key (repositories).
+ *
+ * Returns:
+ *   object: { doc (YAML.Document), seq (YAMLSeq) }.
+ *
+ * Raises:
+ *   Error: not valid YAML, not a map, or its key no list.
+ */
+function listOf(text, key) {
+  const doc = YAML.parseDocument(String(text ?? "").trim() ? String(text) : `${key}: []\n`);
+  if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
+  if (!YAML.isMap(doc.contents)) throw new Error("the file is not a YAML dictionary");
+  if (!doc.contents.has(key)) doc.contents.set(key, doc.createNode([]));
+  const seq = doc.contents.get(key, true);
+  if (!YAML.isSeq(seq)) throw new Error(`'${key}' must be a list`);
+  return { doc, seq };
+}
+
+/**
+ * The entries of a list file, as plain objects.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   key (string): its list's key.
+ *
+ * Returns:
+ *   object: { errors (string[]), items (object[], null when refused) }.
+ */
+export function parseListFile(text, key) {
+  try {
+    const { doc, seq } = listOf(text, key);
+    return { errors: [], items: seq.items.map((item) => (YAML.isMap(item) ? item.toJS(doc) : item)) };
+  } catch (e) {
+    return { errors: [e.message], items: null };
+  }
+}
+
+/**
+ * The entry of a name in a list : its map, or none.
+ *
+ * Args:
+ *   seq (YAMLSeq): the list.
+ *   name (string): the entry's name.
+ *
+ * Returns:
+ *   YAMLMap|undefined: the entry.
+ */
+const entryOf = (seq, name) => seq.items.find((item) => YAML.isMap(item) && String(item.get("name")) === String(name));
+
+/**
+ * Writes an app edit into an entry of a list file : each key of `edits` set (a new one at its
+ * place in the key order), a key whose edit is undefined removed ; an entry not there added.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   key (string): its list's key.
+ *   name (string): the entry's name (before the edit).
+ *   edits (object): { key: value } ; undefined removes the key.
+ *   keyOrder (string[]): the type's key order.
+ *   whole (object): the entry whole, when it is not there yet.
+ *
+ * Returns:
+ *   string: the file's new text.
+ */
+export function updateListEntry(text, key, name, edits, keyOrder = [], whole = null) {
+  const { doc, seq } = listOf(text, key);
+  const entry = entryOf(seq, name);
+  if (!entry) {
+    if (whole) seq.items.push(doc.createNode(sortedByOrder(whole, keyOrder)));
+    return doc.toString({ lineWidth: 0 });
+  }
+  for (const [k, value] of Object.entries(edits)) {
+    if (value === undefined) entry.delete(k);
+    else setKey(doc, entry, k, value, keyOrder);
+  }
+  return doc.toString({ lineWidth: 0 });
+}
+
+/**
+ * Adds entries to a list file, at its end ; one whose name is there already left as it is.
+ *
+ * Args:
+ *   text (string): the file's text ('' for a new one).
+ *   key (string): its list's key.
+ *   entries (object[]): the entries.
+ *   keyOrder (string[]): the type's key order.
+ *
+ * Returns:
+ *   string: the file's new text.
+ */
+export function appendListEntries(text, key, entries, keyOrder = []) {
+  const { doc, seq } = listOf(text, key);
+  for (const entry of entries) {
+    if (!entryOf(seq, entry.name)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
+  }
+  return doc.toString({ lineWidth: 0 });
+}
+
+/**
+ * Removes an entry of a list file.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   key (string): its list's key.
+ *   name (string): the entry's name.
+ *
+ * Returns:
+ *   string: the file's new text (the same when it is not there).
+ */
+export function removeListEntry(text, key, name) {
+  const { doc, seq } = listOf(text, key);
+  const entry = entryOf(seq, name);
+  if (!entry) return text;
+  seq.items.splice(seq.items.indexOf(entry), 1);
+  return doc.toString({ lineWidth: 0 });
+}
+
+/**
+ * An object's keys in a key order, the others after them.
+ *
+ * Args:
+ *   obj (object): the object.
+ *   keyOrder (string[]): the order.
+ *
+ * Returns:
+ *   object: a copy, its keys in that order.
+ */
+function sortedByOrder(obj, keyOrder) {
+  const rank = (k) => (keyOrder.includes(k) ? keyOrder.indexOf(k) : keyOrder.length);
+  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b)));
+}

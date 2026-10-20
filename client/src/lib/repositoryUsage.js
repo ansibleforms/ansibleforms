@@ -34,6 +34,7 @@ export const USAGE_CATEGORIES = ['designer', 'jobs', 'system', 'appearance', 'ac
 //   oneOnly   one repository at most : greyed on the others, with who has it
 //   folder    its folder in the repository (an object type), or
 //   file      its one file at the repository's root (a type the app has one of : chat.yaml)
+//   list      its one file holding its objects as a list (repositories.yaml)
 //   labelKey  its label's translation when it is its menu item's (settings.repositories.usageTypes.<key>
 //             when not given)
 export const USAGE_TYPES = [
@@ -130,6 +131,16 @@ export const USAGE_TYPES = [
   },
   { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
   { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
+  // the other repositories, a list in its repositories.yaml, named as its menu item names it
+  {
+    key: 'repositories',
+    flag: 'use_for_repositories',
+    category: 'connections',
+    labelKey: 'sidebar.repositories',
+    objects: true,
+    oneOnly: true,
+    list: 'repositories.yaml',
+  },
   {
     key: 'credentials',
     flag: 'use_for_credentials',
@@ -195,6 +206,7 @@ export const USAGE_FLAGS = USAGE_TYPES.map((u) => u.flag);
 // in with them, then the others (the server's order)
 export const APPLY_ORDER = [
   'credentials',
+  'repositories',
   'secret_stores',
   'runners',
   'sso',
@@ -507,24 +519,15 @@ function keptText(t, k) {
  */
 export function activationLines(t, key, name, p) {
   const type = usageLabel(t, key);
-  const { file, folder } = usageType(key) || {};
-  // a type the app has one of : written as its one file, when the repository has none yet
-  const lines = file
-    ? [
-        t(`settings.repositories.${(p.written || []).length ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, {
-          type,
-          name,
-          file,
-        }),
-      ]
-    : [
-        t('settings.repositories.usageOnWritten', {
-          type,
-          name,
-          folder: folder || key,
-          count: (p.written || []).length,
-        }),
-      ];
+  const { file, folder, list } = usageType(key) || {};
+  const count = (p.written || []).length;
+  // a type the app has one of : written as its one file, when the repository has none yet ; a type
+  // kept as a list in one file : its objects written to it ; else one file each in its folder
+  let lines;
+  if (file)
+    lines = [t(`settings.repositories.${count ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, { type, name, file })];
+  else if (list) lines = [t('settings.repositories.usageOnWrittenList', { type, name, file: list, count })];
+  else lines = [t('settings.repositories.usageOnWritten', { type, name, folder: folder || key, count })];
   lines.push(
     (p.clashes || []).length
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })

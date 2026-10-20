@@ -1361,6 +1361,7 @@ export default {
         roles: 'Els rols, al seu roles.yaml (config.yaml encara es llegeix, obsolet)',
         categories: 'Les categories, al seu categories.yaml (config.yaml encara es llegeix, obsolet)',
         constants: 'Les constants, al seu constants.yaml (config.yaml encara es llegeix, obsolet)',
+        repositories: 'Els altres repositoris, al seu repositories.yaml',
       },
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: 'Fer servir {name} per a {type}?',
@@ -1376,6 +1377,7 @@ export default {
       usageOnWritten:
         "{type} d'aquesta aplicació escrits a {name}, un fitxer YAML cadascun a la seva carpeta {folder}: {count}.",
       usageOnWrittenFile: "{type} d'aquesta aplicació escrits a {name} com a {file}, a l'espera del Push.",
+      usageOnWrittenList: "{type} d'aquesta aplicació escrits a {name}, al seu {file}: {count}.",
       usageOnReadFile: "{name} ja té {file}: guanya la versió de git i substitueix {type} d'aquesta aplicació.",
       usageOnGitWins:
         "Quan el mateix nom és a git i en aquesta aplicació, guanya la versió de git i substitueix la de l'aplicació.",
@@ -1402,6 +1404,7 @@ export default {
         seed: 'gestionat pel seed de configuració',
         registered: 'registrat pel seu RTE',
         pending: "pendent d'aprovació",
+        holder: 'conté els repositoris, mai al seu propi fitxer',
       },
       source: 'Origen',
       sourceRepository: 'Repositori: {name}',

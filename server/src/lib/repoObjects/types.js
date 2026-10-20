@@ -49,6 +49,7 @@ export const USAGE_TYPES = [
   { key: "roles", flag: "use_for_roles", category: "access", oneOnly: true, label: "roles" },
   { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", objects: true, oneOnly: true, label: "LDAP directories" },
   { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", objects: true, oneOnly: true, label: "SSO providers" },
+  { key: "repositories", references: ["credentials"], flag: "use_for_repositories", category: "connections", objects: true, oneOnly: true, label: "repositories" },
   { key: "credentials", flag: "use_for_credentials", category: "connections", objects: true, oneOnly: true, label: "credentials" },
   { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", objects: true, oneOnly: true, label: "secret stores" },
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", objects: true, oneOnly: true, label: "runners" },
@@ -68,6 +69,9 @@ export const ONE_ONLY_FLAGS = USAGE_TYPES.filter((t) => t.oneOnly).map((t) => t.
 // ones - so an object finds what it names. One that does not is said and waits (engine.js).
 export const APPLY_ORDER = [
   "credentials",
+  // the repositories after the credentials they sign in with, before every other type : one made
+  // from a repositories.yaml may hold any of them
+  "repositories",
   "secret_stores",
   "runners",
   "sso",

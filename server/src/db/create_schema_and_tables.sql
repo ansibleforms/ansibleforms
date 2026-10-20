@@ -517,6 +517,7 @@ CREATE TABLE `repositories` (
   `use_for_schedules` tinyint(4) DEFAULT 0,
   -- the objects it holds, one YAML file each in the type's folder (lib/repoObjects) ; one
   -- repository at most per type
+  `use_for_repositories` tinyint(4) DEFAULT 0,
   `use_for_credentials` tinyint(4) DEFAULT 0,
   `use_for_secret_stores` tinyint(4) DEFAULT 0,
   `use_for_runners` tinyint(4) DEFAULT 0,
@@ -550,6 +551,10 @@ CREATE TABLE `repositories` (
   `head` varchar(50) DEFAULT NULL,    
   `rebase_on_start` tinyint(4) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repositories repository and its file (repositories.yaml) it comes from ; NULL for one kept
+  -- in the app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_repositories_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

@@ -332,6 +332,7 @@ const crudConfigs = {
       { name: 'use_for_schedules', isBoolean: true },
       // the objects it holds, one YAML file each in the type's folder (lib/repoObjects) : one
       // repository at most per type ; those of a later version are refused when turned on
+      { name: 'use_for_repositories', isBoolean: true },
       { name: 'use_for_credentials', isBoolean: true },
       { name: 'use_for_secret_stores', isBoolean: true },
       { name: 'use_for_runners', isBoolean: true },
@@ -362,7 +363,11 @@ const crudConfigs = {
       { name: 'pull_status' },
       { name: 'push_status' },
       { name: 'head' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repositories repository and its repositories.yaml it comes from : written by
+      // lib/repoObjects alone (isRepoLink : never from a request body)
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600

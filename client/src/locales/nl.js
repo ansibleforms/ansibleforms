@@ -1358,6 +1358,7 @@ export default {
         roles: 'De rollen, in zijn roles.yaml (config.yaml nog gelezen, verouderd)',
         categories: 'De categorieën, in zijn categories.yaml (config.yaml nog gelezen, verouderd)',
         constants: 'De constanten, in zijn constants.yaml (config.yaml nog gelezen, verouderd)',
+        repositories: 'De andere repositories, in zijn repositories.yaml',
       },
       usageOnTitle: '{type} inschakelen',
       usageOnQuestion: '{name} gebruiken voor {type}?',
@@ -1372,6 +1373,7 @@ export default {
       usageOffHeading: '{type}: uitgeschakeld',
       usageOnWritten: '{type} van deze app geschreven naar {name}, elk een YAML-bestand in zijn map {folder}: {count}.',
       usageOnWrittenFile: '{type} van deze app naar {name} geschreven als {file}, wachtend op Push.',
+      usageOnWrittenList: '{type} van deze app naar {name} geschreven, in zijn {file}: {count}.',
       usageOnReadFile: '{name} heeft al {file}: de versie in git wint en vervangt {type} van deze app.',
       usageOnGitWins:
         'Staat dezelfde naam in git en in deze app, dan wint de versie in git en vervangt die van de app.',
@@ -1397,6 +1399,7 @@ export default {
         seed: 'beheerd door de configuratie-seed',
         registered: 'geregistreerd door zijn RTE',
         pending: 'wacht op goedkeuring',
+        holder: 'het bevat de repositories, nooit in zijn eigen bestand',
       },
       source: 'Bron',
       sourceRepository: 'Repository: {name}',

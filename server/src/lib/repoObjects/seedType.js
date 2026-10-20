@@ -35,6 +35,7 @@ export const KEPT_REASONS = {
   seed: "managed by the config seed",
   registered: "registered by its RTE",
   pending: "waiting for approval",
+  holder: "it holds the repositories itself, never in its own file",
 };
 
 /**
@@ -74,6 +75,12 @@ export const KEPT_REASONS = {
  *       version).
  *     notImported (function): (object) => why a file's object is not imported (an announcement already
  *       ended), or null : said in the pull output, never refused ; the app's object of it goes.
+ *     listFile, listKey (string): its objects kept as a list in one file (repositories.yaml, its
+ *       `repositories:` list) instead of a file each (the engine's list mode).
+ *     validate (function): (object) => what the type refuses of an object besides the schema (a
+ *       secret in an address) : string[].
+ *     adjust (function): async (object, repository) => { object, notes } - what a file's object
+ *       may not set taken out before it is saved, each said (a usage another repository holds).
  *     notCompared (string[]): the fields a file gives that are no field of the object (a
  *       disclaimer's ask_again : how a changed text is applied) : never compared.
  *
@@ -91,6 +98,11 @@ export function seedType(spec) {
   const links = linkStore(table, spec.idColumn || "id");
   // changed : compared as the seed compares, on the canonical object
   const canonical = spec.canonical || ((o) => o);
+  // a checked object's other rules (spec.validate) : refused when it breaks one
+  const withRules = (checked) => {
+    const errors = checked.object && spec.validate ? spec.validate(checked.object) : [];
+    return errors.length ? { errors, object: null } : checked;
+  };
 
   return {
     key,
@@ -102,9 +114,16 @@ export function seedType(spec) {
     secrets,
     references,
     keyOrder: fields.keys,
-    // an object as the seed (or a file) declares it, checked (lib/repoObjects/fields.js)
-    check: fields.check,
-    parse: (text) => fields.parse(text),
+    listFile: spec.listFile,
+    listKey: spec.listKey,
+    // an object as the seed (or a file) declares it, checked (lib/repoObjects/fields.js), then what
+    // the type refuses besides
+    check: (raw, opts) => withRules(fields.check(raw, opts)),
+    parse: (text) => {
+      const parsed = fields.parse(text);
+      return parsed.object ? { ...parsed, ...withRules(parsed) } : parsed;
+    },
+    adjust: spec.adjust,
 
     store: {
       ...links,
@@ -162,6 +181,8 @@ export function seedType(spec) {
 
     // an app edit : only the fields it changed (lib/repoObjects/fields.js editText)
     fileEdits: (text, row, before) => fields.editText(text, row, before),
+    // the same, as the edits of its entry in a list file (the list mode)
+    entryEdits: (row, before) => fields.editsOf(row, before),
 
     usersOf: spec.usersOf,
     undeletable: spec.undeletable,
