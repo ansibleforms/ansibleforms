@@ -8,9 +8,10 @@ import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
-import ScheduleRepo from '../../models/scheduleRepo.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import Form from '../../models/form.model.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
 
 /**
  * Whether a credential carries what git signs in with : a password or a token (stored, or read
@@ -84,9 +85,10 @@ async function guardRepositoryCredential(req, existing) {
 // ---------------------------------------------------------------------------------------------
 
 // the flags that make a repository's content what AnsibleForms loads and runs : its configuration
-// (roles, and with them who is an admin), its forms, playbooks, workflows, inventories and
-// schedules (which run as the Schedule Service, with the admin role)
-const USE_FOR_FLAGS = ['use_for_config', 'use_for_forms', 'use_for_playbooks', 'use_for_workflows', 'use_for_inventories', 'use_for_schedules'];
+// (roles, and with them who is an admin), its forms, playbooks, workflows, inventories, and the
+// objects it holds (schedules that run as the Schedule Service, credentials, runners ...) - every
+// usage type (lib/repoObjects/types.js)
+const USE_FOR_FLAGS = USAGE_FLAGS;
 
 // where its content comes from : the remote and the branch it pulls
 const SOURCE_FIELDS = ['uri', 'branch'];
@@ -194,7 +196,8 @@ const update = async function(req, res) {
     // its address, branch and use_for_* flags : an admin's (the rest is the connections user's too)
     assertRepositoryAdminFields(req, existing);
     const { dropPassword } = await guardRepositoryCredential(req, existing);
-    // what turning its Schedules usage on or off did (Repository.afterUsageChange), for the answer
+    // what turning its object usages on or off did (Repository.afterUsageChange), by type, for the
+    // answer
     const report = {};
     await Repository.update(req.body, req.params.name, { dropPassword, report });
     // The record may have been RENAMED : `name` is an editable field on the repositories
@@ -217,7 +220,7 @@ const update = async function(req, res) {
       logger.info(`Removing repository '${updated.name}' from cron service (no schedule)`);
       cronService.removeRepository(updated.name);
     }
-    res.json(RestResult.single(report.schedules ? { schedules: report.schedules } : null));
+    res.json(RestResult.single(Object.keys(report).length ? report : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateRepository'), err.message || String(err)));
   }
@@ -232,32 +235,35 @@ const deleteRepository = async function(req, res) {
     // Remove from cron service
     logger.info(`Removing repository '${req.params.name}' from cron service`);
     cronService.removeRepository(req.params.name);
-    res.json(RestResult.single(report.schedules ? { schedules: report.schedules } : null));
+    res.json(RestResult.single(Object.keys(report).length ? report : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedDeleteRepository'), err.message || String(err)));
   }
 };
 
 /**
- * What making a repository the schedules repository (or no longer) would do, changing nothing :
- * the app's recurring schedules it would write to it, the crons that stay in the app, the files
- * whose name an app's schedule has, the one-time jobs, the schedules it holds now, and whether it
- * has changes not pushed yet. For the question its dialog and page ask before the flag is saved.
+ * What turning a repository's object usages on (or off) would do, changing nothing : for each type
+ * asked (?types=schedules,credentials), the app's objects it would write to it, those that stay in
+ * the app and why, those written without their secrets, the files whose name an app's object has
+ * (git wins), the objects it holds now ; and whether it has changes not pushed yet. For the one
+ * question its dialog and page ask before the flags are saved.
  *
  * Args:
- *   req (object): the request, /:name (one not made yet may be named too : its files are none).
- *   res (object): the response.
+ *   req (object): the request, /:name (one not made yet may be named too : its files are none),
+ *     ?types=<type>,<type>.
+ *   res (object): the response, { unpushed, types: { <type>: preview } }.
  */
-const schedulesPreview = async function(req, res) {
+const usagePreview = async function(req, res) {
   try {
     const name = req.params.name ? String(req.params.name) : null;
-    const preview = await ScheduleRepo.preview(name);
+    const keys = String(req.query?.types || '').split(',').map((k) => k.trim()).filter((k) => typeOf(k)?.objects);
+    const types = await RepoObjects.previewTypes(name, keys);
     let unpushed = false;
     if (name) {
       const [withState] = await Repository.withUnpushed([{ name }]);
       unpushed = !!withState?.unpushed;
     }
-    res.json(RestResult.single({ ...preview, unpushed }));
+    res.json(RestResult.single({ unpushed, types }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepository'), err.message || String(err)));
   }
@@ -406,7 +412,7 @@ export default {
     update,
     "delete": deleteRepository,
     clone,
-    schedulesPreview,
+    usagePreview,
     reset,
     pull,
     sync,

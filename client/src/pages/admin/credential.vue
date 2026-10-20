@@ -58,6 +58,7 @@ import { recordButtons } from '@/lib/recordButtons';
 import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import BsRadioChoice from '@/components/BsRadioChoice.vue';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -709,6 +710,8 @@ const tabFields = computed(() => {
   const typed = !fromStore.value;
   return {
     details: [
+      // a credential kept in a repository : where it comes from
+      ...repositorySourceFields(t, credential.value),
       ['name', t('settings.fields.name')],
       ['description', t('settings.fields.description')],
     ],
@@ -927,6 +930,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="credential" />
               <BsInput
                 class="af-credential-field"
                 v-model="edit.name"

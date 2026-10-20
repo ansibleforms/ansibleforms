@@ -218,6 +218,27 @@ class CrudModel {
   }
 
   /**
+   * Where a record comes from (its repository and file, isRepoLink) is the repository engine's to
+   * write (lib/repoObjects, opts.fromRepo), never a request's nor the seed's : dropped from any
+   * other write.
+   *
+   * Args:
+   *   modelName (string): the model.
+   *   data (object): the record written (changed in place).
+   *   opts (object): { fromRepo:true } for the repository engine.
+   *
+   * Returns:
+   *   object: the record.
+   */
+  static stripRepoLink(modelName, data, opts = {}) {
+    if (opts.fromRepo || !data) return data;
+    for (const field of this.getConfig(modelName).fields) {
+      if (field.isRepoLink) delete data[field.name];
+    }
+    return data;
+  }
+
+  /**
    * The required-field check, callable on its own.
    *
    * It normally runs inside create(), which is too late for a model whose preProcess
@@ -256,6 +277,7 @@ class CrudModel {
   static async create(modelName, data, opts = {}) {
     // data = await this.preProcess(modelName, data, 'create');
     this.stripManaged(data, opts);
+    this.stripRepoLink(modelName, data, opts);
     const config = this.getConfig(modelName);
     this.assertRequired(modelName, data);
     this.assertValidCronFields(modelName, data);
@@ -271,6 +293,7 @@ class CrudModel {
   static async update(modelName, data, id, opts = {}) {
     // data = await this.preProcess(modelName, data, 'update');
     this.stripManaged(data, opts);
+    this.stripRepoLink(modelName, data, opts);
     const config = this.getConfig(modelName);
     const cache = this.getCache(modelName);
     const key = config.fields.find(f => f.isKey)?.name || 'id';

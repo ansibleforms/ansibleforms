@@ -1,7 +1,7 @@
 // The Schedules usage of a repository (use_for_schedules) : one repository at most holds the
 // schedules - a second one is refused, by the API and by the config seed, naming the one in use ;
-// turning it on makes the repository take the app's schedules (ScheduleRepo.activate), turning it
-// off or deleting the repository unlinks them, keeping them in the app (ScheduleRepo.deactivate).
+// turning it on makes the repository take the app's schedules (the engine's activate), turning it
+// off or deleting the repository unlinks them, keeping them in the app (its deactivate).
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
@@ -51,7 +51,8 @@ vi.mock("../src/models/db.model.js", () => ({
       if (/SELECT name FROM AnsibleForms.`repositories` WHERE use_for_schedules AND name <> \?/.test(sql)) {
         return repos.filter((r) => Number(r.use_for_schedules) && r.name !== vars[0]).map((r) => ({ name: r.name }));
       }
-      if (/SELECT use_for_schedules FROM AnsibleForms.`repositories` WHERE name = \?/.test(sql)) {
+      // the object flags of a repository, after a save
+      if (/^SELECT use_for_[a-z_, ]+ FROM AnsibleForms.`repositories` WHERE name = \?/.test(sql)) {
         return repos.filter((r) => r.name === vars[0]).map((r) => ({ use_for_schedules: Number(r.use_for_schedules) ? 1 : 0 }));
       }
       return { affectedRows: 1 };
@@ -59,19 +60,26 @@ vi.mock("../src/models/db.model.js", () => ({
     tryDo: async () => [],
   },
 }));
-vi.mock("../src/models/scheduleRepo.model.js", () => ({
-  default: {
-    activate: async (name, opts) => {
-      calls.push(`activate:${name}:${opts?.pull === false ? "nopull" : "pull"}`);
-      return { repository: name, written: ["Nightly"], matched: [], kept: [] };
+// the engine of the repository-backed objects : the one-repository rule its own, what turning a
+// usage on or off does (activate, deactivate) recorded
+vi.mock("../src/lib/repoObjects/index.js", async (importOriginal) => {
+  const real = (await importOriginal()).default;
+  return {
+    default: {
+      ...real,
+      afterUsageChange: async (before, name, now, opts = {}) => {
+        const isOn = !!Number(now?.use_for_schedules ?? 0);
+        if (isOn === !!Number(before?.use_for_schedules ?? 0)) return {};
+        const report = isOn
+          ? (calls.push(`activate:${name}:${opts.pull === false ? "nopull" : "pull"}`), { activated: { repository: name, written: ["Nightly"], matched: [], kept: [] } })
+          : (calls.push(`deactivate:${name}`), { deactivated: { repository: name, pull: "pulled", unlinked: 2 } });
+        if (opts.report) opts.report.schedules = report;
+        return { schedules: report };
+      },
+      renameRepository: async () => {},
     },
-    deactivate: async (name) => {
-      calls.push(`deactivate:${name}`);
-      return { repository: name, pull: "pulled", unlinked: 2 };
-    },
-    renameRepository: async () => {},
-  },
-}));
+  };
+});
 
 const Repository = (await import("../src/models/repository.model.js")).default;
 const { validateSeed } = await import("../src/lib/seed-schema.js");

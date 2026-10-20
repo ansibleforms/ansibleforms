@@ -12,6 +12,7 @@ import { formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import { SECRET_MASK, masked, isMasked } from '../../lib/secretMask.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 import Audit from '../../models/audit.model.js';
 import { writeSecret } from '../../secrets/providers/index.js';
 
@@ -380,6 +381,9 @@ const credentialController = {
       // typed here and written to its secret store : the save's checks first (nothing is written
       // for a save that would be refused), then the store, then the reference saved
       const credential = await saveWithTypedSecret(req, null, null, () => CredentialModel.create(req.body));
+      // the credentials repository, when there is one : written to it as a new file, without its
+      // secrets (lib/repoObjects)
+      await RepoObjects.appCreated('credentials', credential);
       res.json(RestResult.single({ message: i18n.t(req, 'success.created', { resource: 'Credential' }), id: credential }));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));
@@ -414,6 +418,8 @@ const credentialController = {
       // reads) : the save's checks first (nothing is written for a save that would be refused),
       // then the store, then the reference saved
       await saveWithTypedSecret(req, before, req.params.id, () => CredentialModel.update(req.body, req.params.id));
+      // one of the credentials repository : its changed fields written to its file
+      if (before?.repository) await RepoObjects.appUpdated('credentials', before, req.params.id);
       if ([before?.credential_type, req.body?.credential_type].some((t) => SSO_TYPES.includes(t))) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.updated', { resource: 'Credential' }) }));
     } catch (err) {
@@ -427,6 +433,8 @@ const credentialController = {
       await assertMayChange(req, before);
       if (before) await assertUnused(req, before.name);
       await CredentialModel.delete(req.params.id);
+      // one of the credentials repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted('credentials', before);
       if (SSO_TYPES.includes(before?.credential_type)) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.deleted', { resource: 'Credential' }) }));
     } catch (err) {

@@ -1,0 +1,986 @@
+'use strict';
+// The engine of the repository-backed objects : the schedules, the credentials, the runners ...
+// (lib/repoObjects/types.js, the object types), each kept in a repository used for it, one
+// object per YAML file in the type's folder. One repository at most per type.
+//
+// Every type is a descriptor (lib/repoObjects/<type>.js : its folder, its table, how a file
+// reads, what it names, its secret fields) ; what they share is here, written once :
+//   git to app   after each pull (or clone, reset), at the worker's start and when a
+//                repository is made one, its files are read into the table (syncRepository) :
+//                new files make objects, changed ones change them, a removed file removes its
+//                object - unless something uses it, said and refused. A file that is not valid
+//                is refused alone, said in the pull output and the server log, the others still
+//                sync. One that names an object that is not there yet WAITS, said in the pull
+//                output, and is read again when the type it names is next pulled.
+//   app to git   an object of a repository edited, created or deleted in the app writes or
+//                removes its file in the repository's working tree, under its write claim ;
+//                only the changed fields are written, and the change goes to git with the
+//                repository's Push.
+//   activation   made the type's repository, it is pulled and its files read in - a file named
+//                as an object of the app takes that object over, git's version wins - and the
+//                app's other objects are written to it ; what cannot go stays in the app
+//                (preview first, changing nothing : the question asked before it is saved).
+//   deactivation no longer used for it, or deleted : pulled once more, read in, and its objects
+//                unlinked - they stay in the app as they are, the files in git untouched.
+//   secrets      never plain in git : a file gives them as ${ENV} references (resolved as the
+//                config seed resolves them), a plain one is refused ; an app object is written
+//                without its secrets, which stay in the database (lib/repoObjects/secrets.js).
+//
+// What runs (a schedule's state, a runner's socket ...) stays in the database, never in a file.
+import fs from "fs";
+import path from "path";
+import logger from "../logger.js";
+import Errors from "../errors.js";
+import mysql from "../../models/db.model.js";
+import CrudModel from "../../models/crud.model.js";
+import Repo from "../../models/repo.model.js";
+import Repository from "../../models/repository.model.js";
+import { filesIn, fileIn, fileNameFor } from "./yamlFile.js";
+import { given } from "./secrets.js";
+import { APPLY_ORDER, ONE_ONLY_FLAGS, COMING_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
+import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
+
+// ===========================================================================
+// HELPERS
+// ===========================================================================
+
+/**
+ * A name as the tables compare names : case does not count.
+ *
+ * Args:
+ *   name (string): the name.
+ *
+ * Returns:
+ *   string: the key.
+ */
+export const nameKey = (name) => String(name || "").trim().toLowerCase();
+
+/**
+ * A type's title, for the pull output and the log (Schedules, Credentials).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   string: the title.
+ */
+const titleOf = (desc) => desc.title || desc.key;
+
+/**
+ * Whether a repository's working tree is there.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   boolean: true when it is cloned.
+ */
+const cloned = (name) => !!name && Repo.isValidName(name) && fs.existsSync(Repo.folderOf(name));
+
+/**
+ * Runs a write in a repository's working tree under its write claim (no pull, sync or clone on
+ * it meanwhile).
+ *
+ * Args:
+ *   repository (string): the repository.
+ *   write (function): the write.
+ *
+ * Returns:
+ *   Promise<any>: what the write returns.
+ */
+export async function withWriteClaim(repository, write) {
+  const prior = await Repository.claimForWrite(repository);
+  try {
+    return await write();
+  } finally {
+    if (prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));
+  }
+}
+
+/**
+ * The absolute path of an object's file, checked to be right in its type's folder.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   repoFile (string): the file, relative to the repository (credentials/git.yaml).
+ *
+ * Returns:
+ *   string: the path.
+ *
+ * Raises:
+ *   Error: a file outside the folder.
+ */
+export function fileOf(desc, repository, repoFile) {
+  try {
+    return fileIn(Repo.folderOf(repository), desc.folder, repoFile);
+  } catch {
+    throw new Error(`'${repoFile}' is not a ${desc.noun} file of repository '${repository}'`);
+  }
+}
+
+/**
+ * Writes a new object's file in its type's folder, named after it.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   name (string): the object's name.
+ *   text (string): the file's text.
+ *
+ * Returns:
+ *   string: the file, relative to the repository (credentials/git.yaml).
+ */
+export function writeNewFile(desc, repository, name, text) {
+  const folder = path.join(Repo.folderOf(repository), desc.folder);
+  fs.mkdirSync(folder, { recursive: true });
+  const file = fileNameFor(name, (f) => fs.existsSync(path.join(folder, f)), desc.noun);
+  fs.writeFileSync(path.join(folder, file), text, "utf8");
+  return `${desc.folder}/${file}`;
+}
+
+// ===========================================================================
+// THE REPOSITORIES OF A TYPE
+// ===========================================================================
+
+/**
+ * The repositories used for a type.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<string[]>: their names, sorted.
+ */
+export async function repositories(desc) {
+  const rows = await mysql.do(`SELECT name FROM AnsibleForms.\`repositories\` WHERE ${desc.flag} ORDER BY name`);
+  return (rows || []).map((r) => r.name).filter((n) => Repo.isValidName(n));
+}
+
+/**
+ * The repository of a type, if there is one (there is one at most).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<string|null>: its name.
+ */
+export async function activeRepository(desc) {
+  return (await repositories(desc))[0] || null;
+}
+
+/**
+ * Refuses a usage of a later version turned on, and a second repository for a type one
+ * repository holds (the schedules, the credentials ...) : its objects are written back to one.
+ *
+ * Args:
+ *   data (object): the repository as it will be saved (its use_for_* flags, those sent).
+ *   name (string): the repository.
+ *   before (object|null): the repository as it was (null for a new one).
+ *
+ * Raises:
+ *   Errors.BadRequestError: the usage comes in a later version, or another repository is used
+ *     for it, named.
+ */
+export async function assertUsageAllowed(data, name, before = null) {
+  for (const flag of COMING_FLAGS) {
+    if (flagOn(data?.[flag]) && !flagOn(before?.[flag])) {
+      throw new Errors.BadRequestError(`The ${typeOfFlag(flag).label} usage comes in a later version: it cannot be turned on yet.`);
+    }
+  }
+  for (const flag of ONE_ONLY_FLAGS) {
+    if (!flagOn(data?.[flag]) || flagOn(before?.[flag])) continue;
+    const rows = await mysql.do(`SELECT name FROM AnsibleForms.\`repositories\` WHERE ${flag} AND name <> ?`, [name]);
+    if (rows?.length) {
+      const label = typeOfFlag(flag).label;
+      throw new Errors.BadRequestError(`Repository '${rows[0].name}' is already used for ${label}: only one repository can hold the ${label}.`);
+    }
+  }
+}
+
+// ===========================================================================
+// GIT TO APP
+// ===========================================================================
+
+/**
+ * The names a type's objects have, to find what a file names (its references).
+ *
+ * Args:
+ *   key (string): the type (credentials).
+ *
+ * Returns:
+ *   Promise<Set<string>>: their names, as nameKey keys them.
+ */
+async function namesOf(key) {
+  const desc = await descriptorOf(key);
+  return new Set((await desc.store.names()).map(nameKey));
+}
+
+/**
+ * Reads a type's files of a repository, each checked on its own (descriptor.parse), then what each
+ * names : one that names an object not there yet waits.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   ctx (any): the descriptor's context (descriptor.context), for its parse.
+ *
+ * Returns:
+ *   Promise<object[]>: { file, errors, waiting, absent, object, raw, ignored } each.
+ */
+async function readFiles(desc, name, ctx) {
+  const repoDir = Repo.folderOf(name);
+  const files = filesIn(repoDir, desc.folder).map((file) => {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(repoDir, file), "utf8");
+    } catch (e) {
+      return { file, errors: [`cannot be read: ${e.code || e.message}`], object: null, absent: false };
+    }
+    return { file, ...desc.parse(text, ctx) };
+  });
+  // the references : by name, to an object of the type named, that must be there
+  for (const ref of desc.references || []) {
+    const names = await namesOf(ref.type);
+    for (const f of files) {
+      const value = f.object?.[ref.field];
+      if (!f.object || !given(value) || names.has(nameKey(value))) continue;
+      (f.waiting = f.waiting || []).push(`waits for the ${typeOf(ref.type)?.label.replace(/s$/, "") || ref.type} '${value}' (${ref.field}), not there yet`);
+    }
+  }
+  for (const f of files) if (f.waiting) f.object = null;
+  return files;
+}
+
+/**
+ * Reads a type's files of a repository into its table : a new file makes an object, a changed one
+ * changes it, a removed one (or one saying state: absent) removes it - unless something uses it
+ * (descriptor.usersOf), then it is kept and the refusal said. A refused file - not valid, a name
+ * another object has - changes nothing : an object it made before stays as it was, a new one is
+ * not made. A file that names an object not there yet waits, the same way. Where the file gives
+ * no secret, the database's stays.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   opts (object): { context (the descriptor's context, read when not given) }.
+ *
+ * Returns:
+ *   Promise<object>: { created, updated, deleted, unchanged (counts), matched: [name], refused:
+ *     [{ file, reasons }], waiting: [{ file, reasons }], ignored: [{ file, keys }], secretsKept:
+ *     [name] }.
+ */
+export async function syncRepository(desc, name, opts = {}) {
+  const summary = { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [] };
+  const ctx = opts.context !== undefined ? opts.context : await desc.context?.();
+  // step 1 : the files, read and checked on their own, and what they name
+  const files = await readFiles(desc, name, ctx);
+  // step 2 : the objects there are : this repository's by file, the names of the others
+  const rows = await desc.store.rows();
+  const own = new Map();
+  const taken = new Map(); // name key -> where it is taken
+  // the app's own objects : a file of that name takes it over, git's version wins
+  const adoptable = new Map();
+  for (const row of rows || []) {
+    const kind = desc.store.classify(row, name);
+    if (kind === "own") own.set(row.repo_file, row);
+    else if (kind === "adoptable") adoptable.set(nameKey(row.name), row);
+    else taken.set(nameKey(row.name), kind);
+  }
+  // a refused or waiting file that is still there keeps its object, and that object its name
+  const kept = new Set();
+  for (const f of files) {
+    if (!f.object && !f.absent && own.has(f.file)) {
+      kept.add(f.file);
+      taken.set(nameKey(own.get(f.file).name), `${f.file} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
+    }
+  }
+  // step 3 : the names, in file order : the first file to name an object has it ; a file that has
+  // no object yet and names one of the app takes it over
+  for (const f of files) {
+    if (!f.object) continue;
+    const key = nameKey(f.object.name);
+    if (!taken.has(key) && adoptable.has(key)) {
+      if (own.has(f.file)) taken.set(key, `a ${desc.noun} of this app`);
+      else {
+        f.adopt = adoptable.get(key);
+        adoptable.delete(key);
+      }
+    }
+    if (taken.has(key)) {
+      f.errors = [`the name '${f.object.name}' is the name of another ${desc.noun}: ${taken.get(key)}`];
+      f.object = null;
+      if (own.has(f.file)) kept.add(f.file);
+      continue;
+    }
+    taken.set(key, `${name}/${f.file}`);
+  }
+  // step 4 : the objects whose file is gone (or absent) go first - not one something uses -
+  // then the changed, then the new
+  const present = new Set(files.filter((f) => f.object || kept.has(f.file)).map((f) => f.file));
+  for (const [file, row] of own) {
+    if (present.has(file)) continue;
+    const users = desc.usersOf ? await desc.usersOf(row) : [];
+    if (users.length) {
+      summary.refused.push({ file, reasons: [`its file is gone, but ${users.join(", ")} still uses '${row.name}': kept until nothing uses it`] });
+      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${users.join(", ")} still uses it`);
+      continue;
+    }
+    await desc.store.remove(row);
+    logger.notice(`Removed ${desc.noun} '${row.name}': its file ${name}/${file} is gone`);
+    summary.deleted++;
+  }
+  for (const f of files) {
+    if (!f.object) {
+      if (f.waiting) {
+        summary.waiting.push({ file: f.file, reasons: f.waiting });
+        logger.warning(`Waiting ${desc.noun} file ${name}/${f.file}: ${f.waiting.join("; ")}`);
+      } else if (f.errors?.length) {
+        summary.refused.push({ file: f.file, reasons: f.errors });
+        logger.warning(`Refused ${desc.noun} file ${name}/${f.file}: ${f.errors.join("; ")}`);
+      }
+      continue;
+    }
+    if (f.ignored?.length) summary.ignored.push({ file: f.file, keys: f.ignored });
+    const row = own.get(f.file);
+    // a secret the file does not give : the database's stays, said in the pull output
+    const before = f.adopt || row;
+    if (before && (desc.secrets || []).some((s) => !given(f.raw?.[s]) && given(before[s]))) summary.secretsKept.push(f.object.name);
+    try {
+      if (f.adopt) {
+        // git's version replaces the app's definition ; what runs it stays
+        await desc.store.adopt(f.adopt, f.object, name, f.file);
+        summary.matched.push(f.object.name);
+        logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' of the app now follows ${name}/${f.file}: git's version replaced it`);
+      } else if (row) {
+        if (!desc.store.changed(row, f.object)) {
+          summary.unchanged++;
+          continue;
+        }
+        await desc.store.update(row, f.object);
+        summary.updated++;
+      } else {
+        await desc.store.insert(f.object, name, f.file);
+        summary.created++;
+      }
+    } catch (e) {
+      // two files swapping their names in one pull, a value the model refuses, or an object made
+      // meanwhile : said, the others go on
+      summary.refused.push({ file: f.file, reasons: [`not saved: ${e.message || e}`] });
+      logger.warning(`Could not save the ${desc.noun} of ${name}/${f.file}: ${e.message || e}`);
+    }
+  }
+  if (summary.created || summary.updated || summary.deleted || summary.matched.length) CrudModel.changed(desc.model);
+  logger.info(
+    `${titleOf(desc)} of repository '${name}': ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.refused.length} refused${summary.waiting.length ? `, ${summary.waiting.length} waiting` : ""}`,
+  );
+  return summary;
+}
+
+/**
+ * What a sync did, as lines for the repository's pull output : the counts, each refused or waiting
+ * file with why, the fields a file gives that the app keeps but does not use, and the objects
+ * whose secrets stay the database's.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   summary (object): syncRepository's result.
+ *
+ * Returns:
+ *   string: the lines, starting with a newline.
+ */
+export function summaryText(desc, summary) {
+  const waiting = summary.waiting || [];
+  const lines = [
+    `${titleOf(desc)}: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.unchanged} unchanged, ${summary.refused.length} refused${waiting.length ? `, ${waiting.length} waiting` : ""}`,
+  ];
+  if (summary.matched.length) lines.push(`Replaced by the file of the same name: ${summary.matched.join(", ")}`);
+  for (const r of summary.refused) lines.push(`Refused ${r.file}: ${r.reasons.join("; ")}`);
+  for (const w of waiting) lines.push(`Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`);
+  for (const i of summary.ignored) lines.push(`${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`);
+  if (summary.secretsKept?.length) lines.push(`Not in git, their secrets kept from the database: ${summary.secretsKept.join(", ")}`);
+  return "\n" + lines.join("\n");
+}
+
+/**
+ * Syncs one type of a repository, its lines for the pull output ; a failure is said there too,
+ * never thrown.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<string>: the lines.
+ */
+export async function syncText(desc, name) {
+  try {
+    return summaryText(desc, await syncRepository(desc, name));
+  } catch (e) {
+    logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be synchronized: ${e.message || e}`);
+    return `\n${titleOf(desc)} not synchronized: ${e.message || e}`;
+  }
+}
+
+/**
+ * The object types that name one of the types given : read again once those are pulled (their
+ * waiting files may find what they name now), in APPLY_ORDER.
+ *
+ * Args:
+ *   keys (string[]): the types just synced.
+ *
+ * Returns:
+ *   string[]: the types that name one of them.
+ */
+function dependentsOf(keys) {
+  return APPLY_ORDER.filter((key) => typeOf(key)?.built && typeOf(key).objects && (typeOf(key).references || []).some((r) => keys.includes(r)));
+}
+
+/**
+ * Reads again the types that name the ones just synced, in their own repositories (another
+ * repository : under its claim ; one busy is read on its own next pull). Their waiting files
+ * find what they name now.
+ *
+ * Args:
+ *   keys (string[]): the types just synced.
+ *   except (string): the repository just synced (its own types were read in order already).
+ *
+ * Returns:
+ *   Promise<string>: the lines for the pull output.
+ */
+async function retryDependents(keys, except) {
+  let out = "";
+  for (const key of dependentsOf(keys)) {
+    const desc = await descriptorOf(key);
+    for (const repo of await repositories(desc)) {
+      if (repo === except || !cloned(repo)) continue;
+      let prior;
+      try {
+        prior = await Repository.claimForWrite(repo);
+      } catch (e) {
+        out += `\n${titleOf(desc)} of repository '${repo}' not read again now (${e.message}): its next pull reads them`;
+        continue;
+      }
+      try {
+        out += `\n${titleOf(desc)} of repository '${repo}', read again:${(await syncText(desc, repo)).replace(/^\n[^:]+:/, "")}`;
+      } finally {
+        await Repository.releaseWrite(repo, prior).catch((e) => logger.error(`Failed to release write-lock on '${repo}': ${e.message}`));
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Syncs every object type of a repository after git changed its working tree (a pull, a clone,
+ * a reset), in APPLY_ORDER, then reads again the types that name them in other repositories :
+ * what it did, for its pull output. A failure is said there too, never thrown : the git operation
+ * itself worked.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   repo (object): its row (its use_for_* flags).
+ *
+ * Returns:
+ *   Promise<string>: the lines for the pull output.
+ */
+export async function afterGit(name, repo) {
+  const keys = objectTypesOf(repo);
+  let out = "";
+  for (const key of keys) out += await syncText(await descriptorOf(key), name);
+  try {
+    out += await retryDependents(keys, name);
+  } catch (e) {
+    logger.error(`The objects that name those of repository '${name}' could not be read again: ${e.message || e}`);
+  }
+  return out;
+}
+
+/**
+ * Syncs every repository of a type that is cloned, each under its write claim ; one busy (a pull
+ * is running, it syncs itself) or failing does not stop the others.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+export async function syncAllOf(desc) {
+  let names;
+  try {
+    names = await repositories(desc);
+  } catch (e) {
+    logger.error(`Could not read the ${desc.title.toLowerCase()} repositories: ${e.message || e}`);
+    return;
+  }
+  const context = names.length ? await desc.context?.() : undefined;
+  for (const name of names) {
+    if (!fs.existsSync(Repo.folderOf(name))) continue;
+    let prior;
+    try {
+      prior = await Repository.claimForWrite(name);
+    } catch (e) {
+      logger.debug(`${titleOf(desc)} of '${name}' not synchronized now: ${e.message}`);
+      continue;
+    }
+    try {
+      await syncRepository(desc, name, { context });
+    } catch (e) {
+      logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be synchronized: ${e.message || e}`);
+    } finally {
+      await Repository.releaseWrite(name, prior).catch((e) => logger.error(`Failed to release write-lock on '${name}': ${e.message}`));
+    }
+  }
+}
+
+/**
+ * Syncs every object type's repositories at the worker's start, in APPLY_ORDER : what changed in
+ * git while no worker ran is what the app starts with.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+export async function syncAll() {
+  for (const key of APPLY_ORDER) {
+    if (!BUILT_OBJECT_TYPES.includes(key)) continue;
+    await syncAllOf(await descriptorOf(key));
+  }
+}
+
+// ===========================================================================
+// ACTIVATION AND DEACTIVATION
+// ===========================================================================
+
+/**
+ * The app's objects a type's repository would take : every object kept in the app only (no
+ * repository), each ready to be written (descriptor.candidateOf : its file's fields) or with why
+ * it stays in the app.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<object[]>: { row, ... } to write, or { row, reason }.
+ */
+async function candidates(desc) {
+  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row)));
+}
+
+/**
+ * What a candidate that stays in the app says : its name and why, the code of why when it has one
+ * (the client says it in its language), and what the type adds.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   c (object): the candidate.
+ *
+ * Returns:
+ *   object: { name, reason, ... }.
+ */
+const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptExtra(c) : {}), reason: c.reason, ...(c.code ? { code: c.code } : {}) });
+
+/**
+ * What making a repository a type's repository would do, changing nothing : the app's objects it
+ * would take (written as files, those whose secret stays in the database said), those that stay
+ * in the app and why, the files whose name an app's object has (git's version would win), and
+ * what it holds now.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string|null): the repository (its working copy read when it is cloned), null for one
+ *     not made yet.
+ *
+ * Returns:
+ *   Promise<object>: { repository, active, written: [name], withoutSecret: [name], kept: [{ name,
+ *     reason }], clashes: [name], files, linked, ...what the type adds (descriptor.previewExtra) }.
+ */
+export async function preview(desc, name) {
+  const list = await candidates(desc);
+  // the files there are now, by name (a pull before the activation may bring more)
+  const fileNames = new Set();
+  let files = 0;
+  if (cloned(name)) {
+    const ctx = await desc.previewContext?.();
+    for (const file of filesIn(Repo.folderOf(name), desc.folder)) {
+      try {
+        const parsed = desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
+        if (parsed.object) {
+          files++;
+          fileNames.add(nameKey(parsed.object.name));
+        }
+      } catch {
+        // an unreadable file is refused by the sync, said then
+      }
+    }
+  }
+  const clashes = list.filter((c) => fileNames.has(nameKey(c.row.name))).map((c) => c.row.name);
+  const clash = new Set(clashes);
+  const written = list.filter((c) => !c.reason && !clash.has(c.row.name));
+  return {
+    repository: name || null,
+    active: (await activeRepository(desc)) || null,
+    written: written.map((c) => c.row.name),
+    withoutSecret: written.filter((c) => c.withoutSecret).map((c) => c.row.name),
+    kept: list.filter((c) => c.reason).map((c) => keptOf(desc, c)),
+    clashes,
+    files,
+    linked: name ? await desc.store.countLinked(name) : 0,
+    ...(desc.previewExtra ? await desc.previewExtra(name, list) : {}),
+  };
+}
+
+/**
+ * Pulls a repository (clones it when it is not yet) before its objects are read in ; a pull that
+ * fails is said and the working copy used as it is.
+ *
+ * Args:
+ *   desc (object): the type's descriptor (for the log).
+ *   name (string): the repository.
+ *   why (string): what the pull is for, for the log.
+ *
+ * Returns:
+ *   Promise<string>: 'pulled', 'cloned', or why not.
+ */
+async function pullFor(desc, name, why) {
+  try {
+    if (fs.existsSync(Repo.folderOf(name))) {
+      await Repository.pull(name);
+      return "pulled";
+    }
+    await Repository.clone(name);
+    return "cloned";
+  } catch (e) {
+    logger.warning(`Repository '${name}' could not be pulled ${why}, its working copy is used as it is: ${e.message || e}`);
+    return `not pulled: ${e.message || e}`;
+  }
+}
+
+/**
+ * Makes a repository a type's repository, once its flag is saved : pulls it (clones it when it is
+ * not yet), reads its files in (a file named as an app's object takes it over, git wins), then
+ * writes every other object of the app to it as a new file - without its secrets, which stay in
+ * the database - for its Push. What cannot go stays in the app.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   opts (object): { pull (false : the caller pulled or cloned it just now) }.
+ *
+ * Returns:
+ *   Promise<object>: { repository, pull, created, matched: [name], written: [name],
+ *     withoutSecret: [name], kept: [{ name, reason }], refused, waiting, ...what the type adds }.
+ */
+export async function activate(desc, name, { pull = true } = {}) {
+  const report = { repository: name, pull: "", created: 0, matched: [], written: [], withoutSecret: [], kept: [], refused: [], waiting: [] };
+  // step 1 : the latest files (a pull of the repository reads them in itself)
+  if (pull) report.pull = await pullFor(desc, name, `to take the ${desc.title.toLowerCase()}`);
+  if (!fs.existsSync(Repo.folderOf(name))) {
+    report.pull = report.pull || "not cloned";
+    logger.warning(`Repository '${name}' is not cloned: its ${desc.title.toLowerCase()} are read in once it is`);
+    return report;
+  }
+  // step 2 : its files read in (again : the pull may not have run), git wins on a name
+  const summary = await syncRepository(desc, name);
+  report.created = summary.created;
+  report.matched = summary.matched;
+  report.refused = summary.refused;
+  report.waiting = summary.waiting;
+  // step 3 : the app's other objects, each a new file
+  const list = await candidates(desc);
+  await withWriteClaim(name, async () => {
+    for (const c of list) {
+      if (c.reason) {
+        report.kept.push(keptOf(desc, c));
+        continue;
+      }
+      try {
+        const file = writeNewFile(desc, name, c.row.name, desc.newFileText(c));
+        await desc.linkCandidate(c, name, file);
+        report.written.push(c.row.name);
+        if (c.withoutSecret) report.withoutSecret.push(c.row.name);
+      } catch (e) {
+        report.kept.push({ ...keptOf(desc, c), reason: `not written: ${e.message || e}` });
+      }
+    }
+  });
+  if (desc.reportExtra) Object.assign(report, await desc.reportExtra(name));
+  if (report.written.length || report.matched.length) CrudModel.changed(desc.model);
+  logger.notice(
+    `Repository '${name}' holds the ${desc.title.toLowerCase()} now: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${report.withoutSecret.length ? `, ${report.withoutSecret.length} without their secrets, kept in the database` : ""}), ${report.kept.length} kept in the app${report.kept.length ? ` (${report.kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`,
+  );
+  return report;
+}
+
+/**
+ * Unlinks a repository's objects of a type (it is no longer used for it, or it is deleted) : they
+ * stay in the app with everything they have ; only where they came from is cleared. The files in
+ * git are not touched.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<number>: how many were unlinked.
+ */
+export async function unlinkRepository(desc, name) {
+  const unlinked = await desc.store.unlink(name);
+  if (unlinked) {
+    CrudModel.changed(desc.model);
+    logger.notice(`Unlinked the ${unlinked} ${desc.noun}(s) of repository '${name}': they stay in the app`);
+  }
+  return unlinked;
+}
+
+/**
+ * Lets a repository go as a type's repository (its flag taken off, or it is deleted) : pulls it
+ * once more and reads its files in, so the objects match the latest files (a pull that fails is
+ * said, the working copy read as it is), then unlinks them : they stay in the app. The files in
+ * git are not touched.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   opts (object): { pull (false : the caller pulled it just now) }.
+ *
+ * Returns:
+ *   Promise<object>: { repository, pull ('pulled' or why not), unlinked }.
+ */
+export async function deactivate(desc, name, { pull = true } = {}) {
+  const report = { repository: name, pull: "", unlinked: 0 };
+  if (cloned(name)) {
+    if (pull) {
+      try {
+        await Repository.pull(name);
+        report.pull = "pulled";
+      } catch (e) {
+        report.pull = `not pulled: ${e.message || e}`;
+        logger.warning(`Repository '${name}' could not be pulled before its ${desc.title.toLowerCase()} are unlinked, its working copy is read as it is: ${e.message || e}`);
+      }
+    }
+    try {
+      await syncRepository(desc, name);
+    } catch (e) {
+      logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be read in before they are unlinked: ${e.message || e}`);
+    }
+  } else {
+    report.pull = "not cloned";
+  }
+  report.unlinked = await unlinkRepository(desc, name);
+  return report;
+}
+
+/**
+ * Follows a repository's new name : the objects of every type say they come from it.
+ *
+ * Args:
+ *   from (string): the old name.
+ *   to (string): the new name.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+export async function renameRepository(from, to) {
+  for (const key of BUILT_OBJECT_TYPES) {
+    const desc = await descriptorOf(key);
+    if (await desc.store.rename(from, to)) CrudModel.changed(desc.model);
+  }
+}
+
+/**
+ * Follows a repository made, or no longer, a type's repository : made one, it takes the app's
+ * objects (activate) ; no longer one, its objects are unlinked and stay in the app (deactivate) ;
+ * several types at once in APPLY_ORDER, the repository pulled once. What it did is put in
+ * opts.report, by type, for the answer. A failure is logged, never thrown : the repository
+ * itself was saved.
+ *
+ * Args:
+ *   before (object|null): the repository as it was (null for a new one).
+ *   name (string): its name now.
+ *   now (object): its flags now.
+ *   opts (object): { report (an object the result is written to, by type), pull (false : it was
+ *     cloned just now) }.
+ *
+ * Returns:
+ *   Promise<object>: what it did, by type ({} when no flag changed).
+ */
+export async function afterUsageChange(before, name, now, opts = {}) {
+  const report = {};
+  let pull = opts.pull !== false;
+  let pulled = "";
+  for (const key of APPLY_ORDER) {
+    if (!BUILT_OBJECT_TYPES.includes(key)) continue;
+    const flag = typeOf(key).flag;
+    const isOn = !!Number(now?.[flag] ?? 0);
+    const wasOn = !!Number(before?.[flag] ?? 0);
+    if (isOn === wasOn) continue;
+    try {
+      const desc = await descriptorOf(key);
+      report[key] = isOn ? { activated: await activate(desc, name, { pull }) } : { deactivated: await deactivate(desc, name, { pull }) };
+      // one pull : the next types read the same working copy, and say how it went
+      const r = report[key].activated || report[key].deactivated;
+      if (pull) {
+        pulled = r.pull;
+        pull = false;
+      } else if (pulled && !r.pull) r.pull = pulled;
+    } catch (e) {
+      logger.error(`The ${key} of repository '${name}' could not follow its usage: ${e.message || e}`);
+      report[key] = { error: e.message || String(e) };
+    }
+  }
+  if (opts.report) Object.assign(opts.report, report);
+  return report;
+}
+
+// ===========================================================================
+// APP TO GIT
+// ===========================================================================
+
+/**
+ * A new object made in the app : written to its type's repository as a new file and linked to it,
+ * for its Push - without its secrets, which stay in the database. Nothing when the type has no
+ * repository (or it is not cloned), or the object stays in the app (descriptor.candidateOf).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   id (number): the new object.
+ *
+ * Returns:
+ *   Promise<object|null>: { repository, file, withoutSecret }, null when it stays in the app.
+ */
+export async function appCreated(desc, id) {
+  const repository = await activeRepository(desc);
+  if (!repository || !cloned(repository)) return null;
+  const row = await desc.store.byId(id);
+  if (!row || desc.store.classify(row, repository) !== "adoptable") return null;
+  const c = await desc.candidateOf(row);
+  if (c.reason) return null;
+  return withWriteClaim(repository, async () => {
+    const file = writeNewFile(desc, repository, row.name, desc.newFileText(c));
+    await desc.linkCandidate(c, repository, file);
+    CrudModel.changed(desc.model);
+    logger.info(`Wrote ${desc.noun} '${row.name}' to ${repository}/${file}${c.withoutSecret ? ", without its secret (kept in the database)" : ""}`);
+    return { repository, file, withoutSecret: !!c.withoutSecret };
+  });
+}
+
+/**
+ * An object of a repository edited in the app : only the fields the edit changed written into its
+ * file (descriptor.fileEdits : the object before and after it), the rest of it - the keys the app does not use, its ${ENV}
+ * references, its comments - kept ; a file gone meanwhile written again, whole. Its secrets are
+ * never written.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   before (object): the object as it was (its repository and file).
+ *   id (number): the object.
+ *
+ * Returns:
+ *   Promise<boolean>: whether its file was written.
+ */
+export async function appUpdated(desc, before, id) {
+  if (!before?.repository || !before.repo_file) return false;
+  const row = await desc.store.byId(id);
+  if (!row) return false;
+  return withWriteClaim(before.repository, async () => {
+    const abs = fileOf(desc, before.repository, before.repo_file);
+    const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
+    const next = text === null ? desc.newFileText(await desc.candidateOf({ ...row, repository: null })) : desc.fileEdits(text, row, before);
+    if (next === text) return false;
+    fs.writeFileSync(abs, next, "utf8");
+    logger.info(`Saved ${desc.noun} '${row.name}' into ${before.repository}/${before.repo_file}`);
+    return true;
+  });
+}
+
+/**
+ * An object of a repository deleted in the app : its file goes too, for the repository's Push.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   before (object): the object as it was (its repository and file).
+ *
+ * Returns:
+ *   Promise<boolean>: whether a file was removed.
+ */
+export async function appDeleted(desc, before) {
+  if (!before?.repository || !before.repo_file) return false;
+  return withWriteClaim(before.repository, async () => {
+    fs.rmSync(fileOf(desc, before.repository, before.repo_file), { force: true });
+    logger.info(`Deleted the file ${before.repository}/${before.repo_file} of ${desc.noun} '${before.name}'`);
+    return true;
+  });
+}
+
+// ===========================================================================
+// THE STORE OF A TABLE
+// ===========================================================================
+
+/**
+ * What every object table does the same way to follow its repository (its repository and
+ * repo_file columns) : link an object, unlink a repository's, follow a rename, count them.
+ *
+ * Args:
+ *   table (string): the table (AnsibleForms.`credentials`).
+ *
+ * Returns:
+ *   object: { link(id, repository, file), unlink(repository), rename(from, to),
+ *     countLinked(repository) }.
+ */
+export function linkStore(table) {
+  return {
+    link: (id, repository, file) => mysql.do(`UPDATE ${table} SET repository = ?, repo_file = ? WHERE id = ?`, [repository, file, id]),
+    unlink: async (repository) => (await mysql.do(`UPDATE ${table} SET repository = NULL, repo_file = NULL WHERE repository = ?`, [repository]))?.affectedRows || 0,
+    rename: async (from, to) => (await mysql.do(`UPDATE ${table} SET repository = ? WHERE repository = ?`, [to, from]))?.affectedRows || 0,
+    countLinked: async (repository) => Number((await mysql.do(`SELECT COUNT(*) AS n FROM ${table} WHERE repository = ?`, [repository]))?.[0]?.n || 0),
+  };
+}
+
+/**
+ * How a row of a table is placed for a repository's sync : its own (linked to it), the app's
+ * (no repository, a file of its name takes it over), or taken (the reason).
+ *
+ * Args:
+ *   row (object): the row.
+ *   name (string): the repository synced.
+ *   reasonInApp (string|null): why an app's row cannot be taken over (managed by the config
+ *     seed ...), null when it can.
+ *
+ * Returns:
+ *   string: 'own', 'adoptable', or where it is taken.
+ */
+export function classifyRow(row, name, reasonInApp = null) {
+  if (row.repository === name && row.repo_file) return "own";
+  if (row.repository) return `repository '${row.repository}' (${row.repo_file})`;
+  if (reasonInApp) return reasonInApp;
+  return "adoptable";
+}
+
+export default {
+  nameKey,
+  withWriteClaim,
+  fileOf,
+  writeNewFile,
+  repositories,
+  activeRepository,
+  assertUsageAllowed,
+  syncRepository,
+  summaryText,
+  syncText,
+  afterGit,
+  syncAllOf,
+  syncAll,
+  preview,
+  activate,
+  unlinkRepository,
+  deactivate,
+  renameRepository,
+  afterUsageChange,
+  appCreated,
+  appUpdated,
+  appDeleted,
+  linkStore,
+  classifyRow,
+};

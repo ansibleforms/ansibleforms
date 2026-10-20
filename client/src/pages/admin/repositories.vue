@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
 import { sortPulls } from '@/lib/pullResults';
 import { useAppStore } from '@/stores/app';
-import { toPush } from '@/lib/repositoryUsage';
+import { toPush, pullOrder } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
@@ -25,25 +25,7 @@ const adminMulti = ref(null);
 const authenticated = ref(false);
 
 /**
- * Shows a repository's row as running a git action until the list is read again : its status
- * (the lock any git operation takes), and the Push badge for a push (sync), else the Pull badge
- * (a pull or a reset) - as the server writes them (models/repository.model.js claim).
- *
- * Args:
- *   name (string): the repository's name.
- *   action (string): the api action ('clone', 'sync', 'reset').
- */
-function showRunning(name, action) {
-  adminMulti.value.setItemProperty({ id: name, key: 'status', value: 'running' });
-  adminMulti.value.setItemProperty({
-    id: name,
-    key: action === 'sync' ? 'push_status' : 'pull_status',
-    value: 'running',
-  });
-}
-
-/**
- * Runs a git action of a repository's row (Pull, Push, Reset) : its badge shown as running
+ * Runs a git action of a repository's row (Pull, Push, Reset) : its status shown as running
  * meanwhile, a refusal said in a toast (the server's own words), and the list read again
  * whatever the answer, so the row never stays on running.
  *
@@ -53,7 +35,7 @@ function showRunning(name, action) {
  *   title (string): what the action is called, said when the server gives no reason.
  */
 async function runGit(repo, action, title) {
-  showRunning(repo.name, action);
+  adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
   try {
     await axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/${action}`, {});
     // wait 1 second to visually see the change
@@ -67,20 +49,32 @@ async function runGit(repo, action, title) {
 async function triggerClone(repo) {
   await runGit(repo, 'clone', t('settings.repositories.pull'));
 }
-// Pull all : every repository pulled (cloned when it is not there yet) at once, as its own Pull
-// does ; the ones that fail are named, and so are the ones skipped because their changes are
-// not pushed yet (the server refuses their pull with a 409, the others still go)
+// Pull all : every repository pulled (cloned when it is not there yet), as its own Pull does ; the
+// ones holding objects one after the other in the objects' order (the credentials before what signs
+// in with them : lib/repositoryUsage.js pullOrder), the others at once ; the ones that fail are named,
+// and so are the ones skipped because their changes are not pushed yet (the server refuses their pull
+// with a 409, the others still go)
 const pullingAll = ref(false);
 async function pullAll() {
   pullingAll.value = true;
   try {
     const result = await axios.get('/api/v2/repository/');
     const repos = Array.isArray(result.data.records) ? result.data.records : [];
-    for (const repo of repos) showRunning(repo.name, 'clone');
-    const pulls = await Promise.allSettled(
-      repos.map((repo) => axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/clone`, {})),
-    );
-    const { pulled, skipped, failed } = sortPulls(repos, pulls);
+    for (const repo of repos) adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
+    const pull = (repo) => axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/clone`, {});
+    const [ordered, rest] = pullOrder(repos);
+    // each outcome as Promise.allSettled gives it, in the order the repositories were pulled
+    const settled = [];
+    for (const repo of ordered) {
+      settled.push(
+        await pull(repo).then(
+          (value) => ({ status: 'fulfilled', value }),
+          (reason) => ({ status: 'rejected', reason }),
+        ),
+      );
+    }
+    settled.push(...(await Promise.allSettled(rest.map(pull))));
+    const { pulled, skipped, failed } = sortPulls([...ordered, ...rest], settled);
     if (failed.length) toast.error(t('settings.repositories.pullAllFailed', { names: failed.join(', ') }));
     if (skipped.length) toast.warning(t('settings.repositories.pullAllSkipped', { names: skipped.join(', ') }));
     if (!failed.length && pulled.length) toast.success(t('settings.repositories.pullAllDone', pulled.length));

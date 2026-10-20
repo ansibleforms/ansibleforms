@@ -70,7 +70,12 @@ const crudConfigs = {
       { name: 'vault_path' },
       { name: 'secret_store' },
       { name: 'secret_ref' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the credentials repository and the file (credentials/<file>.yaml) it comes from : written
+      // by lib/repoObjects alone (isRepoLink : never from a request body), NULL for one kept in the
+      // app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -120,7 +125,11 @@ const crudConfigs = {
       { name: 'rte_max_jobs' },
       { name: 'rte_cache_mb' },
       { name: 'rte_files' },
-      { name: 'rte_drain_seconds' }
+      { name: 'rte_drain_seconds' },
+      // the runners repository and the file (runners/<file>.yaml) it comes from : written by
+      // lib/repoObjects alone (isRepoLink : never from a request body)
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -297,6 +306,21 @@ const crudConfigs = {
       { name: 'use_for_inventories', isBoolean: true },
       // the schedules in its schedules folder, one YAML file each (models/scheduleRepo.model.js)
       { name: 'use_for_schedules', isBoolean: true },
+      // the objects it holds, one YAML file each in the type's folder (lib/repoObjects) : one
+      // repository at most per type ; those of a later version are refused when turned on
+      { name: 'use_for_credentials', isBoolean: true },
+      { name: 'use_for_secret_stores', isBoolean: true },
+      { name: 'use_for_runners', isBoolean: true },
+      { name: 'use_for_notification_channels', isBoolean: true },
+      { name: 'use_for_sso', isBoolean: true },
+      { name: 'use_for_ldap', isBoolean: true },
+      { name: 'use_for_syslog', isBoolean: true },
+      { name: 'use_for_chat', isBoolean: true },
+      { name: 'use_for_disclaimer', isBoolean: true },
+      { name: 'use_for_branding', isBoolean: true },
+      { name: 'use_for_labels', isBoolean: true },
+      { name: 'use_for_announcements', isBoolean: true },
+      { name: 'use_for_settings', isBoolean: true },
       // a credential of Connections > Credentials : the user and password git uses
       { name: 'credential' },
       { name: 'rebase_on_start', isBoolean: true },

@@ -634,8 +634,10 @@ textarea:focus::placeholder {
 }
 
 // the Required badge of an item the config must keep (the admin and default roles) : a border and
-// darker text, so it reads on a white row as on a hovered one
-.af-required-badge {
+// darker text, so it reads on a white row as on a hovered one ; a repository's Usage badges
+// (lib/repositoryUsage.js usageBadges, a badge per type it is used for) the same
+.af-required-badge,
+.af-usage-badge {
   background-color: var(--bs-secondary-bg-subtle);
   border: 1px solid var(--bs-border-color);
   color: var(--bs-secondary-color);
@@ -652,8 +654,9 @@ textarea:focus::placeholder {
   font-weight: 600;
 }
 
-// the Repository badge of a schedule kept in a schedules repository (Jobs > Scheduled, its page) :
-// the shape of the other row badges, in the info tone, its file in the tooltip
+// the Repository badge of an object kept in a repository (a schedule's, a credential's, a runner's
+// page : AppRepositorySource) : the shape of the other row badges, in the info tone, its file in
+// the tooltip
 .af-source-badge {
   background-color: var(--bs-info-bg-subtle);
   border: 1px solid var(--bs-info-border-subtle);

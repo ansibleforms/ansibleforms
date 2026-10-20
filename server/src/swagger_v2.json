@@ -1344,6 +1344,19 @@
                           "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
                   "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
+                  "use_for_credentials": { "type": "boolean", "description": "Its credentials folder holds the credentials, one YAML file each in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_runners": { "type": "boolean", "description": "Its runners folder holds the runners, one YAML file each in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notification_channels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_sso": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_ldap": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_syslog": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_chat": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_branding": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_labels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_announcements": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_settings": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
                           "rebase_on_start": { "type": "boolean" },
                           "cron": { "type": "string" },
                           "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -1390,6 +1403,19 @@
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
                   "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
+                  "use_for_credentials": { "type": "boolean", "description": "Its credentials folder holds the credentials, one YAML file each in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_runners": { "type": "boolean", "description": "Its runners folder holds the runners, one YAML file each in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notification_channels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_sso": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_ldap": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_syslog": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_chat": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_branding": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_labels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_announcements": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_settings": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -1416,27 +1442,15 @@
         }
       }
     },
-    "/repository/{name}/schedules-preview": {
+    "/repository/{name}/usage-preview": {
       "get": {
-        "tags": [
-          "repository"
-        ],
-        "summary": "Preview its Schedules usage",
-        "description": "What turning the repository's Schedules usage on (or off) would do, changing nothing : the app's recurring schedules it would write as files, the crons that cannot be written as a rrule (they stay in the app), the files whose name an app schedule has (the file wins), the one-time jobs that stay in the app, the schedules it holds now, and whether it has changes not pushed yet.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "tags": ["repository"],
+        "summary": "Preview turning its object usages on or off",
+        "description": "What turning the repository's object usages on (or off) would do, changing nothing, for each type asked : the app's objects it would write as files (and those written without their secrets, which stay in the database), those that stay in the app and why, the files whose name an app object has (the file wins), the objects it holds now ; and whether it has changes not pushed yet.",
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "types", "in": "query", "required": true, "description": "The object types, comma separated", "schema": { "type": "string", "example": "credentials,runners" } }
         ],
         "responses": {
           "200": {
@@ -1446,63 +1460,32 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "repository": {
-                      "type": "string"
-                    },
-                    "active": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "The schedules repository now"
-                    },
-                    "recurring": {
-                      "type": "integer"
-                    },
-                    "written": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "kept": {
-                      "type": "array",
-                      "items": {
+                    "unpushed": { "type": "boolean", "description": "It has changes not pushed yet" },
+                    "types": {
+                      "type": "object",
+                      "description": "By type (schedules, credentials, runners)",
+                      "additionalProperties": {
                         "type": "object",
                         "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "cron": {
-                            "type": "string"
-                          },
-                          "reason": {
-                            "type": "string"
-                          }
+                          "repository": { "type": "string" },
+                          "active": { "type": "string", "nullable": true, "description": "The type's repository now" },
+                          "written": { "type": "array", "items": { "type": "string" } },
+                          "withoutSecret": { "type": "array", "items": { "type": "string" }, "description": "Written without their secrets, kept in the database" },
+                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "cron": { "type": "string" } } } },
+                          "clashes": { "type": "array", "items": { "type": "string" } },
+                          "files": { "type": "integer" },
+                          "linked": { "type": "integer" },
+                          "recurring": { "type": "integer", "description": "Schedules : the app's recurring schedules" },
+                          "planned": { "type": "integer", "description": "Schedules : the one-time jobs, which stay in the app" }
                         }
                       }
-                    },
-                    "clashes": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "files": {
-                      "type": "integer"
-                    },
-                    "planned": {
-                      "type": "integer"
-                    },
-                    "linked": {
-                      "type": "integer"
-                    },
-                    "unpushed": {
-                      "type": "boolean"
                     }
                   }
                 }
               }
             }
-          }
+          },
+          "500": { "description": "Server error" }
         }
       }
     },
@@ -1541,6 +1524,19 @@
                     "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
                   "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
+                  "use_for_credentials": { "type": "boolean", "description": "Its credentials folder holds the credentials, one YAML file each in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_runners": { "type": "boolean", "description": "Its runners folder holds the runners, one YAML file each in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notification_channels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_sso": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_ldap": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_syslog": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_chat": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_branding": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_labels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_announcements": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_settings": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
                     "rebase_on_start": { "type": "boolean" },
                     "cron": { "type": "string" },
                     "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -1590,6 +1586,19 @@
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
                   "use_for_schedules": { "type": "boolean", "description": "Its schedules folder holds the schedules, one YAML file each, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as a file), turning it off keeps them in the app, unlinked" },
+                  "use_for_credentials": { "type": "boolean", "description": "Its credentials folder holds the credentials, one YAML file each in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_runners": { "type": "boolean", "description": "Its runners folder holds the runners, one YAML file each in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notification_channels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_sso": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_ldap": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_syslog": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_chat": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_branding": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_labels": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_announcements": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
+                  "use_for_settings": { "type": "boolean", "description": "Coming in a later version : refused when turned on" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -7852,6 +7861,8 @@
           "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
           "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
           "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (runners/<file>.yaml)" },
           "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
         }
       },
@@ -8051,6 +8062,8 @@
           "db_type": { "type": "string", "description": "Type of database (mysql, postgres, etc).", "example": "mysql" },
           "secret_store": { "type": "string", "description": "Name of the secret store user and password are read from.", "example": "vault" },
           "secret_ref": { "type": "string", "description": "Where the secret lives in the store, e.g. a Vault path.", "example": "secret/myapp/prod" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The credentials repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (credentials/<file>.yaml)" },
           "vault_path": { "type": "string", "deprecated": true, "description": "Deprecated since 7, removed in 8 : the same as secret_store 'vault' with this secret_ref.", "example": "secret/data/myapp/prod" }
         },
         "required": ["name"]

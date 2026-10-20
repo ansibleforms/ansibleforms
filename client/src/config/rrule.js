@@ -150,28 +150,3 @@ export function rruleCell(value) {
     .replace(/"/g, '&quot;');
   return `<span class="font-monospace small">${text}</span>`;
 }
-
-/**
- * Where a schedule comes from, for its list's Source column and its page : 'This app', or the
- * schedules repository it is kept in, as a badge.
- *
- * Args:
- *   t (function): vue-i18n's t.
- *   row (object): the schedule.
- *
- * Returns:
- *   string: the cell's HTML, escaped.
- */
-export function scheduleSource(t, row) {
-  const esc = (s) =>
-    String(s ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  // the app's own schedules say nothing : only one from git says where it comes from
-  if (!row?.repository) return '';
-  return `<span class="badge af-source-badge" title="${esc(row.repo_file)}">${esc(
-    t('settings.schedules.sourceRepository', { name: row.repository }),
-  )}</span>`;
-}

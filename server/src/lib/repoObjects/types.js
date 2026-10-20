@@ -1,0 +1,150 @@
+'use strict';
+// The usage types of a repository : what the app reads from it, one flag each (use_for_<type>),
+// grouped in five categories as its Usage step shows them. The one list the server knows them
+// by : the repository model, its controller, the config seed's schema and the engine of the
+// repository-backed objects (lib/repoObjects/engine.js) all read it.
+//
+// A type is one of three kinds :
+//   a content type  (forms, playbooks, workflows, inventories, config) : files the app reads as
+//                   they are ; several repositories may hold forms, workflows and inventories,
+//                   and the app uses the first one of config and of playbooks (its Usage step
+//                   greys the box on the others, the server only warns) - as before
+//   an object type  (schedules, credentials, runners) : one object per YAML file, kept in step
+//                   with a table both ways by the engine (lib/repoObjects/engine.js), one
+//                   repository at most, refused by the API and the seed
+//   coming soon     a type of a later version : accepted by the API and the seed while it is off,
+//                   refused when it is turned on, its box greyed with a short note
+
+// ===========================================================================
+// THE TYPES
+// ===========================================================================
+
+// the categories, in the order the Usage step shows them
+export const CATEGORIES = ["designer", "access", "connections", "appearance", "system"];
+
+// every usage type, in its category's order :
+//   key        the type (its translation key on the client)
+//   flag       its column of the repositories table
+//   category   its heading
+//   built      false : coming in a later version (refused when turned on)
+//   objects    kept in step with the app by the engine, one object per file
+//   oneOnly    one repository at most (the server refuses a second)
+//   label      how the server's messages name it
+//   references the object types its objects name (a runner its credential) : read again when
+//              those are pulled, an object waiting for what it names finds it then
+export const USAGE_TYPES = [
+  // Designer : what the designer builds and the app runs
+  { key: "forms", flag: "use_for_forms", category: "designer", built: true, label: "forms" },
+  { key: "playbooks", flag: "use_for_playbooks", category: "designer", built: true, label: "playbooks" },
+  { key: "workflows", flag: "use_for_workflows", category: "designer", built: true, label: "workflows" },
+  { key: "inventories", flag: "use_for_inventories", category: "designer", built: true, label: "inventories" },
+  { key: "schedules", flag: "use_for_schedules", category: "designer", built: true, objects: true, oneOnly: true, label: "schedules" },
+  // Access : who signs in, and what they may do
+  { key: "config", flag: "use_for_config", category: "access", built: true, label: "config" },
+  { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", built: false, objects: true, oneOnly: true, label: "SSO providers" },
+  { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", built: false, objects: true, oneOnly: true, label: "LDAP directories" },
+  { key: "disclaimer", flag: "use_for_disclaimer", category: "access", built: false, objects: true, oneOnly: true, label: "disclaimer" },
+  // Connections : what the app signs in to, where jobs run and where messages go
+  { key: "credentials", flag: "use_for_credentials", category: "connections", built: true, objects: true, oneOnly: true, label: "credentials" },
+  { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", built: false, objects: true, oneOnly: true, label: "secret stores" },
+  { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", built: true, objects: true, oneOnly: true, label: "runners" },
+  { key: "notification_channels", references: ["credentials"], flag: "use_for_notification_channels", category: "connections", built: false, objects: true, oneOnly: true, label: "notification channels" },
+  { key: "syslog", flag: "use_for_syslog", category: "connections", built: false, objects: true, oneOnly: true, label: "syslog servers" },
+  { key: "chat", references: ["credentials"], flag: "use_for_chat", category: "connections", built: false, objects: true, oneOnly: true, label: "chat" },
+  // Appearance : how the app looks
+  { key: "branding", flag: "use_for_branding", category: "appearance", built: false, objects: true, oneOnly: true, label: "branding" },
+  { key: "labels", flag: "use_for_labels", category: "appearance", built: false, objects: true, oneOnly: true, label: "labels" },
+  { key: "announcements", flag: "use_for_announcements", category: "appearance", built: false, objects: true, oneOnly: true, label: "announcements" },
+  // System : the System > General settings
+  { key: "settings", flag: "use_for_settings", category: "system", built: false, objects: true, oneOnly: true, label: "settings" },
+];
+
+// every usage flag, as the repositories table, its API and the config seed know them
+export const USAGE_FLAGS = USAGE_TYPES.map((t) => t.flag);
+
+// the flags of a later version : refused when turned on
+export const COMING_FLAGS = USAGE_TYPES.filter((t) => !t.built).map((t) => t.flag);
+
+// the flags one repository at most may have
+export const ONE_ONLY_FLAGS = USAGE_TYPES.filter((t) => t.oneOnly).map((t) => t.flag);
+
+// The order the object types are read in, at the worker's start and in one pull : the
+// credentials and the secret stores first, then what signs in with them, then the independent
+// ones - so an object finds what it names. One that does not is said and waits (engine.js).
+export const APPLY_ORDER = [
+  "credentials",
+  "secret_stores",
+  "runners",
+  "sso",
+  "ldap",
+  "notification_channels",
+  "syslog",
+  "chat",
+  "schedules",
+  "disclaimer",
+  "branding",
+  "labels",
+  "announcements",
+  "settings",
+];
+
+// ===========================================================================
+// HELPERS
+// ===========================================================================
+
+/**
+ * A usage type by its key.
+ *
+ * Args:
+ *   key (string): the type (credentials).
+ *
+ * Returns:
+ *   object|undefined: the type.
+ */
+export function typeOf(key) {
+  return USAGE_TYPES.find((t) => t.key === key);
+}
+
+/**
+ * A usage type by its flag.
+ *
+ * Args:
+ *   flag (string): the flag (use_for_credentials).
+ *
+ * Returns:
+ *   object|undefined: the type.
+ */
+export function typeOfFlag(flag) {
+  return USAGE_TYPES.find((t) => t.flag === flag);
+}
+
+/**
+ * Whether a usage flag is on, whatever it is sent as (true, 1, '1', 'true').
+ *
+ * Args:
+ *   v (any): the flag.
+ *
+ * Returns:
+ *   boolean: true when it is on.
+ */
+export function flagOn(v) {
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+
+/**
+ * The object types a repository is used for, in APPLY_ORDER.
+ *
+ * Args:
+ *   repo (object): the repository's row (its use_for_* flags).
+ *
+ * Returns:
+ *   string[]: the type keys (credentials, runners ...), built ones only.
+ */
+export function objectTypesOf(repo) {
+  return APPLY_ORDER.filter((key) => {
+    const type = typeOf(key);
+    return type?.built && type.objects && !!Number(repo?.[type.flag] ?? 0);
+  });
+}
+
+export default { CATEGORIES, USAGE_TYPES, USAGE_FLAGS, COMING_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagOn, objectTypesOf };

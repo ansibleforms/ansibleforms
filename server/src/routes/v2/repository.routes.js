@@ -7,8 +7,8 @@ router.get('/', repositoryController.find);
 router.post('/', repositoryController.create);
 // Retrieve a single repository with id
 router.get('/:name', repositoryController.findByName);
-// what making it the schedules repository, or no longer, would do (changes nothing)
-router.get('/:name/schedules-preview', repositoryController.schedulesPreview);
+// what turning its object usages on or off would do (changes nothing)
+router.get('/:name/usage-preview', repositoryController.usagePreview);
 // Update a repository with id
 router.put('/:name', repositoryController.update);
 // Delete a repository with id

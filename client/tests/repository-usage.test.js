@@ -1,0 +1,298 @@
+// What a repository is used for (lib/repositoryUsage.js) : its usage types in five groups, the
+// Usage step's group boxes (three states, skipping the types another repository has and those of a
+// later version), the one question asked when a save turns several object types on or off (a
+// section per type, one Cancel and one confirm), the toast after, the repositories list's Usage
+// column of badges, Pull all's order, and the Repository line of a linked object's page.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+// the server's preview, by type, and the toasts said after
+let previews = {};
+let unpushed = false;
+const asked = [];
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(async (url) => {
+      asked.push(url);
+      const types = new URL(url, 'http://x').searchParams.get('types').split(',');
+      return { data: { unpushed, types: Object.fromEntries(types.map((k) => [k, previews[k] || {}])) } };
+    }),
+  },
+}));
+const toasts = [];
+vi.mock('vue-sonner', () => ({
+  toast: { success: (m) => toasts.push(['success', m]), error: (m) => toasts.push(['error', m]) },
+}));
+
+import getSettings from '../src/config/settings.js';
+import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
+import {
+  USAGE_CATEGORIES,
+  USAGE_TYPES,
+  USAGE_FLAGS,
+  typesOf,
+  takenBy,
+  categoryState,
+  setCategory,
+  usageChanges,
+  confirmUsageChange,
+  usageToast,
+  usageBadges,
+  usageSortValue,
+  pullOrder,
+  repositorySourceFields,
+} from '../src/lib/repositoryUsage.js';
+import * as server from '../../server/src/lib/repoObjects/types.js';
+
+// the key, with its values, as the text : what reaches the page is checked, not a translation
+const t = (key, values) => (values ? `${key} ${JSON.stringify(values)}` : key);
+const settings = getSettings(t);
+const read = (file) => readFileSync(join(import.meta.dirname, '../src', file), 'utf8');
+const LANGS = ['en', 'es', 'ca', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh'];
+
+beforeEach(() => {
+  previews = {};
+  unpushed = false;
+  asked.length = 0;
+  toasts.length = 0;
+  if (confirmPrompt.open) answerConfirm(false);
+});
+
+describe('the usage types', () => {
+  it('are the 19 types of the server, in five groups, each flag once', () => {
+    const pick = (u) => ({
+      key: u.key,
+      flag: u.flag,
+      category: u.category,
+      built: !!u.built,
+      objects: !!u.objects,
+      // the server refuses a second repository for an object type ; config and playbooks are
+      // greyed on the others here only, as before (the server warns and uses the first one)
+      oneOnly: !!u.oneOnly && !!u.objects,
+    });
+    expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
+    expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
+    expect(new Set(USAGE_FLAGS).size).toBe(19);
+    expect(typesOf('connections').map((u) => u.key)).toEqual([
+      'credentials',
+      'secret_stores',
+      'runners',
+      'notification_channels',
+      'syslog',
+      'chat',
+    ]);
+  });
+
+  it('forms, workflows and inventories may be on several repositories, as before ; config and playbooks one', () => {
+    const one = (key) => !!USAGE_TYPES.find((u) => u.key === key).oneOnly;
+    expect(['forms', 'workflows', 'inventories'].map(one)).toEqual([false, false, false]);
+    expect(['config', 'playbooks', 'schedules', 'credentials', 'runners'].map(one)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('every type has its label and its hint, every group its name, in every language', async () => {
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      for (const u of USAGE_TYPES) {
+        expect(r.usageTypes[u.key], `${lang} ${u.key}`).toBeTruthy();
+        expect(r.usageHints[u.key], `${lang} ${u.key}`).toBeTruthy();
+      }
+      for (const c of USAGE_CATEGORIES) expect(r.usageCategories[c], `${lang} ${c}`).toBeTruthy();
+      for (const code of ['seed', 'registered', 'pending']) expect(r.usageKeptWhy[code]).toBeTruthy();
+    }
+  });
+});
+
+describe('a group box ticks every type of it that can be ticked', () => {
+  const others = [
+    { id: 1, name: 'creds', use_for_credentials: 1 },
+    { id: 2, name: 'self', use_for_forms: 1 },
+  ];
+
+  it('a type another repository has is not this one to tick : its name said', () => {
+    const credentials = USAGE_TYPES.find((u) => u.key === 'credentials');
+    expect(takenBy(credentials, { id: 2, name: 'self' }, others)).toBe('creds');
+    // the repository that has it : its own
+    expect(takenBy(credentials, { id: 1, name: 'creds', use_for_credentials: 1 }, others)).toBeNull();
+  });
+
+  it('Connections : only the runners can be ticked here (credentials are taken, the rest comes later)', () => {
+    const record = { id: 2, name: 'self' };
+    expect(categoryState('connections', record, others)).toEqual({
+      checked: false,
+      indeterminate: false,
+      disabled: false,
+    });
+    setCategory('connections', record, others, true);
+    expect(USAGE_FLAGS.filter((f) => record[f])).toEqual(['use_for_runners']);
+    expect(categoryState('connections', record, others).checked).toBe(true);
+    setCategory('connections', record, others, false);
+    expect(record.use_for_runners).toBe(false);
+  });
+
+  it('some of a group ticked : half ticked ; a group with nothing to tick : greyed', () => {
+    const record = { id: 3, name: 'new', use_for_forms: true };
+    expect(categoryState('designer', record, []).indeterminate).toBe(true);
+    // System : only Settings, of a later version
+    expect(categoryState('system', record, []).disabled).toBe(true);
+    setCategory('system', record, [], true);
+    expect(record.use_for_settings).toBeUndefined();
+  });
+
+  it('the component draws the groups and is used by the dialog and the page', () => {
+    const component = read('components/AppRepositoryUsage.vue');
+    expect(component).toContain(':indeterminate.prop="categoryState(category, modelValue, others).indeterminate"');
+    expect(component).toContain('grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));');
+    expect(component).toMatch(/@media \(max-width: 575\.98px\) \{\s*\.af-usage-types \{\s*grid-template-columns: 1fr;/);
+    expect(read('components/AppAdminMulti.vue')).toMatch(
+      /<AppRepositoryUsage\s+v-if="showField\(field\) && field.type === 'usage'"/,
+    );
+    expect(read('pages/admin/repository.vue')).toContain('<AppRepositoryUsage v-model="edit"');
+  });
+});
+
+describe('one question when a save turns several object types on or off', () => {
+  it('ticking all of Connections : a section per type, what is common said once, one Cancel / one Save', async () => {
+    previews = {
+      credentials: {
+        written: ['git', 'api'],
+        withoutSecret: ['git', 'api'],
+        clashes: [],
+        kept: [{ name: 'seeded', code: 'seed' }],
+      },
+      runners: { written: ['rte1'], clashes: ['rte2'], kept: [{ name: 'joined', code: 'registered' }] },
+    };
+    const was = { name: 'ops' };
+    const now = { name: 'ops' };
+    setCategory('connections', now, [], true);
+    expect(usageChanges(was, now)).toEqual({ on: ['credentials', 'runners'], off: [] });
+    const answer = confirmUsageChange(t, 'ops', was, now);
+    await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
+    expect(asked).toEqual(['/api/v2/repository/ops/usage-preview?types=credentials,runners']);
+    expect(confirmPrompt.title).toBe('settings.repositories.usageChangeTitle');
+    expect(confirmPrompt.message).toBe('settings.repositories.usageChangeQuestion {"name":"ops"}');
+    expect(confirmPrompt.ok).toBe('settings.repositories.usageChangeButton');
+    const d = confirmPrompt.details;
+    const headings = d.filter((x) => x.heading).map((x) => x.heading);
+    expect(headings).toEqual([
+      'settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.credentials"}',
+      'settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.runners"}',
+    ]);
+    const text = d.map((x) => x.heading || x).join('\n');
+    expect(text).toContain('"folder":"credentials","count":2');
+    expect(text).toContain('settings.repositories.usageOnWithoutSecret {"names":"git, api"}');
+    expect(text).toContain(
+      'settings.repositories.usageOnKept {"names":"seeded (settings.repositories.usageKeptWhy.seed)"}',
+    );
+    expect(text).toContain('settings.repositories.usageOnClashes {"names":"rte2"}');
+    expect(text).toContain('joined (settings.repositories.usageKeptWhy.registered)');
+    // what follows : once, at the end
+    expect(d.filter((x) => x === 'settings.repositories.usageOnAfter').length).toBe(1);
+    expect(d[d.length - 1]).toBe('settings.repositories.usageOnAfter');
+    answerConfirm(true);
+    expect(await answer).toBe(true);
+  });
+
+  it('one on and one off : both sections, the pull and the unpushed warning once', async () => {
+    unpushed = true;
+    previews = { runners: { linked: 2 }, schedules: { written: [] } };
+    const answer = confirmUsageChange(t, 'ops', { use_for_runners: 1 }, { use_for_schedules: 1 });
+    await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
+    const d = confirmPrompt.details;
+    expect(d.filter((x) => x.heading).length).toBe(2);
+    expect(d).toContain(
+      'settings.repositories.usageOffKept {"type":"settings.repositories.usageTypes.runners","count":2}',
+    );
+    expect(d.filter((x) => x === 'settings.repositories.usageOffPull').length).toBe(1);
+    expect(d.filter((x) => x === 'settings.repositories.usageOffUnpushed').length).toBe(1);
+    answerConfirm(false);
+    expect(await answer).toBe(false);
+  });
+
+  it('a content type only (forms) : nothing is asked', async () => {
+    expect(await confirmUsageChange(t, 'ops', {}, { use_for_forms: 1, use_for_workflows: 1 })).toBe(true);
+    expect(asked).toEqual([]);
+  });
+
+  it('the toast says each type, in order ; a failure in red', () => {
+    usageToast(t, {
+      runners: { activated: { pull: 'pulled', written: ['a'], matched: [], kept: [] } },
+      credentials: { activated: { pull: 'pulled', written: ['x', 'y'], matched: ['z'], kept: [] } },
+    });
+    expect(toasts[0][0]).toBe('success');
+    expect(toasts[0][1].indexOf('usageTypes.credentials')).toBeLessThan(toasts[0][1].indexOf('usageTypes.runners'));
+    usageToast(t, { credentials: { error: 'disk full' } });
+    expect(toasts[1]).toEqual([
+      'error',
+      'settings.repositories.usageFailed {"type":"settings.repositories.usageTypes.credentials","error":"disk full"}',
+    ]);
+  });
+});
+
+describe("the repositories list's Usage column", () => {
+  const field = settings.repositories.fields.find((f) => f.key === 'usage');
+
+  it('one column of badges replaces the column per usage', () => {
+    expect(settings.repositories.fields.filter((f) => /^use_for_/.test(f.key))).toEqual([]);
+    expect(field).toMatchObject({
+      step: 'usage',
+      type: 'usage',
+      label: 'settings.repositories.usageColumn',
+      filterable: true,
+    });
+    expect(field.hidden).toBeUndefined();
+    // and the dialog does not send it
+    expect(settings.repositories.beforeSave({ name: 'a', usage: 'x', pull_scheduled: true })).toEqual({ name: 'a' });
+  });
+
+  it('a badge per type, in order, escaped, in the shape of the other row badges', () => {
+    const html = field.render(null, { use_for_runners: 1, use_for_forms: 1, use_for_config: 0 });
+    expect(html).toBe(
+      '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.forms</span>' +
+        '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.runners</span>',
+    );
+    expect(usageBadges((k) => (k.endsWith('forms') ? '<b>' : k), { use_for_forms: 1 })).toContain('&lt;b&gt;');
+    expect(usageBadges(t, {})).toBe('');
+    const css = read('styles/bootstrap-override.scss');
+    expect(css).toMatch(/\.af-required-badge,\s*\.af-usage-badge \{/);
+  });
+
+  it('sorts by the types, a repository used for nothing last', () => {
+    expect(usageSortValue(t, { use_for_forms: 1 })).toBe('settings.repositories.usageTypes.forms');
+    expect(usageSortValue(t, {}) > usageSortValue(t, { use_for_settings: 1 })).toBe(true);
+    expect(field.sortValue({ use_for_forms: 1 })).toBe(usageSortValue(t, { use_for_forms: 1 }));
+  });
+});
+
+describe('Pull all, and a linked object', () => {
+  it('pulls the repositories holding objects first, credentials before runners, one after the other', () => {
+    const [ordered, rest] = pullOrder([
+      { name: 'forms', use_for_forms: 1 },
+      { name: 'run', use_for_runners: 1 },
+      { name: 'cred', use_for_credentials: 1 },
+    ]);
+    expect(ordered.map((r) => r.name)).toEqual(['cred', 'run']);
+    expect(rest.map((r) => r.name)).toEqual(['forms']);
+    expect(read('pages/admin/repositories.vue')).toContain('for (const repo of ordered) await pull(repo)');
+  });
+
+  it("a credential's, a runner's and a schedule's page show where it comes from, with one component", () => {
+    for (const page of ['pages/admin/credential.vue', 'pages/admin/runner.vue', 'pages/schedule.vue']) {
+      expect(read(page), page).toMatch(/<AppRepositorySource v-show="fieldShown\('source'\)" :record="\w+" \/>/);
+      expect(read(page), page).toContain('...repositorySourceFields(t, ');
+    }
+    expect(repositorySourceFields(t, { repository: null })).toEqual([]);
+    expect(repositorySourceFields(t, { repository: 'ops', repo_file: 'runners/a.yaml' })[0]).toEqual([
+      'source',
+      'settings.repositories.source',
+      'settings.repositories.sourceRepository {"name":"ops"}',
+      'runners/a.yaml',
+    ]);
+  });
+});

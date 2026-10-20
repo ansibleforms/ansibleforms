@@ -683,6 +683,8 @@ const SCHEMA_MANIFEST = {
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
                                'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
+                               'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
                                'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
                      indexes: ['jobs.idx_jobs_stored_job'] },
   },
@@ -1253,6 +1255,16 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("schedule", "repository", "varchar(250)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("schedule", "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("schedule", "launch_options", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
+  // YAML file per object in the type's folder ; the credentials and the runners say where they come
+  // from (repository, repo_file), the other types' tables will in the version that brings them
+  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "labels", "announcements", "settings"]) {
+    await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
+  }
+  for (const table of ["credentials", "runners"]) {
+    await checkPromise(addColumn(table, "repository", "varchar(250)", true, "NULL"), messages, success, failed);
+    await checkPromise(addColumn(table, "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
+  }
   // a secret store a credential's secret may be written to (secrets/providers write) : off, and
   // only below its write prefix
   await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);

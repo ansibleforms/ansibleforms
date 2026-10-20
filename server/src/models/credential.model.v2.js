@@ -687,19 +687,46 @@ class CredentialModel extends CrudModel {
   static async usageCounts() {
     const rows = await mysql.do(
       "SELECT name, COUNT(*) AS n FROM (" +
-        "SELECT credential AS name FROM AnsibleForms.`secret_stores` " +
-        "UNION ALL SELECT pvwa_credential FROM AnsibleForms.`secret_stores` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`notification_channels` " +
-        "UNION ALL SELECT token_credential FROM AnsibleForms.`notification_channels` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`repositories` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`ldap` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`oauth2_providers` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`runners` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`databases` " +
-        "UNION ALL SELECT credential FROM AnsibleForms.`chat_settings`" +
+        this.USED_BY.map((u, i) => `${i ? "UNION ALL " : ""}SELECT ${u.column}${i ? "" : " AS name"} FROM AnsibleForms.\`${u.table}\``).join(" ") +
         ") used WHERE name IS NOT NULL AND name <> '' GROUP BY name",
     );
     return new Map((rows || []).map((r) => [r.name, Number(r.n) || 0]));
+  }
+
+  // the tables that name a credential, the column that does, and how what names it is called (its
+  // name column, none for a single row)
+  static USED_BY = [
+    { table: 'secret_stores', column: 'credential', label: 'secret store', name: 'name' },
+    { table: 'secret_stores', column: 'pvwa_credential', label: 'secret store', name: 'name' },
+    { table: 'notification_channels', column: 'credential', label: 'notification channel', name: 'name' },
+    { table: 'notification_channels', column: 'token_credential', label: 'notification channel', name: 'name' },
+    { table: 'repositories', column: 'credential', label: 'repository', name: 'name' },
+    { table: 'ldap', column: 'credential', label: 'LDAP directory', name: 'name' },
+    { table: 'oauth2_providers', column: 'credential', label: 'SSO provider', name: 'name' },
+    { table: 'runners', column: 'credential', label: 'runner', name: 'name' },
+    { table: 'databases', column: 'credential', label: 'database', name: 'name' },
+    { table: 'chat_settings', column: 'credential', label: 'chat assistant', name: null },
+  ];
+
+  /**
+   * What uses one credential, each said as a person reads it (runner 'rte1', chat assistant) :
+   * the records of the tables that name it (USED_BY), not the forms nor the workflows. What a
+   * repository's pull may not take away (lib/repoObjects : a credential's file removed while
+   * something uses it is refused).
+   *
+   * Args:
+   *   name (string): the credential's name.
+   *
+   * Returns:
+   *   Promise<string[]>: what names it, empty when nothing does.
+   */
+  static async usersOf(name) {
+    if (!name) return [];
+    const rows = await mysql.do(
+      this.USED_BY.map((u) => `SELECT '${u.label}' AS kind, ${u.name || "NULL"} AS name FROM AnsibleForms.\`${u.table}\` WHERE ${u.column} = ?`).join(" UNION ALL "),
+      this.USED_BY.map(() => name),
+    );
+    return (rows || []).map((r) => (r.name ? `${r.kind} '${r.name}'` : r.kind));
   }
 
   /**

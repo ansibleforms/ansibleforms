@@ -16,7 +16,7 @@ export const confirmPrompt = reactive({
   message: '',
   ok: '',
   icon: 'circle-question',
-  // paragraphs under the question (what a repository's Schedules usage will do)
+  // paragraphs under the question (what a repository's usages will do), a heading as { heading }
   details: [],
   resolve: null,
 });
@@ -27,7 +27,8 @@ export const confirmPrompt = reactive({
  * Args:
  *   message (string): the question ; what follows its question mark shows on a line of its own.
  *   options (object): title (the modal's title), ok (its button's label, the title when not
- *     given), icon (of the title and the button) and details (paragraphs under the question).
+ *     given), icon (of the title and the button) and details (paragraphs under the question,
+ *     each a string, or { heading } for the title of a section).
  *
  * Returns:
  *   Promise<boolean>: true when its button is clicked, false when it is closed.

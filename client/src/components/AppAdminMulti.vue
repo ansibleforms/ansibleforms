@@ -82,11 +82,13 @@
 /*      choice, '' when not given                                 */
 /*  settings.confirmSave: async (body, original) => Boolean - a   */
 /*      question before a create (original null) or an update ;   */
-/*      false saves nothing (a repository's Schedules usage)      */
+/*      false saves nothing (a repository's object usages)        */
 /*  settings.afterSave: (answer) => void - after a create, an     */
 /*      update or a delete, with the server's answer              */
 /*  settings.confirmDelete: async (item) => Boolean|null - a      */
 /*      question of its own before a delete ; null asks the usual */
+/*  field.type 'usage': a repository's usage types under their    */
+/*      headings (AppRepositoryUsage), its use_for_* flags        */
 /*  field.type 'rrule': an iCal rrule, its next runs under it      */
 /*      (BsRrule : a schedule kept in a schedules repository)     */
 /*  field.emptyText: what a dropdown with nothing to choose says, */
@@ -1939,6 +1941,16 @@ defineExpose({
           </div>
         </div>
 
+        <!-- USAGE FIELD : a repository's usage types under their headings (AppRepositoryUsage), its
+             flags on the record ; a one-only type another record has greyed with its name -->
+        <AppRepositoryUsage
+          v-if="showField(field) && field.type === 'usage'"
+          v-model="item"
+          class="mb-3"
+          :others="itemList"
+          :readonly="!!field.readonly"
+        />
+
         <!-- A SHORT CHECKBOX (shortLabel) : at the left edge, its label and a few grey words
              (shortHint) on one line ; one only (oneOnly) and already ticked on another record :
              greyed out, and who has it in the tooltip -->
@@ -2102,6 +2114,7 @@ defineExpose({
             field.type !== 'datetime' &&
             field.type !== 'cron' &&
             field.type !== 'rrule' &&
+            field.type !== 'usage' &&
             !field.listWhen?.(item)
           "
           :isHorizontal="true"

@@ -33,7 +33,8 @@ import Helpers from '@/lib/Helpers';
 import { statusPill, schedulePill } from '@/config/settings';
 import { editorStyle } from '@/config/editorStyle';
 import { cronValidationMessage } from '@/config/cron';
-import { rruleValidationMessage, scheduleSource } from '@/config/rrule';
+import { rruleValidationMessage } from '@/config/rrule';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -240,13 +241,8 @@ const tabFields = computed(() => {
       ['state', t('settings.schedules.scheduleState'), t('settings.schedules.scheduleStateHelp')],
       ['lastRun', t('settings.fields.lastRun'), s.last_run ? Helpers.formatServerDate(s.last_run) : ''],
       ['nextRun', t('settings.schedules.nextRun'), s.next_run ? Helpers.formatServerDate(s.next_run) : ''],
-      [
-        'source',
-        t('settings.schedules.source'),
-        // only a schedule from a repository has a source to find
-        s.repository ? t('settings.schedules.sourceRepository', { name: s.repository }) : '',
-        s.repo_file,
-      ],
+      // only a schedule from a repository has a source to find
+      ...repositorySourceFields(t, s),
       ['name', t('settings.fields.name'), t('settings.repositories.helpName')],
       ['description', t('settings.fields.description'), edit.value?.description],
       ['form', t('settings.fields.form'), edit.value?.form],
@@ -507,16 +503,7 @@ onMounted(async () => {
                 <span>{{ schedule.next_run ? Helpers.formatServerDate(schedule.next_run) : '–' }}</span>
               </div>
               <!-- where it comes from : a schedules repository's file ; nothing for the app's own -->
-              <div v-show="inRepository && fieldShown('source')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.schedules.source') }}</div>
-                <span v-html="scheduleSource(t, schedule)"></span>
-                <span v-if="inRepository" class="ms-2 font-monospace small text-body-secondary">{{
-                  schedule.repo_file
-                }}</span>
-                <div class="form-text">
-                  {{ t('settings.schedules.sourceRepositoryHelp', { name: schedule.repository }) }}
-                </div>
-              </div>
+              <AppRepositorySource v-show="fieldShown('source')" :record="schedule" />
               <BsInput
                 class="af-schedule-field"
                 v-model="edit.description"

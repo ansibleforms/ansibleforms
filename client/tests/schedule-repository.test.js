@@ -1,6 +1,6 @@
 // Schedules kept in a git repository : the repository's Schedules usage (use_for_schedules, one
-// repository at most), the questions asked before it is turned on or off, the Source column and
-// badge of Jobs > Scheduled, and the rrule editor : for a new recurring schedule while a schedules
+// repository at most, a type of the Designer group : lib/repositoryUsage.js), the question asked
+// before it is turned on or off, the Repository badge of a schedule's page, and the rrule editor : for a new recurring schedule while a schedules
 // repository is used, and for every schedule that has a rrule, linked or not. No "where it lives"
 // choice : the server decides.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,7 +12,8 @@ let previewData = {};
 vi.mock('axios', () => ({
   default: {
     get: vi.fn(async (url) => {
-      if (url.endsWith('/schedules-preview')) return { data: previewData };
+      if (url.includes('/usage-preview?types=schedules'))
+        return { data: { unpushed: !!previewData.unpushed, types: { schedules: previewData } } };
       if (url === '/api/v2/schedule/repositories')
         return { data: { records: previewData.active ? [{ name: previewData.active }] : [] } };
       return { data: {} };
@@ -30,18 +31,19 @@ import {
   rruleValidationMessage,
   defaultRrule,
   zoneOf,
-  scheduleSource,
   rruleCell,
   scheduleRepository,
   loadScheduleRepository,
 } from '../src/config/rrule.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
 import {
-  confirmScheduleUsage,
-  confirmScheduleDelete,
-  scheduleUsageToast,
+  usageType,
+  confirmUsageChange,
+  confirmUsageDelete,
+  usageToast,
   activationLines,
-} from '../src/lib/scheduleUsage.js';
+  repositoryBadge,
+} from '../src/lib/repositoryUsage.js';
 
 // the key, with its values, as the text : what reaches the page is checked, not a translation
 const t = (key, values) => (values ? `${key} ${JSON.stringify(values)}` : key);
@@ -49,38 +51,36 @@ const settings = getSettings(t);
 const field = (list, key) => settings[list].fields.find((f) => f.key === key);
 
 describe('the Schedules usage of a repository', () => {
-  it('is a short checkbox of the Usage step, its own column, as the other usages', () => {
-    const f = field('repositories', 'use_for_schedules');
-    expect(f).toMatchObject({
-      step: 'usage',
-      type: 'checkbox',
-      shortLabel: 'settings.repositories.useSchedulesShort',
-      columnLabel: 'settings.repositories.useSchedulesShort',
-      help: 'settings.repositories.helpUseForSchedules',
+  it('is an object type of the Designer group, one repository at most', () => {
+    expect(usageType('schedules')).toMatchObject({
+      flag: 'use_for_schedules',
+      category: 'designer',
+      built: true,
+      objects: true,
+      oneOnly: true,
+      folder: 'schedules',
     });
-    // one repository holds the schedules : greyed out, with who has it, on the others
-    expect(f.oneOnly).toBe(true);
   });
 
   it('makes a repository one the app pushes back to', () => {
     const push = settings.repositories.actions.find((a) => a.name === 'sync');
     expect(push.dependency).toContain('use_for_schedules');
     const page = readFileSync(join(import.meta.dirname, '../src/pages/admin/repository.vue'), 'utf8');
-    expect(page).toMatch(/key: 'use_for_schedules',\s*label: t\('settings\.repositories\.useSchedulesShort'\)/);
-    expect(page).toContain('repo.value?.use_for_schedules');
+    expect(page).toContain('...USAGE_FLAGS,');
+    expect(page).toContain('const canPush = computed(() => usedFor(repo.value).length > 0);');
   });
 });
 
 describe('where a schedule comes from', () => {
   it("this app's own : nothing, the source only says where a schedule from git comes from", () => {
-    expect(scheduleSource(t, { name: 'x', repository: null })).toBe('');
+    expect(repositoryBadge(t, { name: 'x', repository: null })).toBe('');
   });
 
   it('a repository : a Repository badge with its name, its file in the tooltip, escaped', () => {
-    const html = scheduleSource(t, { repository: 'ops<b>', repo_file: 'schedules/a "b".yaml' });
+    const html = repositoryBadge(t, { repository: 'ops<b>', repo_file: 'schedules/a "b".yaml' });
     expect(html).toContain('class="badge af-source-badge"');
     expect(html).toContain('title="schedules/a &quot;b&quot;.yaml"');
-    expect(html).toContain('settings.schedules.sourceRepository');
+    expect(html).toContain('settings.repositories.sourceRepository');
     expect(html).toContain('ops&lt;b&gt;');
     expect(html).not.toContain('<b>');
   });
@@ -164,7 +164,7 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
   });
 });
 
-describe('the questions before the Schedules usage changes', () => {
+describe('the question before the Schedules usage changes', () => {
   beforeEach(() => {
     toasts.length = 0;
     previewData = {
@@ -177,48 +177,58 @@ describe('the questions before the Schedules usage changes', () => {
     };
   });
 
-  it('turned on : what it will take, git winning on a name, the crons kept, Cancel / Use for schedules', async () => {
-    const answer = confirmScheduleUsage(t, 'ops', false, true);
+  it('turned on : what it will take, git winning on a name, the crons kept, Cancel / Turn on', async () => {
+    const answer = confirmUsageChange(t, 'ops', { use_for_schedules: 0 }, { use_for_schedules: 1 });
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
-    expect(confirmPrompt.title).toBe('settings.repositories.schedulesOnTitle');
-    expect(confirmPrompt.ok).toBe('settings.repositories.schedulesOnButton');
+    expect(confirmPrompt.title).toBe(
+      'settings.repositories.usageOnTitle {"type":"settings.repositories.usageTypes.schedules"}',
+    );
+    expect(confirmPrompt.ok).toBe('settings.repositories.usageOnButton');
     const text = confirmPrompt.details.join('\n');
-    expect(text).toContain('settings.repositories.schedulesOnWritten {"count":2,"name":"ops"}');
-    expect(text).toContain('settings.repositories.schedulesOnClashes {"names":"Backup"}');
+    expect(text).toContain(
+      'settings.repositories.usageOnWritten {"type":"settings.repositories.usageTypes.schedules","name":"ops","folder":"schedules","count":2}',
+    );
+    expect(text).toContain('settings.repositories.usageOnClashes {"names":"Backup"}');
     expect(text).toContain('settings.repositories.schedulesOnKept {"names":"First or Monday (0 0 1 * 1)"}');
     expect(text).toContain('settings.repositories.schedulesOnPlanned');
-    expect(text).toContain('settings.repositories.schedulesOnAfter');
+    expect(text).toContain('settings.repositories.usageOnAfter');
+    // one type : its own question, no section heading
+    expect(confirmPrompt.details.some((d) => d.heading)).toBe(false);
     answerConfirm(false);
     expect(await answer).toBe(false);
   });
 
   it('no clash : says git wins all the same', () => {
-    const lines = activationLines(t, 'ops', { written: [], kept: [], clashes: [] });
-    expect(lines).toContain('settings.repositories.schedulesOnGitWins');
+    const lines = activationLines(t, 'schedules', 'ops', { written: [], kept: [], clashes: [] });
+    expect(lines).toContain('settings.repositories.usageOnGitWins');
   });
 
   it('turned off : its schedules stay in the app, the unpushed changes warned of', async () => {
-    const answer = confirmScheduleUsage(t, 'ops', true, false);
+    const answer = confirmUsageChange(t, 'ops', { use_for_schedules: 1 }, { use_for_schedules: 0 });
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
-    expect(confirmPrompt.title).toBe('settings.repositories.schedulesOffTitle');
+    expect(confirmPrompt.title).toBe(
+      'settings.repositories.usageOffTitle {"type":"settings.repositories.usageTypes.schedules"}',
+    );
     const text = confirmPrompt.details.join('\n');
-    expect(text).toContain('settings.repositories.schedulesOffKept {"count":3,"name":"ops"}');
-    expect(text).toContain('settings.repositories.schedulesOffUnpushed');
+    expect(text).toContain(
+      'settings.repositories.usageOffKept {"type":"settings.repositories.usageTypes.schedules","count":3}',
+    );
+    expect(text).toContain('settings.repositories.usageOffUnpushed');
     answerConfirm(true);
     expect(await answer).toBe(true);
   });
 
   it('unchanged : nothing is asked', async () => {
-    expect(await confirmScheduleUsage(t, 'ops', true, true)).toBe(true);
+    expect(await confirmUsageChange(t, 'ops', { use_for_schedules: 1 }, { use_for_schedules: true })).toBe(true);
     expect(confirmPrompt.open).toBe(false);
   });
 
   it('deleting a schedules repository asks the same ; another repository the usual question', async () => {
-    expect(await confirmScheduleDelete(t, { name: 'forms', use_for_schedules: 0 })).toBeNull();
-    const answer = confirmScheduleDelete(t, { name: 'ops', use_for_schedules: 1 });
+    expect(await confirmUsageDelete(t, { name: 'forms', use_for_schedules: 0, use_for_forms: 1 })).toBeNull();
+    const answer = confirmUsageDelete(t, { name: 'ops', use_for_schedules: 1 });
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
     expect(confirmPrompt.ok).toBe('common.delete');
-    expect(confirmPrompt.details.join('\n')).toContain('settings.repositories.schedulesOffKept');
+    expect(confirmPrompt.details.join('\n')).toContain('settings.repositories.usageOffKept');
     answerConfirm(true);
     expect(await answer).toBe(true);
   });
@@ -233,14 +243,16 @@ describe('the questions before the Schedules usage changes', () => {
   });
 
   it('says what the server did', () => {
-    scheduleUsageToast(t, {
-      schedules: { activated: { pull: 'pulled', written: ['a', 'b'], matched: ['c'], kept: [] } },
-    });
-    expect(toasts[0][1]).toBe('settings.repositories.schedulesOnDone {"written":2,"matched":1,"kept":0}');
-    scheduleUsageToast(t, { schedules: { deactivated: { pull: 'not pulled: offline', unlinked: 4 } } });
-    expect(toasts[1][1]).toContain('settings.repositories.schedulesOffDone {"count":4}');
-    expect(toasts[1][1]).toContain('settings.repositories.schedulesNotPulled');
-    expect(scheduleUsageToast(t, null)).toBe('');
+    usageToast(t, { schedules: { activated: { pull: 'pulled', written: ['a', 'b'], matched: ['c'], kept: [] } } });
+    expect(toasts[0][1]).toBe(
+      'settings.repositories.usageOnDone {"type":"settings.repositories.usageTypes.schedules","written":2,"matched":1,"kept":0}',
+    );
+    usageToast(t, { schedules: { deactivated: { pull: 'not pulled: offline', unlinked: 4 } } });
+    expect(toasts[1][1]).toContain(
+      'settings.repositories.usageOffDone {"type":"settings.repositories.usageTypes.schedules","count":4}',
+    );
+    expect(toasts[1][1]).toContain('settings.repositories.usageNotPulled');
+    expect(usageToast(t, null)).toBe('');
   });
 });
 

@@ -8,6 +8,7 @@
 // the files and writes the database.
 import YAML from "yaml";
 import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
+import { setKey as setMapKey, same, fileNameFor as objectFileName, YAML_FILE } from "./repoObjects/yamlFile.js";
 
 // ===========================================================================
 // CONSTANTS
@@ -17,8 +18,8 @@ import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
 // repository is read as a schedule
 export const SCHEDULES_FOLDER = "schedules";
 
-// a schedule's file : yaml
-export const SCHEDULE_FILE = /\.(yaml|yml)$/i;
+// a schedule's file : yaml, as every object file
+export const SCHEDULE_FILE = YAML_FILE;
 
 // the keys of a schedule in the export's order (its own fields, its prompts, then
 // unified_job_template, enabled and rrule, then related and natural_key) : a new file is written in it, a key added to a file goes to its
@@ -340,8 +341,8 @@ export function parseScheduleFile(text) {
 // ===========================================================================
 
 /**
- * Sets a key of a map, a key that is not there yet put at its place in the export's order (KEY_ORDER)
- * among the keys there ; whatever else the map holds (and its comments) left as it is.
+ * Sets a key of a schedule's map, a new key put at its place in the export's order (KEY_ORDER) :
+ * the shared writer of the object files (lib/repoObjects/yamlFile.js).
  *
  * Args:
  *   doc (YAML.Document): the document.
@@ -350,48 +351,7 @@ export function parseScheduleFile(text) {
  *   value (any): the value.
  */
 function setKey(doc, map, key, value) {
-  if (map.has(key)) {
-    const pair = map.items.find((p) => (YAML.isScalar(p.key) ? p.key.value : p.key) === key);
-    const node = doc.createNode(value);
-    // the comment before the old value stays with the key
-    if (pair?.value?.commentBefore) node.commentBefore = pair.value.commentBefore;
-    if (pair?.value?.comment) node.comment = pair.value.comment;
-    pair.value = node;
-    return;
-  }
-  const pair = doc.createPair(key, value);
-  const rank = KEY_ORDER.indexOf(key);
-  const keyOf = (p) => (YAML.isScalar(p.key) ? p.key.value : p.key);
-  let at = map.items.length;
-  if (rank >= 0) {
-    // after the last key ranked before it, else before the first ranked after it
-    let lastBefore = -1;
-    let firstAfter = -1;
-    map.items.forEach((p, i) => {
-      const r = KEY_ORDER.indexOf(keyOf(p));
-      if (r < 0) return;
-      if (r < rank) lastBefore = i;
-      else if (r > rank && firstAfter < 0) firstAfter = i;
-    });
-    if (lastBefore >= 0) at = lastBefore + 1;
-    else if (firstAfter >= 0) at = firstAfter;
-  }
-  map.items.splice(at, 0, pair);
-}
-
-/**
- * Whether two plain values are the same (a changed field only is written, so a file the app
- * saves with nothing changed stays byte for byte).
- *
- * Args:
- *   a (any): one.
- *   b (any): the other.
- *
- * Returns:
- *   boolean: true when they are.
- */
-function same(a, b) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  setMapKey(doc, map, key, value, KEY_ORDER);
 }
 
 /**
@@ -471,7 +431,8 @@ export function newScheduleFile({ name, description = "", rrule, enabled = true,
 
 /**
  * The file name a new schedule gets in the schedules folder : its name in lower case, letters
- * and digits apart by dashes, a number added when a file has it already.
+ * and digits apart by dashes, a number added when a file has it already (the shared namer of the
+ * object files, lib/repoObjects/yamlFile.js).
  *
  * Args:
  *   name (string): the schedule's name.
@@ -481,16 +442,5 @@ export function newScheduleFile({ name, description = "", rrule, enabled = true,
  *   string: the file name (nightly-log-rotation.yaml).
  */
 export function fileNameFor(name, taken = () => false) {
-  const slug =
-    String(name || "")
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60)
-      .replace(/-+$/g, "") || "schedule";
-  let file = `${slug}.yaml`;
-  for (let n = 2; taken(file); n++) file = `${slug}-${n}.yaml`;
-  return file;
+  return objectFileName(name, taken, "schedule");
 }

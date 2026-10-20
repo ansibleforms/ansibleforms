@@ -8,6 +8,7 @@ import RunnerJoinToken from "../../models/runnerJoinToken.model.js";
 import { socketState, isSocketRunner, dropSocket, pushSettings } from "../../runners/rteHub.js";
 import { publish } from "../../lib/liveEvents.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 // the token and password are stored encrypted and decrypted on read, so they never leave
 // here unmasked
@@ -91,6 +92,8 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     const created = await Runner.create(req.body);
+    // the runners repository, when there is one : written to it as a new file (lib/repoObjects)
+    await RepoObjects.appCreated("runners", created);
     // { message, id }, as the other records answer a create
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "resources.runnerAdded"), id: created }));
   } catch (err) {
@@ -114,8 +117,11 @@ const update = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
+    const before = await Runner.findStoredById(req.params.id).catch(() => null);
     const updated = await Runner.update(req.body, req.params.id);
     if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
+    // one of the runners repository : its changed fields written to its file
+    if (before?.repository) await RepoObjects.appUpdated("runners", before, req.params.id);
     // its RTE gets its settings now when this node holds its socket, else at the next renewal
     const saved = await Runner.findById(req.params.id).catch(() => null);
     if (saved) pushSettings(saved);
@@ -134,6 +140,8 @@ const deleteRunner = async (req, res) => {
     const deleted = await Runner.delete(req.params.id);
     if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
     if (before?.name) dropSocket(before.name, "deleted under Connections > Runners");
+    // one of the runners repository : its file goes too, for the repository's Push
+    if (before?.repository) await RepoObjects.appDeleted("runners", before);
     return res.json(RestResult.single(deleted));
   } catch (err) {
     Errors.ReturnError(res, err);

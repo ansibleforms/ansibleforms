@@ -30,15 +30,14 @@ const details = computed(() => confirmPrompt.details || []);
       <p v-for="(line, i) in lines" :key="i" :class="{ 'mb-0': i === lines.length - 1 && !details.length }">
         {{ line }}
       </p>
-      <!-- what the action will do, a paragraph each -->
-      <p
-        v-for="(line, i) in details"
-        :key="`d${i}`"
-        class="af-confirm-detail"
-        :class="{ 'mb-0': i === details.length - 1 }"
-      >
-        {{ line }}
-      </p>
+      <!-- what the action will do, a paragraph each ; a heading ({ heading }) opens a section of
+           its own (a repository's usages turned on or off at once, a section per type) -->
+      <template v-for="(line, i) in details" :key="`d${i}`">
+        <p v-if="line && line.heading" class="af-confirm-heading">{{ line.heading }}</p>
+        <p v-else class="af-confirm-detail" :class="{ 'mb-0': i === details.length - 1 }">
+          {{ line }}
+        </p>
+      </template>
     </template>
     <template #footer>
       <BsButton icon="times" @click="answerConfirm(false)">{{ t('common.cancel') }}</BsButton>
@@ -53,5 +52,11 @@ const details = computed(() => confirmPrompt.details || []);
 .af-confirm-detail {
   font-size: 0.875rem;
   color: var(--bs-secondary-color);
+}
+/* a section's heading among the details : bold, in the body colour, close to its paragraphs */
+.af-confirm-heading {
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
 }
 </style>

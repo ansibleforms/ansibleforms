@@ -7,7 +7,14 @@ import Helpers from '@/lib/Helpers';
 import { cronCell } from '@/lib/cronCell';
 import { cronValidationMessage } from './cron';
 import { rruleValidationMessage, defaultRrule, rruleCell, scheduleRepository } from './rrule';
-import { confirmScheduleUsage, confirmScheduleDelete, scheduleUsageToast } from '@/lib/scheduleUsage';
+import {
+  USAGE_FLAGS,
+  confirmUsageChange,
+  confirmUsageDelete,
+  usageToast,
+  usageBadges,
+  usageSortValue,
+} from '@/lib/repositoryUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
@@ -999,14 +1006,14 @@ export default function getSettings(t) {
       selectable: false,
       // a row opens the repository's page
       openPage: (item) => `/settings/repositories/${item.id}`,
-      // Scheduled pull off : no schedule ; the switch itself is not stored
-      beforeSave: ({ pull_scheduled, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
-      // its Schedules usage turned on or off asks first (what it will take, or that its schedules
-      // stay in the app), and says after what it did ; deleting a schedules repository asks the same
-      confirmSave: (body, original) =>
-        confirmScheduleUsage(t, body.name, original?.use_for_schedules, body.use_for_schedules),
-      afterSave: (answer) => scheduleUsageToast(t, answer),
-      confirmDelete: (item) => confirmScheduleDelete(t, item),
+      // Scheduled pull off : no schedule ; the switch itself is not stored, nor the Usage column
+      beforeSave: ({ pull_scheduled, usage: _usage, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
+      // its object usages (schedules, credentials, runners ...) turned on or off ask first, one
+      // question for all of them (what each will take, or let go), and say after what they did ;
+      // deleting a repository that holds objects asks the same
+      confirmSave: (body, original) => confirmUsageChange(t, body.name, original, body),
+      afterSave: (answer) => usageToast(t, answer),
+      confirmDelete: (item) => confirmUsageDelete(t, item),
       // the dialog in steps : what the repository is, the credentials to reach it, what it is used
       // for, when it syncs
       steps: [
@@ -1027,21 +1034,14 @@ export default function getSettings(t) {
           dividerBefore: true,
         },
         {
-          // only a repository the app writes to (forms, settings, playbooks, workflows, inventories,
-          // schedules) is pushed back, and only when it has changes not pushed yet
+          // only a repository the app writes to (forms, config, playbooks, workflows, inventories,
+          // the objects it holds) is pushed back, and only when it has changes not pushed yet
           name: 'sync',
           enabledWhen: (r) => !!r.unpushed,
           icon: 'upload',
           title: t('settings.repositories.push'),
           color: 'test',
-          dependency: [
-            'use_for_forms',
-            'use_for_config',
-            'use_for_playbooks',
-            'use_for_workflows',
-            'use_for_inventories',
-            'use_for_schedules',
-          ],
+          dependency: USAGE_FLAGS,
         },
         { name: 'reset', icon: 'redo', title: t('settings.repositories.reset'), color: 'refresh' },
         {
@@ -1215,90 +1215,16 @@ export default function getSettings(t) {
           hidden: true,
         },
         {
-          key: 'use_for_config',
+          // what the app reads from it : its usage types under their five headings, ticked one by one
+          // or a heading at once (AppRepositoryUsage) ; in the list, one column of badges, a badge per
+          // type it is used for, sorted and filtered by their names
+          key: 'usage',
           step: 'usage',
-          // the app uses one repository for it
-          oneOnly: true,
-          shortLabel: t('settings.repositories.useConfigShort'),
-          shortHint: t('settings.repositories.useConfigHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForConfig'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useConfigShort'),
-          help: t('settings.repositories.helpUseForConfig'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_forms',
-          step: 'usage',
-          shortLabel: t('settings.repositories.useFormsShort'),
-          shortHint: t('settings.repositories.useFormsHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForForms'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useFormsShort'),
-          help: t('settings.repositories.helpUseForForms'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_playbooks',
-          step: 'usage',
-          // the app uses one repository for it
-          oneOnly: true,
-          shortLabel: t('settings.repositories.usePlaybooksShort'),
-          shortHint: t('settings.repositories.usePlaybooksHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForPlaybooks'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.usePlaybooksShort'),
-          help: t('settings.repositories.helpUseForPlaybooks'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_inventories',
-          step: 'usage',
-          // several repositories may hold inventories, each its own
-          shortLabel: t('settings.repositories.useInventoriesShort'),
-          shortHint: t('settings.repositories.useInventoriesHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForInventories'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useInventoriesShort'),
-          help: t('settings.repositories.helpUseForInventories'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_workflows',
-          step: 'usage',
-          // several repositories may hold workflows, as forms
-          shortLabel: t('settings.repositories.useWorkflowsShort'),
-          shortHint: t('settings.repositories.useWorkflowsHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForWorkflows'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useWorkflowsShort'),
-          help: t('settings.repositories.helpUseForWorkflows'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_schedules',
-          step: 'usage',
-          // one repository holds the schedules (the server refuses a second)
-          oneOnly: true,
-          shortLabel: t('settings.repositories.useSchedulesShort'),
-          shortHint: t('settings.repositories.useSchedulesHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForSchedules'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useSchedulesShort'),
-          help: t('settings.repositories.helpUseForSchedules'),
-          hidden: true,
+          type: 'usage',
+          label: t('settings.repositories.usageColumn'),
+          render: (v, row) => usageBadges(t, row),
+          sortValue: (row) => usageSortValue(t, row),
+          filterable: true,
         },
       ],
     },
@@ -1599,7 +1525,7 @@ export default function getSettings(t) {
           // where it comes from (set by the server, never chosen) : no column in the list, the
           // schedule's page says it for one kept in the schedules repository
           key: 'repository',
-          label: t('settings.schedules.source'),
+          label: t('settings.repositories.source'),
           noInput: true,
           noTable: true,
         },

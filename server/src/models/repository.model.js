@@ -13,7 +13,11 @@ import Errors from '../lib/errors.js';
 import { SECRET_MASK } from '../lib/secretMask.js';
 import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
-import { releasedOperationsSql } from '../lib/repositoryClaims.js';
+import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES } from '../lib/repoObjects/types.js';
+
+// the flags of the object types : a repository's that turn on or off make it take the app's
+// objects, or let them go (lib/repoObjects/engine.js)
+const OBJECT_FLAGS = USAGE_TYPES.filter((t) => t.objects).map((t) => t.flag);
 
 // a repository claim older than this is released whatever its node says : no clone, pull or
 // sync runs for that long, so it is the remains of one that hung
@@ -113,14 +117,15 @@ function removeEmptyFolders(dir, keepSelf = false) {
 }
 
 /**
- * The schedules of the schedules repositories (models/scheduleRepo.model.js), loaded when first
- * needed : it imports this model, so a static import would be a cycle.
+ * The repository-backed objects (lib/repoObjects : the schedules, the credentials, the runners
+ * ... kept in a repository used for them), loaded when first needed : they import this model, so a
+ * static import would be a cycle.
  *
  * Returns:
- *   Promise<object>: the ScheduleRepo model.
+ *   Promise<object>: the RepoObjects engine.
  */
-async function scheduleRepo() {
-  return (await import("./scheduleRepo.model.js")).default
+async function repoObjects() {
+  return (await import("../lib/repoObjects/index.js")).default
 }
 
 /**
@@ -198,8 +203,9 @@ class Repository extends CrudModel {
     if (!opts.fromSeed && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
-    // one schedules repository at most
-    if (Repository.flagOn(data.use_for_schedules)) await Repository.assertOneSchedulesRepository(data.name);
+    // one repository at most per object type (the schedules, the credentials ...), and no usage of
+    // a later version
+    await (await repoObjects()).assertUsageAllowed(data, data.name, null);
     const insertId = await super.create(this.modelName, data, opts);
     // Don't await - clone happens in background (it can take minutes and the API has to
     // answer the create now). But the rejection must not escape: clone() throws before it
@@ -210,17 +216,18 @@ class Repository extends CrudModel {
     Repository.clone(data.name).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
       try {
-        await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
+        await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
       } catch (e2) {
         logger.error(`...and the failure could not be recorded on the repository either: ${helpers.getError(e2)}`)
       }
     }).then(async () => {
-      // made the schedules repository : once cloned, it takes the app's schedules (activate)
-      if (!Repository.flagOn(data.use_for_schedules)) return
+      // made the repository of object types (the schedules, the credentials ...) : once cloned, it
+      // takes the app's objects of each (activate), the clone just made read as it is
+      if (!objectTypesOf(data).length) return
       try {
-        await (await scheduleRepo()).activate(data.name, { pull: false })
+        await (await repoObjects()).afterUsageChange(null, data.name, data, { pull: false })
       } catch (e) {
-        logger.error(`Repository '${data.name}' could not take the schedules: ${helpers.getError(e)}`)
+        logger.error(`Repository '${data.name}' could not take the objects of its usages: ${helpers.getError(e)}`)
       }
     });
     return insertId;
@@ -239,10 +246,9 @@ class Repository extends CrudModel {
     if (data.name !== undefined && data.name !== name && !Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
-    // one schedules repository at most : turned on here while another one has it, refused
-    if (Repository.flagOn(data.use_for_schedules) && !Repository.flagOn(repo.use_for_schedules)) {
-      await Repository.assertOneSchedulesRepository(name);
-    }
+    // one repository at most per object type : turned on here while another one has it, refused ;
+    // a usage of a later version too
+    await (await repoObjects()).assertUsageAllowed(data, name, repo);
 
     // Remove empty fields - but a field the dialog can clear, sent empty, is cleared : its
     // schedule (Scheduled pull off) or its credential. Removed with the others, an empty
@@ -282,8 +288,8 @@ class Repository extends CrudModel {
         const res = await super.update(this.modelName, data, repo.id, opts);
         // release the claim under the NEW name - the row carries it now
         await Repository.writeState("update AnsibleForms.`repositories` set status = ? where name = ?", [repo.status ?? null, newName])
-        // its schedules say they come from it under its new name
-        await (await scheduleRepo()).renameRepository(name, newName).catch((e) => logger.error(`The schedules of repository '${name}' still name it so: ${helpers.getError(e)}`))
+        // its objects (schedules, credentials ...) say they come from it under its new name
+        await (await repoObjects()).renameRepository(name, newName).catch((e) => logger.error(`The objects of repository '${name}' still name it so: ${helpers.getError(e)}`))
         await Repository.afterUsageChange(repo, newName, opts)
         return res;
       } catch (e) {
@@ -309,63 +315,28 @@ class Repository extends CrudModel {
   }
 
   /**
-   * Whether a usage flag is on, whatever it is sent as (true, 1, '1', 'true').
-   *
-   * Args:
-   *   v (any): the flag.
-   *
-   * Returns:
-   *   boolean: true when it is on.
-   */
-  static flagOn(v) {
-    return v === true || v === 1 || v === "1" || v === "true"
-  }
-
-  /**
-   * Refuses a second schedules repository : the schedules are written back to one repository.
-   *
-   * Args:
-   *   name (string): the repository being made one.
-   *
-   * Raises:
-   *   Errors.BadRequestError: another repository is used for schedules, named.
-   */
-  static async assertOneSchedulesRepository(name) {
-    const rows = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_schedules AND name <> ?", [name])
-    if (rows?.length) {
-      throw new Errors.BadRequestError(`Repository '${rows[0].name}' is already used for schedules: only one repository can hold the schedules.`)
-    }
-  }
-
-  /**
-   * Follows a repository made, or no longer, the schedules repository (use_for_schedules) : made
-   * one, it takes the app's schedules (ScheduleRepo.activate : pulled, its files read in, the
-   * app's recurring schedules written to it) ; no longer one, its schedules are unlinked and stay
-   * in the app (ScheduleRepo.deactivate). What it did is put in opts.report.schedules, for the
-   * answer. A failure is logged, never thrown : the repository itself was saved.
+   * Follows a repository made, or no longer, the repository of object types (the schedules, the
+   * credentials, the runners ...) : made one, it takes the app's objects of each ; no longer one,
+   * its objects are unlinked and stay in the app (lib/repoObjects/engine.js afterUsageChange, the
+   * repository pulled once). What it did is put in opts.report, by type, for the answer. A failure
+   * is logged, never thrown : the repository itself was saved.
    *
    * Args:
    *   before (object): the repository as it was.
    *   name (string): its name now.
-   *   opts (object): { report (an object the result is written to) }.
+   *   opts (object): { report (an object the result is written to, by type) }.
    *
    * Returns:
-   *   Promise<object|null>: what it did, null when the flag did not change.
+   *   Promise<object>: what it did, by type ({} when no flag changed).
    */
   static async afterUsageChange(before, name, opts = {}) {
     try {
-      const rows = await mysql.do("SELECT use_for_schedules FROM AnsibleForms.`repositories` WHERE name = ?", [name])
-      const now = !!Number(rows?.[0]?.use_for_schedules)
-      const was = !!Number(before?.use_for_schedules)
-      if (now === was) return null
-      const schedules = await scheduleRepo()
-      const report = now ? { activated: await schedules.activate(name) } : { deactivated: await schedules.deactivate(name) }
-      if (opts.report) opts.report.schedules = report
-      return report
+      const flags = OBJECT_FLAGS.join(", ")
+      const rows = await mysql.do(`SELECT ${flags} FROM AnsibleForms.\`repositories\` WHERE name = ?`, [name])
+      return await (await repoObjects()).afterUsageChange(before, name, rows?.[0] || {}, { report: opts.report })
     } catch (e) {
-      logger.error(`The schedules of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
-      if (opts.report) opts.report.schedules = { error: helpers.getError(e) }
-      return null
+      logger.error(`The objects of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
+      return {}
     }
   }
 
@@ -380,11 +351,11 @@ class Repository extends CrudModel {
     // would be refused an edit but still be deletable, which is worse than either.
     if (!opts.fromSeed) await CrudModel.assertNotManaged(this.modelName, repo.id);
 
-    // the schedules repository : pulled once more, its files read in, and its schedules unlinked
-    // - they stay in the app, on their rrule (the files in git are not touched)
-    if (repo.use_for_schedules) {
-      const report = await (await scheduleRepo()).deactivate(name)
-      if (opts.report) opts.report.schedules = { deactivated: report }
+    // the repository of object types (the schedules, the credentials ...) : pulled once more, its
+    // files read in, and its objects unlinked - they stay in the app (the files in git are not
+    // touched)
+    if (objectTypesOf(repo).length) {
+      await (await repoObjects()).afterUsageChange(repo, name, {}, { report: opts.report })
     }
 
     // Claim the repo BEFORE deleting the tree, exactly as reset() does and for the same
@@ -406,7 +377,7 @@ class Repository extends CrudModel {
       await Repo.delete(name);
     } catch (e) {
       // release the claim, or a failed rm wedges the repo at 'running' for ever
-      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, status = 'failed', pull_status = 'failed' where name = ?", [e.message, name], { name })
+      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, status = 'failed' where name = ?", [e.message, name], { name })
       throw e
     }
     // Deletes with its own SQL, so it must evict what CrudModel.delete would have:
@@ -445,9 +416,8 @@ class Repository extends CrudModel {
   static async reset(name) {
     logger.info(`Resetting repository ${name}`);
     // claim the repo BEFORE deleting the tree : a reset rm's the working tree,
-    // which must not race a pull/sync running git on it (issue #414). A reset is a
-    // fresh clone, so its Pull reads running meanwhile.
-    const claim = await Repository.claim(name, "pull")
+    // which must not race a pull/sync running git on it (issue #414)
+    const claim = await Repository.claim(name)
     if (!claim.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -456,7 +426,7 @@ class Repository extends CrudModel {
       await Repository.clone(name, true); // recreate it ; clone writes the final status
     } catch (e) {
       // release the claim so a delete failure doesn't wedge the repo at 'running'
-      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [e.message, name], { name })
+      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [e.message, name], { name })
       throw e
     }
   }
@@ -773,8 +743,8 @@ class Repository extends CrudModel {
       // the working tree first and comes in claimed, so it is never refused here.
       await Repository.assertNoLocalChanges(name)
       // atomic check-and-set : a clone must not run git while a pull/sync/reset
-      // is touching the same working tree ; a clone is a pull, its Pull reads running
-      const claim = await Repository.claim(name, "pull")
+      // is touching the same working tree
+      const claim = await Repository.claim(name)
       if (!claim.affectedRows) {
         throw new Error(`Repository '${name}' not found or already running, try again later`)
       }
@@ -789,8 +759,8 @@ class Repository extends CrudModel {
         output += await (await formModel()).duplicateLines(name)
       }
       // its schedules folder read into the schedule table, still under the claim
-      if (repo.use_for_schedules) {
-        output += await (await scheduleRepo()).afterGit(name)
+      if (objectTypesOf(repo).length) {
+        output += await (await repoObjects()).afterGit(name, repo)
       }
       status = "success"
     } catch (e) {
@@ -798,7 +768,7 @@ class Repository extends CrudModel {
       status = "failed"
     }
     output = Repository.maskSecrets(output, repo) // never expose git credentials
-    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ?, pull_status = ? where name = ?", [output, status, status, name], { name })
+    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ? where name = ?", [output, status, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see
@@ -844,8 +814,8 @@ class Repository extends CrudModel {
     // a working tree with changes not pushed yet is not pulled over, as the scheduled pull does
     await Repository.assertNoLocalChanges(name)
     // atomic check-and-set : a pull and a sync (or another pull) must not run
-    // git on the same working tree at the same time (issue #414) ; its Pull reads running
-    const claimed = await Repository.claim(name, "pull")
+    // git on the same working tree at the same time (issue #414)
+    const claimed = await Repository.claim(name)
     if (!claimed.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -860,8 +830,8 @@ class Repository extends CrudModel {
       output = await Repo.pull(name, Repository.gitAuth(pullRepo), pullRepo?.uri)
       // its schedules folder read into the schedule table, still under the claim : what changed
       // is said under git's output
-      if (pullRepo?.use_for_schedules) {
-        output += await (await scheduleRepo()).afterGit(name)
+      if (objectTypesOf(pullRepo).length) {
+        output += await (await repoObjects()).afterGit(name, pullRepo)
       }
       // a form name it shares with another forms repository : which copy is used, which skipped
       if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
@@ -880,7 +850,7 @@ class Repository extends CrudModel {
     } else {
       output = Repository.maskSecrets(output, pullRepo) // never expose git credentials
     }
-    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ?, pull_status = ? where name = ?", [output, status, status, name], { name })
+    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ? where name = ?", [output, status, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see
@@ -1009,37 +979,16 @@ class Repository extends CrudModel {
     await Repository.writeState("update AnsibleForms.`repositories` set status = ?, claim_node = NULL where name = ? and status = 'running' and (claim_node = ? or claim_node IS NULL)", [priorStatus ?? null, name, nodeId], { name })
   }
 
-  /**
-   * The atomic claim every git operation and designer save takes (status<>'running' -> 'running'),
-   * naming the node that holds it and since when : a claim whose node went away is released by
-   * the worker (releaseStaleClaims) instead of wedging the repository until somebody notices.
-   *
-   * `status` stays the one lock of the repository (one git operation at a time, on every node).
-   * What runs under it is said apart : a pull (or clone, reset) sets pull_status 'running', a
-   * push push_status 'running', in the same statement, so the Pull and the Push badges each
-   * read their own operation. The other one keeps how it last ended : a push no longer reads as
-   * a pull running, nor a pull as a push. A save or a rename names neither, both stay as they are.
-   *
-   * Args:
-   *   name (string): the repository.
-   *   op (string): what takes the claim, "pull" or "push" ; anything else (a save, a rename,
-   *     a delete) sets neither pull_status nor push_status.
-   *
-   * Returns:
-   *   Promise<object>: the update's result ; affectedRows 0 when the repository is unknown or
-   *   already claimed.
-   */
-  static async claim(name, op = undefined) {
-    // the operation's own status column, set with the lock or not at all
-    const opStatus = { pull: ", pull_status = 'running'", push: ", push_status = 'running'" }[op] || ""
+  // The atomic claim every git operation and designer save takes (status<>'running' -> 'running'),
+  // naming the node that holds it and since when : a claim whose node went away is released by
+  // the worker (releaseStaleClaims) instead of wedging the repository until somebody notices.
+  static async claim(name) {
     return Repository.writeState(
-      "update AnsibleForms.`repositories` set status = 'running'" + opStatus + ", claim_node = ?, claim_since = NOW() where name = ? and COALESCE(status,'') <> 'running'",
+      "update AnsibleForms.`repositories` set status = 'running', claim_node = ?, claim_since = NOW() where name = ? and COALESCE(status,'') <> 'running'",
       [nodeId, name], { name })
   }
 
-  // Release the claims nobody will release any more, marking those repositories 'failed', and
-  // the pull or the push that held it (pull_status, push_status 'running') failed with them, so no
-  // badge stays on running for a node that will never end it :
+  // Release the claims nobody will release any more, marking those repositories 'failed' :
   //   - the node holding it stopped answering (no heartbeat for NODE_DEAD_SECONDS)
   //   - it is older than CLAIM_MAX_HOURS : no git operation takes that long
   //   - atStart (the worker's start) : its own from before this process started (a process
@@ -1049,7 +998,7 @@ class Repository extends CrudModel {
   // at its start, letting a second git process into a working tree an app node was writing.
   static async releaseStaleClaims({ atStart = false } = {}) {
     const result = await Repository.writeState(
-      "update AnsibleForms.`repositories` r set r.status = 'failed', " + releasedOperationsSql("r.") + "r.claim_node = NULL where r.status = 'running' and (" +
+      "update AnsibleForms.`repositories` r set r.status = 'failed', r.claim_node = NULL where r.status = 'running' and (" +
         "(r.claim_node IS NOT NULL and NOT EXISTS (SELECT 1 FROM AnsibleForms.`nodes` n WHERE n.id = r.claim_node AND n.last_seen > (NOW() - INTERVAL ? SECOND)))" +
         " or r.claim_since < (NOW() - INTERVAL ? HOUR)" +
         (atStart ? " or (r.claim_node = ? and r.claim_since < (NOW() - INTERVAL ? SECOND)) or r.claim_node IS NULL" : "") + ")",
@@ -1120,10 +1069,14 @@ class Repository extends CrudModel {
   // (use_for_playbooks), with their own message ; its vars files from the forms repository.
   static async sync(name, triggeredBy, message = undefined) {
     var output, status, head, syncRepo = null
+    // the last pull's status, given back when the push ends : a push has its own (push_status),
+    // and must not read as a failed or a fresh pull. Never 'running' : the SELECT and the claim are
+    // separate statements, so it could catch another operation's claim (as claimForWrite)
+    const before = await mysql.do("SELECT status FROM AnsibleForms.`repositories` WHERE name = ?", [name])
+    const pullStatus = before[0]?.status && before[0].status !== "running" ? before[0].status : null
     // atomic check-and-set : refuse concurrent syncs of the same repository
-    // (eg the settings page button while a designer push is in flight) ; its Push reads running,
-    // its Pull keeps how the last pull ended (pull_status, which a push never writes)
-    const claimed = await Repository.claim(name, "push")
+    // (eg the settings page button while a designer push is in flight)
+    const claimed = await Repository.claim(name)
     if (!claimed.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -1131,8 +1084,8 @@ class Repository extends CrudModel {
       syncRepo = await Repository.withCredential(await Repository.findByName(name))
       // a forms repo (read+write forms) or the config-origin repo (so config
       // edits can be committed even when config lives in a separate repo)
-      if (!syncRepo.use_for_forms && !syncRepo.use_for_config && !syncRepo.use_for_playbooks && !syncRepo.use_for_workflows && !syncRepo.use_for_inventories && !syncRepo.use_for_schedules) {
-        throw new Error(`Repository '${name}' is not a forms, config, playbooks, workflows, inventories or schedules repository`)
+      if (!USAGE_FLAGS.some((flag) => !!Number(syncRepo[flag] ?? 0))) {
+        throw new Error(`Repository '${name}' is used for nothing the app writes to (forms, config, playbooks, workflows, inventories, or objects such as schedules)`)
       }
       const repoDir = Repo.folderOf(name)
       if (!fs.existsSync(repoDir)) {
@@ -1142,8 +1095,9 @@ class Repository extends CrudModel {
       // bind the new staged forms to this repository before committing (only a
       // forms repo receives staged forms ; a config-only repo just pushes config)
       if (syncRepo.use_for_forms) Repository.flushStagingInto(name)
-      // a repository that only holds schedules says so in its commit
-      const what = !syncRepo.use_for_forms && syncRepo.use_for_schedules ? "Schedules" : "Forms"
+      // a repository that only holds objects (schedules, credentials ...) says which in its commit
+      const objects = objectTypesOf(syncRepo).map((key) => typeOf(key).label)
+      const what = !syncRepo.use_for_forms && objects.length ? objects.join(", ").replace(/^./, (c) => c.toUpperCase()) : "Forms"
       output = await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
       status = "success"
     } catch (e) {
@@ -1151,9 +1105,9 @@ class Repository extends CrudModel {
       status = "failed"
     }
     output = Repository.maskSecrets(output, syncRepo) // never expose git credentials
-    // the push's own output, status and time ; the claim released with it, status given back the
-    // last pull's (pull_status) : a push must not read as a failed or a fresh pull
-    await Repository.writeState("update AnsibleForms.`repositories` set push_output = ?, push_status = ?, pushed_at = NOW(), status = pull_status where name = ?", [output, status, name], { name })
+    // the push's own output, status and time ; the last pull's status back as it was (the claim
+    // released with it)
+    await Repository.writeState("update AnsibleForms.`repositories` set push_output = ?, push_status = ?, pushed_at = NOW(), status = ? where name = ?", [output, status, pullStatus, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see

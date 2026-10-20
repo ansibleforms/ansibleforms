@@ -9,6 +9,7 @@
 // file live in git next to the rest of the deployment.
 import Ajv from "ajv";
 import { CHAT_PROVIDERS } from "../chat/vendors.js";
+import { USAGE_TYPES, ONE_ONLY_FLAGS, COMING_FLAGS, typeOfFlag } from "./repoObjects/types.js";
 
 const str = { type: "string" };
 const bool = { type: "boolean" };
@@ -403,12 +404,8 @@ const repositoryItem = {
     password: str,
     // a credential of the credentials section (or the app), used instead of user/password
     credential: str,
-    use_for_config: bool,
-    use_for_forms: bool,
-    use_for_playbooks: bool,
-    use_for_workflows: bool,
-    use_for_inventories: bool,
-    use_for_schedules: bool,
+    // what the app reads from it : every usage type's flag (lib/repoObjects/types.js)
+    ...Object.fromEntries(USAGE_TYPES.map((t) => [t.flag, bool])),
     rebase_on_start: bool,
     cron: str,
     // status, pull_status, push_status, pull_output, push_output, pulled_at, pushed_at and head
@@ -680,26 +677,71 @@ function assertSingletonFlags(doc) {
       throw new Error(`Seed file enables more than one '${provider}' oauth2 provider: ${names.sort().join(", ")}`);
     }
   }
-  // one schedules repository : the schedules are written back to it, they cannot go to two
-  const schedules = (doc.repositories?.items || []).filter((item) => item.use_for_schedules).map((item) => item.name);
-  if (schedules.length > 1) {
-    throw new Error(`Seed file declares use_for_schedules on more than one repository: ${schedules.sort().join(", ")}`);
+  // one repository per object type (the schedules, the credentials ...) : the objects are written
+  // back to it, they cannot go to two
+  for (const flag of ONE_ONLY_FLAGS) {
+    const names = (doc.repositories?.items || []).filter((item) => item[flag]).map((item) => item.name);
+    if (names.length > 1) {
+      throw new Error(`Seed file declares ${flag} on more than one repository: ${names.sort().join(", ")}`);
+    }
   }
+  // a usage of a later version : accepted off, refused on
+  for (const item of doc.repositories?.items || []) {
+    const coming = COMING_FLAGS.filter((flag) => item[flag]);
+    if (coming.length) {
+      throw new Error(`Seed file turns on ${coming.join(", ")} on repository '${item.name}': the ${coming.map((f) => typeOfFlag(f).label).join(", ")} usage comes in a later version`);
+    }
+  }
+}
+
+/**
+ * The messages of a schema validation, one string : each error's path and message, the key an
+ * additionalProperties error is about named (ajv's own message does not say which one).
+ *
+ * Args:
+ *   errors (object[]): ajv's errors.
+ *
+ * Returns:
+ *   string: the messages, apart by ' ; '.
+ */
+export function schemaErrors(errors) {
+  return (errors || [])
+    .map((e) => {
+      // ajv's own message for additionalProperties is 'must NOT have additional
+      // properties', which does not say WHICH one - useless when the whole point of
+      // rejecting unknown keys is to point at the typo. The name is in params.
+      const extra = e.params?.additionalProperty ? ` '${e.params.additionalProperty}'` : "";
+      return `${e.instancePath || "/"} ${e.message}${extra}`;
+    })
+    .join(" ; ");
+}
+
+/**
+ * A validator of one item of a list section (credentials, runners ...), as the seed checks it :
+ * what the repository-backed objects check their files with (lib/repoObjects).
+ *
+ * Args:
+ *   section (string): the section (credentials).
+ *
+ * Returns:
+ *   object: { validate (function : item => string[] of errors), keys (the item's fields, in
+ *     the schema's order), schema (its JSON schema) }.
+ */
+export function itemValidator(section) {
+  const schema = seedSchema.properties[section].properties.items.items;
+  const check = ajv.compile(schema);
+  return {
+    schema,
+    keys: Object.keys(schema.properties),
+    validate: (item) => (check(item) ? [] : [schemaErrors(check.errors)]),
+  };
 }
 
 // Validates the parsed seed document. Throws with every message combined, so one
 // restart tells the operator everything that is wrong instead of the first thing.
 export function validateSeed(doc) {
   if (!validator(doc)) {
-    const details = (validator.errors || [])
-      .map((e) => {
-        // ajv's own message for additionalProperties is 'must NOT have additional
-        // properties', which does not say WHICH one - useless when the whole point of
-        // rejecting unknown keys is to point at the typo. The name is in params.
-        const extra = e.params?.additionalProperty ? ` '${e.params.additionalProperty}'` : "";
-        return `${e.instancePath || "/"} ${e.message}${extra}`;
-      })
-      .join(" ; ");
+    const details = schemaErrors(validator.errors);
     throw new Error(`Seed file validation failed: ${details}`);
   }
   // the deprecated awx: items count as runners for the cross-item rules, and the deprecated mail
