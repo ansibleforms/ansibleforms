@@ -1349,7 +1349,7 @@ export default {
         config: 'config.yaml mit den Kategorien und Konstanten (nur ein Repository)',
         sso: 'SSO-Anbieter in YAML, je eine Datei in seinem Ordner sso, die ihre Anmeldedaten benennen',
         ldap: 'LDAP-Verzeichnisse in YAML, je eine Datei in seinem Ordner ldap, in ihrer Suchreihenfolge',
-        disclaimer: 'Der Haftungsausschluss, den Benutzer akzeptieren, und seine Versionen',
+        disclaimer: 'Versionen des Haftungsausschlusses in YAML, je eine Datei in seinem Ordner disclaimer',
         credentials:
           'Anmeldedaten in YAML, je eine Datei in seinem Ordner credentials, Geheimnisse nur als Umgebungsverweise',
         secret_stores:
@@ -1357,14 +1357,12 @@ export default {
         runners: 'Runner in YAML, je eine Datei in seinem Ordner runners, die ihre Anmeldedaten benennen',
         notification_channels: 'Benachrichtigungskanäle in YAML, je eine Datei in seinem Ordner notification-channels',
         syslog: 'Syslog-Server in YAML, je eine Datei in seinem Ordner syslog',
-        chat: 'Die Einstellungen des Chat-Assistenten, in einer YAML-Datei',
-        branding: 'Name, Logo, Symbol, Links und Standardwerte, in einer YAML-Datei und ihren Bildern',
+        chat: 'Die Einstellungen des Chat-Assistenten in seiner chat.yaml, der Schlüssel nur als Umgebungsverweis',
+        branding: 'Name, Links, Standardwerte, Logo und Symbol in seiner branding.yaml und den Bildern daneben',
         labels: 'Die Labels neben dem Logo in YAML, je eine Datei in seinem Ordner labels, in ihrer Reihenfolge',
-        announcements: 'Ankündigungen, je eine YAML-Datei',
-        settings: 'Die Einstellungen unter System > Allgemein nach ihrem Umgebungsnamen, in einer YAML-Datei',
+        announcements: 'Ankündigungen in YAML, je eine Datei in seinem Ordner announcements',
+        settings: 'Die Einstellungen unter System > Allgemein nach ihrem Umgebungsnamen, in seiner settings.yaml',
       },
-      usageComingSoon: 'Demnächst',
-      usageComingSoonHint: 'Diese Verwendung kommt in einer späteren Version.',
       usageOnTitle: '{type} einschalten',
       usageOnQuestion: '{name} für {type} verwenden?',
       usageOnButton: 'Einschalten',
@@ -1378,6 +1376,8 @@ export default {
       usageOffHeading: '{type}: ausgeschaltet',
       usageOnWritten:
         '{type} dieser App, die nach {name} geschrieben werden, je eine YAML-Datei in seinem Ordner {folder}: {count}.',
+      usageOnWrittenFile: '{type} dieser App als {file} nach {name} geschrieben, wartet auf Push.',
+      usageOnReadFile: '{name} hat bereits {file}: die Version in git gewinnt und ersetzt {type} dieser App.',
       usageOnGitWins:
         'Steht derselbe Name in git und in dieser App, gewinnt die Version in git und ersetzt die der App.',
       usageOnClashes: 'Gleicher Name in git und in dieser App, die Version in git ersetzt die der App: {names}.',

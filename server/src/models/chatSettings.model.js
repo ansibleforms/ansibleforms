@@ -66,6 +66,32 @@ function clampInt(v, min, max, dflt) {
   return Math.min(max, Math.max(min, n));
 }
 
+/**
+ * The fields a declaration gives (the config seed's chat section, a repository's chat.yaml),
+ * converted as a save from the app converts them (the constructor : the key encrypted, the numbers
+ * clamped) - only those it declares : the constructor materialises every field it knows.
+ *
+ * Args:
+ *   declared (object): the declared fields ; extra headers may be a yaml mapping.
+ *
+ * Returns:
+ *   object: { cfg (the declaration, its extra headers as the model keeps them : compared with the
+ *     stored row), record (the fields to write) }.
+ *
+ * Raises:
+ *   Error: extra headers that cannot be sent as they are.
+ */
+ChatSettings.declared = function (declared) {
+  const cfg = declared.extra_headers === undefined ? declared : { ...declared, extra_headers: normaliseExtraHeaders(declared.extra_headers) };
+  const converted = { ...new ChatSettings(cfg) };
+  const record = {};
+  for (const key of Object.keys(converted)) {
+    if (cfg[key] === undefined || converted[key] === undefined) continue;
+    record[key] = converted[key];
+  }
+  return { cfg, record };
+};
+
 ChatSettings.update = async function (record) {
   logger.info(`Updating chat settings (provider ${record.provider || 'none'})`);
   const res = await mysql.do("UPDATE AnsibleForms.`chat_settings` set ?", record);

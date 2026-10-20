@@ -6,10 +6,9 @@
 /*  USAGE_CATEGORIES), side by side, one per line on a narrow     */
 /*  screen. Each heading's box ticks or unticks every type of it  */
 /*  that can be ticked (three states : all, some, none) ; a type  */
-/*  another repository has is greyed with that repository's name, */
-/*  a type of a later version with a short note. Used by the      */
-/*  repository's dialog (AppAdminMulti, field type 'usage') and   */
-/*  its page (pages/admin/repository.vue).                        */
+/*  another repository has is greyed with that repository's name. */
+/*  Used by the repository's dialog (AppAdminMulti, field type    */
+/*  'usage') and its page (pages/admin/repository.vue).           */
 /*                                                                */
 /*  Props                                                         */
 /*    modelValue  the repository as edited (its use_for_* flags,  */
@@ -91,7 +90,7 @@ function setAll(category, on) {
 }
 
 /**
- * A type's grey note : of a later version, or another repository's.
+ * A type's grey note : the repository that has it, when another one does.
  *
  * Args:
  *   type (object): the type.
@@ -100,7 +99,6 @@ function setAll(category, on) {
  *   string: the note, '' for none.
  */
 function noteOf(type) {
-  if (!type.built) return t('settings.repositories.usageComingSoon');
   const other = takenBy(type, props.modelValue, props.others);
   return other ? t('settings.common.takenBy', { name: other }) : '';
 }
@@ -114,8 +112,7 @@ function noteOf(type) {
  * Returns:
  *   string: the tooltip.
  */
-const titleOf = (type) =>
-  !type.built ? t('settings.repositories.usageComingSoonHint') : noteOf(type) || usageHint(t, type.key);
+const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
 </script>
 
 <template>

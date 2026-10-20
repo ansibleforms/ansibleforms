@@ -31,6 +31,10 @@ CREATE TABLE `secret_stores` (
   `pvwa_auth` varchar(20) DEFAULT NULL,
   `platform_id` varchar(250) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (secret-stores/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

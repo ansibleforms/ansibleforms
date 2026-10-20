@@ -10,7 +10,7 @@
 /*                                                                */
 /*  The server keeps the same list (server/src/lib/repoObjects/   */
 /*  types.js) : it refuses a second repository for a one-only     */
-/*  type and a type of a later version turned on.                 */
+/*  type.                                                         */
 /*                                                                */
 /******************************************************************/
 import axios from 'axios';
@@ -29,34 +29,41 @@ export const USAGE_CATEGORIES = ['designer', 'access', 'connections', 'appearanc
 //   key       the type (its label : settings.repositories.usageTypes.<key>, its hint : usageHints)
 //   flag      the repository's column
 //   category  its heading
-//   built     false : coming in a later version, greyed with a short note
 //   objects   one object per file in its folder, kept in step both ways : turning it on or off
 //             asks first (what it will take, or let go)
 //   oneOnly   one repository at most : greyed on the others, with who has it
-//   folder    its folder in the repository (an object type)
+//   folder    its folder in the repository (an object type), or
+//   file      its one file at the repository's root (a type the app has one of : chat.yaml)
 export const USAGE_TYPES = [
-  { key: 'forms', flag: 'use_for_forms', category: 'designer', built: true },
-  { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer', built: true, oneOnly: true },
-  { key: 'workflows', flag: 'use_for_workflows', category: 'designer', built: true },
-  { key: 'inventories', flag: 'use_for_inventories', category: 'designer', built: true },
+  { key: 'forms', flag: 'use_for_forms', category: 'designer' },
+  { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer', oneOnly: true },
+  { key: 'workflows', flag: 'use_for_workflows', category: 'designer' },
+  { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
   {
     key: 'schedules',
     flag: 'use_for_schedules',
     category: 'designer',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'schedules',
   },
-  { key: 'config', flag: 'use_for_config', category: 'access', built: true, oneOnly: true },
-  { key: 'sso', flag: 'use_for_sso', category: 'access', built: true, objects: true, oneOnly: true, folder: 'sso' },
-  { key: 'ldap', flag: 'use_for_ldap', category: 'access', built: true, objects: true, oneOnly: true, folder: 'ldap' },
-  { key: 'disclaimer', flag: 'use_for_disclaimer', category: 'access', built: false, objects: true, oneOnly: true },
+  { key: 'config', flag: 'use_for_config', category: 'access', oneOnly: true },
+  { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
+  { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
+  {
+    key: 'disclaimer',
+    flag: 'use_for_disclaimer',
+    category: 'access',
+    objects: true,
+    oneOnly: true,
+    folder: 'disclaimer',
+  },
   {
     key: 'credentials',
     flag: 'use_for_credentials',
     category: 'connections',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'credentials',
@@ -65,7 +72,7 @@ export const USAGE_TYPES = [
     key: 'secret_stores',
     flag: 'use_for_secret_stores',
     category: 'connections',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'secret-stores',
@@ -74,7 +81,7 @@ export const USAGE_TYPES = [
     key: 'runners',
     flag: 'use_for_runners',
     category: 'connections',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'runners',
@@ -83,7 +90,7 @@ export const USAGE_TYPES = [
     key: 'notification_channels',
     flag: 'use_for_notification_channels',
     category: 'connections',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'notification-channels',
@@ -92,18 +99,25 @@ export const USAGE_TYPES = [
     key: 'syslog',
     flag: 'use_for_syslog',
     category: 'connections',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'syslog',
   },
-  { key: 'chat', flag: 'use_for_chat', category: 'connections', built: false, objects: true, oneOnly: true },
-  { key: 'branding', flag: 'use_for_branding', category: 'appearance', built: false, objects: true, oneOnly: true },
+  { key: 'chat', flag: 'use_for_chat', category: 'connections', objects: true, oneOnly: true, file: 'chat.yaml' },
+  {
+    key: 'branding',
+    flag: 'use_for_branding',
+    category: 'appearance',
+    objects: true,
+    oneOnly: true,
+    file: 'branding.yaml',
+  },
   {
     key: 'labels',
     flag: 'use_for_labels',
     category: 'appearance',
-    built: true,
+
     objects: true,
     oneOnly: true,
     folder: 'labels',
@@ -112,11 +126,19 @@ export const USAGE_TYPES = [
     key: 'announcements',
     flag: 'use_for_announcements',
     category: 'appearance',
-    built: false,
+
     objects: true,
     oneOnly: true,
+    folder: 'announcements',
   },
-  { key: 'settings', flag: 'use_for_settings', category: 'system', built: false, objects: true, oneOnly: true },
+  {
+    key: 'settings',
+    flag: 'use_for_settings',
+    category: 'system',
+    objects: true,
+    oneOnly: true,
+    file: 'settings.yaml',
+  },
 ];
 
 // every usage flag : what a repository's dialog and page edit and save
@@ -242,7 +264,7 @@ export function takenBy(type, record, others) {
 }
 
 /**
- * Whether a type can be ticked or unticked on a repository : built, and not another one's.
+ * Whether a type can be ticked or unticked on a repository : not another one's.
  *
  * Args:
  *   type (object): the type.
@@ -252,7 +274,7 @@ export function takenBy(type, record, others) {
  * Returns:
  *   boolean: true when it can.
  */
-export const available = (type, record, others) => type.built && !takenBy(type, record, others);
+export const available = (type, record, others) => !takenBy(type, record, others);
 
 /**
  * The state of a category's box : ticked when every type that can be ticked is, half when some
@@ -277,8 +299,8 @@ export function categoryState(category, record, others) {
 }
 
 /**
- * Ticks or unticks every type of a category that can be : the ones another repository uses and
- * the ones of a later version are left as they are.
+ * Ticks or unticks every type of a category that can be : the ones another repository uses are
+ * left as they are.
  *
  * Args:
  *   category (string): the category.
@@ -377,7 +399,6 @@ export function usageChanges(was, now) {
   const off = [];
   for (const key of APPLY_ORDER) {
     const u = usageType(key);
-    if (!u.built) continue;
     const before = flagOn(was?.[u.flag]);
     const after = flagOn(now?.[u.flag]);
     if (after && !before) on.push(key);
@@ -438,14 +459,24 @@ function keptText(t, k) {
  */
 export function activationLines(t, key, name, p) {
   const type = usageLabel(t, key);
-  const lines = [
-    t('settings.repositories.usageOnWritten', {
-      type,
-      name,
-      folder: usageType(key)?.folder || key,
-      count: (p.written || []).length,
-    }),
-  ];
+  const { file, folder } = usageType(key) || {};
+  // a type the app has one of : written as its one file, when the repository has none yet
+  const lines = file
+    ? [
+        t(`settings.repositories.${(p.written || []).length ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, {
+          type,
+          name,
+          file,
+        }),
+      ]
+    : [
+        t('settings.repositories.usageOnWritten', {
+          type,
+          name,
+          folder: folder || key,
+          count: (p.written || []).length,
+        }),
+      ];
   lines.push(
     (p.clashes || []).length
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })
@@ -663,6 +694,28 @@ export function repositorySourceFields(t, row) {
       row.repo_file,
     ],
   ];
+}
+
+/**
+ * Where a type kept in one file is (the chat's, the settings', the branding's) : the repository
+ * used for it and its file, as a record of a repository says it ; none when no repository holds it.
+ *
+ * Args:
+ *   key (string): the type.
+ *
+ * Returns:
+ *   Promise<object|null>: { repository, repo_file }, or null.
+ */
+export async function singleTypeSource(key) {
+  const type = usageType(key);
+  if (!type?.file) return null;
+  try {
+    const res = await axios.get('/api/v2/repository/');
+    const repo = (res.data?.records || []).find((r) => flagOn(r[type.flag]));
+    return repo ? { repository: repo.name, repo_file: type.file } : null;
+  } catch {
+    return null;
+  }
 }
 
 // ===========================================================================

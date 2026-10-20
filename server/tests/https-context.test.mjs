@@ -171,8 +171,8 @@ describe("the wiring that makes it live", () => {
     // A redacted variable comes back as the mask string and the client leaves its box
     // empty, so sweeping HTTPS_KEY in would make the path uneditable for no benefit - it
     // names a file, it is not the key. Read the REAL pattern rather than restating it.
-    const src = readFileSync(path.join(serverRoot, "src/controllers/v2/config.controller.js"), "utf8");
-    const m = /const SECRET_ENV_NAME\s*=\s*\/(.+?)\/([gimsuy]*)\s*;/.exec(src);
+    const src = readFileSync(path.join(serverRoot, "src/lib/envSettings.js"), "utf8");
+    const m = /export const SECRET_ENV_NAME\s*=\s*\/(.+?)\/([gimsuy]*)\s*;/.exec(src);
     expect(m, "SECRET_ENV_NAME moved - this test is pinning nothing").toBeTruthy();
     const pattern = new RegExp(m[1], m[2]);
     expect(pattern.test("HTTPS_KEY"), "HTTPS_KEY must stay visible").toBe(false);

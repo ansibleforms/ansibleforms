@@ -26,7 +26,10 @@ describe('the order of a table', () => {
     expect(sorted([{ n: 10 }, { n: 2 }], { key: 'n', label: 'N' }).map((r) => r.n)).toEqual([2, 10]);
     expect(sorted([{ on: true }, { on: false }], { key: 'on', label: 'On' }).map((r) => r.on)).toEqual([false, true]);
     const col = { key: 'when', label: 'When', sortValue: (r) => Date.parse(r.when) };
-    expect(sorted([{ when: '2026-10-15' }, { when: '2026-01-02' }], col).map((r) => r.when)).toEqual(['2026-01-02', '2026-10-15']);
+    expect(sorted([{ when: '2026-10-15' }, { when: '2026-01-02' }], col).map((r) => r.when)).toEqual([
+      '2026-01-02',
+      '2026-10-15',
+    ]);
   });
 });
 

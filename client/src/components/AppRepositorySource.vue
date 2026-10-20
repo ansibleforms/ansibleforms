@@ -8,24 +8,34 @@
 /*                                                                */
 /*  Props                                                         */
 /*    record  the object ({ repository, repo_file })              */
+/*    type    a type kept in one file (chat, settings, branding) :*/
+/*            the repository that holds it, read here             */
 /*                                                                */
 /******************************************************************/
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { repositoryBadge } from '@/lib/repositoryUsage';
+import { repositoryBadge, singleTypeSource } from '@/lib/repositoryUsage';
 
-defineProps({
+const props = defineProps({
   record: { type: Object, default: null },
+  type: { type: String, default: '' },
 });
 const { t } = useI18n();
+// a type kept in one file : where it is, as a record of a repository says it
+const single = ref(null);
+onMounted(async () => {
+  if (props.type) single.value = await singleTypeSource(props.type);
+});
+const source = computed(() => (props.type ? single.value : props.record));
 </script>
 
 <template>
-  <div v-if="record?.repository" class="mb-3 af-repository-source">
+  <div v-if="source?.repository" class="mb-3 af-repository-source">
     <div class="form-label fw-bold">{{ t('settings.repositories.source') }}</div>
-    <span v-html="repositoryBadge(t, record)"></span>
-    <span class="ms-2 font-monospace small text-body-secondary">{{ record.repo_file }}</span>
+    <span v-html="repositoryBadge(t, source)"></span>
+    <span class="ms-2 font-monospace small text-body-secondary">{{ source.repo_file }}</span>
     <div class="form-text">
-      {{ t('settings.repositories.sourceRepositoryHelp', { name: record.repository }) }}
+      {{ t('settings.repositories.sourceRepositoryHelp', { name: source.repository }) }}
     </div>
   </div>
 </template>

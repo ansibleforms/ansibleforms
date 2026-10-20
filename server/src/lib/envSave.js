@@ -1,0 +1,129 @@
+'use strict';
+// Saving environment variables : what Settings > System > General's Save does, written once - for
+// the page (controllers/v2/config.controller.js saveEnv) and for a settings repository's pull
+// (lib/repoObjects/settings.js). Every value checked before anything is written (a known
+// variable, not refused, not set in the real environment, valid for its documentation), then the
+// managed file written, the other nodes told (the 'env' epoch), each variable applied at once when
+// it can be or said to need a restart, and the change audited (the names only : the values include
+// credentials).
+import Help from "../models/help.model.js";
+import Audit from "../models/audit.model.js";
+import logger from "./logger.js";
+import EnvSettings from "./envSettings.js";
+import appConfig from "../../config/app.config.js";
+import { bump } from "./epochs.js";
+import { publish } from "./liveEvents.js";
+
+// the mask the page shows a secret as : sent back, it means unchanged, never a value to store
+export const ENV_MASK = "*** NOT REVEALED ***";
+
+/**
+ * A save refused : its HTTP status and why.
+ */
+export class EnvSaveError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = "EnvSaveError";
+    this.status = status;
+  }
+}
+
+/**
+ * The documented environment variables (help.yaml), by name.
+ *
+ * Returns:
+ *   Promise<Map<string, object>>: each variable's documentation.
+ */
+export async function envDocs() {
+  const help = await Help.get();
+  const section = (help || []).find((x) => x.name === "Environment Variables");
+  return new Map((section?.items || []).map((x) => [x.name, x]));
+}
+
+/**
+ * Whether Settings > System > General shows and edits a variable : documented, not refused, not
+ * another page's nor the deployment's.
+ *
+ * Args:
+ *   name (string): the variable.
+ *   docs (Map): the documented variables (envDocs).
+ *
+ * Returns:
+ *   boolean: true when the page edits it.
+ */
+export function onSettingsPage(name, docs) {
+  return docs.has(name) && EnvSettings.classify(name) !== "refused" && !EnvSettings.OWNED_ELSEWHERE.test(name);
+}
+
+/**
+ * Saves environment variables as the settings page does.
+ *
+ * Args:
+ *   updates (object): { NAME: value } ; an empty value clears it (back to its default).
+ *   who (object): { user, ip } for the audit entry.
+ *
+ * Returns:
+ *   Promise<object>: { changed: [name], restartRequired: [name] }.
+ *
+ * Raises:
+ *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0), or a value refused.
+ */
+export async function saveEnvValues(updates, who = {}) {
+  const names = Object.keys(updates || {});
+  if (!names.length) throw new EnvSaveError(400, "No environment variables given");
+  // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session
+  if (!appConfig.allowEnvEdit) throw new EnvSaveError(403, EnvSettings.ENV_EDIT_DISABLED_REASON);
+  const docs = await envDocs();
+  const managed = await EnvSettings.readManaged();
+
+  // validate everything BEFORE writing anything : a partial write of a bad set would leave the
+  // file describing a state nobody asked for
+  for (const name of names) {
+    if (!docs.has(name)) throw new EnvSaveError(400, `${name} is not a known environment variable`);
+    if (EnvSettings.REFUSED[name]) throw new EnvSaveError(400, EnvSettings.REFUSED[name]);
+    if (EnvSettings.isOverridden(name, managed)) throw new EnvSaveError(409, `${name} is set in the environment and cannot be changed from here`);
+    // the client sends nothing for an unchanged secret, but never trust that : storing the mask
+    // would replace a working credential with the literal placeholder
+    if (String(updates[name] ?? "").trim() === ENV_MASK) throw new EnvSaveError(400, `${name} was not changed`);
+    const problem = EnvSettings.validate(name, updates[name], docs.get(name));
+    if (problem) throw new EnvSaveError(400, problem);
+  }
+
+  // PERSIST FIRST, then apply. applyLive mutates the running process - the log level, the paths,
+  // the db pool size, the TLS context - and writeManaged can still fail after that (a read-only
+  // persistent volume, ENOSPC). A write that fails now changes nothing at all.
+  const valueOf = (name) => (updates[name] === null || updates[name] === undefined ? "" : String(updates[name]));
+  for (const name of names) {
+    if (valueOf(name) === "") managed.delete(name);
+    else managed.set(name, valueOf(name));
+  }
+  await EnvSettings.writeManaged(managed);
+  // the other nodes read the file again and apply what changed (init/cluster.js)
+  bump("env");
+
+  const restartRequired = [];
+  for (const name of names) {
+    // hand the documented default over : clearing a field means "back to the default", and
+    // applyLive cannot know what that is ; an RTE's own variable : the app has nothing to apply,
+    // and its restart would change nothing
+    const live = EnvSettings.applyLive(name, valueOf(name), docs.get(name)?.default);
+    if (EnvSettings.classify(name) !== "rte" && !live) restartRequired.push(name);
+  }
+
+  // the NAMES only : these values include credentials
+  Audit.log({
+    user: who.user,
+    ip: who.ip,
+    action: "settings.env.update",
+    outcome: "success",
+    targetType: "env",
+    target: names.slice(0, 5).join(","),
+    detail: { changed: names, restartRequired },
+  });
+  logger.notice(`Environment settings updated: ${names.join(", ")}`);
+  // a variable the header shows (the Designer's link) : every open tab re-reads it at once
+  publish("appearance");
+  return { changed: names, restartRequired };
+}
+
+export default { ENV_MASK, EnvSaveError, envDocs, onSettingsPage, saveEnvValues };

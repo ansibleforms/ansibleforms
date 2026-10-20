@@ -263,7 +263,7 @@ const Disclaimer = {
    */
   async versions() {
     const rows = await mysql.do(
-      'SELECT v.version AS id, v.version, v.title, v.text, v.checkbox_label, v.created_by, v.created_at, ' +
+      'SELECT v.version AS id, v.version, v.title, v.text, v.checkbox_label, v.created_by, v.created_at, v.repository, v.repo_file, ' +
         '(SELECT COUNT(*) FROM AnsibleForms.`disclaimer_acceptances` a WHERE a.version = v.version) AS acceptances ' +
         'FROM AnsibleForms.`disclaimer_versions` v ORDER BY v.version DESC',
     );
@@ -323,7 +323,8 @@ const Disclaimer = {
    * new latest does not take its place).
    *
    * Args:
-   *   data (object): title, text, checkbox_label.
+   *   data (object): title, text, checkbox_label ; version, the number a disclaimer repository's
+   *     file (or the config seed) gives it, else the next one.
    *   admin (string): who adds it.
    *
    * Returns:
@@ -335,8 +336,9 @@ const Disclaimer = {
     if (current.version) {
       await mysql.do('UPDATE AnsibleForms.`settings` SET disclaimer_version = ? WHERE disclaimer_version IS NULL', [current.version]);
     }
+    // its number : the next one, or the one a disclaimer repository's file (or the seed) gives it
     const latest = await mysql.do('SELECT COALESCE(MAX(version), 0) AS v FROM AnsibleForms.`disclaimer_versions`');
-    const next = (latest[0]?.v || 0) + 1;
+    const next = data?.version ? Number(data.version) : (latest[0]?.v || 0) + 1;
     await mysql.do('INSERT INTO AnsibleForms.`disclaimer_versions` SET ?', {
       version: next,
       ...w,

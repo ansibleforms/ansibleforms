@@ -46,10 +46,10 @@ function envGroups() {
   });
 }
 
-/** The exclusion regex, read from the page rather than restated. */
+/** The exclusion regex, read from the server (the page shows what it says) rather than restated. */
 function ownedElsewhere() {
-  const src = readFileSync(path.join(repoRoot, 'client/src/pages/admin/settings.vue'), 'utf8');
-  const m = /const OWNED_ELSEWHERE =\s*\/(.+?)\/;/.exec(src);
+  const src = readFileSync(path.join(repoRoot, 'server/src/lib/envSettings.js'), 'utf8');
+  const m = /export const OWNED_ELSEWHERE =\s*\/(.+?)\/;/.exec(src);
   expect(m, 'OWNED_ELSEWHERE moved').toBeTruthy();
   return new RegExp(m[1]);
 }

@@ -1,6 +1,6 @@
 'use strict';
-import { forgetAppDefaults } from "../../routes/v2/app.routes.js";
-import { publish } from "../../lib/liveEvents.js";
+import { saveSettingsFields } from "../../lib/appearance.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 import Settings from '../../models/settings.model.js';
 import Form from '../../models/form.model.js';
 import Lock from '../../models/lock.model.js';
@@ -219,17 +219,14 @@ const update = async function(req, res) {
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
           }
-          const record = new Settings(body);
-          // Guard against an effectively-empty record (no recognized fields),
-          // which would produce invalid `UPDATE t set ?` SQL.
-          if (Object.keys(record).length === 0) {
+          // the branding repository's file, before : its changed fields written into it after
+          const before = await RepoObjects.snapshot('branding');
+          // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
+          // with no field the model knows is refused
+          if (!(await saveSettingsFields(body))) {
             return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
           }
-          await Settings.update(record);
-          // the theme, the name, the label, the announcement : shown at once, in every open tab
-          // (the 'appearance' live event : the header re-reads /api/v2/app/config)
-          forgetAppDefaults();
-          publish("appearance");
+          await RepoObjects.appUpdated('branding', before);
           res.json(RestResult.single(null));
         } catch(err) {
           res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));

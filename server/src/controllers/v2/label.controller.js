@@ -72,10 +72,8 @@ const deleteLabel = async (req, res) => {
 // one place up or down in the header : { direction: 'up' | 'down' }
 const move = async (req, res) => {
   try {
-    const before = await Label.findAll();
-    const moved = await Label.move(req.params.id, req.body?.direction);
     // every place numbered again : the labels repository's files follow
-    if (moved) await RepoObjects.appReordered("labels", before);
+    const moved = await RepoObjects.following("labels", () => Label.move(req.params.id, req.body?.direction));
     return res.json(RestResult.single({ moved }));
   } catch (err) {
     Errors.ReturnError(res, err);

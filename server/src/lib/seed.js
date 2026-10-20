@@ -22,6 +22,7 @@
 // supposed to describe it, and nothing says so out loud. A RELOAD of an already running
 // instance is the opposite : see reloadConfigSeed.
 import fs from "fs";
+import path from "path";
 import { createHash } from "node:crypto";
 import yaml from "yaml";
 import logger from "./logger.js";
@@ -39,7 +40,7 @@ import Label from "../models/label.model.js";
 import NotificationChannel from "../models/notificationChannel.model.js";
 import Ldap from "../models/ldap.model.js";
 import Settings from "../models/settings.model.js";
-import ChatSettings, { normaliseExtraHeaders } from "../models/chatSettings.model.js";
+import ChatSettings from "../models/chatSettings.model.js";
 import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
@@ -331,14 +332,8 @@ async function applySettings(cfg, summary) {
 export async function applyChat(declared, summary) {
   // extra headers may be written as a yaml mapping : compared and stored as the model keeps
   // them (normalised JSON text), or every start would see a difference
-  const cfg = declared.extra_headers === undefined ? declared : { ...declared, extra_headers: normaliseExtraHeaders(declared.extra_headers) };
+  const { cfg, record } = ChatSettings.declared(declared);
   const stored = await ChatSettings.find();
-  const converted = { ...new ChatSettings(cfg) };
-  const record = {};
-  for (const key of Object.keys(converted)) {
-    if (cfg[key] === undefined || converted[key] === undefined) continue;
-    record[key] = converted[key];
-  }
   if (stored?.managed && !differs(cfg, stored)) {
     summary.unchanged++;
     return;
@@ -563,7 +558,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   // written would otherwise carry a `managed` flag with nothing in the trail explaining
   // who set it - so record what got as far as being applied, then re-throw.
   try {
-    await applySections(doc, summary);
+    await applySections(doc, summary, { dir: path.dirname(seedPath) });
   } catch (e) {
     await logApply(seedPath, summary, 'failure');
     throw e;
@@ -767,7 +762,15 @@ async function reloadSeedNow({ force = false, trigger = "poll" } = {}) {
   }
 }
 
-async function applySections(doc, summary) {
+/**
+ * Applies the sections of a validated seed document.
+ *
+ * Args:
+ *   doc (object): the document.
+ *   summary (object): what was applied, filled in.
+ *   opts (object): { dir (the seed file's folder : the files a section names beside it) }.
+ */
+async function applySections(doc, summary, opts = {}) {
   for (const section of listSections) {
     // an absent section behaves like an empty one, so deleting a block from the file
     // releases its records rather than freezing them for ever
@@ -795,6 +798,24 @@ async function applySections(doc, summary) {
   } else {
     const res = await mysql.do("UPDATE AnsibleForms.`chat_settings` SET managed=0 WHERE managed=1");
     if (res.affectedRows > 0) summary.released.push("chat");
+  }
+
+  // the branding, the announcements and the disclaimer versions : read through the descriptors a
+  // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted
+  const sections = [
+    ["branding", "branding", "branding"],
+    ["announcements", "announcements", "announcement"],
+    ["disclaimer", "disclaimer", "disclaimer version"],
+  ];
+  if (sections.some(([key]) => doc[key])) {
+    const { default: RepoObjects } = await import("./repoObjects/index.js");
+    for (const [key, type, label] of sections) {
+      if (!doc[key]) continue;
+      const done = await RepoObjects.applyDeclared(await RepoObjects.descriptorOf(type), doc[key].items || doc[key], opts);
+      summary.created.push(...done.created.map((n) => `${label}:${n}`));
+      summary.updated.push(...done.updated.map((n) => (n === type ? label : `${label}:${n}`)));
+      summary.unchanged += done.unchanged;
+    }
   }
 
 }

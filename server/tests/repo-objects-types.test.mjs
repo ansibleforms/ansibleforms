@@ -220,7 +220,7 @@ describe("what the new types bring to the engine", () => {
     fx.rowNamed("labels", "First").position = 2;
     fx.rowNamed("labels", "Second").position = 1;
     CrudModel.flushAllLocal();
-    assert.equal(await RepoObjects.appReordered("labels", before), 2);
+    await RepoObjects.appChangedRows("labels", before);
     assert.equal(fx.readObject(repoOf("labels"), "labels", "first.yaml").position, 2);
     assert.equal(fx.readObject(repoOf("labels"), "labels", "second.yaml").position, 1);
     // and a pull of them changes nothing

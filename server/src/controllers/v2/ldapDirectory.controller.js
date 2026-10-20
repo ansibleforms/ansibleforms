@@ -165,10 +165,8 @@ const remove = async function (req, res) {
 // one place up or down in the lookup order : { direction: 'up' | 'down' }
 const move = async function (req, res) {
   try {
-    const before = await Ldap.findAll();
-    const moved = await Ldap.move(req.params.id, req.body?.direction);
     // every place numbered again : the LDAP repository's files follow
-    if (moved) await RepoObjects.appReordered('ldap', before);
+    const moved = await RepoObjects.following('ldap', () => Ldap.move(req.params.id, req.body?.direction));
     res.status(200).json(RestResultv2.single({ moved }));
   } catch (err) {
     logger.error("Error moving the LDAP directory: ", err);

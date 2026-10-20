@@ -10,12 +10,22 @@
 // fields its files leave out, and why an object of the app stays in the app.
 import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
-import { itemValidator } from "../seed-schema.js";
 import { differs } from "../seedCompare.js";
-import { parseMapFile, newMapFile, updateMapFile, same } from "./yamlFile.js";
-import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
+import { fieldSet } from "./fields.js";
 import { linkStore, classifyRow } from "./engine.js";
 import { typeOf } from "./types.js";
+
+/**
+ * An object without some of its fields.
+ *
+ * Args:
+ *   obj (object): the object.
+ *   keys (string[]): the fields left out ; none : the object as it is.
+ *
+ * Returns:
+ *   object: a copy without them.
+ */
+const omit = (obj, keys = []) => Object.fromEntries(Object.entries(obj).filter(([k]) => !keys.includes(k)));
 
 // what a repository's write tells the models : not a request's, nor the seed's
 export const FROM_REPO = { fromRepo: true };
@@ -54,46 +64,31 @@ export const KEPT_REASONS = {
  *       directory), or null : its file removed is refused with that reason.
  *     order (string): its field of a place in an order (a label's, a directory's position) : the
  *       app's objects are written in that order, and a move in the app rewrites the places.
+ *     table (string): its table, when its model is no crud model (the announcements) ; idColumn
+ *       (string) the column its rows are found by ('id' when not said : a disclaimer's version).
+ *     canonical (function): (object) => the object as it is compared and written (a moment as an
+ *       ISO text), the file's and the app's alike.
+ *     nameFor (function): (row) => the name an object of the app without one is written with (an
+ *       announcement : the start of its message) ; it keeps that name from then on.
+ *     nameColumn (string): the column its name is in ('name' when not said : a disclaimer's is its
+ *       version).
+ *     notCompared (string[]): the fields a file gives that are no field of the object (a
+ *       disclaimer's ask_again : how a changed text is applied) : never compared.
  *
  * Returns:
  *   object: the descriptor (lib/repoObjects/engine.js).
  */
 export function seedType(spec) {
-  const { key, section, model, Model, secrets = [], references = [], skip = [], keepFalse = [], keptReason = () => null, defaults = {} } = spec;
+  const { key, model, Model, secrets = [], references = [], keptReason = () => null, defaults = {} } = spec;
   // its rows, decrypted : through the crud model, unless the type reads them its own way
   const read = spec.read || { all: () => CrudModel.findAll(model), byId: (id) => CrudModel.findById(model, id) };
   // the app's objects in their order : by their place when they have one, else by name
   const byOrder = (a, b) => (spec.order ? Number(a[spec.order] ?? 0) - Number(b[spec.order] ?? 0) : 0) || String(a.name).localeCompare(String(b.name));
-  const { validate, keys, schema } = itemValidator(section);
-  const table = CrudModel.getConfig(model).table;
-  const links = linkStore(table);
-  const booleans = new Set(keys.filter((k) => schema.properties[k].type === "boolean"));
-  // the fields a file holds, in the seed's order
-  const fileKeys = keys.filter((k) => !skip.includes(k));
-
-  /**
-   * A row as its file gives it : the seed's fields that are set, its secrets left out.
-   *
-   * Args:
-   *   row (object): the row (decrypted).
-   *
-   * Returns:
-   *   object: { object, withoutSecret }.
-   */
-  function toFile(row) {
-    const obj = {};
-    for (const k of fileKeys) {
-      const v = row[k];
-      if (booleans.has(k)) {
-        if (v === null || v === undefined) continue;
-        const on = !!Number(v);
-        if (on || keepFalse.includes(k)) obj[k] = on;
-      } else if (given(v)) {
-        obj[k] = v;
-      }
-    }
-    return withoutSecrets(obj, secrets);
-  }
+  const fields = fieldSet(spec);
+  const table = spec.table || CrudModel.getConfig(model).table;
+  const links = linkStore(table, spec.idColumn || "id");
+  // changed : compared as the seed compares, on the canonical object
+  const canonical = spec.canonical || ((o) => o);
 
   return {
     key,
@@ -104,34 +99,16 @@ export function seedType(spec) {
     noun: spec.noun,
     secrets,
     references,
-    keyOrder: fileKeys,
-
-    /**
-     * Reads a file : one item of the seed's section, its secrets ${ENV} references only (resolved),
-     * checked against the seed's schema. A file saying state: absent holds no object.
-     *
-     * Args:
-     *   text (string): the file's text.
-     *
-     * Returns:
-     *   object: { errors, absent, object (resolved, null when refused), raw (as the file gives it) }.
-     */
-    parse(text) {
-      const { errors, object: raw } = parseMapFile(text);
-      if (errors.length) return { errors, absent: false, object: null };
-      if (raw.state === "absent") return { errors: [], absent: true, object: null };
-      const resolved = resolveSecrets(raw, secrets);
-      if (resolved.errors.length) return { errors: resolved.errors, absent: false, object: null, raw };
-      const invalid = validate(resolved.object);
-      if (invalid.length) return { errors: invalid, absent: false, object: null, raw };
-      return { errors: [], absent: false, object: resolved.object, raw };
-    },
+    keyOrder: fields.keys,
+    // an object as the seed (or a file) declares it, checked (lib/repoObjects/fields.js)
+    check: fields.check,
+    parse: (text) => fields.parse(text),
 
     store: {
       ...links,
       // decrypted, as the seed compares them
       rows: () => read.all(),
-      names: async () => ((await mysql.do(`SELECT name FROM ${table}`)) || []).map((r) => r.name),
+      names: async () => ((await mysql.do(`SELECT ${spec.nameColumn || "name"} AS name FROM ${table}`)) || []).map((r) => String(r.name ?? "")).filter(Boolean),
       byId: (id) => read.byId(id),
       // an object of the app is taken over by a file of its name, unless the config seed manages it
       // or it stays in the app for a reason of its own
@@ -139,10 +116,11 @@ export function seedType(spec) {
         const code = row.managed ? "seed" : keptReason(row);
         return classifyRow(row, name, code ? `an object of this app (${KEPT_REASONS[code] || code})` : null);
       },
-      changed: (row, obj) => differs(obj, row),
+      changed: (row, obj) => differs(omit(obj, spec.notCompared), canonical({ ...row })),
       insert: async (obj, name, file) => {
         const id = await Model.create({ ...defaults, ...obj }, FROM_REPO);
-        await links.link(id, name, file);
+        if (name) await links.link(id, name, file);
+        CrudModel.changed(model);
         return id;
       },
       update: (row, obj) => Model.update({ ...obj }, row.id, FROM_REPO),
@@ -157,48 +135,31 @@ export function seedType(spec) {
 
     /**
      * An object of the app as a repository would take it : its file's fields (without its
-     * secrets), or why it stays in the app.
+     * secrets), or why it stays in the app. One without a name (an announcement made in the app)
+     * is written with the one nameFor gives it.
      *
      * Args:
      *   row (object): the row.
      *
      * Returns:
-     *   object: { row, object, withoutSecret } or { row, code, reason }.
+     *   object: { row, object, withoutSecret, named } or { row, code, reason }.
      */
     candidateOf(row) {
       const code = row.managed ? "seed" : keptReason(row);
       if (code) return { row, code, reason: KEPT_REASONS[code] || code };
-      return { row, ...toFile(row) };
+      const named = !row.name && spec.nameFor ? { ...row, name: spec.nameFor(row) } : row;
+      return { row: named, named: named !== row, ...fields.toFile(named) };
     },
 
-    // a new file : the seed's fields in the seed's order
-    newFileText: (c) => newMapFile(c.object, fileKeys),
-    linkCandidate: (c, name, file) => links.link(c.row.id, name, file),
-
-    /**
-     * An app edit as the edits of its file : each field the edit changed (the row before and after
-     * it, as a file gives them) written, a field emptied removed ; the others - the file's ${ENV}
-     * references, the fields it does not declare - left as they are, the secrets never written.
-     *
-     * Args:
-     *   text (string): the file's text.
-     *   row (object): the row as saved (decrypted).
-     *   before (object): the row before the edit.
-     *
-     * Returns:
-     *   string: the file's new text (the same text when nothing changed).
-     */
-    fileEdits(text, row, before) {
-      const next = toFile(row).object;
-      const prev = toFile(before || {}).object;
-      const edits = {};
-      for (const k of fileKeys) {
-        if (secrets.includes(k) || same(next[k], prev[k])) continue;
-        // emptied in the app : no longer declared (a yes or no off is its default)
-        edits[k] = next[k];
-      }
-      return Object.keys(edits).length ? updateMapFile(text, edits, fileKeys) : text;
+    newFileText: (c) => fields.newText(c.object),
+    // linked to its file ; a name given for the file kept by the object too
+    linkCandidate: async (c, name, file) => {
+      await links.link(c.row.id, name, file);
+      if (c.named) await Model.update({ name: c.row.name }, c.row.id, FROM_REPO);
     },
+
+    // an app edit : only the fields it changed (lib/repoObjects/fields.js editText)
+    fileEdits: (text, row, before) => fields.editText(text, row, before),
 
     usersOf: spec.usersOf,
     undeletable: spec.undeletable,

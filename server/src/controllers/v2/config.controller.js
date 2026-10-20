@@ -16,8 +16,6 @@ import { getStore, checkStore, listMounts, VAULT_STORE_NAME } from "../../secret
 import appConfig from "../../../config/app.config.js";
 
 import { fileURLToPath } from 'url';
-import { bump } from '../../lib/epochs.js';
-import { publish } from '../../lib/liveEvents.js';
 import Errors from '../../lib/errors.js';
 import { formLinks, formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
@@ -25,7 +23,8 @@ import yaml from 'yaml';
 import { isAdminRequest, assertKeepsOwnAdmin } from '../../lib/adminGrants.js';
 import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
-import { designsAllForms, designsEverything, designerConfig, designerWarnings, designerForms, designerWorkflowFiles, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
+import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -62,10 +61,6 @@ const findList = async function(req,res){
     // remove roles and remove constants
     delete formConfig.roles
     delete formConfig.constants
-    // the forms are the user's roles' already ; the loader's warning of a name defined twice is
-    // not, so without designAllForms the ones naming a form hidden from them are left out
-    // (lib/designerForms.js)
-    formConfig.warnings = await designerWarnings(formConfig.warnings, req?.user?.user)
     // this is sufficient for frontend to display the forms
     res.json(RestResult.single(formConfig))
   }catch(err){
@@ -106,8 +101,7 @@ const findAll = async function(req,res){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.onlyAdminsOrDesigners')))
     }
     var forms = await Form.load(undefined,undefined,true) // true means load all forms, not just the ones for the user
-    // without designAllForms : the forms of the user's roles, the subforms they use read only (lib/designerForms.js)
-    res.json(RestResult.single(designsAllForms(user) ? forms : await designerConfig(forms, user, await Form.unloaded())))
+    res.json(RestResult.single(forms))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }
@@ -136,91 +130,25 @@ const saveEnv = async function(req,res){
     if(outside.length){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`))
     }
-    // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session
-    // and signs the user out. Refused at the endpoint, not merely greyed out in the UI.
-    if(!appConfig.allowEnvEdit){
-      return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), EnvSettings.ENV_EDIT_DISABLED_REASON))
-    }
-    const help = await Help.get()
-    const envSection = help.filter(x => x.name=='Environment Variables')[0]
-    const docs = new Map((envSection?.items || []).map(x => [x.name, x]))
-    const managed = await EnvSettings.readManaged()
-
-    // validate everything BEFORE writing anything : a partial write of a bad set would
-    // leave the file describing a state nobody asked for
-    for(const name of names){
-      if(!docs.has(name)){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} is not a known environment variable`))
-      }
-      if(EnvSettings.REFUSED[name]){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), EnvSettings.REFUSED[name]))
-      }
-      if(EnvSettings.isOverridden(name, managed)){
-        return res.status(409).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} is set in the environment and cannot be changed from here`))
-      }
-      // the client sends nothing for an unchanged secret, but never trust that : storing
-      // the mask would replace a working credential with the literal placeholder
-      if(String(updates[name] ?? '').trim() === MASK){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} was not changed`))
-      }
-      const problem = EnvSettings.validate(name, updates[name], docs.get(name))
-      if(problem){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), problem))
-      }
-    }
-
-    // PERSIST FIRST, then apply. applyLive mutates the running process - the log level,
-    // the paths, VAULT_TOKEN, the db pool size, the TLS context - and writeManaged can
-    // still fail after that (a read-only persistent volume, ENOSPC). Applying first meant
-    // the caller got a 500 saying the save had failed while every one of those changes was
-    // already in force, and stayed in force until a restart, with nothing on disk to
-    // explain it. A write that fails now changes nothing at all.
-    for(const name of names){
-      const value = updates[name] === null || updates[name] === undefined ? '' : String(updates[name])
-      if(value === ''){ managed.delete(name) } else { managed.set(name, value) }
-    }
-    await EnvSettings.writeManaged(managed)
-    // the other nodes read the file again and apply what changed (init/cluster.js)
-    bump('env')
-
-    const restart = []
-    for(const name of names){
-      const value = updates[name] === null || updates[name] === undefined ? '' : String(updates[name])
-      // hand the documented default over : clearing a field means "back to the default", and
-      // applyLive cannot know what that is
-      // an RTE's own variable : the app has nothing to apply, and its restart would change nothing
-      if(EnvSettings.classify(name) === 'rte'){ EnvSettings.applyLive(name, value, docs.get(name)?.default); continue }
-      if(!EnvSettings.applyLive(name, value, docs.get(name)?.default)) restart.push(name)
-    }
-
-    // the NAMES only : these values include credentials
-    Audit.log({
-      user: req.user?.user,
-      ip: req.ip,
-      action: 'settings.env.update',
-      outcome: 'success',
-      targetType: 'env',
-      target: names.slice(0, 5).join(','),
-      detail: { changed: names, restartRequired: restart },
-    })
-    logger.notice(`Environment settings updated: ${names.join(', ')}`)
-    // a variable the header shows (the Designer's link) : every open tab re-reads it at once
-    publish('appearance')
+    // the settings and branding repositories' files, before (the language and the Designer's link
+    // are the branding's) : their changed variables written into them after
+    const before = await RepoObjects.snapshots(['settings', 'branding'])
+    // checked, written, applied, audited : as a settings repository's pull (lib/envSave.js)
+    const { restartRequired: restart } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
+    await RepoObjects.appUpdatedAll(before)
     return res.json(RestResult.single({ message: i18n.t(req, 'config.envVarsSaved'), changed: names, restartRequired: restart }))
   }catch(err){
+    if(err instanceof EnvSaveError){
+      return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), err.message))
+    }
     logger.error(helpers.getError(err))
     return res.status(500).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), helpers.getError(err)))
   }
 }
 
-// Names whose VALUE must never be sent to the client. A bare 'TOKEN' would be too broad -
-// ACCESS_TOKEN_EXPIRATION and ACCESS_TOKEN_ISSUER are not secrets and are worth seeing -
-// so this matches a trailing _TOKEN instead, which is what VAULT_TOKEN and any future
-// <service>_TOKEN look like. HTTPS_KEY is deliberately NOT matched: it is a path to a key
-// file, not the key itself, and the path is useful to see. PASSWORD and SECRET are trailing
-// too, for the same reason : PASSWORD_MIN_LENGTH is a number, and it was hidden as a secret.
-const SECRET_ENV_NAME = /_PASSWORD$|_SECRET$|_TOKEN$|_SECRET_PREVIOUS$/;
-const MASK = "*** NOT REVEALED ***";
+// the secrets' names : their values never leave the server (lib/envSettings.js)
+const SECRET_ENV_NAME = EnvSettings.SECRET_ENV_NAME;
+const MASK = ENV_MASK;
 // the state an unset secret is in : the page says it instead of the mask
 const SECRET_STATES = { ENCRYPTION_SECRET: 'default', ACCESS_TOKEN_SECRET: 'random' };
 
@@ -333,6 +261,8 @@ const env = async function(req,res){
       }
       // a restart applies a new path but does not move what is already at the old one
       item.relocates = EnvSettings.RELOCATES.has(x.name)
+      // another page's or the deployment's : not shown on this page (lib/envSettings.js)
+      item.ownedElsewhere = EnvSettings.OWNED_ELSEWHERE.test(x.name)
       item.description = x.description || null
       item.type = x.type || null
       item.allowed = x.allowed || null
@@ -350,10 +280,6 @@ const env = async function(req,res){
 const restore = async function(req,res){
   var lock
   var user=req.user.user
-  // a backup replaces every form : not for a designer limited to the forms of their roles
-  if(!designsAllForms(user)){
-    return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedRestoreForms'), "Restoring a backup replaces every form: it needs the role option designAllForms"))
-  }
   // whether THIS request took the lock. A restore replaces the whole config, so it
   // must not run next to a designer session ; but when the caller is not already in
   // the designer the lock is ours only for the duration of the write and has to be
@@ -454,29 +380,6 @@ const save = async function(req,res){
       } catch (err) {
         if (err instanceof Errors.AccessDeniedError) return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         if (err instanceof Errors.ConflictError) return res.status(409).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
-        throw err
-      }
-      // without designAllForms : what the user sent laid over the forms they do not see, kept as
-      // they are ; a hidden form's name, a changed read-only subform, a form without one of their
-      // roles refused (lib/designerForms.js)
-      // and without designAllPlaybooks or designAllWorkflows : a form naming a playbook or a workflow
-      // hidden from the user refused, by the forms as they are before this save ; and without any of
-      // the three, a new or changed expression or query the server runs (lib/designerForms.js)
-      try {
-        let sent = null
-        let unread = null
-        try { sent = Form.parse(newConfig) || {} } catch (e) { sent = null; unread = e }
-        if(!designsEverything(user)){
-          // not read : refused as Form.save would refuse it (a 400), nothing laid over
-          if(sent === null) throw new Errors.BadRequestError(helpers.getError(unread))
-          const stored = await Form.load(undefined,undefined,true)
-          // no expression nor query the forms do not have already (it would read the hidden files)
-          assertServerCodeKept(sent.forms, stored.forms, user)
-          if(!designsAllForms(user)) newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
-        }
-        if(sent) await assertFilesShown(sent.forms, user)
-      } catch (err) {
-        if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         throw err
       }
       // the designer writes the whole document, so the previous one has to be read
@@ -585,9 +488,7 @@ const formNames = async function(req,res){
 const formsLinked = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    // reached with a part of the settings only, and designAllForms off : the forms their designer
-    // shows, never the hidden ones (lib/designerForms.js)
-    res.json(RestResult.list(formLinks(designerForms(formConfig.forms, req?.user?.user))))
+    res.json(RestResult.list(formLinks(formConfig.forms)))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -598,9 +499,7 @@ const formsLinked = async function(req,res){
 const formsCredentials = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    // with the connections settings only, and designAllForms off : the forms their designer shows
-    // (lib/designerForms.js)
-    res.json(RestResult.list(formCredentials(designerForms(formConfig.forms, req?.user?.user))))
+    res.json(RestResult.list(formCredentials(formConfig.forms)))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -610,9 +509,7 @@ const formsCredentials = async function(req,res){
 // credential's Used by tab
 const workflowsCredentials = async function(req,res){
   try{
-    // with the connections settings only, and designAllWorkflows off : the workflow files their
-    // designer shows (lib/designerForms.js)
-    res.json(RestResult.list(await workflowCredentials(await designerWorkflowFiles(req?.user?.user))))
+    res.json(RestResult.list(await workflowCredentials()))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }

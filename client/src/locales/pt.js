@@ -1346,7 +1346,7 @@ export default {
         config: 'config.yaml com as categorias e constantes (um só repositório)',
         sso: 'Fornecedores SSO em YAML, um por ficheiro na sua pasta sso, que nomeiam a sua credencial',
         ldap: 'Diretórios LDAP em YAML, um por ficheiro na sua pasta ldap, pela sua ordem de pesquisa',
-        disclaimer: 'O aviso legal que os utilizadores aceitam, e as suas versões',
+        disclaimer: 'Versões do aviso legal em YAML, uma por ficheiro na sua pasta disclaimer',
         credentials:
           'Credenciais em YAML, uma por ficheiro na sua pasta credentials, segredos só como referências de ambiente',
         secret_stores:
@@ -1354,15 +1354,13 @@ export default {
         runners: 'Runners em YAML, um por ficheiro na sua pasta runners, que nomeiam a sua credencial',
         notification_channels: 'Canais de notificação em YAML, um por ficheiro na sua pasta notification-channels',
         syslog: 'Servidores syslog em YAML, um por ficheiro na sua pasta syslog',
-        chat: 'As definições do assistente de chat, num ficheiro YAML',
+        chat: 'As definições do assistente de chat no seu chat.yaml, a chave só como referência de ambiente',
         branding:
-          'O nome, o logótipo, o ícone, as ligações e os valores predefinidos, num ficheiro YAML e as suas imagens',
+          'O nome, as ligações, os valores predefinidos, o logótipo e o ícone no seu branding.yaml e as imagens ao lado',
         labels: 'As etiquetas ao lado do logótipo em YAML, uma por ficheiro na sua pasta labels, pela sua ordem',
-        announcements: 'Anúncios, um ficheiro YAML cada',
-        settings: 'As definições de Sistema > Geral pelo seu nome de ambiente, num ficheiro YAML',
+        announcements: 'Anúncios em YAML, um por ficheiro na sua pasta announcements',
+        settings: 'As definições de Sistema > Geral pelo seu nome de ambiente, no seu settings.yaml',
       },
-      usageComingSoon: 'Em breve',
-      usageComingSoonHint: 'Esta utilização chega numa versão posterior.',
       usageOnTitle: 'Ativar {type}',
       usageOnQuestion: 'Usar {name} para {type}?',
       usageOnButton: 'Ativar',
@@ -1376,6 +1374,8 @@ export default {
       usageOffHeading: '{type}: desativado',
       usageOnWritten:
         '{type} desta aplicação escritos em {name}, um ficheiro YAML cada na sua pasta {folder}: {count}.',
+      usageOnWrittenFile: '{type} desta aplicação escritos em {name} como {file}, à espera do Push.',
+      usageOnReadFile: '{name} já tem {file}: ganha a versão do git e substitui {type} desta aplicação.',
       usageOnGitWins:
         'Quando o mesmo nome está no git e nesta aplicação, ganha a versão do git e substitui a da aplicação.',
       usageOnClashes: 'Mesmo nome no git e nesta aplicação, a versão do git substitui a da aplicação: {names}.',

@@ -55,7 +55,6 @@ describe('the Schedules usage of a repository', () => {
     expect(usageType('schedules')).toMatchObject({
       flag: 'use_for_schedules',
       category: 'designer',
-      built: true,
       objects: true,
       oneOnly: true,
       folder: 'schedules',

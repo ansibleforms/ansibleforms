@@ -1340,7 +1340,7 @@ export default {
         config: 'config.yaml z kategoriami i stałymi (tylko jedno repozytorium)',
         sso: 'Dostawcy SSO w YAML, jeden na plik w folderze sso, wskazujący swoje poświadczenie',
         ldap: 'Katalogi LDAP w YAML, jeden na plik w folderze ldap, w kolejności wyszukiwania',
-        disclaimer: 'Zastrzeżenie akceptowane przez użytkowników i jego wersje',
+        disclaimer: 'Wersje zastrzeżenia w YAML, jedna na plik w folderze disclaimer',
         credentials:
           'Poświadczenia w YAML, jedno na plik w folderze credentials, sekrety tylko jako odwołania do zmiennych środowiskowych',
         secret_stores:
@@ -1348,14 +1348,12 @@ export default {
         runners: 'Runnery w YAML, jeden na plik w folderze runners, wskazujące swoje poświadczenie',
         notification_channels: 'Kanały powiadomień w YAML, jeden na plik w folderze notification-channels',
         syslog: 'Serwery syslog w YAML, jeden na plik w folderze syslog',
-        chat: 'Ustawienia asystenta czatu, w jednym pliku YAML',
-        branding: 'Nazwa, logo, ikona, linki i wartości domyślne, w jednym pliku YAML i jego obrazach',
+        chat: 'Ustawienia asystenta czatu w jego chat.yaml, klucz tylko jako odwołanie do zmiennej środowiskowej',
+        branding: 'Nazwa, linki, wartości domyślne, logo i ikona w jego branding.yaml i obrazach obok',
         labels: 'Etykiety obok logo w YAML, jedna na plik w folderze labels, w swojej kolejności',
-        announcements: 'Ogłoszenia, każde w osobnym pliku YAML',
-        settings: 'Ustawienia System > Ogólne według nazw zmiennych środowiskowych, w jednym pliku YAML',
+        announcements: 'Ogłoszenia w YAML, jedno na plik w folderze announcements',
+        settings: 'Ustawienia System > Ogólne według nazw zmiennych środowiskowych, w jego settings.yaml',
       },
-      usageComingSoon: 'Wkrótce',
-      usageComingSoonHint: 'To użycie pojawi się w późniejszej wersji.',
       usageOnTitle: 'Włącz {type}',
       usageOnQuestion: 'Używać {name} dla: {type}?',
       usageOnButton: 'Włącz',
@@ -1369,6 +1367,8 @@ export default {
       usageOffHeading: '{type}: wyłączone',
       usageOnWritten:
         '{type} tej aplikacji zapisane w {name}, każdy w osobnym pliku YAML w folderze {folder}: {count}.',
+      usageOnWrittenFile: '{type} tej aplikacji zapisane w {name} jako {file}, czekają na Push.',
+      usageOnReadFile: '{name} ma już {file}: wygrywa wersja z git i zastępuje {type} tej aplikacji.',
       usageOnGitWins:
         'Gdy ta sama nazwa jest w git i w tej aplikacji, wygrywa wersja z git i zastępuje tę z aplikacji.',
       usageOnClashes: 'Ta sama nazwa w gicie i w tej aplikacji, wersja z gita zastępuje tę z aplikacji: {names}.',

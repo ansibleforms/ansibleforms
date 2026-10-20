@@ -42,6 +42,8 @@ import {
   usageSortValue,
   pullOrder,
   repositorySourceFields,
+  activationLines,
+  singleTypeSource,
 } from '../src/lib/repositoryUsage.js';
 import * as server from '../../server/src/lib/repoObjects/types.js';
 
@@ -65,7 +67,6 @@ describe('the usage types', () => {
       key: u.key,
       flag: u.flag,
       category: u.category,
-      built: !!u.built,
       objects: !!u.objects,
       // the server refuses a second repository for an object type ; config and playbooks are
       // greyed on the others here only, as before (the server warns and uses the first one)
@@ -122,7 +123,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
     expect(takenBy(credentials, { id: 1, name: 'creds', use_for_credentials: 1 }, others)).toBeNull();
   });
 
-  it('Connections : the credentials another repository has and the chat of a later version are skipped', () => {
+  it('Connections : the credentials another repository has are skipped, every other type ticked', () => {
     const record = { id: 2, name: 'self' };
     expect(categoryState('connections', record, others)).toEqual({
       checked: false,
@@ -135,20 +136,31 @@ describe('a group box ticks every type of it that can be ticked', () => {
       'use_for_runners',
       'use_for_notification_channels',
       'use_for_syslog',
+      'use_for_chat',
     ]);
     expect(categoryState('connections', record, others).checked).toBe(true);
     setCategory('connections', record, others, false);
     expect(record.use_for_runners).toBe(false);
-    expect(record.use_for_chat).toBeUndefined();
   });
 
-  it('some of a group ticked : half ticked ; a group with nothing to tick : greyed', () => {
+  it('some of a group ticked : half ticked ; every type taken : the group box greyed', () => {
     const record = { id: 3, name: 'new', use_for_forms: true };
     expect(categoryState('designer', record, []).indeterminate).toBe(true);
-    // System : only Settings, of a later version
-    expect(categoryState('system', record, []).disabled).toBe(true);
-    setCategory('system', record, [], true);
+    // System : only Settings, which another repository has
+    const taken = [{ id: 9, name: 'cfg', use_for_settings: 1 }];
+    expect(categoryState('system', record, taken).disabled).toBe(true);
+    setCategory('system', record, taken, true);
     expect(record.use_for_settings).toBeUndefined();
+  });
+
+  it('no type is of a later version any more : nothing coming soon, every one can be ticked', async () => {
+    expect(USAGE_TYPES.some((u) => 'built' in u)).toBe(false);
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      expect(r.usageComingSoon).toBeUndefined();
+      expect(r.usageComingSoonHint).toBeUndefined();
+    }
+    expect(read('components/AppRepositoryUsage.vue')).not.toContain('usageComingSoon');
   });
 
   it('the component draws the groups and is used by the dialog and the page', () => {
@@ -177,7 +189,7 @@ describe('one question when a save turns several object types on or off', () => 
     const was = { name: 'ops' };
     const now = { name: 'ops' };
     setCategory('connections', now, [], true);
-    const all = ['credentials', 'secret_stores', 'runners', 'notification_channels', 'syslog'];
+    const all = ['credentials', 'secret_stores', 'runners', 'notification_channels', 'syslog', 'chat'];
     expect(usageChanges(was, now)).toEqual({ on: all, off: [] });
     const answer = confirmUsageChange(t, 'ops', was, now);
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
@@ -314,5 +326,43 @@ describe('Pull all, and a linked object', () => {
       'settings.repositories.sourceRepository {"name":"ops"}',
       'runners/a.yaml',
     ]);
+  });
+});
+
+describe('the types kept in one file : the chat, the settings, the branding', () => {
+  it('say their file : the app written to it, or the one in git applied', () => {
+    expect(activationLines(t, 'chat', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
+      'settings.repositories.usageOnWrittenFile {"type":"settings.repositories.usageTypes.chat","name":"cfg","file":"chat.yaml"}',
+    );
+    expect(activationLines(t, 'branding', 'cfg', { written: [], clashes: ['Branding'] })[0]).toBe(
+      'settings.repositories.usageOnReadFile {"type":"settings.repositories.usageTypes.branding","name":"cfg","file":"branding.yaml"}',
+    );
+  });
+
+  it('their pages say which repository holds them, the record pages which file', async () => {
+    const axios = (await import('axios')).default;
+    axios.get.mockImplementationOnce(async () => ({ data: { records: [{ name: 'cfg', use_for_branding: 1 }] } }));
+    expect(await singleTypeSource('branding')).toEqual({ repository: 'cfg', repo_file: 'branding.yaml' });
+    expect(await singleTypeSource('forms')).toBeNull();
+    for (const [page, type] of [
+      ['pages/admin/chat.vue', 'chat'],
+      ['pages/admin/settings.vue', 'settings'],
+      ['pages/admin/name.vue', 'branding'],
+      ['pages/admin/links.vue', 'branding'],
+      ['pages/admin/defaults.vue', 'branding'],
+      ['pages/admin/logo.vue', 'branding'],
+      ['pages/admin/favicon.vue', 'branding'],
+    ]) {
+      expect(read(page), page).toMatch(new RegExp(`<AppRepositorySource [^>]*type="${type}" />`));
+    }
+    for (const page of ['pages/admin/announcement.vue', 'pages/admin/disclaimer-version.vue']) {
+      expect(read(page), page).toContain('<AppRepositorySource v-show="fieldShown(\'source\')" :record="record" />');
+    }
+  });
+
+  it("the settings page shows what the server says is its own (one list, the server's)", () => {
+    const page = read('pages/admin/settings.vue');
+    expect(page).toContain('if (matched.has(e.name) || e.ownedElsewhere) return false;');
+    expect(page).not.toContain('const OWNED_ELSEWHERE');
   });
 });

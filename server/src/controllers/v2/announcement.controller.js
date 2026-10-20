@@ -7,6 +7,7 @@ import Errors from "../../lib/errors.js";
 import i18n from "../../lib/i18n.js";
 import { publish } from "../../lib/liveEvents.js";
 import { forgetAppDefaults } from "../../routes/v2/app.routes.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 /**
  * The header re-reads the config : on this node now, on the others through the live event.
@@ -37,7 +38,8 @@ const create = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const id = await Announcement.create(req.body, req.user?.user?.username);
+    // the announcements repository follows (lib/repoObjects : a new file)
+    const id = await RepoObjects.following("announcements", () => Announcement.create(req.body, req.user?.user?.username));
     announce();
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Announcement" }), id }));
   } catch (err) {
@@ -50,7 +52,8 @@ const update = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    await Announcement.update(req.params.id, req.body);
+    // the announcements repository follows (its changed fields written to its file)
+    await RepoObjects.following("announcements", () => Announcement.update(req.params.id, req.body));
     announce();
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Announcement" }) }));
   } catch (err) {
@@ -60,7 +63,8 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
-    await Announcement.delete(req.params.id);
+    // the announcements repository follows (its file removed)
+    await RepoObjects.following("announcements", () => Announcement.delete(req.params.id));
     announce();
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Announcement" }) }));
   } catch (err) {

@@ -9,7 +9,7 @@
 // file live in git next to the rest of the deployment.
 import Ajv from "ajv";
 import { CHAT_PROVIDERS } from "../chat/vendors.js";
-import { USAGE_TYPES, ONE_ONLY_FLAGS, COMING_FLAGS, typeOfFlag } from "./repoObjects/types.js";
+import { USAGE_TYPES, ONE_ONLY_FLAGS } from "./repoObjects/types.js";
 
 const str = { type: "string" };
 const bool = { type: "boolean" };
@@ -504,6 +504,9 @@ const chatSection = {
   properties: {
     provider: { type: "string", enum: ["", ...CHAT_PROVIDERS] },
     api_key: str,
+    // an api credential of the credentials section whose password is the key, instead of api_key
+    // (optional : omitted leaves the column alone)
+    credential: str,
     base_url: str,
     model: str,
     max_turns: strOrInt,
@@ -576,6 +579,80 @@ export const ldapDirectoryItem = {
   },
 };
 
+// The chat assistant's settings as a repository holds them (lib/repoObjects/chat.js, chat.yaml) :
+// the chat section's fields, none required - a file declares what it owns, its api key left out
+// when the app's stays in the database
+export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);
+
+// The branding (Settings > Appearance : Name, Links, Defaults, Logo, Icon) : the app's name, the
+// header's links and whether the Designer's shows, the defaults (theme, colour, forms view, time
+// zone, date format, language), and the logo and the website icon as image files named by their
+// path, relative to the seed file (or the repository's branding.yaml), read as binary and checked
+// as an upload is. Every field optional : what is not declared is left alone. The seed applies it
+// on each start, as a repository's pull does ; it is not made read only.
+export const brandingSection = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    app_name: str,
+    // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
+    header_links: { type: ["array", "string"] },
+    show_designer: bool,
+    default_theme: { type: "string", enum: ["system", "light", "dark"] },
+    default_theme_color: str,
+    forms_view: str,
+    default_timezone: str,
+    default_date_format: str,
+    default_language: str,
+    // an image file's path ; empty : the default (the bundled logo, the bundled icon)
+    logo: str,
+    icon: str,
+  },
+};
+
+// An announcement under the header (Settings > Appearance > Announcements) : named, so a seed or a
+// repository finds it again ; its message, type, switch, and when it starts and ends showing (ISO
+// moments, UTC when they carry no zone)
+const announcementItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "message"],
+  properties: {
+    name: { type: "string", minLength: 1, maxLength: 100 },
+    message: str,
+    level: { type: "string", enum: ["info", "warning", "danger"] },
+    enabled: bool,
+    start_at: str,
+    end_at: str,
+  },
+};
+
+// A version of the disclaimer users accept (Settings > Access > Disclaimer) : its number, title,
+// text and checkbox label, and whether it is the one in force (enabled : the disclaimer on, this
+// version asked). A changed text is a correction of that version ; with ask_again: true, everyone
+// who accepted it is asked again - as the app's save offers both. Acceptances are never declared.
+export const disclaimerItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["version"],
+  properties: {
+    version: { type: "integer", minimum: 1 },
+    title: str,
+    text: str,
+    checkbox_label: str,
+    enabled: bool,
+    ask_again: bool,
+  },
+};
+
+// a section of named items the seed makes or changes (never deletes : they are not managed)
+const itemsSection = (item) => ({
+  type: "object",
+  additionalProperties: false,
+  required: ["items"],
+  properties: { items: { type: "array", items: item } },
+});
+
 // The public url, and the mail fields of before 7.6 (deprecated, removed in 8 : the settings row
 // has no mail columns any more, foldMailSettingsIntoChannel makes them a mail channel and its
 // smtp credential). The settings row also holds config_yaml, the logo and the theme defaults -
@@ -646,6 +723,9 @@ export const seedSchema = {
     ldap: ldapSection,
     settings: settingsSection,
     chat: chatSection,
+    branding: brandingSection,
+    announcements: itemsSection(announcementItem),
+    disclaimer: itemsSection(disclaimerItem),
   },
 };
 
@@ -656,7 +736,7 @@ const validator = ajv.compile(seedSchema);
 // typo here : the second entry silently wins the upsert while the first is counted
 // as declared, so a prune would spare a record nobody can see in the file.
 function assertUniqueNames(doc) {
-  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels"]) {
+  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels", "announcements"]) {
     const items = doc[key]?.items;
     if (!Array.isArray(items)) continue;
     const seen = new Set();
@@ -708,13 +788,12 @@ function assertSingletonFlags(doc) {
       throw new Error(`Seed file declares ${flag} on more than one repository: ${names.sort().join(", ")}`);
     }
   }
-  // a usage of a later version : accepted off, refused on
-  for (const item of doc.repositories?.items || []) {
-    const coming = COMING_FLAGS.filter((flag) => item[flag]);
-    if (coming.length) {
-      throw new Error(`Seed file turns on ${coming.join(", ")} on repository '${item.name}': the ${coming.map((f) => typeOfFlag(f).label).join(", ")} usage comes in a later version`);
-    }
-  }
+  // one disclaimer version of each number, one at most in force
+  const versions = (doc.disclaimer?.items || []).map((item) => item.version);
+  const twice = versions.filter((v, i) => versions.indexOf(v) !== i);
+  if (twice.length) throw new Error(`Seed file declares disclaimer version ${[...new Set(twice)].join(", ")} more than once`);
+  const enabled = (doc.disclaimer?.items || []).filter((item) => item.enabled).map((item) => item.version);
+  if (enabled.length > 1) throw new Error(`Seed file enables more than one disclaimer version: ${enabled.join(", ")}`);
 }
 
 /**

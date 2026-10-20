@@ -18,6 +18,10 @@ CREATE TABLE `syslog_servers` (
   `receives` varchar(10) NOT NULL DEFAULT 'both',
   `enabled` tinyint(4) DEFAULT 1,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (syslog/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_syslog_servers_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

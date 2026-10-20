@@ -55,6 +55,40 @@ export const REFUSED = {
   'YTT_LIB_DATA_{dynamic}': 'A prefix, not a variable - set YTT_LIB_DATA_<name> in the environment instead',
 };
 
+// The variables Settings > System > General leaves to another page or to the deployment, and so
+// does not show : the page's own list (env API ownedElsewhere), and the one a settings repository
+// keeps out of its settings.yaml (lib/repoObjects/settings.js).
+// VAULT_* are only imported once, when upgrading to 7 (Secret stores). BASE_URL is here for a different reason -
+// it is the one setting that genuinely cannot be applied without a restart, because the
+// served index.html has the base path baked into it, so every page already open would break.
+// Showing it on a page of editable settings would only offer an edit that cannot work; it is
+// reported as a fact on the Status page instead.
+// AF_ROLE and RTE_* describe which process this is and where its RTE lives : set in
+// the environment of the container, not edited from inside the app - but RTE_QUEUE_MINUTES, how
+// long the app's job waits for a busy RTE, and RTE_FILES_MAX_MB, the largest folder it sends an
+// RTE, which the app reads (Jobs). ANSIBLE_PATH, PROCESS_MAX_BUFFER, APP_URL, APP_TLS_VERIFY and
+// LISTEN_HOST are read by an RTE only : since 7 the app runs no playbook itself.
+// the MCP server's switch and options (Settings > Connections > MCP) and the chat assistant's
+// switch (Settings > Connections > Chat assistant) ; the default language (Settings > Appearance >
+// Defaults) and the designer's switch (Settings > Appearance > Links).
+// The local admin's first start (ADMIN_USERNAME, ADMIN_PASSWORD, REINIT_ADMIN) : the account is
+// the Users page's once it exists. NODE_ENV and ALLOW_ENV_EDIT decide how the process boots and
+// whether this page writes at all (it says so when it does not) : the deployment's.
+// YTT_LIB_DATA_<name> is a prefix, not a variable : documented, nothing to show. LOG_COLOR_* are
+// the console's ANSI colour codes : rarely changed, documented. LOG_SYSLOG_* are imported once as a
+// syslog server (Settings > Connections > Syslog), as VAULT_* as a secret store.
+export const OWNED_ELSEWHERE =
+  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\})$/;
+
+// Names whose VALUE must never be sent to the client. A bare 'TOKEN' would be too broad -
+// ACCESS_TOKEN_EXPIRATION and ACCESS_TOKEN_ISSUER are not secrets and are worth seeing -
+// so this matches a trailing _TOKEN instead, which is what VAULT_TOKEN and any future
+// <service>_TOKEN look like. HTTPS_KEY is deliberately NOT matched: it is a path to a key
+// file, not the key itself, and the path is useful to see. PASSWORD and SECRET are trailing
+// too, for the same reason : PASSWORD_MIN_LENGTH is a number, and it was hidden as a secret.
+// A settings repository writes these only as ${ENV} references.
+export const SECRET_ENV_NAME = /_PASSWORD$|_SECRET$|_TOKEN$|_SECRET_PREVIOUS$/;
+
 // Why the whole page is read only, when it is. Distinct from a per-variable refusal :
 // nothing here is wrong with the variable, the store itself is not ours to write.
 export const ENV_EDIT_DISABLED_REASON =
@@ -552,4 +586,4 @@ export async function writeManaged(map) {
   return text;
 }
 
-export default { MANAGED_ENV_PATH, REFUSED, ENV_EDIT_DISABLED_REASON, RELOCATES, RUNNER_PAGE, classify, isOverridden, serialize, parseEnvFile, readManaged, validate, applyLive, writeManaged };
+export default { MANAGED_ENV_PATH, OWNED_ELSEWHERE, SECRET_ENV_NAME, REFUSED, ENV_EDIT_DISABLED_REASON, RELOCATES, RUNNER_PAGE, classify, isOverridden, serialize, parseEnvFile, readManaged, validate, applyLive, writeManaged };

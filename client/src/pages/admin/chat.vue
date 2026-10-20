@@ -86,7 +86,9 @@ onMounted(async () => {
       @saveExtra="saveSwitch()"
     >
       <!-- General : the switch first, as on the MCP page ; the settings wait for it -->
-      <template #tab-top-general>
+      <template #tab-top-general="{ searching }">
+        <!-- kept in a repository's chat.yaml : which one -->
+        <AppRepositorySource v-show="!searching" type="chat" />
         <div v-if="envRestartPending.length" class="alert alert-warning py-2">
           <FaIcon icon="triangle-exclamation" class="me-2" />
           {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}

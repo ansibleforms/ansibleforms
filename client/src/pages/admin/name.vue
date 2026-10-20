@@ -86,6 +86,8 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="1" />
         <template v-else>
+          <!-- kept in a repository's branding.yaml : which one -->
+          <AppRepositorySource type="branding" />
           <BsInput
             class="af-interface-field"
             :isFloating="false"

@@ -6548,8 +6548,7 @@
     description: |
       A repository's **Usage** step (Settings > Connections > Repositories, its dialog and its page) lists what the
       app reads from it, one box per type, in five groups. A box on a group's heading ticks or unticks every type of
-      the group that can be ticked; a type another repository uses is greyed with that repository's name, and a type
-      of a later version is greyed with a short note (the API and the config seed refuse to turn it on). The
+      the group that can be ticked; a type another repository uses is greyed with that repository's name. The
       repositories list shows one **Usage** column: a badge per type the repository is used for.
 
       | Group | Types (flag) |
@@ -6561,11 +6560,11 @@
       | System | Settings (`use_for_settings`) |
 
       Forms, Playbooks, Workflows, Inventories and Config work as before (several repositories may hold forms,
-      workflows and inventories). **Schedules**, **Credentials**, **Runners**, **Secret stores**, **Notification
-      channels**, **SSO**, **LDAP**, **Syslog** and **Labels** are object types: one object per YAML file in a folder
-      named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`, `notification-channels/`,
-      `sso/`, `ldap/`, `syslog/`, `labels/`), one repository at most per type. Disclaimer, Chat, Branding,
-      Announcements and Settings come in a later version.
+      workflows and inventories). Every other type is an object type, one repository at most per type: one object
+      per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
+      `notification-channels/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
+      what the app has one of, one file at the repository's root (`chat.yaml`, `settings.yaml`, `branding.yaml`
+      and its images).
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
@@ -6656,6 +6655,82 @@
       notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
       is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
       then what names them; Pull all pulls the repositories in the same order.
+  - name: Settings, chat, branding, announcements and the disclaimer kept in a git repository
+    short: The last usage types, three of them one file each
+    version: v7.4.0
+    description: |
+      The last five usage types work as the others (two ways, the same question before turning them on or off,
+      the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
+      Three are things the app has one of: each is **one file** at the repository's root. Turning the type on
+      writes the app's values to that file when the repository has none, or applies the file when it has one (git
+      wins); a pull applies it; a save in the app rewrites only the fields it changed; turning it off reads it once
+      more and the app keeps its values. A file removed from git changes nothing in the app.
+
+      **Chat** (`chat.yaml`): the chat assistant's settings in the config seed's `chat:` format, every field
+      optional. `api_key` only as `${ENV}`, or left out (the one in the database stays); `credential` names an api
+      credential, and the file waits while it is missing.
+      ```yaml
+      provider: openai
+      model: gpt-5
+      api_key: ${CHAT_API_KEY}
+      allow_job_status: false
+      ```
+
+      **Settings** (`settings.yaml`): Settings > System > General by environment variable names, only those that
+      page changes (never one another page or the deployment owns, a refused one, or one set in the real
+      environment). A variable whose name ends in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as
+      `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
+      value changes nothing), the managed file written, the other nodes told, each variable applied at once or
+      said to need a restart (in the pull output), and the change audited. The app writes the variables saved from
+      the page.
+      ```yaml
+      JOB_RETENTION_DAYS: 30
+      LOG_LEVEL: info
+      DB_PASSWORD: ${DB_PASSWORD}
+      ```
+
+      **Branding** (`branding.yaml` and its images): the name, the header's links (`header_links`) and the
+      Designer's (`show_designer`), the defaults (`default_theme`, `default_theme_color`, `forms_view`,
+      `default_timezone`, `default_date_format`, `default_language`) and the logo and the website icon as image
+      files beside it, named by their path. The images are read and written as binary and checked as an upload is
+      (an image type sniffed from its bytes; the logo at most 900 KB, the icon 256 KB); an empty value restores the
+      bundled one. The config seed has a `branding:` section in the same format, its images relative to the seed
+      file; it applies it on each start without making it read only.
+      ```yaml
+      app_name: ACME Automation
+      default_theme: dark
+      default_language: fr
+      logo: logo.png
+      icon: icon.svg
+      ```
+
+      **Announcements** (`announcements/`, one file each): named (what a pull finds them by), with their
+      `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,
+      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. The
+      app removes an announcement whose end is past; its file, still in git, is then refused until it is removed.
+      The seed's `announcements:` section takes the same items.
+      ```yaml
+      name: Maintenance
+      message: The app is down on Sunday from 8 to 10.
+      level: warning
+      start_at: 2030-01-06T08:00:00Z
+      end_at: 2030-01-06T10:00:00Z
+      ```
+
+      **Disclaimer** (`disclaimer/`, one file per version): `version` (its number, what a pull finds it by),
+      `title`, `text`, `checkbox_label` and `enabled` (the version in force, the disclaimer on; one at most). A
+      changed title, text or label arriving from git is a **correction** of that version, as the app's save makes
+      one; with `ask_again: true` in the file, everyone who accepted it is asked again (a key of the file only:
+      never written back, and nothing happens while the text does not change). Who accepted what is never in git.
+      The seed's `disclaimer:` section takes the same items.
+      ```yaml
+      version: 2
+      title: Terms of use
+      text: Use this tool for your own team's systems only.
+      checkbox_label: I agree
+      enabled: true
+      ask_again: true
+      ```
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
     version: v6.0.3

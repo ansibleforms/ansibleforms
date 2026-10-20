@@ -306,35 +306,17 @@ function envHelp(e) {
 // tests/env-group-coverage.test.js pins exactly that: it reads the real help.yaml and fails
 // when a variable belongs to no group, or to more than one.
 //
-// VAULT_* are only imported once, when upgrading to 7 (Secret stores). BASE_URL is here for a different reason -
-// it is the one setting that genuinely cannot be applied without a restart, because the
-// served index.html has the base path baked into it, so every page already open would break.
-// Showing it on a page of editable settings would only offer an edit that cannot work; it is
-// reported as a fact on the Status page instead.
-// AF_ROLE and RTE_* describe which process this is and where its RTE lives : set in
-// the environment of the container, not edited from inside the app - but RTE_QUEUE_MINUTES, how
-// long the app's job waits for a busy RTE, and RTE_FILES_MAX_MB, the largest folder it sends an
-// RTE, which the app reads (Jobs). ANSIBLE_PATH, PROCESS_MAX_BUFFER, APP_URL, APP_TLS_VERIFY and
-// LISTEN_HOST are read by an RTE only : since 7 the app runs no playbook itself.
-// the MCP server's switch and options (Settings > Connections > MCP) and the chat assistant's
-// switch (Settings > Connections > Chat assistant) ; the default language (Settings > Appearance >
-// Defaults) and the designer's switch (Settings > Appearance > Links).
-// The local admin's first start (ADMIN_USERNAME, ADMIN_PASSWORD, REINIT_ADMIN) : the account is
-// the Users page's once it exists. NODE_ENV and ALLOW_ENV_EDIT decide how the process boots and
-// whether this page writes at all (it says so when it does not) : the deployment's.
-// YTT_LIB_DATA_<name> is a prefix, not a variable : documented, nothing to show. LOG_COLOR_* are
-// the console's ANSI colour codes : rarely changed, documented. LOG_SYSLOG_* are imported once as a
-// syslog server (Settings > Connections > Syslog), as VAULT_* as a secret store.
-const OWNED_ELSEWHERE =
-  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\})$/;
-
+// The variables this page leaves to another page or to the deployment (VAULT_*, MCP_*, BASE_URL,
+// AF_ROLE, RTE_* but two, ...) : the server says so of each (ownedElsewhere, lib/envSettings.js
+// OWNED_ELSEWHERE, the one list : a settings repository keeps the same variables this page
+// edits), and they are not shown here.
 const envGroups = computed(() => {
   if (!env.value || !Array.isArray(env.value)) return [];
   const matched = new Set();
   const groups = envGroupOrder
     .map((g) => {
       const items = env.value.filter((e) => {
-        if (matched.has(e.name) || OWNED_ELSEWHERE.test(e.name)) return false;
+        if (matched.has(e.name) || e.ownedElsewhere) return false;
         if (envInGroup(g, e.name)) {
           matched.add(e.name);
           return true;
@@ -566,6 +548,8 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="5" />
         <template v-else>
+          <!-- kept in a repository's settings.yaml : which one -->
+          <AppRepositorySource v-show="!searching" type="settings" />
           <!-- Environment Variable tabs -->
           <div v-if="searching && !shownGroups.length" class="text-body-secondary fst-italic">
             {{ t('settings.settingsPage.searchNone') }}

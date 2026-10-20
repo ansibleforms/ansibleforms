@@ -721,6 +721,13 @@ CREATE TABLE `announcements` (
   `end_at` datetime DEFAULT NULL,
   `created_by` varchar(250) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  -- its name : a seed's or a repository's announcement is found again by it ; none for one made
+  -- in the app until a repository writes it
+  `name` varchar(100) DEFAULT NULL,
+  -- the repository and the file (announcements/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -734,6 +741,10 @@ CREATE TABLE `disclaimer_versions` (
   `checkbox_label` varchar(200) NOT NULL,
   `created_by` varchar(250) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  -- the repository and the file (disclaimer/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `disclaimer_acceptances`;

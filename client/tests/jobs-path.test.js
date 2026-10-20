@@ -17,7 +17,15 @@ describe('jobsPath', () => {
   });
 
   it('has a name for every status, none a number', () => {
-    expect(JOBS_STATUS_SLUGS).toEqual(['running', 'approval', 'succeeded', 'failed', 'aborted', 'rejected', 'abandoned']);
+    expect(JOBS_STATUS_SLUGS).toEqual([
+      'running',
+      'approval',
+      'succeeded',
+      'failed',
+      'aborted',
+      'rejected',
+      'abandoned',
+    ]);
     for (const slug of JOBS_STATUS_SLUGS) expect(jobsPath(statusFromSlug(slug))).toBe(`/jobs/${slug}`);
   });
 });

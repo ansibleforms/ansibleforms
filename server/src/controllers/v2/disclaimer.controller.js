@@ -6,6 +6,8 @@ import RestResult from "../../models/restResult.model.v2.js";
 import Errors from "../../lib/errors.js";
 import i18n from "../../lib/i18n.js";
 import logger from "../../lib/logger.js";
+// the disclaimer repository follows every change of the versions (lib/repoObjects)
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 // ─── every signed-in user ────────────────────────────────────────────────────
 
@@ -51,7 +53,7 @@ const saveSettings = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    await Disclaimer.save(req.body, req.user?.user?.username);
+    await RepoObjects.following("disclaimer", () => Disclaimer.save(req.body, req.user?.user?.username));
     return res.json(RestResult.single(await Disclaimer.forSettings()));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -77,7 +79,7 @@ const version = async (req, res) => {
 // a disclaimer added : a new version, not enabled
 const createVersion = async (req, res) => {
   try {
-    const version = await Disclaimer.createVersion(req.body, req.user?.user?.username);
+    const version = await RepoObjects.following("disclaimer", () => Disclaimer.createVersion(req.body, req.user?.user?.username));
     return res.json(RestResult.single({ id: version, version }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -87,7 +89,7 @@ const createVersion = async (req, res) => {
 // a version's words changed : a correction, or (askAgain) everyone accepting it again
 const updateVersion = async (req, res) => {
   try {
-    await Disclaimer.updateVersion(req.params.id, req.body);
+    await RepoObjects.following("disclaimer", () => Disclaimer.updateVersion(req.params.id, req.body));
     return res.json(RestResult.single(await Disclaimer.version(req.params.id)));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -97,7 +99,9 @@ const updateVersion = async (req, res) => {
 // a version enabled (the one users accept) or disabled (the disclaimer off) { enabled }
 const enableVersion = async (req, res) => {
   try {
-    await Disclaimer.enableVersion(req.params.id, req.body?.enabled !== false && req.body?.enabled !== 0, req.user?.user?.username);
+    await RepoObjects.following("disclaimer", () =>
+      Disclaimer.enableVersion(req.params.id, req.body?.enabled !== false && req.body?.enabled !== 0, req.user?.user?.username),
+    );
     return res.json(RestResult.single(await Disclaimer.version(req.params.id)));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -107,7 +111,7 @@ const enableVersion = async (req, res) => {
 // a version deleted, with who accepted it
 const deleteVersion = async (req, res) => {
   try {
-    await Disclaimer.deleteVersion(req.params.id);
+    await RepoObjects.following("disclaimer", () => Disclaimer.deleteVersion(req.params.id));
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Disclaimer version" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -117,7 +121,7 @@ const deleteVersion = async (req, res) => {
 // a version restored : enabled again, the one users accept (Disclaimer.restoreVersion, as Enable)
 const restoreVersion = async (req, res) => {
   try {
-    const version = await Disclaimer.restoreVersion(req.params.id, req.user?.user?.username);
+    const version = await RepoObjects.following("disclaimer", () => Disclaimer.restoreVersion(req.params.id, req.user?.user?.username));
     return res.json(RestResult.single({ version }));
   } catch (err) {
     Errors.ReturnError(res, err);

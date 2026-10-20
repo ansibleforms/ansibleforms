@@ -171,6 +171,8 @@ onMounted(async () => {
         }}</BsButton>
       </template>
       <template #default>
+        <!-- kept in a repository's branding.yaml, the image beside it : which one -->
+        <AppRepositorySource type="branding" />
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label fw-bold mb-2">{{ t('favicon.current') }}</label>

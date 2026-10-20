@@ -35,9 +35,9 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
-import { filesIn, fileIn, fileNameFor } from "./yamlFile.js";
+import { filesIn, fileIn, fileNameFor, parseMapFile } from "./yamlFile.js";
 import { given } from "./secrets.js";
-import { APPLY_ORDER, ONE_ONLY_FLAGS, COMING_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
+import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 
 // ===========================================================================
@@ -171,8 +171,8 @@ export async function activeRepository(desc) {
 }
 
 /**
- * Refuses a usage of a later version turned on, and a second repository for a type one
- * repository holds (the schedules, the credentials ...) : its objects are written back to one.
+ * Refuses a second repository for a type one repository holds (the schedules, the credentials
+ * ...) : its objects are written back to one.
  *
  * Args:
  *   data (object): the repository as it will be saved (its use_for_* flags, those sent).
@@ -180,15 +180,9 @@ export async function activeRepository(desc) {
  *   before (object|null): the repository as it was (null for a new one).
  *
  * Raises:
- *   Errors.BadRequestError: the usage comes in a later version, or another repository is used
- *     for it, named.
+ *   Errors.BadRequestError: another repository is used for it, named.
  */
 export async function assertUsageAllowed(data, name, before = null) {
-  for (const flag of COMING_FLAGS) {
-    if (flagOn(data?.[flag]) && !flagOn(before?.[flag])) {
-      throw new Errors.BadRequestError(`The ${typeOfFlag(flag).label} usage comes in a later version: it cannot be turned on yet.`);
-    }
-  }
   for (const flag of ONE_ONLY_FLAGS) {
     if (!flagOn(data?.[flag]) || flagOn(before?.[flag])) continue;
     const rows = await mysql.do(`SELECT name FROM AnsibleForms.\`repositories\` WHERE ${flag} AND name <> ?`, [name]);
@@ -241,16 +235,39 @@ async function readFiles(desc, name, ctx) {
     return { file, ...desc.parse(text, ctx) };
   });
   // the references : by name, to an object of the type named, that must be there
-  for (const ref of desc.references || []) {
-    const names = await namesOf(ref.type);
-    for (const f of files) {
-      const value = f.object?.[ref.field];
-      if (!f.object || !given(value) || names.has(nameKey(value))) continue;
-      (f.waiting = f.waiting || []).push(`waits for the ${typeOf(ref.type)?.label.replace(/s$/, "") || ref.type} '${value}' (${ref.field}), not there yet`);
+  const cache = new Map();
+  for (const f of files) {
+    if (!f.object) continue;
+    const waiting = await waitingOf(desc, f.object, cache);
+    if (waiting.length) {
+      f.waiting = waiting;
+      f.object = null;
     }
   }
-  for (const f of files) if (f.waiting) f.object = null;
   return files;
+}
+
+/**
+ * What an object names that is not there yet (its references, by name) : it waits for them.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   object (object): the object a file gives.
+ *   cache (Map): the names of the types read already, by type (one read per sync).
+ *
+ * Returns:
+ *   Promise<string[]>: why it waits, one line per missing object ; none when all are there.
+ */
+async function waitingOf(desc, object, cache = new Map()) {
+  const out = [];
+  for (const ref of desc.references || []) {
+    const value = object?.[ref.field];
+    if (!given(value)) continue;
+    if (!cache.has(ref.type)) cache.set(ref.type, await namesOf(ref.type));
+    if (cache.get(ref.type).has(nameKey(value))) continue;
+    out.push(`waits for the ${typeOf(ref.type)?.label.replace(/s$/, "") || ref.type} '${value}' (${ref.field}), not there yet`);
+  }
+  return out;
 }
 
 /**
@@ -273,7 +290,9 @@ async function readFiles(desc, name, ctx) {
  *     [name] }.
  */
 export async function syncRepository(desc, name, opts = {}) {
-  const summary = { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [] };
+  // a type kept in one file : its own mode
+  if (desc.file) return syncSingle(desc, name);
+  const summary = newSummary();
   const ctx = opts.context !== undefined ? opts.context : await desc.context?.();
   // step 1 : the files, read and checked on their own, and what they name
   const files = await readFiles(desc, name, ctx);
@@ -398,6 +417,17 @@ export async function syncRepository(desc, name, opts = {}) {
  * Returns:
  *   string: the lines, starting with a newline.
  */
+/**
+ * An empty sync summary.
+ *
+ * Returns:
+ *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
+ *     secretsKept, notes }.
+ */
+function newSummary() {
+  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], notes: [] };
+}
+
 export function summaryText(desc, summary) {
   const waiting = summary.waiting || [];
   const lines = [
@@ -408,6 +438,7 @@ export function summaryText(desc, summary) {
   for (const w of waiting) lines.push(`Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`);
   for (const i of summary.ignored) lines.push(`${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`);
   if (summary.secretsKept?.length) lines.push(`Not in git, their secrets kept from the database: ${summary.secretsKept.join(", ")}`);
+  lines.push(...(summary.notes || []));
   return "\n" + lines.join("\n");
 }
 
@@ -442,7 +473,7 @@ export async function syncText(desc, name) {
  *   string[]: the types that name one of them.
  */
 function dependentsOf(keys) {
-  return APPLY_ORDER.filter((key) => typeOf(key)?.built && typeOf(key).objects && (typeOf(key).references || []).some((r) => keys.includes(r)));
+  return APPLY_ORDER.filter((key) => typeOf(key)?.objects && (typeOf(key).references || []).some((r) => keys.includes(r)));
 }
 
 /**
@@ -605,6 +636,7 @@ const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptE
  *     reason }], clashes: [name], files, linked, ...what the type adds (descriptor.previewExtra) }.
  */
 export async function preview(desc, name) {
+  if (desc.file) return previewSingle(desc, name);
   const list = await candidates(desc);
   // the files there are now, by name (a pull before the activation may bring more)
   const fileNames = new Set();
@@ -689,6 +721,8 @@ export async function activate(desc, name, { pull = true } = {}) {
     logger.warning(`Repository '${name}' is not cloned: its ${desc.title.toLowerCase()} are read in once it is`);
     return report;
   }
+  // a type kept in one file : its own mode
+  if (desc.file) return activateSingle(desc, name, report);
   // step 2 : its files read in (again : the pull may not have run), git wins on a name
   const summary = await syncRepository(desc, name);
   report.created = summary.created;
@@ -776,7 +810,8 @@ export async function deactivate(desc, name, { pull = true } = {}) {
   } else {
     report.pull = "not cloned";
   }
-  report.unlinked = await unlinkRepository(desc, name);
+  // a type kept in one file has nothing to unlink but itself : the app keeps its values
+  report.unlinked = desc.file ? 1 : await unlinkRepository(desc, name);
   return report;
 }
 
@@ -889,6 +924,8 @@ export async function appCreated(desc, id) {
  *   Promise<boolean>: whether its file was written.
  */
 export async function appUpdated(desc, before, id) {
+  // a type kept in one file : its own mode, before being the app's object before the edit
+  if (desc.file) return appUpdatedSingle(desc, before);
   if (!before?.repository || !before.repo_file) return false;
   const row = await desc.store.byId(id);
   if (!row) return false;
@@ -923,6 +960,249 @@ export async function appDeleted(desc, before) {
 }
 
 // ===========================================================================
+// THE TYPES KEPT IN ONE FILE
+// ===========================================================================
+// The chat assistant's settings, the System > General settings, the branding : the app has one
+// object of each, its repository one file of it (desc.file, at its root : chat.yaml), and the
+// files the YAML names beside it (the branding's images). The same rules as the folder types :
+// a pull applies the file (git wins), turning the type on writes the app's values to it when it
+// has none (and applies it when it has one), an app edit writes only the changed fields, the
+// secrets are ${ENV} references only, turning it off reads it once more and the app keeps its
+// values. A file removed changes nothing in the app.
+
+/**
+ * The file of a single-file type in a repository.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   string: its absolute path.
+ */
+const singleFileOf = (desc, name) => path.join(Repo.folderOf(name), desc.file);
+
+/**
+ * Writes a single-file type's YAML and the files beside it : a file whose content is the same is
+ * left as it is, a file beside it the object no longer names removed.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   out (object): { text (null : the YAML left as it is), extraFiles: [{ name, buffer }] }.
+ *   gone (string[]): the files beside it the object named before.
+ *
+ * Returns:
+ *   boolean: whether anything was written.
+ */
+function writeSingle(desc, name, out, gone = []) {
+  const dir = path.dirname(singleFileOf(desc, name));
+  let written = false;
+  const abs = singleFileOf(desc, name);
+  if (out.text !== null && out.text !== undefined && (!fs.existsSync(abs) || fs.readFileSync(abs, "utf8") !== out.text)) {
+    fs.writeFileSync(abs, out.text, "utf8");
+    written = true;
+  }
+  const kept = new Set();
+  for (const extra of out.extraFiles || []) {
+    const file = fileIn(dir, ".", extra.name, /./);
+    kept.add(path.basename(file));
+    if (fs.existsSync(file) && Buffer.compare(fs.readFileSync(file), extra.buffer) === 0) continue;
+    fs.writeFileSync(file, extra.buffer);
+    written = true;
+  }
+  for (const old of gone) {
+    if (kept.has(old)) continue;
+    fs.rmSync(fileIn(dir, ".", old, /./), { force: true });
+    written = true;
+  }
+  return written;
+}
+
+/**
+ * Reads a single-file type's file into the app : checked, what it names there, then applied as
+ * the app's own save applies it - only when it changes something. No file : nothing changes.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<object>: the summary, as syncRepository's ; its notes what the apply said.
+ */
+async function syncSingle(desc, name) {
+  const summary = newSummary();
+  const abs = singleFileOf(desc, name);
+  if (!fs.existsSync(abs)) {
+    summary.notes.push(`No ${desc.file} in the repository: the app keeps its ${desc.title.toLowerCase()}`);
+    return summary;
+  }
+  const { errors, object: raw } = parseMapFile(fs.readFileSync(abs, "utf8"));
+  const checked = errors.length ? { errors } : await desc.check(raw, { dir: path.dirname(abs) });
+  if (checked.errors.length) {
+    summary.refused.push({ file: desc.file, reasons: checked.errors });
+    logger.warning(`Refused ${desc.noun} file ${name}/${desc.file}: ${checked.errors.join("; ")}`);
+    return summary;
+  }
+  const waiting = await waitingOf(desc, checked.object);
+  if (waiting.length) {
+    summary.waiting.push({ file: desc.file, reasons: waiting });
+    return summary;
+  }
+  const current = await desc.current();
+  const secrets = desc.secretsOf ? desc.secretsOf(current) : desc.secrets || [];
+  if (secrets.some((s) => !given(raw[s]) && given(current?.[s]))) summary.secretsKept.push(desc.title);
+  if (!desc.changed(checked.object, current)) {
+    summary.unchanged = 1;
+    return summary;
+  }
+  try {
+    summary.notes.push(...((await desc.apply(checked.object, current)) || []));
+    summary.updated = 1;
+    CrudModel.changed(desc.model);
+    logger.notice(`The ${desc.title.toLowerCase()} follow ${name}/${desc.file}`);
+  } catch (e) {
+    summary.refused.push({ file: desc.file, reasons: [`not saved: ${e.message || e}`] });
+    logger.warning(`Could not apply ${name}/${desc.file}: ${e.message || e}`);
+  }
+  return summary;
+}
+
+/**
+ * What making a repository a single-file type's would do, changing nothing : the app's values
+ * written to it when it has no file (said when its secrets stay in the database), else the file
+ * applied, git winning.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string|null): the repository.
+ *
+ * Returns:
+ *   Promise<object>: as preview's.
+ */
+async function previewSingle(desc, name) {
+  const exists = cloned(name) && fs.existsSync(singleFileOf(desc, name));
+  const { withoutSecret } = desc.fileOf(await desc.current());
+  const active = (await activeRepository(desc)) || null;
+  return {
+    repository: name || null,
+    active,
+    written: exists ? [] : [desc.title],
+    withoutSecret: !exists && withoutSecret ? [desc.title] : [],
+    kept: [],
+    clashes: exists ? [desc.title] : [],
+    files: exists ? 1 : 0,
+    linked: name && active === name ? 1 : 0,
+  };
+}
+
+/**
+ * Makes a repository a single-file type's (pulled already) : its file applied when it has one, git
+ * winning, else the app's values written to it, for its Push.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   report (object): the report so far (activate's), filled in.
+ *
+ * Returns:
+ *   Promise<object>: the report.
+ */
+async function activateSingle(desc, name, report) {
+  if (fs.existsSync(singleFileOf(desc, name))) {
+    const summary = await syncSingle(desc, name);
+    report.refused = summary.refused;
+    report.waiting = summary.waiting;
+    if (!summary.refused.length && !summary.waiting.length) report.matched = [desc.title];
+  } else {
+    const out = desc.fileOf(await desc.current());
+    await withWriteClaim(name, async () => writeSingle(desc, name, out));
+    report.written = [desc.title];
+    if (out.withoutSecret) report.withoutSecret = [desc.title];
+  }
+  logger.notice(`Repository '${name}' holds the ${desc.title.toLowerCase()} now (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`);
+  return report;
+}
+
+/**
+ * A single-file type edited in the app : only the fields the edit changed written into its file,
+ * and the files beside it that changed ; the file written whole when it is gone. Nothing when
+ * the type has no repository.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   before (object|null): the app's object before the edit (RepoObjects.snapshot) ; null : the
+ *     type had no repository then.
+ *
+ * Returns:
+ *   Promise<boolean>: whether its file was written.
+ */
+async function appUpdatedSingle(desc, before) {
+  if (!before) return false;
+  const repository = await activeRepository(desc);
+  if (!repository || !cloned(repository)) return false;
+  const after = await desc.current();
+  return withWriteClaim(repository, async () => {
+    const abs = singleFileOf(desc, repository);
+    const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);
+    const gone = desc.fileOf(before).extraFiles.map((f) => f.name);
+    const written = writeSingle(desc, repository, out, gone);
+    if (written) logger.info(`Saved the ${desc.title.toLowerCase()} into ${repository}/${desc.file}`);
+    return written;
+  });
+}
+
+// ===========================================================================
+// THE SEED : WHAT IT DECLARES OF A TYPE
+// ===========================================================================
+
+/**
+ * Applies what the config seed declares of a type (the branding, the announcements, the
+ * disclaimer : sections the seed reads through the same descriptors as a repository) : checked
+ * as a file is (its references resolved by the seed already), then a single-file type applied,
+ * a folder type's objects made or changed by name. Nothing is linked to a repository.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   declared (object|object[]): the section's object (a single-file type), or its items.
+ *   opts (object): { dir (the seed file's folder : what the section names beside it) }.
+ *
+ * Returns:
+ *   Promise<object>: { created: [name], updated: [name], unchanged (count) }.
+ *
+ * Raises:
+ *   Error: an item refused, named with why.
+ */
+export async function applyDeclared(desc, declared, opts = {}) {
+  const out = { created: [], updated: [], unchanged: 0 };
+  if (desc.file) {
+    const checked = await desc.check(declared, { resolved: true, dir: opts.dir });
+    if (checked.errors.length) throw new Error(`${desc.title}: ${checked.errors.join("; ")}`);
+    const current = await desc.current();
+    if (!desc.changed(checked.object, current)) out.unchanged++;
+    else {
+      await desc.apply(checked.object, current);
+      out.updated.push(desc.key);
+    }
+    return out;
+  }
+  for (const item of declared || []) {
+    const checked = desc.check(item, { resolved: true });
+    if (checked.errors.length) throw new Error(`${desc.noun} '${item?.name ?? ""}': ${checked.errors.join("; ")}`);
+    const row = ((await desc.store.rows()) || []).find((r) => nameKey(r.name) === nameKey(checked.object.name));
+    if (!row) {
+      await desc.store.insert(checked.object, null, null);
+      out.created.push(checked.object.name);
+    } else if (desc.store.changed(row, checked.object)) {
+      await desc.store.update(row, checked.object);
+      out.updated.push(checked.object.name);
+    } else out.unchanged++;
+  }
+  if (out.created.length || out.updated.length) CrudModel.changed(desc.model);
+  return out;
+}
+
+// ===========================================================================
 // THE STORE OF A TABLE
 // ===========================================================================
 
@@ -932,14 +1212,15 @@ export async function appDeleted(desc, before) {
  *
  * Args:
  *   table (string): the table (AnsibleForms.`credentials`).
+ *   key (string): the column a row is found by ('id', a disclaimer's 'version').
  *
  * Returns:
  *   object: { link(id, repository, file), unlink(repository), rename(from, to),
  *     countLinked(repository) }.
  */
-export function linkStore(table) {
+export function linkStore(table, key = "id") {
   return {
-    link: (id, repository, file) => mysql.do(`UPDATE ${table} SET repository = ?, repo_file = ? WHERE id = ?`, [repository, file, id]),
+    link: (id, repository, file) => mysql.do(`UPDATE ${table} SET repository = ?, repo_file = ? WHERE ${key} = ?`, [repository, file, id]),
     unlink: async (repository) => (await mysql.do(`UPDATE ${table} SET repository = NULL, repo_file = NULL WHERE repository = ?`, [repository]))?.affectedRows || 0,
     rename: async (from, to) => (await mysql.do(`UPDATE ${table} SET repository = ? WHERE repository = ?`, [to, from]))?.affectedRows || 0,
     countLinked: async (repository) => Number((await mysql.do(`SELECT COUNT(*) AS n FROM ${table} WHERE repository = ?`, [repository]))?.[0]?.n || 0),
@@ -989,6 +1270,7 @@ export default {
   appCreated,
   appUpdated,
   appDeleted,
+  applyDeclared,
   linkStore,
   classifyRow,
 };

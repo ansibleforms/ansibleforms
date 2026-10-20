@@ -9,6 +9,7 @@ import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import { stripTrailingSlashes } from '../../lib/url.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
 // the mask the key is shown as (lib/secretMask.js)
 const MASK = SECRET_MASK;
@@ -101,7 +102,10 @@ const update = async function (req, res) {
       // a setting that cannot be sent as it is (extra headers) : say which, do not store it
       return res.status(400).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.message));
     }
+    // the chat repository's chat.yaml, before : its changed fields written into it after
+    const before = await RepoObjects.snapshot('chat');
     await ChatSettings.update(record);
+    await RepoObjects.appUpdated('chat', before);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.chatSettingsUpdated') }));
   } catch (err) {
     logger.error("Error updating chat settings: ", err);

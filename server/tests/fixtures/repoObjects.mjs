@@ -33,7 +33,7 @@ export const state = {
  *   tables (object): the rows to start with, by table (repositories, credentials, runners).
  */
 export function reset(tables = {}) {
-  const empty = ["repositories", "credentials", "runners", "secret_stores", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels"];
+  const empty = ["repositories", "credentials", "runners", "secret_stores", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels", "settings", "announcements"];
   state.tables = { ...Object.fromEntries(empty.map((t) => [t, []])), ...structuredClone(tables) };
   state.nextId = 100;
   state.calls.length = 0;
@@ -82,8 +82,9 @@ export const db = {
       return out;
     }
     // the repository link (lib/repoObjects/engine.js linkStore)
-    if (/^UPDATE \S+ SET repository = \?, repo_file = \? WHERE id = \?/.test(sql)) {
-      const row = rows.find((r) => r.id === Number(params[2]));
+    m = sql.match(/^UPDATE \S+ SET repository = \?, repo_file = \? WHERE (\w+) = \?/);
+    if (m) {
+      const row = rows.find((r) => String(r[m[1]]) === String(params[2]));
       if (row) Object.assign(row, { repository: params[0], repo_file: params[1] });
       return { affectedRows: row ? 1 : 0 };
     }
@@ -104,6 +105,24 @@ export const db = {
     if (/^UPDATE AnsibleForms\.`runners` SET is_default = 0 WHERE id <> \? AND type = \?/.test(sql)) {
       rowsOf("runners").filter((r) => r.id !== Number(params[0]) && r.type === params[1] && !r.managed).forEach((r) => (r.is_default = 0));
       return { affectedRows: 1 };
+    }
+    // a single-row table (the settings, the chat assistant's) : its row, a field of it, a write
+    if (/^SELECT (\*|\w+) FROM \S+ limit 1;?$/i.test(sql)) return copy(rows.slice(0, 1));
+    if (/^UPDATE \S+ set \?$/i.test(sql)) {
+      const values = Array.isArray(params) ? params[0] : params;
+      rows.forEach((r) => Object.assign(r, values));
+      return { affectedRows: rows.length };
+    }
+    if (/^INSERT INTO \S+ \(\?\?\) SELECT \? FROM DUAL WHERE NOT EXISTS/.test(sql)) {
+      if (rows.length) return { affectedRows: 0 };
+      rows.push(Object.fromEntries(params[0].map((k, i) => [k, params[1][i]])));
+      return { affectedRows: 1 };
+    }
+    // the announcements whose end is past : gone
+    if (/^DELETE FROM \S+ WHERE end_at IS NOT NULL AND end_at <= UTC_TIMESTAMP\(\)/.test(sql)) {
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      state.tables[table] = rows.filter((r) => !r.end_at || String(r.end_at) > now);
+      return { affectedRows: rows.length - state.tables[table].length };
     }
     // the crud models : a row by its id or name, all of them, a write
     m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) = \?$/);

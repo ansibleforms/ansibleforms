@@ -1346,7 +1346,7 @@ export default {
         config: 'config.yaml amb les categories i constants (un sol repositori)',
         sso: 'Proveïdors SSO en YAML, un per fitxer a la seva carpeta sso, que nomenen la seva credencial',
         ldap: 'Directoris LDAP en YAML, un per fitxer a la seva carpeta ldap, en el seu ordre de cerca',
-        disclaimer: "L'avís legal que accepten els usuaris, i les seves versions",
+        disclaimer: "Versions de l'avís legal en YAML, una per fitxer a la seva carpeta disclaimer",
         credentials:
           "Credencials en YAML, una per fitxer a la seva carpeta credentials, secrets només com a referències d'entorn",
         secret_stores:
@@ -1354,15 +1354,13 @@ export default {
         runners: 'Runners en YAML, un per fitxer a la seva carpeta runners, que nomenen la seva credencial',
         notification_channels: 'Canals de notificació en YAML, un per fitxer a la seva carpeta notification-channels',
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
-        chat: "Els ajustos de l'assistent de xat, en un fitxer YAML",
+        chat: "Els ajustos de l'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
         branding:
-          'El nom, el logotip, la icona, els enllaços i els valors per defecte, en un fitxer YAML i les seves imatges',
+          'El nom, els enllaços, els valors per defecte, el logotip i la icona al seu branding.yaml i les imatges al costat',
         labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
-        announcements: 'Anuncis, un fitxer YAML cadascun',
-        settings: "Els ajustos de Sistema > General pel seu nom d'entorn, en un fitxer YAML",
+        announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',
+        settings: "Els ajustos de Sistema > General pel seu nom d'entorn, al seu settings.yaml",
       },
-      usageComingSoon: 'Properament',
-      usageComingSoonHint: 'Aquest ús arribarà en una versió posterior.',
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: 'Fer servir {name} per a {type}?',
       usageOnButton: 'Activar',
@@ -1376,6 +1374,8 @@ export default {
       usageOffHeading: '{type}: desactivat',
       usageOnWritten:
         "{type} d'aquesta aplicació escrits a {name}, un fitxer YAML cadascun a la seva carpeta {folder}: {count}.",
+      usageOnWrittenFile: "{type} d'aquesta aplicació escrits a {name} com a {file}, a l'espera del Push.",
+      usageOnReadFile: "{name} ja té {file}: guanya la versió de git i substitueix {type} d'aquesta aplicació.",
       usageOnGitWins:
         "Quan el mateix nom és a git i en aquesta aplicació, guanya la versió de git i substitueix la de l'aplicació.",
       usageOnClashes:

@@ -1348,7 +1348,7 @@ export default {
         config: 'config.yaml avec les catégories et les constantes (un seul dépôt)',
         sso: 'Fournisseurs SSO en YAML, un par fichier dans son dossier sso, qui nomment leur identifiant',
         ldap: 'Annuaires LDAP en YAML, un par fichier dans son dossier ldap, dans leur ordre de recherche',
-        disclaimer: "L'avertissement que les utilisateurs acceptent, et ses versions",
+        disclaimer: "Versions de l'avertissement en YAML, une par fichier dans son dossier disclaimer",
         credentials:
           "Identifiants en YAML, un par fichier dans son dossier credentials, secrets uniquement en références d'environnement",
         secret_stores:
@@ -1356,14 +1356,13 @@ export default {
         runners: 'Runners en YAML, un par fichier dans son dossier runners, qui nomment leur identifiant',
         notification_channels: 'Canaux de notification en YAML, un par fichier dans son dossier notification-channels',
         syslog: 'Serveurs syslog en YAML, un par fichier dans son dossier syslog',
-        chat: "Les paramètres de l'assistant de chat, dans un fichier YAML",
-        branding: "Le nom, le logo, l'icône, les liens et les valeurs par défaut, dans un fichier YAML et ses images",
+        chat: "Les paramètres de l'assistant de chat dans son chat.yaml, la clé uniquement en référence d'environnement",
+        branding:
+          "Le nom, les liens, les valeurs par défaut, le logo et l'icône dans son branding.yaml et les images à côté",
         labels: 'Les étiquettes à côté du logo en YAML, une par fichier dans son dossier labels, dans leur ordre',
-        announcements: 'Annonces, un fichier YAML chacune',
-        settings: "Les paramètres de Système > Général par leur nom d'environnement, dans un fichier YAML",
+        announcements: 'Annonces en YAML, une par fichier dans son dossier announcements',
+        settings: "Les paramètres de Système > Général par leur nom d'environnement, dans son settings.yaml",
       },
-      usageComingSoon: 'Bientôt',
-      usageComingSoonHint: 'Cet usage arrive dans une version ultérieure.',
       usageOnTitle: 'Activer {type}',
       usageOnQuestion: 'Utiliser {name} pour {type} ?',
       usageOnButton: 'Activer',
@@ -1377,6 +1376,8 @@ export default {
       usageOffHeading: '{type} : désactivé',
       usageOnWritten:
         '{type} de cette application écrits dans {name}, un fichier YAML chacun dans son dossier {folder} : {count}.',
+      usageOnWrittenFile: '{type} de cette application écrits dans {name} en {file}, en attente du Push.',
+      usageOnReadFile: "{name} a déjà {file} : la version de git l'emporte et remplace {type} de cette application.",
       usageOnGitWins:
         "Quand le même nom est dans git et dans cette application, la version de git l'emporte et remplace celle de l'application.",
       usageOnClashes:

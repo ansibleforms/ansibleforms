@@ -71,22 +71,119 @@ const RepoObjects = {
   appDeleted: (key, before) => appStep(key, "a delete", (desc) => Engine.appDeleted(desc, before)),
 
   /**
-   * Objects of a type moved in the app (a label, an LDAP directory moved up or down : every place
-   * numbered again) : each linked one's file rewritten where its place changed.
+   * A single-file type's object as the app holds it now (the chat's, the settings', the
+   * branding's), before an edit : what appUpdated compares the saved one with. Null when the type
+   * has no repository (nothing to write then).
    *
    * Args:
    *   key (string): the type.
-   *   before (object[]): the objects as they were, before the move.
    *
    * Returns:
-   *   Promise<number>: how many files were written.
+   *   Promise<object|null>: the object, or null.
    */
-  async appReordered(key, before) {
-    let written = 0;
-    for (const row of before || []) {
-      if (row.repository && (await RepoObjects.appUpdated(key, row, row.id))) written++;
+  async snapshot(key) {
+    try {
+      const desc = await descriptorOf(key);
+      if (!desc.file || !(await Engine.activeRepository(desc))) return null;
+      return await desc.current();
+    } catch (e) {
+      logger.error(`The ${key} could not be read before an edit: ${e.message || e}`);
+      return null;
     }
-    return written;
+  },
+
+  /**
+   * Several single-file types' objects before an edit (snapshot each).
+   *
+   * Args:
+   *   keys (string[]): the types.
+   *
+   * Returns:
+   *   Promise<object>: { <type>: object or null }.
+   */
+  async snapshots(keys) {
+    const out = {};
+    for (const key of keys) out[key] = await RepoObjects.snapshot(key);
+    return out;
+  },
+
+  /**
+   * Several single-file types edited in the app : each one's file written (appUpdated).
+   *
+   * Args:
+   *   befores (object): { <type>: its object before the edit } (snapshots).
+   *
+   * Returns:
+   *   Promise<void>
+   */
+  async appUpdatedAll(befores) {
+    for (const [key, before] of Object.entries(befores || {})) {
+      if (before) await RepoObjects.appUpdated(key, before);
+    }
+  },
+
+  /**
+   * A type's objects as they are now (its rows, as the engine reads them) : what appChangedRows
+   * compares them with after a change that may touch several (a move, a version enabled).
+   *
+   * Args:
+   *   key (string): the type.
+   *
+   * Returns:
+   *   Promise<object[]>: the rows, none when they cannot be read.
+   */
+  async rowsOf(key) {
+    try {
+      return (await (await descriptorOf(key)).store.rows()) || [];
+    } catch (e) {
+      logger.error(`The ${key} could not be read before a change: ${e.message || e}`);
+      return [];
+    }
+  },
+
+  /**
+   * A change in the app that may touch several objects of a type (a label or an LDAP directory
+   * moved : every place numbered again ; a disclaimer version enabled, added or deleted) : each
+   * new object written to the type's repository, each linked one's file rewritten where it
+   * changed, each linked one gone removed.
+   *
+   * Args:
+   *   key (string): the type.
+   *   before (object[]): its objects before the change (rowsOf).
+   *
+   * Returns:
+   *   Promise<void>
+   */
+  async appChangedRows(key, before) {
+    const after = await RepoObjects.rowsOf(key);
+    const was = new Map((before || []).map((r) => [String(r.id), r]));
+    const now = new Set(after.map((r) => String(r.id)));
+    for (const row of after) {
+      const old = was.get(String(row.id));
+      if (!old) await RepoObjects.appCreated(key, row.id);
+      else if (old.repository) await RepoObjects.appUpdated(key, old, row.id);
+    }
+    for (const old of before || []) {
+      if (!now.has(String(old.id)) && old.repository) await RepoObjects.appDeleted(key, old);
+    }
+  },
+
+  /**
+   * Runs a change in the app that may touch several objects of a type, the type's repository
+   * following it (rowsOf before, appChangedRows after).
+   *
+   * Args:
+   *   key (string): the type.
+   *   change (function): async () => the change.
+   *
+   * Returns:
+   *   Promise<any>: what the change returns.
+   */
+  async following(key, change) {
+    const before = await RepoObjects.rowsOf(key);
+    const out = await change();
+    await RepoObjects.appChangedRows(key, before);
+    return out;
   },
 
   /**

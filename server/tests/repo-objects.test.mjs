@@ -9,7 +9,7 @@
 //   app to git   an edit rewrites only its changed fields ; a new object is a new file ; a delete
 //                removes the file
 //   deactivation the objects unlinked, kept in the app, the files untouched
-//   the rules    one repository per type, the usages of a later version refused, the fixed order
+//   the rules    one repository per type, the fixed order
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
@@ -281,16 +281,16 @@ describe("the rules of the usages", () => {
     await RepoObjects.assertUsageAllowed({ use_for_forms: 1, use_for_workflows: 1, use_for_inventories: 1 }, "other", {});
   });
 
-  test("a usage of a later version is refused when turned on, accepted off", async () => {
-    await assert.rejects(RepoObjects.assertUsageAllowed({ use_for_chat: 1 }, "other", {}), /chat usage comes in a later version/);
-    await RepoObjects.assertUsageAllowed({ use_for_chat: 0 }, "other", {});
-  });
-
   test("the types and their descriptors agree : what a runner names, every category, every flag once", () => {
     assert.deepEqual(runners.references.map((r) => r.type), types.typeOf("runners").references);
     assert.equal(new Set(types.USAGE_FLAGS).size, 19);
     for (const t of types.USAGE_TYPES) assert.ok(types.CATEGORIES.includes(t.category), t.key);
-    for (const key of RepoObjects.BUILT_OBJECT_TYPES) assert.equal(types.typeOf(key).built, true, key);
+    // every object type has its descriptor : none is of a later version
+    assert.deepEqual(
+      [...RepoObjects.BUILT_OBJECT_TYPES].sort(),
+      types.USAGE_TYPES.filter((t) => t.objects).map((t) => t.key).sort(),
+    );
+    for (const t of types.USAGE_TYPES) assert.equal(t.built, undefined, t.key);
   });
 
   test("turning several usages on at once : in the fixed order, the repository pulled once", async () => {
