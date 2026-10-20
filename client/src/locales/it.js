@@ -2287,7 +2287,7 @@ export default {
       noConstants: 'Nessuna costante configurata',
       roleOptionShowDesigner: 'Mostra il Designer',
       roleOptionAllowFormDesign: 'Modificare i Moduli',
-      roleOptionDesignAllForms: 'Progettare Tutti i Moduli',
+      roleOptionDesignAllForms: 'Modificare Tutti i Moduli',
       roleOptionAllowPlaybookDesign: 'Modificare i Playbook',
       roleOptionAllowWorkflowDesign: 'Modificare i Workflow',
       roleOptionAllowInventoryDesign: 'Modificare gli Inventari',

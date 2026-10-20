@@ -2289,7 +2289,7 @@ export default {
       noConstants: 'Nenhuma constante configurada',
       roleOptionShowDesigner: 'Mostrar o Designer',
       roleOptionAllowFormDesign: 'Editar Formulários',
-      roleOptionDesignAllForms: 'Desenhar Todos os Formulários',
+      roleOptionDesignAllForms: 'Editar Todos os Formulários',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Fluxos de trabalho',
       roleOptionAllowInventoryDesign: 'Editar Inventários',

@@ -2295,7 +2295,7 @@ export default {
       noConstants: 'Keine Konstanten konfiguriert',
       roleOptionShowDesigner: 'Designer anzeigen',
       roleOptionAllowFormDesign: 'Formulare bearbeiten',
-      roleOptionDesignAllForms: 'Alle Formulare gestalten',
+      roleOptionDesignAllForms: 'Alle Formulare bearbeiten',
       roleOptionAllowPlaybookDesign: 'Playbooks bearbeiten',
       roleOptionAllowWorkflowDesign: 'Workflows bearbeiten',
       roleOptionAllowInventoryDesign: 'Inventare bearbeiten',

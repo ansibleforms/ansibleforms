@@ -2201,7 +2201,7 @@ export default {
       noConstants: '未配置常量',
       roleOptionShowDesigner: '显示设计器',
       roleOptionAllowFormDesign: '编辑表单',
-      roleOptionDesignAllForms: '设计所有表单',
+      roleOptionDesignAllForms: '编辑所有表单',
       roleOptionAllowPlaybookDesign: '编辑 playbook',
       roleOptionAllowWorkflowDesign: '编辑工作流',
       roleOptionAllowInventoryDesign: '编辑清单',

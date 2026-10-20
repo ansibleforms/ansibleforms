@@ -2294,7 +2294,7 @@ export default {
       noConstants: 'No hi ha cap constant configurada',
       roleOptionShowDesigner: 'Mostra el Dissenyador',
       roleOptionAllowFormDesign: 'Editar Formularis',
-      roleOptionDesignAllForms: 'Dissenyar Tots els Formularis',
+      roleOptionDesignAllForms: 'Editar Tots els Formularis',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Fluxos de treball',
       roleOptionAllowInventoryDesign: 'Editar Inventaris',

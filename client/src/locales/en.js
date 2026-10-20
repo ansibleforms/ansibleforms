@@ -2262,7 +2262,7 @@ export default {
       noConstants: 'No constants configured',
       roleOptionShowDesigner: 'Show Designer',
       roleOptionAllowFormDesign: 'Edit Forms',
-      roleOptionDesignAllForms: 'Design All Forms',
+      roleOptionDesignAllForms: 'Edit All Forms',
       roleOptionAllowPlaybookDesign: 'Edit Playbooks',
       roleOptionAllowWorkflowDesign: 'Edit Workflows',
       roleOptionAllowInventoryDesign: 'Edit Inventories',

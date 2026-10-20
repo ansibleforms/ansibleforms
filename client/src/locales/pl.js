@@ -2278,7 +2278,7 @@ export default {
       noConstants: 'Nie skonfigurowano stałych',
       roleOptionShowDesigner: 'Pokaż Projektanta',
       roleOptionAllowFormDesign: 'Edytować Formularze',
-      roleOptionDesignAllForms: 'Projektować Wszystkie Formularze',
+      roleOptionDesignAllForms: 'Edytować Wszystkie Formularze',
       roleOptionAllowPlaybookDesign: 'Edytować Playbooki',
       roleOptionAllowWorkflowDesign: 'Edytować Przepływy pracy',
       roleOptionAllowInventoryDesign: 'Edytować Inwentarze',

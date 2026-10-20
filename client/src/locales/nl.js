@@ -2283,7 +2283,7 @@ export default {
       noConstants: 'Geen constanten geconfigureerd',
       roleOptionShowDesigner: 'Ontwerper tonen',
       roleOptionAllowFormDesign: 'Formulieren bewerken',
-      roleOptionDesignAllForms: 'Alle formulieren ontwerpen',
+      roleOptionDesignAllForms: 'Alle formulieren bewerken',
       roleOptionAllowPlaybookDesign: 'Playbooks bewerken',
       roleOptionAllowWorkflowDesign: 'Workflows bewerken',
       roleOptionAllowInventoryDesign: 'Inventarissen bewerken',

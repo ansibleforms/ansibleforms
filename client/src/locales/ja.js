@@ -2255,7 +2255,7 @@ export default {
       noConstants: '定数が設定されていません',
       roleOptionShowDesigner: 'デザイナーを表示',
       roleOptionAllowFormDesign: 'フォームを編集',
-      roleOptionDesignAllForms: 'すべてのフォームを設計',
+      roleOptionDesignAllForms: 'すべてのフォームを編集',
       roleOptionAllowPlaybookDesign: 'playbook を編集',
       roleOptionAllowWorkflowDesign: 'ワークフローを編集',
       roleOptionAllowInventoryDesign: 'インベントリを編集',
