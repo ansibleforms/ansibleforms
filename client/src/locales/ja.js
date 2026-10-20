@@ -1371,6 +1371,7 @@ export default {
       usageOnKept: '次はこのアプリに残ります：{names}。',
       usageOnWithoutSecret:
         'シークレットなしで書き込まれ、シークレットはデータベースに残ります（git に平文のシークレットが入ることはありません）：{names}。',
+      usageOnSkipped: 'git ですでに終了しており、インポートされません：{count}。',
       usageOnAfter: '以後、プルで git の変更が取り込まれ、ここでの変更はリポジトリのプッシュで git に送られます。',
       usageOnDone:
         '{type}：{written} 件をリポジトリに書き込み（Push 待ち）、{matched} 件を git で置き換え、{kept} 件をこのアプリに残しました。',

@@ -588,8 +588,9 @@ export const chatFileItem = (({ required: _all, ...section }) => section)(chatSe
 // header's links and whether the Designer's shows, the defaults (theme, colour, forms view, time
 // zone, date format, language), and the logo and the website icon as image files named by their
 // path, relative to the seed file (or the repository's branding.yaml), read as binary and checked
-// as an upload is. Every field optional : what is not declared is left alone. The seed applies it
-// on each start, as a repository's pull does ; it is not made read only.
+// as an upload is. Every field optional : what is not declared is left alone. What the seed declares
+// is its own, field by field : read only in the app (lib/brandingManaged.js), released when it is no
+// longer declared or the seed is turned off.
 export const brandingSection = {
   type: "object",
   additionalProperties: false,

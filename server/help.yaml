@@ -6695,7 +6695,12 @@
       files beside it, named by their path. The images are read and written as binary and checked as an upload is
       (an image type sniffed from its bytes; the logo at most 900 KB, the icon 256 KB); an empty value restores the
       bundled one. The config seed has a `branding:` section in the same format, its images relative to the seed
-      file; it applies it on each start without making it read only.
+      file. As every seed section, it locks what it declares, field by field: those fields are read only on the
+      Appearance pages (a notice says so, a seeded logo or icon cannot be uploaded nor removed) and the API refuses
+      their change (403); a field it no longer declares is released, and all are when the seed is turned off. A
+      Branding repository and the seed never own the same field: the seed keeps the fields it declares (listed as
+      staying in the app when the repository is made the branding's, never written to `branding.yaml`, and not
+      applied from it, said in the pull output); the repository holds the others.
       ```yaml
       app_name: ACME Automation
       default_theme: dark
@@ -6706,9 +6711,12 @@
 
       **Announcements** (`announcements/`, one file each): named (what a pull finds them by), with their
       `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,
-      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. The
-      app removes an announcement whose end is past; its file, still in git, is then refused until it is removed.
-      The seed's `announcements:` section takes the same items.
+      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. A
+      file whose end is already past is not imported: no refusal, an information line in the pull output (`Not
+      imported, already ended: Maintenance (announcements/maintenance.yaml)`), and the announcement of it, if the
+      app has it, is removed from the app. The file stays in git as it is; the app's own removal of an ended
+      announcement never deletes nor rewrites its file. Turning the usage on skips them too, and its question
+      says how many. The seed's `announcements:` section takes the same items, an ended one left out.
       ```yaml
       name: Maintenance
       message: The app is down on Sunday from 8 to 10.

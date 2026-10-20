@@ -65,7 +65,7 @@ const update = function (req, res) {
       logger.notice(`Website icon updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
     } catch (e) {
-      res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(e)));
+      res.status(e.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(e)));
     }
   });
 };
@@ -85,7 +85,7 @@ const remove = async function (req, res) {
     logger.notice(`Website icon removed, the default one restored`)
     res.json(RestResult.single(null));
   } catch (err) {
-    res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(err)));
+    res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(err)));
   }
 };
 

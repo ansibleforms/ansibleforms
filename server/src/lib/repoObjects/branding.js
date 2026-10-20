@@ -8,6 +8,11 @@
 // (lib/appearance.js), the language and the Designer's link as environment settings
 // (lib/envSave.js), the images. The config seed's branding section is read the same way, its images
 // relative to the seed file.
+//
+// The seed and a branding repository never own the same field : a field the seed's branding
+// section declares stays the seed's (read only in the app, lib/brandingManaged.js) - never written
+// to the repository's file, never applied from it (said in the pull output), listed as staying in
+// the app when the repository is made the branding's. The repository holds the other fields.
 import fs from "fs";
 import path from "path";
 import Settings, { validHeaderLinks } from "../../models/settings.model.js";
@@ -16,6 +21,7 @@ import { brandingSection } from "../seed-schema.js";
 import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
+import { seedManagedBranding } from "../brandingManaged.js";
 import { same } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
@@ -60,6 +66,23 @@ function readImage(dir, name) {
   }
 }
 
+/**
+ * The fields a declaration changes : those whose value is not the app's - the ones the config seed
+ * manages left out, unless the seed itself applies them.
+ *
+ * Args:
+ *   declared (object): the declaration (a file's, the seed's).
+ *   current (object): the app's branding (current).
+ *   opts (object): { fromSeed (true : the seed's own declaration) }.
+ *
+ * Returns:
+ *   string[]: the fields.
+ */
+function changedFields(declared, current, opts = {}) {
+  const seeded = opts.fromSeed ? [] : current?._seedManaged || [];
+  return Object.keys(declared).filter((k) => !seeded.includes(k) && !same(comparable(declared[k]), comparable(current?.[k])));
+}
+
 export default singleType({
   key: "branding",
   file: "branding.yaml",
@@ -77,11 +100,19 @@ export default singleType({
     out.default_language = process.env.DEFAULT_LANGUAGE || null;
     out.show_designer = !!appConfig.showDesigner;
     for (const kind of IMAGES) out[kind] = await BRAND_IMAGES[kind].get();
+    // the fields the config seed manages : the seed's, never the repository's
+    out._seedManaged = await seedManagedBranding();
     return out;
   },
+  // the fields the seed manages stay in the app (a seed-managed object stays with the seed)
+  kept: (current) => (current?._seedManaged || []).map((field) => ({ name: field, code: "seed", reason: "managed by the config seed" })),
   // its YAML names its images by the file they are written as
-  toFile: (current) => ({ ...current, ...Object.fromEntries(IMAGES.map((k) => [k, imageFile(k, current[k])?.name])) }),
-  extraFiles: (current) => IMAGES.map((k) => imageFile(k, current[k])).filter(Boolean),
+  toFile: (current) => {
+    const out = { ...current, ...Object.fromEntries(IMAGES.map((k) => [k, imageFile(k, current[k])?.name])) };
+    for (const field of current._seedManaged || []) delete out[field];
+    return out;
+  },
+  extraFiles: (current) => IMAGES.filter((k) => !(current._seedManaged || []).includes(k)).map((k) => imageFile(k, current[k])).filter(Boolean),
   // the images it names read and checked ; its links as the model keeps them
   fromFile: async (declared, { dir } = {}) => {
     const out = { ...declared };
@@ -92,21 +123,24 @@ export default singleType({
     if (declared.header_links !== undefined) out.header_links = validHeaderLinks(declared.header_links);
     return out;
   },
-  changed: (declared, current) => Object.keys(declared).some((k) => !same(comparable(declared[k]), comparable(current?.[k]))),
-  apply: async (declared, current) => {
-    const changed = Object.keys(declared).filter((k) => !same(comparable(declared[k]), comparable(current?.[k])));
+  changed: (declared, current, opts = {}) => changedFields(declared, current, opts).length > 0,
+  apply: async (declared, current, opts = {}) => {
+    const changed = changedFields(declared, current, opts);
     // the settings row's fields, as the pages save them
     const fields = Object.fromEntries(changed.filter((k) => ROW_FIELDS.includes(k)).map((k) => [k, declared[k]]));
-    if (Object.keys(fields).length) await saveSettingsFields(fields);
+    if (Object.keys(fields).length) await saveSettingsFields(fields, opts);
     // the language and the Designer's link : environment settings, as their pages save them
     const env = Object.fromEntries(changed.filter((k) => ENV_FIELDS[k]).map((k) => [ENV_FIELDS[k], k === "show_designer" ? (declared[k] ? "1" : "0") : declared[k] ?? ""]));
     const notes = [];
     if (Object.keys(env).length) {
-      const { restartRequired } = await saveEnvValues(env, { user: "repository" });
+      const { restartRequired } = await saveEnvValues(env, { user: opts.fromSeed ? "config seed" : "repository" }, opts);
       if (restartRequired.length) notes.push(`Saved ; applied at the next restart: ${restartRequired.join(", ")}`);
     }
     // the images : the one named, or the bundled one
-    for (const kind of IMAGES) if (changed.includes(kind)) await BRAND_IMAGES[kind].set(declared[kind]);
+    for (const kind of IMAGES) if (changed.includes(kind)) await BRAND_IMAGES[kind].set(declared[kind], opts);
+    // a repository's file declaring a field the seed manages : not applied, said
+    const seeded = opts.fromSeed ? [] : Object.keys(declared).filter((k) => (current?._seedManaged || []).includes(k));
+    if (seeded.length) notes.push(`Kept by the config seed, not applied: ${seeded.join(", ")}`);
     return notes;
   },
 });

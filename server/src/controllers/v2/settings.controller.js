@@ -229,7 +229,8 @@ const update = async function(req, res) {
           await RepoObjects.appUpdated('branding', before);
           res.json(RestResult.single(null));
         } catch(err) {
-          res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
+          // a branding field the config seed manages : 403, as every seeded object
+          res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
         }
     }
 };

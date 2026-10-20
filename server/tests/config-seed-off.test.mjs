@@ -56,6 +56,12 @@ vi.mock("../src/models/db.model.js", () => ({
         audits.push(vars);
         return { insertId: audits.length };
       }
+      // the branding fields the seed manages (lib/brandingManaged.js), kept in the settings row
+      if (/^SELECT branding_managed FROM/.test(sql)) return (tables.settings || []).slice(0, 1);
+      if (/^UPDATE AnsibleForms\.`settings` SET branding_managed = \?/.test(sql)) {
+        for (const r of tables.settings || []) r.branding_managed = vars[0];
+        return { affectedRows: 1 };
+      }
       if (/^SELECT name FROM .* WHERE managed=1$/.test(sql)) {
         return (tables[table] || []).filter((r) => r.managed === 1).map((r) => ({ name: r.name }));
       }
@@ -107,6 +113,15 @@ afterEach(() => {
 });
 
 describe("CONFIG_SEED_PATH unset releases what the seed managed", () => {
+  test("the branding fields its branding section declared are released too", async () => {
+    appConfig.configSeedPath = "";
+    tables.settings[0].branding_managed = JSON.stringify(["app_name", "logo"]);
+    await applyConfigSeed();
+    assert.equal(tables.settings[0].branding_managed, null);
+    const detail = JSON.parse(audits[0][7]);
+    assert.ok(detail.released.includes("branding:app_name") && detail.released.includes("branding:logo"), JSON.stringify(detail));
+  });
+
   test("every managed row becomes editable, with its values kept", async () => {
     appConfig.configSeedPath = "";
     assert.equal(await applyConfigSeed(), null, "an off seed still reports nothing applied");

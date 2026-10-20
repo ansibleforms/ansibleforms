@@ -1,0 +1,80 @@
+'use strict';
+// The branding fields the config seed manages (its branding section) : read only in the app, as
+// every seeded object is - refused with a 403 by the helpers that save them (lib/appearance.js,
+// lib/envSave.js, lib/brandImages.js), whatever page or request calls them ; the seed itself
+// writes them (opts.fromSeed). The branding lives in the settings row and in two environment
+// settings, so the seed's hold is kept per field : the names of the fields its section declares,
+// in the settings row's branding_managed (JSON). A field it stops declaring is released, and all
+// are when the seed is turned off (lib/seed.js).
+import mysql from "../models/db.model.js";
+import Errors from "./errors.js";
+
+// the branding's fields (lib/repoObjects/branding.js, the seed's branding section)
+export const BRANDING_FIELDS = [
+  "app_name",
+  "header_links",
+  "show_designer",
+  "default_theme",
+  "default_theme_color",
+  "forms_view",
+  "default_timezone",
+  "default_date_format",
+  "default_language",
+  "logo",
+  "icon",
+];
+
+// the two that are environment settings, by their variable
+export const BRANDING_ENV = { DEFAULT_LANGUAGE: "default_language", SHOW_DESIGNER: "show_designer" };
+
+/**
+ * The branding fields the config seed manages.
+ *
+ * Returns:
+ *   Promise<string[]>: their names ; none when it manages none (or they cannot be read).
+ */
+export async function seedManagedBranding() {
+  try {
+    const rows = await mysql.do("SELECT branding_managed FROM AnsibleForms.`settings` LIMIT 1");
+    const list = JSON.parse(rows?.[0]?.branding_managed || "[]");
+    return Array.isArray(list) ? list.filter((f) => BRANDING_FIELDS.includes(f)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Records the branding fields the config seed manages now (the ones its section declares).
+ *
+ * Args:
+ *   fields (string[]): their names ; none releases them all.
+ *
+ * Returns:
+ *   Promise<string[]>: the ones released (managed before, no longer).
+ */
+export async function setSeedManagedBranding(fields) {
+  const before = await seedManagedBranding();
+  const now = (fields || []).filter((f) => BRANDING_FIELDS.includes(f));
+  if (JSON.stringify([...before].sort()) !== JSON.stringify([...now].sort())) {
+    await mysql.do("UPDATE AnsibleForms.`settings` SET branding_managed = ?", [now.length ? JSON.stringify(now) : null]);
+  }
+  return before.filter((f) => !now.includes(f));
+}
+
+/**
+ * Refuses a change of branding fields the config seed manages : 403, as the API refuses a change
+ * of any seeded object. The seed's own write passes.
+ *
+ * Args:
+ *   fields (string[]): the branding fields a save changes.
+ *   opts (object): { fromSeed (true : the seed's own write) }.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: one of them is the seed's, named.
+ */
+export async function assertBrandingFree(fields, opts = {}) {
+  if (opts.fromSeed || !fields?.length) return;
+  const managed = await seedManagedBranding();
+  const held = fields.filter((f) => managed.includes(f));
+  if (held.length) throw new Errors.AccessDeniedError(`Managed by the config seed and read only here: ${held.join(", ")}`);
+}

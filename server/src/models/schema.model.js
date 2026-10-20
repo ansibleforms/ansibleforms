@@ -685,7 +685,7 @@ const SCHEMA_MANIFEST = {
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
                                'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
                                'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
-                               'announcements.name', 'announcements.repository', 'announcements.repo_file',
+                               'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.branding_managed',
                                'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
@@ -1267,6 +1267,8 @@ async function patchVersion7(messages, success, failed) {
   }
   // an announcement is found by its name (a seed's, a repository's)
   await checkPromise(addColumn("announcements", "name", "varchar(100)", true, "NULL"), messages, success, failed);
+  // the branding fields the config seed manages (its branding section), read only in the app
+  await checkPromise(addColumn("settings", "branding_managed", "text", true, "NULL"), messages, success, failed);
   for (const table of ["credentials", "runners", "secret_stores", "notification_channels", "oauth2_providers", "ldap", "syslog_servers", "labels", "announcements", "disclaimer_versions"]) {
     await checkPromise(addColumn(table, "repository", "varchar(250)", true, "NULL"), messages, success, failed);
     await checkPromise(addColumn(table, "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);

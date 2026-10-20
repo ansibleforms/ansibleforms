@@ -1383,6 +1383,7 @@ export default {
       usageOnKept: 'Aquests es queden en aquesta aplicació: {names}.',
       usageOnWithoutSecret:
         'Escrits sense els seus secrets, que es queden a la base de dades (git mai no guarda un secret en clar): {names}.',
+      usageOnSkipped: 'Ja acabats a git, no importats: {count}.',
       usageOnAfter:
         "A partir d'aleshores, un pull porta els canvis fets a git, i els canvis fets aquí van a git amb el Push del repositori.",
       usageOnDone:

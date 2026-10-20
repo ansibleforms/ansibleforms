@@ -489,6 +489,8 @@ export function activationLines(t, key, name, p) {
   if ((p.withoutSecret || []).length) {
     lines.push(t('settings.repositories.usageOnWithoutSecret', { names: p.withoutSecret.join(', ') }));
   }
+  // files the type does not import (announcements already ended) : how many
+  if (p.skipped) lines.push(t('settings.repositories.usageOnSkipped', { count: p.skipped }));
   for (const note of TYPE_NOTES[key] || []) lines.push(t(note));
   return lines;
 }

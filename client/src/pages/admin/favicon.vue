@@ -15,6 +15,7 @@ import Profile from '@/lib/Profile';
 import { useAppStore } from '@/stores/app';
 import { useI18n } from 'vue-i18n';
 import { useSingleTab } from '@/composables/useSingleTab';
+import { useBrandingSeed } from '@/composables/useBrandingSeed';
 
 const { t } = useI18n();
 
@@ -129,9 +130,13 @@ function onIconLoad(event) {
   iconSize.value = svg ? 'svg' : { width: img.naturalWidth, height: img.naturalHeight };
 }
 
+// the branding fields the config seed manages : read only here
+const { seeded, loadBrandingSeed } = useBrandingSeed();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   State.loadFavicon();
+  await loadBrandingSeed();
 });
 </script>
 <template>
@@ -162,15 +167,16 @@ onMounted(async () => {
         <BsButton
           icon="upload"
           :colorClass="!selectedFile || busy ? 'secondary' : 'primary'"
-          :disabled="!selectedFile || busy"
+          :disabled="!selectedFile || busy || seeded('icon')"
           @click="upload()"
           >{{ t('favicon.uploadButton') }}</BsButton
         >
-        <BsButton v-if="store.customFavicon" icon="trash" :disabled="busy" @click="removeIcon()">{{
+        <BsButton v-if="store.customFavicon" icon="trash" :disabled="busy || seeded('icon')" @click="removeIcon()">{{
           t('favicon.remove')
         }}</BsButton>
       </template>
       <template #default>
+        <AppSeedNotice v-if="seeded('icon')" />
         <!-- kept in a repository's branding.yaml, the image beside it : which one -->
         <AppRepositorySource type="branding" />
         <div class="row g-3">
@@ -201,6 +207,7 @@ onMounted(async () => {
         <div>
           <input
             ref="fileInput"
+            :disabled="seeded('icon')"
             class="form-control"
             style="max-width: 40rem"
             type="file"

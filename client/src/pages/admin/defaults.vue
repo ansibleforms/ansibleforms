@@ -22,6 +22,7 @@ import { useEnvVars } from '@/composables/useEnvVars';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { useBrandingSeed } from '@/composables/useBrandingSeed';
 
 const { t } = useI18n();
 
@@ -207,10 +208,13 @@ const searchHeads = computed(() => Object.keys(GROUPS).filter((g) => groupShown(
 
 // a color still hovered when the page goes : the user's own theme again (Theme.previewColor)
 onBeforeUnmount(() => Theme.endPreview());
+// the branding fields the config seed manages : read only here
+const { seeded, loadBrandingSeed } = useBrandingSeed();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
-  await Promise.all([loadTheme(), loadEnvironmentVariables()]);
+  await Promise.all([loadTheme(), loadEnvironmentVariables(), loadBrandingSeed()]);
   loaded.value = true;
 });
 </script>
@@ -251,6 +255,18 @@ onMounted(async () => {
         <template v-else>
           <!-- kept in a repository's branding.yaml : which one -->
           <AppRepositorySource v-show="!searching" type="branding" />
+          <AppSeedNotice
+            v-if="
+              seeded(
+                'default_language',
+                'default_theme',
+                'default_theme_color',
+                'forms_view',
+                'default_timezone',
+                'default_date_format',
+              )
+            "
+          />
           <div v-if="envRestartPending.length" class="alert alert-warning py-2">
             <FaIcon icon="triangle-exclamation" class="me-2" />
             {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
@@ -276,59 +292,65 @@ onMounted(async () => {
             <!-- the language : an environment variable -->
             <template v-for="e in languageEnv" :key="e.name">
               <div v-show="shown('language')" :class="{ 'mt-4': spaced('language') }">
-                <AppEnvField v-model="envEdits[e.name]" :e="e" class="af-defaults-wide" />
+                <fieldset :disabled="seeded('default_language')">
+                  <AppEnvField v-model="envEdits[e.name]" :e="e" class="af-defaults-wide" />
+                </fieldset>
               </div>
             </template>
             <!-- the theme : no environment variable, kept in the database -->
-            <BsInput
-              v-show="shown('theme')"
-              class="af-interface-field"
-              :class="{ 'mt-4': spaced('theme') }"
-              :isFloating="false"
-              type="select"
-              icon="palette"
-              v-model="theme.default_theme"
-              :values="themeOptions"
-              valueKey="value"
-              labelKey="label"
-              :label="t('settings.settingsPage.defaultTheme')"
-              :help="t('settings.settingsPage.defaultThemeHelp')"
-            />
-            <div v-if="theme.default_theme === 'color'" v-show="shown('theme')" class="mt-2 ms-1">
-              <div class="d-flex flex-wrap gap-2">
-                <button
-                  v-for="c in colorPalette"
-                  :key="c.hex"
-                  type="button"
-                  class="settings-color-swatch"
-                  :style="{ backgroundColor: c.hex }"
-                  :class="{ 'settings-color-swatch-active': theme.default_theme_color === c.hex }"
-                  :title="c.label"
-                  @click="theme.default_theme_color = c.hex"
-                  @mouseenter="Theme.previewColor(c.hex)"
-                  @mouseleave="Theme.endPreview()"
-                  @focus="Theme.previewColor(c.hex)"
-                  @blur="Theme.endPreview()"
-                >
-                  <FaIcon v-if="theme.default_theme_color === c.hex" icon="check" class="settings-swatch-check" />
-                </button>
+            <fieldset :disabled="seeded('default_theme', 'default_theme_color')">
+              <BsInput
+                v-show="shown('theme')"
+                class="af-interface-field"
+                :class="{ 'mt-4': spaced('theme') }"
+                :isFloating="false"
+                type="select"
+                icon="palette"
+                v-model="theme.default_theme"
+                :values="themeOptions"
+                valueKey="value"
+                labelKey="label"
+                :label="t('settings.settingsPage.defaultTheme')"
+                :help="t('settings.settingsPage.defaultThemeHelp')"
+              />
+              <div v-if="theme.default_theme === 'color'" v-show="shown('theme')" class="mt-2 ms-1">
+                <div class="d-flex flex-wrap gap-2">
+                  <button
+                    v-for="c in colorPalette"
+                    :key="c.hex"
+                    type="button"
+                    class="settings-color-swatch"
+                    :style="{ backgroundColor: c.hex }"
+                    :class="{ 'settings-color-swatch-active': theme.default_theme_color === c.hex }"
+                    :title="c.label"
+                    @click="theme.default_theme_color = c.hex"
+                    @mouseenter="Theme.previewColor(c.hex)"
+                    @mouseleave="Theme.endPreview()"
+                    @focus="Theme.previewColor(c.hex)"
+                    @blur="Theme.endPreview()"
+                  >
+                    <FaIcon v-if="theme.default_theme_color === c.hex" icon="check" class="settings-swatch-check" />
+                  </button>
+                </div>
               </div>
-            </div>
+            </fieldset>
             <!-- the forms list's view : in the database -->
-            <BsInput
-              v-show="shown('forms')"
-              class="af-interface-field"
-              :class="{ 'mt-4': spaced('forms') }"
-              :isFloating="false"
-              type="select"
-              icon="table-cells-large"
-              v-model="theme.forms_view"
-              :values="formsViews"
-              valueKey="value"
-              labelKey="label"
-              :label="t('settings.interface.formsView')"
-              :help="t('settings.interface.formsViewHelp')"
-            />
+            <fieldset :disabled="seeded('forms_view')">
+              <BsInput
+                v-show="shown('forms')"
+                class="af-interface-field"
+                :class="{ 'mt-4': spaced('forms') }"
+                :isFloating="false"
+                type="select"
+                icon="table-cells-large"
+                v-model="theme.forms_view"
+                :values="formsViews"
+                valueKey="value"
+                labelKey="label"
+                :label="t('settings.interface.formsView')"
+                :help="t('settings.interface.formsViewHelp')"
+              />
+            </fieldset>
             <template v-if="searching && searchHeads.includes('datetime')">
               <hr v-if="searchHeads[0] !== 'datetime'" class="mt-4 mb-0 af-search-line" />
               <h6
@@ -341,34 +363,38 @@ onMounted(async () => {
               </h6>
             </template>
             <!-- the time zone and the date format : in the database -->
-            <BsInput
-              v-show="shown('timezone')"
-              class="af-interface-field"
-              :class="{ 'mt-4': spaced('timezone') }"
-              :isFloating="false"
-              type="select"
-              icon="clock"
-              v-model="theme.default_timezone"
-              :values="timezones"
-              valueKey="value"
-              labelKey="label"
-              :label="t('settings.interface.timezone')"
-              :help="t('settings.interface.timezoneHelp')"
-            />
-            <BsInput
-              v-show="shown('date')"
-              class="af-interface-field"
-              :class="{ 'mt-4': spaced('date') }"
-              :isFloating="false"
-              type="select"
-              icon="calendar"
-              v-model="theme.default_date_format"
-              :values="dateFormats"
-              valueKey="value"
-              labelKey="label"
-              :label="t('settings.interface.dateFormat')"
-              :help="t('settings.interface.dateFormatHelp')"
-            />
+            <fieldset :disabled="seeded('default_timezone')">
+              <BsInput
+                v-show="shown('timezone')"
+                class="af-interface-field"
+                :class="{ 'mt-4': spaced('timezone') }"
+                :isFloating="false"
+                type="select"
+                icon="clock"
+                v-model="theme.default_timezone"
+                :values="timezones"
+                valueKey="value"
+                labelKey="label"
+                :label="t('settings.interface.timezone')"
+                :help="t('settings.interface.timezoneHelp')"
+              />
+            </fieldset>
+            <fieldset :disabled="seeded('default_date_format')">
+              <BsInput
+                v-show="shown('date')"
+                class="af-interface-field"
+                :class="{ 'mt-4': spaced('date') }"
+                :isFloating="false"
+                type="select"
+                icon="calendar"
+                v-model="theme.default_date_format"
+                :values="dateFormats"
+                valueKey="value"
+                labelKey="label"
+                :label="t('settings.interface.dateFormat')"
+                :help="t('settings.interface.dateFormatHelp')"
+              />
+            </fieldset>
             <!-- the time now in the default zone and format : how dates read for whoever has not
                  picked their own, as Profile > Preferences shows it -->
             <template v-if="!searching && activeTab === 'datetime'">

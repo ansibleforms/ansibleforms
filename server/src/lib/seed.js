@@ -45,6 +45,7 @@ import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
 import { canonicalJson, differs } from "./seedCompare.js";
+import { setSeedManagedBranding } from "./brandingManaged.js";
 
 // The one thing that distinguishes the seed from an API caller. Everything the seed
 // writes goes through the normal models, so encryption, the is_default handling and
@@ -644,6 +645,14 @@ async function releaseWhenOff() {
     }
   }
 
+  // Step 2b : the branding fields its branding section declared (kept per field in the settings
+  // row, lib/brandingManaged.js)
+  const branding = await setSeedManagedBranding([]);
+  if (branding.length) {
+    released.push(...branding.map((field) => `branding:${field}`));
+    groups.push(`branding: ${branding.join(", ")}`);
+  }
+
   // Step 3 : say so, once. Nothing released (every start after the first) is silent.
   if (!released.length) return released;
   logger.warning(
@@ -807,6 +816,10 @@ async function applySections(doc, summary, opts = {}) {
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
   ];
+  // the branding fields it declares are its own from now on (read only in the app) ; one it no
+  // longer declares, or a section gone, released (lib/brandingManaged.js)
+  const brandingReleased = await setSeedManagedBranding(Object.keys(doc.branding || {}));
+  summary.released.push(...brandingReleased.map((field) => `branding:${field}`));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");
     for (const [key, type, label] of sections) {

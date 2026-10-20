@@ -442,6 +442,9 @@ CREATE TABLE `settings` (
   `disclaimer_enabled` tinyint(4) NOT NULL DEFAULT 0,
   -- the disclaimer version users accept, Restore's choice ; none : the latest
   `disclaimer_version` int(11) DEFAULT NULL,
+  -- the branding fields the config seed's branding section declares (JSON list) : read only in the
+  -- app (lib/brandingManaged.js)
+  `branding_managed` text DEFAULT NULL,
   `forms_view` varchar(10) DEFAULT NULL,
   `default_timezone` varchar(64) DEFAULT NULL,
   `default_date_format` varchar(20) DEFAULT NULL,

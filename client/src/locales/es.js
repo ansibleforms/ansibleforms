@@ -1384,6 +1384,7 @@ export default {
       usageOnKept: 'Estos se quedan en esta aplicación: {names}.',
       usageOnWithoutSecret:
         'Escritos sin sus secretos, que se quedan en la base de datos (git nunca guarda un secreto en claro): {names}.',
+      usageOnSkipped: 'Ya terminados en git, no importados: {count}.',
       usageOnAfter:
         'A partir de entonces, un pull trae los cambios hechos en git, y los cambios hechos aquí van a git con el Push del repositorio.',
       usageOnDone:

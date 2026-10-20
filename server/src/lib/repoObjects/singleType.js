@@ -25,10 +25,13 @@ import { typeOf } from "./types.js";
  *     secrets, skip, keepFalse, canonical : as lib/repoObjects/fields.js reads them.
  *     references (object[]): what it names : [{ field, type }] ; it waits when one is missing.
  *     current (function): async () => the app's object now (decrypted), as the file gives it.
- *     apply (function): async (declared, current) => applies a file's object as the app's save
- *       does ; returns lines for the pull output (a restart needed ...), or nothing.
- *     changed (function): (declared, current) => whether applying it changes anything ; as the
- *       seed compares when not given.
+ *     apply (function): async (declared, current, opts) => applies a file's object as the app's
+ *       save does (opts.fromSeed : the config seed's own declaration) ; returns lines for the pull
+ *       output (a restart needed ...), or nothing.
+ *     changed (function): (declared, current, opts) => whether applying it changes anything ; as
+ *       the seed compares when not given.
+ *     kept (function): (current) => [{ name, code, reason }] - the parts that stay in the app (the
+ *       branding fields the config seed manages), said before the type is turned on.
  *     fromFile (function): async (object, { dir }) => the object as the app reads it, the files
  *       beside the YAML read (the branding's images) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
@@ -85,6 +88,7 @@ export function singleType(spec) {
     current: spec.current,
     apply: spec.apply,
     changed: spec.changed || ((declared, current) => differs(declared, current || {})),
+    kept: spec.kept || (() => []),
 
     /**
      * The app's object as its file : its YAML (its secrets left out) and the files beside it.

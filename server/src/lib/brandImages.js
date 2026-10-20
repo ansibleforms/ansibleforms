@@ -7,11 +7,13 @@
 import Settings from "../models/settings.model.js";
 import { sniffImageMime } from "./imagetype.js";
 import { DEFAULT_LOGO } from "./defaultlogo.js";
+import { assertBrandingFree } from "./brandingManaged.js";
 
 // the image types a file of the repository is written as, by the type sniffed
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/svg+xml": "svg", "image/webp": "webp", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico" };
 
-// each image : its limit, how it is read and written, and what its default is
+// each image : its limit, how it is read and written (refused when the config seed manages it, its
+// own write apart : opts.fromSeed), and what its default is
 export const BRAND_IMAGES = {
   // a logo is small ; capped well below anything that would bloat the settings table
   logo: {
@@ -20,13 +22,19 @@ export const BRAND_IMAGES = {
       const logo = await Settings.getLogo();
       return logo && logo !== DEFAULT_LOGO ? logo : null;
     },
-    set: (dataUrl) => Settings.setLogo(dataUrl || DEFAULT_LOGO),
+    set: async (dataUrl, opts = {}) => {
+      await assertBrandingFree(["logo"], opts);
+      await Settings.setLogo(dataUrl || DEFAULT_LOGO);
+    },
   },
   // the browser tab's icon : the bundled one when none
   icon: {
     maxBytes: 256 * 1024,
     get: async () => (await Settings.getFavicon()) || null,
-    set: (dataUrl) => Settings.setFavicon(dataUrl || null),
+    set: async (dataUrl, opts = {}) => {
+      await assertBrandingFree(["icon"], opts);
+      await Settings.setFavicon(dataUrl || null);
+    },
   },
 };
 

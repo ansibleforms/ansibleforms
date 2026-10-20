@@ -7,6 +7,7 @@ import Profile from '@/lib/Profile';
 import { useAppStore } from '@/stores/app';
 import { useI18n } from 'vue-i18n';
 import { useSingleTab } from '@/composables/useSingleTab';
+import { useBrandingSeed } from '@/composables/useBrandingSeed';
 
 const { t } = useI18n();
 
@@ -114,9 +115,13 @@ async function removeLogo() {
   }
 }
 
+// the branding fields the config seed manages : read only here
+const { seeded, loadBrandingSeed } = useBrandingSeed();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   await measureHeaderLogo();
+  await loadBrandingSeed();
 });
 </script>
 <template>
@@ -147,15 +152,20 @@ onMounted(async () => {
         <BsButton
           icon="upload"
           :colorClass="!selectedFile || busy ? 'secondary' : 'primary'"
-          :disabled="!selectedFile || busy"
+          :disabled="!selectedFile || busy || seeded('logo')"
           @click="upload()"
           >{{ t('logo.uploadButton') }}</BsButton
         >
-        <BsButton v-if="store.customLogo && !store.logoIsDefault" icon="trash" :disabled="busy" @click="removeLogo()">{{
-          t('logo.remove')
-        }}</BsButton>
+        <BsButton
+          v-if="store.customLogo && !store.logoIsDefault"
+          icon="trash"
+          :disabled="busy || seeded('logo')"
+          @click="removeLogo()"
+          >{{ t('logo.remove') }}</BsButton
+        >
       </template>
       <template #default>
+        <AppSeedNotice v-if="seeded('logo')" />
         <!-- kept in a repository's branding.yaml, the image beside it : which one -->
         <AppRepositorySource type="branding" />
         <div class="row">
@@ -183,6 +193,7 @@ onMounted(async () => {
         <div>
           <input
             ref="fileInput"
+            :disabled="seeded('logo')"
             class="form-control"
             style="max-width: 40rem"
             type="file"

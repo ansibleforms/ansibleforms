@@ -255,6 +255,56 @@ describe("the branding and its images", () => {
   });
 });
 
+// ─── the branding the config seed manages ─────────────────────────────────────
+describe("the branding fields the config seed declares are its own", () => {
+  test("refused through the save helpers ; the others, and one sent back as it is, still saved", async () => {
+    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { saveSettingsFields } = await import("../src/lib/appearance.js");
+    const { saveEnvValues } = await import("../src/lib/envSave.js");
+    const { BRAND_IMAGES } = await import("../src/lib/brandImages.js");
+    await setSeedManagedBranding(["app_name", "logo", "default_language"]);
+    await assert.rejects(saveSettingsFields({ app_name: "Mine" }), { status: 403, message: /Managed by the config seed and read only here: app_name/ });
+    await assert.rejects(BRAND_IMAGES.logo.set(dataUrl(PNG)), { status: 403 });
+    await assert.rejects(saveEnvValues({ DEFAULT_LANGUAGE: "fr" }, {}), { status: 403 });
+    // what the seed does not declare stays editable ; the name sent back as it is passes
+    assert.equal(await saveSettingsFields({ default_theme: "dark", app_name: "Old name" }), true);
+    assert.equal(fx.state.tables.settings[0].default_theme, "dark");
+    await BRAND_IMAGES.icon.set(dataUrl(PNG));
+    // the seed's own write passes
+    await saveSettingsFields({ app_name: "Seeded" }, { fromSeed: true });
+    assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
+  });
+
+  test("a field the seed stops declaring is released", async () => {
+    const { setSeedManagedBranding, seedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    await setSeedManagedBranding(["app_name", "logo"]);
+    assert.deepEqual(await setSeedManagedBranding(["app_name"]), ["logo"]);
+    assert.deepEqual(await seedManagedBranding(), ["app_name"]);
+    const { BRAND_IMAGES } = await import("../src/lib/brandImages.js");
+    await BRAND_IMAGES.logo.set(dataUrl(PNG));
+  });
+
+  test("with a branding repository : the seed's fields stay the seed's, the repository holds the rest", async () => {
+    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    await setSeedManagedBranding(["app_name"]);
+    Object.assign(fx.state.tables.settings[0], { app_name: "Seeded", default_theme: "light" });
+    fx.cloneEmpty("cfg");
+    // turned on : the seed's field listed as staying in the app, never written to the file
+    const p = await RepoObjects.preview(await desc("branding"), "cfg");
+    assert.deepEqual(p.kept, [{ name: "app_name", code: "seed", reason: "managed by the config seed" }]);
+    await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
+    assert.equal(fx.readObject("cfg", ".", "branding.yaml").app_name, undefined);
+    assert.equal(fx.readObject("cfg", ".", "branding.yaml").default_theme, "light");
+    // a file declaring it : not applied, said ; the other fields applied
+    writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_theme: dark\n");
+    const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
+    assert.equal(fx.state.tables.settings[0].default_theme, "dark");
+    assert.match(RepoObjects.summaryText(await desc("branding"), summary), /Kept by the config seed, not applied: app_name/);
+  });
+});
+
 // ─── the announcements and the disclaimer ──────────────────────────────────────
 describe("the announcements", () => {
   test("named, their moments in UTC : made, then unchanged ; one of the app written with a name", async () => {
@@ -270,6 +320,52 @@ describe("the announcements", () => {
     const report = await RepoObjects.activate(await desc("announcements"), "news", { pull: false });
     assert.deepEqual(report.written, ["New forms are coming"]);
     assert.equal(fx.state.tables.announcements.find((r) => r.id === 7).name, "New forms are coming");
+  });
+});
+
+describe("an announcement already ended in git", () => {
+  const ended = { name: "Maintenance", message: "Down on Sunday", end_at: "2020-01-01T10:00:00Z" };
+
+  test("is not imported : no refusal, an information line, the sync goes on", async () => {
+    fx.writeFile("news", "announcements", "maintenance.yaml", ended);
+    fx.writeFile("news", "announcements", "later.yaml", { name: "Later", message: "Soon", end_at: "2099-01-01T10:00:00Z" });
+    const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(summary.created, 1, "a future end still imports");
+    assert.equal(fx.rowNamed("announcements", "Maintenance"), undefined);
+    assert.match(RepoObjects.summaryText(await desc("announcements"), summary), /Not imported, already ended: Maintenance \(announcements\/maintenance.yaml\)/);
+    // and the question before turning the usage on says how many are skipped
+    assert.equal((await RepoObjects.preview(await desc("announcements"), "news")).skipped, 1);
+  });
+
+  test("a linked one whose file has since ended is removed from the app, its file left as it is", async () => {
+    fx.writeFile("news", "announcements", "maintenance.yaml", { ...ended, end_at: "2099-01-01T10:00:00Z" });
+    await RepoObjects.syncRepository(await desc("announcements"), "news");
+    assert.ok(fx.rowNamed("announcements", "Maintenance"));
+    fx.writeFile("news", "announcements", "maintenance.yaml", ended);
+    const text = fx.readText("news", "announcements", "maintenance.yaml");
+    const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
+    assert.equal(summary.deleted, 1);
+    assert.deepEqual(summary.refused, []);
+    assert.equal(fx.rowNamed("announcements", "Maintenance"), undefined);
+    assert.equal(fx.readText("news", "announcements", "maintenance.yaml"), text);
+    // and later pulls skip it, never refused
+    assert.deepEqual((await RepoObjects.syncRepository(await desc("announcements"), "news")).refused, []);
+  });
+
+  test("the app's own clean-up of an ended linked announcement leaves git untouched", async () => {
+    fx.writeFile("news", "announcements", "maintenance.yaml", { ...ended, end_at: "2099-01-01T10:00:00Z" });
+    await RepoObjects.syncRepository(await desc("announcements"), "news");
+    const before = await RepoObjects.rowsOf("announcements");
+    const text = fx.readText("news", "announcements", "maintenance.yaml");
+    // it ends meanwhile : the app's clean-up removes it on the next read
+    fx.rowNamed("announcements", "Maintenance").end_at = "2020-01-01 10:00:00";
+    before[0].end_at = "2020-01-01 10:00:00";
+    fx.state.calls.length = 0;
+    await RepoObjects.appChangedRows("announcements", before);
+    assert.equal(fx.rowNamed("announcements", "Maintenance"), undefined);
+    assert.equal(fx.readText("news", "announcements", "maintenance.yaml"), text);
+    assert.deepEqual(fx.state.calls, [], "no write claim : nothing staged");
   });
 });
 

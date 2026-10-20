@@ -163,8 +163,13 @@ const RepoObjects = {
       if (!old) await RepoObjects.appCreated(key, row.id);
       else if (old.repository) await RepoObjects.appUpdated(key, old, row.id);
     }
+    // gone by itself (an announcement the app removes once it has ended : descriptor.notImported) : its
+    // file stays in git as it is, a pull skips it
+    const desc = await descriptorOf(key);
     for (const old of before || []) {
-      if (!now.has(String(old.id)) && old.repository) await RepoObjects.appDeleted(key, old);
+      if (now.has(String(old.id)) || !old.repository) continue;
+      if (desc.notImported && desc.notImported(desc.canonical ? desc.canonical({ ...old }) : old)) continue;
+      await RepoObjects.appDeleted(key, old);
     }
   },
 

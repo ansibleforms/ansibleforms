@@ -234,6 +234,15 @@ async function readFiles(desc, name, ctx) {
     }
     return { file, ...desc.parse(text, ctx) };
   });
+  // a file the type does not import (an announcement already ended : descriptor.notImported) : not
+  // refused, said on a line of its own ; its object, if the app has it, goes
+  for (const f of files) {
+    const reason = f.object && desc.notImported ? desc.notImported(f.object) : null;
+    if (reason) {
+      f.skipped = { name: f.object.name, reason };
+      f.object = null;
+    }
+  }
   // the references : by name, to an object of the type named, that must be there
   const cache = new Map();
   for (const f of files) {
@@ -287,7 +296,8 @@ async function waitingOf(desc, object, cache = new Map()) {
  * Returns:
  *   Promise<object>: { created, updated, deleted, unchanged (counts), matched: [name], refused:
  *     [{ file, reasons }], waiting: [{ file, reasons }], ignored: [{ file, keys }], secretsKept:
- *     [name] }.
+ *     [name], skipped: [{ file, name, reason }] (files the type does not import : descriptor.notImported),
+ *     notes }.
  */
 export async function syncRepository(desc, name, opts = {}) {
   // a type kept in one file : its own mode
@@ -311,7 +321,7 @@ export async function syncRepository(desc, name, opts = {}) {
   // a refused or waiting file that is still there keeps its object, and that object its name
   const kept = new Set();
   for (const f of files) {
-    if (!f.object && !f.absent && own.has(f.file)) {
+    if (!f.object && !f.absent && !f.skipped && own.has(f.file)) {
       kept.add(f.file);
       taken.set(nameKey(own.get(f.file).name), `${f.file} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
     }
@@ -355,12 +365,15 @@ export async function syncRepository(desc, name, opts = {}) {
       continue;
     }
     await desc.store.remove(row);
-    logger.notice(`Removed ${desc.noun} '${row.name}': its file ${name}/${file} is gone`);
+    const skipped = files.find((f) => f.file === file && f.skipped);
+    logger.notice(`Removed ${desc.noun} '${row.name}': ${skipped ? `its file ${name}/${file} says it is ${skipped.skipped.reason}` : `its file ${name}/${file} is gone`}`);
     summary.deleted++;
   }
   for (const f of files) {
     if (!f.object) {
-      if (f.waiting) {
+      if (f.skipped) {
+        summary.skipped.push({ file: f.file, ...f.skipped });
+      } else if (f.waiting) {
         summary.waiting.push({ file: f.file, reasons: f.waiting });
         logger.warning(`Waiting ${desc.noun} file ${name}/${f.file}: ${f.waiting.join("; ")}`);
       } else if (f.errors?.length) {
@@ -425,7 +438,7 @@ export async function syncRepository(desc, name, opts = {}) {
  *     secretsKept, notes }.
  */
 function newSummary() {
-  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], notes: [] };
+  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [] };
 }
 
 export function summaryText(desc, summary) {
@@ -438,6 +451,11 @@ export function summaryText(desc, summary) {
   for (const w of waiting) lines.push(`Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`);
   for (const i of summary.ignored) lines.push(`${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`);
   if (summary.secretsKept?.length) lines.push(`Not in git, their secrets kept from the database: ${summary.secretsKept.join(", ")}`);
+  // the files not imported, by why : an information, not a refusal
+  const skipped = summary.skipped || [];
+  for (const reason of [...new Set(skipped.map((k) => k.reason))]) {
+    lines.push(`Not imported, ${reason}: ${skipped.filter((k) => k.reason === reason).map((k) => `${k.name} (${k.file})`).join(", ")}`);
+  }
   lines.push(...(summary.notes || []));
   return "\n" + lines.join("\n");
 }
@@ -641,12 +659,15 @@ export async function preview(desc, name) {
   // the files there are now, by name (a pull before the activation may bring more)
   const fileNames = new Set();
   let files = 0;
+  let skipped = 0;
   if (cloned(name)) {
     const ctx = await desc.previewContext?.();
     for (const file of filesIn(Repo.folderOf(name), desc.folder)) {
       try {
         const parsed = desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
-        if (parsed.object) {
+        // one the type does not import (an announcement already ended) : counted apart
+        if (parsed.object && desc.notImported?.(parsed.object)) skipped++;
+        else if (parsed.object) {
           files++;
           fileNames.add(nameKey(parsed.object.name));
         }
@@ -666,6 +687,7 @@ export async function preview(desc, name) {
     kept: list.filter((c) => c.reason).map((c) => keptOf(desc, c)),
     clashes,
     files,
+    skipped,
     linked: name ? await desc.store.countLinked(name) : 0,
     ...(desc.previewExtra ? await desc.previewExtra(name, list) : {}),
   };
@@ -729,6 +751,7 @@ export async function activate(desc, name, { pull = true } = {}) {
   report.matched = summary.matched;
   report.refused = summary.refused;
   report.waiting = summary.waiting;
+  report.skipped = summary.skipped;
   // step 3 : the app's other objects, each a new file
   const list = await candidates(desc);
   await withWriteClaim(name, async () => {
@@ -1082,14 +1105,16 @@ async function syncSingle(desc, name) {
  */
 async function previewSingle(desc, name) {
   const exists = cloned(name) && fs.existsSync(singleFileOf(desc, name));
-  const { withoutSecret } = desc.fileOf(await desc.current());
+  const current = await desc.current();
+  const { withoutSecret } = desc.fileOf(current);
   const active = (await activeRepository(desc)) || null;
   return {
     repository: name || null,
     active,
     written: exists ? [] : [desc.title],
     withoutSecret: !exists && withoutSecret ? [desc.title] : [],
-    kept: [],
+    // what stays in the app (the branding fields the config seed manages)
+    kept: desc.kept(current),
     clashes: exists ? [desc.title] : [],
     files: exists ? 1 : 0,
     linked: name && active === name ? 1 : 0,
@@ -1109,6 +1134,7 @@ async function previewSingle(desc, name) {
  *   Promise<object>: the report.
  */
 async function activateSingle(desc, name, report) {
+  report.kept = desc.kept(await desc.current());
   if (fs.existsSync(singleFileOf(desc, name))) {
     const summary = await syncSingle(desc, name);
     report.refused = summary.refused;
@@ -1179,9 +1205,10 @@ export async function applyDeclared(desc, declared, opts = {}) {
     const checked = await desc.check(declared, { resolved: true, dir: opts.dir });
     if (checked.errors.length) throw new Error(`${desc.title}: ${checked.errors.join("; ")}`);
     const current = await desc.current();
-    if (!desc.changed(checked.object, current)) out.unchanged++;
+    // the seed's own declaration : what it manages passes the seed's hold
+    if (!desc.changed(checked.object, current, { fromSeed: true })) out.unchanged++;
     else {
-      await desc.apply(checked.object, current);
+      await desc.apply(checked.object, current, { fromSeed: true });
       out.updated.push(desc.key);
     }
     return out;
@@ -1189,6 +1216,8 @@ export async function applyDeclared(desc, declared, opts = {}) {
   for (const item of declared || []) {
     const checked = desc.check(item, { resolved: true });
     if (checked.errors.length) throw new Error(`${desc.noun} '${item?.name ?? ""}': ${checked.errors.join("; ")}`);
+    // one the type does not import (an announcement already ended) : left out, as a pull leaves it
+    if (desc.notImported?.(checked.object)) continue;
     const row = ((await desc.store.rows()) || []).find((r) => nameKey(r.name) === nameKey(checked.object.name));
     if (!row) {
       await desc.store.insert(checked.object, null, null);

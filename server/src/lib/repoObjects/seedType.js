@@ -72,6 +72,8 @@ export const KEPT_REASONS = {
  *       announcement : the start of its message) ; it keeps that name from then on.
  *     nameColumn (string): the column its name is in ('name' when not said : a disclaimer's is its
  *       version).
+ *     notImported (function): (object) => why a file's object is not imported (an announcement already
+ *       ended), or null : said in the pull output, never refused ; the app's object of it goes.
  *     notCompared (string[]): the fields a file gives that are no field of the object (a
  *       disclaimer's ask_again : how a changed text is applied) : never compared.
  *
@@ -163,6 +165,8 @@ export function seedType(spec) {
 
     usersOf: spec.usersOf,
     undeletable: spec.undeletable,
+    notImported: spec.notImported,
+    canonical,
     order: spec.order,
   };
 }

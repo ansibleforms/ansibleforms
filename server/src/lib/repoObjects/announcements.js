@@ -3,9 +3,9 @@
 // announcement under the header per YAML file in a repository's `announcements` folder, in the
 // config seed's format (an item of its announcements section) : its name (what it is found by),
 // message, type, switch, and when it starts and ends showing. An announcement made in the app has
-// no name : it is written with the start of its message as one, and keeps it. An announcement
-// whose end is past is removed by the app ; its file, still there, is refused (an end in the past)
-// until it is removed from git.
+// no name : it is written with the start of its message as one, and keeps it. A file whose end is
+// past is not imported (said in the pull output, never refused) and the app's announcement of it
+// goes ; the app's own clean-up of an ended announcement leaves its file in git as it is.
 import mysql from "../../models/db.model.js";
 import Announcement from "../../models/announcement.model.js";
 import { seedType } from "./seedType.js";
@@ -56,6 +56,8 @@ export default seedType({
   keepFalse: ["enabled"],
   // its moments as ISO texts in UTC, the file's and the stored ones alike
   canonical: (o) => ({ ...o, ...(o.start_at !== undefined ? { start_at: isoMoment(o.start_at) } : {}), ...(o.end_at !== undefined ? { end_at: isoMoment(o.end_at) } : {}) }),
+  // ended : not imported, its file left in git as it is
+  notImported: (o) => (o.end_at && Date.parse(o.end_at) <= Date.now() ? "already ended" : null),
   // one made in the app : the start of its message
   nameFor: (row) => String(row.message || "").replace(/\s+/g, " ").trim().slice(0, 40).trim() || `announcement ${row.id}`,
 });

@@ -1338,6 +1338,7 @@ export default {
       usageOnClashes: 'git 和本应用中同名,git 中的版本替换应用中的:{names}。',
       usageOnKept: '以下保留在本应用中：{names}。',
       usageOnWithoutSecret: '写入时不含其密钥，密钥保留在数据库中（git 中从不保存明文密钥）：{names}。',
+      usageOnSkipped: '在 git 中已结束，未导入：{count}。',
       usageOnAfter: '此后,拉取会带来 git 中的更改,而在这里所做的更改通过仓库的推送发送到 git。',
       usageOnDone: '{type}：{written} 个已写入仓库（等待 Push），{matched} 个被 git 替换，{kept} 个保留在本应用中。',
       usageOffKept: '{type}：{count} 个保持原样留在本应用中，不再与 git 关联。',

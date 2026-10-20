@@ -13,6 +13,7 @@ import EnvSettings from "./envSettings.js";
 import appConfig from "../../config/app.config.js";
 import { bump } from "./epochs.js";
 import { publish } from "./liveEvents.js";
+import { BRANDING_ENV, assertBrandingFree } from "./brandingManaged.js";
 
 // the mask the page shows a secret as : sent back, it means unchanged, never a value to store
 export const ENV_MASK = "*** NOT REVEALED ***";
@@ -61,20 +62,29 @@ export function onSettingsPage(name, docs) {
  * Args:
  *   updates (object): { NAME: value } ; an empty value clears it (back to its default).
  *   who (object): { user, ip } for the audit entry.
+ *   opts (object): { fromSeed (true : the config seed's own write) }.
  *
  * Returns:
  *   Promise<object>: { changed: [name], restartRequired: [name] }.
  *
  * Raises:
- *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0), or a value refused.
+ *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0), a value refused, or a
+ *     branding setting the config seed manages changed (403).
  */
-export async function saveEnvValues(updates, who = {}) {
+export async function saveEnvValues(updates, who = {}, opts = {}) {
   const names = Object.keys(updates || {});
   if (!names.length) throw new EnvSaveError(400, "No environment variables given");
   // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session
   if (!appConfig.allowEnvEdit) throw new EnvSaveError(403, EnvSettings.ENV_EDIT_DISABLED_REASON);
   const docs = await envDocs();
   const managed = await EnvSettings.readManaged();
+  // the branding's language and Designer's link : the config seed's when its branding declares them
+  const branding = names.filter((name) => BRANDING_ENV[name] && String(updates[name] ?? "") !== String(process.env[name] ?? "")).map((name) => BRANDING_ENV[name]);
+  try {
+    await assertBrandingFree(branding, opts);
+  } catch (e) {
+    throw new EnvSaveError(403, e.message);
+  }
 
   // validate everything BEFORE writing anything : a partial write of a bad set would leave the
   // file describing a state nobody asked for

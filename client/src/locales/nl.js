@@ -1378,6 +1378,7 @@ export default {
       usageOnKept: 'Deze blijven in deze app: {names}.',
       usageOnWithoutSecret:
         'Geschreven zonder hun geheimen, die in de database blijven (git bevat nooit een geheim in klare tekst): {names}.',
+      usageOnSkipped: 'In git al afgelopen, niet geïmporteerd: {count}.',
       usageOnAfter:
         'Vanaf dan brengt een pull de wijzigingen uit git binnen, en gaan de wijzigingen die hier gemaakt worden naar git met de Push van de repository.',
       usageOnDone:

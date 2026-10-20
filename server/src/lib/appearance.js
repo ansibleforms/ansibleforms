@@ -7,20 +7,29 @@
 import Settings from "../models/settings.model.js";
 import { forgetAppDefaults } from "../routes/v2/app.routes.js";
 import { publish } from "./liveEvents.js";
+import { BRANDING_FIELDS, assertBrandingFree } from "./brandingManaged.js";
 
 /**
  * Saves fields of the settings row, as converted by Settings (its constructor).
  *
  * Args:
  *   fields (object): the fields sent ; those Settings does not know are left out.
+ *   opts (object): { fromSeed (true : the config seed's own write) }.
  *
  * Returns:
  *   Promise<boolean>: false when none was one Settings knows (nothing written).
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: a branding field the config seed manages changed (one sent as it is
+ *     stored passes : a page sends back what it loaded).
  */
-export async function saveSettingsFields(fields) {
+export async function saveSettingsFields(fields, opts = {}) {
   const record = new Settings(fields);
   // an effectively-empty record (no recognized fields) would produce invalid `UPDATE t set ?` SQL
   if (Object.keys(record).length === 0) return false;
+  const stored = await Settings.find().catch(() => ({}));
+  const changed = Object.keys(record).filter((k) => BRANDING_FIELDS.includes(k) && String(record[k] ?? "") !== String(stored[k] ?? ""));
+  await assertBrandingFree(changed, opts);
   await Settings.update(record);
   forgetAppDefaults();
   publish("appearance");

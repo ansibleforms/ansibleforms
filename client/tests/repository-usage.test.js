@@ -366,3 +366,34 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     expect(page).not.toContain('const OWNED_ELSEWHERE');
   });
 });
+
+describe('the branding the config seed manages : read only on the Appearance pages', () => {
+  it('reads the fields the seed manages, and says which a page has', async () => {
+    const axios = (await import('axios')).default;
+    axios.get.mockImplementationOnce(async () => ({ data: { branding_managed: '["app_name","logo"]' } }));
+    const { useBrandingSeed } = await import('../src/composables/useBrandingSeed.js');
+    const { seeded, loadBrandingSeed } = useBrandingSeed();
+    await loadBrandingSeed();
+    expect(seeded('app_name')).toBe(true);
+    expect(seeded('default_theme', 'logo')).toBe(true);
+    expect(seeded('icon')).toBe(false);
+  });
+
+  it('each page shows the notice and locks its seeded fields, a seeded image cannot be uploaded nor removed', () => {
+    expect(read('pages/admin/name.vue')).toContain(`<fieldset :disabled="seeded('app_name')">`);
+    expect(read('pages/admin/links.vue')).toContain(`:disabled="seeded('header_links')"`);
+    expect(read('pages/admin/links.vue')).toContain(`<fieldset :disabled="seeded('show_designer')">`);
+    for (const f of ['default_language', 'forms_view', 'default_timezone', 'default_date_format']) {
+      expect(read('pages/admin/defaults.vue')).toContain(`<fieldset :disabled="seeded('${f}')">`);
+    }
+    for (const [page, field] of [
+      ['pages/admin/logo.vue', 'logo'],
+      ['pages/admin/favicon.vue', 'icon'],
+    ]) {
+      expect(read(page)).toContain(`:disabled="!selectedFile || busy || seeded('${field}')"`);
+      expect(read(page)).toContain(`:disabled="busy || seeded('${field}')"`);
+      expect(read(page)).toContain(`<AppSeedNotice v-if="seeded('${field}')" />`);
+    }
+    expect(read('components/AppSeedNotice.vue')).toContain("t('settings.common.seedManagedNotice')");
+  });
+});

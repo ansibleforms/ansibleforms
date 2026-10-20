@@ -113,6 +113,11 @@ export const db = {
       rows.forEach((r) => Object.assign(r, values));
       return { affectedRows: rows.length };
     }
+    m = sql.match(/^UPDATE \S+ SET (\w+) = \?$/);
+    if (m) {
+      rows.forEach((r) => (r[m[1]] = params[0]));
+      return { affectedRows: rows.length };
+    }
     if (/^INSERT INTO \S+ \(\?\?\) SELECT \? FROM DUAL WHERE NOT EXISTS/.test(sql)) {
       if (rows.length) return { affectedRows: 0 };
       rows.push(Object.fromEntries(params[0].map((k, i) => [k, params[1][i]])));
