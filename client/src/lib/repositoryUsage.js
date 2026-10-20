@@ -23,7 +23,7 @@ import { esc } from '@/lib/tableCells';
 // ===========================================================================
 
 // the categories, in the order the Usage step shows them
-export const USAGE_CATEGORIES = ['designer', 'access', 'connections', 'appearance', 'system'];
+export const USAGE_CATEGORIES = ['designer', 'system', 'appearance', 'access', 'connections'];
 
 // every usage type, in its category's order :
 //   key       the type (its label : settings.repositories.usageTypes.<key>, its hint : usageHints)
@@ -36,9 +36,9 @@ export const USAGE_CATEGORIES = ['designer', 'access', 'connections', 'appearanc
 //   file      its one file at the repository's root (a type the app has one of : chat.yaml)
 export const USAGE_TYPES = [
   { key: 'forms', flag: 'use_for_forms', category: 'designer' },
+  { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
   { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer', oneOnly: true },
   { key: 'workflows', flag: 'use_for_workflows', category: 'designer' },
-  { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
   {
     key: 'schedules',
     flag: 'use_for_schedules',
@@ -48,9 +48,40 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'schedules',
   },
-  { key: 'config', flag: 'use_for_config', category: 'access', oneOnly: true },
-  { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
-  { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
+  {
+    key: 'settings',
+    flag: 'use_for_settings',
+    category: 'system',
+    objects: true,
+    oneOnly: true,
+    file: 'settings.yaml',
+  },
+  {
+    key: 'branding',
+    flag: 'use_for_branding',
+    category: 'appearance',
+    objects: true,
+    oneOnly: true,
+    file: 'branding.yaml',
+  },
+  {
+    key: 'labels',
+    flag: 'use_for_labels',
+    category: 'appearance',
+
+    objects: true,
+    oneOnly: true,
+    folder: 'labels',
+  },
+  {
+    key: 'announcements',
+    flag: 'use_for_announcements',
+    category: 'appearance',
+
+    objects: true,
+    oneOnly: true,
+    folder: 'announcements',
+  },
   {
     key: 'disclaimer',
     flag: 'use_for_disclaimer',
@@ -59,6 +90,9 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'disclaimer',
   },
+  { key: 'config', flag: 'use_for_config', category: 'access', oneOnly: true },
+  { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
+  { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
   {
     key: 'credentials',
     flag: 'use_for_credentials',
@@ -95,6 +129,7 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'notification-channels',
   },
+  { key: 'chat', flag: 'use_for_chat', category: 'connections', objects: true, oneOnly: true, file: 'chat.yaml' },
   {
     key: 'syslog',
     flag: 'use_for_syslog',
@@ -103,41 +138,6 @@ export const USAGE_TYPES = [
     objects: true,
     oneOnly: true,
     folder: 'syslog',
-  },
-  { key: 'chat', flag: 'use_for_chat', category: 'connections', objects: true, oneOnly: true, file: 'chat.yaml' },
-  {
-    key: 'branding',
-    flag: 'use_for_branding',
-    category: 'appearance',
-    objects: true,
-    oneOnly: true,
-    file: 'branding.yaml',
-  },
-  {
-    key: 'labels',
-    flag: 'use_for_labels',
-    category: 'appearance',
-
-    objects: true,
-    oneOnly: true,
-    folder: 'labels',
-  },
-  {
-    key: 'announcements',
-    flag: 'use_for_announcements',
-    category: 'appearance',
-
-    objects: true,
-    oneOnly: true,
-    folder: 'announcements',
-  },
-  {
-    key: 'settings',
-    flag: 'use_for_settings',
-    category: 'system',
-    objects: true,
-    oneOnly: true,
-    file: 'settings.yaml',
   },
 ];
 

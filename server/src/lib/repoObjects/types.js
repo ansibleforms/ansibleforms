@@ -19,7 +19,7 @@
 // ===========================================================================
 
 // the categories, in the order the Usage step shows them
-export const CATEGORIES = ["designer", "access", "connections", "appearance", "system"];
+export const CATEGORIES = ["designer", "system", "appearance", "access", "connections"];
 
 // every usage type, in its category's order :
 //   key        the type (its translation key on the client)
@@ -31,30 +31,25 @@ export const CATEGORIES = ["designer", "access", "connections", "appearance", "s
 //   references the object types its objects name (a runner its credential) : read again when
 //              those are pulled, an object waiting for what it names finds it then
 export const USAGE_TYPES = [
-  // Designer : what the designer builds and the app runs
   { key: "forms", flag: "use_for_forms", category: "designer", label: "forms" },
+  { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
   { key: "workflows", flag: "use_for_workflows", category: "designer", label: "workflows" },
-  { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "schedules", flag: "use_for_schedules", category: "designer", objects: true, oneOnly: true, label: "schedules" },
-  // Access : who signs in, and what they may do
-  { key: "config", flag: "use_for_config", category: "access", label: "config" },
-  { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", objects: true, oneOnly: true, label: "SSO providers" },
-  { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", objects: true, oneOnly: true, label: "LDAP directories" },
+  { key: "settings", flag: "use_for_settings", category: "system", objects: true, oneOnly: true, label: "settings" },
+  { key: "branding", flag: "use_for_branding", category: "appearance", objects: true, oneOnly: true, label: "branding" },
+  { key: "labels", flag: "use_for_labels", category: "appearance", objects: true, oneOnly: true, label: "labels" },
+  { key: "announcements", flag: "use_for_announcements", category: "appearance", objects: true, oneOnly: true, label: "announcements" },
   { key: "disclaimer", flag: "use_for_disclaimer", category: "access", objects: true, oneOnly: true, label: "disclaimer" },
-  // Connections : what the app signs in to, where jobs run and where messages go
+  { key: "config", flag: "use_for_config", category: "access", label: "config" },
+  { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", objects: true, oneOnly: true, label: "LDAP directories" },
+  { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", objects: true, oneOnly: true, label: "SSO providers" },
   { key: "credentials", flag: "use_for_credentials", category: "connections", objects: true, oneOnly: true, label: "credentials" },
   { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", objects: true, oneOnly: true, label: "secret stores" },
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", objects: true, oneOnly: true, label: "runners" },
   { key: "notification_channels", references: ["credentials"], flag: "use_for_notification_channels", category: "connections", objects: true, oneOnly: true, label: "notification channels" },
-  { key: "syslog", flag: "use_for_syslog", category: "connections", objects: true, oneOnly: true, label: "syslog servers" },
   { key: "chat", references: ["credentials"], flag: "use_for_chat", category: "connections", objects: true, oneOnly: true, label: "chat" },
-  // Appearance : how the app looks
-  { key: "branding", flag: "use_for_branding", category: "appearance", objects: true, oneOnly: true, label: "branding" },
-  { key: "labels", flag: "use_for_labels", category: "appearance", objects: true, oneOnly: true, label: "labels" },
-  { key: "announcements", flag: "use_for_announcements", category: "appearance", objects: true, oneOnly: true, label: "announcements" },
-  // System : the System > General settings
-  { key: "settings", flag: "use_for_settings", category: "system", objects: true, oneOnly: true, label: "settings" },
+  { key: "syslog", flag: "use_for_syslog", category: "connections", objects: true, oneOnly: true, label: "syslog servers" },
 ];
 
 // every usage flag, as the repositories table, its API and the config seed know them

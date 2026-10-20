@@ -2268,21 +2268,7 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* a one-only checkbox another record already has : the whole line greyed */
-.af-taken .form-check-label,
-.af-taken .form-check-label span {
-  color: var(--bs-secondary-color) !important;
-  opacity: 0.6;
-}
-/* a radio of a group, or a short checkbox : at the left edge, the list tight */
-.af-short-check {
-  margin-bottom: 0.6rem;
-}
-/* the labels one width, so their grey hints line up in a column */
-.af-short-label {
-  display: inline-block;
-  min-width: 12rem;
-}
+/* .af-taken, .af-short-check and .af-short-label : global (styles/bootstrap-override.scss) */
 /* a follow-up radio group : indented to the labels of the group above, its title small and
    bold, a line at its left joining it to the option it follows */
 .af-radio-nested {

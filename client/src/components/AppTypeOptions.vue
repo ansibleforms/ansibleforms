@@ -45,14 +45,3 @@ defineProps({
     </label>
   </div>
 </template>
-<style scoped>
-/* the radios tight, as the dialog's ; the labels one width, so the grey hints line up in a
-   column (the pages' own styles are scoped and cannot reach in here) */
-.af-short-check {
-  margin-bottom: 0.6rem;
-}
-.af-short-label {
-  display: inline-block;
-  min-width: 12rem;
-}
-</style>

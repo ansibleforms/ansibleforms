@@ -144,13 +144,13 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
           t(`settings.repositories.usageCategories.${category}`)
         }}</label>
       </div>
-      <!-- its types, side by side ; one that cannot be ticked greyed, why beside its name -->
+      <!-- its types, one per row ; one that cannot be ticked greyed, why beside its name -->
       <div class="af-usage-types">
         <div
           v-for="type in typesOf(category)"
           v-show="typeShown(type)"
           :key="type.key"
-          class="form-check af-usage-type"
+          class="form-check af-short-check"
           :class="{ 'af-taken': !available(type, modelValue, others) }"
           :title="titleOf(type)"
         >
@@ -163,9 +163,9 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
             @change="setType(type, $event.target.checked)"
           />
           <label class="form-check-label" :for="'af-usage-' + type.flag">
-            <span class="af-usage-label">{{ usageLabel(t, type.key) }}</span>
+            <span class="af-short-label">{{ usageLabel(t, type.key) }}</span>
             <span v-if="noteOf(type)" class="af-usage-note">{{ noteOf(type) }}</span>
-            <span class="af-usage-hint">{{ usageHint(t, type.key) }}</span>
+            <span class="text-body-secondary small">{{ usageHint(t, type.key) }}</span>
           </label>
         </div>
       </div>
@@ -174,43 +174,29 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
 </template>
 
 <style scoped>
-/* a heading, then its types under it, a little apart from the next heading */
+/* a heading, then its types under it, one per row as the Type tabs' options (.af-short-check,
+   .af-short-label, .af-taken : global), a little apart from the next heading */
 .af-usage-group + .af-usage-group {
   margin-top: 1rem;
 }
 .af-usage-heading .form-check-label {
   font-weight: 600;
 }
-/* the types side by side, as many as the width holds, under their heading */
 .af-usage-types {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.35rem 1.5rem;
-  margin: 0.4rem 0 0 1.5rem;
+  margin: 0.6rem 0 0 1.5rem;
 }
-/* a narrow screen : one per line */
-@media (max-width: 575.98px) {
-  .af-usage-types {
-    grid-template-columns: 1fr;
-  }
+/* its options closer together than a Type tab's : nineteen of them in one list */
+.af-usage-types .af-short-check {
+  margin-bottom: 0.25rem;
 }
-.af-usage-type {
+/* the last option : no space of its own under it, the card's padding is enough */
+.af-usage-group:last-child .af-short-check:last-child {
   margin-bottom: 0;
 }
-/* why it cannot be ticked, beside its name ; what it holds, under it, small and grey */
+/* why it cannot be ticked, beside its name, small and slanted */
 .af-usage-note {
-  margin-left: 0.4rem;
+  margin-right: 0.6rem;
   font-size: 0.8rem;
   font-style: italic;
-}
-.af-usage-hint {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--bs-secondary-color);
-}
-.af-taken .form-check-label,
-.af-taken .form-check-label span {
-  color: var(--bs-secondary-color) !important;
-  opacity: 0.75;
 }
 </style>

@@ -80,8 +80,8 @@ describe('the usage types', () => {
       'secret_stores',
       'runners',
       'notification_channels',
-      'syslog',
       'chat',
+      'syslog',
     ]);
   });
 
@@ -135,8 +135,8 @@ describe('a group box ticks every type of it that can be ticked', () => {
       'use_for_secret_stores',
       'use_for_runners',
       'use_for_notification_channels',
-      'use_for_syslog',
       'use_for_chat',
+      'use_for_syslog',
     ]);
     expect(categoryState('connections', record, others).checked).toBe(true);
     setCategory('connections', record, others, false);
@@ -166,8 +166,10 @@ describe('a group box ticks every type of it that can be ticked', () => {
   it('the component draws the groups and is used by the dialog and the page', () => {
     const component = read('components/AppRepositoryUsage.vue');
     expect(component).toContain(':indeterminate.prop="categoryState(category, modelValue, others).indeterminate"');
-    expect(component).toContain('grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));');
-    expect(component).toMatch(/@media \(max-width: 575\.98px\) \{\s*\.af-usage-types \{\s*grid-template-columns: 1fr;/);
+    // a single list, one type per row, spaced and lined up as the Type tabs' options
+    expect(component).toContain('class="form-check af-short-check"');
+    expect(component).toContain('<span class="af-short-label">');
+    expect(component).not.toContain('grid-template-columns');
     expect(read('components/AppAdminMulti.vue')).toMatch(
       /<AppRepositoryUsage\s+v-if="showField\(field\) && field.type === 'usage'"/,
     );
