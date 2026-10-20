@@ -8,10 +8,11 @@ import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
-import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
-import Form from '../../models/form.model.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
 import { repositoryDeprecations } from '../../lib/configKeys.js';
+import Form from '../../models/form.model.js';
+import { duplicateShown } from '../../lib/designerForms.js';
+import _ from 'lodash';
 import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
 
 /**
@@ -139,8 +140,7 @@ function assertRepositoryAdminFields(req, existing) {
 const find = async function(req, res) {
   try {
     const repositories = await Repository.withUnpushed(await Repository.findAll());
-    // their pull and push outputs as the user reads them (lib/designerForms.js)
-    res.json(RestResult.list(await designerRepositories(repositories, req.user?.user)));
+    res.json(RestResult.list(repositories));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepositories'), err.message || String(err)));
   }
@@ -172,18 +172,17 @@ const create = async function(req, res) {
 
 const findByName = async function(req, res) {
   try {
-    // its pull and push outputs as the user reads them (lib/designerForms.js)
-    const [repository] = await designerRepositories(await Repository.withUnpushed([await Repository.findByName(req.params.name)]), req.user?.user);
+    const [repository] = await Repository.withUnpushed([await Repository.findByName(req.params.name)]);
+    // its roles, categories or constants read from config.yaml : deprecated, said on its page
+    if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
     // a form name it shares with another forms repository : which copy is used, which skipped
     // (without designAllForms, only those naming forms the user's roles reach ; the roles not sent)
     if (repository?.use_for_forms) {
       const user = req.user?.user;
       repository.formDuplicates = (await Form.duplicates(repository.name).catch(() => []))
         .filter((d) => duplicateShown(d, user))
-        .map((d) => ({ name: d.name, used: { repository: d.used.repository, place: d.used.place }, skipped: { repository: d.skipped.repository, place: d.skipped.place }, notice: d.notice }));
+        .map((d) => ({ name: d.name, used: _.omit(d.used, "roles"), skipped: _.omit(d.skipped, "roles"), notice: d.notice }));
     }
-    // its roles, categories or constants read from config.yaml : deprecated, said on its page
-    if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
     repository.password = SECRET_MASK; // mask the password for api
     res.json(RestResult.single(repository));
   } catch(err) {

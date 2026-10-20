@@ -716,6 +716,9 @@ function readFormsFile(formsPath,filename){
   }  
 }
 
+// whether a user's roles reach a form (an admin reaches every one) : the Forms page's filter, and
+// the designer's for a user without designAllForms (lib/designerForms.js)
+Form.checkFormRole = (form, userRoles) => checkFormRole(form, userRoles)
 function checkFormRole(form, userRoles) {
   if(!userRoles) {
     return true
@@ -851,7 +854,8 @@ function collectForms(formsdirs, warn, error) {
  *   entries (object[]): the forms with where they are (collectForms).
  *
  * Returns:
- *   object[]: [{ name, used: { repository, place }, skipped: { repository, place }, notice }].
+ *   object[]: [{ name, used: { repository, place, roles }, skipped: { repository, place, roles },
+ *     notice }].
  */
 function duplicatesOf(entries) {
   const first = new Map()
@@ -866,8 +870,9 @@ function duplicatesOf(entries) {
     const used = first.get(name)
     out.push({
       name,
-      used: { repository: used.repository, place: used.place },
-      skipped: { repository: e.repository, place: e.place },
+      // the roles of each copy : a designer without designAllForms is told only of copies they reach
+      used: { repository: used.repository, place: used.place, roles: used.form.roles || [] },
+      skipped: { repository: e.repository, place: e.place, roles: e.form.roles || [] },
       notice: duplicateNotice(name, used, e),
     })
   }
@@ -1124,12 +1129,22 @@ function collectSubformNames(fields, unvalidated, collected, visited){
 // definitions referenced by its list fields (recursively). Missing subforms
 // produce an error entry but do not throw, so the form itself can still be
 // rendered (the client will show a placeholder).
-function collectSubformsForForm(parentForm, unvalidated, errors){
+/**
+ * The subforms a form uses, by name : its list and yaml fields' (recursively) and its wizard steps'.
+ *
+ * Args:
+ *   parentForm (object): the form.
+ *   unvalidated (object[]): every form, as read.
+ *
+ * Returns:
+ *   Set<string>: the subforms' names.
+ */
+function subformNamesOf(parentForm, unvalidated){
   const names = new Set()
   const visited = new Set()
-  collectSubformNames(parentForm.fields, unvalidated, names, visited)
+  collectSubformNames(parentForm?.fields, unvalidated, names, visited)
   // wizard steps reference subforms by name too
-  if(Array.isArray(parentForm.wizard)){
+  if(Array.isArray(parentForm?.wizard)){
     for(const step of parentForm.wizard){
       if(step?.subform && !visited.has(step.subform)){
         visited.add(step.subform)
@@ -1141,6 +1156,12 @@ function collectSubformsForForm(parentForm, unvalidated, errors){
       }
     }
   }
+  return names
+}
+Form.subformNamesOf = subformNamesOf
+
+function collectSubformsForForm(parentForm, unvalidated, errors){
+  const names = subformNamesOf(parentForm, unvalidated)
   const result = []
   for(const name of names){
     const raw = unvalidated.find(f => f.name === name && f.type === "subform")

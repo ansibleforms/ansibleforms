@@ -25,6 +25,7 @@ import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
 import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
+import { designsAllForms, designerConfig, designerSave } from '../../lib/designerForms.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -101,7 +102,8 @@ const findAll = async function(req,res){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.onlyAdminsOrDesigners')))
     }
     var forms = await Form.load(undefined,undefined,true) // true means load all forms, not just the ones for the user
-    res.json(RestResult.single(forms))
+    // without designAllForms : the forms of the user's roles, the subforms they use read only (lib/designerForms.js)
+    res.json(RestResult.single(await designerConfig(forms, user)))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }
@@ -281,6 +283,10 @@ const env = async function(req,res){
 const restore = async function(req,res){
   var lock
   var user=req.user.user
+  // a backup replaces every form : not for a designer limited to the forms of their roles
+  if(!designsAllForms(user)){
+    return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedRestoreForms'), "Restoring a backup replaces every form: it needs the role option designAllForms"))
+  }
   // whether THIS request took the lock. A restore replaces the whole config, so it
   // must not run next to a designer session ; but when the caller is not already in
   // the designer the lock is ours only for the duration of the write and has to be
@@ -382,6 +388,19 @@ const save = async function(req,res){
         if (err instanceof Errors.AccessDeniedError) return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         if (err instanceof Errors.ConflictError) return res.status(409).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         throw err
+      }
+      // without designAllForms : what the user sent laid over the forms they do not see, kept as
+      // they are ; a hidden form's name, a changed read-only subform, a form without one of their
+      // roles refused (lib/designerForms.js)
+      if(!designsAllForms(user)){
+        try {
+          const sent = Form.parse(newConfig) || {}
+          const stored = await Form.load(undefined,undefined,true)
+          newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user) })
+        } catch (err) {
+          if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
+          throw err
+        }
       }
       // the designer writes the whole document, so the previous one has to be read
       // before the save to get a role delta out of it

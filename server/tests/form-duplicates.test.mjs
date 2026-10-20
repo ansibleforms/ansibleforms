@@ -104,13 +104,20 @@ describe("the duplicate said, naming both copies", () => {
     assert.equal(await Form.duplicateLines("forms-team"), `\nWarning: ${NOTICE}`);
     assert.equal(await Form.duplicateLines("forms-alone"), "");
     assert.deepEqual(await Form.duplicates("forms-team"), [
-      { name: "Deploy", used: { repository: "forms-ops", place: "forms-ops/forms/deploy.yaml" }, skipped: { repository: "forms-team", place: "forms-team/forms/deploy.yaml" }, notice: NOTICE },
+      { name: "Deploy", used: { repository: "forms-ops", place: "forms-ops/forms/deploy.yaml", roles: ["default"] }, skipped: { repository: "forms-team", place: "forms-team/forms/deploy.yaml", roles: ["default"] }, notice: NOTICE },
     ]);
     // the pull and the clone add them to their output ; the page reads them
     const model = fs.readFileSync(new URL("../src/models/repository.model.js", import.meta.url), "utf8");
     assert.equal(model.match(/output \+= await \(await formModel\(\)\)\.duplicateLines\(name\)/g).length, 2);
     const controller = fs.readFileSync(new URL("../src/controllers/v2/repository.controller.js", import.meta.url), "utf8");
-    assert.match(controller, /repository\.formDuplicates = await Form\.duplicates\(repository\.name\)/);
+    assert.match(controller, /repository\.formDuplicates = \(await Form\.duplicates\(repository\.name\)/);
+    // a designer limited to the forms of their roles is told only of copies they reach
+    const { duplicateShown } = await import("../src/lib/designerForms.js");
+    const [d] = await Form.duplicates("forms-team");
+    const limited = { roles: ["ops", "default"], options: { designAllForms: false } };
+    assert.equal(duplicateShown(d, limited), true);
+    assert.equal(duplicateShown({ ...d, skipped: { ...d.skipped, roles: ["team"] } }, limited), false);
+    assert.equal(duplicateShown({ ...d, skipped: { ...d.skipped, roles: ["team"] } }, { roles: ["ops"], options: {} }), true);
   });
 });
 

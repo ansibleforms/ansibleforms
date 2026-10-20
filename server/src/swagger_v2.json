@@ -4632,6 +4632,117 @@
         }
       }
     },
+    "/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "The designer's forms config",
+        "description": "The categories, the roles, the constants and the forms, as the designer edits them, with the load's errors and warnings. With the role option designAllForms off (it is on by default, and always for admins) only the forms whose roles hold one of the user's roles are returned; the subforms those use are added with readOnly: true, and the warnings naming a hidden form are left out. Designer access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The config"
+          },
+          "403": {
+            "description": "Forbidden - no designer access"
+          },
+          "500": {
+            "description": "Failed to read the forms config"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Save the designer's forms config",
+        "description": "Writes the forms (each to its file), the categories and the constants; the roles are the admin's. With the role option designAllForms off, the forms the user does not see are kept as they are (a file holding several forms keeps its hidden ones), a read-only subform must come back unchanged (403), a form named as a hidden one is refused with the name said to be taken (409), and every form saved must keep one of the user's roles (400). Needs allowFormDesign.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "forms": {
+                    "type": "string",
+                    "description": "The whole config as YAML"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "A form saved without one of the user's roles (designAllForms off)"
+          },
+          "403": {
+            "description": "No form design access, or a read-only subform changed"
+          },
+          "409": {
+            "description": "The form name is already taken (designAllForms off)"
+          },
+          "423": {
+            "description": "The designer is locked by another user"
+          },
+          "500": {
+            "description": "Failed to save the forms"
+          }
+        }
+      }
+    },
+    "/config/restore/{backupName}": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Restore a backup of the forms config",
+        "description": "Replaces the forms config with a backup. Refused (403) for a user whose role option designAllForms is off: a backup replaces every form.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backupName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restored"
+          },
+          "403": {
+            "description": "No form design access, or designAllForms off"
+          },
+          "423": {
+            "description": "The designer is locked by another user"
+          },
+          "500": {
+            "description": "Failed to restore"
+          }
+        }
+      }
+    },
     "/config/templated": {
       "get": {
         "tags": [

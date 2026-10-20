@@ -369,13 +369,9 @@ export default {
       allowFormDesign:
         'Modifier les formulaires dans le designer : catégories, constantes et formulaires (sinon : en lecture seule).',
       designAllForms:
-        "Afficher et modifier tous les formulaires dans le designer ; sans cela, seulement les formulaires des rôles de l'utilisateur (les sous-formulaires qu'ils utilisent, en lecture seule). Limite uniquement les formulaires (les playbooks et les workflows ont leurs propres options) ; les inventaires, fichiers de variables, catégories et constantes restent visibles pour tous les designers.",
+        "Afficher et modifier tous les formulaires dans le designer ; sans cela, seulement les formulaires des rôles de l'utilisateur (les sous-formulaires qu'ils utilisent, en lecture seule). Limite uniquement les formulaires ; les playbooks, workflows, inventaires, fichiers de variables, catégories et constantes restent visibles pour tous les designers.",
       allowPlaybookDesign: 'Modifier les playbooks dans le designer (sinon : en lecture seule).',
-      designAllPlaybooks:
-        "Afficher et modifier tous les playbooks dans le designer ; sans cela, seulement les playbooks utilisés par les formulaires que l'utilisateur peut voir, et ceux qu'aucun formulaire n'utilise encore.",
       allowWorkflowDesign: 'Modifier les workflows dans le designer (sinon : en lecture seule).',
-      designAllWorkflows:
-        "Afficher et modifier tous les workflows dans le designer ; sans cela, seulement les workflows utilisés par les formulaires que l'utilisateur peut voir, et ceux qu'aucun formulaire n'utilise encore.",
       allowInventoryDesign: 'Modifier les inventaires dans le designer (sinon : en lecture seule).',
       allowVarsFileDesign: 'Modifier les fichiers de variables dans le designer (sinon : en lecture seule).',
       showLogs: 'Voir le journal du serveur.',
@@ -787,16 +783,6 @@ export default {
       'Cette page utilise encore une build plus ancienne que le serveur. Rechargez la page pour obtenir la nouvelle version.',
   },
   common: {
-    help: 'Aide',
-    name: 'Nom',
-    orDivider: 'ou',
-    noFilterMatch: 'Aucune ligne ne correspond au filtre',
-    toggleNavigation: 'Afficher ou masquer la navigation',
-    toggleDropdown: 'Afficher ou masquer le menu',
-    switchTheme: 'Changer de thème',
-    pagination: 'Pagination',
-    goToPage: 'Aller à la page {n}',
-    searchPlaceholder: 'Rechercher...',
     edit: 'Modifier',
     open: 'Ouvrir',
     abort: 'Arrêter',
@@ -907,13 +893,6 @@ export default {
       'La requête était trop volumineuse pour le serveur (HTTP 431). Si vous vous connectez par authentification unique et appartenez à de nombreux groupes, demandez à un administrateur de définir un filtre de groupes sur le fournisseur.',
   },
   login: {
-    pleaseSignIn: 'Veuillez vous connecter',
-    signingIn: 'Connexion en cours…',
-    withMicrosoft: 'Se connecter avec Microsoft',
-    withOidc: 'Se connecter avec OpenID Connect',
-    ssoFailed: "La connexion auprès du fournisseur d'identité a échoué",
-    settingsFailed: 'Impossible de lire les paramètres de connexion',
-    formInvalid: "Saisissez un nom d'utilisateur et un mot de passe",
     title: 'Connexion',
     username: "Nom d'utilisateur",
     password: 'Mot de passe',
@@ -1429,7 +1408,7 @@ export default {
       lastPushOutput: 'Sortie du dernier push',
       showPullOutput: 'Afficher la sortie du dernier pull',
       showPushOutput: 'Afficher la sortie du dernier push',
-      notFound: "Aucun dépôt avec l'id '{id}'.",
+      notFound: "Aucun dépôt nommé '{name}'.",
       ownUser: 'Il a encore son propre utilisateur ({user}) : choisissez un identifiant pour le remplacer.',
       pull: 'Pull',
       pullAll: 'Tout puller',
@@ -2320,11 +2299,9 @@ export default {
       noConstants: 'Aucune constante configuree',
       roleOptionShowDesigner: 'Afficher le Designer',
       roleOptionAllowFormDesign: 'Modifier les Formulaires',
-      roleOptionDesignAllForms: 'Modifier Tous les Formulaires',
+      roleOptionDesignAllForms: 'Concevoir Tous les Formulaires',
       roleOptionAllowPlaybookDesign: 'Modifier les Playbooks',
-      roleOptionDesignAllPlaybooks: 'Modifier Tous les Playbooks',
       roleOptionAllowWorkflowDesign: 'Modifier les Workflows',
-      roleOptionDesignAllWorkflows: 'Modifier Tous les Workflows',
       roleOptionAllowInventoryDesign: 'Modifier les Inventaires',
       roleOptionAllowVarsFileDesign: 'Modifier les Fichiers de variables',
       roleOptionShowLogs: 'Afficher le Journal du serveur',
@@ -2450,8 +2427,6 @@ export default {
     hasWarnings: 'Cette configuration contient',
   },
   designer: {
-    overlayIconPlaceholder: 'p. ex. check, bolt',
-    overlayTextPlaceholder: 'p. ex. NOUVEAU',
     pasteNotAllowed:
       "Le navigateur n'a pas autorisé la lecture du presse-papiers. Utilisez plutôt Ctrl+V dans l'éditeur.",
     lockReleasedBy:
@@ -3249,12 +3224,6 @@ export default {
     scheduleName: 'Nom',
     cronExpression: 'Expression Cron',
     runAt: 'Executer a',
-    scheduleNamePlaceholder: 'p. ex. Sauvegarde quotidienne',
-    jobNamePlaceholder: 'p. ex. Fenêtre de maintenance',
-    scheduleNameHint: 'Un nom descriptif pour cette planification',
-    jobNameHint: 'Un nom descriptif pour ce job',
-    runAtHint: "Choisissez la date et l'heure auxquelles exécuter ce job une seule fois",
-    storeNamePlaceholder: 'p. ex. Configuration de production',
     creating: 'Creation...',
     scheduleJob: 'Planifier le job',
     saveFormData: 'Enregistrer les donnees du formulaire',
@@ -3320,38 +3289,6 @@ export default {
     download: 'Télécharger',
     noLog: 'Aucun journal du serveur pour le {date}.',
     resetHint: 'De nouveau le journal du jour, qui suit ses nouvelles lignes, sans recherche',
-  },
-  changePassword: {
-    title: 'Changez votre mot de passe',
-    defaultPassword:
-      'Vous vous êtes connecté avec le mot de passe par défaut, qui est public. Choisissez-en un autre pour continuer.',
-    currentRequired: 'Saisissez votre mot de passe actuel',
-    newRequired: 'Saisissez un nouveau mot de passe',
-    invalid: 'Remplissez tous les champs, avec deux fois le même nouveau mot de passe',
-  },
-  schema: {
-    ready: 'La base de données est prête !',
-    redirecting: "Redirection vers l'accueil dans {n} seconde... | Redirection vers l'accueil dans {n} secondes...",
-    creating: 'Création du schéma et des tables...',
-    firstSetup:
-      "S'il s'agit d'une première installation et que vous n'avez pas encore votre propre schéma ni vos tables, AnsibleForms peut les créer.",
-    willCreate: 'Les éléments suivants seront créés :',
-    databaseSchema: 'Schéma de base de données',
-    tables: 'Tables',
-    allTables: 'Toutes les tables nécessaires',
-    partial:
-      "Votre schéma semble inutilisable : une partie de la base de données est présente, une autre manque. Contactez votre administrateur de base de données ou de l'application pour restaurer une sauvegarde, créer les tables manquantes ou supprimer la base de données afin qu'AnsibleForms puisse la créer. Sous Kubernetes, mieux vaut ne pas créer de base de données par défaut. Tant que le schéma et les tables ne sont pas cohérents, AnsibleForms ne peut pas continuer.",
-    disabled: 'La création du schéma est désactivée par votre administrateur.',
-    contactAdmin:
-      "Contactez votre administrateur de base de données ou de l'application pour créer le schéma et les tables.",
-    unreachable: "Une erreur s'est produite. La base de données n'est très probablement pas joignable.",
-  },
-  apiDocs: {
-    title: "Documentation de l'API",
-    welcome: "Bienvenue sur le portail de documentation de l'API AnsibleForms.",
-    version: "L'API REST est en {version} (l'API v1 a été supprimée en 7.0.0).",
-    endpoint: "Point d'accès de la documentation de l'API :",
-    hint: "Cliquez sur le lien ci-dessus ou saisissez-le dans votre navigateur pour ouvrir l'interface interactive Swagger UI.",
   },
   datePick: {
     year: 'Année',

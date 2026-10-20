@@ -117,14 +117,3 @@ describe("designAllForms : every form in the designer, or only those of the user
     expect((await User.getRolesAndOptions(["local/admins", "local/audit"], user)).options.designAllForms).toBe(true);
   });
 });
-
-describe("designAllPlaybooks and designAllWorkflows : as designAllForms", () => {
-  test.each(["designAllPlaybooks", "designAllWorkflows"])("%s : on by default, false wins, the default role fills it, always on for an admin", async (option) => {
-    expect((await User.getRolesAndOptions(["local/ops"], user)).options[option]).toBe(true);
-    config.roles = config.roles.map((r) => (r.name === "audit" ? { ...r, options: { ...r.options, [option]: false } } : r.name === "lead" ? { ...r, options: { ...r.options, [option]: true } } : r));
-    expect((await User.getRolesAndOptions(["local/audit", "local/lead"], user)).options[option]).toBe(false);
-    config.roles = config.roles.map((r) => (r.name === "default" ? { ...r, options: { ...r.options, [option]: false } } : r));
-    expect((await User.getRolesAndOptions(["local/ops"], user)).options[option]).toBe(false);
-    expect((await User.getRolesAndOptions(["local/admins", "local/audit"], user)).options[option]).toBe(true);
-  });
-});
