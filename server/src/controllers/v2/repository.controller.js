@@ -11,6 +11,7 @@ import { isAdminRequest } from '../../lib/adminGrants.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import Form from '../../models/form.model.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
+import { repositoryDeprecations } from '../../lib/configKeys.js';
 import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
 
 /**
@@ -95,7 +96,7 @@ const SOURCE_FIELDS = ['uri', 'branch'];
 
 /**
  * Refuses to a user who is not an admin a write that chooses what AnsibleForms loads or runs. A
- * repository marked use_for_config, use_for_forms or use_for_playbooks (or workflows,
+ * repository marked use_for_roles, use_for_forms or use_for_playbooks (or workflows,
  * inventories) is pulled into the configuration, the forms and the playbooks : a user with only
  * connections access who could add one, point an existing one at a git server of their own, or
  * mark one of theirs so, would write the roles (and make themselves admin) or the code the
@@ -179,6 +180,8 @@ const findByName = async function(req, res) {
         .filter((d) => duplicateShown(d, user))
         .map((d) => ({ name: d.name, used: { repository: d.used.repository, place: d.used.place }, skipped: { repository: d.skipped.repository, place: d.skipped.place }, notice: d.notice }));
     }
+    // its roles, categories or constants read from config.yaml : deprecated, said on its page
+    if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
     repository.password = SECRET_MASK; // mask the password for api
     res.json(RestResult.single(repository));
   } catch(err) {

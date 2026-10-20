@@ -1,4 +1,4 @@
-// A repository marked use_for_config, use_for_forms or use_for_playbooks (or workflows,
+// A repository marked use_for_roles, use_for_forms or use_for_playbooks (or workflows,
 // inventories) is pulled into the configuration, the forms and the playbooks AnsibleForms runs. A
 // user with only connections access (showConnectionsSettings without the admin role) who could add
 // one, point one at their own git server, or mark one of theirs so, would write the roles (and make
@@ -18,7 +18,7 @@ process.env.DB_PASSWORD ||= "test";
 
 const repos = {
   forms: { id: 1, name: "forms", uri: "https://git.local/forms.git", branch: "main", description: "", cron: null,
-    use_for_forms: 1, use_for_config: 0, use_for_playbooks: 0, use_for_workflows: 0, use_for_inventories: 0, credential: null, password: "" },
+    use_for_forms: 1, use_for_roles: 0, use_for_playbooks: 0, use_for_workflows: 0, use_for_inventories: 0, credential: null, password: "" },
 };
 const calls = [];
 vi.mock("../src/models/repository.model.js", () => ({
@@ -74,7 +74,7 @@ beforeEach(() => { calls.length = 0; });
 
 describe("a connections user", () => {
   test("may not add a repository, whatever it is used for", async () => {
-    for (const flags of [{ use_for_config: 1 }, { use_for_forms: 1 }, { use_for_playbooks: 1 }, {}]) {
+    for (const flags of [{ use_for_roles: 1 }, { use_for_forms: 1 }, { use_for_playbooks: 1 }, {}]) {
       const r = await call(controller.create, ops, { body: { name: "evil", uri: "https://evil/x.git", branch: "main", ...flags } });
       expect(r.status).toBe(403);
     }
@@ -89,7 +89,7 @@ describe("a connections user", () => {
   test.each([
     ["its address", { uri: "https://evil/forms.git" }],
     ["its branch", { branch: "evil" }],
-    ["use_for_config on", { use_for_config: true }],
+    ["use_for_roles on", { use_for_roles: true }],
     ["use_for_playbooks on", { use_for_playbooks: "1" }],
     ["use_for_inventories on", { use_for_inventories: 1 }],
     ["use_for_workflows on", { use_for_workflows: true }],
@@ -102,7 +102,7 @@ describe("a connections user", () => {
   });
 
   test("may save it with those fields sent back unchanged, and change its description", async () => {
-    const body = { ...repos.forms, uri: " https://git.local/forms.git ", use_for_forms: true, use_for_config: false, description: "ours" };
+    const body = { ...repos.forms, uri: " https://git.local/forms.git ", use_for_forms: true, use_for_roles: false, description: "ours" };
     const r = await call(controller.update, ops, { body });
     expect(r.status).toBeLessThan(300);
     expect(calls[0][0]).toBe("update");
@@ -123,8 +123,8 @@ describe("a connections user", () => {
 
 describe("an admin", () => {
   test("may add, change and delete one", async () => {
-    expect((await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_config: 1 } })).status).toBeLessThan(300);
-    expect((await call(controller.update, admin, { body: { uri: "https://git/new.git", branch: "dev", use_for_config: 1 } })).status).toBeLessThan(300);
+    expect((await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_roles: 1 } })).status).toBeLessThan(300);
+    expect((await call(controller.update, admin, { body: { uri: "https://git/new.git", branch: "dev", use_for_roles: 1 } })).status).toBeLessThan(300);
     expect((await call(controller.delete, admin)).status).toBeLessThan(300);
     expect(calls.map((c) => c[0])).toEqual(["create", "update", "delete"]);
   });

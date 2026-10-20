@@ -1322,7 +1322,6 @@ export default {
         workflows: 'Workflows',
         inventories: 'Inventários',
         schedules: 'Agendamentos',
-        config: 'Configuração',
         sso: 'SSO',
         ldap: 'LDAP',
         disclaimer: 'Aviso legal',
@@ -1330,7 +1329,6 @@ export default {
         secret_stores: 'Cofres de segredos',
         runners: 'Runners',
         syslog: 'Syslog',
-        chat: 'Chat',
         branding: 'Marca',
         labels: 'Etiquetas',
         announcements: 'Anúncios',
@@ -1342,7 +1340,6 @@ export default {
         workflows: 'Workflows construídos, editados e enviados de volta pelo designer',
         inventories: 'Um inventário: inventory.yaml, group_vars e host_vars na raiz',
         schedules: 'Agendamentos em YAML, um por ficheiro na sua pasta schedules',
-        config: 'config.yaml com as categorias e constantes (um só repositório)',
         sso: 'Fornecedores SSO em YAML, um por ficheiro na sua pasta sso, que nomeiam a sua credencial',
         ldap: 'Diretórios LDAP em YAML, um por ficheiro na sua pasta ldap, pela sua ordem de pesquisa',
         disclaimer: 'Versões do aviso legal em YAML, uma por ficheiro na sua pasta disclaimer',
@@ -1353,13 +1350,16 @@ export default {
         runners: 'Runners em YAML, um por ficheiro na sua pasta runners, que nomeiam a sua credencial',
         notification_channels: 'Notificações em YAML, uma por ficheiro na sua pasta notification-channels',
         syslog: 'Servidores syslog em YAML, um por ficheiro na sua pasta syslog',
-        chat: 'As definições do assistente de chat no seu chat.yaml, a chave só como referência de ambiente',
+        chat: 'O assistente de chat no seu chat.yaml, a chave só como referência de ambiente',
         branding:
           'O nome, os valores predefinidos, o idioma, o logótipo e o ícone no seu branding.yaml e as imagens ao lado',
         links: 'As ligações do cabeçalho e a do designer, no seu links.yaml',
         labels: 'As etiquetas ao lado do logótipo em YAML, uma por ficheiro na sua pasta labels, pela sua ordem',
         announcements: 'Anúncios em YAML, um por ficheiro na sua pasta announcements',
         settings: 'As definições de Sistema > Geral pelo seu nome de ambiente, no seu settings.yaml',
+        roles: 'As funções, no seu roles.yaml (config.yaml ainda lido, obsoleto)',
+        categories: 'As categorias, no seu categories.yaml (config.yaml ainda lido, obsoleto)',
+        constants: 'As constantes, no seu constants.yaml (config.yaml ainda lido, obsoleto)',
       },
       usageOnTitle: 'Ativar {type}',
       usageOnQuestion: 'Usar {name} para {type}?',
@@ -1383,6 +1383,8 @@ export default {
       usageOnWithoutSecret:
         'Escritos sem os seus segredos, que ficam na base de dados (o git nunca guarda um segredo em claro): {names}.',
       usageOnSkipped: 'Já terminados no git, não importados: {count}.',
+      configDeprecated:
+        '{key} lidos de config.yaml: obsoleto, mova-os para {file} (config.yaml deixa de ser lido na 8.0.0)',
       usageOnAfter:
         'A partir daí, um pull traz as alterações feitas no git, e as alterações feitas aqui vão para o git com o Push do repositório.',
       usageOnDone:

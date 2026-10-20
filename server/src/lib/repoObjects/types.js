@@ -5,10 +5,12 @@
 // repository-backed objects (lib/repoObjects/engine.js) all read it.
 //
 // A type is one of two kinds :
-//   a content type  (forms, playbooks, workflows, inventories, config) : files the app reads as
-//                   they are ; several repositories may hold forms, workflows and inventories,
-//                   and the app uses the first one of config and of playbooks (its Usage step
-//                   greys the box on the others, the server only warns) - as before
+//   a content type  (forms, playbooks, workflows, inventories, roles, categories, constants) :
+//                   files the app reads as they are ; several repositories may hold forms,
+//                   workflows and inventories, the app uses the first one of playbooks (its Usage
+//                   step greys the box on the others, the server only warns), and one repository
+//                   at most holds the roles, the categories and the constants, each read from its
+//                   own file (lib/configKeys.js)
 //   an object type  (schedules, credentials, runners, secret stores, SSO ...) : one object per
 //                   YAML file, kept in step with a table both ways by the engine
 //                   (lib/repoObjects/engine.js), one repository at most, refused by the API and
@@ -31,6 +33,8 @@ export const CATEGORIES = ["designer", "system", "appearance", "access", "connec
 //   references the object types its objects name (a runner its credential) : read again when
 //              those are pulled, an object waiting for what it names finds it then
 export const USAGE_TYPES = [
+  { key: "categories", flag: "use_for_categories", category: "designer", oneOnly: true, label: "categories" },
+  { key: "constants", flag: "use_for_constants", category: "designer", oneOnly: true, label: "constants" },
   { key: "forms", flag: "use_for_forms", category: "designer", label: "forms" },
   { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
@@ -42,7 +46,7 @@ export const USAGE_TYPES = [
   { key: "labels", flag: "use_for_labels", category: "appearance", objects: true, oneOnly: true, label: "labels" },
   { key: "announcements", flag: "use_for_announcements", category: "appearance", objects: true, oneOnly: true, label: "announcements" },
   { key: "disclaimer", flag: "use_for_disclaimer", category: "access", objects: true, oneOnly: true, label: "disclaimer" },
-  { key: "config", flag: "use_for_config", category: "access", label: "config" },
+  { key: "roles", flag: "use_for_roles", category: "access", oneOnly: true, label: "roles" },
   { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", objects: true, oneOnly: true, label: "LDAP directories" },
   { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", objects: true, oneOnly: true, label: "SSO providers" },
   { key: "credentials", flag: "use_for_credentials", category: "connections", objects: true, oneOnly: true, label: "credentials" },

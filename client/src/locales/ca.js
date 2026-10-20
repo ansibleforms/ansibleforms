@@ -1322,7 +1322,6 @@ export default {
         workflows: 'Workflows',
         inventories: 'Inventaris',
         schedules: 'Programacions',
-        config: 'Configuració',
         sso: 'SSO',
         ldap: 'LDAP',
         disclaimer: 'Avís legal',
@@ -1330,7 +1329,6 @@ export default {
         secret_stores: 'Magatzems de secrets',
         runners: 'Runners',
         syslog: 'Syslog',
-        chat: 'Xat',
         branding: 'Marca',
         labels: 'Etiquetes',
         announcements: 'Anuncis',
@@ -1342,7 +1340,6 @@ export default {
         workflows: 'Workflows del dissenyador, editats i enviats de tornada pel dissenyador',
         inventories: 'Un inventari: inventory.yaml, group_vars i host_vars a la seva arrel',
         schedules: 'Programacions en YAML, una per fitxer a la seva carpeta schedules',
-        config: 'config.yaml amb les categories i constants (un sol repositori)',
         sso: 'Proveïdors SSO en YAML, un per fitxer a la seva carpeta sso, que nomenen la seva credencial',
         ldap: 'Directoris LDAP en YAML, un per fitxer a la seva carpeta ldap, en el seu ordre de cerca',
         disclaimer: "Versions de l'avís legal en YAML, una per fitxer a la seva carpeta disclaimer",
@@ -1353,13 +1350,16 @@ export default {
         runners: 'Runners en YAML, un per fitxer a la seva carpeta runners, que nomenen la seva credencial',
         notification_channels: 'Notificacions en YAML, una per fitxer a la seva carpeta notification-channels',
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
-        chat: "Els ajustos de l'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
+        chat: "L'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
         branding:
           "El nom, els valors per defecte, l'idioma, el logotip i la icona al seu branding.yaml i les imatges al costat",
         links: 'Els enllaços de la capçalera i el del dissenyador, al seu links.yaml',
         labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
         announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',
         settings: "Els ajustos de Sistema > General pel seu nom d'entorn, al seu settings.yaml",
+        roles: 'Els rols, al seu roles.yaml (config.yaml encara es llegeix, obsolet)',
+        categories: 'Les categories, al seu categories.yaml (config.yaml encara es llegeix, obsolet)',
+        constants: 'Les constants, al seu constants.yaml (config.yaml encara es llegeix, obsolet)',
       },
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: 'Fer servir {name} per a {type}?',
@@ -1384,6 +1384,8 @@ export default {
       usageOnWithoutSecret:
         'Escrits sense els seus secrets, que es queden a la base de dades (git mai no guarda un secret en clar): {names}.',
       usageOnSkipped: 'Ja acabats a git, no importats: {count}.',
+      configDeprecated:
+        '{key} llegits de config.yaml: obsolet, mou-los a {file} (config.yaml ja no es llegeix a la 8.0.0)',
       usageOnAfter:
         "A partir d'aleshores, un pull porta els canvis fets a git, i els canvis fets aquí van a git amb el Push del repositori.",
       usageOnDone:

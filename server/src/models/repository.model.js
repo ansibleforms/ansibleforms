@@ -14,6 +14,7 @@ import { SECRET_MASK } from '../lib/secretMask.js';
 import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES } from '../lib/repoObjects/types.js';
+import { deprecationLines } from '../lib/configKeys.js';
 
 // the flags of the object types : a repository's that turn on or off make it take the app's
 // objects, or let them go (lib/repoObjects/engine.js)
@@ -508,29 +509,12 @@ class Repository extends CrudModel {
   // persistent/config.yaml while the repository copy kept being served, discarding the
   // edit silently. Let it throw; the caller reports the real cause.
   {
-    // First check for repositories with use_for_config enabled (new way since 6.1.0)
-    var configRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_config")
-    
-    if(configRepositories.length > 0){
-      // Found config repository/repositories
-      if(configRepositories.length > 1){
-        const repoNames = configRepositories.map(r => r.name).join(", ")
-        logger.warning(`Multiple repositories are marked as 'use_for_config': ${repoNames}. Only one should be enabled. Using first one: ${configRepositories[0].name}`)
-      }
-      
-      const repoPath = Repo.folderOf(configRepositories[0].name)
-      
-      const configPath = path.join(repoPath, "config.yaml")
-      if(fs.existsSync(configPath)){
-        logger.debug(`Found config.yaml in use_for_config repository: ${configRepositories[0].name}`)
-        return configPath
-      }
+    // The roles, the categories and the constants : each from its own repository (use_for_roles,
+    // use_for_categories, use_for_constants, lib/configKeys.js), laid over the base configuration -
+    // which then is the local CONFIG_PATH (or the database copy), never a repository's file
+    const keyRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants")
+    if (keyRepositories.length > 0) return ""
 
-      // Config repo exists but no config file found
-      logger.warning(`Repository '${configRepositories[0].name}' is marked as use_for_config but has no config.yaml`)
-      return ""
-    }
-    
     // Fall back to old behavior: check use_for_forms repositories (backwards compatibility) ;
     // in the order they were added : the first one holding a config.yaml wins, the same one every time
     var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
@@ -762,6 +746,8 @@ class Repository extends CrudModel {
       if (objectTypesOf(repo).length) {
         output += await (await repoObjects()).afterGit(name, repo)
       }
+      // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
+      output += await deprecationLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -833,6 +819,8 @@ class Repository extends CrudModel {
       if (objectTypesOf(pullRepo).length) {
         output += await (await repoObjects()).afterGit(name, pullRepo)
       }
+      // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
+      output += await deprecationLines(name)
       // a form name it shares with another forms repository : which copy is used, which skipped
       if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
       status = "success"

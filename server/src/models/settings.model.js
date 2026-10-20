@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import yaml from "yaml";
 import Announcement from './announcement.model.js';
+import { keySources, composeConfig, writeConfigKeys, mergeIntoBase } from '../lib/configKeys.js';
 
 //mail object create
 var Settings=function(settings){
@@ -404,6 +405,18 @@ Settings.exportConfig = async function(){
   return "config.yaml exported successfully"
 }
 Settings.getActiveConfig = async function() {
+  // the roles, the categories and the constants a repository holds laid over the base
+  // configuration (lib/configKeys.js)
+  return composeConfig(await activeBaseText(), await keySources(), (file) => fs.readFileSync(file, 'utf8'))
+}
+/**
+ * The base configuration's text : the database copy when it serves the config, else the config
+ * file (a forms repository's config.yaml of before, or the local CONFIG_PATH).
+ *
+ * Returns:
+ *   Promise<string>: the text, '' when there is none.
+ */
+async function activeBaseText() {
   const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
@@ -423,6 +436,14 @@ Settings.saveActiveConfig = async function(yamlStr, options = {}) {
   if (!options.ignoreDesignerLock) await Settings.assertDesignerNotLocked()
   const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
+
+  // the keys a repository holds : each written back to the file it was read from, the rest into the
+  // base configuration, its other keys kept (lib/configKeys.js) ; a ytt template is written as it is
+  const sources = await keySources()
+  if (sources.length && !/^\s*#@/m.test(yamlStr)) {
+    const { rest } = await writeConfigKeys(yaml.parse(yamlStr) || {}, sources, { claim: true })
+    yamlStr = mergeIntoBase(await activeBaseText(), rest)
+  }
 
   if (useDatabase) {
     logger.info("Saving config to database")

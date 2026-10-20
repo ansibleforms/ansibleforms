@@ -319,7 +319,11 @@ const crudConfigs = {
       { name: 'user' },
       { name: 'password', isEncrypted: true, setDefault: true },
       { name: 'description' },
-      { name: 'use_for_config', isBoolean: true },
+      // the roles, the categories and the constants, each from its own file (lib/configKeys.js) ;
+      // the Config usage of before (use_for_config) is split into them
+      { name: 'use_for_roles', isBoolean: true },
+      { name: 'use_for_categories', isBoolean: true },
+      { name: 'use_for_constants', isBoolean: true },
       { name: 'use_for_forms', isBoolean: true },
       { name: 'use_for_playbooks', isBoolean: true },
       { name: 'use_for_workflows', isBoolean: true },

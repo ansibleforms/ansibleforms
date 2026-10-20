@@ -37,6 +37,24 @@ export const USAGE_CATEGORIES = ['designer', 'system', 'appearance', 'access', '
 //   labelKey  its label's translation when it is its menu item's (settings.repositories.usageTypes.<key>
 //             when not given)
 export const USAGE_TYPES = [
+  // the base configuration's keys : each from its own file (roles.yaml, categories.yaml,
+  // constants.yaml ; config.yaml still read, deprecated), named as their menu items name them
+  {
+    key: 'categories',
+    flag: 'use_for_categories',
+    category: 'designer',
+    labelKey: 'sidebar.categories',
+    oneOnly: true,
+    file: 'categories.yaml',
+  },
+  {
+    key: 'constants',
+    flag: 'use_for_constants',
+    category: 'designer',
+    labelKey: 'sidebar.constants',
+    oneOnly: true,
+    file: 'constants.yaml',
+  },
   { key: 'forms', flag: 'use_for_forms', category: 'designer' },
   { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
   { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer', oneOnly: true },
@@ -102,7 +120,14 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'disclaimer',
   },
-  { key: 'config', flag: 'use_for_config', category: 'access', oneOnly: true },
+  {
+    key: 'roles',
+    flag: 'use_for_roles',
+    category: 'access',
+    labelKey: 'sidebar.roles',
+    oneOnly: true,
+    file: 'roles.yaml',
+  },
   { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
   { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
   {
@@ -142,7 +167,16 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'notification-channels',
   },
-  { key: 'chat', flag: 'use_for_chat', category: 'connections', objects: true, oneOnly: true, file: 'chat.yaml' },
+  // named as its menu item names it (Chat assistant)
+  {
+    key: 'chat',
+    flag: 'use_for_chat',
+    category: 'connections',
+    labelKey: 'sidebar.chat',
+    objects: true,
+    oneOnly: true,
+    file: 'chat.yaml',
+  },
   {
     key: 'syslog',
     flag: 'use_for_syslog',

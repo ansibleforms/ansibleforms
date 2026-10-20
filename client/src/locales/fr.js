@@ -1324,7 +1324,6 @@ export default {
         workflows: 'Workflows',
         inventories: 'Inventaires',
         schedules: 'Planifications',
-        config: 'Configuration',
         sso: 'SSO',
         ldap: 'LDAP',
         disclaimer: 'Avertissement',
@@ -1332,7 +1331,6 @@ export default {
         secret_stores: 'Coffres de secrets',
         runners: 'Runners',
         syslog: 'Syslog',
-        chat: 'Chat',
         branding: 'Image de marque',
         labels: 'Étiquettes',
         announcements: 'Annonces',
@@ -1344,7 +1342,6 @@ export default {
         workflows: 'Workflows que construit le designer, modifiés et repoussés par le designer',
         inventories: 'Un inventaire : inventory.yaml, group_vars et host_vars à sa racine',
         schedules: 'Planifications en YAML, une par fichier dans son dossier schedules',
-        config: 'config.yaml avec les catégories et les constantes (un seul dépôt)',
         sso: 'Fournisseurs SSO en YAML, un par fichier dans son dossier sso, qui nomment leur identifiant',
         ldap: 'Annuaires LDAP en YAML, un par fichier dans son dossier ldap, dans leur ordre de recherche',
         disclaimer: "Versions de l'avertissement en YAML, une par fichier dans son dossier disclaimer",
@@ -1355,13 +1352,16 @@ export default {
         runners: 'Runners en YAML, un par fichier dans son dossier runners, qui nomment leur identifiant',
         notification_channels: 'Notifications en YAML, une par fichier dans son dossier notification-channels',
         syslog: 'Serveurs syslog en YAML, un par fichier dans son dossier syslog',
-        chat: "Les paramètres de l'assistant de chat dans son chat.yaml, la clé uniquement en référence d'environnement",
+        chat: "L'assistant de chat dans son chat.yaml, la clé uniquement en référence d'environnement",
         branding:
           "Le nom, les valeurs par défaut, la langue, le logo et l'icône dans son branding.yaml et les images à côté",
         links: "Les liens de l'en-tête et celui du concepteur, dans son links.yaml",
         labels: 'Les étiquettes à côté du logo en YAML, une par fichier dans son dossier labels, dans leur ordre',
         announcements: 'Annonces en YAML, une par fichier dans son dossier announcements',
         settings: "Les paramètres de Système > Général par leur nom d'environnement, dans son settings.yaml",
+        roles: 'Les rôles, dans son roles.yaml (config.yaml encore lu, obsolète)',
+        categories: 'Les catégories, dans son categories.yaml (config.yaml encore lu, obsolète)',
+        constants: 'Les constantes, dans son constants.yaml (config.yaml encore lu, obsolète)',
       },
       usageOnTitle: 'Activer {type}',
       usageOnQuestion: 'Utiliser {name} pour {type} ?',
@@ -1386,6 +1386,8 @@ export default {
       usageOnWithoutSecret:
         'Écrits sans leurs secrets, qui restent dans la base de données (git ne contient jamais un secret en clair) : {names}.',
       usageOnSkipped: 'Déjà terminés dans git, non importés : {count}.',
+      configDeprecated:
+        "{key} lus depuis config.yaml : obsolète, déplacez-les dans {file} (config.yaml n'est plus lu en 8.0.0)",
       usageOnAfter:
         'Dès lors, un pull apporte les changements faits dans git, et les changements faits ici vont dans git avec le Push du dépôt.',
       usageOnDone:

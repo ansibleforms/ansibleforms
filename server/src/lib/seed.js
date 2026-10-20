@@ -28,6 +28,7 @@ import yaml from "yaml";
 import logger from "./logger.js";
 import appConfig from "../../config/app.config.js";
 import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
+import { foldConfigFlag } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -249,7 +250,7 @@ async function applyListSection(section, cfg, summary) {
  * does. So if that first clone failed - bad credentials, DNS, or the pod killed mid-clone by
  * a readiness probe - every later boot took the `unchanged` fast path, because status/head/
  * output are runtime state and deliberately not declarable, so differs() never looks at
- * them. A repository marked use_for_config then made the instance serve NO forms, for ever,
+ * them. A repository marked use_for_roles then made the instance serve NO forms, for ever,
  * while the seed reported itself applied.
  *
  * Checking the directory rather than `status` on purpose: status can read 'success' from an
@@ -516,6 +517,13 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   if (doc.awx) {
     logger.warning("The config seed's awx: section is deprecated since 7 and removed in 8: declare those connections under runners: with type: awx");
     doc = foldAwxIntoRunners(doc);
+  }
+  // a repository's use_for_config : deprecated since 7.4.0, removed in 8 - the roles, the categories
+  // and the constants, each a flag of its own now
+  const configFlag = foldConfigFlag(doc);
+  doc = configFlag.doc;
+  for (const name of configFlag.folded) {
+    logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.4.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
   }
   // a runner's own token, or user and password : deprecated since 7.3 in favour of a credential
   // of its kind (credential:), removed in 8. Applied as such a credential, named after the runner

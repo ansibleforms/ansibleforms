@@ -180,6 +180,31 @@ export function foldAwxIntoRunners(doc) {
 }
 
 /**
+ * A repository's use_for_config in the seed (deprecated since 7.4.0, removed in 8) as the three
+ * flags it is now : use_for_roles, use_for_categories and use_for_constants, each the seed's own
+ * when it declares it. Returns a new document and the repositories folded ; the warning is the
+ * caller's.
+ *
+ * Args:
+ *   doc (object): the seed document.
+ *
+ * Returns:
+ *   { doc: object, folded: string[] }: the document, and the repositories whose flag moved.
+ */
+export function foldConfigFlag(doc) {
+  const items = doc?.repositories?.items || [];
+  if (!items.some((r) => r.use_for_config !== undefined)) return { doc, folded: [] };
+  const folded = [];
+  const repositoryItems = items.map((r) => {
+    if (r.use_for_config === undefined) return r;
+    const { use_for_config: on, ...rest } = r;
+    folded.push(r.name);
+    return { use_for_roles: on, use_for_categories: on, use_for_constants: on, ...rest };
+  });
+  return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded };
+}
+
+/**
  * Whether a seeded runner carries its own secrets (a token, or a user and password) instead of
  * naming a credential : what foldRunnerSecretsIntoCredentials folds.
  *
@@ -412,6 +437,9 @@ const repositoryItem = {
     credential: str,
     // what the app reads from it : every usage type's flag (lib/repoObjects/types.js)
     ...Object.fromEntries(USAGE_TYPES.map((t) => [t.flag, bool])),
+    // deprecated since 7.4.0, removed in 8 : the roles, the categories and the constants at once
+    // (foldConfigFlag)
+    use_for_config: bool,
     rebase_on_start: bool,
     cron: str,
     // status, pull_status, push_status, pull_output, push_output, pulled_at, pushed_at and head
@@ -862,8 +890,10 @@ export function validateSeed(doc) {
   // the deprecated awx: items count as runners for the cross-item rules, and the deprecated mail
   // keys of the settings as the channel and credential they become
   const folded = foldMailSettingsIntoChannel(foldAwxIntoRunners(doc)).doc;
-  assertUniqueNames(folded);
-  assertSingletonFlags(folded);
+  // a repository's use_for_config counts as the three flags it is now
+  const flags = foldConfigFlag(folded).doc;
+  assertUniqueNames(flags);
+  assertSingletonFlags(flags);
   return true;
 }
 

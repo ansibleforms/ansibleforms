@@ -45,7 +45,7 @@ describe("getConfigPath reports failure instead of inventing an answer", () => {
   const fn = slice("static async getConfigPath()", "static async getFormsFolders()");
 
   test("the slice really is the function, so these assertions are not vacuous", () => {
-    assert.match(fn, /use_for_config/);
+    assert.match(fn, /use_for_roles/);
   });
 
   test("no catch answers the empty string", () => {
@@ -401,7 +401,7 @@ describe("forms live in files only (7.0.0)", () => {
     const refuse = save.indexOf("Every form must be saved");
     const write = save.indexOf("yaml.stringify(formsConfig)");
     assert.ok(refuse > -1 && write > refuse);
-    assert.match(save.slice(write - 200, write), /delete formsConfig\.forms/);
+    assert.match(save.slice(write - 400, write), /delete formsConfig\.forms/);
   });
 
   test("nothing reads forms.yaml or FORMS_PATH any more", () => {

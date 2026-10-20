@@ -683,7 +683,7 @@ const SCHEMA_MANIFEST = {
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
                                'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
-                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_links', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_runners', 'repositories.use_for_notification_channels', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat', 'repositories.use_for_disclaimer', 'repositories.use_for_branding', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_settings',
                                'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
                                'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.branding_managed',
                                'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
@@ -1262,9 +1262,11 @@ async function patchVersion7(messages, success, failed) {
   // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
   // YAML file per object in the type's folder ; the objects of the types built say where they come
   // from (repository, repo_file), the other types' tables will in the version that brings them
-  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "links", "labels", "announcements", "settings"]) {
+  for (const type of ["credentials", "secret_stores", "runners", "notification_channels", "sso", "ldap", "syslog", "chat", "disclaimer", "branding", "links", "labels", "announcements", "settings", "roles", "categories", "constants"]) {
     await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
   }
+  // the Config usage split into Roles, Categories and Constants (the three columns added just above)
+  await checkPromise(splitConfigUsage(), messages, success, failed);
   // an announcement is found by its name (a seed's, a repository's)
   await checkPromise(addColumn("announcements", "name", "varchar(100)", true, "NULL"), messages, success, failed);
   // the branding fields the config seed manages (its branding section), read only in the app
@@ -2185,6 +2187,25 @@ export async function dedupeLdapNames() {
   if (!renamed.length) return null;
   const message = `LDAP directories shared a name: renamed ${renamed.join(", ")} so the name can be unique`;
   logger.warning(message);
+  return message;
+}
+
+/**
+ * Splits the Config usage of the repositories into its three keys' (lib/configKeys.js) : a
+ * repository that had use_for_config gets use_for_roles, use_for_categories and use_for_constants,
+ * so it serves the same configuration as before, and use_for_config goes back to 0 - the column
+ * kept, no longer read, so a second start changes nothing.
+ *
+ * Returns:
+ *   Promise<string|null>: what it did, null when no repository had it.
+ */
+export async function splitConfigUsage() {
+  const res = await mysql.do(
+    "UPDATE AnsibleForms.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE use_for_config = 1",
+  );
+  if (!res?.affectedRows) return null;
+  const message = `The Config usage of ${res.affectedRows} repository(ies) is now Roles, Categories and Constants`;
+  logger.notice(message);
   return message;
 }
 

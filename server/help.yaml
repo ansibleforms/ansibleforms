@@ -6553,14 +6553,30 @@
 
       | Group | Types (flag) |
       | --- | --- |
-      | Designer | Forms (`use_for_forms`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Inventories (`use_for_inventories`), Schedules (`use_for_schedules`) |
-      | Access | Config (`use_for_config`), SSO (`use_for_sso`), LDAP (`use_for_ldap`), Disclaimer (`use_for_disclaimer`) |
-      | Connections | Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notification channels (`use_for_notification_channels`), Syslog (`use_for_syslog`), Chat (`use_for_chat`) |
+      | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
+      | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
+      | Connections | Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notification_channels`), Chat assistant (`use_for_chat`), Syslog (`use_for_syslog`) |
       | Appearance | Branding (`use_for_branding`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | Settings (`use_for_settings`) |
 
-      Forms, Playbooks, Workflows, Inventories and Config work as before (several repositories may hold forms,
-      workflows and inventories). Every other type is an object type, one repository at most per type: one object
+      Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
+      and inventories).
+
+      **Roles, Categories and Constants** (the Config usage of before, split) each read only their own key of the
+      base configuration, one repository at most each: `roles:` from the repository's `roles.yaml`, `categories:`
+      from `categories.yaml`, `constants:` from `constants.yaml`. When that file is missing, the key is read from
+      the repository's `config.yaml`, still working but deprecated: the server log says it once per load, the
+      repository's pull output and its page say it too, for example `roles read from config.yaml: deprecated,
+      move them to roles.yaml (config.yaml is no longer read in 8.0.0)`. The new file is preferred when both are
+      there. A key no repository holds comes from where the base configuration comes from (the database copy, or
+      the `CONFIG_PATH` file), as before; the keys of the repositories are laid over it. The designer saving the
+      categories or the constants, and a save of the roles, writes each key back into the file it was read from
+      (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own when the repository
+      has neither; the repository's Push sends it as before. An install upgraded from before gets the three
+      flags on every repository that had `use_for_config`; the config seed still takes `use_for_config` as a
+      deprecated alias of the three, with a warning.
+
+      Every other type is an object type, one repository at most per type: one object
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
       `notification-channels/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
       what the app has one of, one file at the repository's root (`chat.yaml`, `settings.yaml`, `branding.yaml`

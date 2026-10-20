@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 20 types of the server, in five groups, each flag once', () => {
+  it('are the 22 types of the server, in five groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -75,7 +75,19 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(20);
+    expect(new Set(USAGE_FLAGS).size).toBe(22);
+    // the Designer group in the Designer menu's order, Schedules last
+    expect(typesOf('designer').map((u) => u.key)).toEqual([
+      'categories',
+      'constants',
+      'forms',
+      'inventories',
+      'playbooks',
+      'workflows',
+      'schedules',
+    ]);
+    // Roles where Config was : Disclaimer, Roles, LDAP, SSO
+    expect(typesOf('access').map((u) => u.key)).toEqual(['disclaimer', 'roles', 'ldap', 'sso']);
     expect(typesOf('connections').map((u) => u.key)).toEqual([
       'credentials',
       'secret_stores',
@@ -86,16 +98,35 @@ describe('the usage types', () => {
     ]);
   });
 
-  it('forms, workflows and inventories may be on several repositories, as before ; config and playbooks one', () => {
+  it('forms, workflows and inventories may be on several repositories ; roles, categories, constants and playbooks one', () => {
     const one = (key) => !!USAGE_TYPES.find((u) => u.key === key).oneOnly;
     expect(['forms', 'workflows', 'inventories'].map(one)).toEqual([false, false, false]);
-    expect(['config', 'playbooks', 'schedules', 'credentials', 'runners'].map(one)).toEqual([
+    expect(['roles', 'categories', 'constants', 'playbooks', 'schedules', 'credentials', 'runners'].map(one)).toEqual([
+      true,
+      true,
       true,
       true,
       true,
       true,
       true,
     ]);
+    // the server refuses a second one for the three configuration keys too
+    for (const key of ['roles', 'categories', 'constants']) {
+      expect(server.USAGE_TYPES.find((u) => u.key === key).oneOnly).toBe(true);
+    }
+  });
+
+  it('named as their menu items : Roles, Categories, Constants, Chat assistant', () => {
+    const labels = Object.fromEntries(USAGE_TYPES.filter((u) => u.labelKey).map((u) => [u.key, u.labelKey]));
+    expect(labels).toMatchObject({
+      roles: 'sidebar.roles',
+      categories: 'sidebar.categories',
+      constants: 'sidebar.constants',
+      chat: 'sidebar.chat',
+    });
+    expect(read('pages/admin/repository.vue')).toContain(
+      "t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })",
+    );
   });
 
   it('every type has its label and its hint, every group its name, in every language', async () => {
@@ -338,7 +369,7 @@ describe('Pull all, and a linked object', () => {
 describe('the types kept in one file : the chat, the settings, the branding', () => {
   it('say their file : the app written to it, or the one in git applied', () => {
     expect(activationLines(t, 'chat', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
-      'settings.repositories.usageOnWrittenFile {"type":"settings.repositories.usageTypes.chat","name":"cfg","file":"chat.yaml"}',
+      'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat.yaml"}',
     );
     expect(activationLines(t, 'branding', 'cfg', { written: [], clashes: ['Branding'] })[0]).toBe(
       'settings.repositories.usageOnReadFile {"type":"settings.repositories.usageTypes.branding","name":"cfg","file":"branding.yaml"}',

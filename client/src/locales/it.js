@@ -1320,7 +1320,6 @@ export default {
         workflows: 'Workflow',
         inventories: 'Inventari',
         schedules: 'Pianificazioni',
-        config: 'Configurazione',
         sso: 'SSO',
         ldap: 'LDAP',
         disclaimer: 'Disclaimer',
@@ -1328,7 +1327,6 @@ export default {
         secret_stores: 'Archivi di segreti',
         runners: 'Runner',
         syslog: 'Syslog',
-        chat: 'Chat',
         branding: 'Branding',
         labels: 'Etichette',
         announcements: 'Annunci',
@@ -1340,7 +1338,6 @@ export default {
         workflows: 'Workflow che il designer costruisce, modificati e reinviati dal designer',
         inventories: 'Un inventario: inventory.yaml, group_vars e host_vars nella radice',
         schedules: 'Pianificazioni in YAML, una per file nella sua cartella schedules',
-        config: 'config.yaml con le categorie e le costanti (un solo repository)',
         sso: 'Provider SSO in YAML, uno per file nella sua cartella sso, che nominano la loro credenziale',
         ldap: 'Directory LDAP in YAML, una per file nella sua cartella ldap, nel loro ordine di ricerca',
         disclaimer: 'Versioni del disclaimer in YAML, una per file nella sua cartella disclaimer',
@@ -1351,13 +1348,16 @@ export default {
         runners: 'Runner in YAML, uno per file nella sua cartella runners, che nominano la loro credenziale',
         notification_channels: 'Notifiche in YAML, una per file nella sua cartella notification-channels',
         syslog: 'Server syslog in YAML, uno per file nella sua cartella syslog',
-        chat: "Le impostazioni dell'assistente chat nel suo chat.yaml, la chiave solo come riferimento di ambiente",
+        chat: "L'assistente chat nel suo chat.yaml, la chiave solo come riferimento di ambiente",
         branding:
           "Il nome, i valori predefiniti, la lingua, il logo e l'icona nel suo branding.yaml e le immagini accanto",
         links: "I link dell'intestazione e quello del designer, nel suo links.yaml",
         labels: 'Le etichette accanto al logo in YAML, una per file nella sua cartella labels, nel loro ordine',
         announcements: 'Annunci in YAML, uno per file nella sua cartella announcements',
         settings: 'Le impostazioni di Sistema > Generale per nome di ambiente, nel suo settings.yaml',
+        roles: 'I ruoli, nel suo roles.yaml (config.yaml ancora letto, deprecato)',
+        categories: 'Le categorie, nel suo categories.yaml (config.yaml ancora letto, deprecato)',
+        constants: 'Le costanti, nel suo constants.yaml (config.yaml ancora letto, deprecato)',
       },
       usageOnTitle: 'Attiva {type}',
       usageOnQuestion: 'Usare {name} per {type}?',
@@ -1381,6 +1381,8 @@ export default {
       usageOnWithoutSecret:
         'Scritti senza i loro segreti, che restano nel database (git non contiene mai un segreto in chiaro): {names}.',
       usageOnSkipped: 'Già terminati in git, non importati: {count}.',
+      configDeprecated:
+        '{key} letti da config.yaml: deprecato, spostali in {file} (config.yaml non viene più letto dalla 8.0.0)',
       usageOnAfter:
         'Da quel momento un pull porta le modifiche fatte in git, e le modifiche fatte qui vanno in git con il Push del repository.',
       usageOnDone:

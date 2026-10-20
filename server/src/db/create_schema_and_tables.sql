@@ -503,7 +503,12 @@ CREATE TABLE `repositories` (
   `use_for_playbooks` tinyint(4) DEFAULT NULL,
   -- added by a patch on an existing install ; keep both paths in sync (schema.model.js)
   `branch` varchar(250) DEFAULT NULL,
+  -- the Config usage of before 7.4.0 : split into the three below by a patch, no longer read
   `use_for_config` tinyint(4) DEFAULT 0,
+  -- the roles, the categories and the constants, each from its own file (lib/configKeys.js)
+  `use_for_roles` tinyint(4) DEFAULT 0,
+  `use_for_categories` tinyint(4) DEFAULT 0,
+  `use_for_constants` tinyint(4) DEFAULT 0,
   -- the workflows the designer builds (one repository only)
   `use_for_workflows` tinyint(4) DEFAULT 0,
   -- the inventories the playbook forms name (inventory: <name>)

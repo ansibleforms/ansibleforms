@@ -32,6 +32,7 @@ import {
   usageToast,
   usageSearchFields,
   usedFor,
+  usageLabel,
 } from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -470,6 +471,12 @@ onMounted(async () => {
                 <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
               </h6>
             </template>
+            <!-- its roles, categories or constants read from config.yaml : deprecated, a line each -->
+            <div v-for="d in repo.deprecations || []" :key="d.key" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{
+                t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })
+              }}
+            </div>
             <!-- a form name it shares with another forms repository : the copy used, the one skipped -->
             <div v-for="d in repo.formDuplicates || []" :key="d.skipped.place" class="alert alert-warning py-2">
               <FaIcon icon="triangle-exclamation" class="me-2" />{{

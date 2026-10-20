@@ -20,6 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
+import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase } from "../lib/configKeys.js";
 
 
 const ajv = new Ajv({allErrors: true, allowUnionTypes: true});
@@ -258,8 +259,11 @@ async function getSaveTargets() {
   const names = new Set(repoFolders.map(f => f.name).filter(Boolean))
   const configRepo = configRepoFromPath(targetConfigPath, appConfig.repoPath)
   if (configRepo) names.add(configRepo)
+  // and the repositories that hold the roles, the categories or the constants (lib/configKeys.js)
+  const sources = await keySources()
+  for (const source of sources) names.add(source.repository)
   const repoNames = [...names]
-  return { configPath: targetConfigPath, formsDirs, repoMode, repoNames }
+  return { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: sources }
 }
 
 // ===========================================================================
@@ -429,6 +433,19 @@ async function saveRenamedRole(renamed) {
   }
 }
 
+/**
+ * A configuration file's text : read, or rendered with ytt (USE_YTT), its lib folder beside it.
+ *
+ * Args:
+ *   file (string): the file.
+ *
+ * Returns:
+ *   string: its text.
+ */
+function renderConfigFile(file) {
+  return appConfig.useYtt ? execYtt(file, path.join(path.dirname(file), "/lib")) : fs.readFileSync(file, 'utf8')
+}
+
 async function getBaseConfig() {
   var rawdata=''
 
@@ -479,11 +496,18 @@ async function getBaseConfig() {
     }
   }
 
+  // the roles, the categories and the constants a repository holds, each from its own file (or its
+  // config.yaml, deprecated), laid over the base (lib/configKeys.js)
+  const sources = await keySources()
+  rawdata = composeConfig(rawdata, sources, renderConfigFile)
+
   // now let's see if it's valid yaml - kept by the text's hash, a deep copy each time : the base
   // config is read on every Form.load and every role check
   try{
     const hash = crypto.createHash("sha256").update(String(rawdata)).digest("hex")
     if (baseConfigCache.hash === hash && !(baseConfigCache.retryAt <= Date.now())) return structuredClone(baseConfigCache.config)
+    // a key read from a repository's config.yaml : said once per load, not on each request
+    for (const source of sources.filter((x) => x.deprecated)) logger.warning(`Repository '${source.repository}': ${deprecationNotice(source)}`)
     // a config from before 7 names the role every user has `public` : renamed `default`, and
     // written back where it came from - once per text, the cache below keeps the result ; a
     // refused write is tried again a minute later
@@ -1831,7 +1855,7 @@ Form.save = async function(data, options = {}){
     throw new Errors.BadRequestError(Helpers.getError(err))
   }
   assertUniqueFormNames(formsConfig.forms)
-  const { configPath: targetConfigPath, formsDirs, repoMode, repoNames } = await getSaveTargets()
+  const { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: keySourcesHeld } = await getSaveTargets()
   logger.info(`Saving forms to ${formsDirs.map(d => d.path).join(", ")}`)
   var groups={}  // key "<repository>\0<source>" -> { repository, source, forms:[] }
 
@@ -2024,7 +2048,14 @@ Form.save = async function(data, options = {}){
 
     // the base config only : categories, roles, constants - the forms are in their files
     delete formsConfig.forms
-    const configYaml = yaml.stringify(formsConfig)
+    // the keys a repository holds : each written back to the file it was read from (its claim held
+    // above), the rest into the base config, its other keys kept (lib/configKeys.js)
+    let configYaml = yaml.stringify(formsConfig)
+    if (keySourcesHeld.length) {
+      const { rest } = await writeConfigKeys(formsConfig, keySourcesHeld, { claim: false })
+      const baseText = useDatabase ? configSettings.config_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath, 'utf8') : '')
+      configYaml = mergeIntoBase(baseText, rest)
+    }
 
     if (useDatabase) {
       logger.debug("Writing base config to database")

@@ -1320,7 +1320,6 @@ export default {
         workflows: 'Workflows',
         inventories: 'Inventarissen',
         schedules: 'Planners',
-        config: 'Configuratie',
         sso: 'SSO',
         ldap: 'LDAP',
         disclaimer: 'Disclaimer',
@@ -1328,7 +1327,6 @@ export default {
         secret_stores: 'Secret stores',
         runners: 'Runners',
         syslog: 'Syslog',
-        chat: 'Chat',
         branding: 'Huisstijl',
         labels: 'Labels',
         announcements: 'Aankondigingen',
@@ -1340,7 +1338,6 @@ export default {
         workflows: 'Workflows die de designer bouwt, bewerkt en teruggepusht door de designer',
         inventories: 'Een inventaris: inventory.yaml, group_vars en host_vars in de hoofdmap',
         schedules: 'Planners in YAML, één per bestand in de map schedules',
-        config: 'config.yaml met de categorieën en constanten (één repository)',
         sso: 'SSO-providers in YAML, één per bestand in zijn map sso, die hun inloggegevens noemen',
         ldap: 'LDAP-directories in YAML, één per bestand in zijn map ldap, in hun zoekvolgorde',
         disclaimer: 'Disclaimerversies in YAML, één per bestand in zijn map disclaimer',
@@ -1350,13 +1347,16 @@ export default {
         runners: 'Runners in YAML, één per bestand in zijn map runners, die hun inloggegevens noemen',
         notification_channels: 'Meldingen in YAML, één per bestand in zijn map notification-channels',
         syslog: 'Syslog-servers in YAML, één per bestand in zijn map syslog',
-        chat: 'De instellingen van de chat-assistent in zijn chat.yaml, de sleutel alleen als omgevingsverwijzing',
+        chat: 'De chat-assistent in zijn chat.yaml, de sleutel alleen als omgevingsverwijzing',
         branding:
           'De naam, standaardwaarden, taal, het logo en het pictogram in zijn branding.yaml en de afbeeldingen ernaast',
         links: 'De links in de kop en die naar de ontwerper, in zijn links.yaml',
         labels: 'De labels naast het logo in YAML, één per bestand in zijn map labels, in hun volgorde',
         announcements: 'Aankondigingen in YAML, één per bestand in zijn map announcements',
         settings: 'De instellingen van Systeem > Algemeen op hun omgevingsnaam, in zijn settings.yaml',
+        roles: 'De rollen, in zijn roles.yaml (config.yaml nog gelezen, verouderd)',
+        categories: 'De categorieën, in zijn categories.yaml (config.yaml nog gelezen, verouderd)',
+        constants: 'De constanten, in zijn constants.yaml (config.yaml nog gelezen, verouderd)',
       },
       usageOnTitle: '{type} inschakelen',
       usageOnQuestion: '{name} gebruiken voor {type}?',
@@ -1379,6 +1379,8 @@ export default {
       usageOnWithoutSecret:
         'Geschreven zonder hun geheimen, die in de database blijven (git bevat nooit een geheim in klare tekst): {names}.',
       usageOnSkipped: 'In git al afgelopen, niet geïmporteerd: {count}.',
+      configDeprecated:
+        '{key} gelezen uit config.yaml: verouderd, verplaats ze naar {file} (config.yaml wordt vanaf 8.0.0 niet meer gelezen)',
       usageOnAfter:
         'Vanaf dan brengt een pull de wijzigingen uit git binnen, en gaan de wijzigingen die hier gemaakt worden naar git met de Push van de repository.',
       usageOnDone:

@@ -99,6 +99,12 @@ export const db = {
       return { affectedRows: hit.length };
     }
     if (/^SELECT COUNT\(\*\) AS n FROM \S+ WHERE repository = \?/.test(sql)) return [{ n: rows.filter((r) => r.repository === params[0]).length }];
+    // the Config usage split into its three keys' (models/schema.model.js splitConfigUsage)
+    if (/^UPDATE AnsibleForms\.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE use_for_config = 1/.test(sql)) {
+      const hit = rows.filter((r) => Number(r.use_for_config) === 1);
+      hit.forEach((r) => Object.assign(r, { use_for_roles: 1, use_for_categories: 1, use_for_constants: 1, use_for_config: 0 }));
+      return { affectedRows: hit.length };
+    }
     // a runner's credential, and its default
     if (/^SELECT credential_type FROM AnsibleForms\.`credentials` WHERE name = \?/.test(sql)) return rowsOf("credentials").filter((r) => r.name === params[0]).map((r) => ({ credential_type: r.credential_type }));
     if (/^SELECT name FROM AnsibleForms\.`runners` WHERE is_default = 1 AND managed = 1/.test(sql)) return [];
@@ -107,7 +113,7 @@ export const db = {
       return { affectedRows: 1 };
     }
     // a single-row table (the settings, the chat assistant's) : its row, a field of it, a write
-    if (/^SELECT (\*|\w+) FROM \S+ limit 1;?$/i.test(sql)) return copy(rows.slice(0, 1));
+    if (/^SELECT (\*|[\w, ]+) FROM \S+ limit 1;?$/i.test(sql)) return copy(rows.slice(0, 1));
     if (/^UPDATE \S+ set \?$/i.test(sql)) {
       const values = Array.isArray(params) ? params[0] : params;
       rows.forEach((r) => Object.assign(r, values));
@@ -133,6 +139,8 @@ export const db = {
     m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) = \?$/);
     if (m) return copy(rows.filter((r) => (m[1] === "name" ? lower(r.name) === lower(params[0]) : String(r[m[1]]) === String(params[0]))));
     if (/^SELECT .+ FROM \S+$/.test(sql)) return copy(rows);
+    // a list by name (the repositories)
+    if (/^SELECT .+ FROM \S+ ORDER BY name$/.test(sql)) return copy(rows).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     // a list in its order (the LDAP directories, the labels)
     if (/^SELECT .+ FROM \S+ ORDER BY position, (id|name)$/.test(sql)) {
       return copy(rows).sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || String(a.id).localeCompare(String(b.id)));
