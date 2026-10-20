@@ -69,13 +69,15 @@ export const USAGE_TYPES = [
     oneOnly: true,
     folder: 'schedules',
   },
+  // named as its menu item names it (System > General)
   {
-    key: 'settings',
-    flag: 'use_for_settings',
+    key: 'general',
+    flag: 'use_for_general',
     category: 'system',
+    labelKey: 'sidebar.ansibleForms',
     objects: true,
     oneOnly: true,
-    file: 'settings.yaml',
+    file: 'general.yaml',
   },
   {
     key: 'branding',
@@ -188,6 +190,16 @@ export const USAGE_TYPES = [
     oneOnly: true,
     file: 'chat.yaml',
   },
+  // named as its menu item names it (MCP)
+  {
+    key: 'mcp',
+    flag: 'use_for_mcp',
+    category: 'connections',
+    labelKey: 'sidebar.mcp',
+    objects: true,
+    oneOnly: true,
+    file: 'mcp.yaml',
+  },
   {
     key: 'syslog',
     flag: 'use_for_syslog',
@@ -220,7 +232,8 @@ export const APPLY_ORDER = [
   'links',
   'labels',
   'announcements',
-  'settings',
+  'general',
+  'mcp',
 ];
 
 // what a type's question adds of its own (the schedules : the one-time jobs stay in the app), and

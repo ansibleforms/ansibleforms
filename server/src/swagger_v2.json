@@ -1355,12 +1355,13 @@
                   "use_for_ldap": { "type": "boolean", "description": "Its ldap folder holds the LDAP directories, one YAML file each (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's file cannot be removed while linked. One repository at most" },
                   "use_for_syslog": { "type": "boolean", "description": "Its syslog folder holds the syslog servers, one YAML file each in the config seed format. One repository at most" },
                   "use_for_chat": { "type": "boolean", "description": "Its chat.yaml holds the chat assistant's settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "Its mcp.yaml holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
                   "use_for_disclaimer": { "type": "boolean", "description": "Its disclaimer folder holds the disclaimer versions, one YAML file each (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
                   "use_for_branding": { "type": "boolean", "description": "Its branding.yaml holds the name, the defaults, the language and the logo and icon as image files beside it, read and written as binary. One repository at most" },
                   "use_for_links": { "type": "boolean", "description": "Its links.yaml holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
                   "use_for_labels": { "type": "boolean", "description": "Its labels folder holds the labels beside the logo, one YAML file each in the config seed format, with their position. One repository at most" },
                   "use_for_announcements": { "type": "boolean", "description": "Its announcements folder holds the announcements, one YAML file each, named, with their schedule and switch. One repository at most" },
-                  "use_for_settings": { "type": "boolean", "description": "Its settings.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "Its general.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                           "rebase_on_start": { "type": "boolean" },
                           "cron": { "type": "string" },
                           "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -1418,12 +1419,13 @@
                   "use_for_ldap": { "type": "boolean", "description": "Its ldap folder holds the LDAP directories, one YAML file each (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's file cannot be removed while linked. One repository at most" },
                   "use_for_syslog": { "type": "boolean", "description": "Its syslog folder holds the syslog servers, one YAML file each in the config seed format. One repository at most" },
                   "use_for_chat": { "type": "boolean", "description": "Its chat.yaml holds the chat assistant's settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "Its mcp.yaml holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
                   "use_for_disclaimer": { "type": "boolean", "description": "Its disclaimer folder holds the disclaimer versions, one YAML file each (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
                   "use_for_branding": { "type": "boolean", "description": "Its branding.yaml holds the name, the defaults, the language and the logo and icon as image files beside it, read and written as binary. One repository at most" },
                   "use_for_links": { "type": "boolean", "description": "Its links.yaml holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
                   "use_for_labels": { "type": "boolean", "description": "Its labels folder holds the labels beside the logo, one YAML file each in the config seed format, with their position. One repository at most" },
                   "use_for_announcements": { "type": "boolean", "description": "Its announcements folder holds the announcements, one YAML file each, named, with their schedule and switch. One repository at most" },
-                  "use_for_settings": { "type": "boolean", "description": "Its settings.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "Its general.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -1543,12 +1545,13 @@
                   "use_for_ldap": { "type": "boolean", "description": "Its ldap folder holds the LDAP directories, one YAML file each (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's file cannot be removed while linked. One repository at most" },
                   "use_for_syslog": { "type": "boolean", "description": "Its syslog folder holds the syslog servers, one YAML file each in the config seed format. One repository at most" },
                   "use_for_chat": { "type": "boolean", "description": "Its chat.yaml holds the chat assistant's settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "Its mcp.yaml holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
                   "use_for_disclaimer": { "type": "boolean", "description": "Its disclaimer folder holds the disclaimer versions, one YAML file each (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
                   "use_for_branding": { "type": "boolean", "description": "Its branding.yaml holds the name, the defaults, the language and the logo and icon as image files beside it, read and written as binary. One repository at most" },
                   "use_for_links": { "type": "boolean", "description": "Its links.yaml holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
                   "use_for_labels": { "type": "boolean", "description": "Its labels folder holds the labels beside the logo, one YAML file each in the config seed format, with their position. One repository at most" },
                   "use_for_announcements": { "type": "boolean", "description": "Its announcements folder holds the announcements, one YAML file each, named, with their schedule and switch. One repository at most" },
-                  "use_for_settings": { "type": "boolean", "description": "Its settings.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "Its general.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                     "rebase_on_start": { "type": "boolean" },
                     "cron": { "type": "string" },
                     "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -1609,12 +1612,13 @@
                   "use_for_ldap": { "type": "boolean", "description": "Its ldap folder holds the LDAP directories, one YAML file each (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's file cannot be removed while linked. One repository at most" },
                   "use_for_syslog": { "type": "boolean", "description": "Its syslog folder holds the syslog servers, one YAML file each in the config seed format. One repository at most" },
                   "use_for_chat": { "type": "boolean", "description": "Its chat.yaml holds the chat assistant's settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "Its mcp.yaml holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
                   "use_for_disclaimer": { "type": "boolean", "description": "Its disclaimer folder holds the disclaimer versions, one YAML file each (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
                   "use_for_branding": { "type": "boolean", "description": "Its branding.yaml holds the name, the defaults, the language and the logo and icon as image files beside it, read and written as binary. One repository at most" },
                   "use_for_links": { "type": "boolean", "description": "Its links.yaml holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
                   "use_for_labels": { "type": "boolean", "description": "Its labels folder holds the labels beside the logo, one YAML file each in the config seed format, with their position. One repository at most" },
                   "use_for_announcements": { "type": "boolean", "description": "Its announcements folder holds the announcements, one YAML file each, named, with their schedule and switch. One repository at most" },
-                  "use_for_settings": { "type": "boolean", "description": "Its settings.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "Its general.yaml holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -4413,7 +4417,7 @@
                       },
                       "ownedElsewhere": {
                         "type": "boolean",
-                        "description": "Another page's or the deployment's : not shown on Settings > System > General, never in a settings repository's settings.yaml"
+                        "description": "Another page's or the deployment's : not shown on Settings > System > General, never in a General repository's general.yaml"
                       },
                       "short": {
                         "type": "string",

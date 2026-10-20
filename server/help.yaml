@@ -6555,9 +6555,9 @@
       | --- | --- |
       | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
       | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
-      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notification_channels`), Chat assistant (`use_for_chat`), Syslog (`use_for_syslog`) |
+      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notification_channels`), Chat assistant (`use_for_chat`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
       | Appearance | Branding (`use_for_branding`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
-      | System | Settings (`use_for_settings`) |
+      | System | General (`use_for_general`) |
 
       Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
       and inventories).
@@ -6579,7 +6579,7 @@
       Every other type is an object type, one repository at most per type: one object
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
       `notification-channels/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
-      what the app has one of, one file at the repository's root (`chat.yaml`, `settings.yaml`, `branding.yaml`
+      what the app has one of, one file at the repository's root (`chat.yaml`, `general.yaml`, `branding.yaml`
       and its images, `links.yaml`). The repositories are a list in one file, `repositories.yaml`.
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
@@ -6716,8 +6716,8 @@
     description: |
       The last six usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
-      Four are things the app has one of (chat, settings, branding, links): each is **one file** at the
-      repository's root. Turning the type on
+      Five are things the app has one of (chat, general settings, MCP, branding, links): each is **one file** at
+      the repository's root. Turning the type on
       writes the app's values to that file when the repository has none, or applies the file when it has one (git
       wins); a pull applies it; a save in the app rewrites only the fields it changed; turning it off reads it once
       more and the app keeps its values. A file removed from git changes nothing in the app.
@@ -6732,7 +6732,7 @@
       allow_job_status: false
       ```
 
-      **Settings** (`settings.yaml`): Settings > System > General by environment variable names, only those that
+      **General** (`general.yaml`): Settings > System > General by environment variable names, only those that
       page changes (never one another page or the deployment owns, a refused one, or one set in the real
       environment). A variable whose name ends in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as
       `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
@@ -6743,6 +6743,18 @@
       JOB_RETENTION_DAYS: 30
       LOG_LEVEL: info
       DB_PASSWORD: ${DB_PASSWORD}
+      ```
+
+      **MCP** (`mcp.yaml`): Settings > Connections > MCP by environment variable names, every switch that page
+      changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
+      never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
+      General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
+      General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
+      section in the same format, and it locks what it declares, variable by variable, as its `branding:` does.
+      ```yaml
+      ENABLE_MCP: 1
+      MCP_READ_ONLY: 1
+      MCP_CHAT_FORMS_ONLY: 0
       ```
 
       **Branding** (`branding.yaml` and its images): the name and the defaults (`default_theme`,
@@ -6771,7 +6783,8 @@
       As every seed section, the seed's `branding:` and `links:` lock what they declare, field by field: those
       fields are read only on the Appearance pages (a notice says so, a seeded logo or icon cannot be uploaded nor
       removed) and the API refuses their change (403); a field no longer declared is released, and all are when the
-      seed is turned off. A Branding or Links repository and the seed never own the same field: the seed keeps the
+      seed is turned off. The seed's `mcp:` does the same on the MCP page, variable by variable. A Branding, Links or
+      MCP repository and the seed never own the same field: the seed keeps the
       fields it declares (listed as staying in the app when the repository is made the type's, never written to its
       file, and not applied from it, said in the pull output); the repository holds the others.
 

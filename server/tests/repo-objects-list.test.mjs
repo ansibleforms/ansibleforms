@@ -169,8 +169,9 @@ describe("the app's repositories to repositories.yaml", () => {
       "runners",
       "notification_channels",
       "chat",
+      "mcp",
       "syslog",
     ]);
-    assert.equal(types.USAGE_FLAGS.length, 23);
+    assert.equal(types.USAGE_FLAGS.length, 24);
   });
 });

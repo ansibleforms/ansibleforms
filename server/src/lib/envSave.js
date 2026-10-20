@@ -1,11 +1,11 @@
 'use strict';
 // Saving environment variables : what Settings > System > General's Save does, written once - for
-// the page (controllers/v2/config.controller.js saveEnv) and for a settings repository's pull
-// (lib/repoObjects/settings.js). Every value checked before anything is written (a known
-// variable, not refused, not set in the real environment, valid for its documentation), then the
-// managed file written, the other nodes told (the 'env' epoch), each variable applied at once when
-// it can be or said to need a restart, and the change audited (the names only : the values include
-// credentials).
+// the page (controllers/v2/config.controller.js saveEnv), for the MCP page (the same route), and
+// for a General or MCP repository's pull (lib/repoObjects/envType.js). Every value checked before
+// anything is written (a known variable, not refused, not set in the real environment, valid for
+// its documentation), then the managed file written, the other nodes told (the 'env' epoch), each
+// variable applied at once when it can be or said to need a restart, and the change audited (the
+// names only : the values include credentials).
 import Help from "../models/help.model.js";
 import Audit from "../models/audit.model.js";
 import logger from "./logger.js";
@@ -13,7 +13,7 @@ import EnvSettings from "./envSettings.js";
 import appConfig from "../../config/app.config.js";
 import { bump } from "./epochs.js";
 import { publish } from "./liveEvents.js";
-import { BRANDING_ENV, assertBrandingFree } from "./brandingManaged.js";
+import { BRANDING_ENV, MCP_ENV, assertBrandingFree } from "./brandingManaged.js";
 
 // the mask the page shows a secret as : sent back, it means unchanged, never a value to store
 export const ENV_MASK = "*** NOT REVEALED ***";
@@ -41,6 +41,31 @@ export async function envDocs() {
   return new Map((section?.items || []).map((x) => [x.name, x]));
 }
 
+// the pages that save environment variables, each the variables it owns, by the repository type
+// that keeps them : System > General (general) everything no other page nor the deployment owns
+// (lib/envSettings.js OWNED_ELSEWHERE), Connections > MCP (mcp) the MCP server's settings - never
+// one variable for two (OWNED_ELSEWHERE names the MCP ones)
+export const ENV_OWNERS = {
+  general: (name) => !EnvSettings.OWNED_ELSEWHERE.test(name),
+  mcp: (name) => MCP_ENV.test(name),
+};
+
+/**
+ * Whether a page (by its repository type) shows and edits a variable : documented, not refused,
+ * one it owns.
+ *
+ * Args:
+ *   type (string): the page's repository type (general, mcp).
+ *   name (string): the variable.
+ *   docs (Map): the documented variables (envDocs).
+ *
+ * Returns:
+ *   boolean: true when the page edits it.
+ */
+export function ownsVariable(type, name, docs) {
+  return docs.has(name) && EnvSettings.classify(name) !== "refused" && !!ENV_OWNERS[type]?.(name);
+}
+
 /**
  * Whether Settings > System > General shows and edits a variable : documented, not refused, not
  * another page's nor the deployment's.
@@ -53,7 +78,7 @@ export async function envDocs() {
  *   boolean: true when the page edits it.
  */
 export function onSettingsPage(name, docs) {
-  return docs.has(name) && EnvSettings.classify(name) !== "refused" && !EnvSettings.OWNED_ELSEWHERE.test(name);
+  return ownsVariable("general", name, docs);
 }
 
 /**
@@ -69,7 +94,7 @@ export function onSettingsPage(name, docs) {
  *
  * Raises:
  *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0), a value refused, or a
- *     branding setting the config seed manages changed (403).
+ *     branding or MCP setting the config seed manages changed (403).
  */
 export async function saveEnvValues(updates, who = {}, opts = {}) {
   const names = Object.keys(updates || {});
@@ -78,10 +103,12 @@ export async function saveEnvValues(updates, who = {}, opts = {}) {
   if (!appConfig.allowEnvEdit) throw new EnvSaveError(403, EnvSettings.ENV_EDIT_DISABLED_REASON);
   const docs = await envDocs();
   const managed = await EnvSettings.readManaged();
-  // the branding's language and Designer's link : the config seed's when its branding declares them
-  const branding = names.filter((name) => BRANDING_ENV[name] && String(updates[name] ?? "") !== String(process.env[name] ?? "")).map((name) => BRANDING_ENV[name]);
+  // the branding's language and Designer's link, the MCP settings : the config seed's when its
+  // branding or mcp section declares them (an MCP setting held by its variable)
+  const seedFieldOf = (name) => BRANDING_ENV[name] || (MCP_ENV.test(name) ? name : null);
+  const held = names.filter((name) => seedFieldOf(name) && String(updates[name] ?? "") !== String(process.env[name] ?? "")).map(seedFieldOf);
   try {
-    await assertBrandingFree(branding, opts);
+    await assertBrandingFree(held, opts);
   } catch (e) {
     throw new EnvSaveError(403, e.message);
   }
@@ -136,4 +163,4 @@ export async function saveEnvValues(updates, who = {}, opts = {}) {
   return { changed: names, restartRequired };
 }
 
-export default { ENV_MASK, EnvSaveError, envDocs, onSettingsPage, saveEnvValues };
+export default { ENV_MASK, ENV_OWNERS, EnvSaveError, envDocs, ownsVariable, onSettingsPage, saveEnvValues };

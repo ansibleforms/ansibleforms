@@ -1,11 +1,12 @@
 'use strict';
-// The appearance fields the config seed manages (its branding and links sections) : read only in
-// the app, as every seeded object is - refused with a 403 by the helpers that save them
+// The fields the config seed manages per field (its branding, links and mcp sections) : read only
+// in the app, as every seeded object is - refused with a 403 by the helpers that save them
 // (lib/appearance.js, lib/envSave.js, lib/brandImages.js), whatever page or request calls them ;
-// the seed itself writes them (opts.fromSeed). They live in the settings row and in two environment
-// settings, so the seed's hold is kept per field, one list for both sections : the names of the
-// fields they declare, in the settings row's branding_managed (JSON). A field it stops declaring is released, and all
-// are when the seed is turned off (lib/seed.js).
+// the seed itself writes them (opts.fromSeed). They live in the settings row and in environment
+// settings, so the seed's hold is kept per field, one list for every section : the names of the
+// fields they declare (an MCP setting by its variable), in the settings row's branding_managed
+// (JSON). A field it stops declaring is released, and all are when the seed is turned off
+// (lib/seed.js).
 import mysql from "../models/db.model.js";
 import Errors from "./errors.js";
 
@@ -28,8 +29,23 @@ export const BRANDING_FIELDS = [
 // the two that are environment settings, by their variable
 export const BRANDING_ENV = { DEFAULT_LANGUAGE: "default_language", SHOW_DESIGNER: "show_designer" };
 
+// the MCP server's settings (Settings > Connections > MCP : its switch and its options), by their
+// variable : the MCP type's (lib/repoObjects/mcp.js) and the seed's mcp section, each a field
+export const MCP_ENV = /^(ENABLE_MCP|MCP_[A-Z0-9_]+)$/;
+
 /**
- * The branding fields the config seed manages.
+ * Whether the seed can hold a field : an appearance field or an MCP setting.
+ *
+ * Args:
+ *   field (string): its name (an MCP setting's variable).
+ *
+ * Returns:
+ *   boolean: true when it is one.
+ */
+export const seedField = (field) => BRANDING_FIELDS.includes(field) || MCP_ENV.test(String(field));
+
+/**
+ * The fields the config seed manages (the appearance fields, the MCP settings).
  *
  * Returns:
  *   Promise<string[]>: their names ; none when it manages none (or they cannot be read).
@@ -38,14 +54,14 @@ export async function seedManagedBranding() {
   try {
     const rows = await mysql.do("SELECT branding_managed FROM AnsibleForms.`settings` LIMIT 1");
     const list = JSON.parse(rows?.[0]?.branding_managed || "[]");
-    return Array.isArray(list) ? list.filter((f) => BRANDING_FIELDS.includes(f)) : [];
+    return Array.isArray(list) ? list.filter(seedField) : [];
   } catch {
     return [];
   }
 }
 
 /**
- * Records the branding fields the config seed manages now (the ones its section declares).
+ * Records the fields the config seed manages now (the ones its sections declare).
  *
  * Args:
  *   fields (string[]): their names ; none releases them all.
@@ -55,7 +71,7 @@ export async function seedManagedBranding() {
  */
 export async function setSeedManagedBranding(fields) {
   const before = await seedManagedBranding();
-  const now = (fields || []).filter((f) => BRANDING_FIELDS.includes(f));
+  const now = (fields || []).filter(seedField);
   if (JSON.stringify([...before].sort()) !== JSON.stringify([...now].sort())) {
     await mysql.do("UPDATE AnsibleForms.`settings` SET branding_managed = ?", [now.length ? JSON.stringify(now) : null]);
   }
@@ -63,11 +79,11 @@ export async function setSeedManagedBranding(fields) {
 }
 
 /**
- * Refuses a change of branding fields the config seed manages : 403, as the API refuses a change
+ * Refuses a change of fields the config seed manages : 403, as the API refuses a change
  * of any seeded object. The seed's own write passes.
  *
  * Args:
- *   fields (string[]): the branding fields a save changes.
+ *   fields (string[]): the fields a save changes (an MCP setting by its variable).
  *   opts (object): { fromSeed (true : the seed's own write) }.
  *
  * Raises:

@@ -1,12 +1,14 @@
 // The last object types on the engine (lib/repoObjects) : the ones kept in ONE file of their
-// repository - the chat assistant (chat.yaml), the System > General settings (settings.yaml), the
+// repository - the chat assistant (chat.yaml), the System > General settings (general.yaml), the
 // branding (branding.yaml and its images) - and the announcements and the disclaimer versions, one
 // file each. On the shared fixture :
 //   single-file mode  a pull applies the file (git wins), turning the type on writes the app's
 //                     values when there is no file, an edit in the app rewrites only what changed,
 //                     its secret an ${ENV} reference only, what it names waited for
-//   settings          checked and applied as the settings page's Save : a variable another page or
+//   general           checked and applied as the settings page's Save : a variable another page or
 //                     the deployment owns refused, a secret only as ${ENV}, a restart said
+//   mcp               the MCP page's switches the same way (mcp.yaml), applied at once, never a
+//                     variable of the settings' ; the seed's mcp section holding them per variable
 //   branding          its images beside it, read and written as binary, checked as an upload
 //   announcements     named, their moments compared in UTC, one made in the app named on its way
 //   disclaimer        a changed text a correction, or everyone asked again when the file says so
@@ -90,12 +92,13 @@ beforeEach(() => {
   process.env.CHAT_KEY = "sk-from-env";
   delete process.env.JOB_RETENTION_DAYS;
   delete process.env.DEFAULT_LANGUAGE;
+  for (const name of ["ENABLE_MCP", "MCP_READ_ONLY", "MCP_CHAT_FORMS_ONLY"]) delete process.env[name];
   fs.rmSync(MANAGED, { force: true });
   audits.length = 0;
   acceptances = { 1: 5 };
   fx.reset({
     repositories: [
-      { id: 1, name: "cfg", use_for_chat: 1, use_for_settings: 1, use_for_branding: 1, use_for_links: 1 },
+      { id: 1, name: "cfg", use_for_chat: 1, use_for_general: 1, use_for_branding: 1, use_for_links: 1, use_for_mcp: 1 },
       { id: 2, name: "news", use_for_announcements: 1, use_for_disclaimer: 1 },
     ],
     credentials: [{ id: 1, name: "chat-key", credential_type: "api", password: "enc:k" }],
@@ -169,35 +172,110 @@ describe("a type kept in one file : the chat assistant", () => {
 // ─── the settings ──────────────────────────────────────────────────────────────
 describe("the System > General settings, by their environment names", () => {
   test("a pull applies them as the page's Save : written, applied, audited", async () => {
-    writeRaw("cfg", "settings.yaml", "JOB_RETENTION_DAYS: 30\n");
-    const summary = await RepoObjects.syncRepository(await desc("settings"), "cfg");
+    writeRaw("cfg", "general.yaml", "JOB_RETENTION_DAYS: 30\n");
+    const summary = await RepoObjects.syncRepository(await desc("general"), "cfg");
     assert.equal(summary.updated, 1, JSON.stringify(summary));
     assert.match(fs.readFileSync(MANAGED, "utf8"), /JOB_RETENTION_DAYS='30'/);
     assert.equal(audits[0].action, "settings.env.update");
     assert.deepEqual(audits[0].detail.changed, ["JOB_RETENTION_DAYS"]);
-    assert.equal((await RepoObjects.syncRepository(await desc("settings"), "cfg")).unchanged, 1);
+    assert.equal((await RepoObjects.syncRepository(await desc("general"), "cfg")).unchanged, 1);
   });
 
   test("only what the page changes : another page's, an unknown one, a bad value, a plain secret refused", async () => {
-    writeRaw("cfg", "settings.yaml", "BASE_URL: /af/\nNOT_A_SETTING: 1\nJOB_RETENTION_DAYS: lots\n");
-    const summary = await RepoObjects.syncRepository(await desc("settings"), "cfg");
+    writeRaw("cfg", "general.yaml", "BASE_URL: /af/\nNOT_A_SETTING: 1\nJOB_RETENTION_DAYS: lots\n");
+    const summary = await RepoObjects.syncRepository(await desc("general"), "cfg");
     const why = summary.refused[0].reasons.join(" ");
     assert.match(why, /BASE_URL is not one Settings > System > General changes/);
     assert.match(why, /NOT_A_SETTING is not a known environment variable/);
     assert.match(why, /JOB_RETENTION_DAYS/);
     assert.equal(fs.existsSync(MANAGED), false, "nothing written");
-    writeRaw("cfg", "settings.yaml", "DB_PASSWORD: plain\n");
-    assert.match((await RepoObjects.syncRepository(await desc("settings"), "cfg")).refused[0].reasons[0], /DB_PASSWORD must be an \$\{ENV\} reference/);
+    writeRaw("cfg", "general.yaml", "DB_PASSWORD: plain\n");
+    assert.match((await RepoObjects.syncRepository(await desc("general"), "cfg")).refused[0].reasons[0], /DB_PASSWORD must be an \$\{ENV\} reference/);
   });
 
   test("a save from the page rewrites the file, its secrets never", async () => {
-    writeRaw("cfg", "settings.yaml", "# ops\nJOB_RETENTION_DAYS: 30\n");
-    await RepoObjects.syncRepository(await desc("settings"), "cfg");
+    writeRaw("cfg", "general.yaml", "# ops\nJOB_RETENTION_DAYS: 30\n");
+    await RepoObjects.syncRepository(await desc("general"), "cfg");
     const { saveEnvValues } = await import("../src/lib/envSave.js");
-    const before = await RepoObjects.snapshot("settings");
+    const before = await RepoObjects.snapshot("general");
     await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
-    await RepoObjects.appUpdated("settings", before);
-    assert.equal(fx.readText("cfg", ".", "settings.yaml"), "# ops\nJOB_RETENTION_DAYS: \"45\"\n");
+    await RepoObjects.appUpdated("general", before);
+    assert.equal(fx.readText("cfg", ".", "general.yaml"), "# ops\nJOB_RETENTION_DAYS: \"45\"\n");
+  });
+});
+
+// ─── the MCP settings ──────────────────────────────────────────────────────────
+describe("the MCP settings, in their mcp.yaml", () => {
+  test("turned on : every switch written with its value ; a pull applies ENABLE_MCP at once ; an edit rewrites it ; turned off", async () => {
+    fx.cloneEmpty("cfg");
+    const report = await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
+    assert.deepEqual(report.written, ["MCP"]);
+    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: "0", MCP_CHAT_FORMS_ONLY: "0", MCP_READ_ONLY: "0" });
+    // a pull : saved as the page saves it, the server switched on without a restart
+    const { default: appConfig } = await import("./__mocks__/app.config.js");
+    writeRaw("cfg", "mcp.yaml", "ENABLE_MCP: 1\nMCP_READ_ONLY: 0\n");
+    const summary = await RepoObjects.syncRepository(await desc("mcp"), "cfg");
+    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    assert.equal(appConfig.enableMcp, true);
+    assert.doesNotMatch(RepoObjects.summaryText(await desc("mcp"), summary), /restart/);
+    assert.match(fs.readFileSync(MANAGED, "utf8"), /ENABLE_MCP='1'/);
+    assert.deepEqual(audits[0].detail, { changed: ["ENABLE_MCP"], restartRequired: [] });
+    assert.equal((await RepoObjects.syncRepository(await desc("mcp"), "cfg")).unchanged, 1);
+    // a save from the page rewrites the file
+    const { saveEnvValues } = await import("../src/lib/envSave.js");
+    const before = await RepoObjects.snapshot("mcp");
+    await saveEnvValues({ MCP_READ_ONLY: "1" }, { user: "root" });
+    await RepoObjects.appUpdated("mcp", before);
+    assert.equal(fx.readObject("cfg", ".", "mcp.yaml").MCP_READ_ONLY, "1");
+    // turned off : the app keeps its values, the file stays
+    assert.equal((await RepoObjects.deactivate(await desc("mcp"), "cfg")).unlinked, 1);
+    assert.equal(appConfig.enableMcp, true);
+    assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "mcp.yaml")));
+    appConfig.enableMcp = false;
+  });
+
+  test("never one variable for both : the settings refuse the MCP switches, the MCP the settings'", async () => {
+    const { envDocs, ownsVariable } = await import("../src/lib/envSave.js");
+    const docs = await envDocs();
+    const both = [...docs.keys()].filter((name) => ownsVariable("general", name, docs) && ownsVariable("mcp", name, docs));
+    assert.deepEqual(both, []);
+    assert.deepEqual([...docs.keys()].filter((name) => ownsVariable("mcp", name, docs)).sort(), ["ENABLE_MCP", "MCP_CHAT_FORMS_ONLY", "MCP_READ_ONLY"]);
+    writeRaw("cfg", "general.yaml", "ENABLE_MCP: 1\n");
+    assert.match((await RepoObjects.syncRepository(await desc("general"), "cfg")).refused[0].reasons[0], /ENABLE_MCP is not one Settings > System > General changes/);
+    writeRaw("cfg", "mcp.yaml", "JOB_RETENTION_DAYS: 30\nMCP_READ_ONLY: 1\n");
+    const why = (await RepoObjects.syncRepository(await desc("mcp"), "cfg")).refused[0].reasons.join(" ");
+    assert.match(why, /JOB_RETENTION_DAYS is not one Settings > Connections > MCP changes/);
+    assert.equal(fs.existsSync(MANAGED), false, "nothing written");
+  });
+
+  test("the seed's mcp section holds its switches : refused in the app, kept out of the repository's file", async () => {
+    const { setSeedManagedBranding, seedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { saveEnvValues } = await import("../src/lib/envSave.js");
+    const { validateSeed } = await import("../src/lib/seed-schema.js");
+    assert.equal(validateSeed({ mcp: { ENABLE_MCP: true, MCP_READ_ONLY: 1 } }), true);
+    assert.throws(() => validateSeed({ mcp: { JOB_RETENTION_DAYS: 30 } }), /validation failed/);
+    await setSeedManagedBranding(["MCP_READ_ONLY"]);
+    assert.deepEqual(await seedManagedBranding(), ["MCP_READ_ONLY"]);
+    await assert.rejects(saveEnvValues({ MCP_READ_ONLY: "1" }, {}), { status: 403, message: /MCP_READ_ONLY/ });
+    // turned on : listed as staying in the app, never written to the file
+    fx.cloneEmpty("cfg");
+    assert.deepEqual((await RepoObjects.preview(await desc("mcp"), "cfg")).kept.map((k) => k.name), ["MCP_READ_ONLY"]);
+    await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
+    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: "0", MCP_CHAT_FORMS_ONLY: "0" });
+    // a file declaring it : not applied, said ; the others applied
+    writeRaw("cfg", "mcp.yaml", "MCP_READ_ONLY: 1\nMCP_CHAT_FORMS_ONLY: 1\n");
+    const summary = await RepoObjects.syncRepository(await desc("mcp"), "cfg");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(process.env.MCP_READ_ONLY, undefined);
+    assert.equal(process.env.MCP_CHAT_FORMS_ONLY, "1");
+    assert.match(RepoObjects.summaryText(await desc("mcp"), summary), /Kept by the config seed, not applied: MCP_READ_ONLY/);
+    // the seed's own section applies it
+    const done = await RepoObjects.applyDeclared(await desc("mcp"), { MCP_READ_ONLY: true }, {});
+    assert.deepEqual(done.updated, ["mcp"]);
+    assert.equal(process.env.MCP_READ_ONLY, "1");
+    // released when the seed stops declaring it
+    assert.deepEqual(await setSeedManagedBranding([]), ["MCP_READ_ONLY"]);
+    await saveEnvValues({ MCP_READ_ONLY: "0" }, {});
   });
 });
 

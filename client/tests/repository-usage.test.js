@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 23 types of the server, in six groups, each flag once', () => {
+  it('are the 24 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -75,7 +75,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(23);
+    expect(new Set(USAGE_FLAGS).size).toBe(24);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -96,6 +96,7 @@ describe('the usage types', () => {
       'runners',
       'notification_channels',
       'chat',
+      'mcp',
       'syslog',
     ]);
   });
@@ -174,6 +175,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
       'use_for_runners',
       'use_for_notification_channels',
       'use_for_chat',
+      'use_for_mcp',
       'use_for_syslog',
     ]);
     expect(categoryState('connections', record, others).checked).toBe(true);
@@ -184,11 +186,11 @@ describe('a group box ticks every type of it that can be ticked', () => {
   it('some of a group ticked : half ticked ; every type taken : the group box greyed', () => {
     const record = { id: 3, name: 'new', use_for_forms: true };
     expect(categoryState('designer', record, []).indeterminate).toBe(true);
-    // System : only Settings, which another repository has
-    const taken = [{ id: 9, name: 'cfg', use_for_settings: 1 }];
+    // System : only General, which another repository has
+    const taken = [{ id: 9, name: 'cfg', use_for_general: 1 }];
     expect(categoryState('system', record, taken).disabled).toBe(true);
     setCategory('system', record, taken, true);
-    expect(record.use_for_settings).toBeUndefined();
+    expect(record.use_for_general).toBeUndefined();
   });
 
   it('no type is of a later version any more : nothing coming soon, every one can be ticked', async () => {
@@ -229,7 +231,16 @@ describe('one question when a save turns several object types on or off', () => 
     const was = { name: 'ops' };
     const now = { name: 'ops' };
     setCategory('connections', now, [], true);
-    const all = ['credentials', 'repositories', 'secret_stores', 'runners', 'notification_channels', 'syslog', 'chat'];
+    const all = [
+      'credentials',
+      'repositories',
+      'secret_stores',
+      'runners',
+      'notification_channels',
+      'syslog',
+      'chat',
+      'mcp',
+    ];
     expect(usageChanges(was, now)).toEqual({ on: all, off: [] });
     const answer = confirmUsageChange(t, 'ops', was, now);
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
@@ -323,7 +334,7 @@ describe("the repositories list's Usage column", () => {
 
   it('sorts by the types, a repository used for nothing last', () => {
     expect(usageSortValue(t, { use_for_forms: 1 })).toBe('settings.repositories.usageTypes.forms');
-    expect(usageSortValue(t, {}) > usageSortValue(t, { use_for_settings: 1 })).toBe(true);
+    expect(usageSortValue(t, {}) > usageSortValue(t, { use_for_general: 1 })).toBe(true);
     expect(field.sortValue({ use_for_forms: 1 })).toBe(usageSortValue(t, { use_for_forms: 1 }));
   });
 });
@@ -386,7 +397,8 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     expect(await singleTypeSource('forms')).toBeNull();
     for (const [page, type] of [
       ['pages/admin/chat.vue', 'chat'],
-      ['pages/admin/settings.vue', 'settings'],
+      ['pages/admin/settings.vue', 'general'],
+      ['pages/admin/mcp.vue', 'mcp'],
       ['pages/admin/name.vue', 'branding'],
       ['pages/admin/links.vue', 'links'],
       ['pages/admin/defaults.vue', 'branding'],
@@ -458,6 +470,46 @@ describe('the header links : their own type, after Branding', () => {
       '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
         '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
     );
+  });
+});
+
+describe('the MCP settings : one mcp.yaml, in Connections', () => {
+  it('between Chat assistant and Syslog, named as its menu item, applied with the independent types', () => {
+    expect(USAGE_TYPES.find((u) => u.key === 'mcp')).toMatchObject({
+      flag: 'use_for_mcp',
+      category: 'connections',
+      labelKey: 'sidebar.mcp',
+      file: 'mcp.yaml',
+      oneOnly: true,
+      objects: true,
+    });
+    expect(server.APPLY_ORDER.at(-1)).toBe('mcp');
+    expect(
+      activationLines(t, 'mcp', 'cfg', { written: ['MCP'], kept: [{ name: 'MCP_READ_ONLY', code: 'seed' }] }),
+    ).toEqual(
+      expect.arrayContaining([
+        'settings.repositories.usageOnKept {"names":"MCP_READ_ONLY (settings.repositories.usageKeptWhy.seed)"}',
+      ]),
+    );
+    // its page : the repository line, the seed's switches read only
+    const page = read('pages/admin/mcp.vue');
+    expect(page).toContain('<AppRepositorySource v-show="!searching" type="mcp" />');
+    expect(page).toContain(':disabled="seeded(e.name) || (e.name !== \'ENABLE_MCP\' && !mcpOn)"');
+  });
+
+  it('its hint in every language ; Settings named General, as its menu item, in its general.yaml', async () => {
+    const tt = (key) => key;
+    expect(usageBadges(tt, { use_for_general: 1, use_for_mcp: 1 })).toBe(
+      '<span class="badge af-usage-badge me-1">sidebar.ansibleForms</span>' +
+        '<span class="badge af-usage-badge me-1">sidebar.mcp</span>',
+    );
+    expect(usageLabel(tt, 'general')).toBe('sidebar.ansibleForms');
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      expect(r.usageHints.mcp, lang).toContain('mcp.yaml');
+      expect(r.usageHints.general, lang).toContain('general.yaml');
+      expect(r.usageTypes.settings, lang).toBeUndefined();
+    }
   });
 });
 

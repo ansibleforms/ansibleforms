@@ -1,6 +1,6 @@
 'use strict';
 // The descriptor of an object type kept in ONE file of its repository instead of a folder : the
-// chat assistant's settings (chat.yaml), the System > General settings (settings.yaml), the
+// chat assistant's settings (chat.yaml), the System > General settings (general.yaml), the
 // branding (branding.yaml and its images). The app has one such object ; the file holds it, in
 // the config seed's format, checked, its secrets ${ENV} references only (lib/repoObjects/fields.js).
 // The engine's single-file mode (lib/repoObjects/engine.js) reads it in, writes the app's values to

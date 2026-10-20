@@ -46,7 +46,10 @@ import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
 import { canonicalJson, differs } from "./seedCompare.js";
-import { setSeedManagedBranding } from "./brandingManaged.js";
+import { MCP_ENV, setSeedManagedBranding } from "./brandingManaged.js";
+
+// a field the seed held per field, as a release names it : an MCP setting, or a branding field
+const heldName = (field) => (MCP_ENV.test(field) ? `mcp:${field}` : `branding:${field}`);
 
 // The one thing that distinguishes the seed from an API caller. Everything the seed
 // writes goes through the normal models, so encryption, the is_default handling and
@@ -653,12 +656,15 @@ async function releaseWhenOff() {
     }
   }
 
-  // Step 2b : the branding fields its branding section declared (kept per field in the settings
-  // row, lib/brandingManaged.js)
+  // Step 2b : the fields its branding, links and mcp sections declared (kept per field in the
+  // settings row, lib/brandingManaged.js)
   const branding = await setSeedManagedBranding([]);
-  if (branding.length) {
-    released.push(...branding.map((field) => `branding:${field}`));
-    groups.push(`branding: ${branding.join(", ")}`);
+  released.push(...branding.map(heldName));
+  for (const [label, fields] of [
+    ["branding", branding.filter((f) => !MCP_ENV.test(f))],
+    ["mcp", branding.filter((f) => MCP_ENV.test(f))],
+  ]) {
+    if (fields.length) groups.push(`${label}: ${fields.join(", ")}`);
   }
 
   // Step 3 : say so, once. Nothing released (every start after the first) is silent.
@@ -817,18 +823,20 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("chat");
   }
 
-  // the branding, the links, the announcements and the disclaimer versions : read through the descriptors a
-  // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted
+  // the branding, the links, the MCP settings, the announcements and the disclaimer versions : read
+  // through the descriptors a repository holding them uses (lib/repoObjects), made or changed,
+  // never managed nor deleted
   const sections = [
     ["branding", "branding", "branding"],
     ["links", "links", "links"],
+    ["mcp", "mcp", "MCP"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
   ];
-  // the appearance fields its branding and links sections declare are its own from now on (read
-  // only in the app) ; one it no longer declares, or a section gone, released (lib/brandingManaged.js)
-  const brandingReleased = await setSeedManagedBranding([...Object.keys(doc.branding || {}), ...Object.keys(doc.links || {})]);
-  summary.released.push(...brandingReleased.map((field) => `branding:${field}`));
+  // the fields its branding, links and mcp sections declare are its own from now on (read only in
+  // the app) ; one it no longer declares, or a section gone, released (lib/brandingManaged.js)
+  const brandingReleased = await setSeedManagedBranding([...Object.keys(doc.branding || {}), ...Object.keys(doc.links || {}), ...Object.keys(doc.mcp || {})]);
+  summary.released.push(...brandingReleased.map(heldName));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");
     for (const [key, type, label] of sections) {

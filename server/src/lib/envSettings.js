@@ -56,8 +56,8 @@ export const REFUSED = {
 };
 
 // The variables Settings > System > General leaves to another page or to the deployment, and so
-// does not show : the page's own list (env API ownedElsewhere), and the one a settings repository
-// keeps out of its settings.yaml (lib/repoObjects/settings.js).
+// does not show : the page's own list (env API ownedElsewhere), and the one a General repository
+// keeps out of its general.yaml (lib/repoObjects/general.js).
 // VAULT_* are only imported once, when upgrading to 7 (Secret stores). BASE_URL is here for a different reason -
 // it is the one setting that genuinely cannot be applied without a restart, because the
 // served index.html has the base path baked into it, so every page already open would break.
@@ -86,7 +86,7 @@ export const OWNED_ELSEWHERE =
 // <service>_TOKEN look like. HTTPS_KEY is deliberately NOT matched: it is a path to a key
 // file, not the key itself, and the path is useful to see. PASSWORD and SECRET are trailing
 // too, for the same reason : PASSWORD_MIN_LENGTH is a number, and it was hidden as a secret.
-// A settings repository writes these only as ${ENV} references.
+// A General repository writes these only as ${ENV} references.
 export const SECRET_ENV_NAME = /_PASSWORD$|_SECRET$|_TOKEN$|_SECRET_PREVIOUS$/;
 
 // Why the whole page is read only, when it is. Distinct from a per-variable refusal :

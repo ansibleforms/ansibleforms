@@ -1333,7 +1333,6 @@ export default {
         branding: 'Marca',
         labels: 'Etiquetes',
         announcements: 'Anuncis',
-        settings: 'Ajustos',
       },
       usageHints: {
         forms: 'Formularis i els seus fitxers vars, editats i enviats pel dissenyador',
@@ -1352,12 +1351,13 @@ export default {
         notification_channels: 'Notificacions en YAML, una per fitxer a la seva carpeta notification-channels',
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
         chat: "L'assistent de xat al seu chat.yaml, la clau només com a referència d'entorn",
+        mcp: "Els ajustos de MCP pel seu nom d'entorn, al seu mcp.yaml",
         branding:
           "El nom, els valors per defecte, l'idioma, el logotip i la icona al seu branding.yaml i les imatges al costat",
         links: 'Els enllaços de la capçalera i el del dissenyador, al seu links.yaml',
         labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
         announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',
-        settings: "Els ajustos de Sistema > General pel seu nom d'entorn, al seu settings.yaml",
+        general: "Els ajustos de General pel seu nom d'entorn, al seu general.yaml",
         roles: 'Els rols, al seu roles.yaml (config.yaml encara es llegeix, obsolet)',
         categories: 'Les categories, al seu categories.yaml (config.yaml encara es llegeix, obsolet)',
         constants: 'Les constants, al seu constants.yaml (config.yaml encara es llegeix, obsolet)',

@@ -10,9 +10,7 @@
 // file.
 //
 // The seed and a repository never own the same field : a field the seed declares stays the seed's
-// (read only in the app, lib/brandingManaged.js) - never written to the repository's file, never
-// applied from it (said in the pull output), listed as staying in the app when the repository is
-// made the type's. The repository holds the other fields.
+// (lib/repoObjects/seedHold.js, shared with the MCP settings). The repository holds the others.
 import fs from "fs";
 import path from "path";
 import Settings, { validHeaderLinks } from "../../models/settings.model.js";
@@ -20,7 +18,7 @@ import appConfig from "../../../config/app.config.js";
 import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
-import { seedManagedBranding } from "../brandingManaged.js";
+import { seedHold } from "./seedHold.js";
 import { same } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
@@ -85,8 +83,9 @@ function readImage(dir, name) {
 export function appearanceType(spec) {
   const { rowFields = [], envFields = [], images = [] } = spec;
   const fields = [...rowFields, ...envFields, ...images];
-  // the fields of this type the config seed manages
-  const seededOf = (current) => (current?._seedManaged || []).filter((f) => fields.includes(f));
+  // the config seed's hold on this type's fields
+  const hold = seedHold((f) => fields.includes(f));
+  const { seededOf } = hold;
 
   /**
    * The fields a declaration changes : those whose value is not the app's - the ones the config
@@ -123,17 +122,13 @@ export function appearanceType(spec) {
       for (const field of envFields) out[field] = ENV[field].read();
       for (const kind of images) out[kind] = await BRAND_IMAGES[kind].get();
       // the fields the config seed manages : the seed's, never the repository's
-      out._seedManaged = await seedManagedBranding();
+      out._seedManaged = await hold.managed();
       return out;
     },
     // the fields the seed manages stay in the app (a seed-managed object stays with the seed)
-    kept: (current) => seededOf(current).map((field) => ({ name: field, code: "seed", reason: "managed by the config seed" })),
+    kept: hold.kept,
     // its YAML names its images by the file they are written as ; the seed's fields left out
-    toFile: (current) => {
-      const out = { ...current, ...Object.fromEntries(images.map((k) => [k, imageFile(k, current[k])?.name])) };
-      for (const field of seededOf(current)) delete out[field];
-      return out;
-    },
+    toFile: (current) => hold.without({ ...current, ...Object.fromEntries(images.map((k) => [k, imageFile(k, current[k])?.name])) }, current),
     extraFiles: (current) => images.filter((k) => !seededOf(current).includes(k)).map((k) => imageFile(k, current[k])).filter(Boolean),
     // the images it names read and checked ; its links as the model keeps them
     fromFile: async (declared, { dir } = {}) => {
@@ -163,9 +158,6 @@ export function appearanceType(spec) {
       return notes;
     },
     // a repository's file declaring a field the seed manages : not applied, said
-    notesOf: (declared, current) => {
-      const seeded = Object.keys(declared).filter((k) => seededOf(current).includes(k));
-      return seeded.length ? [`Kept by the config seed, not applied: ${seeded.join(", ")}`] : [];
-    },
+    notesOf: hold.notesOf,
   });
 }

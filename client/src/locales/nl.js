@@ -1331,7 +1331,6 @@ export default {
         branding: 'Huisstijl',
         labels: 'Labels',
         announcements: 'Aankondigingen',
-        settings: 'Instellingen',
       },
       usageHints: {
         forms: 'Formulieren en vars-bestanden, bewerkt en teruggepusht door de designer',
@@ -1349,12 +1348,13 @@ export default {
         notification_channels: 'Meldingen in YAML, één per bestand in zijn map notification-channels',
         syslog: 'Syslog-servers in YAML, één per bestand in zijn map syslog',
         chat: 'De chat-assistent in zijn chat.yaml, de sleutel alleen als omgevingsverwijzing',
+        mcp: 'De MCP-instellingen op hun omgevingsnaam, in zijn mcp.yaml',
         branding:
           'De naam, standaardwaarden, taal, het logo en het pictogram in zijn branding.yaml en de afbeeldingen ernaast',
         links: 'De links in de kop en die naar de ontwerper, in zijn links.yaml',
         labels: 'De labels naast het logo in YAML, één per bestand in zijn map labels, in hun volgorde',
         announcements: 'Aankondigingen in YAML, één per bestand in zijn map announcements',
-        settings: 'De instellingen van Systeem > Algemeen op hun omgevingsnaam, in zijn settings.yaml',
+        general: 'De instellingen van Algemeen op hun omgevingsnaam, in zijn general.yaml',
         roles: 'De rollen, in zijn roles.yaml (config.yaml nog gelezen, verouderd)',
         categories: 'De categorieën, in zijn categories.yaml (config.yaml nog gelezen, verouderd)',
         constants: 'De constanten, in zijn constants.yaml (config.yaml nog gelezen, verouderd)',

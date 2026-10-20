@@ -1334,7 +1334,6 @@ export default {
         branding: 'Marca',
         labels: 'Etiquetas',
         announcements: 'Anuncios',
-        settings: 'Ajustes',
       },
       usageHints: {
         forms: 'Formularios y sus archivos vars, editados y enviados por el diseñador',
@@ -1353,12 +1352,13 @@ export default {
         notification_channels: 'Notificaciones en YAML, una por archivo en su carpeta notification-channels',
         syslog: 'Servidores syslog en YAML, uno por archivo en su carpeta syslog',
         chat: 'El asistente de chat en su chat.yaml, la clave solo como referencia de entorno',
+        mcp: 'Los ajustes de MCP por su nombre de entorno, en su mcp.yaml',
         branding:
           'El nombre, los valores por defecto, el idioma, el logo y el icono en su branding.yaml y las imágenes junto a él',
         links: 'Los enlaces del encabezado y el del diseñador, en su links.yaml',
         labels: 'Las etiquetas junto al logo en YAML, una por archivo en su carpeta labels, en su orden',
         announcements: 'Anuncios en YAML, uno por archivo en su carpeta announcements',
-        settings: 'Los ajustes de Sistema > General por su nombre de entorno, en su settings.yaml',
+        general: 'Los ajustes de General por su nombre de entorno, en su general.yaml',
         roles: 'Los roles, en su roles.yaml (config.yaml aún se lee, obsoleto)',
         categories: 'Las categorías, en su categories.yaml (config.yaml aún se lee, obsoleto)',
         constants: 'Las constantes, en su constants.yaml (config.yaml aún se lee, obsoleto)',

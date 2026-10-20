@@ -649,6 +649,16 @@ export const linksSection = {
   },
 };
 
+// The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
+// their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as an mcp.yaml holds them.
+// What the seed declares is its own, variable by variable, as the branding's fields
+// (lib/brandingManaged.js) ; each checked as the page's Save checks it when applied.
+export const mcpSection = {
+  type: "object",
+  propertyNames: { pattern: "^(ENABLE_MCP|MCP_[A-Z0-9_]+)$" },
+  additionalProperties: { type: ["string", "number", "boolean"] },
+};
+
 // An announcement under the header (Settings > Appearance > Announcements) : named, so a seed or a
 // repository finds it again ; its message, type, switch, and when it starts and ends showing (ISO
 // moments, UTC when they carry no zone)
@@ -764,6 +774,7 @@ export const seedSchema = {
     chat: chatSection,
     branding: brandingSection,
     links: linksSection,
+    mcp: mcpSection,
     announcements: itemsSection(announcementItem),
     disclaimer: itemsSection(disclaimerItem),
   },

@@ -147,7 +147,7 @@ export function fieldSet(spec) {
 
 /**
  * The fields of a file that is a flat map of names to values, its names not known beforehand (the
- * System > General settings by their environment names, lib/repoObjects/settings.js) : the same
+ * System > General settings by their environment names, lib/repoObjects/general.js) : the same
  * rules as fieldSet's, a name's value a text, a number or a yes or no, its secrets known by their
  * names.
  *

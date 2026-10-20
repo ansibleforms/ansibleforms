@@ -308,7 +308,7 @@ function envHelp(e) {
 //
 // The variables this page leaves to another page or to the deployment (VAULT_*, MCP_*, BASE_URL,
 // AF_ROLE, RTE_* but two, ...) : the server says so of each (ownedElsewhere, lib/envSettings.js
-// OWNED_ELSEWHERE, the one list : a settings repository keeps the same variables this page
+// OWNED_ELSEWHERE, the one list : a General repository keeps the same variables this page
 // edits), and they are not shown here.
 const envGroups = computed(() => {
   if (!env.value || !Array.isArray(env.value)) return [];
@@ -548,8 +548,8 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="5" />
         <template v-else>
-          <!-- kept in a repository's settings.yaml : which one -->
-          <AppRepositorySource v-show="!searching" type="settings" />
+          <!-- kept in a repository's general.yaml : which one -->
+          <AppRepositorySource v-show="!searching" type="general" />
           <!-- Environment Variable tabs -->
           <div v-if="searching && !shownGroups.length" class="text-body-secondary fst-italic">
             {{ t('settings.settingsPage.searchNone') }}

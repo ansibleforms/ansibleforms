@@ -40,7 +40,7 @@ export const USAGE_TYPES = [
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
   { key: "workflows", flag: "use_for_workflows", category: "designer", label: "workflows" },
   { key: "schedules", flag: "use_for_schedules", category: "jobs", objects: true, oneOnly: true, label: "schedules" },
-  { key: "settings", flag: "use_for_settings", category: "system", objects: true, oneOnly: true, label: "settings" },
+  { key: "general", flag: "use_for_general", category: "system", objects: true, oneOnly: true, label: "general settings" },
   { key: "branding", flag: "use_for_branding", category: "appearance", objects: true, oneOnly: true, label: "branding" },
   { key: "links", flag: "use_for_links", category: "appearance", objects: true, oneOnly: true, label: "links" },
   { key: "labels", flag: "use_for_labels", category: "appearance", objects: true, oneOnly: true, label: "labels" },
@@ -55,6 +55,7 @@ export const USAGE_TYPES = [
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", objects: true, oneOnly: true, label: "runners" },
   { key: "notification_channels", references: ["credentials"], flag: "use_for_notification_channels", category: "connections", objects: true, oneOnly: true, label: "notification channels" },
   { key: "chat", references: ["credentials"], flag: "use_for_chat", category: "connections", objects: true, oneOnly: true, label: "chat" },
+  { key: "mcp", flag: "use_for_mcp", category: "connections", objects: true, oneOnly: true, label: "MCP settings" },
   { key: "syslog", flag: "use_for_syslog", category: "connections", objects: true, oneOnly: true, label: "syslog servers" },
 ];
 
@@ -85,7 +86,8 @@ export const APPLY_ORDER = [
   "links",
   "labels",
   "announcements",
-  "settings",
+  "general",
+  "mcp",
 ];
 
 // ===========================================================================
