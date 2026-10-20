@@ -1308,6 +1308,7 @@ export default {
       usageColumn: 'Gebruik',
       usageCategories: {
         designer: 'Ontwerper',
+        jobs: 'Taken',
         access: 'Toegang',
         connections: 'Verbindingen',
         appearance: 'Uiterlijk',

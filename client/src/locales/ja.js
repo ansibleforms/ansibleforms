@@ -1301,6 +1301,7 @@ export default {
       usageColumn: '用途',
       usageCategories: {
         designer: 'デザイナー',
+        jobs: 'ジョブ',
         access: 'アクセス',
         connections: '接続',
         appearance: '外観',

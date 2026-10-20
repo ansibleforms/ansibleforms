@@ -1312,6 +1312,7 @@ export default {
       usageColumn: 'Usage',
       usageCategories: {
         designer: 'Concepteur',
+        jobs: 'Jobs',
         access: 'Accès',
         connections: 'Connexions',
         appearance: 'Apparence',

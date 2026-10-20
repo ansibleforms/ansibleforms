@@ -1299,6 +1299,7 @@ export default {
       usageColumn: 'Usage',
       usageCategories: {
         designer: 'Designer',
+        jobs: 'Jobs',
         access: 'Access',
         connections: 'Connections',
         appearance: 'Appearance',

@@ -51,10 +51,10 @@ const settings = getSettings(t);
 const field = (list, key) => settings[list].fields.find((f) => f.key === key);
 
 describe('the Schedules usage of a repository', () => {
-  it('is an object type of the Designer group, one repository at most', () => {
+  it('is an object type of the Jobs group, one repository at most', () => {
     expect(usageType('schedules')).toMatchObject({
       flag: 'use_for_schedules',
-      category: 'designer',
+      category: 'jobs',
       objects: true,
       oneOnly: true,
       folder: 'schedules',

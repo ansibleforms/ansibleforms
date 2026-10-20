@@ -21,7 +21,7 @@
 // ===========================================================================
 
 // the categories, in the order the Usage step shows them
-export const CATEGORIES = ["designer", "system", "appearance", "access", "connections"];
+export const CATEGORIES = ["designer", "jobs", "system", "appearance", "access", "connections"];
 
 // every usage type, in its category's order :
 //   key        the type (its translation key on the client)
@@ -39,7 +39,7 @@ export const USAGE_TYPES = [
   { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
   { key: "workflows", flag: "use_for_workflows", category: "designer", label: "workflows" },
-  { key: "schedules", flag: "use_for_schedules", category: "designer", objects: true, oneOnly: true, label: "schedules" },
+  { key: "schedules", flag: "use_for_schedules", category: "jobs", objects: true, oneOnly: true, label: "schedules" },
   { key: "settings", flag: "use_for_settings", category: "system", objects: true, oneOnly: true, label: "settings" },
   { key: "branding", flag: "use_for_branding", category: "appearance", objects: true, oneOnly: true, label: "branding" },
   { key: "links", flag: "use_for_links", category: "appearance", objects: true, oneOnly: true, label: "links" },

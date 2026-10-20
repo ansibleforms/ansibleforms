@@ -1276,7 +1276,14 @@ export default {
       stepSchedule: '拉取计划',
       stepUsage: '用途',
       usageColumn: '用途',
-      usageCategories: { designer: '设计器', access: '访问', connections: '连接', appearance: '外观', system: '系统' },
+      usageCategories: {
+        designer: '设计器',
+        jobs: '作业',
+        access: '访问',
+        connections: '连接',
+        appearance: '外观',
+        system: '系统',
+      },
       usageCategoryAll: '{category}：所有可勾选的类型',
       usageTypes: {
         forms: '表单',

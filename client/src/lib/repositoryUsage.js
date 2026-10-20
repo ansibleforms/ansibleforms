@@ -23,7 +23,7 @@ import { esc } from '@/lib/tableCells';
 // ===========================================================================
 
 // the categories, in the order the Usage step shows them
-export const USAGE_CATEGORIES = ['designer', 'system', 'appearance', 'access', 'connections'];
+export const USAGE_CATEGORIES = ['designer', 'jobs', 'system', 'appearance', 'access', 'connections'];
 
 // every usage type, in its category's order :
 //   key       the type (its label : settings.repositories.usageTypes.<key>, its hint : usageHints)
@@ -62,7 +62,7 @@ export const USAGE_TYPES = [
   {
     key: 'schedules',
     flag: 'use_for_schedules',
-    category: 'designer',
+    category: 'jobs',
 
     objects: true,
     oneOnly: true,

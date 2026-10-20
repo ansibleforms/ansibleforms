@@ -1310,6 +1310,7 @@ export default {
       usageColumn: 'Utilização',
       usageCategories: {
         designer: 'Designer',
+        jobs: 'Tarefas',
         access: 'Acesso',
         connections: 'Ligações',
         appearance: 'Aparência',

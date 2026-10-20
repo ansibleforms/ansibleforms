@@ -1313,6 +1313,7 @@ export default {
       usageColumn: 'Verwendung',
       usageCategories: {
         designer: 'Designer',
+        jobs: 'Jobs',
         access: 'Zugriff',
         connections: 'Verbindungen',
         appearance: 'Erscheinungsbild',

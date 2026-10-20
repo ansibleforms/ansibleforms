@@ -1304,6 +1304,7 @@ export default {
       usageColumn: 'Użycie',
       usageCategories: {
         designer: 'Projektant',
+        jobs: 'Zadania',
         access: 'Dostęp',
         connections: 'Połączenia',
         appearance: 'Wygląd',

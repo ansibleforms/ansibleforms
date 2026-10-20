@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 22 types of the server, in five groups, each flag once', () => {
+  it('are the 22 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -84,8 +84,9 @@ describe('the usage types', () => {
       'inventories',
       'playbooks',
       'workflows',
-      'schedules',
     ]);
+    // Schedules in a section of its own, Jobs, below the Designer
+    expect(typesOf('jobs').map((u) => u.key)).toEqual(['schedules']);
     // Roles where Config was : Disclaimer, Roles, LDAP, SSO
     expect(typesOf('access').map((u) => u.key)).toEqual(['disclaimer', 'roles', 'ldap', 'sso']);
     expect(typesOf('connections').map((u) => u.key)).toEqual([
