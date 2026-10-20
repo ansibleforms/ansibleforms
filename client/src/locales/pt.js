@@ -367,9 +367,13 @@ export default {
       allowFormDesign:
         'Editar os formulários no designer: categorias, constantes e formulários (sem isso: só leitura).',
       designAllForms:
-        'Mostrar e editar todos os formulários no designer; sem isto, apenas os formulários das funções do utilizador (os subformulários que usam, só de leitura). Limita apenas os formulários; playbooks, workflows, inventários, ficheiros de variáveis, categorias e constantes continuam visíveis para todos os designers.',
+        'Mostrar e editar todos os formulários no designer; sem isto, apenas os formulários das funções do utilizador (os subformulários que usam, só de leitura). Limita apenas os formulários (os playbooks e os fluxos de trabalho têm as suas próprias opções); inventários, ficheiros de variáveis, categorias e constantes continuam visíveis para todos os designers.',
       allowPlaybookDesign: 'Editar os playbooks no designer (sem isso: só leitura).',
+      designAllPlaybooks:
+        'Mostrar e editar todos os playbooks no designer; sem isto, apenas os playbooks usados pelos formulários que o utilizador pode ver, e os que nenhum formulário usa ainda.',
       allowWorkflowDesign: 'Editar os fluxos de trabalho no designer (sem isso: só leitura).',
+      designAllWorkflows:
+        'Mostrar e editar todos os fluxos de trabalho no designer; sem isto, apenas os fluxos de trabalho usados pelos formulários que o utilizador pode ver, e os que nenhum formulário usa ainda.',
       allowInventoryDesign: 'Editar os inventários no designer (sem isso: só leitura).',
       allowVarsFileDesign: 'Editar os ficheiros de variáveis no designer (sem isso: só leitura).',
       showLogs: 'Ver o registo do servidor.',
@@ -2291,7 +2295,9 @@ export default {
       roleOptionAllowFormDesign: 'Editar Formulários',
       roleOptionDesignAllForms: 'Editar Todos os Formulários',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
+      roleOptionDesignAllPlaybooks: 'Editar Todos os Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Fluxos de trabalho',
+      roleOptionDesignAllWorkflows: 'Editar Todos os Fluxos de trabalho',
       roleOptionAllowInventoryDesign: 'Editar Inventários',
       roleOptionAllowVarsFileDesign: 'Editar Ficheiros de variáveis',
       roleOptionShowLogs: 'Mostrar o Registo do servidor',

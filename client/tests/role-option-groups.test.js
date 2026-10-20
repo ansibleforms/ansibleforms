@@ -77,3 +77,41 @@ describe('designAllForms : every form in the designer, or only those of the role
     expect(src('pages/designer.vue')).toContain('!canDesignForms || formReadOnly');
   });
 });
+
+describe('designAllPlaybooks and designAllWorkflows : right after Edit Playbooks and Edit Workflows', () => {
+  const LANGS = ['en', 'es', 'ca', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh'];
+
+  it('in the Designer group, each after its Edit option, on by default, needing the designer', () => {
+    const designer = roleOptionGroups.find((g) => g.name === 'designer').keys;
+    expect(designer).toEqual([
+      'showDesigner',
+      'allowFormDesign',
+      'designAllForms',
+      'allowPlaybookDesign',
+      'designAllPlaybooks',
+      'allowWorkflowDesign',
+      'designAllWorkflows',
+      'allowInventoryDesign',
+      'allowVarsFileDesign',
+    ]);
+    for (const key of ['designAllPlaybooks', 'designAllWorkflows']) {
+      expect(roleOptionDefaults('ops')[key]).toBe(true);
+      expect(effectiveRoleOption({ showDesigner: false, [key]: true }, key).needs).toBe('showDesigner');
+    }
+  });
+
+  it('their labels and descriptions in every language, for the role editor and the Permissions view', async () => {
+    for (const lang of LANGS) {
+      const m = (await import(`../src/locales/${lang}.js`)).default;
+      for (const key of ['DesignAllPlaybooks', 'DesignAllWorkflows']) {
+        expect(m.settings.settingsPage[`roleOption${key}`], lang).toBeTruthy();
+        expect(m.profilePage.optionDescription[key.charAt(0).toLowerCase() + key.slice(1)], lang).toBeTruthy();
+      }
+    }
+    const en = (await import('../src/locales/en.js')).default.settings.settingsPage;
+    expect([en.roleOptionDesignAllPlaybooks, en.roleOptionDesignAllWorkflows]).toEqual([
+      'Edit All Playbooks',
+      'Edit All Workflows',
+    ]);
+  });
+});

@@ -367,9 +367,13 @@ export default {
       allowFormDesign:
         'Editar los formularios en el diseñador: categorías, constantes y formularios (sin ello: solo lectura).',
       designAllForms:
-        'Mostrar y editar todos los formularios en el diseñador; sin esto, solo los formularios de los roles del usuario (los subformularios que usan, de solo lectura). Limita solo los formularios; los playbooks, flujos de trabajo, inventarios, archivos de variables, categorías y constantes siguen visibles para todos los diseñadores.',
+        'Mostrar y editar todos los formularios en el diseñador; sin esto, solo los formularios de los roles del usuario (los subformularios que usan, de solo lectura). Limita solo los formularios (los playbooks y los flujos de trabajo tienen sus propias opciones); los inventarios, archivos de variables, categorías y constantes siguen visibles para todos los diseñadores.',
       allowPlaybookDesign: 'Editar los playbooks en el diseñador (sin ello: solo lectura).',
+      designAllPlaybooks:
+        'Mostrar y editar todos los playbooks en el diseñador; sin esto, solo los playbooks que usan los formularios que el usuario puede ver, y los que ningún formulario usa todavía.',
       allowWorkflowDesign: 'Editar los flujos de trabajo en el diseñador (sin ello: solo lectura).',
+      designAllWorkflows:
+        'Mostrar y editar todos los flujos de trabajo en el diseñador; sin esto, solo los flujos de trabajo que usan los formularios que el usuario puede ver, y los que ningún formulario usa todavía.',
       allowInventoryDesign: 'Editar los inventarios en el diseñador (sin ello: solo lectura).',
       allowVarsFileDesign: 'Editar los archivos de variables en el diseñador (sin ello: solo lectura).',
       showLogs: 'Ver el registro del servidor.',
@@ -2293,7 +2297,9 @@ export default {
       roleOptionAllowFormDesign: 'Editar Formularios',
       roleOptionDesignAllForms: 'Editar Todos los Formularios',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
+      roleOptionDesignAllPlaybooks: 'Editar Todos los Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Flujos de trabajo',
+      roleOptionDesignAllWorkflows: 'Editar Todos los Flujos de trabajo',
       roleOptionAllowInventoryDesign: 'Editar Inventarios',
       roleOptionAllowVarsFileDesign: 'Editar Archivos de variables',
       roleOptionShowLogs: 'Mostrar el Registro del servidor',

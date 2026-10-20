@@ -133,20 +133,14 @@ export async function listWorkflows(shown = null) {
  * The credentials each of the designer's workflows names : its job template nodes' (the export's
  * related.credentials, or credentials), for a credential's Used by tab.
  *
- * Args:
- *   shown (function): (file) => whether a workflow file (its absolute path) is shown to the user ;
- *     every one when not given.
- *
  * Returns:
  *   Promise<object[]>: { name, description, file, credentials: [{ name, where }] } for the
  *     workflows that name at least one credential, sorted by name ; where says the file and the
  *     node, such as "deploy.yaml, node configure".
  */
-export async function workflowCredentials(shown = null) {
+export async function workflowCredentials() {
   const out = [];
-  for (const { workflow, rel, file } of await allWorkflows()) {
-    // a workflow file hidden from the user (lib/designerForms.js) : not named
-    if (shown && !shown(path.resolve(file))) continue;
+  for (const { workflow, rel } of await allWorkflows()) {
     const credentials = [];
     for (const node of workflow.nodes || []) {
       const nodeName = node.identifier || node.name || "?";
@@ -225,27 +219,6 @@ export async function findWorkflow(ref) {
 }
 
 /**
- * Every workflow a form's reference may mean, among workflows already read : the file's (its path,
- * or a file name alone matching in a subfolder too), or each one of the name. findWorkflowIn runs
- * one of them only when they are one ; the designer's visibility counts each of them as used
- * (lib/designerForms.js), so a second workflow of the same name never shows the first.
- *
- * Args:
- *   all (object[]): the workflows (workflowFiles).
- *   ref (string): the form's workflow : a file or a name.
- *
- * Returns:
- *   object[]: the workflows ({ workflow, file, rel }) ; none when nothing matches.
- */
-export function workflowCandidates(all, ref) {
-  const { file, name } = workflowRef(ref);
-  if (!file) return all.filter((f) => f.workflow.name === name);
-  const inFile = all.filter((f) => f.rel === file);
-  if (inFile.length || file.includes("/")) return inFile;
-  return all.filter((f) => path.basename(f.rel) === file);
-}
-
-/**
  * A workflow as a form names it, among workflows already read (findWorkflow's rules).
  *
  * Args:
@@ -261,11 +234,12 @@ export function workflowCandidates(all, ref) {
 export function findWorkflowIn(all, ref) {
   const { file, name } = workflowRef(ref);
   if (file) {
-    let inFile = workflowCandidates(all, ref);
+    let inFile = all.filter((f) => f.rel === file);
     // a file name alone : in a subfolder, when only one file has it
-    if (inFile.length && inFile[0].rel !== file) {
-      const files = [...new Set(inFile.map((f) => f.rel))].sort();
+    if (!inFile.length && !file.includes("/")) {
+      const files = [...new Set(all.filter((f) => path.basename(f.rel) === file).map((f) => f.rel))].sort();
       if (files.length > 1) throw new Errors.ConflictError(`Workflow file '${file}' is in ${files.join(" and ")}: name it with its folder`);
+      inFile = all.filter((f) => f.rel === files[0]);
     }
     if (!inFile.length) throw new Errors.NotFoundError(`No workflow file '${file}' in the designer's workflows`);
     // a file from two places (the workflows folder and a repository) : as two names would be

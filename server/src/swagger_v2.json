@@ -13,6 +13,7 @@
     { "name": "user", "description": "User management and profile" },
     { "name": "group", "description": "Group management" },
     { "name": "settings", "description": "Application settings and configuration" },
+    { "name": "designer", "description": "The designer's playbooks, vars files, inventories and workflows" },
     { "name": "ldapdirectory", "description": "The LDAP directories users sign in with (Settings > Access > LDAP)" },
     { "name": "secretstore", "description": "Secret stores (HashiCorp Vault, ...) that credentials read from" },
     { "name": "syslogserver", "description": "Syslog servers the server log and the audit entries are sent to" },
@@ -4739,6 +4740,267 @@
           },
           "500": {
             "description": "Failed to restore"
+          }
+        }
+      }
+    },
+    "/files/workflows/names": {
+      "get": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "The designer's workflows by name",
+        "description": "Each workflow with its file: what a workflow form may run. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workflows"
+          }
+        }
+      }
+    },
+    "/files/{kind}": {
+      "get": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "The designer's files of a kind",
+        "description": "The files of the playbooks, the vars files, the inventories or the workflows. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The listing"
+          }
+        }
+      }
+    },
+    "/files/{kind}/file": {
+      "get": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "Read a file",
+        "description": "A file's content. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file"
+          },
+          "404": {
+            "description": "No such file, or hidden from the user"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "Save a file",
+        "description": "Writes a file; needs the designer lock and the kind's edit option (Edit Playbooks, Edit Workflows ...). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, the name already taken.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved"
+          },
+          "409": {
+            "description": "The name is already taken"
+          },
+          "423": {
+            "description": "The designer lock is not held"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "Create a file",
+        "description": "A new file; refused when it exists. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, the name already taken.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "409": {
+            "description": "The name is already taken"
+          },
+          "423": {
+            "description": "The designer lock is not held"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "designer"
+        ],
+        "summary": "Delete a file",
+        "description": "Deletes a file. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "No such file, or hidden from the user"
+          },
+          "423": {
+            "description": "The designer lock is not held"
           }
         }
       }

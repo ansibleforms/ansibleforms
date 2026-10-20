@@ -28,7 +28,10 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: Form } = await import("../src/models/form.model.js");
-const { designsAllForms, designerConfig, designerSave } = await import("../src/lib/designerForms.js");
+const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown } = await import("../src/lib/designerForms.js");
+const { default: ansibleConfig } = await import("../config/ansible.config.js");
+const { default: ProjectFiles } = await import("../src/models/projectFiles.model.js");
+const { listWorkflows } = await import("../src/models/workflowRun.js");
 const { default: configController } = await import("../src/controllers/v2/config.controller.js");
 
 const ROLES = [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }];
@@ -144,5 +147,87 @@ describe("with designAllForms off", () => {
   test("a backup restore : refused, it replaces every form", async () => {
     const res = await call(configController.restore, { user: { user: limited }, params: { backupName: "x" }, query: {} });
     assert.equal(res.code, 403);
+  });
+});
+
+// ─── the playbooks and the workflows ───────────────────────────────────────────
+describe("designAllPlaybooks and designAllWorkflows : what the user's forms use, and what no form uses", () => {
+  const write = (dir, file, text) => {
+    fs.mkdirSync(path.dirname(path.join(ROOT, dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, dir, file), text);
+  };
+  const flow = (name, nodes) =>
+    YAML.stringify({
+      workflow_job_templates: [
+        { name, related: { workflow_nodes: nodes.map(([type, ref], i) => ({ identifier: `n${i}`, unified_job_template: { type, name: ref } })) } },
+      ],
+    });
+  const files = async (kind, user) => (await designerListing(kind, await ProjectFiles.list(kind), user)).files.map((f) => f.path).sort();
+  const opts = (o) => ({ ...limited, options: { ...limited.options, designAllForms: true, ...o } });
+
+  beforeEach(() => {
+    ansibleConfig.path = path.join(ROOT, "playbooks");
+    appConfig.workflowsPath = path.join(ROOT, "workflows");
+    // Ops deploy runs x.yaml (the fixture's) ; a playbook form of team's, two workflow forms
+    fs.writeFileSync(
+      path.join(ROOT, "forms", "forms", "flows.yaml"),
+      YAML.stringify([
+        form("Team play", ["team"], { playbook: "team.yml" }),
+        form("Ops steps", ["ops"], { type: "multistep", playbook: undefined, steps: [{ type: "ansible", name: "one", playbook: "step.yml" }] }),
+        form("Team steps", ["team"], { type: "multistep", playbook: undefined, steps: [{ type: "ansible", name: "one", playbook: "team-step.yml" }] }),
+        { name: "Ops flow", type: "workflow", workflow: "main.yml", roles: ["ops"], categories: [], fields: [] },
+        { name: "Team flow", type: "workflow", workflow: "Team flow", roles: ["team"], categories: [], fields: [] },
+      ]),
+    );
+    for (const f of ["x.yaml", "team.yml", "step.yml", "team-step.yml", "wf-play.yml", "nested-play.yml", "team-node.yml", "team-nested-play.yml", "free.yml"]) write("playbooks", f, "- hosts: all\n");
+    write("workflows", "main.yml", flow("Main", [["job_template", "wf-play.yml"], ["workflow_job_template", "Nested"]]));
+    write("workflows", "sub/nested.yml", flow("Nested", [["job_template", "nested-play.yml"]]));
+    write("workflows", "team.yml", flow("Team flow", [["job_template", "team-node.yml"], ["workflow_job_template", "team-nested.yml"]]));
+    write("workflows", "team-nested.yml", flow("Team nested", [["job_template", "team-nested-play.yml"]]));
+    write("workflows", "free.yml", flow("Free", [["job_template", "free.yml"]]));
+  });
+
+  test("on by default, and always for an admin : every file", async () => {
+    assert.equal(await fileVisibility("playbooks", everything), null);
+    assert.equal(await fileVisibility("workflows", admin), null);
+    assert.equal(await fileVisibility("playbooks", { ...admin, options: { designAllPlaybooks: false } }), null);
+    assert.equal(await fileVisibility("vars", opts({ designAllPlaybooks: false })), null, "the other kinds stay whole");
+    assert.equal((await files("playbooks", everything)).length, 9);
+  });
+
+  test("off, designAllForms on : every used one counts, the unused ones shown too", async () => {
+    assert.deepEqual(await files("playbooks", opts({ designAllPlaybooks: false })), [
+      "free.yml",
+      "nested-play.yml",
+      "step.yml",
+      "team-nested-play.yml",
+      "team-node.yml",
+      "team-step.yml",
+      "team.yml",
+      "wf-play.yml",
+      "x.yaml",
+    ]);
+  });
+
+  test("off with designAllForms off : the playbooks of the user's forms (their steps and their workflows' nodes, nested), and the unused ones", async () => {
+    const user = { ...limited, options: { ...limited.options, designAllPlaybooks: false, designAllWorkflows: false } };
+    assert.deepEqual(await files("playbooks", user), ["free.yml", "nested-play.yml", "step.yml", "wf-play.yml", "x.yaml"]);
+    // the team's : its form's playbook, its steps', its workflow's nodes and its nested workflow's, all hidden
+    assert.deepEqual(await files("workflows", user), ["free.yml", "main.yml", "sub/nested.yml"]);
+    assert.deepEqual((await listWorkflows(await fileVisibility("workflows", user))).map((w) => w.name), ["Free", "Main", "Nested"]);
+    // designAllForms off but designAllPlaybooks on : every playbook
+    assert.equal((await files("playbooks", { ...limited })).length, 9);
+  });
+
+  test("a hidden file : not read, its delete not found, its save a name taken ; a new unused file shown", async () => {
+    const user = { ...limited, options: { ...limited.options, designAllPlaybooks: false, designAllWorkflows: false } };
+    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "read"), { status: 404, message: "File 'team.yml' not found" });
+    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "delete"), { status: 404 });
+    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "save"), { status: 409, message: "The name 'team.yml' is already taken" });
+    await assert.rejects(assertFileShown("workflows", "team.yml", user, "create"), { status: 409 });
+    await assertFileShown("playbooks", "x.yaml", user, "save");
+    write("playbooks", "brand-new.yml", "- hosts: all\n");
+    await assertFileShown("playbooks", "brand-new.yml", user, "read");
+    assert.ok((await files("playbooks", user)).includes("brand-new.yml"));
   });
 });

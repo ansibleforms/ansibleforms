@@ -367,9 +367,13 @@ export default {
       allowFormDesign:
         'Editar els formularis al dissenyador: categories, constants i formularis (sense: només lectura).',
       designAllForms:
-        "Mostrar i editar tots els formularis al dissenyador; sense això, només els formularis dels rols de l'usuari (els subformularis que fan servir, només de lectura). Limita només els formularis; els playbooks, fluxos de treball, inventaris, fitxers de variables, categories i constants continuen visibles per a tots els dissenyadors.",
+        "Mostrar i editar tots els formularis al dissenyador; sense això, només els formularis dels rols de l'usuari (els subformularis que fan servir, només de lectura). Limita només els formularis (els playbooks i els fluxos de treball tenen les seves pròpies opcions); els inventaris, fitxers de variables, categories i constants continuen visibles per a tots els dissenyadors.",
       allowPlaybookDesign: 'Editar els playbooks al dissenyador (sense: només lectura).',
+      designAllPlaybooks:
+        "Mostrar i editar tots els playbooks al dissenyador; sense això, només els playbooks que fan servir els formularis que l'usuari pot veure, i els que cap formulari no fa servir encara.",
       allowWorkflowDesign: 'Editar els fluxos de treball al dissenyador (sense: només lectura).',
+      designAllWorkflows:
+        "Mostrar i editar tots els fluxos de treball al dissenyador; sense això, només els fluxos de treball que fan servir els formularis que l'usuari pot veure, i els que cap formulari no fa servir encara.",
       allowInventoryDesign: 'Editar els inventaris al dissenyador (sense: només lectura).',
       allowVarsFileDesign: 'Editar els fitxers de variables al dissenyador (sense: només lectura).',
       showLogs: 'Veure el registre del servidor.',
@@ -2296,7 +2300,9 @@ export default {
       roleOptionAllowFormDesign: 'Editar Formularis',
       roleOptionDesignAllForms: 'Editar Tots els Formularis',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
+      roleOptionDesignAllPlaybooks: 'Editar Tots els Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Fluxos de treball',
+      roleOptionDesignAllWorkflows: 'Editar Tots els Fluxos de treball',
       roleOptionAllowInventoryDesign: 'Editar Inventaris',
       roleOptionAllowVarsFileDesign: 'Editar Fitxers de variables',
       roleOptionShowLogs: 'Mostra el Registre del servidor',

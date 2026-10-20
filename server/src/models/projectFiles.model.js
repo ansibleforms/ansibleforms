@@ -9,10 +9,6 @@
 // A kind has one root ; the inventories have the local folder (one folder per inventory) and
 // a root per inventories repository, each an inventory of its own : its paths start with its name
 // (production/inventory.yaml), as a local inventory's start with its folder's.
-//
-// A form file (Form.formsFileTest : a forms folder's, every yaml file of a forms repository serving
-// its forms from its root) is never written nor deleted here : the designer's forms write it,
-// checked.
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -23,7 +19,6 @@ import Repository from "./repository.model.js";
 import Repo from "./repo.model.js";
 import { configRepoFromPath } from "../lib/forms-git.js";
 import { FILE_KINDS, MAX_FILE_BYTES, MAX_LISTED_FILES, safeRelativePath, isInside, isTextBuffer } from "../lib/projectFiles.js";
-import Form from "./form.model.js";
 
 const ProjectFiles = {};
 
@@ -156,45 +151,6 @@ ProjectFiles.absolutes = async function (kind, rels) {
   }
   return out;
 };
-
-/**
- * A file of a kind as a read, a save or a delete resolves it : its absolute path, and its path as
- * those name it in what they answer. A request refused for a file hidden from the user answers in
- * the same words (lib/designerForms.js).
- *
- * Args:
- *   kind (string): the kind.
- *   rel (string): the file's path, as the explorer shows it.
- *
- * Returns:
- *   Promise<object>: { abs, name }.
- *
- * Raises:
- *   BadRequestError: the path names no root of the kind, is not valid, or leads out of it.
- */
-ProjectFiles.locate = async function (kind, rel) {
-  const { root, prefix, inner } = await rootOf(kind, rel);
-  const file = await resolveIn(root, inner);
-  return { abs: file.abs, name: shown(prefix, file.rel) };
-};
-
-/**
- * Refuses a write of a form file (Form.formsFileTest) : the designer's forms write them, checked
- * (their names, their roles, their validation, the forms hidden from a designer) ; here none of it
- * would apply.
- *
- * Args:
- *   abs (string): the path.
- *   name (string): the path as the request names it.
- *
- * Raises:
- *   Errors.AccessDeniedError: it is a form file.
- */
-async function assertNotFormsFile(abs, name) {
-  if ((await Form.formsFileTest())(abs)) {
-    throw new Errors.AccessDeniedError(`'${name}' is a form file: it is written by the designer's forms, where it is checked`);
-  }
-}
 
 /** A path as the explorer shows it : its root's prefix first, when the kind has several. */
 const shown = (prefix, rel) => (prefix ? `${prefix}/${rel}` : rel);
@@ -331,7 +287,6 @@ async function withWriteClaim(repository, write) {
  * Raises:
  *   BadRequestError: the path or the content is not valid.
  *   ConflictError: onlyNew and the file exists.
- *   AccessDeniedError: it is a form file (Form.formsFileTest).
  */
 ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   if (typeof content !== "string") throw new Errors.BadRequestError("The content must be text");
@@ -339,7 +294,6 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
-  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     if (fs.existsSync(file.abs)) {
       if (onlyNew) throw new Errors.ConflictError(`File '${name}' exists already`);
@@ -364,13 +318,11 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
  *
  * Raises:
  *   NotFoundError: there is no such file.
- *   AccessDeniedError: it is a form file (Form.formsFileTest).
  */
 ProjectFiles.remove = async function (kind, rel) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
-  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     const stat = await fs.promises.lstat(file.abs).catch(() => null);
     if (!stat || !stat.isFile()) throw new Errors.NotFoundError(`File '${name}' not found`);

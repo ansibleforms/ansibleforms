@@ -369,9 +369,13 @@ export default {
       allowFormDesign:
         'Modifier les formulaires dans le designer : catégories, constantes et formulaires (sinon : en lecture seule).',
       designAllForms:
-        "Afficher et modifier tous les formulaires dans le designer ; sans cela, seulement les formulaires des rôles de l'utilisateur (les sous-formulaires qu'ils utilisent, en lecture seule). Limite uniquement les formulaires ; les playbooks, workflows, inventaires, fichiers de variables, catégories et constantes restent visibles pour tous les designers.",
+        "Afficher et modifier tous les formulaires dans le designer ; sans cela, seulement les formulaires des rôles de l'utilisateur (les sous-formulaires qu'ils utilisent, en lecture seule). Limite uniquement les formulaires (les playbooks et les workflows ont leurs propres options) ; les inventaires, fichiers de variables, catégories et constantes restent visibles pour tous les designers.",
       allowPlaybookDesign: 'Modifier les playbooks dans le designer (sinon : en lecture seule).',
+      designAllPlaybooks:
+        "Afficher et modifier tous les playbooks dans le designer ; sans cela, seulement les playbooks utilisés par les formulaires que l'utilisateur peut voir, et ceux qu'aucun formulaire n'utilise encore.",
       allowWorkflowDesign: 'Modifier les workflows dans le designer (sinon : en lecture seule).',
+      designAllWorkflows:
+        "Afficher et modifier tous les workflows dans le designer ; sans cela, seulement les workflows utilisés par les formulaires que l'utilisateur peut voir, et ceux qu'aucun formulaire n'utilise encore.",
       allowInventoryDesign: 'Modifier les inventaires dans le designer (sinon : en lecture seule).',
       allowVarsFileDesign: 'Modifier les fichiers de variables dans le designer (sinon : en lecture seule).',
       showLogs: 'Voir le journal du serveur.',
@@ -2301,7 +2305,9 @@ export default {
       roleOptionAllowFormDesign: 'Modifier les Formulaires',
       roleOptionDesignAllForms: 'Modifier Tous les Formulaires',
       roleOptionAllowPlaybookDesign: 'Modifier les Playbooks',
+      roleOptionDesignAllPlaybooks: 'Modifier Tous les Playbooks',
       roleOptionAllowWorkflowDesign: 'Modifier les Workflows',
+      roleOptionDesignAllWorkflows: 'Modifier Tous les Workflows',
       roleOptionAllowInventoryDesign: 'Modifier les Inventaires',
       roleOptionAllowVarsFileDesign: 'Modifier les Fichiers de variables',
       roleOptionShowLogs: 'Afficher le Journal du serveur',

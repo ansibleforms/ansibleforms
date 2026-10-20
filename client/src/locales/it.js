@@ -367,9 +367,13 @@ export default {
       showDesigner: 'Vedere e usare il designer.',
       allowFormDesign: 'Modificare i moduli nel designer: categorie, costanti e moduli (senza: sola lettura).',
       designAllForms:
-        "Mostrare e modificare tutti i moduli nel designer; senza, solo i moduli dei ruoli dell'utente (i sottomoduli che usano in sola lettura). Limita solo i moduli; playbook, workflow, inventari, file di variabili, categorie e costanti restano visibili a ogni designer.",
+        "Mostrare e modificare tutti i moduli nel designer; senza, solo i moduli dei ruoli dell'utente (i sottomoduli che usano in sola lettura). Limita solo i moduli (playbook e workflow hanno le proprie opzioni); inventari, file di variabili, categorie e costanti restano visibili a ogni designer.",
       allowPlaybookDesign: 'Modificare i playbook nel designer (senza: sola lettura).',
+      designAllPlaybooks:
+        "Mostrare e modificare tutti i playbook nel designer; senza, solo i playbook usati dai moduli che l'utente può vedere, e quelli che nessun modulo usa ancora.",
       allowWorkflowDesign: 'Modificare i workflow nel designer (senza: sola lettura).',
+      designAllWorkflows:
+        "Mostrare e modificare tutti i workflow nel designer; senza, solo i workflow usati dai moduli che l'utente può vedere, e quelli che nessun modulo usa ancora.",
       allowInventoryDesign: 'Modificare gli inventari nel designer (senza: sola lettura).',
       allowVarsFileDesign: 'Modificare i file di variabili nel designer (senza: sola lettura).',
       showLogs: 'Vedere il log del server.',
@@ -2289,7 +2293,9 @@ export default {
       roleOptionAllowFormDesign: 'Modificare i Moduli',
       roleOptionDesignAllForms: 'Modificare Tutti i Moduli',
       roleOptionAllowPlaybookDesign: 'Modificare i Playbook',
+      roleOptionDesignAllPlaybooks: 'Modificare Tutti i Playbook',
       roleOptionAllowWorkflowDesign: 'Modificare i Workflow',
+      roleOptionDesignAllWorkflows: 'Modificare Tutti i Workflow',
       roleOptionAllowInventoryDesign: 'Modificare gli Inventari',
       roleOptionAllowVarsFileDesign: 'Modificare i File di variabili',
       roleOptionShowLogs: 'Mostra il Log del server',

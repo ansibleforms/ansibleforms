@@ -362,9 +362,13 @@ export default {
       showDesigner: 'See and use the designer.',
       allowFormDesign: 'Edit the forms in the designer: categories, constants and forms (without it: read-only).',
       designAllForms:
-        "Show and edit every form in the designer; without it, only the forms of the user's roles (the subforms they use read-only). Limits the forms only; playbooks, workflows, inventories, vars files, categories and constants stay visible to every designer.",
+        "Show and edit every form in the designer; without it, only the forms of the user's roles (the subforms they use read-only). Limits the forms only (playbooks and workflows have their own options); inventories, vars files, categories and constants stay visible to every designer.",
       allowPlaybookDesign: 'Edit the playbooks in the designer (without it: read-only).',
+      designAllPlaybooks:
+        'Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet.',
       allowWorkflowDesign: 'Edit the workflows in the designer (without it: read-only).',
+      designAllWorkflows:
+        'Show and edit every workflow in the designer; without it, only the workflows used by the forms the user can see, and the ones no form uses yet.',
       allowInventoryDesign: 'Edit the inventories in the designer (without it: read-only).',
       allowVarsFileDesign: 'Edit the vars files in the designer (without it: read-only).',
       showLogs: 'See the server log.',
@@ -2264,7 +2268,9 @@ export default {
       roleOptionAllowFormDesign: 'Edit Forms',
       roleOptionDesignAllForms: 'Edit All Forms',
       roleOptionAllowPlaybookDesign: 'Edit Playbooks',
+      roleOptionDesignAllPlaybooks: 'Edit All Playbooks',
       roleOptionAllowWorkflowDesign: 'Edit Workflows',
+      roleOptionDesignAllWorkflows: 'Edit All Workflows',
       roleOptionAllowInventoryDesign: 'Edit Inventories',
       roleOptionAllowVarsFileDesign: 'Edit Vars files',
       roleOptionShowLogs: 'Show Server log',

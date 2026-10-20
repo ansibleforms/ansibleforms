@@ -367,9 +367,13 @@ export default {
       showDesigner: 'Den Designer sehen und verwenden.',
       allowFormDesign: 'Die Formulare im Designer bearbeiten: Kategorien, Konstanten und Formulare (ohne: nur lesen).',
       designAllForms:
-        'Alle Formulare im Designer anzeigen und bearbeiten; ohne nur die Formulare der Rollen des Benutzers (die von ihnen genutzten Unterformulare schreibgeschützt). Beschränkt nur die Formulare; Playbooks, Workflows, Inventare, Variablendateien, Kategorien und Konstanten bleiben für jeden Designer sichtbar.',
+        'Alle Formulare im Designer anzeigen und bearbeiten; ohne nur die Formulare der Rollen des Benutzers (die von ihnen genutzten Unterformulare schreibgeschützt). Beschränkt nur die Formulare (Playbooks und Workflows haben eigene Optionen); Inventare, Variablendateien, Kategorien und Konstanten bleiben für jeden Designer sichtbar.',
       allowPlaybookDesign: 'Die Playbooks im Designer bearbeiten (ohne: nur lesen).',
+      designAllPlaybooks:
+        'Alle Playbooks im Designer anzeigen und bearbeiten; ohne nur die Playbooks, die die für den Benutzer sichtbaren Formulare verwenden, und die, die noch kein Formular verwendet.',
       allowWorkflowDesign: 'Die Workflows im Designer bearbeiten (ohne: nur lesen).',
+      designAllWorkflows:
+        'Alle Workflows im Designer anzeigen und bearbeiten; ohne nur die Workflows, die die für den Benutzer sichtbaren Formulare verwenden, und die, die noch kein Formular verwendet.',
       allowInventoryDesign: 'Die Inventare im Designer bearbeiten (ohne: nur lesen).',
       allowVarsFileDesign: 'Die Variablendateien im Designer bearbeiten (ohne: nur lesen).',
       showLogs: 'Das Serverprotokoll sehen.',
@@ -2297,7 +2301,9 @@ export default {
       roleOptionAllowFormDesign: 'Formulare bearbeiten',
       roleOptionDesignAllForms: 'Alle Formulare bearbeiten',
       roleOptionAllowPlaybookDesign: 'Playbooks bearbeiten',
+      roleOptionDesignAllPlaybooks: 'Alle Playbooks bearbeiten',
       roleOptionAllowWorkflowDesign: 'Workflows bearbeiten',
+      roleOptionDesignAllWorkflows: 'Alle Workflows bearbeiten',
       roleOptionAllowInventoryDesign: 'Inventare bearbeiten',
       roleOptionAllowVarsFileDesign: 'Variablendateien bearbeiten',
       roleOptionShowLogs: 'Serverprotokoll anzeigen',

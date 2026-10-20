@@ -355,9 +355,13 @@ export default {
       showDesigner: '查看和使用设计器。',
       allowFormDesign: '在设计器中编辑表单：类别、常量和表单（否则：只读）。',
       designAllForms:
-        '在设计器中显示并编辑所有表单；否则仅显示用户角色的表单（它们使用的子表单为只读）。只限制表单；剧本、工作流、清单、变量文件、类别和常量对每个设计者仍然可见。',
+        '在设计器中显示并编辑所有表单；否则仅显示用户角色的表单（它们使用的子表单为只读）。只限制表单（playbook 和工作流有各自的选项）；清单、变量文件、类别和常量对每个设计者仍然可见。',
       allowPlaybookDesign: '在设计器中编辑 playbook（否则：只读）。',
+      designAllPlaybooks:
+        '在设计器中显示并编辑所有 playbook；否则仅显示用户可见的表单所使用的 playbook，以及尚无表单使用的 playbook。',
       allowWorkflowDesign: '在设计器中编辑工作流（否则：只读）。',
+      designAllWorkflows:
+        '在设计器中显示并编辑所有工作流；否则仅显示用户可见的表单所使用的工作流，以及尚无表单使用的工作流。',
       allowInventoryDesign: '在设计器中编辑清单（否则：只读）。',
       allowVarsFileDesign: '在设计器中编辑变量文件（否则：只读）。',
       showLogs: '查看服务器日志。',
@@ -2203,7 +2207,9 @@ export default {
       roleOptionAllowFormDesign: '编辑表单',
       roleOptionDesignAllForms: '编辑所有表单',
       roleOptionAllowPlaybookDesign: '编辑 playbook',
+      roleOptionDesignAllPlaybooks: '编辑所有 playbook',
       roleOptionAllowWorkflowDesign: '编辑工作流',
+      roleOptionDesignAllWorkflows: '编辑所有工作流',
       roleOptionAllowInventoryDesign: '编辑清单',
       roleOptionAllowVarsFileDesign: '编辑变量文件',
       roleOptionShowLogs: '显示服务器日志',
