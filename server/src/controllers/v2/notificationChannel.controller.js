@@ -10,6 +10,7 @@ import Helpers from "../../lib/common.js";
 import i18n from "../../lib/i18n.js";
 import CredentialModel from "../../models/credential.model.v2.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 // the fields that say where a channel sends the credential it names, by type : a mail channel's
 // own server (used while its credential has none), a webhook's url and a telegram bot's API
@@ -125,6 +126,8 @@ const create = async (req, res) => {
     }
     await guardChannelCredentials(req, null);
     const id = await NotificationChannel.create(req.body);
+    // the notification channels repository, when there is one : written to it as a new file
+    await RepoObjects.appCreated("notification_channels", id);
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Notification channel" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -151,6 +154,8 @@ const update = async (req, res) => {
     if (!existing) throw new Errors.NotFoundError(`No notification channel with id ${req.params.id}`);
     await guardChannelCredentials(req, existing);
     await NotificationChannel.update(req.body, req.params.id);
+    // one of the notification channels repository : its changed fields written to its file
+    if (existing.repository) await RepoObjects.appUpdated("notification_channels", existing, req.params.id);
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -159,7 +164,10 @@ const update = async (req, res) => {
 
 const deleteChannel = async (req, res) => {
   try {
+    const before = await NotificationChannel.findById(req.params.id).catch(() => null);
     await NotificationChannel.delete(req.params.id);
+    // one of the notification channels repository : its file goes too, for the repository's Push
+    if (before?.repository) await RepoObjects.appDeleted("notification_channels", before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);

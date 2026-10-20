@@ -9,9 +9,10 @@
 //                   they are ; several repositories may hold forms, workflows and inventories,
 //                   and the app uses the first one of config and of playbooks (its Usage step
 //                   greys the box on the others, the server only warns) - as before
-//   an object type  (schedules, credentials, runners) : one object per YAML file, kept in step
-//                   with a table both ways by the engine (lib/repoObjects/engine.js), one
-//                   repository at most, refused by the API and the seed
+//   an object type  (schedules, credentials, runners, secret stores, SSO ...) : one object per
+//                   YAML file, kept in step with a table both ways by the engine
+//                   (lib/repoObjects/engine.js), one repository at most, refused by the API and
+//                   the seed
 //   coming soon     a type of a later version : accepted by the API and the seed while it is off,
 //                   refused when it is turned on, its box greyed with a short note
 
@@ -41,19 +42,19 @@ export const USAGE_TYPES = [
   { key: "schedules", flag: "use_for_schedules", category: "designer", built: true, objects: true, oneOnly: true, label: "schedules" },
   // Access : who signs in, and what they may do
   { key: "config", flag: "use_for_config", category: "access", built: true, label: "config" },
-  { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", built: false, objects: true, oneOnly: true, label: "SSO providers" },
-  { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", built: false, objects: true, oneOnly: true, label: "LDAP directories" },
+  { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", built: true, objects: true, oneOnly: true, label: "SSO providers" },
+  { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", built: true, objects: true, oneOnly: true, label: "LDAP directories" },
   { key: "disclaimer", flag: "use_for_disclaimer", category: "access", built: false, objects: true, oneOnly: true, label: "disclaimer" },
   // Connections : what the app signs in to, where jobs run and where messages go
   { key: "credentials", flag: "use_for_credentials", category: "connections", built: true, objects: true, oneOnly: true, label: "credentials" },
-  { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", built: false, objects: true, oneOnly: true, label: "secret stores" },
+  { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", built: true, objects: true, oneOnly: true, label: "secret stores" },
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", built: true, objects: true, oneOnly: true, label: "runners" },
-  { key: "notification_channels", references: ["credentials"], flag: "use_for_notification_channels", category: "connections", built: false, objects: true, oneOnly: true, label: "notification channels" },
-  { key: "syslog", flag: "use_for_syslog", category: "connections", built: false, objects: true, oneOnly: true, label: "syslog servers" },
+  { key: "notification_channels", references: ["credentials"], flag: "use_for_notification_channels", category: "connections", built: true, objects: true, oneOnly: true, label: "notification channels" },
+  { key: "syslog", flag: "use_for_syslog", category: "connections", built: true, objects: true, oneOnly: true, label: "syslog servers" },
   { key: "chat", references: ["credentials"], flag: "use_for_chat", category: "connections", built: false, objects: true, oneOnly: true, label: "chat" },
   // Appearance : how the app looks
   { key: "branding", flag: "use_for_branding", category: "appearance", built: false, objects: true, oneOnly: true, label: "branding" },
-  { key: "labels", flag: "use_for_labels", category: "appearance", built: false, objects: true, oneOnly: true, label: "labels" },
+  { key: "labels", flag: "use_for_labels", category: "appearance", built: true, objects: true, oneOnly: true, label: "labels" },
   { key: "announcements", flag: "use_for_announcements", category: "appearance", built: false, objects: true, oneOnly: true, label: "announcements" },
   // System : the System > General settings
   { key: "settings", flag: "use_for_settings", category: "system", built: false, objects: true, oneOnly: true, label: "settings" },

@@ -30,7 +30,8 @@
 /*            tab under its name, the tabs set aside meanwhile)   */
 /*      searchTopMatches: Object - { <tab key>: true } : the page */
 /*            has a match in that tab's tab-top slot (the slot    */
-/*            gets `searching` and `matches(...texts)`)           */
+/*            gets `searching`, `matches(...texts)` and the       */
+/*            `record` as loaded)                                 */
 /*                                                                */
 /*  @model search: String - the text searched (v-model:search)    */
 /*                                                                */
@@ -500,6 +501,7 @@ defineExpose({
           :name="'tab-top-' + tab.key"
           :searching="searching"
           :matches="matches"
+          :record="item"
           :active="activeTab === tab.key"
         ></slot>
         <!-- a toggle as the switches of the MCP and chat pages : its title, the switch, its help ; above

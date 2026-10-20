@@ -7,7 +7,7 @@
 //   vi.mock("../src/models/repo.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).repo }));
 //   vi.mock("../src/models/repository.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).repository }));
 //   vi.mock("../src/lib/crypto.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).crypto }));
-//   vi.mock("../src/lib/logger.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).logger }));
+//   vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -33,7 +33,8 @@ export const state = {
  *   tables (object): the rows to start with, by table (repositories, credentials, runners).
  */
 export function reset(tables = {}) {
-  state.tables = { repositories: [], credentials: [], runners: [], secret_stores: [], notification_channels: [], ldap: [], oauth2_providers: [], chat_settings: [], ...structuredClone(tables) };
+  const empty = ["repositories", "credentials", "runners", "secret_stores", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels"];
+  state.tables = { ...Object.fromEntries(empty.map((t) => [t, []])), ...structuredClone(tables) };
   state.nextId = 100;
   state.calls.length = 0;
   state.pullFails = false;
@@ -74,8 +75,10 @@ export const db = {
     // what uses a credential (Credential.usersOf)
     if (/ AS kind, /.test(sql)) {
       const out = [];
-      for (const r of rowsOf("runners")) if (r.credential === params[0]) out.push({ kind: "runner", name: r.name });
-      for (const r of rowsOf("repositories")) if (r.credential === params[0]) out.push({ kind: "repository", name: r.name });
+      for (const part of sql.split(" UNION ALL ")) {
+        const [, kind, nameCol, from, column] = part.match(/SELECT '([^']+)' AS kind, (\w+) AS name FROM AnsibleForms\.`(\w+)` WHERE (\w+) = \?/);
+        for (const r of rowsOf(from)) if (r[column] === params[0]) out.push({ kind, name: nameCol === "NULL" ? null : r[nameCol] });
+      }
       return out;
     }
     // the repository link (lib/repoObjects/engine.js linkStore)
@@ -106,7 +109,23 @@ export const db = {
     m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) = \?$/);
     if (m) return copy(rows.filter((r) => (m[1] === "name" ? lower(r.name) === lower(params[0]) : String(r[m[1]]) === String(params[0]))));
     if (/^SELECT .+ FROM \S+$/.test(sql)) return copy(rows);
-    if (/^INSERT INTO \S+ SET \?/.test(sql)) {
+    // a list in its order (the LDAP directories, the labels)
+    if (/^SELECT .+ FROM \S+ ORDER BY position, (id|name)$/.test(sql)) {
+      return copy(rows).sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || String(a.id).localeCompare(String(b.id)));
+    }
+    // the next place in an ordered list
+    if (/^SELECT COALESCE\(MAX\(position\), 0\)/.test(sql)) {
+      const max = Math.max(0, ...rows.map((r) => Number(r.position) || 0));
+      return [{ p: max, next: max + 1 }];
+    }
+    // another row of that name (an LDAP directory's)
+    if (/^SELECT id FROM \S+ WHERE name = \? AND id <> \?/.test(sql)) return rows.filter((r) => lower(r.name) === lower(params[0]) && r.id !== Number(params[1])).map((r) => ({ id: r.id }));
+    // the one active mail channel
+    if (/^UPDATE AnsibleForms\.`notification_channels` SET is_active = 0 WHERE id <> \?/.test(sql)) {
+      rows.filter((r) => r.id !== Number(params[0]) && r.type === "mail").forEach((r) => (r.is_active = 0));
+      return { affectedRows: 1 };
+    }
+    if (/^INSERT INTO \S+ SET \?/i.test(sql)) {
       // the values : the object itself, as the crud model passes them
       const values = Array.isArray(params) ? params[0] : params;
       if (rows.some((r) => lower(r.name) === lower(values.name))) throw new Error(`Duplicate entry '${values.name}' for key 'name'`);
@@ -114,7 +133,7 @@ export const db = {
       rows.push({ id, repository: null, repo_file: null, ...values });
       return { insertId: id, affectedRows: 1 };
     }
-    m = sql.match(/^UPDATE \S+ SET \? WHERE (\w+) = \?/);
+    m = sql.match(/^UPDATE \S+ SET \? WHERE (\w+) = \?/i);
     if (m) {
       const row = rows.find((r) => String(r[m[1]]) === String(params[1]));
       if (row) Object.assign(row, params[0]);
@@ -150,6 +169,7 @@ export const repository = {
   },
   clone: async (name) => {
     state.calls.push(`clone:${name}`);
+    fs.mkdirSync(path.join(ROOT, name), { recursive: true });
   },
   claimForWrite: async (name) => {
     state.calls.push(`claim:${name}`);
@@ -166,7 +186,6 @@ export const crypto = {
   decrypt: (text) => String(text).replace(/^enc:/, ""),
 };
 
-export const logger = { notice: () => {}, info: () => {}, warning: () => {}, error: () => {}, debug: () => {}, crit: () => {} };
 
 // ===========================================================================
 // FILES
@@ -193,6 +212,7 @@ export const readObject = (name, folder, file) => YAML.parse(readText(name, fold
 export const fileExists = (name, folder, file) => fs.existsSync(path.join(ROOT, name, folder, file));
 export const removeFile = (name, folder, file) => fs.rmSync(path.join(ROOT, name, folder, file));
 export const cloneEmpty = (name) => fs.mkdirSync(path.join(ROOT, name), { recursive: true });
+export const listFiles = (name, folder) => fs.readdirSync(path.join(ROOT, name, folder)).sort();
 
 /**
  * A table's row by its name.

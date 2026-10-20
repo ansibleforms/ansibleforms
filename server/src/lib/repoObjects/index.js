@@ -71,6 +71,25 @@ const RepoObjects = {
   appDeleted: (key, before) => appStep(key, "a delete", (desc) => Engine.appDeleted(desc, before)),
 
   /**
+   * Objects of a type moved in the app (a label, an LDAP directory moved up or down : every place
+   * numbered again) : each linked one's file rewritten where its place changed.
+   *
+   * Args:
+   *   key (string): the type.
+   *   before (object[]): the objects as they were, before the move.
+   *
+   * Returns:
+   *   Promise<number>: how many files were written.
+   */
+  async appReordered(key, before) {
+    let written = 0;
+    for (const row of before || []) {
+      if (row.repository && (await RepoObjects.appUpdated(key, row, row.id))) written++;
+    }
+    return written;
+  },
+
+  /**
    * What turning a repository's usages on would do, changing nothing : each type's preview.
    *
    * Args:

@@ -5,6 +5,7 @@ import Errors from "../../lib/errors.js";
 import i18n from "../../lib/i18n.js";
 import { checkStore, listMounts } from "../../secrets/providers/index.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 /**
  * Refuses a write of a secret store to anyone but an admin. A store logs in with a Vault token or
@@ -58,6 +59,8 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, 'errors.requiredFields'));
     }
     const created = await SecretStore.create(req.body);
+    // the secret stores repository, when there is one : written to it as a new file (lib/repoObjects)
+    await RepoObjects.appCreated('secret_stores', created);
     return res.status(201).json(RestResult.single(i18n.t(req, 'resources.secretStoreAdded'), created));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -80,8 +83,11 @@ const update = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, 'errors.requiredFields'));
     }
+    const before = await SecretStore.findById(req.params.id).catch(() => null);
     const updated = await SecretStore.update(req.body, req.params.id);
     if (!updated) throw new Errors.NotFoundError(i18n.t(req, 'resources.secretStoreNotFound'));
+    // one of the secret stores repository : its changed fields written to its file
+    if (before?.repository) await RepoObjects.appUpdated('secret_stores', before, req.params.id);
     return res.json(RestResult.single(updated));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -91,8 +97,11 @@ const update = async (req, res) => {
 const deleteStore = async (req, res) => {
   try {
     assertAdmin(req);
+    const before = await SecretStore.findById(req.params.id).catch(() => null);
     const deleted = await SecretStore.delete(req.params.id);
     if (!deleted) throw new Errors.NotFoundError(i18n.t(req, 'resources.secretStoreNotFound'));
+    // one of the secret stores repository : its file goes too, for the repository's Push
+    if (before?.repository) await RepoObjects.appDeleted('secret_stores', before);
     return res.json(RestResult.single(deleted));
   } catch (err) {
     Errors.ReturnError(res, err);

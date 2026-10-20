@@ -7,6 +7,7 @@ import i18n from '../../lib/i18n.js';
 import { SECRET_MASK } from '../../lib/secretMask.js';
 import auth_entraid from '../../auth/auth_entraid.js';
 import auth_oidc from '../../auth/auth_oidc.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
 const oauth2Controller = {
   // List all OAuth2 providers or filter by name
@@ -36,6 +37,8 @@ const oauth2Controller = {
   async create(req, res) {
     try {
       const created = await OAuth2.create(req.body);
+      // the SSO repository, when there is one : written to it as a new file, without its secret
+      await RepoObjects.appCreated('sso', created);
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready
       return res.status(201).json(RestResult.single(i18n.t(req, 'resources.oauth2Added'), created));
@@ -58,7 +61,10 @@ const oauth2Controller = {
   // Update OAuth2 provider
   async update(req, res) {
     try {
+      const before = await OAuth2.findById(req.params.id).catch(() => null);
       const updated = await OAuth2.update(req.body, req.params.id);
+      // one of the SSO repository : its changed fields written to its file
+      if (before?.repository) await RepoObjects.appUpdated('sso', before, req.params.id);
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready      
       return res.json(RestResult.single(updated));
@@ -70,7 +76,10 @@ const oauth2Controller = {
   // Delete OAuth2 provider
   async delete(req, res) {
     try {
+      const before = await OAuth2.findById(req.params.id).catch(() => null);
       const deleted = await OAuth2.delete(req.params.id);
+      // one of the SSO repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted('sso', before);
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready
       return res.json(RestResult.single(deleted));

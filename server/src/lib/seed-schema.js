@@ -391,6 +391,12 @@ const oauth2Item = {
   },
 };
 
+// One SSO provider as a repository holds it (lib/repoObjects/sso.js) : an item of the oauth2
+// section, without its rule that the client secret or a credential be given - a provider of the
+// app is written to git without its secret, which stays in the database (the model still checks
+// a new provider has its client : OAuth2.assertClient)
+export const ssoProviderItem = (({ anyOf: _client, ...item }) => item)(oauth2Item);
+
 const repositoryItem = {
   type: "object",
   additionalProperties: false,
@@ -550,6 +556,23 @@ const ldapSection = {
     // never heard of. Omitted means "leave the column alone" - applyLdap only writes keys
     // the seed declared - which is the same as the empty filter it defaults to.
     groupfilter: str,
+  },
+};
+
+// One LDAP directory as a repository holds it (lib/repoObjects/ldap.js, one file per directory) :
+// the fields of the ldap section above, and the directory's own - its name (main is the one the
+// ldap section is), its place in the lookup order, its sign-in domains. Only the name is required :
+// a file declares what it owns, as the list sections' items do, so the main directory's file is the
+// ldap section with `name: main`.
+export const ldapDirectoryItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$" },
+    position: strOrInt,
+    domains: str,
+    ...ldapSection.properties,
   },
 };
 
@@ -721,14 +744,15 @@ export function schemaErrors(errors) {
  * what the repository-backed objects check their files with (lib/repoObjects).
  *
  * Args:
- *   section (string): the section (credentials).
+ *   section (string|object): the section (credentials), or an item's own schema (an LDAP
+ *     directory's, ldapDirectoryItem).
  *
  * Returns:
  *   object: { validate (function : item => string[] of errors), keys (the item's fields, in
  *     the schema's order), schema (its JSON schema) }.
  */
 export function itemValidator(section) {
-  const schema = seedSchema.properties[section].properties.items.items;
+  const schema = typeof section === "string" ? seedSchema.properties[section].properties.items.items : section;
   const check = ajv.compile(schema);
   return {
     schema,

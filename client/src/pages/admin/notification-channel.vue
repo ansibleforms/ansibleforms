@@ -51,6 +51,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -282,6 +283,8 @@ const tabFields = computed(() => {
   const nc = (key, params) => t(`settings.notificationChannels.${key}`, params);
   const fields = {
     details: [
+      // one kept in a repository : where it comes from
+      ...repositorySourceFields(t, channel.value),
       ['name', t('settings.fields.name')],
       ['description', t('settings.fields.description')],
       ['enabled', nc('enabled'), nc('enabledHelp')],
@@ -570,6 +573,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="channel" />
               <BsInput
                 class="af-channel-field"
                 v-model="edit.name"

@@ -122,7 +122,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
     expect(takenBy(credentials, { id: 1, name: 'creds', use_for_credentials: 1 }, others)).toBeNull();
   });
 
-  it('Connections : only the runners can be ticked here (credentials are taken, the rest comes later)', () => {
+  it('Connections : the credentials another repository has and the chat of a later version are skipped', () => {
     const record = { id: 2, name: 'self' };
     expect(categoryState('connections', record, others)).toEqual({
       checked: false,
@@ -130,10 +130,16 @@ describe('a group box ticks every type of it that can be ticked', () => {
       disabled: false,
     });
     setCategory('connections', record, others, true);
-    expect(USAGE_FLAGS.filter((f) => record[f])).toEqual(['use_for_runners']);
+    expect(USAGE_FLAGS.filter((f) => record[f])).toEqual([
+      'use_for_secret_stores',
+      'use_for_runners',
+      'use_for_notification_channels',
+      'use_for_syslog',
+    ]);
     expect(categoryState('connections', record, others).checked).toBe(true);
     setCategory('connections', record, others, false);
     expect(record.use_for_runners).toBe(false);
+    expect(record.use_for_chat).toBeUndefined();
   });
 
   it('some of a group ticked : half ticked ; a group with nothing to tick : greyed', () => {
@@ -171,19 +177,19 @@ describe('one question when a save turns several object types on or off', () => 
     const was = { name: 'ops' };
     const now = { name: 'ops' };
     setCategory('connections', now, [], true);
-    expect(usageChanges(was, now)).toEqual({ on: ['credentials', 'runners'], off: [] });
+    const all = ['credentials', 'secret_stores', 'runners', 'notification_channels', 'syslog'];
+    expect(usageChanges(was, now)).toEqual({ on: all, off: [] });
     const answer = confirmUsageChange(t, 'ops', was, now);
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
-    expect(asked).toEqual(['/api/v2/repository/ops/usage-preview?types=credentials,runners']);
+    expect(asked).toEqual([`/api/v2/repository/ops/usage-preview?types=${all.join(',')}`]);
     expect(confirmPrompt.title).toBe('settings.repositories.usageChangeTitle');
     expect(confirmPrompt.message).toBe('settings.repositories.usageChangeQuestion {"name":"ops"}');
     expect(confirmPrompt.ok).toBe('settings.repositories.usageChangeButton');
     const d = confirmPrompt.details;
     const headings = d.filter((x) => x.heading).map((x) => x.heading);
-    expect(headings).toEqual([
-      'settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.credentials"}',
-      'settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.runners"}',
-    ]);
+    expect(headings).toEqual(
+      all.map((key) => `settings.repositories.usageOnHeading {"type":"settings.repositories.usageTypes.${key}"}`),
+    );
     const text = d.map((x) => x.heading || x).join('\n');
     expect(text).toContain('"folder":"credentials","count":2');
     expect(text).toContain('settings.repositories.usageOnWithoutSecret {"names":"git, api"}');
@@ -282,11 +288,25 @@ describe('Pull all, and a linked object', () => {
     expect(read('pages/admin/repositories.vue')).toContain('for (const repo of ordered) await pull(repo)');
   });
 
-  it("a credential's, a runner's and a schedule's page show where it comes from, with one component", () => {
-    for (const page of ['pages/admin/credential.vue', 'pages/admin/runner.vue', 'pages/schedule.vue']) {
+  it('the page of every object kept in a repository shows where it comes from, with one component', () => {
+    for (const page of [
+      'pages/admin/credential.vue',
+      'pages/admin/runner.vue',
+      'pages/schedule.vue',
+      'pages/admin/secret-store.vue',
+      'pages/admin/notification-channel.vue',
+      'pages/admin/sso-provider.vue',
+      'pages/admin/syslog-server.vue',
+      'pages/admin/label.vue',
+    ]) {
       expect(read(page), page).toMatch(/<AppRepositorySource v-show="fieldShown\('source'\)" :record="\w+" \/>/);
       expect(read(page), page).toContain('...repositorySourceFields(t, ');
     }
+    // the LDAP directory's page : its Details tab's top, the record its page loaded
+    const ldap = read('pages/admin/ldap-directory.vue');
+    expect(ldap).toContain('<template #tab-top-details="{ record, searching, matches }">');
+    expect(ldap).toContain(':record="record"');
+    expect(read('components/AppAdminSingle.vue')).toContain(':matches="matches" :record="item"');
     expect(repositorySourceFields(t, { repository: null })).toEqual([]);
     expect(repositorySourceFields(t, { repository: 'ops', repo_file: 'runners/a.yaml' })[0]).toEqual([
       'source',

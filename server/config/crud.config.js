@@ -25,7 +25,11 @@ const crudConfigs = {
       { name: 'token_url' },
       { name: 'userinfo_url' },
       { name: 'extra' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },
@@ -178,7 +182,11 @@ const crudConfigs = {
       { name: 'headers' },
       { name: 'verify_tls', isBoolean: true },
       { name: 'payload' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -194,7 +202,11 @@ const crudConfigs = {
       { name: 'color' },
       { name: 'enabled', isBoolean: true },
       { name: 'position' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -215,7 +227,11 @@ const crudConfigs = {
       { name: 'source' },
       { name: 'receives' },
       { name: 'enabled', isBoolean: true },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -254,7 +270,11 @@ const crudConfigs = {
       { name: 'pvwa_credential' },
       { name: 'pvwa_auth' },
       { name: 'platform_id' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -371,7 +391,11 @@ const crudConfigs = {
       { name: 'group_member_attribute' },
       { name: 'group_member_user_attribute' },
       { name: 'mail_attribute' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },

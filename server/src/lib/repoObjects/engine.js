@@ -256,7 +256,8 @@ async function readFiles(desc, name, ctx) {
 /**
  * Reads a type's files of a repository into its table : a new file makes an object, a changed one
  * changes it, a removed one (or one saying state: absent) removes it - unless something uses it
- * (descriptor.usersOf), then it is kept and the refusal said. A refused file - not valid, a name
+ * (descriptor.usersOf) or it can never be deleted (descriptor.undeletable), then it is kept and
+ * the refusal said. A refused file - not valid, a name
  * another object has - changes nothing : an object it made before stays as it was, a new one is
  * not made. A file that names an object not there yet waits, the same way. Where the file gives
  * no secret, the database's stays.
@@ -321,6 +322,13 @@ export async function syncRepository(desc, name, opts = {}) {
   const present = new Set(files.filter((f) => f.object || kept.has(f.file)).map((f) => f.file));
   for (const [file, row] of own) {
     if (present.has(file)) continue;
+    // one that can never be deleted (the main LDAP directory) : kept, said
+    const never = desc.undeletable ? desc.undeletable(row) : null;
+    if (never) {
+      summary.refused.push({ file, reasons: [`its file is gone, but ${never}: kept, and still linked to it`] });
+      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${never}`);
+      continue;
+    }
     const users = desc.usersOf ? await desc.usersOf(row) : [];
     if (users.length) {
       summary.refused.push({ file, reasons: [`its file is gone, but ${users.join(", ")} still uses '${row.name}': kept until nothing uses it`] });

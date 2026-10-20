@@ -29,6 +29,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import Helpers from '@/lib/Helpers';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -193,6 +194,8 @@ const { search, searching, matches, matchingKeys, shownTabs, tabShown, searchHea
 // each tab's fields : [key, label, help], only the ones the page draws
 const tabFields = computed(() => ({
   details: [
+    // one kept in a repository : where it comes from
+    ...repositorySourceFields(t, provider.value),
     ['name', t('settings.fields.name')],
     ['description', t('settings.fields.description')],
     ...switches.value.map((sw) => [sw.key, sw.label, sw.help]),
@@ -341,6 +344,8 @@ onMounted(async () => {
                 <li v-for="(line, l) in note.items" :key="l">{{ line }}</li>
               </ul>
             </div>
+            <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+            <AppRepositorySource v-show="fieldShown('source')" :record="provider" />
             <BsInput
               class="af-provider-field"
               v-model="edit.name"

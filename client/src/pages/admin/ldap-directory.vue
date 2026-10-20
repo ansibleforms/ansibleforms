@@ -26,6 +26,7 @@ import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import getSettings from '@/config/settings';
 import Helpers from '@/lib/Helpers';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -107,7 +108,15 @@ onMounted(async () => {
       searchable
       @test="openTest"
       @delete="(item) => (deleting = item)"
-    />
+    >
+      <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+      <template #tab-top-details="{ record, searching, matches }">
+        <AppRepositorySource
+          v-show="!searching || repositorySourceFields(t, record).some((f) => matches(...f.slice(1)))"
+          :record="record"
+        />
+      </template>
+    </AppAdminSingle>
   </AppSettingsPage>
 </template>
 <route lang="yaml">

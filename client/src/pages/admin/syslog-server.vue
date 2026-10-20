@@ -28,6 +28,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -177,6 +178,8 @@ const { search, searching, matchingKeys, shownTabs, tabShown, searchHead } = use
 // each tab's fields : [key, label, help], only the ones the page draws
 const tabFields = computed(() => ({
   details: [
+    // one kept in a repository : where it comes from
+    ...repositorySourceFields(t, server.value),
     ['name', t('settings.fields.name')],
     ['description', t('settings.fields.description')],
     ['enabled', t('settings.syslogServers.enabled'), t('settings.syslogServers.enabledHelp')],
@@ -351,6 +354,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="server" />
               <BsInput
                 class="af-syslog-field"
                 v-model="edit.name"

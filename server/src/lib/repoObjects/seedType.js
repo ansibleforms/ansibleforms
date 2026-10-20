@@ -33,7 +33,8 @@ export const KEPT_REASONS = {
  * Args:
  *   spec (object):
  *     key (string): the type (credentials).
- *     section (string): its section of the seed (credentials).
+ *     section (string|object): its section of the seed (credentials), or its item's own schema
+ *       (an LDAP directory's, lib/seed-schema.js ldapDirectoryItem).
  *     model (string): its crud model (credential).
  *     Model (class): its model, which writes a row (create, update, delete), as the app saves it.
  *     title, noun (string): how the pull output names it (Credentials, credential).
@@ -47,12 +48,22 @@ export const KEPT_REASONS = {
  *     usersOf (function): (row) => Promise<string[]> - what uses an object : its file removed while
  *       one does is refused.
  *     defaults (object): the values a new row is made with when its file leaves them out.
+ *     read (object): { all, byId } - how its rows are read when its model does not read them
+ *       through the crud model (the LDAP directories) ; decrypted, as the seed compares them.
+ *     undeletable (function): (row) => why an object can never be deleted (the main LDAP
+ *       directory), or null : its file removed is refused with that reason.
+ *     order (string): its field of a place in an order (a label's, a directory's position) : the
+ *       app's objects are written in that order, and a move in the app rewrites the places.
  *
  * Returns:
  *   object: the descriptor (lib/repoObjects/engine.js).
  */
 export function seedType(spec) {
   const { key, section, model, Model, secrets = [], references = [], skip = [], keepFalse = [], keptReason = () => null, defaults = {} } = spec;
+  // its rows, decrypted : through the crud model, unless the type reads them its own way
+  const read = spec.read || { all: () => CrudModel.findAll(model), byId: (id) => CrudModel.findById(model, id) };
+  // the app's objects in their order : by their place when they have one, else by name
+  const byOrder = (a, b) => (spec.order ? Number(a[spec.order] ?? 0) - Number(b[spec.order] ?? 0) : 0) || String(a.name).localeCompare(String(b.name));
   const { validate, keys, schema } = itemValidator(section);
   const table = CrudModel.getConfig(model).table;
   const links = linkStore(table);
@@ -119,9 +130,9 @@ export function seedType(spec) {
     store: {
       ...links,
       // decrypted, as the seed compares them
-      rows: () => CrudModel.findAll(model),
+      rows: () => read.all(),
       names: async () => ((await mysql.do(`SELECT name FROM ${table}`)) || []).map((r) => r.name),
-      byId: (id) => CrudModel.findById(model, id),
+      byId: (id) => read.byId(id),
       // an object of the app is taken over by a file of its name, unless the config seed manages it
       // or it stays in the app for a reason of its own
       classify: (row, name) => {
@@ -141,7 +152,7 @@ export function seedType(spec) {
       },
       remove: (row) => Model.delete(row.id, FROM_REPO),
       // the app's own : no repository
-      appRows: async () => ((await CrudModel.findAll(model)) || []).filter((r) => !r.repository).sort((a, b) => String(a.name).localeCompare(String(b.name))),
+      appRows: async () => ((await read.all()) || []).filter((r) => !r.repository).sort(byOrder),
     },
 
     /**
@@ -190,5 +201,7 @@ export function seedType(spec) {
     },
 
     usersOf: spec.usersOf,
+    undeletable: spec.undeletable,
+    order: spec.order,
   };
 }

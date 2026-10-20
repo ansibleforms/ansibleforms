@@ -278,14 +278,7 @@ async function applyLdap(cfg, summary) {
   // hand-configured LDAP set enable=0 and destroyed the group mapping - it stopped
   // directory logins. So take only the keys the seed actually declared, with the
   // constructor's conversion applied. Same rule as applySettings, and as buildRecord.
-  const converted = { ...new Ldap(cfg) };
-  const record = {};
-  for (const key of Object.keys(converted)) {
-    if (key === 'testuser' || key === 'testpassword') continue;
-    if (cfg[key] === undefined) continue;          // not declared : leave it alone
-    if (converted[key] === undefined) continue;
-    record[key] = converted[key];
-  }
+  const record = Ldap.declared(cfg);
   // compare against what was declared, not against the freshly encrypted record
   if (stored?.managed && !differs(cfg, stored)) {
     summary.unchanged++;

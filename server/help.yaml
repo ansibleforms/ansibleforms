@@ -6561,9 +6561,10 @@
       | System | Settings (`use_for_settings`) |
 
       Forms, Playbooks, Workflows, Inventories and Config work as before (several repositories may hold forms,
-      workflows and inventories). **Schedules**, **Credentials** and **Runners** are object types: one object per
-      YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`), one repository at most
-      per type. SSO, LDAP, Disclaimer, Secret stores, Notification channels, Syslog, Chat, Branding, Labels,
+      workflows and inventories). **Schedules**, **Credentials**, **Runners**, **Secret stores**, **Notification
+      channels**, **SSO**, **LDAP**, **Syslog** and **Labels** are object types: one object per YAML file in a folder
+      named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`, `notification-channels/`,
+      `sso/`, `ldap/`, `syslog/`, `labels/`), one repository at most per type. Disclaimer, Chat, Branding,
       Announcements and Settings come in a later version.
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
@@ -6619,6 +6620,42 @@
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and read
       in, then its objects are unlinked; they stay in the app as they are, the files in git untouched.
+  - name: Secret stores, notification channels, SSO, LDAP, syslog servers and labels kept in a git repository
+    short: One YAML file per object, in the seed's format
+    version: v7.4.0
+    description: |
+      Six more object types work exactly as the credentials and the runners (see *Credentials and runners kept in a
+      git repository*): one object per YAML file in the type's folder, one repository at most per type, two ways,
+      the same question before turning a type on or off, the same pull output, and **Repository: <name>** on the
+      object's page. Each file is in the config seed's format, so a seed item and a repository file are
+      interchangeable.
+
+      | Usage | Folder | A file is | Names (waits when missing) | Secrets (`${ENV}` only) |
+      | --- | --- | --- | --- | --- |
+      | Secret stores | `secret-stores/` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
+      | Notification channels | `notification-channels/` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `sso/` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | LDAP | `ldap/` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
+      | Syslog | `syslog/` | an item of `syslog_servers:` | | |
+      | Labels | `labels/` | an item of `labels:` | | |
+
+      A file may leave a secret out: the one in the database stays (an object of the app is written to git without
+      its secrets, and the pull output says so). An SSO provider's file may therefore give neither its client
+      secret nor a credential when the provider already has its secret in the app.
+
+      **LDAP.** One file per directory, `ldap/<name>.yaml`; the main directory's file is the seed's `ldap:` section
+      with `name: main`, and a file named `main` takes the main directory over. The main directory keeps its rules:
+      it is never renamed nor deleted, so removing its file while it is linked is refused, said in the pull output,
+      and the directory stays linked. The directories keep their lookup order: `position` is written to each file,
+      and moving a directory up or down in the app rewrites the positions of the files that changed.
+
+      **Labels** keep their order the same way: `position` is in each file, a label moved in the app rewrites the
+      positions in the files, and a label without a position goes after the others.
+
+      **Credentials they use** cannot lose their file: removing a credential's file while a secret store, a
+      notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
+      is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
+      then what names them; Pull all pulls the repositories in the same order.
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
     version: v6.0.3

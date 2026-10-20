@@ -61,6 +61,30 @@ Ldap.isUnreachable = isUnreachable;
 Ldap.urls = urls;
 
 /**
+ * The fields a declaration gives (the config seed's ldap section, a repository's directory file),
+ * converted as a save from the app converts them (the constructor : the yes or no flags, the bind
+ * password encrypted) - only those it declares : the constructor materialises every field it
+ * knows (an absent flag as 0, the group fields as ""), and writing that whole would blank what the
+ * declaration never mentioned.
+ *
+ * Args:
+ *   cfg (object): the declared fields.
+ *
+ * Returns:
+ *   object: the fields to write.
+ */
+Ldap.declared = function (cfg) {
+  const converted = { ...new Ldap(cfg) };
+  const record = {};
+  for (const key of Object.keys(converted)) {
+    if (key === "testuser" || key === "testpassword") continue;
+    if (cfg[key] === undefined || converted[key] === undefined) continue;
+    record[key] = converted[key];
+  }
+  return record;
+};
+
+/**
  * A directory as stored, its bind password decrypted (an undecryptable one emptied).
  *
  * Args:

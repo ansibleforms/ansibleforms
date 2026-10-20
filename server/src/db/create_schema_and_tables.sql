@@ -136,6 +136,10 @@ CREATE TABLE `notification_channels` (
   `verify_tls` tinyint(4) DEFAULT 1,
   `payload` text DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (notification-channels/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_notification_channels_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -161,6 +165,10 @@ CREATE TABLE `syslog_servers` (
   `receives` varchar(10) NOT NULL DEFAULT 'both',
   `enabled` tinyint(4) DEFAULT 1,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (syslog/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_syslog_servers_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -179,6 +187,10 @@ CREATE TABLE `labels` (
   -- its place among the labels, lowest first
   `position` int(11) NOT NULL DEFAULT 0,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (labels/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_labels_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -217,6 +229,10 @@ CREATE TABLE `secret_stores` (
   `pvwa_auth` varchar(20) DEFAULT NULL,
   `platform_id` varchar(250) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (secret-stores/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -318,6 +334,10 @@ CREATE TABLE `ldap` (
   `groupfilter` varchar(250) DEFAULT NULL,
   `enable` tinyint(4) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (ldap/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -461,6 +481,10 @@ CREATE TABLE `oauth2_providers` (
   `userinfo_url` TEXT DEFAULT NULL,
   `extra` JSON DEFAULT NULL, -- for any additional provider-specific config
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (sso/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   UNIQUE KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 -- create repositories table

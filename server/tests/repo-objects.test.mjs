@@ -22,7 +22,7 @@ vi.mock("../src/models/db.model.js", async () => ({ default: (await import("./fi
 vi.mock("../src/models/repo.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).repo }));
 vi.mock("../src/models/repository.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).repository }));
 vi.mock("../src/lib/crypto.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).crypto }));
-vi.mock("../src/lib/logger.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).logger }));
+vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 
 const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
@@ -282,8 +282,8 @@ describe("the rules of the usages", () => {
   });
 
   test("a usage of a later version is refused when turned on, accepted off", async () => {
-    await assert.rejects(RepoObjects.assertUsageAllowed({ use_for_ldap: 1 }, "other", {}), /LDAP directories usage comes in a later version/);
-    await RepoObjects.assertUsageAllowed({ use_for_ldap: 0 }, "other", {});
+    await assert.rejects(RepoObjects.assertUsageAllowed({ use_for_chat: 1 }, "other", {}), /chat usage comes in a later version/);
+    await RepoObjects.assertUsageAllowed({ use_for_chat: 0 }, "other", {});
   });
 
   test("the types and their descriptors agree : what a runner names, every category, every flag once", () => {

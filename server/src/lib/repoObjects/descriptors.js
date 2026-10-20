@@ -7,6 +7,12 @@ const LOADERS = {
   schedules: () => import("./schedules.js"),
   credentials: () => import("./credentials.js"),
   runners: () => import("./runners.js"),
+  secret_stores: () => import("./secretStores.js"),
+  notification_channels: () => import("./notificationChannels.js"),
+  sso: () => import("./sso.js"),
+  ldap: () => import("./ldap.js"),
+  syslog: () => import("./syslog.js"),
+  labels: () => import("./labels.js"),
 };
 
 // the object types built so far : the others are coming in a later version
