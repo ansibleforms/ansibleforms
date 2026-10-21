@@ -914,7 +914,7 @@ Form.duplicateLines = async function(repository) {
 /**
  * The copies of a form the loader skips, by their file : a name a folder read before already
  * defines (duplicatesOf). The designer never sees them, so a save never sends them ; they are kept
- * in their files when the file is written again (withSkippedCopies).
+ * in their files when the file is written again, as forms that do not load are (formsToKeep).
  *
  * Args:
  *   formsDirs (object[]): the forms folders, in the order they are read (formsFolders).
@@ -941,57 +941,18 @@ function skippedCopies(formsDirs) {
 }
 
 /**
- * The forms a save writes into a file, with the copies the loader skipped in it kept in their
- * places : each skipped copy as the file has it, each other place taken by the next form saved,
- * the forms saved left over after them.
- *
- * Args:
- *   target (string): the file's absolute path.
- *   forms (object[]): the forms the save writes into it.
- *   skipped (Set<string>|undefined): the names of the copies skipped in it (skippedCopies).
- *
- * Returns:
- *   object[]: the forms to write.
- */
-function withSkippedCopies(target, forms, skipped) {
-  if (!skipped?.size || !fs.existsSync(target)) return forms
-  let stored
-  try {
-    const parsed = yaml.parse(fs.readFileSync(target, "utf8"))
-    stored = Array.isArray(parsed) ? parsed : [parsed]
-  } catch {
-    return forms
-  }
-  const out = []
-  let next = 0
-  for (const f of stored) {
-    if (f && skipped.has(f.name)) out.push(f)
-    else if (next < forms.length) out.push(forms[next++])
-  }
-  return [...out, ...forms.slice(next)]
-}
-
-/**
- * Refuses a save that would define a form name twice : twice in what is saved, or a form new to
- * its forms repository (or the staging folder) whose name another forms repository already
- * defines. The copy the loader uses is saved where it is, as before.
+ * Refuses a save that would put a form new to its forms repository (or the staging folder) under
+ * a name another forms repository already defines. A name twice in what is saved is refused
+ * before, by assertUniqueFormNames. The copy the loader uses is saved where it is, as before.
  *
  * Args:
  *   groups (object[]): what is saved, by file ([{ dir (its folder), forms }]).
  *   formsDirs (object[]): the folders saved into.
  *
  * Raises:
- *   Error: the names, and where each is already defined.
+ *   Errors.ConflictError: the names, and where each is already defined (a 409).
  */
 function assertNoDuplicateForms(groups, formsDirs) {
-  const seen = new Set()
-  const twice = new Set()
-  for (const g of groups) for (const f of g.forms || []) {
-    if (!f?.name) continue
-    if (seen.has(f.name)) twice.add(f.name)
-    seen.add(f.name)
-  }
-  if (twice.size) throw new Error(`Form name(s) defined twice: ${[...twice].join(", ")}. Form names must be unique.`)
   // where each name is defined now, by folder
   const existing = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
   const clashes = []
@@ -1001,7 +962,7 @@ function assertNoDuplicateForms(groups, formsDirs) {
     if (!copies.length || copies.some((e) => e.dir.path === g.dir?.path)) continue
     clashes.push(`'${f.name}' (already in ${copies.map((e) => e.place).join(", ")})`)
   }
-  if (clashes.length) throw new Error(`A form with this name already exists in another forms repository: ${clashes.join(", ")}. Form names must be unique across forms repositories.`)
+  if (clashes.length) throw new Errors.ConflictError(`A form with this name already exists in another forms repository: ${clashes.join(", ")}. Form names must be unique across forms repositories.`)
 }
 
 // load the forms config
@@ -1880,7 +1841,6 @@ Form.save = async function(data){
       // that was emptied before the replacements were written.
       for (const g of dirGroups) {
         const target = path.join(dirEntry.path, g.source)
-<<<<<<< HEAD
         const forms = g.forms
         // the forms of this file the designer never received (no name, failing validation)
         // are written back as they were, in their places : saving another form of the file
@@ -1892,6 +1852,12 @@ Form.save = async function(data){
             // the loader left the whole file out, so none of its forms were in the designer :
             // writing over it would lose them all
             throw new Errors.BadRequestError(`The file '${g.source}' cannot be read as forms ; fix it, or save the form to another file`)
+          }
+          // the skipped copy of a form name another forms repository defines first : the designer
+          // never had it either, so it stays as it is, in its place, like a form that does not load
+          const skippedHere = skipped.get(path.resolve(target))
+          if (skippedHere?.size) {
+            for (const f of onDisk.forms) if (f.name && skippedHere.has(f.name)) f.notLoaded = true
           }
           const savedNames = new Set(forms.map(f => f?.name).filter(Boolean))
           // a form the designer never received, sent now : it is that form, edited. It must
@@ -1906,9 +1872,6 @@ Form.save = async function(data){
           kept = formsToKeep(onDisk, savedNames)
           if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load, so the designer never had it`)
         }
-=======
-        const forms = withSkippedCopies(target, g.forms, skipped.get(path.resolve(target)))
->>>>>>> 7ff9f20f (fix: a designer save keeps the skipped copy of a duplicate form in a file holding other forms)
         logger.debug(`saving ${forms.length==1 ? `single form '${forms[0].name}'` : `forms ${forms.map(x => x.name)}`} to '${target}'`)
         // ensure parent directory exists for nested paths
         fse.ensureDirSync(path.dirname(target));

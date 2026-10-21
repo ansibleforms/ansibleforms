@@ -133,9 +133,18 @@ describe("a save that would define a form name twice", () => {
       save([{ ...form("Solo", "team"), source: "solo.yaml", repository: "forms-team" }, { ...form("Deploy", "new"), source: "new-deploy.yaml" }, { ...form("Other", "ops"), source: "other.yaml", repository: "forms-ops" }]),
       /form names must be unique|Form names must be unique across forms repositories/i,
     );
-    await assert.rejects(save([{ ...form("Deploy", "new"), source: "new-deploy.yaml" }]), /already in forms-ops\/forms\/deploy\.yaml/);
-    // twice in what is saved
-    await assert.rejects(save([{ ...form("Other", "a"), source: "a.yaml" }, { ...form("Other", "b"), source: "b.yaml" }]), /Form name\(s\) defined twice: Other/);
+    // a 409, saying where the name already is
+    await assert.rejects(save([{ ...form("Deploy", "new"), source: "new-deploy.yaml" }]), (err) => {
+      assert.equal(err.status, 409);
+      assert.match(err.message, /already in forms-ops\/forms\/deploy\.yaml/);
+      return true;
+    });
+    // twice in what is saved : refused before, by the save's own check (assertUniqueFormNames)
+    await assert.rejects(save([{ ...form("Other", "a"), source: "a.yaml" }, { ...form("Other", "b"), source: "b.yaml" }]), (err) => {
+      assert.equal(err.status, 409);
+      assert.match(err.message, /A form named 'Other' already exists/);
+      return true;
+    });
   });
 
   test("the copy used saved where it is, as before, the skipped one left alone", async () => {

@@ -348,7 +348,11 @@ describe('Pull all, and a linked object', () => {
     ]);
     expect(ordered.map((r) => r.name)).toEqual(['cred', 'run']);
     expect(rest.map((r) => r.name)).toEqual(['forms']);
-    expect(read('pages/admin/repositories.vue')).toContain('for (const repo of ordered) await pull(repo)');
+    // one after the other, then the rest at once, every outcome sorted into pulled, skipped and failed
+    const page = read('pages/admin/repositories.vue');
+    expect(page).toContain('for (const repo of ordered) {');
+    expect(page).toContain('await pull(repo).then(');
+    expect(page).toContain('sortPulls([...ordered, ...rest], settled)');
   });
 
   it('the page of every object kept in a repository shows where it comes from, with one component', () => {
