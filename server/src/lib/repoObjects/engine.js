@@ -67,6 +67,20 @@ export const nameKey = (name) => String(name || "").trim().toLowerCase();
 const titleOf = (desc) => desc.title || desc.key;
 
 /**
+ * How the log and the pull output name what a type holds, one way per mode : a type kept in one
+ * file by its label, as a name (General, Branding, MCP, Chat assistant, Links), a folder or a list
+ * type by its objects (the credentials). The sentences built on it never make a verb agree with
+ * it, so they read the same for both.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   string: what the type holds, as a sentence names it (General, the credentials).
+ */
+const holdingOf = (desc) => (desc.file ? titleOf(desc) : `the ${titleOf(desc).toLowerCase()}`);
+
+/**
  * Whether a repository's working tree is there.
  *
  * Args:
@@ -368,7 +382,7 @@ export async function syncRepository(desc, name, opts = {}) {
   const files = await readFiles(desc, name, ctx);
   // a type kept as a list in one file, the repository without that file : the app keeps its objects
   if (files === null) {
-    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps its ${desc.title.toLowerCase()}`);
+    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps ${holdingOf(desc)} as it has them`);
     return summary;
   }
   // step 2 : the objects there are : this repository's by file, the names of the others
@@ -547,7 +561,7 @@ export async function syncText(desc, name) {
   try {
     return summaryText(desc, await syncRepository(desc, name));
   } catch (e) {
-    logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be synchronized: ${e.message || e}`);
+    logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);
     return `\n${titleOf(desc)} not synchronized: ${e.message || e}`;
   }
 }
@@ -641,7 +655,7 @@ export async function syncAllOf(desc) {
   try {
     names = await repositories(desc);
   } catch (e) {
-    logger.error(`Could not read the ${desc.title.toLowerCase()} repositories: ${e.message || e}`);
+    logger.error(`Could not read the repositories holding ${holdingOf(desc)}: ${e.message || e}`);
     return;
   }
   const context = names.length ? await desc.context?.() : undefined;
@@ -657,7 +671,7 @@ export async function syncAllOf(desc) {
     try {
       await syncRepository(desc, name, { context });
     } catch (e) {
-      logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be synchronized: ${e.message || e}`);
+      logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);
     } finally {
       await Repository.releaseWrite(name, prior).catch((e) => logger.error(`Failed to release write-lock on '${name}': ${e.message}`));
     }
@@ -820,10 +834,10 @@ async function pullFor(desc, name, why) {
 export async function activate(desc, name, { pull = true } = {}) {
   const report = { repository: name, pull: "", created: 0, matched: [], written: [], withoutSecret: [], kept: [], refused: [], waiting: [] };
   // step 1 : the latest files (a pull of the repository reads them in itself)
-  if (pull) report.pull = await pullFor(desc, name, `to take the ${desc.title.toLowerCase()}`);
+  if (pull) report.pull = await pullFor(desc, name, `to take ${holdingOf(desc)}`);
   if (!fs.existsSync(Repo.folderOf(name))) {
     report.pull = report.pull || "not cloned";
-    logger.warning(`Repository '${name}' is not cloned: its ${desc.title.toLowerCase()} are read in once it is`);
+    logger.warning(`Repository '${name}' is not cloned yet: ${holdingOf(desc)} will be read from it once it is`);
     return report;
   }
   // a type kept in one file : its own mode
@@ -871,7 +885,7 @@ export async function activate(desc, name, { pull = true } = {}) {
   if (desc.reportExtra) Object.assign(report, await desc.reportExtra(name));
   if (report.written.length || report.matched.length) CrudModel.changed(desc.model);
   logger.notice(
-    `Repository '${name}' holds the ${desc.title.toLowerCase()} now: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${report.withoutSecret.length ? `, ${report.withoutSecret.length} without their secrets, kept in the database` : ""}), ${report.kept.length} kept in the app${report.kept.length ? ` (${report.kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`,
+    `Repository '${name}' now holds ${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${report.withoutSecret.length ? `, ${report.withoutSecret.length} without their secrets, kept in the database` : ""}), ${report.kept.length} kept in the app${report.kept.length ? ` (${report.kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`,
   );
   return report;
 }
@@ -920,13 +934,13 @@ export async function deactivate(desc, name, { pull = true } = {}) {
         report.pull = "pulled";
       } catch (e) {
         report.pull = `not pulled: ${e.message || e}`;
-        logger.warning(`Repository '${name}' could not be pulled before its ${desc.title.toLowerCase()} are unlinked, its working copy is read as it is: ${e.message || e}`);
+        logger.warning(`Repository '${name}' could not be pulled before it lets go of ${holdingOf(desc)}, its working copy is read as it is: ${e.message || e}`);
       }
     }
     try {
       await syncRepository(desc, name);
     } catch (e) {
-      logger.error(`The ${desc.title.toLowerCase()} of repository '${name}' could not be read in before they are unlinked: ${e.message || e}`);
+      logger.error(`Could not read in ${holdingOf(desc)} of repository '${name}' before it lets go of them: ${e.message || e}`);
     }
   } else {
     report.pull = "not cloned";
@@ -1175,7 +1189,7 @@ async function syncSingle(desc, name) {
   const summary = newSummary();
   const abs = singleFileOf(desc, name);
   if (!fs.existsSync(abs)) {
-    summary.notes.push(`No ${desc.file} in the repository: the app keeps its ${desc.title.toLowerCase()}`);
+    summary.notes.push(`No ${desc.file} in the repository: the app keeps ${holdingOf(desc)} as it is`);
     return summary;
   }
   const { errors, object: raw } = parseMapFile(fs.readFileSync(abs, "utf8"));
@@ -1202,7 +1216,7 @@ async function syncSingle(desc, name) {
     summary.notes.push(...((await desc.apply(checked.object, current)) || []));
     summary.updated = 1;
     CrudModel.changed(desc.model);
-    logger.notice(`The ${desc.title.toLowerCase()} follow ${name}/${desc.file}`);
+    logger.notice(`Applied ${name}/${desc.file}: the app follows git for ${holdingOf(desc)} from now on`);
   } catch (e) {
     summary.refused.push({ file: desc.file, reasons: [`not saved: ${e.message || e}`] });
     logger.warning(`Could not apply ${name}/${desc.file}: ${e.message || e}`);
@@ -1265,7 +1279,7 @@ async function activateSingle(desc, name, report) {
     report.written = [desc.title];
     if (out.withoutSecret) report.withoutSecret = [desc.title];
   }
-  logger.notice(`Repository '${name}' holds the ${desc.title.toLowerCase()} now (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`);
+  logger.notice(`Repository '${name}' now holds ${holdingOf(desc)} (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`);
   return report;
 }
 
@@ -1294,7 +1308,7 @@ async function appUpdatedSingle(desc, before) {
     // changed), else every one the object named before that it does not write again
     const gone = out.gone ?? desc.fileOf(before).extraFiles.map((f) => f.name);
     const written = writeSingle(desc, repository, out, gone);
-    if (written) logger.info(`Saved the ${desc.title.toLowerCase()} into ${repository}/${desc.file}`);
+    if (written) logger.info(`Saved ${holdingOf(desc)} into ${repository}/${desc.file}`);
     return written;
   });
 }

@@ -77,6 +77,7 @@ vi.mock("../src/models/disclaimer.model.js", async () => {
 const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
+const { default: logger } = await import("./__mocks__/logger.js");
 const desc = (key) => RepoObjects.descriptorOf(key);
 
 // a PNG as the sniffing reads it : its signature, then anything
@@ -382,6 +383,33 @@ describe("the branding and its images", () => {
     assert.deepEqual(done.updated, ["branding"]);
     assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
     assert.equal(fx.state.tables.settings[0].logo, dataUrl(PNG));
+  });
+});
+
+// ─── the log lines of a type kept in one file ───────────────────────────────────
+describe("the log names a type kept in one file by its label", () => {
+  test("turned on, applied from git, saved from the app : sentences that read as such", async () => {
+    const lines = [];
+    const spies = ["notice", "info", "warning"].map((level) => vi.spyOn(logger, level).mockImplementation((m) => lines.push(m)));
+    try {
+      fx.cloneEmpty("cfg");
+      await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
+      writeRaw("cfg", "general.yaml", "JOB_RETENTION_DAYS: 30\n");
+      await RepoObjects.syncRepository(await desc("general"), "cfg");
+      fs.rmSync(path.join(fx.ROOT, "cfg", "chat-assistant.yaml"), { force: true });
+      const none = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+      const { saveEnvValues } = await import("../src/lib/envSave.js");
+      const before = await RepoObjects.snapshot("general");
+      await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
+      await RepoObjects.appUpdated("general", before);
+      assert.ok(lines.includes("Repository 'cfg' now holds MCP (written to mcp.yaml, waiting for Push)"), lines.join("\n"));
+      assert.ok(lines.includes("Applied cfg/general.yaml: the app follows git for General from now on"), lines.join("\n"));
+      assert.ok(lines.includes("Saved General into cfg/general.yaml"), lines.join("\n"));
+      assert.deepEqual(none.notes, ["No chat-assistant.yaml in the repository: the app keeps Chat assistant as it is"]);
+      assert.ok(!lines.some((l) => /holds the general|The \w+ follow /.test(l)), lines.join("\n"));
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });
 
