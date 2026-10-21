@@ -255,6 +255,31 @@ describe("Schedule.plan", () => {
     }
   });
 
+  test("a cron or a one time run sent without a rrule replaces the rrule ; a rrule with a one time run is refused", async () => {
+    let updated = null;
+    const original = CrudModel.update;
+    CrudModel.update = async (_m, data) => { updated = { ...data }; return {}; };
+    try {
+      // it runs on the cron it is given, not on the rrule it had
+      await Schedule.update({ one_time_run: 0, cron: "0 1 * * *", run_at: null }, 7);
+      assert.equal(updated.rrule, null);
+      assert.equal(updated.cron, "0 1 * * *");
+      // once, at its time
+      await Schedule.update({ one_time_run: 1, run_at: "2030-01-01 00:00:00" }, 7);
+      assert.equal(updated.rrule, null);
+      // neither : the rrule stays
+      await Schedule.update({ enabled: 0 }, 7);
+      assert.equal("rrule" in updated, false);
+      // a one time run has no rrule
+      const rrule = "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1";
+      await assert.rejects(Schedule.update({ one_time_run: 1, run_at: "2030-01-01 00:00:00", rrule }, 7), { name: "BadRequestError" });
+      await assert.rejects(Schedule.create({ name: "once", form: "Demo Form", one_time_run: 1, run_at: "2030-01-01 00:00:00", rrule }), { name: "BadRequestError" });
+      assert.equal(created, null);
+    } finally {
+      CrudModel.update = original;
+    }
+  });
+
   test("an update changes neither the owner nor the values a run was planned with", async () => {
     let updated = null;
     const original = CrudModel.update;

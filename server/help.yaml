@@ -6515,7 +6515,8 @@
       (`5MO`), `COUNT` with `UNTIL`, `COUNT` above 999 (in any case, `count=5000` too), and a rule that never fires: no
       run in the 50 years after its `DTSTART`, or runs that cannot be worked out within a second
       (`FREQ=HOURLY;INTERVAL=2;BYHOUR=1` from midnight only meets even hours). A time a DST change skips is skipped.
-      Schedules kept in the app keep their cron.
+      Schedules kept in the app keep their cron; one sent a cron or a one time run without a rrule drops the rrule it
+      had, and a rrule with a one time run is refused.
 
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
       files are read in; a file named as a recurring schedule of the app replaces that schedule's definition (git

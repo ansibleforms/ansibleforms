@@ -91,22 +91,29 @@ function isLaunchRefusal(err) {
 
 /**
  * Checks the rrule a schedule kept in the app is given (one a schedules repository it came from
- * left it, or one typed for it) : refused when it is not a valid rrule ; with one, it runs on it,
- * not on a cron. None given, nothing changes.
+ * left it, or one typed for it) : refused when it is not a valid rrule, or sent with a one time
+ * run ; with one, it runs on it, not on a cron. A cron or a one time run sent without a rrule
+ * replaces the rrule it had : it runs on what it was given. None of them given, nothing changes.
  *
  * Args:
  *   data (object): the request body (changed in place).
  *
  * Raises:
- *   Errors.BadRequestError: the rrule is refused.
+ *   Errors.BadRequestError: the rrule is refused, or sent with a one time run.
  */
 function checkAppRrule(data) {
-  if (data.rrule === undefined) return;
+  const once = data.one_time_run === true || Number(data.one_time_run) === 1;
+  if (data.rrule === undefined) {
+    // timed otherwise : the rrule it had goes
+    if (once || (data.cron && String(data.cron).trim())) data.rrule = null;
+    return;
+  }
   const rrule = normalizeRrule(data.rrule);
   if (!rrule) {
     data.rrule = null;
     return;
   }
+  if (once) throw new Errors.BadRequestError("A one time run has no rrule: send either, not both.");
   const errors = validateRrule(rrule);
   if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
   data.rrule = rrule;

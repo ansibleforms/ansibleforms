@@ -1105,7 +1105,7 @@
           "schedule"
         ],
         "summary": "Update a schedule",
-        "description": "Updates a schedule. A repository's schedule is saved into its file (only the fields changed ; the rest of the file kept) for the repository's Push ; it is timed by its rrule, never a cron.",
+        "description": "Updates a schedule. A repository's schedule is saved into its file (only the fields changed ; the rest of the file kept) for the repository's Push ; it is timed by its rrule, never a cron. A pull that removed it meanwhile answers 404, one that moved it 409. A schedule kept in the app sent a cron or a one time run without a rrule drops the rrule it had ; a rrule with a one time run is refused (400).",
         "security": [
           {
             "bearerAuth": []
