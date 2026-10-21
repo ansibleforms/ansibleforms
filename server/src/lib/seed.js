@@ -123,7 +123,16 @@ const listSections = [
     // repository's user/password/cron reported "1 updated" on every boot for ever while
     // never actually clearing it - the old credential kept being injected into the clone
     // URL. Going through CrudModel writes the empty value, which is what was declared.
-    update: (d, row) => CrudModel.update("repositories", d, row.id, seedOpts),
+    // ... yet the rules of its usages as the app's save : one repository at most per object type
+    // (refused, naming the one in use), and a usage turned on or off followed (its objects taken,
+    // or unlinked and kept in the app)
+    update: async (d, row) => {
+      const RepoObjects = (await import("./repoObjects/index.js")).default;
+      await RepoObjects.assertUsageAllowed(d, row.name, row);
+      const res = await CrudModel.update("repositories", d, row.id, seedOpts);
+      await Repository.afterUsageChange(row, d.name ?? row.name, seedOpts);
+      return res;
+    },
     remove: (row) => Repository.delete(row.name, seedOpts),
   },
   {

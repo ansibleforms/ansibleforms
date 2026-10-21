@@ -83,6 +83,7 @@ vi.mock("../src/lib/repoObjects/index.js", async (importOriginal) => {
 
 const Repository = (await import("../src/models/repository.model.js")).default;
 const { validateSeed } = await import("../src/lib/seed-schema.js");
+const { listSections } = await import("../src/lib/seed.js");
 
 beforeEach(() => {
   calls.length = 0;
@@ -110,6 +111,22 @@ describe("one schedules repository at most", () => {
     const repo = (name, flag) => ({ name, uri: "https://x/y.git", use_for_schedules: flag });
     assert.throws(() => validateSeed({ repositories: { items: [repo("a", true), repo("b", true)] } }), /use_for_schedules on more than one repository: a, b/);
     assert.ok(validateSeed({ repositories: { items: [repo("a", true), repo("b", false)] } }));
+  });
+});
+
+describe("the config seed's update of a repository", () => {
+  const section = listSections.find((x) => x.key === "repositories");
+
+  test("refused when another repository holds the usage, nothing saved", async () => {
+    await assert.rejects(section.update({ use_for_schedules: true }, { ...repos[1] }), /Repository 'ops' is already used for schedules/);
+    assert.equal(repos[1].use_for_schedules, 0);
+  });
+
+  test("a usage turned on or off is followed : taken, or unlinked", async () => {
+    await section.update({ use_for_schedules: false }, { ...repos[0] });
+    assert.deepEqual(calls, ["deactivate:ops"]);
+    await section.update({ use_for_schedules: true }, { ...repos[1] });
+    assert.deepEqual(calls, ["deactivate:ops", "activate:forms:pull"]);
   });
 });
 
