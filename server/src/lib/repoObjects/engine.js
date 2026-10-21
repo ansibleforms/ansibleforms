@@ -1329,6 +1329,12 @@ async function syncSingle(desc, name) {
     return summary;
   }
   const current = await desc.current();
+  // the config seed's whole object (the chat assistant's settings) : not applied, said
+  if (desc.heldBySeed(current)) {
+    summary.notes.push(`Kept by the config seed, not applied: ${desc.file}`);
+    summary.unchanged = 1;
+    return summary;
+  }
   summary.notes.push(...desc.notesOf(checked.object, current));
   const secrets = desc.secretsOf ? desc.secretsOf(current) : desc.secrets || [];
   if (secrets.some((s) => !given(raw[s]) && given(current?.[s]))) summary.secretsKept.push(desc.title);
@@ -1365,11 +1371,13 @@ async function previewSingle(desc, name) {
   const current = await desc.current();
   const { withoutSecret } = desc.fileOf(current);
   const active = (await activeRepository(desc)) || null;
+  // written when the repository has no file, unless the config seed holds the whole object
+  const writes = !exists && !desc.heldBySeed(current);
   return {
     repository: name || null,
     active,
-    written: exists ? [] : [desc.title],
-    withoutSecret: !exists && withoutSecret ? [desc.title] : [],
+    written: writes ? [desc.title] : [],
+    withoutSecret: writes && withoutSecret ? [desc.title] : [],
     // what stays in the app (the branding fields the config seed manages)
     kept: desc.kept(current),
     clashes: exists ? [desc.title] : [],
@@ -1391,7 +1399,13 @@ async function previewSingle(desc, name) {
  *   Promise<object>: the report.
  */
 async function activateSingle(desc, name, report) {
-  report.kept = desc.kept(await desc.current());
+  const current = await desc.current();
+  report.kept = desc.kept(current);
+  if (desc.heldBySeed(current)) {
+    // the config seed's whole object : it stays with the seed, nothing written nor applied
+    logger.notice(`Repository '${name}' now holds ${holdingOf(desc)}, kept by the config seed while it declares them: nothing written to ${desc.file}`);
+    return report;
+  }
   if (fs.existsSync(singleFileOf(desc, name))) {
     const summary = await syncSingle(desc, name);
     report.refused = summary.refused;
@@ -1425,6 +1439,8 @@ async function appUpdatedSingle(desc, before) {
   const repository = await activeRepository(desc);
   if (!repository || !cloned(repository)) return false;
   const after = await desc.current();
+  // the config seed's whole object : never written to the repository
+  if (desc.heldBySeed(after)) return false;
   return withWriteClaim(repository, async () => {
     const abs = singleFileOf(desc, repository);
     const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);

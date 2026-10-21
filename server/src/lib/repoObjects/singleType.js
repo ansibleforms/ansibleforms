@@ -32,6 +32,9 @@ import { typeOf } from "./types.js";
  *       the seed compares when not given.
  *     kept (function): (current) => [{ name, code, reason }] - the parts that stay in the app (the
  *       branding fields the config seed manages), said before the type is turned on.
+ *     heldBySeed (function): (current) => whether the config seed manages the whole object (the
+ *       chat assistant's settings) : it stays with the seed, as a seed-managed object of a folder
+ *       type does - never written to the repository's file, its file never applied (said).
  *     notesOf (function): (declared, current) => lines for the pull output about a file, whether it
  *       changes anything or not (the fields of it the config seed keeps).
  *     fromFile (function): async (object, { dir, fromSeed }) => the object as the app reads it, the files
@@ -96,6 +99,7 @@ export function singleType(spec) {
     apply: spec.apply,
     changed: spec.changed || ((declared, current) => differs(declared, current || {})),
     kept: spec.kept || (() => []),
+    heldBySeed: spec.heldBySeed || (() => false),
     notesOf: spec.notesOf || (() => []),
 
     /**

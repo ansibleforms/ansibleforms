@@ -1482,7 +1482,7 @@
                           "active": { "type": "string", "nullable": true, "description": "The type's repository now" },
                           "written": { "type": "array", "items": { "type": "string" } },
                           "withoutSecret": { "type": "array", "items": { "type": "string" }, "description": "Written without their secrets, kept in the database" },
-                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "cron": { "type": "string" } } } },
+                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "code": { "type": "string", "description": "Why it stays in the app (seed, registered, pending, holder)" }, "whole": { "type": "boolean", "description": "The type's one object stays whole (the chat assistant's settings the config seed manages)" }, "cron": { "type": "string" } } } },
                           "clashes": { "type": "array", "items": { "type": "string" } },
                           "files": { "type": "integer" },
                           "linked": { "type": "integer" },

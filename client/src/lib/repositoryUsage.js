@@ -506,15 +506,18 @@ async function preview(name, keys) {
  *
  * Args:
  *   t (function): vue-i18n's t.
- *   k (object): what the server kept ({ name, code, reason, cron }).
+ *   k (object): what the server kept ({ name, code, reason, cron, whole (the type's one object :
+ *     the chat assistant's settings, named by the type) }).
+ *   key (string): the type.
  *
  * Returns:
  *   string: its name and why (a cron's, its cron).
  */
-function keptText(t, k) {
-  if (k.cron) return `${k.name} (${k.cron})`;
+function keptText(t, k, key) {
+  const name = k.whole ? usageLabel(t, key) : k.name;
+  if (k.cron) return `${name} (${k.cron})`;
   const why = k.code ? t(`settings.repositories.usageKeptWhy.${k.code}`) : k.reason;
-  return why ? `${k.name} (${why})` : k.name;
+  return why ? `${name} (${why})` : name;
 }
 
 /**
@@ -537,7 +540,10 @@ export function activationLines(t, key, name, p) {
   // a type the app has one of : written as its one file, when the repository has none yet ; a type
   // kept as a list in one file : its objects written to it ; else one file each in its folder
   let lines;
-  if (file)
+  // a type the app has one of, which the config seed holds whole (nothing written) and the
+  // repository has no file of : its kept line says it
+  if (file && !count && !p.files && (p.kept || []).some((k) => k.whole)) lines = [];
+  else if (file)
     lines = [t(`settings.repositories.${count ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, { type, name, file })];
   else if (list) lines = [t('settings.repositories.usageOnWrittenList', { type, name, file: list, count })];
   else lines = [t('settings.repositories.usageOnWritten', { type, name, folder: folder || key, count })];
@@ -547,7 +553,7 @@ export function activationLines(t, key, name, p) {
       : t('settings.repositories.usageOnGitWins'),
   );
   if ((p.kept || []).length) {
-    const names = p.kept.map((k) => keptText(t, k)).join(', ');
+    const names = p.kept.map((k) => keptText(t, k, key)).join(', ');
     lines.push(t(KEPT_KEY[key] || 'settings.repositories.usageOnKept', { names }));
   }
   if ((p.withoutSecret || []).length) {

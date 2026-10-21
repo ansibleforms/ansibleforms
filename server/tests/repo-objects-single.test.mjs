@@ -180,6 +180,28 @@ describe("a type kept in one file : the chat assistant", () => {
     assert.equal(fs.readFileSync(target, "utf8"), "model: read-from-the-server\n");
   });
 
+  test("the config seed's chat : it stays with the seed, never written to git, its file not applied", async () => {
+    fx.cloneEmpty("cfg");
+    Object.assign(fx.state.tables.chat_settings[0], { provider: "openai", model: "seeded", managed: 1 });
+    const p = await RepoObjects.preview(await desc("chat_assistant"), "cfg");
+    assert.deepEqual(p.written, []);
+    assert.deepEqual(p.kept, [{ name: "Chat assistant", whole: true, code: "seed", reason: "managed by the config seed" }]);
+    const report = await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
+    assert.deepEqual(report.written, []);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "chat-assistant.yaml")), false, "nothing written");
+    // a file in git : not applied, said, never refused
+    writeRaw("cfg", "chat-assistant.yaml", "model: from-git\n");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(fx.state.tables.chat_settings[0].model, "seeded");
+    assert.match(RepoObjects.summaryText(await desc("chat_assistant"), summary), /Kept by the config seed, not applied: chat-assistant.yaml/);
+    // the app's own write (the seed's apply) never reaches the file
+    const before = await RepoObjects.snapshot("chat_assistant");
+    fx.state.tables.chat_settings[0].model = "seeded-2";
+    assert.equal(await RepoObjects.appUpdated("chat_assistant", before), false);
+    assert.equal(fx.readText("cfg", ".", "chat-assistant.yaml"), "model: from-git\n");
+  });
+
   test("turned off : read once more, the app keeps its values, the file stays", async () => {
     writeRaw("cfg", "chat-assistant.yaml", "model: last\n");
     const report = await RepoObjects.deactivate(await desc("chat_assistant"), "cfg");

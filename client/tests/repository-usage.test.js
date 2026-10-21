@@ -402,6 +402,17 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     );
   });
 
+  it("the config seed's chat : said staying with the seed, by its type, no file said written or read", () => {
+    const lines = activationLines(t, 'chat_assistant', 'cfg', {
+      written: [],
+      files: 0,
+      kept: [{ name: 'Chat assistant', whole: true, code: 'seed', reason: 'managed by the config seed' }],
+    });
+    expect(lines.join(' ')).not.toContain('usageOnReadFile');
+    expect(lines.join(' ')).not.toContain('usageOnWrittenFile');
+    expect(lines).toContain('settings.repositories.usageOnKept {"names":"sidebar.chat (settings.repositories.usageKeptWhy.seed)"}');
+  });
+
   it('their pages say which repository holds them, the record pages which file', async () => {
     const axios = (await import('axios')).default;
     axios.get.mockImplementationOnce(async () => ({ data: { records: [{ name: 'cfg', use_for_branding: 1 }] } }));
