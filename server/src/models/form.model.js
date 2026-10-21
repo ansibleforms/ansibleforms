@@ -941,6 +941,57 @@ function skippedCopies(formsDirs) {
 }
 
 /**
+ * The forms the loader leaves out because they do not load (no name aside : failing validation),
+ * each the copy its name resolves to (a later copy of a name is a skipped one, duplicatesOf) : the
+ * designer never receives them, a save keeps them (formsToKeep). A designer without designAllForms
+ * is refused their names and their files when they are not theirs (lib/designerForms.js).
+ *
+ * Returns:
+ *   Promise<object[]>: [{ form (as read), source (its file in its folder), repository (its
+ *     repository, null for a local or the staging folder) }].
+ */
+Form.unloaded = async function() {
+  const first = new Map()
+  for (const e of collectForms(await formsFolders(), () => {}, () => {})) {
+    if (e.form?.name && !first.has(e.form.name)) first.set(e.form.name, e)
+  }
+  // validated as the loader validates them : a form that loads is answered from its cache
+  const loads = (form) => {
+    try {
+      validatedForm(form)
+      return true
+    } catch {
+      return false
+    }
+  }
+  return [...first.values()].filter((e) => !loads(e.form)).map((e) => ({ form: e.form, source: e.file, repository: e.repository }))
+}
+
+/**
+ * The error the loader records for a form failing validation : what a designer without
+ * designAllForms is not shown of a form hidden from them (lib/designerForms.js).
+ *
+ * Args:
+ *   name (string): the form.
+ *   message (string): why it fails ; '' for the start every such error has.
+ *
+ * Returns:
+ *   string: the error.
+ */
+Form.validationError = (name, message) => `Failed to validate form '${name}'.\r\n${message}`
+
+/**
+ * What a save says of a form name it cannot take, to a designer who is not told where it is.
+ *
+ * Args:
+ *   name (string): the name.
+ *
+ * Returns:
+ *   string: the message.
+ */
+Form.nameTaken = (name) => `The form name '${name}' is already taken`
+
+/**
  * Refuses a save that would put a form new to its forms repository (or the staging folder) under
  * a name another forms repository already defines. A name twice in what is saved is refused
  * before, by assertUniqueFormNames. The copy the loader uses is saved where it is, as before.
@@ -948,11 +999,13 @@ function skippedCopies(formsDirs) {
  * Args:
  *   groups (object[]): what is saved, by file ([{ dir (its folder), forms }]).
  *   formsDirs (object[]): the folders saved into.
+ *   conceal (boolean): say only that the name is taken, not where (a designer without
+ *     designAllForms : a copy may be one hidden from them).
  *
  * Raises:
  *   Errors.ConflictError: the names, and where each is already defined (a 409).
  */
-function assertNoDuplicateForms(groups, formsDirs) {
+function assertNoDuplicateForms(groups, formsDirs, conceal = false) {
   // where each name is defined now, by folder
   const existing = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
   const clashes = []
@@ -960,6 +1013,7 @@ function assertNoDuplicateForms(groups, formsDirs) {
     const copies = existing.filter((e) => e.form?.name === f.name)
     // in its own folder already (an edit, or a move to another file of it) : as before
     if (!copies.length || copies.some((e) => e.dir.path === g.dir?.path)) continue
+    if (conceal) throw new Errors.ConflictError(Form.nameTaken(f.name))
     clashes.push(`'${f.name}' (already in ${copies.map((e) => e.place).join(", ")})`)
   }
   if (clashes.length) throw new Errors.ConflictError(`A form with this name already exists in another forms repository: ${clashes.join(", ")}. Form names must be unique across forms repositories.`)
@@ -1081,7 +1135,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         form = getFormInfo(f,formName,loadFullConfig); // retreive only the necessary form info
       } catch (e) {
         // convert e to proper string
-        error(`Failed to validate form '${f.name}'.\r\n${e.message}`);
+        error(Form.validationError(f.name, e.message));
       }  
       if(form){
         // Load varsFiles if this is a single form request and varsFiles is defined
@@ -1735,7 +1789,9 @@ function assertUniqueFormNames(forms){
   }
 }
 
-Form.save = async function(data){
+// options.conceal : a refused name is said taken, never where it is (a designer without
+// designAllForms, lib/designerForms.js)
+Form.save = async function(data, options = {}){
   // The checks of what the user sent come first, and each answers as the user's mistake
   // (lib/errors.js) : the controller turns them into a 400 or a 409 with their message,
   // where a plain Error became a 500 that read as a broken server.
@@ -1792,7 +1848,7 @@ Form.save = async function(data){
   }
 
   // a form name defined twice, or new here and already another forms repository's : refused
-  assertNoDuplicateForms(Object.values(groups), formsDirs)
+  assertNoDuplicateForms(Object.values(groups), formsDirs, options.conceal)
 
   // repository and source are internal placement fields : never write them to a form file or config
   // source is re-stamped from the filename on load ; repository pins a form to its repo

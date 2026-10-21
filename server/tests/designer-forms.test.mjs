@@ -37,7 +37,8 @@ const { default: configController } = await import("../src/controllers/v2/config
 const ROLES = [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }];
 const form = (name, roles, extra = {}) => ({ name, type: "ansible", playbook: "x.yaml", roles, categories: [], fields: [], ...extra });
 const OPS = form("Ops deploy", ["ops"], { fields: [{ name: "hosts", type: "list", subform: "Host row" }] });
-const TEAM = form("Team deploy", ["team"]);
+// the team's form uses the ops form's subform too : read only for olga
+const TEAM = form("Team deploy", ["team"], { fields: [{ name: "hosts", type: "list", subform: "Host row" }] });
 const SUB = { name: "Host row", type: "subform", fields: [{ name: "host", type: "text" }] };
 const OPEN = form("Everyone", ["default"]);
 
@@ -229,5 +230,61 @@ describe("designAllPlaybooks and designAllWorkflows : what the user's forms use,
     write("playbooks", "brand-new.yml", "- hosts: all\n");
     await assertFileShown("playbooks", "brand-new.yml", user, "read");
     assert.ok((await files("playbooks", user)).includes("brand-new.yml"));
+  });
+});
+
+// ─── nothing hidden reached another way ────────────────────────────────────────
+describe("with designAllForms off : no other way to a hidden form", () => {
+  const DIR = () => path.join(ROOT, "forms", "forms");
+  const BASE = { categories: [{ name: "Default", icon: "bars" }], roles: ROLES, constants: {} };
+  const save = (user, forms) => call(configController.save, { user: { user }, body: { forms: YAML.stringify({ ...BASE, forms }) }, ip: "::1" });
+  const mine = async (user = limited) => (await designerConfig(await load(), user, await Form.unloaded())).forms.filter((f) => !f.readOnly);
+  // a team form that does not load (a field of no type there is)
+  const BROKEN = { name: "Secret payroll", type: "ansible", playbook: "x.yaml", roles: ["team"], categories: [], fields: [{ name: "x", type: "bogus" }] };
+
+  test("a list field naming a hidden form that is no subform shows nothing of it", async () => {
+    const forms = (await mine()).map((f) => (f.name === "Ops deploy" ? { ...f, fields: [...f.fields, { name: "peek", type: "list", subform: "Team deploy" }] } : f));
+    assert.equal((await save(limited, forms)).code, 200);
+    const res = await call(configController.findAll, { user: { user: limited } });
+    assert.equal(res.body.forms.some((f) => f.name === "Team deploy"), false, JSON.stringify(names(res.body.forms)));
+  });
+
+  test("a hidden form that does not load : not named in the errors, its name and its file refused", async () => {
+    fs.writeFileSync(path.join(DIR(), "secret.yaml"), YAML.stringify(BROKEN));
+    // one of the user's that does not load : its error still shown
+    fs.writeFileSync(path.join(DIR(), "mine.yaml"), YAML.stringify({ ...BROKEN, name: "Ops broken", roles: ["ops"] }));
+    const res = await call(configController.findAll, { user: { user: limited } });
+    assert.doesNotMatch(JSON.stringify(res.body), /Secret payroll/);
+    assert.match(JSON.stringify(res.body.errors), /Ops broken/);
+    // its name : taken, nothing more said, the file left as it was
+    const named = await save(limited, [...(await mine()), form("Secret payroll", ["ops"], { source: "other.yaml" })]);
+    assert.equal(named.code, 409);
+    assert.equal(named.body.details, "The form name 'Secret payroll' is already taken");
+    // its file : taken too
+    const placed = await save(limited, [...(await mine()), form("Mine too", ["ops"], { source: "secret.yaml" })]);
+    assert.equal(placed.code, 409);
+    assert.equal(placed.body.details, "The file 'secret.yaml' is already taken");
+    assert.deepEqual(YAML.parse(fs.readFileSync(path.join(DIR(), "secret.yaml"), "utf8")), BROKEN);
+  });
+
+  test("subforms : a new one and those only the user's forms use are theirs, those a hidden form uses are not", async () => {
+    const rows = { name: "My rows", type: "subform", fields: [{ name: "a", type: "text" }], source: "deploy.yaml" };
+    const withRows = (forms) => forms.map((f) => (f.name === "Ops deploy" ? { ...f, fields: [...f.fields, { name: "rows", type: "list", subform: "My rows" }] } : f));
+    // a new subform, used by a form of theirs : saved, then shown theirs to edit
+    const first = await save(limited, withRows([...(await mine()), rows]));
+    assert.equal(first.code, 200, JSON.stringify(first.body));
+    const shown = (await designerConfig(await load(), limited)).forms.find((f) => f.name === "My rows");
+    assert.equal(shown.readOnly, undefined);
+    const edited = (await mine()).map((f) => (f.name === "My rows" ? { ...f, fields: [{ name: "b", type: "text" }] } : f));
+    const second = await save(limited, edited);
+    assert.equal(second.code, 200, JSON.stringify(second.body));
+    assert.equal(YAML.parse(fs.readFileSync(path.join(DIR(), "deploy.yaml"), "utf8")).find((f) => f.name === "My rows").fields[0].name, "b");
+    // a subform only a hidden form uses : neither shown, nor named by a form of theirs, nor its name taken
+    fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify([form("Team rows form", ["team"], { fields: [{ name: "r", type: "list", subform: "Team rows" }] }), { name: "Team rows", type: "subform", fields: [{ name: "t", type: "text" }] }]));
+    assert.equal((await designerConfig(await load(), limited)).forms.some((f) => f.name === "Team rows"), false);
+    const naming = (await mine()).map((f) => (f.name === "Ops deploy" ? { ...f, fields: [...f.fields, { name: "t", type: "list", subform: "Team rows" }] } : f));
+    assert.equal((await save(limited, naming)).body.details, "The form name 'Team rows' is already taken");
+    const taking = [...(await mine()), { name: "Team rows", type: "subform", fields: [{ name: "t", type: "text" }], source: "deploy.yaml" }];
+    assert.equal((await save(limited, taking)).code, 409);
   });
 });

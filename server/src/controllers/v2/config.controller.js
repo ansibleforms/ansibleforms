@@ -103,7 +103,7 @@ const findAll = async function(req,res){
     }
     var forms = await Form.load(undefined,undefined,true) // true means load all forms, not just the ones for the user
     // without designAllForms : the forms of the user's roles, the subforms they use read only (lib/designerForms.js)
-    res.json(RestResult.single(await designerConfig(forms, user)))
+    res.json(RestResult.single(designsAllForms(user) ? forms : await designerConfig(forms, user, await Form.unloaded())))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }
@@ -396,21 +396,23 @@ const save = async function(req,res){
       // without designAllForms : what the user sent laid over the forms they do not see, kept as
       // they are ; a hidden form's name, a changed read-only subform, a form without one of their
       // roles refused (lib/designerForms.js)
-      if(!designsAllForms(user)){
-        try {
-          const sent = Form.parse(newConfig) || {}
+      try {
+        let sent = null
+        try { sent = Form.parse(newConfig) || {} } catch { sent = null }
+        if(!designsAllForms(user)){
+          // not read : refused as Form.save would refuse it, nothing laid over
+          if(sent === null) Form.parse(newConfig)
           const stored = await Form.load(undefined,undefined,true)
-          newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user) })
-        } catch (err) {
-          if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
-          throw err
+          newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
         }
+      } catch (err) {
+        if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
+        throw err
       }
       // the designer writes the whole document, so the previous one has to be read
       // before the save to get a role delta out of it
       var previousConfig = await Settings.getActiveConfig().catch(() => '')
-      // a name another forms repository holds said taken without where, to a designer limited to
-      // some forms (a copy may be one hidden from them)
+      // a name taken said without where, to a designer limited to some forms
       var forms = await Form.save(newConfig, { conceal: !designsAllForms(user) })
       if(forms) {
         // read back what was actually written rather than re-serializing req.body :

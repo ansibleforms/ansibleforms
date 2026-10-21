@@ -172,3 +172,15 @@ describe("a save that would define a form name twice", () => {
     assert.equal(forms.find((f) => f.name === "Deploy").description, "ops");
   });
 });
+
+describe("a designer without designAllForms", () => {
+  test("a name another forms repository defines : said taken, never where", async () => {
+    formsRepos = ["forms-team", "forms-ops"];
+    const data = { forms: YAML.stringify({ categories: [{ name: "Default", icon: "bars" }], roles: ROLES, constants: {}, forms: [{ ...form("Deploy", "new"), source: "new-deploy.yaml" }] }) };
+    await assert.rejects(Form.save(data, { conceal: true }), (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.message, "The form name 'Deploy' is already taken");
+      return true;
+    });
+  });
+});

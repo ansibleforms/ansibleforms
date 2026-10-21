@@ -4639,7 +4639,7 @@
           "config"
         ],
         "summary": "The designer's forms config",
-        "description": "The categories, the roles, the constants and the forms, as the designer edits them, with the load's errors and warnings. With the role option designAllForms off (it is on by default, and always for admins) only the forms whose roles hold one of the user's roles are returned; the subforms those use are added with readOnly: true, and the warnings naming a hidden form are left out. Designer access.",
+        "description": "The categories, the roles, the constants and the forms, as the designer edits them, with the load's errors and warnings. With the role option designAllForms off (it is on by default, and always for admins) only the forms whose roles hold one of the user's roles are returned, with the subforms no hidden form uses; a subform a hidden form uses as well as one of theirs is added with readOnly: true, and the warnings and errors naming a hidden form are left out. Designer access.",
         "security": [
           {
             "bearerAuth": []
@@ -4662,7 +4662,7 @@
           "config"
         ],
         "summary": "Save the designer's forms config",
-        "description": "Writes the forms (each to its file), the categories and the constants; the roles are the admin's. With the role option designAllForms off, the forms the user does not see are kept as they are (a file holding several forms keeps its hidden ones), a read-only subform must come back unchanged (403), a form named as a hidden one is refused with the name said to be taken (409), and every form saved must keep one of the user's roles (400). Needs allowFormDesign.",
+        "description": "Writes the forms (each to its file), the categories and the constants; the roles are the admin's. With the role option designAllForms off, the forms the user does not see are kept as they are (a file holding several forms keeps its hidden ones), a read-only subform must come back unchanged (403), a form named as a hidden one (one that does not load included), a subform a hidden form uses, or a form put in the file of a hidden form that does not load is refused with the name said to be taken (409), and every form saved (a subform aside) must keep one of the user's roles (400). Needs allowFormDesign.",
         "security": [
           {
             "bearerAuth": []
@@ -4695,7 +4695,7 @@
             "description": "No form design access, or a read-only subform changed"
           },
           "409": {
-            "description": "The form name is already taken (designAllForms off)"
+            "description": "A form name or file already taken (designAllForms off)"
           },
           "423": {
             "description": "The designer is locked by another user"

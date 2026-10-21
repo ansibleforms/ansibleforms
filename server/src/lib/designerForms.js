@@ -6,16 +6,21 @@
 // The forms (the role option designAllForms) : every form with it on (the
 // default, and always for an admin), else only the forms whose roles hold one of the user's - the
 // Forms page's filter (Form.checkFormRole), enforced here on the server for the designer's config
-// (GET /api/v2/config), its save (POST /api/v2/config), its restore and the load's warnings.
+// (GET /api/v2/config), its save (POST /api/v2/config), its restore and the load's warnings and
+// errors.
 //
-//   shown      the forms the user reaches, and the subforms they use (their list, yaml and wizard
-//              steps' subforms, recursively) read only, so a form of theirs can still be edited ;
-//              any other form is left out, never named
+//   shown      the forms the user reaches ; the subforms (they have no roles) their forms use, or
+//              no form uses, theirs to edit ; a subform a hidden form uses as well read only, so a
+//              form of theirs can still be edited ; any other form is left out, never named (a
+//              list field naming a form that is no subform shows nothing)
 //   saved      what the user sends laid over the forms they do not see : those are kept as they
 //              are (in their files, a file holding several forms keeping its hidden ones in their
-//              places), a read-only subform kept unless it is unchanged, a form whose name is a
-//              hidden one's refused (the name taken, nothing more said), and every form saved must
-//              keep one of the user's roles, or they would no longer see it
+//              places), a read-only subform kept unless it is unchanged ; refused, as a name taken
+//              and nothing more said : a hidden form's name (one that does not load too), a subform
+//              name a hidden form uses, a subform hidden from them used by a form of theirs, and a
+//              form of theirs put in a file holding a hidden form that does not load ; every form
+//              saved (a subform aside) must keep one of the user's roles, or they would no longer
+//              see it
 //
 // The playbooks and the workflow files (designAllPlaybooks, designAllWorkflows) : the ones a form
 // the user sees in the designer uses (by the rule above : every form with designAllForms on), and
@@ -71,28 +76,63 @@ export function designsAll(user, option) {
   return (user?.roles || []).includes("admin") || user?.options?.[option] !== false;
 }
 
+/** A form's roles as a role check reads them : a form that does not load may hold anything there. */
+const rolesOf = (form) => ({ roles: Array.isArray(form?.roles) ? form.roles : [] });
+
+/** Whether a form is a subform : used by the forms naming it, it has no roles of its own. */
+const isSubform = (form) => form?.type === "subform";
+
 /**
- * The forms a user designs, out of every form : the ones their roles reach, and the subforms those
- * use, read only.
+ * The forms a user designs, out of every form : the ones their roles reach, the subforms no hidden
+ * form uses (theirs to edit), and the subforms a hidden form uses as well as one of theirs, read
+ * only.
  *
  * Args:
  *   forms (object[]): every form (Form.load(undefined, undefined, true)).
  *   user (object): the signed-in user.
+ *   unloaded (object[]): the forms that do not load (Form.unloaded) ; none when not given.
  *
  * Returns:
  *   object: { visible (Set of names : theirs), readOnly (Set of names : the subforms only used),
- *     hidden (object[] : every other form, and the read-only ones, as stored) }.
+ *     hidden (object[] : every other form, and the read-only ones, as stored), taken (Set of the
+ *     names they cannot take : a hidden form's, one that does not load included, and a subform
+ *     name a hidden form uses), hiddenSubforms (Set of the subforms hidden from them, not read
+ *     only), files ([{ source, repository }] : the files holding a hidden form that does not
+ *     load) }.
  */
-export function designerScope(forms, user) {
+export function designerScope(forms, user, unloaded = []) {
   const all = forms || [];
-  if (designsAllForms(user)) return { visible: new Set(all.map((f) => f.name)), readOnly: new Set(), hidden: [] };
-  const visible = new Set(all.filter((f) => Form.checkFormRole(f, user?.roles || [])).map((f) => f.name));
-  const readOnly = new Set();
-  for (const f of all) {
-    if (!visible.has(f.name)) continue;
-    for (const name of Form.subformNamesOf(f, all)) if (!visible.has(name)) readOnly.add(name);
+  if (designsAllForms(user)) {
+    return { visible: new Set(all.map((f) => f.name)), readOnly: new Set(), hidden: [], taken: new Set(), hiddenSubforms: new Set(), files: [] };
   }
-  return { visible, readOnly, hidden: all.filter((f) => !visible.has(f.name)) };
+  const roles = user?.roles || [];
+  const subforms = all.filter(isSubform).map((f) => f.name);
+  const mine = new Set(all.filter((f) => !isSubform(f) && Form.checkFormRole(f, roles)).map((f) => f.name));
+  // the subform names the user's forms use, and those the others use (one that does not load too) ;
+  // only a form of type subform is one (a list field naming any other form shows nothing)
+  const usedByMine = new Set();
+  const usedByHidden = new Set();
+  for (const f of all) {
+    if (isSubform(f)) continue;
+    for (const name of Form.subformNamesOf(f, all)) (mine.has(f.name) ? usedByMine : usedByHidden).add(name);
+  }
+  for (const u of unloaded || []) {
+    if (!isSubform(u.form) && !Form.checkFormRole(rolesOf(u.form), roles)) for (const name of Form.subformNamesOf(u.form, all)) usedByHidden.add(name);
+  }
+  const visible = new Set([...mine, ...subforms.filter((name) => !usedByHidden.has(name))]);
+  const readOnly = new Set(subforms.filter((name) => usedByHidden.has(name) && usedByMine.has(name)));
+  const hidden = all.filter((f) => !visible.has(f.name));
+  // the forms that do not load and are not theirs : a subform one when a hidden form uses it
+  const unloadedHidden = (unloaded || []).filter((u) => (isSubform(u.form) ? usedByHidden.has(u.form.name) : !Form.checkFormRole(rolesOf(u.form), roles)));
+  return {
+    visible,
+    readOnly,
+    hidden,
+    // a subform name a hidden form uses : one of theirs it names that is no subform aside
+    taken: new Set([...hidden.map((f) => f.name), ...unloadedHidden.map((u) => u.form.name), ...[...usedByHidden].filter((name) => !visible.has(name))]),
+    hiddenSubforms: new Set([...hidden, ...unloadedHidden.map((u) => u.form)].filter((f) => isSubform(f) && !readOnly.has(f.name)).map((f) => f.name)),
+    files: unloadedHidden.map((u) => ({ source: u.source, repository: u.repository })),
+  };
 }
 
 /**
@@ -114,22 +154,49 @@ export function duplicateShown(duplicate, user) {
 
 /**
  * The designer's config for a user : the forms they design (the subforms they only use marked
- * readOnly), and the load's warnings without the duplicates naming a form hidden from them.
+ * readOnly), the load's warnings without the duplicates naming a form hidden from them, and its
+ * errors without those of a form hidden from them that does not load.
  *
  * Args:
  *   config (object): the full config (Form.load(undefined, undefined, true)).
  *   user (object): the signed-in user.
+ *   unloaded (object[]): the forms that do not load (Form.unloaded).
  *
  * Returns:
  *   Promise<object>: the config as they get it (the same one when they design every form).
  */
-export async function designerConfig(config, user) {
+export async function designerConfig(config, user, unloaded = []) {
   if (designsAllForms(user)) return config;
-  const { visible, readOnly } = designerScope(config.forms, user);
+  const { visible, readOnly, taken } = designerScope(config.forms, user, unloaded);
   const forms = (config.forms || []).filter((f) => visible.has(f.name) || readOnly.has(f.name)).map((f) => (readOnly.has(f.name) ? { ...f, readOnly: true } : f));
   // a duplicate naming a hidden form : its warning left out
   const hiddenNotices = new Set((await Form.duplicates()).filter((d) => !duplicateShown(d, user)).map((d) => d.notice));
-  return { ...config, forms, warnings: (config.warnings || []).filter((w) => !hiddenNotices.has(w)) };
+  // a hidden form failing validation : its error left out
+  const hiddenErrors = [...taken].map((name) => Form.validationError(name, ""));
+  return {
+    ...config,
+    forms,
+    warnings: (config.warnings || []).filter((w) => !hiddenNotices.has(w)),
+    errors: (config.errors || []).filter((e) => !hiddenErrors.some((start) => String(e).startsWith(start))),
+  };
+}
+
+/**
+ * Whether a form is saved in a file holding a hidden form that does not load, and was not there
+ * before : the file is not the user's to write into.
+ *
+ * Args:
+ *   form (object): the form saved ({ source, repository }).
+ *   before (object|undefined): the same form as stored.
+ *   files (object[]): the files holding a hidden form that does not load (designerScope).
+ *
+ * Returns:
+ *   boolean: true when it is refused.
+ */
+function inHiddenFile(form, before, files) {
+  const repository = form?.repository ?? null;
+  const there = files.some((u) => u.source === form?.source && (repository === null || repository === u.repository));
+  return there && !(before && before.source === form.source && (before.repository ?? null) === repository);
 }
 
 /**
@@ -140,20 +207,23 @@ export async function designerConfig(config, user) {
  *   sent (object[]): the forms the designer sent.
  *   stored (object[]): every form as stored (Form.load(undefined, undefined, true)).
  *   user (object): the signed-in user.
+ *   unloaded (object[]): the forms that do not load (Form.unloaded).
  *
  * Returns:
  *   object[]: the forms to save (the sent ones as they are when the user designs every form).
  *
  * Raises:
- *   Errors.ConflictError: a form named as one hidden from them (the name taken, nothing more said).
+ *   Errors.ConflictError: a name they cannot take, a subform hidden from them used, a file of a
+ *     hidden form that does not load (the name or the file taken, nothing more said).
  *   Errors.AccessDeniedError: a read-only subform changed.
  *   Errors.BadRequestError: a form saved without one of their roles.
  */
-export function designerSave(sent, stored, user) {
+export function designerSave(sent, stored, user, unloaded = []) {
   const forms = sent || [];
   if (designsAllForms(user)) return forms;
-  const { readOnly, hidden } = designerScope(stored, user);
+  const { readOnly, hidden, taken, hiddenSubforms, files } = designerScope(stored, user, unloaded);
   const hiddenByName = new Map(hidden.map((f) => [f.name, f]));
+  const storedByName = new Map((stored || []).map((f) => [f.name, f]));
   const roles = user?.roles || [];
   const own = [];
   for (const f of forms) {
@@ -165,8 +235,14 @@ export function designerSave(sent, stored, user) {
       }
       continue;
     }
-    if (kept) throw new Errors.ConflictError(`The form name '${f.name}' is already taken`);
-    if (!Form.checkFormRole(f, roles)) {
+    if (kept || taken.has(f?.name)) throw new Errors.ConflictError(Form.nameTaken(f.name));
+    // a subform hidden from them, named by a form of theirs : it would show it
+    for (const name of Form.subformNamesOf(f, stored || [])) {
+      if (hiddenSubforms.has(name)) throw new Errors.ConflictError(Form.nameTaken(name));
+    }
+    if (inHiddenFile(f, storedByName.get(f?.name), files)) throw new Errors.ConflictError(`The file '${f.source}' is already taken`);
+    // a subform has no roles : it is theirs while no hidden form uses it
+    if (!isSubform(f) && !Form.checkFormRole(f, roles)) {
       const mine = roles.filter((r) => r !== "admin");
       throw new Errors.BadRequestError(`Form '${f?.name ?? ""}': keep one of your roles (${mine.join(", ")}) in its roles, or you would no longer see it`);
     }
