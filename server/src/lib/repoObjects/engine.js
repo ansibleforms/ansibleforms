@@ -792,7 +792,22 @@ export async function syncAll() {
  *   Promise<object[]>: { row, ... } to write, or { row, reason }.
  */
 async function candidates(desc, name = null) {
-  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row, name)));
+  const taken = await takenNames(desc);
+  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row, name, taken)));
+}
+
+/**
+ * The names a type's objects have, as nameKey keys them : what a name given to an object of the app
+ * without one (an announcement) must not be (descriptor.candidateOf).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<Set<string>|null>: the names ; null for a type that does not list them.
+ */
+async function takenNames(desc) {
+  return desc.store.names ? new Set((await desc.store.names()).map(nameKey)) : null;
 }
 
 /**
@@ -1139,7 +1154,7 @@ export async function appCreated(desc, id) {
   if (!repository || !cloned(repository)) return null;
   const row = await desc.store.byId(id);
   if (!row || desc.store.classify(row, repository) !== "adoptable") return null;
-  const c = await desc.candidateOf(row);
+  const c = await desc.candidateOf(row, null, await takenNames(desc));
   if (c.reason) return null;
   return withWriteClaim(repository, async () => {
     const file = desc.listFile ? writeListEntry(desc, repository, c.object) : writeNewFile(desc, repository, row.name, desc.newFileText(c));

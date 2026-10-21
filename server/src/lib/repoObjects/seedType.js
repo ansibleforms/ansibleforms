@@ -12,7 +12,7 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import { differs } from "../seedCompare.js";
 import { fieldSet } from "./fields.js";
-import { linkStore, classifyRow, columnDefaults } from "./engine.js";
+import { linkStore, classifyRow, columnDefaults, nameKey } from "./engine.js";
 import { typeOf } from "./types.js";
 
 /**
@@ -26,6 +26,25 @@ import { typeOf } from "./types.js";
  *   object: a copy without them.
  */
 const omit = (obj, keys = []) => Object.fromEntries(Object.entries(obj).filter(([k]) => !keys.includes(k)));
+
+/**
+ * A name not taken yet : the name, else the name with the first free suffix (Name (2), Name (3)
+ * ...), recorded as taken.
+ *
+ * Args:
+ *   name (string): the name wanted.
+ *   taken (Set<string>|null): the names taken, as nameKey keys them ; none : the name as it is.
+ *
+ * Returns:
+ *   string: the name.
+ */
+function uniqueName(name, taken) {
+  if (!taken) return name;
+  let unique = name;
+  for (let n = 2; taken.has(nameKey(unique)); n++) unique = `${name} (${n})`;
+  taken.add(nameKey(unique));
+  return unique;
+}
 
 // what a repository's write tells the models : not a request's, nor the seed's
 export const FROM_REPO = { fromRepo: true };
@@ -171,19 +190,22 @@ export function seedType(spec) {
     /**
      * An object of the app as a repository would take it : its file's fields (without its
      * secrets), or why it stays in the app. One without a name (an announcement made in the app)
-     * is written with the one nameFor gives it.
+     * is written with the one nameFor gives it, made unique among the names taken (a suffix : the
+     * second "Planned maintenance" is "Planned maintenance (2)") - a pull finds each by its name.
      *
      * Args:
      *   row (object): the row.
      *   holder (string|null): the repository that would take it.
+     *   taken (Set<string>|null): the names taken, as nameKey keys them (the type's, and those
+     *     given meanwhile) ; the name given is added to it.
      *
      * Returns:
      *   object: { row, object, withoutSecret, named } or { row, code, reason }.
      */
-    candidateOf(row, holder = null) {
+    candidateOf(row, holder = null, taken = null) {
       const code = row.managed ? "seed" : keptReason(row, holder);
       if (code) return { row, code, reason: KEPT_REASONS[code] || code };
-      const named = !row.name && spec.nameFor ? { ...row, name: spec.nameFor(row) } : row;
+      const named = !row.name && spec.nameFor ? { ...row, name: uniqueName(spec.nameFor(row), taken) } : row;
       return { row: named, named: named !== row, ...fields.toFile(named) };
     },
 

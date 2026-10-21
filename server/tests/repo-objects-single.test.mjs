@@ -615,6 +615,24 @@ describe("the config seed and a repository naming the same announcement", () => 
   });
 });
 
+describe("announcements made in the app with the same start", () => {
+  test("each written with a name of its own, a suffix ; a pull then takes every one, none refused", async () => {
+    fx.cloneEmpty("news");
+    const message = "Planned maintenance window: the app will be unavailable";
+    fx.state.tables.announcements.push({ id: 7, name: null, message: `${message} on Saturday`, level: "info", enabled: 1 }, { id: 8, name: null, message: `${message} on Sunday`, level: "info", enabled: 1 });
+    const report = await RepoObjects.activate(await desc("announcements"), "news", { pull: false });
+    const base = message.slice(0, 40).trim();
+    assert.deepEqual(report.written, [base, `${base} (2)`]);
+    // one made after : the next free suffix
+    fx.state.tables.announcements.push({ id: 9, name: null, message: `${message} again`, level: "info", enabled: 1 });
+    await RepoObjects.appCreated("announcements", 9);
+    assert.equal(fx.state.tables.announcements.find((r) => r.id === 9).name, `${base} (3)`);
+    const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(summary.unchanged, 3);
+  });
+});
+
 describe("an announcement already ended in git", () => {
   const ended = { name: "Maintenance", message: "Down on Sunday", end_at: "2020-01-01T10:00:00Z" };
 
