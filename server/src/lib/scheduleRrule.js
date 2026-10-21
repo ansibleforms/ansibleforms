@@ -10,7 +10,7 @@
 //     at most
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
 //   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
-//   a minutely or hourly rule is moved up to now before it is walked
+//   a minutely, hourly or daily rule is moved up to now before it is walked
 //   its runs are looked for in growing windows up to 50 years ahead, in a thread of their own
 //     (lib/scheduleRruleWorker.js) given one second at most : a rule rrule.js would walk for
 //     ever (FREQ=HOURLY;INTERVAL=2;BYHOUR=1 from midnight) never blocks the process
@@ -293,10 +293,11 @@ function momentOf(floating, zone) {
 }
 
 /**
- * A minutely or hourly rule's start moved up to the last of its runs before the reference,
- * before it is walked : walking every minute since a DTSTART of
- * years ago would take minutes. A rule with a COUNT keeps its start (its runs are counted from
- * it), a start still ahead too.
+ * A minutely, hourly or daily rule's start moved up to the last of its runs before the reference,
+ * before it is walked : walking every minute (or every day, at each of its times) since a DTSTART
+ * of years ago would take minutes. The step is the rule's period in the floating time, which has
+ * no DST : the start stays on the rule's own lattice, its time of the day kept. A rule with a
+ * COUNT keeps its start (its runs are counted from it), a start still ahead too.
  *
  * Args:
  *   options (object): the rule's options.
@@ -307,16 +308,17 @@ function momentOf(floating, zone) {
  *   number: the start to walk it from, floating ms.
  */
 function fastForward(options, start, reference) {
-  if (![RRule.HOURLY, RRule.MINUTELY].includes(options.freq)) return start;
+  const period = { [RRule.MINUTELY]: 60000, [RRule.HOURLY]: 3600000, [RRule.DAILY]: 86400000 }[options.freq];
+  if (!period) return start;
   if (options.count) return start;
   if (start > reference) return start;
-  const step = (options.interval || 1) * (options.freq === RRule.HOURLY ? 3600000 : 60000);
+  const step = (options.interval || 1) * period;
   return start + Math.floor((reference - start) / step) * step;
 }
 
 /**
- * The rule set of a compiled rrule, in floating time, its minutely and hourly rules moved up to
- * the reference.
+ * The rule set of a compiled rrule, in floating time, its minutely, hourly and daily rules moved
+ * up to the reference.
  *
  * Args:
  *   compiled (object): compileRrule's result.

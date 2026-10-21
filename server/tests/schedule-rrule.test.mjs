@@ -165,6 +165,18 @@ describe("its runs, in its own time zone", () => {
     }
   });
 
+  test("a daily rule from years ago, at many times of the day, is walked from now, at once", () => {
+    // the shape a cron every 7 minutes is written as (lib/cronToRrule.js)
+    const minutes = Array.from({ length: 9 }, (_, i) => i * 7).join(",");
+    const hours = Array.from({ length: 24 }, (_, i) => i).join(",");
+    const rrule = `DTSTART;TZID=Europe/Brussels:20100101T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=${hours};BYMINUTE=${minutes}`;
+    const after = new Date("2026-11-10T09:17:23Z");
+    const started = Date.now();
+    const next = nextRuns(rrule, { after, count: 10 }).map((d) => d.toISOString());
+    assert.ok(Date.now() - started < 500, `fast (${Date.now() - started} ms)`);
+    assert.deepEqual(next.slice(0, 3), ["2026-11-10T09:21:00.000Z", "2026-11-10T09:28:00.000Z", "2026-11-10T09:35:00.000Z"]);
+  });
+
   test("the next run : after the moment asked, none once the rule ended", () => {
     const rrule = "DTSTART;TZID=Europe/Brussels:20300101T020000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2";
     assert.equal(nextRun(rrule, new Date("2030-01-01T01:00:00Z")).toISOString(), "2030-01-02T01:00:00.000Z");

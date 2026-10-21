@@ -65,6 +65,22 @@ describe("a cron becomes a rrule that fires at the same moments", () => {
   }
 });
 
+describe("a cron written as a rrule years ago still has its next runs at once", () => {
+  // its DTSTART the day the schedules repository took it : the rule is walked from now, not from
+  // then, whatever its shape
+  const LONG_AGO = new Date("2016-03-01T10:00:00Z");
+  for (const cron of ["*/7 * * * *", "*/10 * * * * *", "10-20/5 9-17 * * MON-FRI", "*/5 * * * *", "30 2 * * *"]) {
+    test(cron, () => {
+      const { rrule } = cronToRrule(cron, ZONE, LONG_AGO);
+      assert.ok(rrule.startsWith(`DTSTART;TZID=${ZONE}:20160301T`));
+      const started = Date.now();
+      const runs = nextRuns(rrule, { after: NOW, count: 40 }).map((d) => d.toISOString());
+      assert.ok(Date.now() - started < 500, `fast (${Date.now() - started} ms)`);
+      assert.deepEqual(runs, cronRuns(cron), "the same next runs");
+    });
+  }
+});
+
 describe("a cron a rrule cannot express is refused, saying why", () => {
   const cases = [
     ["the day of the month and the day of the week both restricted (OR against AND)", "0 0 1 * 1", "both the day of the month and the day of the week"],
