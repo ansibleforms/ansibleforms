@@ -6749,8 +6749,13 @@
 
       **General** (`general.yaml`): Settings > System > General by environment variable names, only those that
       page changes (never one another page or the deployment owns, a refused one, or one set in the real
-      environment). A variable whose name ends in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as
-      `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
+      environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
+      command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
+      `ENABLE_CONFIG_IN_DATABASE`, ytt (`USE_YTT`, `YTT_*`), `EXPRESSION_SANITIZER`, `CONTENT_SECURITY_POLICY`,
+      `REST_ALLOWED_HOSTS`, `REST_DENIED_HOSTS`, `REST_IGNORE_CERTS`, the Microsoft sign-in addresses
+      (`ENTRA_*_URI`, `AZURE_*_URI`), `TRUST_PROXY`, `PORT`, `HTTPS`, `HTTPS_KEY` and `HTTPS_CERT`: a file setting one
+      is refused, said with why in the pull output, and the app never writes them to it. A variable whose name ends
+      in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
       value changes nothing), the managed file written, the other nodes told, each variable applied at once or
       said to need a restart (in the pull output), and the change audited. The app writes the variables saved from
       the page, each in its documented type: a number as a number, a yes or no as `true` or `false`, a text as
@@ -6759,7 +6764,7 @@
       ```yaml
       JOB_RETENTION_DAYS: 30
       LOG_LEVEL: info
-      DB_PASSWORD: ${DB_PASSWORD}
+      METRICS_TOKEN: ${METRICS_TOKEN}
       ```
 
       **MCP** (`mcp.yaml`): Settings > Connections > MCP by environment variable names, every switch that page

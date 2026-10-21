@@ -50,6 +50,48 @@ export const ENV_OWNERS = {
   mcp: (name) => MCP_ENV.test(name),
 };
 
+// The variables a repository's file never sets, whatever page owns them : the page saves them (an
+// admin's choice, typed in the app), a general.yaml would hand them to whoever may push to the
+// repository. Each says why, as the pull output refuses it ; the app never writes them to the file.
+export const REPOSITORY_REFUSED = [
+  // a command line the server runs (git, the database dump and restore)
+  { test: /_COMMAND$/, reason: "it is a command the server runs" },
+  // where the app's own database is, and who it signs in as
+  { test: /^DB_/, reason: "it says which database the app connects to" },
+  // where the app reads its configuration, forms, playbooks and files from, and writes its logs,
+  // backups and uploads to
+  { test: /_PATH$/, reason: "it is a path the app reads or writes files at" },
+  { test: /^ENABLE_CONFIG_IN_DATABASE$/, reason: "it says where the app reads its configuration from" },
+  // ytt renders the configuration and the forms : its switch, the files its templates may reach
+  // and the variables they read
+  { test: /^(USE_YTT|YTT_[A-Z_]+)$/, reason: "it decides how the configuration templates are run" },
+  // the expressions of the forms are code : how much of it runs
+  { test: /^EXPRESSION_SANITIZER$/, reason: "it decides which code the forms' expressions may run" },
+  // what the browser may load and run
+  { test: /^CONTENT_SECURITY_POLICY$/, reason: "it decides what code the browser may load" },
+  // the hosts the app's own calls may reach, and whether their certificates are checked
+  { test: /^REST_(ALLOWED_HOSTS|DENIED_HOSTS|IGNORE_CERTS)$/, reason: "it decides which servers the app connects to" },
+  // where a Microsoft sign-in is checked
+  { test: /^(ENTRA|AZURE)_(AUTHORITY|GRAPH)_URI$/, reason: "it decides which server the sign-in trusts" },
+  // which addresses the app trusts to name a client (its rate limits and lockouts)
+  { test: /^TRUST_PROXY$/, reason: "it decides which proxies the app trusts" },
+  // how the app listens, and with which certificate and key
+  { test: /^(PORT|HTTPS|HTTPS_KEY|HTTPS_CERT)$/, reason: "it decides how the app listens for connections" },
+];
+
+/**
+ * Why a repository's file may not set a variable (REPOSITORY_REFUSED), or null when it may.
+ *
+ * Args:
+ *   name (string): the variable.
+ *
+ * Returns:
+ *   string|null: the reason.
+ */
+export function repositoryRefusal(name) {
+  return REPOSITORY_REFUSED.find((r) => r.test.test(String(name)))?.reason || null;
+}
+
 /**
  * Whether a page (by its repository type) shows and edits a variable : documented, not refused,
  * one it owns.
@@ -163,4 +205,4 @@ export async function saveEnvValues(updates, who = {}, opts = {}) {
   return { changed: names, restartRequired };
 }
 
-export default { ENV_MASK, ENV_OWNERS, EnvSaveError, envDocs, ownsVariable, onSettingsPage, saveEnvValues };
+export default { ENV_MASK, ENV_OWNERS, REPOSITORY_REFUSED, repositoryRefusal, EnvSaveError, envDocs, ownsVariable, onSettingsPage, saveEnvValues };

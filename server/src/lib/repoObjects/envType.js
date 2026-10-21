@@ -12,7 +12,7 @@
 // A type the config seed holds per field (the MCP settings, its mcp section) : a variable the
 // seed declares stays the seed's (lib/repoObjects/seedHold.js), the repository holds the others.
 import EnvSettings from "../envSettings.js";
-import { ENV_OWNERS, envDocs, ownsVariable, saveEnvValues } from "../envSave.js";
+import { ENV_OWNERS, envDocs, ownsVariable, repositoryRefusal, saveEnvValues } from "../envSave.js";
 import { mapFieldSet } from "./fields.js";
 import { seedHold } from "./seedHold.js";
 import { singleType } from "./singleType.js";
@@ -57,7 +57,9 @@ export function typedValue(value, type) {
  *   object: the descriptor.
  */
 export function envType(spec) {
-  const owns = (name, docs) => ownsVariable(spec.key, name, docs);
+  // the page's variables a repository's file may hold : never one REPOSITORY_REFUSED names (a
+  // command the server runs, the database, a path ...), refused when a file sets it, never written
+  const owns = (name, docs) => ownsVariable(spec.key, name, docs) && !repositoryRefusal(name);
   // the config seed's hold on the page's variables ; none for a type it does not hold
   const hold = seedHold((name) => !!spec.seedHeld && ENV_OWNERS[spec.key](String(name)));
   const seeded = (current, opts = {}) => (opts.fromSeed ? [] : hold.seededOf(current));
@@ -80,7 +82,8 @@ export function envType(spec) {
     const problems = [];
     for (const [name, value] of Object.entries(declared)) {
       if (!docs.has(name)) problems.push(`${name} is not a known environment variable`);
-      else if (!owns(name, docs)) problems.push(`${name} is not one ${spec.page} changes`);
+      else if (!ownsVariable(spec.key, name, docs)) problems.push(`${name} is not one ${spec.page} changes`);
+      else if (repositoryRefusal(name)) problems.push(`${name} is not one a repository may set: ${repositoryRefusal(name)} (change it on ${spec.page})`);
       else if (EnvSettings.isOverridden(name, managed)) problems.push(`${name} is set in the environment and cannot be changed from here`);
       else {
         const problem = EnvSettings.validate(name, value, docs.get(name));
