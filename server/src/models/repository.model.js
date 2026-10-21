@@ -246,7 +246,12 @@ class Repository extends CrudModel {
       // takes the app's objects of each (activate), the clone just made read as it is
       if (!objectTypesOf(data).length) return
       try {
-        await (await repoObjects()).afterUsageChange(null, data.name, data, { pull: false })
+        const objects = await repoObjects()
+        const report = await objects.afterUsageChange(null, data.name, data, { pull: false })
+        // what it took, said after the clone's own lines : the create answered long ago, so the
+        // repository's page is where its admin reads it
+        const text = await objects.usageReportText(report)
+        if (text) await Repository.writeState("update AnsibleForms.`repositories` set pull_output = CONCAT(COALESCE(pull_output, ''), ?) where name = ?", [text, data.name], { name: data.name })
       } catch (e) {
         logger.error(`Repository '${data.name}' could not take the objects of its usages: ${helpers.getError(e)}`)
       }

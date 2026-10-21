@@ -1089,6 +1089,50 @@ export async function renameRepository(from, to) {
 }
 
 /**
+ * What an activation did, as the log and the pull output say it after "now holds" : a type kept in
+ * one file, written to it or read from it ; another, how many objects were read, replaced, written
+ * and kept in the app (and why).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   report (object): what activate answered.
+ *
+ * Returns:
+ *   string: the text (General (written to general.yaml, waiting for Push)).
+ */
+function activationText(desc, report) {
+  if (desc.file) return `${holdingOf(desc)} (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`;
+  const kept = report.kept || [];
+  const withoutSecret = report.withoutSecret || [];
+  return `${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${withoutSecret.length ? `, ${withoutSecret.length} without their secrets, kept in the database` : ""}), ${kept.length} kept in the app${kept.length ? ` (${kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`;
+}
+
+/**
+ * What turning a repository's usages on or off did (afterUsageChange's report), as lines for its
+ * pull output : a new repository takes the app's objects once its first clone is done, in the
+ * background, so its page says there what was taken, what stayed in the app and what failed.
+ *
+ * Args:
+ *   report (object): the report, by type ({ <type>: { activated | deactivated | error } }).
+ *
+ * Returns:
+ *   Promise<string>: the lines, each starting with a newline ; '' when the report is empty.
+ */
+export async function usageReportText(report) {
+  let out = "";
+  for (const key of APPLY_ORDER) {
+    const r = report?.[key];
+    if (!r) continue;
+    const desc = await descriptorOf(key);
+    if (r.error) out += `\n${titleOf(desc)} could not follow the usage: ${r.error}`;
+    else if (r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
+    else if (r.activated) out += `\nNow holds ${activationText(desc, r.activated)}`;
+    else if (r.deactivated) out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
+  }
+  return out;
+}
+
+/**
  * Follows a repository made, or no longer, a type's repository : made one, it takes the app's
  * objects (activate) ; no longer one, its objects are unlinked and stay in the app (deactivate) ;
  * several types at once in APPLY_ORDER, the repository pulled once. What it did is put in
@@ -1433,7 +1477,7 @@ async function activateSingle(desc, name, report) {
     report.written = [desc.title];
     if (out.withoutSecret) report.withoutSecret = [desc.title];
   }
-  logger.notice(`Repository '${name}' now holds ${holdingOf(desc)} (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`);
+  logger.notice(`Repository '${name}' now holds ${activationText(desc, report)}`);
   return report;
 }
 
@@ -1632,6 +1676,7 @@ export default {
   deactivate,
   renameRepository,
   afterUsageChange,
+  usageReportText,
   appCreated,
   appUpdated,
   appDeleted,

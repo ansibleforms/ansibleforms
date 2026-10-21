@@ -486,4 +486,18 @@ describe("the rules of the usages", () => {
     assert.deepEqual(fx.state.calls.filter((c) => c.startsWith("pull")), ["pull:other"]);
     assert.equal(fx.rowNamed("runners", "a").repository, "other");
   });
+
+  test("what turning them on did reads as lines for the pull output, a failure and a repository not cloned too", async () => {
+    fx.writeFile("other", "credentials", "rte.yaml", rteCredential);
+    fx.state.tables.credentials.push({ id: 1, name: "api", credential_type: "api", password: "enc:pw" });
+    const report = {};
+    await RepoObjects.afterUsageChange({}, "other", { use_for_credentials: 1 }, { report });
+    const text = await RepoObjects.usageReportText(report);
+    assert.match(text, /^\nNow holds the credentials: 1 read from its files, 0 replaced by a file of the same name, 1 written to it \(waiting for Push, 1 without their secrets/);
+    assert.equal(
+      await RepoObjects.usageReportText({ runners: { error: "disk full" }, credentials: { activated: { pull: "not cloned" } } }),
+      "\nNot cloned: the credentials will be taken once it is\nRunners could not follow the usage: disk full",
+    );
+    assert.equal(await RepoObjects.usageReportText({}), "");
+  });
 });
