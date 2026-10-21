@@ -120,6 +120,14 @@ export const db = {
       rowsOf("runners").filter((r) => r.id !== Number(params[0]) && r.type === params[1] && !r.managed).forEach((r) => (r.is_default = 0));
       return { affectedRows: 1 };
     }
+    // the enabled sign-in provider of a type, and Skip the login page : one each
+    if (/^SELECT name FROM AnsibleForms\.`oauth2_providers` WHERE enable = 1 AND managed = 1/.test(sql)) return [];
+    m = sql.match(/^UPDATE AnsibleForms\.`oauth2_providers` SET (enable|auto_login) = 0 WHERE (provider = \?|auto_login = 1)/);
+    if (m) {
+      const hit = rowsOf("oauth2_providers").filter((r) => (m[2] === "provider = ?" ? r.provider === params[0] : Number(r.auto_login) === 1) && !r.managed);
+      hit.forEach((r) => (r[m[1]] = 0));
+      return { affectedRows: hit.length };
+    }
     // a single-row table (the settings, the chat assistant's) : its row, a field of it, a write
     if (/^SELECT (\*|[\w, ]+) FROM \S+ limit 1;?$/i.test(sql)) return copy(rows.slice(0, 1));
     if (/^UPDATE \S+ set \?$/i.test(sql)) {
@@ -144,7 +152,7 @@ export const db = {
       return { affectedRows: rows.length - state.tables[table].length };
     }
     // the crud models : a row by its id or name, all of them, a write
-    m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) = \?$/);
+    m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) ?= ?\?$/);
     if (m) return copy(rows.filter((r) => (m[1] === "name" ? lower(r.name) === lower(params[0]) : String(r[m[1]]) === String(params[0]))));
     if (/^SELECT .+ FROM \S+$/.test(sql)) return copy(rows);
     // a list by name (the repositories)

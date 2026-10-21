@@ -25,10 +25,41 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 // what a save tells the rest of the app (the header's labels, the sign-in providers) : nothing here
 vi.mock("../src/routes/v2/app.routes.js", () => ({ forgetAppDefaults: () => {} }));
 vi.mock("../src/lib/liveEvents.js", () => ({ publish: () => {} }));
+// a runner's RTE told its settings : nothing here
+vi.mock("../src/runners/rteHub.js", () => ({ socketState: () => null, isSocketRunner: () => false, dropSocket: () => {}, pushSettings: () => {} }));
 
 const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
+// the sign-in providers read again after a change : nothing here
+for (const auth of ["auth_entraid", "auth_oidc"]) (await import(`../src/auth/${auth}.js`)).default.initialize = async () => {};
+
+/**
+ * Calls a controller as a request of an admin would.
+ *
+ * Args:
+ *   handler (function): the controller's function.
+ *   req (object): { body, params }.
+ *
+ * Returns:
+ *   Promise<object>: { status, data }.
+ */
+function asAdmin(handler, { body = {}, params = {} } = {}) {
+  return new Promise((resolve) => {
+    const res = {
+      statusCode: 200,
+      status(c) {
+        this.statusCode = c;
+        return this;
+      },
+      json(data) {
+        resolve({ status: this.statusCode, data });
+        return this;
+      },
+    };
+    handler({ body, params, headers: {}, query: {}, user: { user: { username: "admin", roles: ["admin"], options: { showSettings: true } } } }, res);
+  });
+}
 
 // ─── the types, as the table of cases reads them ───────────────────────────────
 //   key, repo (its repository, flag), folder, table : where it lives
@@ -238,5 +269,36 @@ describe("what the new types bring to the engine", () => {
     fx.removeFile("creds", "credentials", "corp-bind.yaml");
     const summary = await RepoObjects.syncRepository(credentials, "creds");
     assert.match(summary.refused[0].reasons[0], /LDAP directory 'corp' still uses 'corp-bind'/);
+  });
+});
+
+describe("a change in the app that changes other objects of the type too", () => {
+  test("a runner made the default : the former default's file says so too", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    const runner = (name, isDefault) => ({ name, type: "rte", uri: `https://${name}:8000`, token: "enc:t", is_default: isDefault, enabled: 1, description: "", repository: "run-repo", repo_file: `runners/${name}.yaml` });
+    fx.state.tables.runners.push({ id: 51, ...runner("a", 1) }, { id: 52, ...runner("b", 0) });
+    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", is_default: true, enabled: true });
+    fx.writeFile("run-repo", "runners", "b.yaml", { name: "b", type: "rte", uri: "https://b:8000", enabled: true });
+    const { default: controller } = await import("../src/controllers/v2/runner.controller.js");
+    const r = await asAdmin(controller.update, { body: { is_default: 1 }, params: { id: "52" } });
+    assert.ok(r.status < 300, JSON.stringify(r.data));
+    assert.equal(fx.readObject("run-repo", "runners", "b.yaml").is_default, true);
+    assert.equal(fx.readObject("run-repo", "runners", "a.yaml").is_default, undefined, "a is no longer the default");
+    // and the next pull changes nothing : the user's choice stays
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("runners"), "run-repo")).updated, 0);
+    assert.equal(fx.rowNamed("runners", "b").is_default, 1);
+  });
+
+  test("an SSO provider enabled : the other provider of its type turned off in its file too", async () => {
+    const provider = (id, name, enable) => ({ id, name, provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable, managed: 0, repository: repoOf("sso"), repo_file: `sso/${name}.yaml` });
+    fx.state.tables.oauth2_providers.push(provider(61, "one", 1), provider(62, "two", 0));
+    fx.writeFile(repoOf("sso"), "sso", "one.yaml", { name: "one", provider: "oidc", issuer: "https://idp", client_id: "id", enable: true });
+    fx.writeFile(repoOf("sso"), "sso", "two.yaml", { name: "two", provider: "oidc", issuer: "https://idp", client_id: "id", enable: false });
+    const { default: controller } = await import("../src/controllers/v2/oauth2.controller.js");
+    const r = await asAdmin(controller.update, { body: { provider: "oidc", enable: 1 }, params: { id: "62" } });
+    assert.ok(r.status < 300, JSON.stringify(r.data));
+    assert.equal(fx.readObject(repoOf("sso"), "sso", "two.yaml").enable, true);
+    assert.equal(fx.readObject(repoOf("sso"), "sso", "one.yaml").enable, false, "one is turned off");
   });
 });

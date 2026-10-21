@@ -91,12 +91,10 @@ const create = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const created = await RepoObjects.holding("runners", async () => {
-      const created = await Runner.create(req.body);
-      // the runners repository, when there is one : written to it as a new file (lib/repoObjects)
-      await RepoObjects.appCreated("runners", created);
-      return created;
-    });
+    // the runners repository follows (lib/repoObjects) : the new runner a new file, and the
+    // others' files where they changed - the default of a type is one runner, so making this one
+    // the default clears it on the others
+    const created = await RepoObjects.following("runners", () => Runner.create(req.body));
     // { message, id }, as the other records answer a create
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "resources.runnerAdded"), id: created }));
   } catch (err) {
@@ -120,14 +118,10 @@ const update = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const before = await Runner.findStoredById(req.params.id).catch(() => null);
-    const updated = await RepoObjects.holding([], async () => {
-      const updated = await Runner.update(req.body, req.params.id);
-      if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
-      // one of the runners repository : its changed fields written to its file
-      if (before?.repository) await RepoObjects.appUpdated("runners", before, req.params.id);
-      return updated;
-    }, before);
+    // the runners repository follows : this runner's changed fields written to its file, and the
+    // others' where it changed them (made the default, it is no longer theirs)
+    const updated = await RepoObjects.following("runners", () => Runner.update(req.body, req.params.id));
+    if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
     // its RTE gets its settings now when this node holds its socket, else at the next renewal
     const saved = await Runner.findById(req.params.id).catch(() => null);
     if (saved) pushSettings(saved);
@@ -171,7 +165,8 @@ const pendingCount = async (req, res) => {
 const approve = async (req, res) => {
   try {
     assertAdmin(req);
-    const runner = await Runner.approve(req.params.id);
+    // approved, it may become the default of its type : the runners repository follows
+    const runner = await RepoObjects.following("runners", () => Runner.approve(req.params.id));
     publish("runners");
     return res.json(RestResult.single(maskSecrets(runner)));
   } catch (err) {
