@@ -20,10 +20,13 @@
 //                 not pushed yet (refused, kept, said)
 //   the seed      a repository the config seed manages stays the seed's
 //   secrets       a credential by name only : a password, or a user and token in its uri, refused
+//   use_for_config  deprecated : applied as use_for_roles, use_for_categories and use_for_constants,
+//                 said, as the config seed folds it
 import mysql from "../../models/db.model.js";
 import Repository from "../../models/repository.model.js";
 import { seedType } from "./seedType.js";
 import { ONE_ONLY_FLAGS, typeOfFlag, flagOn } from "./types.js";
+import { foldConfigItem } from "../seed-schema.js";
 
 // the repositories as the app saves them, by their name (the model works by name)
 const RepositoryModel = {
@@ -59,8 +62,13 @@ export default seedType({
   keptReason: (row, holder) => (Number(row.use_for_repositories) || (holder && row.name === holder) ? "holder" : null),
   // no chains, and no usage another repository holds
   adjust: async (o) => {
-    const out = { ...o };
+    // use_for_config (deprecated since 7.4.0, removed in 8) : the three flags it is now, as the
+    // config seed folds it - the one-repository rule below applies to them
+    const out = { ...foldConfigItem(o) };
     const notes = [];
+    if (o.use_for_config !== undefined) {
+      notes.push("use_for_config is deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, declare those instead");
+    }
     if (flagOn(out.use_for_repositories)) {
       delete out.use_for_repositories;
       notes.push("use_for_repositories refused: a repository of repositories.yaml cannot hold repositories itself");

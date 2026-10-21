@@ -130,6 +130,19 @@ describe("a pull of repositories.yaml", () => {
     assert.match(text, /repositories.yaml#forms: use_for_credentials refused: repository 'creds' holds the credentials already/);
   });
 
+  test("use_for_config : applied as the three flags it is now, said, and the next pull changes nothing", async () => {
+    writeList([entry("cfg", { use_for_config: true })]);
+    const summary = await RepoObjects.syncRepository(await desc(), "hub");
+    const row = fx.rowNamed("repositories", "cfg");
+    assert.equal(Number(row.use_for_roles), 1);
+    assert.equal(Number(row.use_for_categories), 1);
+    assert.equal(Number(row.use_for_constants), 1);
+    assert.match(RepoObjects.summaryText(await desc(), summary), /repositories.yaml#cfg: use_for_config is deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants/);
+    CrudModel.flushAllLocal();
+    const again = await RepoObjects.syncRepository(await desc(), "hub");
+    assert.equal(again.updated, 0, JSON.stringify(again));
+  });
+
   test("a credential not there yet : it waits ; a secret in the file is refused", async () => {
     writeList([entry("forms", { credential: "missing" }), entry("tok", { uri: "https://bot:tok123@git.example.com/x.git" }), entry("pw", { password: "${PW}" })]);
     process.env.PW = "x";
