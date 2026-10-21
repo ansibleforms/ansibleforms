@@ -34,6 +34,14 @@ describe("a refused rrule is refused, with the reason", () => {
     ["DTSTART;TZID=US-Eastern:19961105T090000 RRULE:FREQ=MINUTELY;INTERVAL=10;COUNT=5", "A valid TZID must be provided"],
     ["DTSTART:20300308T050000Z RRULE:FREQ=REGULARLY;INTERVAL=1", "rrule parsing failed validation: invalid 'FREQ': REGULARLY"],
     ["DTSTART;TZID=America/New_York:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1", "rrule parsing failed validation"],
+    // the checks on what was read, whatever the case of the keys or the sign of a number
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=-1", "INTERVAL must be a positive integer"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;interval=0", "INTERVAL must be a positive integer"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=MINUTELY;INTERVAL=1;count=100000000", "COUNT > 999 is unsupported"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;COUNT=0", "COUNT must be a positive integer"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;count=5;until=20310101T000000Z", "RRULE may not contain both COUNT and UNTIL"],
+    // a rule that never fires
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20300101T000000Z", "never fires in the 50 years after its DTSTART"],
   ];
   for (const [rrule, reason] of cases) {
     test(`${rrule || "(empty)"} : ${reason}`, () => {
@@ -162,6 +170,32 @@ describe("its runs, in its own time zone", () => {
     assert.equal(nextRun(rrule, new Date("2030-01-01T01:00:00Z")).toISOString(), "2030-01-02T01:00:00.000Z");
     assert.equal(nextRun(rrule, new Date("2030-01-03T00:00:00Z")), null);
     assert.equal(nextRun("not a rrule"), null);
+  });
+});
+
+describe("a rule rrule.js would walk for ever never blocks the process", () => {
+  // its times never meet its BYHOUR or BYMINUTE (rrule.js loops for ever), or no day is ever
+  // kept (walked to the year 9999) : refused, and its runs given up after a second
+  const rules = [
+    "DTSTART:20260101T000000Z RRULE:FREQ=DAILY;INTERVAL=1;BYMONTH=2;BYMONTHDAY=30",
+    "DTSTART:20260101T000000Z RRULE:FREQ=HOURLY;INTERVAL=2;BYHOUR=1",
+    "DTSTART:20260101T000000Z RRULE:FREQ=MINUTELY;INTERVAL=60;BYMINUTE=30",
+  ];
+  for (const rrule of rules) {
+    test(rrule, { timeout: 10000 }, () => {
+      const started = Date.now();
+      const errors = validateRrule(rrule);
+      assert.ok(errors.length, "refused");
+      assert.match(errors[0], /No run of this rrule could be worked out|never fires/);
+      // its runs : given up, at once once known
+      assert.throws(() => nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z"), count: 3 }), /No run of this rrule could be worked out/);
+      assert.equal(nextRun(rrule), null);
+      assert.ok(Date.now() - started < 3000, `given up in time (${Date.now() - started} ms)`);
+    });
+  }
+
+  test("the next rule is served after one was given up", () => {
+    assert.equal(nextRun("DTSTART:20300101T000000Z RRULE:FREQ=DAILY;INTERVAL=1", new Date("2030-01-01T12:00:00Z")).toISOString(), "2030-01-02T00:00:00.000Z");
   });
 });
 

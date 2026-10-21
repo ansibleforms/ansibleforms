@@ -134,6 +134,17 @@ describe("a rrule schedule is registered at its next run", () => {
     assert.equal(live()[0].pattern.getUTCHours(), 6);
   });
 
+  test("a rule rrule.js would walk for ever registers nothing, and the resync goes on", { timeout: 10000 }, async () => {
+    schedules = [
+      { ...schedules[0], rrule: "DTSTART;TZID=UTC:20260101T000000 RRULE:FREQ=HOURLY;INTERVAL=2;BYHOUR=1" },
+      { id: 8, name: "Daily", one_time_run: 0, cron: null, run_at: null, rrule: "DTSTART;TZID=UTC:20200101T060000 RRULE:FREQ=DAILY;INTERVAL=1" },
+    ];
+    const started = Date.now();
+    await cronService.resync();
+    assert.ok(Date.now() - started < 3000, `in time (${Date.now() - started} ms)`);
+    assert.deepEqual([...cronService.jobs.schedules.keys()], [8]);
+  });
+
   test("a rule with no run ahead registers nothing", async () => {
     schedules = [{ ...schedules[0], rrule: "DTSTART;TZID=UTC:20200101T060000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2" }];
     await cronService.resync();

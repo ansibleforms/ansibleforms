@@ -9,13 +9,18 @@
 //     more, no SECONDLY, no BYDAY with a number (5MO), not COUNT and UNTIL together, COUNT 999
 //     at most
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
+//   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
 //   a minutely or hourly rule is moved up to now before it is walked
+//   its runs are looked for in growing windows up to 50 years ahead, in a thread of their own
+//     (lib/scheduleRruleWorker.js) given one second at most : a rule rrule.js would walk for
+//     ever (FREQ=HOURLY;INTERVAL=2;BYHOUR=1 from midnight) never blocks the process
 //   a time a DST change skips is left out, a time the clock shows twice runs at the first
 //   a preview shows the next ten runs
 //
 // rrule.js is a port of python-dateutil's rrule : the BYxxx parts expand as dateutil expands
 // them. It is given the rule in the zone's wall clock (a "floating" time), and luxon turns each
 // run into the moment it is in that zone.
+import { Worker, MessageChannel, receiveMessageOnPort } from "node:worker_threads";
 import rrulePkg from "rrule";
 import { DateTime } from "luxon";
 
@@ -24,9 +29,20 @@ const { RRule, RRuleSet } = rrulePkg;
 // the most runs a COUNT may ask for
 const MAX_COUNT = 999;
 
-// the occurrences looked at, at most, for the next ones : a rule whose runs all fall in a DST gap
-// would otherwise be walked for ever
-const MAX_STEPS = 5000;
+// how far ahead runs are looked for : a rule with no run in it has none (a rule that never fires
+// is refused)
+export const HORIZON_YEARS = 50;
+const HORIZON_MS = HORIZON_YEARS * 366 * 86400000;
+
+// the first window runs are looked for in, doubled while it holds none
+const FIRST_WINDOW_MS = 3600000;
+
+// the time the runs of one call may take in their thread, and the time its start may take
+const WALK_MS = 1000;
+const START_MS = 10000;
+
+// the rrules whose runs took longer : not walked again (each would cost WALK_MS), at most this many
+const MAX_SLOW = 200;
 
 // ===========================================================================
 // RRULE : CHECKED
@@ -36,7 +52,8 @@ const MAX_STEPS = 5000;
  * Why a rrule is refused : no DTSTART, a naive one (neither a TZID nor a Z), more than one, no RRULE,
  * an EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix (20MO), COUNT and UNTIL together, COUNT above 999, a TZID that is no time zone,
- * and whatever does not parse.
+ * whatever does not parse, and a rule with no run in the HORIZON_YEARS after its DTSTART (or whose
+ * runs cannot be worked out in time : one rrule.js would walk for ever).
  *
  * Args:
  *   value (string): the rrule, written on one line (DTSTART;TZID=Europe/Brussels:
@@ -76,6 +93,14 @@ export function validateRrule(value) {
   if (errors.length) return errors;
   try {
     compileRrule(text);
+  } catch (e) {
+    errors.push(e.message);
+    return errors;
+  }
+  // step 3 : it fires - a run in the years after its DTSTART (its runs may all be past : one that
+  // ended is still a valid rule)
+  try {
+    if (!nextRuns(text, { fromStart: true }).length) errors.push(`This rrule never fires in the ${HORIZON_YEARS} years after its DTSTART.`);
   } catch (e) {
     errors.push(e.message);
   }
@@ -133,7 +158,7 @@ export function compileRrule(value) {
   return {
     zone,
     start,
-    rules: rules.map((r) => ({ kind: r.kind, options: ruleOptions(r.text, zone, fail) })),
+    rules: rules.map((r) => ({ kind: r.kind, options: ruleOptions(r.text, zone, fail, `${r.kind.toUpperCase()}:${r.text}`) })),
   };
 }
 
@@ -152,7 +177,7 @@ export function compileRrule(value) {
  * Raises:
  *   Error: a part that does not parse.
  */
-function ruleOptions(text, zone, fail) {
+function ruleOptions(text, zone, fail, label = `RRULE:${text}`) {
   let until = null;
   const parts = text
     .split(";")
@@ -178,6 +203,19 @@ function ruleOptions(text, zone, fail) {
     throw fail(e.message || String(e));
   }
   if (options.freq === undefined) throw fail("a rule needs a FREQ");
+  // the checks validateRrule makes on the text, made again on what was read : whatever the case
+  // of the keys or the sign of a number (interval=-1, count=5000)
+  if (options.interval !== undefined && options.interval !== null && !(Number.isInteger(options.interval) && options.interval >= 1)) {
+    throw new Error(`INTERVAL must be a positive integer: ${label}`);
+  }
+  if (options.freq === RRule.SECONDLY) throw new Error(`SECONDLY is not supported: ${label}`);
+  if (options.count !== undefined && options.count !== null) {
+    if (until !== null) throw new Error(`RRULE may not contain both COUNT and UNTIL: ${label}`);
+    if (!Number.isInteger(options.count) || options.count < 1) throw new Error(`COUNT must be a positive integer: ${label}`);
+    if (options.count > MAX_COUNT) throw new Error(`COUNT > 999 is unsupported: ${label}`);
+  }
+  const byday = options.byweekday === undefined || options.byweekday === null ? [] : [].concat(options.byweekday);
+  if (byday.some((d) => d && typeof d === "object" && d.n)) throw new Error(`BYDAY with numeric prefix not supported: ${label}`);
   // rrule.js reads both BYDAY and BYWEEKDAY ; no time zone of its own (the wall clock is ours)
   delete options.tzid;
   delete options.dtstart;
@@ -299,12 +337,15 @@ function ruleSet(compiled, reference) {
 }
 
 /**
- * The next runs of a rrule after a moment, in its own time zone, the times its zone's clock skips
- * left out (the preview, and when a schedule runs next).
+ * The next runs of a rrule, worked out here : looked for in windows that start at an hour and
+ * double while they hold none, up to HORIZON_YEARS ahead, the times its zone's clock skips left
+ * out. Only the thread of lib/scheduleRruleWorker.js calls it - a rule rrule.js walks for ever
+ * would block the process ; nextRuns is the guarded call.
  *
  * Args:
  *   value (string|object): the rrule, or compileRrule's result.
- *   options (object): { after (Date, now by default), count (how many, 1 by default) }.
+ *   options (object): { after (Date, now by default), count (how many, 1 by default), fromStart
+ *     (true : from its DTSTART, after ignored) }.
  *
  * Returns:
  *   Date[]: the runs, as moments ; fewer than asked (or none) when the rule ends.
@@ -312,21 +353,124 @@ function ruleSet(compiled, reference) {
  * Raises:
  *   Error: the rrule does not parse.
  */
-export function nextRuns(value, { after = new Date(), count = 1 } = {}) {
+export function walkRuns(value, { after = new Date(), count = 1, fromStart = false } = {}) {
   const compiled = typeof value === "string" ? compileRrule(value) : value;
-  const set = ruleSet(compiled, floatingOf(after, compiled.zone));
+  // from just before its DTSTART, or from the moment asked, as the zone's wall clock shows it
+  const reference = fromStart ? compiled.start - 1000 : floatingOf(after, compiled.zone);
+  const set = ruleSet(compiled, reference);
+  const end = reference + HORIZON_MS;
   const runs = [];
-  let cursor = new Date(floatingOf(after, compiled.zone));
-  for (let step = 0; step < MAX_STEPS && runs.length < count; step++) {
-    const next = set.after(cursor, false);
-    if (!next) break;
-    cursor = next;
-    const moment = momentOf(next.getTime(), compiled.zone);
-    // skipped by a DST change, or (the hour the clock goes back) not after the moment asked
-    if (!moment || moment <= after) continue;
-    runs.push(moment);
+  let from = reference;
+  let window = FIRST_WINDOW_MS;
+  while (runs.length < count && from < end) {
+    const to = Math.min(from + window, end);
+    for (const next of set.between(new Date(from), new Date(to), true)) {
+      // the window's start was looked at in the window before
+      if (next.getTime() === from && from !== reference) continue;
+      if (next.getTime() === reference) continue;
+      const moment = momentOf(next.getTime(), compiled.zone);
+      // skipped by a DST change, or (the hour the clock goes back) not after the moment asked
+      if (!moment || (!fromStart && moment <= after)) continue;
+      runs.push(moment);
+      if (runs.length >= count) break;
+    }
+    from = to;
+    window *= 2;
   }
   return runs;
+}
+
+// the thread the runs are worked out in, started at the first call ; a new one after a call that
+// took too long (the old one is stopped)
+let walker = null;
+const slow = new Map();
+
+/**
+ * The thread of lib/scheduleRruleWorker.js, started and ready (it sets the shared flag once it
+ * has loaded) : its replies come on a port of its own, the flag says one is there.
+ *
+ * Returns:
+ *   object: { worker, port, flag, asked (the last request's id) }.
+ *
+ * Raises:
+ *   Error: it did not start in START_MS.
+ */
+function startWalker() {
+  const flag = new Int32Array(new SharedArrayBuffer(4));
+  const { port1, port2 } = new MessageChannel();
+  const worker = new Worker(new URL("./scheduleRruleWorker.js", import.meta.url), { workerData: { flag, port: port2 }, transferList: [port2] });
+  // it never keeps the process alive
+  worker.unref();
+  port1.unref();
+  if (Atomics.wait(flag, 0, 0, START_MS) === "timed-out") {
+    worker.terminate();
+    throw new Error("The runs of the rrule could not be worked out: their thread did not start.");
+  }
+  return { worker, port: port1, flag, asked: 0 };
+}
+
+/**
+ * Asks the thread for runs and waits for them, a time at most : synchronous, as the callers are
+ * (a list's next runs, a rule checked). A thread that takes longer is stopped (a new one serves
+ * the next call) and the rrule is remembered as one whose runs cannot be worked out.
+ *
+ * Args:
+ *   request (object): { rrule, after (ms), count, fromStart }.
+ *
+ * Returns:
+ *   number[]: the runs, in ms.
+ *
+ * Raises:
+ *   Error: the rrule does not parse, or its runs took too long.
+ */
+function askWalker(request) {
+  const tooSlow = `No run of this rrule could be worked out in ${WALK_MS / 1000} second: does it ever fire?`;
+  if (slow.has(request.rrule)) throw new Error(tooSlow);
+  walker ||= startWalker();
+  const id = ++walker.asked;
+  Atomics.store(walker.flag, 0, 0);
+  walker.worker.postMessage({ id, ...request });
+  const deadline = Date.now() + WALK_MS;
+  for (;;) {
+    const left = deadline - Date.now();
+    if (left > 0) Atomics.wait(walker.flag, 0, 0, left);
+    const reply = receiveMessageOnPort(walker.port)?.message;
+    if (reply && reply.id === id) {
+      if (reply.error) throw new Error(reply.error);
+      return reply.runs;
+    }
+    // a reply to an older call : read past it
+    if (reply) continue;
+    if (Date.now() >= deadline) break;
+    Atomics.store(walker.flag, 0, 0);
+  }
+  // too long : this thread is lost to that rule, a new one for the next call
+  walker.worker.terminate();
+  walker = null;
+  if (slow.size >= MAX_SLOW) slow.delete(slow.keys().next().value);
+  slow.set(request.rrule, true);
+  throw new Error(tooSlow);
+}
+
+/**
+ * The next runs of a rrule after a moment, in its own time zone, the times its zone's clock skips
+ * left out (the preview, and when a schedule runs next) : worked out in a thread of their own,
+ * given WALK_MS at most, so no rule blocks the process.
+ *
+ * Args:
+ *   value (string): the rrule.
+ *   options (object): { after (Date, now by default), count (how many, 1 by default), fromStart
+ *     (true : from its DTSTART) }.
+ *
+ * Returns:
+ *   Date[]: the runs, as moments ; fewer than asked (or none) when the rule ends.
+ *
+ * Raises:
+ *   Error: the rrule does not parse, or its runs cannot be worked out in time.
+ */
+export function nextRuns(value, { after = new Date(), count = 1, fromStart = false } = {}) {
+  const rrule = normalizeRrule(value);
+  return askWalker({ rrule, after: after.getTime(), count, fromStart }).map((ms) => new Date(ms));
 }
 
 /**

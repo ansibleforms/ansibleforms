@@ -124,7 +124,15 @@ const scheduleController = {
     try {
       const rrule = String(req.query?.rrule ?? "");
       const errors = validateRrule(rrule);
-      const next = errors.length ? [] : nextRuns(rrule, { count: PREVIEW_RUNS }).map((d) => d.toISOString());
+      let next = [];
+      // its runs from now, in their thread : one that cannot be worked out in time is refused
+      if (!errors.length) {
+        try {
+          next = nextRuns(rrule, { count: PREVIEW_RUNS }).map((d) => d.toISOString());
+        } catch (e) {
+          errors.push(e.message);
+        }
+      }
       return res.json(RestResult.single({ valid: !errors.length, errors, timezone: errors.length ? null : zoneOf(rrule), next }));
     } catch (err) {
       Errors.ReturnError(res, err);

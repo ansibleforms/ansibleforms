@@ -6511,8 +6511,11 @@
 
       **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (or a UTC time
       ending in `Z`), one or more `RRULE`, and `EXRULE`. Refused: no or several `DTSTART`, a
-      naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL`, `SECONDLY`, `BYDAY` with a number (`5MO`), `COUNT`
-      with `UNTIL`, `COUNT` above 999. A time a DST change skips is skipped. Schedules kept in the app keep their cron.
+      naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL` or with one under 1, `SECONDLY`, `BYDAY` with a number
+      (`5MO`), `COUNT` with `UNTIL`, `COUNT` above 999 (in any case, `count=5000` too), and a rule that never fires: no
+      run in the 50 years after its `DTSTART`, or runs that cannot be worked out within a second
+      (`FREQ=HOURLY;INTERVAL=2;BYHOUR=1` from midnight only meets even hours). A time a DST change skips is skipped.
+      Schedules kept in the app keep their cron.
 
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
       files are read in; a file named as a recurring schedule of the app replaces that schedule's definition (git
