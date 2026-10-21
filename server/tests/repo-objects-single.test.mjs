@@ -308,6 +308,27 @@ describe("the MCP settings, in their mcp.yaml", () => {
     assert.equal(fs.existsSync(MANAGED), false, "nothing written");
   });
 
+  test("the seed's own write : applied with ALLOW_ENV_EDIT=0, a variable set in the environment said, never stopping the start", async () => {
+    const { default: appConfig } = await import("./__mocks__/app.config.js");
+    const warnings = vi.spyOn(logger, "warning");
+    appConfig.allowEnvEdit = false;
+    process.env.MCP_CHAT_FORMS_ONLY = "1";
+    try {
+      const done = await RepoObjects.applyDeclared(await desc("mcp"), { MCP_READ_ONLY: true, MCP_CHAT_FORMS_ONLY: false });
+      assert.deepEqual(done.updated, ["mcp"]);
+      assert.match(fs.readFileSync(MANAGED, "utf8"), /MCP_READ_ONLY='1'/);
+      assert.doesNotMatch(fs.readFileSync(MANAGED, "utf8"), /MCP_CHAT_FORMS_ONLY/);
+      assert.equal(process.env.MCP_CHAT_FORMS_ONLY, "1", "the environment's value kept");
+      assert.ok(warnings.mock.calls.some(([m]) => /config seed declares MCP_CHAT_FORMS_ONLY, which is set in the environment/.test(m)));
+      // the page itself still writes nothing
+      const { saveEnvValues } = await import("../src/lib/envSave.js");
+      await assert.rejects(saveEnvValues({ MCP_READ_ONLY: "0" }, {}), { status: 403 });
+    } finally {
+      appConfig.allowEnvEdit = true;
+      warnings.mockRestore();
+    }
+  });
+
   test("the seed's mcp section holds its switches : refused in the app, kept out of the repository's file", async () => {
     const { setSeedManagedBranding, seedManagedBranding } = await import("../src/lib/brandingManaged.js");
     const { saveEnvValues } = await import("../src/lib/envSave.js");

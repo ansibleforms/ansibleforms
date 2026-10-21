@@ -34,7 +34,7 @@ import { typeOf } from "./types.js";
  *       branding fields the config seed manages), said before the type is turned on.
  *     notesOf (function): (declared, current) => lines for the pull output about a file, whether it
  *       changes anything or not (the fields of it the config seed keeps).
- *     fromFile (function): async (object, { dir }) => the object as the app reads it, the files
+ *     fromFile (function): async (object, { dir, fromSeed }) => the object as the app reads it, the files
  *       beside the YAML read (the branding's images) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
  *       object writes (the branding's images), its YAML naming them.
@@ -77,7 +77,7 @@ export function singleType(spec) {
      * Args:
      *   raw (object): the object.
      *   opts (object): { dir (the folder its file is in), resolved (the seed's own : its
-     *     references resolved already) }.
+     *     references resolved already), fromSeed (the config seed's declaration) }.
      *
      * Returns:
      *   Promise<object>: { errors, object (as the app reads it, null when refused) }.

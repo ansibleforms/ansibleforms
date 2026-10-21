@@ -69,6 +69,8 @@ export function envType(spec) {
    *
    * Args:
    *   declared (object): { NAME: value }.
+   *   opts (object): { fromSeed (true : the config seed's declaration - a variable set in the
+   *     environment is said when it is applied, not refused) }.
    *
    * Returns:
    *   Promise<object>: the same values.
@@ -76,7 +78,7 @@ export function envType(spec) {
    * Raises:
    *   Error: every variable refused, with why.
    */
-  async function checkVariables(declared) {
+  async function checkVariables(declared, opts = {}) {
     const docs = await envDocs();
     const managed = await EnvSettings.readManaged();
     const problems = [];
@@ -84,7 +86,10 @@ export function envType(spec) {
       if (!docs.has(name)) problems.push(`${name} is not a known environment variable`);
       else if (!ownsVariable(spec.key, name, docs)) problems.push(`${name} is not one ${spec.page} changes`);
       else if (repositoryRefusal(name)) problems.push(`${name} is not one a repository may set: ${repositoryRefusal(name)} (change it on ${spec.page})`);
-      else if (EnvSettings.isOverridden(name, managed)) problems.push(`${name} is set in the environment and cannot be changed from here`);
+      // the seed's : the environment's value kept, said when it is applied (lib/envSave.js)
+      else if (EnvSettings.isOverridden(name, managed)) {
+        if (!opts.fromSeed) problems.push(`${name} is set in the environment and cannot be changed from here`);
+      }
       else {
         const problem = EnvSettings.validate(name, value, docs.get(name));
         if (problem) problems.push(problem);
@@ -143,7 +148,7 @@ export function envType(spec) {
       for (const name of Object.keys(out)) out[name] = typedValue(out[name], current?._types?.[name]);
       return out;
     },
-    fromFile: (declared) => checkVariables(declared),
+    fromFile: (declared, opts) => checkVariables(declared, opts),
     changed: (declared, current, opts = {}) => changedNames(declared, current, opts).length > 0,
     apply: async (declared, current, opts = {}) => {
       const updates = Object.fromEntries(changedNames(declared, current, opts).map((name) => [name, declared[name]]));

@@ -1448,7 +1448,7 @@ async function appUpdatedSingle(desc, before) {
 export async function applyDeclared(desc, declared, opts = {}) {
   const out = { created: [], updated: [], unchanged: 0, kept: [] };
   if (desc.file) {
-    const checked = await desc.check(declared, { resolved: true, dir: opts.dir });
+    const checked = await desc.check(declared, { resolved: true, fromSeed: true, dir: opts.dir });
     if (checked.errors.length) throw new Error(`${desc.title}: ${checked.errors.join("; ")}`);
     const current = await desc.current();
     // the seed's own declaration : what it manages passes the seed's hold
@@ -1460,7 +1460,7 @@ export async function applyDeclared(desc, declared, opts = {}) {
     return out;
   }
   for (const item of declared || []) {
-    const checked = desc.check(item, { resolved: true });
+    const checked = desc.check(item, { resolved: true, fromSeed: true });
     if (checked.errors.length) throw new Error(`${desc.noun} '${item?.name ?? ""}': ${checked.errors.join("; ")}`);
     // one the type does not import (an announcement already ended) : left out, as a pull leaves it
     if (desc.notImported?.(checked.object)) continue;

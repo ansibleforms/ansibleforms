@@ -135,16 +135,26 @@ export function onSettingsPage(name, docs) {
  *   Promise<object>: { changed: [name], restartRequired: [name] }.
  *
  * Raises:
- *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0), a value refused, or a
- *     branding or MCP setting the config seed manages changed (403).
+ *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0, the seed's own write
+ *     apart), a value refused, or a branding or MCP setting the config seed manages changed (403).
+ *     The seed's variable set in the real environment is said in the log and left out, not refused.
  */
 export async function saveEnvValues(updates, who = {}, opts = {}) {
-  const names = Object.keys(updates || {});
+  let names = Object.keys(updates || {});
   if (!names.length) throw new EnvSaveError(400, "No environment variables given");
-  // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session
-  if (!appConfig.allowEnvEdit) throw new EnvSaveError(403, EnvSettings.ENV_EDIT_DISABLED_REASON);
+  // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session. The config seed
+  // is the declaration ALLOW_ENV_EDIT=0 stands for : its own write is not this page's, it passes
+  if (!appConfig.allowEnvEdit && !opts.fromSeed) throw new EnvSaveError(403, EnvSettings.ENV_EDIT_DISABLED_REASON);
   const docs = await envDocs();
   const managed = await EnvSettings.readManaged();
+  // the config seed declaring a variable set in the real environment : that one wins, and the
+  // seed's value is not applied - said, never a refusal (the seed's apply would stop the start)
+  if (opts.fromSeed) {
+    const overridden = names.filter((name) => EnvSettings.isOverridden(name, managed));
+    for (const name of overridden) logger.warning(`The config seed declares ${name}, which is set in the environment: the environment's value is kept, the seed's not applied`);
+    names = names.filter((name) => !overridden.includes(name));
+    if (!names.length) return { changed: [], restartRequired: [] };
+  }
   // the branding's language and Designer's link, the MCP settings : the config seed's when its
   // branding or mcp section declares them (an MCP setting held by its variable)
   const seedFieldOf = (name) => BRANDING_ENV[name] || (MCP_ENV.test(name) ? name : null);

@@ -286,7 +286,9 @@
       deployment (kubernetes, docker-compose, ArgoCD): there the file is either ephemeral, so a
       save is silently lost at the next restart, or durable, so it drifts away from the manifest
       that is meant to be authoritative. With 0 every variable is shown with its value in force
-      but cannot be changed, and the save endpoint refuses.
+      but cannot be changed, and the save endpoint refuses. The config seed's own `mcp:` section and the
+      language and Designer link of its `branding:` and `links:` sections are still applied: the seed is the
+      declaration this setting stands for.
   - name: FORMS_FOLDER_PATH
     version: 6.1.0
     type: string
@@ -6773,6 +6775,8 @@
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
       General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
       section in the same format, and it locks what it declares, variable by variable, as its `branding:` does.
+      A variable it declares that is set in the real environment keeps the environment's value: said in the
+      server log, the seed's value not applied, and the start goes on.
       ```yaml
       ENABLE_MCP: true
       MCP_READ_ONLY: true
