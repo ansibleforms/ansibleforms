@@ -47,6 +47,8 @@ vi.mock("../src/lib/liveEvents.js", () => ({ publish: () => {}, onLive: () => {}
 let acceptances;
 vi.mock("../src/models/disclaimer.model.js", async () => {
   const fx = await import("./fixtures/repoObjects.mjs");
+  // the words stored as the model stores them (cleaned : trimmed, within their length)
+  const { default: actual } = await vi.importActual("../src/models/disclaimer.model.js");
   const rows = () => fx.state.tables.disclaimer_versions;
   const enabledOf = () => fx.state.tables.settings[0]?.disclaimer_version;
   const Disclaimer = {
@@ -56,12 +58,13 @@ vi.mock("../src/models/disclaimer.model.js", async () => {
       if (!found) throw new Error(`No disclaimer version ${v}`);
       return found;
     },
+    cleanWords: actual.cleanWords,
     createVersion: async (d) => {
-      rows().push({ version: Number(d.version), title: d.title, text: d.text, checkbox_label: d.checkbox_label, repository: null, repo_file: null });
+      rows().push({ version: Number(d.version), ...actual.words(d), repository: null, repo_file: null });
       return Number(d.version);
     },
     updateVersion: async (v, d) => {
-      Object.assign(rows().find((r) => r.version === Number(v)), { title: d.title, text: d.text, checkbox_label: d.checkbox_label });
+      Object.assign(rows().find((r) => r.version === Number(v)), actual.words(d));
       if (d.askAgain) acceptances[v] = 0;
     },
     enableVersion: async (v, on) => {
@@ -664,5 +667,19 @@ describe("the disclaimer versions", () => {
     acceptances[1] = 2;
     assert.equal((await RepoObjects.syncRepository(await desc("disclaimer"), "news")).unchanged, 1);
     assert.equal(acceptances[1], 2);
+  });
+
+  test("a text ending on a line break (a YAML block) with ask_again : asked again once, never on each pull", async () => {
+    const text = "version: 1\ntitle: Terms\ntext: |\n  Line one.\n  Line two.\ncheckbox_label: I agree\nenabled: true\nask_again: true\n";
+    fx.writeFile("news", "disclaimer", "1.yaml", text);
+    await RepoObjects.syncRepository(await desc("disclaimer"), "news");
+    assert.equal(fx.state.tables.disclaimer_versions[0].text, "Line one.\nLine two.");
+    acceptances[1] = 3;
+    assert.equal((await RepoObjects.syncRepository(await desc("disclaimer"), "news")).unchanged, 1);
+    assert.equal(acceptances[1], 3, "who accepted it is not asked again");
+    // the seed's disclaimer section : the same words, nothing to change
+    const done = await RepoObjects.applyDeclared(await desc("disclaimer"), [{ version: 1, title: " Terms ", text: "Line one.\nLine two.\n", checkbox_label: "I agree", ask_again: true }]);
+    assert.deepEqual(done.updated, []);
+    assert.equal(acceptances[1], 3);
   });
 });

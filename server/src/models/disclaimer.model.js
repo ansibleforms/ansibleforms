@@ -295,6 +295,26 @@ const Disclaimer = {
   },
 
   /**
+   * The words a declaration gives (a disclaimer repository's file, the config seed) as they are
+   * stored : each one given cleaned and within its length, as words() writes it - so a text that
+   * ends on a line break (a YAML block) compares equal to the one stored, and is not taken for a
+   * correction on every read. The other fields as they are.
+   *
+   * Args:
+   *   data (object): the declaration (title, text, checkbox_label among its fields).
+   *
+   * Returns:
+   *   object: a copy, the words it gives cleaned.
+   */
+  cleanWords(data) {
+    const out = { ...data };
+    for (const [key, max] of [['title', MAX_TITLE], ['text', MAX_TEXT], ['checkbox_label', MAX_CHECKBOX]]) {
+      if (out[key] !== undefined && out[key] !== null) out[key] = clean(out[key], max);
+    }
+    return out;
+  },
+
+  /**
    * The words of a version as they are written : a title, a text and the label of its checkbox,
    * each cleaned and within its length, all three needed.
    *

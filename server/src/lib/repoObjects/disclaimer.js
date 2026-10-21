@@ -21,6 +21,19 @@ import { seedType } from "./seedType.js";
  */
 const named = (o) => (o && o.version !== undefined ? { ...o, name: String(o.version) } : o);
 
+/**
+ * A version as it is compared and written : named after its number, its words as the model stores
+ * them (Disclaimer.cleanWords : a text ending on a line break is the stored text), the file's and
+ * the seed's alike - never a correction, nor everyone asked again, on every read.
+ *
+ * Args:
+ *   o (object): the version.
+ *
+ * Returns:
+ *   object: the version.
+ */
+const canonical = (o) => (o ? named(Disclaimer.cleanWords(o)) : o);
+
 // written as the disclaimer page saves them
 const DisclaimerModel = {
   create: async (d) => {
@@ -58,6 +71,6 @@ export default seedType({
   // how a changed text is applied : never a field of the version, never written back
   skip: ["ask_again"],
   notCompared: ["ask_again"],
-  canonical: named,
+  canonical,
   order: "version",
 });
