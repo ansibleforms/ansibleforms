@@ -67,6 +67,14 @@ export function setKey(doc, map, key, value, keyOrder = []) {
     if (lastBefore >= 0) at = lastBefore + 1;
     else if (firstAfter >= 0) at = firstAfter;
   }
+  // first in the file : below its leading comment, which the writer gives the key it was above
+  if (at === 0 && map === doc.contents && YAML.isNode(map.items[0]?.key) && map.items[0].key.commentBefore) {
+    pair.key = YAML.isNode(pair.key) ? pair.key : doc.createNode(pair.key);
+    pair.key.commentBefore = map.items[0].key.commentBefore;
+    pair.key.spaceBefore = map.items[0].key.spaceBefore;
+    map.items[0].key.commentBefore = undefined;
+    map.items[0].key.spaceBefore = undefined;
+  }
   map.items.splice(at, 0, pair);
 }
 

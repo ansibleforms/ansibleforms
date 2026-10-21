@@ -6745,7 +6745,9 @@
       `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
       value changes nothing), the managed file written, the other nodes told, each variable applied at once or
       said to need a restart (in the pull output), and the change audited. The app writes the variables saved from
-      the page.
+      the page, each in its documented type: a number as a number, a yes or no as `true` or `false`, a text as
+      text (quoted when it looks like a number). A file may give a value either way (`30` or `"30"`, `true` or
+      `1`): both are read the same.
       ```yaml
       JOB_RETENTION_DAYS: 30
       LOG_LEVEL: info
@@ -6759,9 +6761,9 @@
       General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
       section in the same format, and it locks what it declares, variable by variable, as its `branding:` does.
       ```yaml
-      ENABLE_MCP: 1
-      MCP_READ_ONLY: 1
-      MCP_CHAT_FORMS_ONLY: 0
+      ENABLE_MCP: true
+      MCP_READ_ONLY: true
+      MCP_CHAT_FORMS_ONLY: false
       ```
 
       **Branding** (`branding.yaml` and its images): the name and the defaults (`default_theme`,

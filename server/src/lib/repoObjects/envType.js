@@ -21,6 +21,27 @@ import { singleType } from "./singleType.js";
 const isSecret = (name) => EnvSettings.SECRET_ENV_NAME.test(name);
 
 /**
+ * A variable's value as its file gives it : in the YAML type of the variable's documented type
+ * (help.yaml) - a number as a number, a yes or no as true or false - and any other value, or one
+ * that is not of its type, as text (a text that looks like a number stays quoted). The app keeps
+ * them as text ; a file may give either, both are read the same (mapFieldSet.check).
+ *
+ * Args:
+ *   value (string): the value, as the app keeps it.
+ *   type (string|undefined): its documented type (number, boolean, string).
+ *
+ * Returns:
+ *   number|boolean|string: the value to write.
+ */
+export function typedValue(value, type) {
+  const text = String(value ?? "");
+  if (type === "number" && /^-?(0|[1-9]\d*)(\.\d+)?$/.test(text)) return Number(text);
+  if (type === "boolean" && /^(1|true|yes|on)$/i.test(text)) return true;
+  if (type === "boolean" && /^(0|false|no|off)$/i.test(text)) return false;
+  return text;
+}
+
+/**
  * The descriptor of an environment type.
  *
  * Args:
@@ -107,11 +128,18 @@ export function envType(spec) {
         }
       } else for (const [name, value] of managed) if (owns(name, docs)) out[name] = value;
       if (spec.seedHeld) out._seedManaged = await hold.managed();
+      // each variable's documented type, for its file (typedValue)
+      Object.defineProperty(out, "_types", { value: Object.fromEntries(Object.keys(out).map((name) => [name, docs.get(name)?.type])) });
       return out;
     },
     // the variables the seed manages stay in the app (a seed-managed object stays with the seed)
     kept: hold.kept,
-    toFile: (current) => hold.without(current, current),
+    // each value in its variable's type (typedValue)
+    toFile: (current) => {
+      const out = hold.without(current, current);
+      for (const name of Object.keys(out)) out[name] = typedValue(out[name], current?._types?.[name]);
+      return out;
+    },
     fromFile: (declared) => checkVariables(declared),
     changed: (declared, current, opts = {}) => changedNames(declared, current, opts).length > 0,
     apply: async (declared, current, opts = {}) => {

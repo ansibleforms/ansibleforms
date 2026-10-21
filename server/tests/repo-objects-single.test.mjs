@@ -200,7 +200,25 @@ describe("the System > General settings, by their environment names", () => {
     const before = await RepoObjects.snapshot("general");
     await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
     await RepoObjects.appUpdated("general", before);
-    assert.equal(fx.readText("cfg", ".", "general.yaml"), "# ops\nJOB_RETENTION_DAYS: \"45\"\n");
+    assert.equal(fx.readText("cfg", ".", "general.yaml"), "# ops\nJOB_RETENTION_DAYS: 45\n");
+  });
+
+  test("each value in its variable's type, a new one below the leading comment ; both forms read", async () => {
+    writeRaw("cfg", "general.yaml", "# ops settings\n# kept by the platform team\nJOB_RETENTION_DAYS: \"30\"\n");
+    const first = await RepoObjects.syncRepository(await desc("general"), "cfg");
+    assert.equal(first.updated, 1, JSON.stringify(first));
+    assert.equal(process.env.JOB_RETENTION_DAYS, "30");
+    const { saveEnvValues } = await import("../src/lib/envSave.js");
+    const before = await RepoObjects.snapshot("general");
+    // a number, and a text that looks like one (TRUST_PROXY is a text : a hop count or addresses)
+    await saveEnvValues({ AUDIT_RETENTION_DAYS: "200", TRUST_PROXY: "1" }, { user: "root" });
+    await RepoObjects.appUpdated("general", before);
+    assert.equal(
+      fx.readText("cfg", ".", "general.yaml"),
+      "# ops settings\n# kept by the platform team\nAUDIT_RETENTION_DAYS: 200\nJOB_RETENTION_DAYS: \"30\"\nTRUST_PROXY: \"1\"\n",
+    );
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await desc("general"), "cfg")).unchanged, 1);
   });
 });
 
@@ -210,7 +228,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     fx.cloneEmpty("cfg");
     const report = await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
     assert.deepEqual(report.written, ["MCP"]);
-    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: "0", MCP_CHAT_FORMS_ONLY: "0", MCP_READ_ONLY: "0" });
+    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false, MCP_READ_ONLY: false });
     // a pull : saved as the page saves it, the server switched on without a restart
     const { default: appConfig } = await import("./__mocks__/app.config.js");
     writeRaw("cfg", "mcp.yaml", "ENABLE_MCP: 1\nMCP_READ_ONLY: 0\n");
@@ -226,7 +244,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     const before = await RepoObjects.snapshot("mcp");
     await saveEnvValues({ MCP_READ_ONLY: "1" }, { user: "root" });
     await RepoObjects.appUpdated("mcp", before);
-    assert.equal(fx.readObject("cfg", ".", "mcp.yaml").MCP_READ_ONLY, "1");
+    assert.equal(fx.readObject("cfg", ".", "mcp.yaml").MCP_READ_ONLY, true);
     // turned off : the app keeps its values, the file stays
     assert.equal((await RepoObjects.deactivate(await desc("mcp"), "cfg")).unlinked, 1);
     assert.equal(appConfig.enableMcp, true);
@@ -261,7 +279,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     fx.cloneEmpty("cfg");
     assert.deepEqual((await RepoObjects.preview(await desc("mcp"), "cfg")).kept.map((k) => k.name), ["MCP_READ_ONLY"]);
     await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
-    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: "0", MCP_CHAT_FORMS_ONLY: "0" });
+    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false });
     // a file declaring it : not applied, said ; the others applied
     writeRaw("cfg", "mcp.yaml", "MCP_READ_ONLY: 1\nMCP_CHAT_FORMS_ONLY: 1\n");
     const summary = await RepoObjects.syncRepository(await desc("mcp"), "cfg");
