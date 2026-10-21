@@ -1372,6 +1372,10 @@ export default {
         "Il modulo '{name}' è definito due volte: viene usato {used}, {skipped} viene ignorato (i nomi dei moduli devono essere unici tra i repository dei moduli)",
       configDeprecated:
         '{key} letti da config.yaml: deprecato, spostali in {file} (config.yaml non viene più letto dalla 8.0.0)',
+      usagePreviewFailed:
+        'Non è stato possibile leggere dal server cosa farà questa modifica: viene comunque applicata se continui.',
+      usageOnNewRepository:
+        '{name} non è ancora clonato: se il remoto ha già questi file, vince la versione in git e sostituisce quella di questa app. Il suo output di pull dice cosa ha preso una volta clonato.',
       usageOnAfter:
         'Da quel momento un pull porta le modifiche fatte in git, e le modifiche fatte qui vanno in git con il Push del repository.',
       usageOnDone:
@@ -1388,6 +1392,9 @@ export default {
         registered: 'registrato dal suo RTE',
         pending: 'in attesa di approvazione',
         holder: 'contiene i repository, mai nel proprio file',
+        noSchedule: 'non ha né cron né rrule',
+        cron: 'il suo cron non si può scrivere come rrule',
+        notWritten: 'non scritto: {error}',
       },
       source: 'Origine',
       sourceRepository: 'Repository: {name}',

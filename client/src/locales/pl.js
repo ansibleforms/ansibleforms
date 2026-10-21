@@ -1368,6 +1368,10 @@ export default {
         "Formularz '{name}' jest zdefiniowany dwukrotnie: używany jest {used}, pominięty {skipped} (nazwy formularzy muszą być unikalne we wszystkich repozytoriach formularzy)",
       configDeprecated:
         '{key} czytane z config.yaml: przestarzałe, przenieś je do {file} (config.yaml nie jest czytany od 8.0.0)',
+      usagePreviewFailed:
+        'Nie udało się odczytać z serwera, co zrobi ta zmiana: i tak zostanie zastosowana, jeśli kontynuujesz.',
+      usageOnNewRepository:
+        '{name} nie jest jeszcze sklonowane: jeśli zdalne repozytorium ma już te pliki, wygrywa wersja z gita i zastępuje tę z tej aplikacji. Jego wynik pull po sklonowaniu mówi, co przejęło.',
       usageOnAfter:
         'Od tej chwili pull przynosi zmiany z gita, a zmiany zrobione tutaj trafiają do gita przez Push repozytorium.',
       usageOnDone:
@@ -1384,6 +1388,9 @@ export default {
         registered: 'zarejestrowany przez swój RTE',
         pending: 'czeka na zatwierdzenie',
         holder: 'przechowuje repozytoria, nigdy we własnym pliku',
+        noSchedule: 'nie ma ani crona, ani rrule',
+        cron: 'jego crona nie da się zapisać jako rrule',
+        notWritten: 'nie zapisano: {error}',
       },
       source: 'Źródło',
       sourceRepository: 'Repozytorium: {name}',

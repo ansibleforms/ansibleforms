@@ -1370,6 +1370,10 @@ export default {
         "Formulier '{name}' is twee keer gedefinieerd: {used} wordt gebruikt, {skipped} wordt overgeslagen (formuliernamen moeten uniek zijn over alle formulierrepositories)",
       configDeprecated:
         '{key} gelezen uit config.yaml: verouderd, verplaats ze naar {file} (config.yaml wordt vanaf 8.0.0 niet meer gelezen)',
+      usagePreviewFailed:
+        'Wat deze wijziging doet kon niet van de server gelezen worden: ze wordt toch toegepast als je doorgaat.',
+      usageOnNewRepository:
+        '{name} is nog niet gekloond: als de remote deze bestanden al heeft, wint de versie in git en vervangt die van deze app. Zijn pull-uitvoer zegt na het klonen wat het overnam.',
       usageOnAfter:
         'Vanaf dan brengt een pull de wijzigingen uit git binnen, en gaan de wijzigingen die hier gemaakt worden naar git met de Push van de repository.',
       usageOnDone:
@@ -1386,6 +1390,9 @@ export default {
         registered: 'geregistreerd door zijn RTE',
         pending: 'wacht op goedkeuring',
         holder: 'het bevat de repositories, nooit in zijn eigen bestand',
+        noSchedule: 'het heeft geen cron en geen rrule',
+        cron: 'zijn cron kan niet als rrule geschreven worden',
+        notWritten: 'niet geschreven: {error}',
       },
       source: 'Bron',
       sourceRepository: 'Repository: {name}',

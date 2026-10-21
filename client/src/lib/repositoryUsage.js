@@ -237,9 +237,10 @@ export const APPLY_ORDER = [
 ];
 
 // what a type's question adds of its own (the schedules : the one-time jobs stay in the app), and
-// how it says what stays in the app (the schedules : the crons a rrule cannot express)
+// how it says what stays in the app, by why (the schedules : the crons a rrule cannot express) ;
+// the others as every type says them
 const TYPE_NOTES = { schedules: ['settings.repositories.schedulesOnPlanned'] };
-const KEPT_KEY = { schedules: 'settings.repositories.schedulesOnKept' };
+const KEPT_KEY = { schedules: { cron: 'settings.repositories.schedulesOnKept' } };
 
 /**
  * A usage type by its key.
@@ -488,7 +489,8 @@ export function usageChanges(was, now) {
  *   keys (string[]): the types.
  *
  * Returns:
- *   Promise<object>: { unpushed, types: { <type>: preview } } ; empty when it cannot be read.
+ *   Promise<object>: { unpushed, types: { <type>: preview } } ; { failed: true } and no types when
+ *     it cannot be read.
  */
 async function preview(name, keys) {
   try {
@@ -497,26 +499,44 @@ async function preview(name, keys) {
     );
     return { unpushed: !!res.data?.unpushed, types: res.data?.types || {} };
   } catch {
-    return { unpushed: false, types: {} };
+    // not read : the question says so, rather than counts of nothing
+    return { unpushed: false, types: {}, failed: true };
   }
 }
 
 /**
- * Why an object stays in the app, as the question says it.
+ * The code of why an object stays in the app : the server's, or, for a schedule kept with its cron
+ * and no code, the cron a rrule cannot express.
  *
  * Args:
  *   t (function): vue-i18n's t.
- *   k (object): what the server kept ({ name, code, reason, cron, whole (the type's one object :
- *     the chat assistant's settings, named by the type) }).
+ *   k (object): what the server kept ({ name, code, reason, cron, error, whole (the type's one
+ *     object : the chat assistant's settings, named by the type) }).
  *   key (string): the type.
  *
  * Returns:
- *   string: its name and why (a cron's, its cron).
+ *   string: the code, '' for none.
+ */
+const keptCode = (k) => k.code || (k.cron ? 'cron' : '');
+
+/**
+ * Why an object stays in the app, as the question says it : by the code of why, in the app's
+ * language (the server's English reason only for one without a code).
+ *
+ * Args:
+ *   t (function): vue-i18n's t.
+ *   k (object): what the server kept ({ name, code, reason, cron, error }).
+ *
+ * Returns:
+ *   string: its name and why (a cron a rrule cannot express : that cron).
  */
 function keptText(t, k, key) {
   const name = k.whole ? usageLabel(t, key) : k.name;
-  if (k.cron) return `${name} (${k.cron})`;
-  const why = k.code ? t(`settings.repositories.usageKeptWhy.${k.code}`) : k.reason;
+  const code = keptCode(k);
+  if (code === 'cron' && k.cron) return `${name} (${k.cron})`;
+  const why = code
+    ? t(`settings.repositories.usageKeptWhy.${code}`, k.error ? { error: k.error } : undefined)
+    : k.reason;
   return why ? `${name} (${why})` : name;
 }
 
@@ -552,10 +572,14 @@ export function activationLines(t, key, name, p) {
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })
       : t('settings.repositories.usageOnGitWins'),
   );
-  if ((p.kept || []).length) {
-    const names = p.kept.map((k) => keptText(t, k, key)).join(', ');
-    lines.push(t(KEPT_KEY[key] || 'settings.repositories.usageOnKept', { names }));
+  // what stays in the app : a sentence per why the type says apart (a schedule's cron), the rest in
+  // the common one
+  const kept = new Map();
+  for (const k of p.kept || []) {
+    const sentence = KEPT_KEY[key]?.[keptCode(k)] || 'settings.repositories.usageOnKept';
+    kept.set(sentence, [...(kept.get(sentence) || []), keptText(t, k, key)]);
   }
+  for (const [sentence, names] of kept) lines.push(t(sentence, { names: names.join(', ') }));
   if ((p.withoutSecret || []).length) {
     lines.push(t('settings.repositories.usageOnWithoutSecret', { names: p.withoutSecret.join(', ') }));
   }
@@ -587,31 +611,36 @@ export function deactivationLines(t, key, p) {
 /**
  * The question asked before a save turns object types on or off, or before the repository is
  * deleted : one type shows its own effects, several a section each under its heading ; what is
- * true of them all (what follows, the pull before letting go, the changes not pushed yet) once,
- * at the end.
+ * true of them all (a new repository's files in git winning, what follows, the pull before letting
+ * go, the changes not pushed yet) once, at the end. A preview that could not be read says so in
+ * one line, in place of the types' own effects.
  *
  * Args:
  *   t (function): vue-i18n's t.
  *   name (string): the repository.
  *   changes (object): { on: [key], off: [key] }.
- *   pv (object): the preview ({ unpushed, types }).
+ *   pv (object): the preview ({ unpushed, types, failed }).
+ *   isNew (boolean): a repository not made yet : its files cannot be read before its clone.
  *
  * Returns:
  *   object: { details (the paragraphs, a heading as { heading }), single (the one type changed,
  *     or null) }.
  */
-export function usageQuestion(t, name, changes, pv) {
+export function usageQuestion(t, name, changes, pv, isNew = false) {
   const single = changes.on.length + changes.off.length === 1;
   const details = [];
-  for (const key of changes.on) {
+  if (pv.failed) details.push(t('settings.repositories.usagePreviewFailed'));
+  for (const key of pv.failed ? [] : changes.on) {
     if (!single) details.push({ heading: t('settings.repositories.usageOnHeading', { type: usageLabel(t, key) }) });
     details.push(...activationLines(t, key, name, pv.types[key] || {}));
   }
-  for (const key of changes.off) {
+  for (const key of pv.failed ? [] : changes.off) {
     if (!single) details.push({ heading: t('settings.repositories.usageOffHeading', { type: usageLabel(t, key) }) });
     details.push(...deactivationLines(t, key, pv.types[key] || {}));
   }
-  // what is true of every type turned on, and of every type turned off : said once
+  // what is true of every type turned on, and of every type turned off : said once ; a new
+  // repository's, what the remote already has, only known once it is cloned
+  if (changes.on.length && isNew) details.push(t('settings.repositories.usageOnNewRepository', { name }));
   if (changes.on.length) details.push(t('settings.repositories.usageOnAfter'));
   if (changes.off.length) {
     details.push(t('settings.repositories.usageOffPull'));
@@ -637,7 +666,7 @@ export async function confirmUsageChange(t, name, was, now) {
   const changes = usageChanges(was, now);
   if (!changes.on.length && !changes.off.length) return true;
   const pv = await preview(name, [...changes.on, ...changes.off]);
-  const { details, single } = usageQuestion(t, name, changes, pv);
+  const { details, single } = usageQuestion(t, name, changes, pv, !was);
   if (single) {
     const on = changes.on.length === 1;
     const type = usageLabel(t, single);

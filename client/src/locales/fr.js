@@ -1379,6 +1379,10 @@ export default {
         "Le formulaire '{name}' est défini deux fois : {used} est utilisé, {skipped} est ignoré (les noms de formulaire doivent être uniques entre les dépôts de formulaires)",
       configDeprecated:
         "{key} lus depuis config.yaml : obsolète, déplacez-les dans {file} (config.yaml n'est plus lu en 8.0.0)",
+      usagePreviewFailed:
+        "Ce que fera ce changement n'a pas pu être lu sur le serveur : il est tout de même appliqué si vous continuez.",
+      usageOnNewRepository:
+        "{name} n'est pas encore cloné : si le dépôt distant a déjà ces fichiers, la version de git l'emporte et remplace celle de cette application. Sa sortie de pull dit ce qu'il a pris une fois cloné.",
       usageOnAfter:
         'Dès lors, un pull apporte les changements faits dans git, et les changements faits ici vont dans git avec le Push du dépôt.',
       usageOnDone:
@@ -1395,6 +1399,9 @@ export default {
         registered: 'enregistré par son RTE',
         pending: "en attente d'approbation",
         holder: 'il contient les dépôts, jamais dans son propre fichier',
+        noSchedule: "il n'a ni cron ni rrule",
+        cron: "son cron ne peut pas s'écrire en rrule",
+        notWritten: 'non écrit : {error}',
       },
       source: 'Source',
       sourceRepository: 'Dépôt : {name}',

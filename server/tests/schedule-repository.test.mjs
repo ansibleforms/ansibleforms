@@ -313,6 +313,16 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     assert.deepEqual(pulls, []);
   });
 
+  test("what stays in the app says why with a code, for the question in the app's language", async () => {
+    appRows();
+    rows.push({ id: 6, name: "No time", form: "Report", cron: null, rrule: null, enabled: 1, repository: null, owner: null, one_time_run: 0 });
+    const preview = await ScheduleRepo.preview("ops");
+    assert.deepEqual(
+      preview.kept.map((k) => [k.name, k.code, k.cron]),
+      [["First or Monday", "cron", "0 0 1 * 1"], ["No time", "noSchedule", null]],
+    );
+  });
+
   test("activation : pulled, git wins on a clash, convertible crons written as files, the rest kept in the app", async () => {
     appRows();
     const report = await ScheduleRepo.activate("ops");

@@ -997,15 +997,13 @@ async function activateFolder(desc, name, report) {
         report.written.push(c.row.name);
         if (c.withoutSecret) report.withoutSecret.push(c.row.name);
       } catch (e) {
-        report.kept.push({ ...keptOf(desc, c), reason: `not written: ${e.message || e}` });
+        report.kept.push({ ...keptOf(desc, c), reason: `not written: ${e.message || e}`, code: "notWritten", error: e.message || String(e) });
       }
     }
   })();
   if (desc.reportExtra) Object.assign(report, await desc.reportExtra(name));
   if (report.written.length || report.matched.length) CrudModel.changed(desc.model);
-  logger.notice(
-    `Repository '${name}' now holds ${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${report.withoutSecret.length ? `, ${report.withoutSecret.length} without their secrets, kept in the database` : ""}), ${report.kept.length} kept in the app${report.kept.length ? ` (${report.kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`,
-  );
+  logger.notice(`Repository '${name}' now holds ${activationText(desc, report)}`);
   return report;
 }
 

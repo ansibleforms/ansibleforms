@@ -1375,6 +1375,9 @@ export default {
         "El formulari '{name}' està definit dues vegades: s'utilitza {used} i s'omet {skipped} (els noms de formulari han de ser únics entre els repositoris de formularis)",
       configDeprecated:
         '{key} llegits de config.yaml: obsolet, mou-los a {file} (config.yaml ja no es llegeix a la 8.0.0)',
+      usagePreviewFailed: "No s'ha pogut llegir del servidor què farà aquest canvi: s'aplica igualment si continues.",
+      usageOnNewRepository:
+        "{name} encara no està clonat: si el remot ja té aquests fitxers, guanya la versió de git i substitueix la d'aquesta aplicació. La seva sortida de pull diu què ha pres un cop clonat.",
       usageOnAfter:
         "A partir d'aleshores, un pull porta els canvis fets a git, i els canvis fets aquí van a git amb el Push del repositori.",
       usageOnDone:
@@ -1391,6 +1394,9 @@ export default {
         registered: 'registrat pel seu RTE',
         pending: "pendent d'aprovació",
         holder: 'conté els repositoris, mai al seu propi fitxer',
+        noSchedule: 'no té cron ni rrule',
+        cron: 'el seu cron no es pot escriure com a rrule',
+        notWritten: 'no escrit: {error}',
       },
       source: 'Origen',
       sourceRepository: 'Repositori: {name}',

@@ -3,7 +3,7 @@
   "info": {
     "title": "AnsibleForms API v2",
     "version": "0.0.0",
-    "description": "API documentation for AnsibleForms v2 endpoints: authentication, system and health, users, groups and roles, settings, runners, credentials, secret stores, SSO providers, repositories, SSH and known hosts, notification channels, syslog servers, queries and expressions, jobs, stored jobs, schedules and planned runs, the forms designer, announcements, the disclaimer, backups, logs and the audit log."
+    "description": "API documentation for AnsibleForms v2 endpoints: authentication, system and health, users, groups and roles, settings, runners, credentials, secret stores, SSO providers, repositories, SSH and known hosts, notification channels, syslog servers, queries and expressions, jobs, backups, logs and the audit log."
   },
   "tags": [
     { "name": "authentication", "description": "Authentication and refresh tokens" },
@@ -32,13 +32,7 @@
     { "name": "credential", "description": "Credential management and database connection testing" },
     { "name": "oauth2", "description": "OAuth2 provider management (Azure AD, OIDC, etc.)" },
     { "name": "knownhosts", "description": "Manage SSH known_hosts entries (flat list)" },
-    { "name": "audit", "description": "The append-only audit trail" },
-    { "name": "chat", "description": "The chat assistant (ENABLE_CHAT)" },
-    { "name": "directory", "description": "LDAP and SSO users and groups seen at sign-in or named by a role" },
-    { "name": "designer", "description": "Designer lock, forms repositories and the designer's playbooks, vars files, inventories and workflows" },
-    { "name": "announcement", "description": "The announcements under the header (Settings > Appearance > Announcements)" },
-    { "name": "schedule", "description": "Scheduled and planned (Run later) jobs" },
-    { "name": "storedjob", "description": "Stored jobs: saved form values per user" }
+    { "name": "audit", "description": "The append-only audit trail" }
   ],
   "servers": [
     { "url": "/api/v2" }
@@ -57,6 +51,40 @@
                 "schema": {
                   "type": "string",
                   "example": "6.1.5"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/help": {
+      "get": {
+        "tags": ["system"],
+        "summary": "Get help data",
+        "description": "Returns help content from help.yaml configuration file.",
+        "security": [ { "bearerAuth": [] } ],
+        "responses": {
+          "200": {
+            "description": "Help data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Help data parsed from YAML file"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to load help data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "description": "Error message" }
+                  }
                 }
               }
             }
@@ -367,7 +395,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Save the active form configuration",
-        "description": "Validates the supplied yaml against the base schema and writes it to the active config source (database, use_for_config repository or local file). Refused while the designer holds the config lock, and to a user without the admin role when it changes the groups or users of the admin role.",
+        "description": "Validates the supplied yaml against the base schema and writes it to the active config source (database, use_for_config repository or local file). Refused while the designer holds the config lock.",
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,
@@ -399,7 +427,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Import configuration from config.yaml",
-        "description": "Loads the config.yaml (or the deprecated forms.yaml) file into the database, replacing the database copy. A restore point of that database copy is written to the backups first. Refused while the designer holds the config lock, and to a user without the admin role when the file changes the groups or users of the admin role or is a ytt template.",
+        "description": "Loads the config.yaml (or the deprecated forms.yaml) file into the database, replacing the database copy. A restore point of that database copy is written to the backups first. Refused while the designer holds the config lock.",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {
@@ -415,7 +443,6 @@
               }
             }
           },
-          "403": { "description": "Only an admin can import a file that changes who is an admin, or whose roles cannot be read (a ytt template)" },
           "423": { "description": "Configuration is locked by the designer" },
           "500": { "description": "Failed to import config" }
         }
@@ -1316,7 +1343,7 @@
       "get": {
         "tags": ["repository"],
         "summary": "List all repositories",
-        "description": "Returns a list of all configured git repositories with masked passwords. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the stored pull and push outputs leave out the lines naming files.",
+        "description": "Returns a list of all configured git repositories with masked passwords.",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {
@@ -1482,7 +1509,7 @@
                           "active": { "type": "string", "nullable": true, "description": "The type's repository now" },
                           "written": { "type": "array", "items": { "type": "string" } },
                           "withoutSecret": { "type": "array", "items": { "type": "string" }, "description": "Written without their secrets, kept in the database" },
-                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "code": { "type": "string", "description": "Why it stays in the app (seed, registered, pending, holder)" }, "whole": { "type": "boolean", "description": "The type's one object stays whole (the chat assistant's settings the config seed manages)" }, "cron": { "type": "string" } } } },
+                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "code": { "type": "string", "description": "Why, as a code the client translates: seed, registered, pending, holder, noSchedule, cron, notWritten" }, "error": { "type": "string", "description": "With notWritten: the error" }, "whole": { "type": "boolean", "description": "The type's one object stays whole (the chat assistant's settings the config seed manages)" }, "cron": { "type": "string" } } } },
                           "clashes": { "type": "array", "items": { "type": "string" } },
                           "files": { "type": "integer" },
                           "linked": { "type": "integer" },
@@ -1504,7 +1531,7 @@
       "get": {
         "tags": ["repository"],
         "summary": "Get repository by name",
-        "description": "Returns a single repository configuration with masked password. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the stored pull and push outputs leave out the lines naming files.",
+        "description": "Returns a single repository configuration with masked password.",
         "security": [ { "bearerAuth": [] } ],
         "parameters": [
           {
@@ -1844,7 +1871,7 @@
       "post": {
         "tags": ["expression"],
         "summary": "Evaluate a form field's server expression",
-        "description": "Evaluates the expression of a form field. Send formName and fieldName (plus subformName for a field in a subform): the expression text is taken from the form definition, loaded with the caller's roles, and only the placeholder values come from the request. A raw `expression` is accepted only from a user with settings access, or a designer who may edit the forms and sees every form, playbook and workflow (the role options designAllForms, designAllPlaybooks and designAllWorkflows on).",
+        "description": "Evaluates the expression of a form field. Send formName and fieldName (plus subformName for a field in a subform): the expression text is taken from the form definition, loaded with the caller's roles, and only the placeholder values come from the request. A raw `expression` is accepted only from a user with settings or designer access.",
         "security": [ { "bearerAuth": [] } ],
         "parameters": [
           { "name": "noLog", "in": "query", "required": false, "schema": { "type": "boolean" }, "description": "Suppress expression logging" }
@@ -1863,7 +1890,7 @@
                   "literals": { "type": "array", "items": { "type": "string" }, "description": "The keys of values that are spliced in as JSON (objects, arrays, records)" },
                   "expression": {
                     "type": "string",
-                    "description": "A raw JavaScript expression - settings access, or a designer who sees every form, playbook and workflow, only",
+                    "description": "A raw JavaScript expression - settings or designer access only",
                     "example": "fn.fnReadYamlFile('/path/to/file.yml')"
                   }
                 }
@@ -1883,7 +1910,7 @@
             }
           },
           "400": { "description": "Bad request - no expression provided" },
-          "403": { "description": "A raw expression without settings access or a designer who sees every form, playbook and workflow, or a form the caller may not use" },
+          "403": { "description": "A raw expression without settings or designer access, or a form the caller may not use" },
           "404": { "description": "The form, subform or field does not exist or has no server expression" },
           "500": { 
             "description": "Expression evaluation error",
@@ -2755,11 +2782,7 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "List all jobs",
-        "description": "The jobs the caller may see (every job for an admin, or with showAllJobLogs or manageAllJobs ; else their own and the ones awaiting an approval they may give), the newest first.",
-        "parameters": [
-          { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false },
-          { "name": "stored_job", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs launched from this stored job (POST /job with its storedJobId), among the ones the caller may see" }
-        ],
+        "parameters": [ { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false } ],
         "responses": { "200": { "description": "Job list" } }
       },
       "post": {
@@ -2793,7 +2816,7 @@
         "tags": ["job"],
         "summary": "Get job by ID",
         "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
-        "responses": { "200": { "description": "Job object. Its storedJob is { id, name } of the stored job it was launched from (POST /job with a storedJobId), when the caller may read that stored job (as GET /stored-jobs/{id}); null otherwise, or once that stored job is deleted" }, "404": { "description": "Not found" } }
+        "responses": { "200": { "description": "Job object" }, "404": { "description": "Not found" } }
       },
       "delete": {
         "security": [ { "bearerAuth": [] } ],
@@ -2903,7 +2926,7 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "Relaunch job by ID, as it ran or with some fields changed",
-        "description": "Without a body the job is replayed with the extravars it ran with. With a body holding `values`, the values the job was launched with are taken, `values` is laid over them, and the result goes through the form engine again - resolved, validated and the extravars built by the server - as a new launch by the caller. Uploads of the original are reused. Without a body, or for a form under launch validation 'enforce', see the Launch validation page : a relaunch that goes through the check is refused (400) for a password field the form shows, since passwords are never stored with the field values ; one its dependencies hide does not count. Only for the job's owner, an admin or a user who sees every job. Needs the form to allow relaunch and the allowJobRelaunch role option. A job launched from a stored job passes it on : the new job names it (storedJob) and its last_used_at is set, when the caller may read that stored job (as GET /stored-jobs/{id}) ; one deleted since is skipped.",
+        "description": "Without a body the job is replayed with the extravars it ran with. With a body holding `values`, the values the job was launched with are taken, `values` is laid over them, and the result goes through the form engine again - resolved, validated and the extravars built by the server - as a new launch by the caller. Uploads of the original are reused. Without a body, or for a form under launch validation 'enforce', see the Launch validation page : a relaunch that goes through the check is refused (400) for a password field the form shows, since passwords are never stored with the field values ; one its dependencies hide does not count. Only for the job's owner, an admin or a user who sees every job. Needs the form to allow relaunch and the allowJobRelaunch role option.",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "verbose", "in": "query", "required": false, "schema": { "type": "boolean" }, "description": "Verbose ansible output (needs the allowVerboseMode role option)" }
@@ -3774,6 +3797,33 @@
         "description": "Deletes an OAuth2 provider and removes authentication strategies from passport.",
         "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
         "responses": { "200": { "description": "OAuth2 provider deleted" }, "404": { "description": "Not found" }, "500": { "description": "Failed to delete OAuth2 provider" } }
+      }
+    },
+    "/backup/restore": {
+      "post": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["backup"],
+        "summary": "Restore from a backup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "folder": { "type": "string", "description": "Backup folder name to restore from" },
+                  "backupFirst": { "type": "boolean", "description": "If true, create a backup before restoring" },
+                  "backupDescription": { "type": "string", "description": "Optional description for the pre-restore backup" }
+                },
+                "required": ["folder"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Restore completed" },
+          "404": { "description": "Backup not found" }
+        }
       }
     },
     "/live": {
@@ -5069,10 +5119,6 @@
                     "logTz": {
                       "type": "string",
                       "description": "Application timezone (LOG_TZ)"
-                    },
-                    "storedJobUnusedDays": {
-                      "type": "integer",
-                      "description": "STORED_JOB_UNUSED_DAYS : a stored job unused for this many days is removed, and the most a stored job's own unused_days may be ; 0 never removes one"
                     }
                   }
                 }
@@ -5125,91 +5171,124 @@
           }
         }
       }
-    },
-    "/profile/tokens": {
-      "get": {
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "user"
-        ],
-        "summary": "List my API tokens",
-        "description": "The signed-in user's API tokens that have not expired or been revoked: sid, name, created_at, expires_at, last_used_at.",
-        "responses": {
-          "200": {
-            "description": "List of tokens"
-          }
-        }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Basic authentication for login."
       },
-      "post": {
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "user"
-        ],
-        "summary": "Create an API token from this session",
-        "description": "Makes an API token for the signed-in user. Needs a role with allowApiTokens or extendedTokenExpiration, a session that signed in at most 10 minutes ago, and is refused from an API token. Rate limited like the sign-in.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiTokenRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The token: { token, expires_at }"
-          },
-          "400": {
-            "description": "expiryDays is not an allowed lifetime"
-          },
-          "403": {
-            "description": "Not allowed; the code field says why: api_token_session, not_allowed or sign_in_again"
-          },
-          "429": {
-            "description": "Too many requests"
-          }
-        }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token. Authenticate via /auth/login, then use 'Authorize' here."
+      },
+      "metricsToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The value of the METRICS_TOKEN environment variable, for /metrics only."
       }
     },
-    "/profile/tokens/{sid}": {
-      "delete": {
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "user"
-        ],
-        "summary": "Revoke one of my API tokens",
-        "description": "Its session ends at once. Rate limited like the sign-in.",
-        "parameters": [
-          {
-            "name": "sid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "The token's session id (sid, from the token list)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "{ revoked: true }"
+    "schemas": {
+      "Runner": {
+        "type": "object",
+        "description": "Where a job runs. type rte : a runtime environment container (AF_ROLE=rte) for playbooks. type awx : AWX / Ansible Automation Platform / Ascender for templates. type semaphore : Semaphore UI for templates, in one project. type rundeck : Rundeck jobs, in one project. type jenkins : Jenkins jobs, signed in with a user and its API token, in a folder if any.",
+        "required": ["name", "type", "uri"],
+        "properties": {
+          "name": { "type": "string", "example": "rte-vmware" },
+          "type": { "type": "string", "enum": ["rte", "awx", "semaphore", "rundeck", "jenkins"] },
+          "description": { "type": "string" },
+          "uri": { "type": "string", "example": "https://rte-vmware:8000" },
+          "token": { "type": "string", "description": "rte : its RTE_TOKEN. awx : an API token (or use_credentials). semaphore : an API token of a Semaphore user. rundeck : a user's API token. jenkins : the API token of the user in username" },
+          "use_credentials": { "type": "boolean", "description": "awx : sign in with username and password instead of a token" },
+          "username": { "type": "string" },
+          "password": { "type": "string", "description": "Stored encrypted ; shown masked" },
+          "ignore_certs": { "type": "boolean" },
+          "ca_bundle": { "type": "string" },
+          "is_default": { "type": "boolean", "description": "Used by playbook forms that name no runner" },
+          "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
+          "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
+          "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (runners/<file>.yaml)" },
+          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
+        }
+      },
+      "SyslogServer": {
+        "type": "object",
+        "description": "A syslog server the server log and the audit entries are sent to.",
+        "required": ["name"],
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (syslog/<file>.yaml)" },
+          "name": { "type": "string", "example": "siem" },
+          "description": { "type": "string" },
+          "host": { "type": "string", "example": "syslog.example.com", "description": "Required unless the protocol is unix or unix-connect" },
+          "port": { "type": "integer", "default": 514 },
+          "protocol": { "type": "string", "enum": ["udp4", "udp6", "tcp4", "tcp6", "tls4", "tls6", "unix", "unix-connect"], "default": "udp4" },
+          "path": { "type": "string", "example": "/dev/log", "description": "The socket, for unix and unix-connect" },
+          "level": { "type": "string", "enum": ["emerg", "alert", "crit", "error", "warning", "notice", "info", "debug"], "default": "info", "description": "The lowest level of the server log it gets; audit entries are always sent" },
+          "type": { "type": "string", "enum": ["BSD", "5424"], "default": "BSD" },
+          "app_name": { "type": "string", "default": "AnsibleForms" },
+          "source": { "type": "string", "default": "localhost", "description": "The host the lines say they come from" },
+          "receives": { "type": "string", "enum": ["log", "audit", "both"], "default": "both" },
+          "enabled": { "type": "boolean", "default": true }
+        }
+      },
+      "NotificationChannel": {
+        "type": "object",
+        "description": "A notification channel. Which fields are used depends on the type.",
+        "required": ["name", "type"],
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (notifications/<file>.yaml)" },
+          "name": { "type": "string", "example": "ops-slack" },
+          "description": { "type": "string" },
+          "type": { "type": "string", "enum": ["mail", "slack", "teams", "telegram", "webhook"], "description": "Set on create; it stays" },
+          "enabled": { "type": "boolean", "default": true },
+          "is_active": { "type": "boolean", "description": "mail: the one the app sends its mail with" },
+          "server": { "type": "string", "example": "smtp.example.com", "description": "mail: read, the server of its smtp credential. Written, deprecated since 7.3 : used only while the credential has no host" },
+          "port": { "type": "integer", "example": 587, "description": "mail: as server, the credential's port" },
+          "secure": { "type": "boolean", "description": "mail: as server, the credential's TLS" },
+          "from_address": { "type": "string", "description": "mail" },
+          "credential": { "type": "string", "description": "mail: an smtp credential, the login" },
+          "webhook_url": { "type": "string", "description": "slack, teams: the webhook address, a secret (masked when read)" },
+          "chat_id": { "type": "string", "description": "telegram: the chat" },
+          "api_url": { "type": "string", "description": "telegram: the Bot API address, empty for api.telegram.org" },
+          "token_credential": { "type": "string", "description": "telegram: an api credential whose password is the bot token; webhook: an api credential whose password is the bearer token" },
+          "url": { "type": "string", "description": "webhook: the address" },
+          "method": { "type": "string", "enum": ["POST", "PUT"], "default": "POST", "description": "webhook" },
+          "headers": { "type": "string", "description": "webhook: extra headers, a JSON object" },
+          "verify_tls": { "type": "boolean", "default": true, "description": "webhook" },
+          "payload": { "type": "string", "description": "webhook: the JSON body, with {{title}} {{text}} {{status}} {{event}} {{jobId}} {{form}} {{user}} {{link}}" }
+        }
+      },
+      "LdapDirectory": {
+        "type": "object",
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (ldap/<file>.yaml)" },
+          "name": {
+            "type": "string",
+            "description": "letters, digits, - and _ ; 'default' keeps its members' short names (ldap/<group>, the bare username), any other's are ldap/<name>/<group> and <name>/<user>"
           },
-          "404": {
-            "description": "No such token of this user"
+          "position": {
+            "type": "integer",
+            "description": "the order a bare username is looked up in, the lowest first"
+          },
+          "domains": {
+            "type": "string",
+            "description": "sign-in domains, comma separated : user@domain goes straight to this directory"
+          },
+          "enable": {
+            "type": "boolean"
+          },
+          "server": {
+            "type": "string",
+            "description": "one or more servers, comma separated, each host, host:port or ldap(s)://host:port ; the next one is tried when one cannot be reached. Read : its ldap credential's servers (host). Written : deprecated since 7.3, used only while the credential has none ; port, enable_tls, ignore_certs, cert and ca_bundle the same"
           },
           "429": {
             "description": "Too many requests"
@@ -7813,7 +7892,7 @@
           "schedule"
         ],
         "summary": "Update a schedule by ID",
-        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, stored_job_id, state, output, last_run and queue_id cannot be changed.",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed.",
         "parameters": [
           {
             "name": "id",
@@ -7952,7 +8031,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job list or single stored job, each with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
+            "description": "Stored job list or single stored job"
           },
           "403": {
             "description": "No allowStoredJobs"
@@ -7985,7 +8064,7 @@
             "description": "Stored job created; data is { id }"
           },
           "400": {
-            "description": "Missing required field, a value too long, a visibility other than private or shared, or unused_days not allowed (see StoredJob)"
+            "description": "Missing required field, a value too long, or a visibility other than private or shared"
           },
           "403": {
             "description": "No allowStoredJobs, or sharing without allowStoredJobsShare or on a form that does not allow it"
@@ -8020,7 +8099,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job, with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
+            "description": "Stored job"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -8040,7 +8119,7 @@
           "storedjob"
         ],
         "summary": "Update a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it. unused_days follows the rule of the StoredJob schema.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it.",
         "parameters": [
           {
             "name": "id",
@@ -8064,9 +8143,6 @@
         "responses": {
           "200": {
             "description": "Stored job updated"
-          },
-          "400": {
-            "description": "A visibility other than private or shared, or unused_days not allowed (see StoredJob)"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -8495,8 +8571,7 @@
           "credentials": { "type": "object", "description": "Credentials for the job.", "example": { "vcenter": "VCENTER_CRED" } },
           "notifications": { "type": "object", "description": "Notification settings for the job.", "example": { "email": "user@example.com" } },
           "job_type": { "type": "string", "description": "Type of job (e.g., ansible, awx, multistep).", "example": "ansible" },
-          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" },
-          "storedJobId": { "type": "integer", "description": "The stored job the values came from (the form opened with ?storedJob=<id>) : its last_used_at is set to now, and the job names it (storedJob in GET /job/{id}). Ignored unless the caller may read it (as GET /stored-jobs/{id}) and it is of this form.", "example": 12 }
+          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" }
         },
         "required": ["formName"]
       },
@@ -8525,232 +8600,6 @@
           "extra": { "type": "object", "description": "Additional provider-specific configuration (JSON).", "example": {} }
         },
         "required": ["provider", "name", "client_id"]
-      },
-      "ApiTokenRequest": {
-        "type": "object",
-        "properties": {
-          "expiryDays": {
-            "oneOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "never"
-                ]
-              }
-            ],
-            "description": "Lifetime in days, at most API_TOKEN_MAX_DAYS; 'never' needs extendedTokenExpiration"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "description": "A label for the token"
-          }
-        }
-      },
-      "BlockedState": {
-        "type": "object",
-        "properties": {
-          "blocked": {
-            "type": "boolean",
-            "description": "true blocks the sign-in, false allows it"
-          }
-        }
-      },
-      "LocalUserCreate": {
-        "type": "object",
-        "required": [
-          "username",
-          "password",
-          "group_id"
-        ],
-        "properties": {
-          "username": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "description": "Who the user is or what the account is for"
-          },
-          "group_id": {
-            "type": "integer",
-            "description": "Its first group"
-          }
-        }
-      },
-      "LocalUserUpdate": {
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string",
-            "description": "'********' keeps the stored one"
-          },
-          "email": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "group_id": {
-            "type": "integer"
-          }
-        }
-      },
-      "ProjectFileWrite": {
-        "type": "object",
-        "required": [
-          "path"
-        ],
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "File path relative to the kind's folder (prefixed with the repository name when there are several roots)."
-          },
-          "content": {
-            "type": "string",
-            "description": "The file content as text."
-          }
-        }
-      },
-      "FormsConfigDocument": {
-        "type": "object",
-        "description": "The forms configuration (categories, roles, constants, forms) as an object; a non-admin may not change the roles.",
-        "additionalProperties": true
-      },
-      "Announcement": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "the text shown (trimmed, cut at 500 characters)"
-          },
-          "level": {
-            "type": "string",
-            "enum": [
-              "info",
-              "warning",
-              "danger"
-            ],
-            "default": "info"
-          },
-          "enabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "start_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "when it starts showing; none : at once"
-          },
-          "end_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "when it stops showing (then it is deleted); after start_at and in the future"
-          }
-        }
-      },
-      "Schedule": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Unique schedule name"
-          },
-          "form": {
-            "type": "string",
-            "description": "Form to launch"
-          },
-          "one_time_run": {
-            "type": "boolean",
-            "description": "Run once at run_at instead of on the cron"
-          },
-          "cron": {
-            "type": "string",
-            "description": "Cron expression (validated, 400 if invalid)"
-          },
-          "run_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When a one-time run fires"
-          },
-          "extra_vars": {
-            "type": "string",
-            "description": "Extra vars as a YAML/JSON string"
-          },
-          "enabled": {
-            "type": "boolean",
-            "description": "Off: the cron or one-time run does not fire (launch still works)"
-          },
-          "planned": {
-            "type": "boolean",
-            "description": "Create only: plan a one-time run as the calling user (Run later) instead of an admin-level schedule"
-          },
-          "raw_form_data": {
-            "description": "Create of a planned run only: the raw field values (object or JSON string), checked by launch validation"
-          },
-          "stored_job_id": {
-            "type": "integer",
-            "description": "Create of a planned run only: the stored job the values came from. Kept when the caller may read it (as GET /stored-jobs/{id}) and it is of this form; its last_used_at is set when the run fires. Ignored for a schedule"
-          }
-        },
-        "description": "Fields owner, state, output, last_run and queue_id are ignored on write."
-      },
-      "StoredJob": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name, unique per user and form"
-          },
-          "description": {
-            "type": "string"
-          },
-          "form_name": {
-            "type": "string",
-            "description": "Form the values belong to"
-          },
-          "form_data": {
-            "type": "string",
-            "description": "The form values as a JSON string"
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When the stored job expires (optional)"
-          },
-          "visibility": {
-            "type": "string",
-            "enum": ["private", "shared"],
-            "description": "private (default): only the owner. shared: also the users with the allowStoredJobsViewAll role option, who can load it but not change it"
-          },
-          "unused_days": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1,
-            "description": "Removed once no job was launched from it for this many days, counted from its last_used_at (or its created_at, never used). null (or left out) follows STORED_JOB_UNUSED_DAYS. While that setting is above 0 it must be from 1 to the setting (400 otherwise) ; with the setting 0 any whole number of at least 1. null (or left out) always follows the setting, which still removes it. The days that count are the shorter of the two ; expires_at keeps working, whichever comes first removes it"
-          },
-          "last_used_at": {
-            "type": "string",
-            "format": "date-time",
-            "readOnly": true,
-            "description": "When a job was last launched from it (POST /job with its storedJobId, the MCP launch_job, a planned run from it when it fires, or a relaunch of a job launched from it) ; null until then. Set by the server only"
-          }
-        },
-        "description": "Only these fields are written; id, username (always the caller), created_at and last_used_at are ignored. name, form_name and form_data are required on create."
       }
     }
   }

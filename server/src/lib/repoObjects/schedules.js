@@ -180,13 +180,14 @@ const schedules = {
    *   row (object): the schedule.
    *
    * Returns:
-   *   object: { row, rrule } or { row, reason }.
+   *   object: { row, rrule } or { row, code (noSchedule, cron), reason }.
    */
   candidateOf(row) {
     if (row.rrule && !validateRrule(row.rrule).length) return { row, rrule: normalizeRrule(row.rrule) };
-    if (!row.cron) return { row, reason: "it has no cron nor rrule" };
+    // why it stays in the app, with its code : the question says it in the app's language
+    if (!row.cron) return { row, code: "noSchedule", reason: "it has no cron nor rrule" };
     const converted = cronToRrule(row.cron, logConfig.tz || "UTC");
-    return converted.rrule ? { row, rrule: converted.rrule } : { row, reason: converted.reason };
+    return converted.rrule ? { row, rrule: converted.rrule } : { row, code: "cron", reason: converted.reason };
   },
 
   /**

@@ -4,7 +4,7 @@
 // section per type, one Cancel and one confirm), the toast after, the repositories list's Usage
 // column of badges, Pull all's order, and the Repository line of a linked object's page.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // the server's preview, by type, and the toasts said after
@@ -25,6 +25,7 @@ vi.mock('vue-sonner', () => ({
   toast: { success: (m) => toasts.push(['success', m]), error: (m) => toasts.push(['error', m]) },
 }));
 
+import axios from 'axios';
 import getSettings from '../src/config/settings.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
 import {
@@ -381,6 +382,75 @@ describe('Pull all, and a linked object', () => {
       'settings.repositories.sourceRepository {"name":"ops"}',
       'runners/a.yaml',
     ]);
+  });
+});
+
+describe('what the question can and cannot know', () => {
+  it('a new repository : what the remote already has wins, said once ; an existing one : not said', async () => {
+    let answer = confirmUsageChange(t, 'ops', null, { use_for_schedules: 1, use_for_runners: 1 });
+    await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
+    let d = confirmPrompt.details;
+    expect(d.filter((x) => x === 'settings.repositories.usageOnNewRepository {"name":"ops"}').length).toBe(1);
+    answerConfirm(false);
+    await answer;
+    answer = confirmUsageChange(t, 'ops', { name: 'ops' }, { use_for_schedules: 1 });
+    await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
+    d = confirmPrompt.details;
+    expect(d.join(' ')).not.toContain('usageOnNewRepository');
+    answerConfirm(false);
+    await answer;
+  });
+
+  it('a preview that cannot be read : one line says so, no counts of nothing ; the save can still go on', async () => {
+    axios.get.mockRejectedValueOnce(new Error('Network Error'));
+    const answer = confirmUsageChange(t, 'ops', { use_for_runners: 1 }, { use_for_general: 1, use_for_schedules: 1 });
+    await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
+    const d = confirmPrompt.details;
+    expect(d[0]).toBe('settings.repositories.usagePreviewFailed');
+    expect(d.filter((x) => x.heading)).toEqual([]);
+    const text = d.join(' ');
+    for (const key of ['usageOnWritten', 'usageOnReadFile', 'usageOnGitWins', 'usageOffKept']) expect(text).not.toContain(key);
+    // what is true of every type is still said
+    expect(d).toContain('settings.repositories.usageOnAfter');
+    expect(d).toContain('settings.repositories.usageOffPull');
+    answerConfirm(true);
+    expect(await answer).toBe(true);
+  });
+});
+
+describe('why an object stays in the app', () => {
+  it("a schedule's cron a rrule cannot express in its own sentence, the other reasons translated in the common one", () => {
+    const lines = activationLines(t, 'schedules', 'ops', {
+      written: [],
+      kept: [
+        { name: 'Weekly', code: 'cron', cron: '0 0 1 * 1', reason: 'both the day of the month and the day of the week' },
+        { name: 'Empty', code: 'noSchedule', cron: null, reason: 'it has no cron nor rrule' },
+        { name: 'Broken', code: 'notWritten', cron: '0 1 * * *', error: 'disk full', reason: 'not written: disk full' },
+      ],
+    });
+    expect(lines).toContain('settings.repositories.schedulesOnKept {"names":"Weekly (0 0 1 * 1)"}');
+    expect(lines).toContain(
+      'settings.repositories.usageOnKept {"names":"Empty (settings.repositories.usageKeptWhy.noSchedule), ' +
+        'Broken (settings.repositories.usageKeptWhy.notWritten {\\"error\\":\\"disk full\\"})"}',
+    );
+    expect(lines.join(' ')).not.toContain('it has no cron');
+  });
+
+  it('every code the server gives has its words in every language', async () => {
+    const dir = join(import.meta.dirname, '../../server/src/lib/repoObjects');
+    const codes = new Set();
+    for (const f of readdirSync(dir)) {
+      const text = readFileSync(join(dir, f), 'utf8');
+      for (const m of text.matchAll(/\bcode: "(\w+)"/g)) codes.add(m[1]);
+      const reasons = text.match(/KEPT_REASONS = \{([^}]*)\}/);
+      if (reasons) for (const m of reasons[1].matchAll(/^\s*(\w+):/gm)) codes.add(m[1]);
+    }
+    expect([...codes]).toEqual(expect.arrayContaining(['seed', 'holder', 'noSchedule', 'cron', 'notWritten']));
+    for (const lang of LANGS) {
+      const why = (await import(`../src/locales/${lang}.js`)).default.settings.repositories.usageKeptWhy;
+      for (const code of codes) expect(why[code], `${lang}: ${code}`).toBeTruthy();
+      expect(why.notWritten, lang).toContain('{error}');
+    }
   });
 });
 

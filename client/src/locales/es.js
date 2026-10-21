@@ -1375,6 +1375,9 @@ export default {
       formDuplicate:
         "El formulario '{name}' está definido dos veces: se usa {used} y se omite {skipped} (los nombres de formulario deben ser únicos entre los repositorios de formularios)",
       configDeprecated: '{key} leídos de config.yaml: obsoleto, muévelos a {file} (config.yaml ya no se lee en 8.0.0)',
+      usagePreviewFailed: 'No se pudo leer del servidor lo que hará este cambio: se aplica igualmente si continúas.',
+      usageOnNewRepository:
+        '{name} aún no está clonado: si el remoto ya tiene estos archivos, gana la versión de git y reemplaza la de esta aplicación. Su salida de pull dice lo que tomó una vez clonado.',
       usageOnAfter:
         'A partir de entonces, un pull trae los cambios hechos en git, y los cambios hechos aquí van a git con el Push del repositorio.',
       usageOnDone:
@@ -1391,6 +1394,9 @@ export default {
         registered: 'registrado por su RTE',
         pending: 'pendiente de aprobación',
         holder: 'contiene los repositorios, nunca en su propio archivo',
+        noSchedule: 'no tiene cron ni rrule',
+        cron: 'su cron no se puede escribir como rrule',
+        notWritten: 'no escrito: {error}',
       },
       source: 'Origen',
       sourceRepository: 'Repositorio: {name}',

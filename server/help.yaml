@@ -6602,6 +6602,13 @@
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
+
+      **A new repository** cannot be read before its first clone, so its question also says that when the remote
+      already has these files, the version in git wins and replaces the app's. Once the clone is done, in the
+      background, its pull output says what each type took, for example `Now holds the schedules: 0 read from its
+      files, 0 replaced by a file of the same name, 2 written to it (waiting for Push), 1 kept in the app`, or why
+      one could not follow. When what a change will do cannot be read from the server, the question says so in
+      one line instead of each type's section, and the change is still applied if confirmed.
   - name: Credentials and runners kept in a git repository
     short: One YAML file per credential or runner, in the seed's format
     version: v7.4.0

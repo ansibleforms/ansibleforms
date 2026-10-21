@@ -1360,6 +1360,10 @@ export default {
         "Form '{name}' is defined twice: {used} is used, {skipped} is skipped (form names must be unique across forms repositories)",
       configDeprecated:
         '{key} read from config.yaml: deprecated, move them to {file} (config.yaml is no longer read in 8.0.0)',
+      usagePreviewFailed:
+        'What this change will do could not be read from the server: it is still applied when you go on.',
+      usageOnNewRepository:
+        '{name} is not cloned yet: if the remote already has these files, the version in git wins and replaces the one in this app. Its pull output says what it took once cloned.',
       usageOnAfter:
         "From then on, a pull brings the changes made in git, and the changes made here go to git with the repository's Push.",
       usageOnDone:
@@ -1376,6 +1380,9 @@ export default {
         registered: 'registered by its RTE',
         pending: 'waiting for approval',
         holder: 'it holds the repositories itself, never in its own file',
+        noSchedule: 'it has no cron nor rrule',
+        cron: 'its cron cannot be written as an rrule',
+        notWritten: 'not written: {error}',
       },
       source: 'Source',
       sourceRepository: 'Repository: {name}',

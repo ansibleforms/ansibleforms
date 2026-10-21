@@ -1376,6 +1376,10 @@ export default {
         "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",
       configDeprecated:
         '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie nach {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
+      usagePreviewFailed:
+        'Was diese Änderung bewirkt, konnte nicht vom Server gelesen werden: Sie wird trotzdem angewendet, wenn Sie fortfahren.',
+      usageOnNewRepository:
+        '{name} ist noch nicht geklont: Hat das Remote diese Dateien bereits, gewinnt die Version in git und ersetzt die dieser App. Seine Pull-Ausgabe sagt nach dem Klonen, was übernommen wurde.',
       usageOnAfter:
         'Ab dann bringt ein Pull die Änderungen aus git, und die hier gemachten Änderungen gehen mit dem Push des Repositorys nach git.',
       usageOnDone:
@@ -1392,6 +1396,9 @@ export default {
         registered: 'von seinem RTE registriert',
         pending: 'wartet auf Genehmigung',
         holder: 'es enthält die Repositories, nie in seiner eigenen Datei',
+        noSchedule: 'es hat weder Cron noch Rrule',
+        cron: 'sein Cron lässt sich nicht als Rrule schreiben',
+        notWritten: 'nicht geschrieben: {error}',
       },
       source: 'Quelle',
       sourceRepository: 'Repository: {name}',
