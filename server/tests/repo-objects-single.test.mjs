@@ -558,6 +558,17 @@ describe("the announcements", () => {
   });
 });
 
+describe("the config seed and a repository naming the same announcement", () => {
+  test("the repository's is kept, the seed's not applied, said : no tug of war between a start and a pull", async () => {
+    fx.writeFile("news", "announcements", "maintenance.yaml", { name: "Maintenance", message: "From git" });
+    await RepoObjects.syncRepository(await desc("announcements"), "news");
+    const done = await RepoObjects.applyDeclared(await desc("announcements"), [{ name: "Maintenance", message: "From the seed" }], {});
+    assert.deepEqual(done.kept, ["Maintenance"]);
+    assert.deepEqual(done.updated, []);
+    assert.equal(fx.rowNamed("announcements", "Maintenance").message, "From git");
+  });
+});
+
 describe("an announcement already ended in git", () => {
   const ended = { name: "Maintenance", message: "Down on Sunday", end_at: "2020-01-01T10:00:00Z" };
 

@@ -1406,7 +1406,8 @@ async function appUpdatedSingle(desc, before) {
  * Applies what the config seed declares of a type (the branding, the announcements, the
  * disclaimer : sections the seed reads through the same descriptors as a repository) : checked
  * as a file is (its references resolved by the seed already), then a single-file type applied,
- * a folder type's objects made or changed by name. Nothing is linked to a repository.
+ * a folder type's objects made or changed by name - never one a repository holds. Nothing is linked
+ * to a repository.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -1414,13 +1415,14 @@ async function appUpdatedSingle(desc, before) {
  *   opts (object): { dir (the seed file's folder : what the section names beside it) }.
  *
  * Returns:
- *   Promise<object>: { created: [name], updated: [name], unchanged (count) }.
+ *   Promise<object>: { created: [name], updated: [name], unchanged (count), kept: [name] (held by a
+ *     repository, not applied) }.
  *
  * Raises:
  *   Error: an item refused, named with why.
  */
 export async function applyDeclared(desc, declared, opts = {}) {
-  const out = { created: [], updated: [], unchanged: 0 };
+  const out = { created: [], updated: [], unchanged: 0, kept: [] };
   if (desc.file) {
     const checked = await desc.check(declared, { resolved: true, dir: opts.dir });
     if (checked.errors.length) throw new Error(`${desc.title}: ${checked.errors.join("; ")}`);
@@ -1439,6 +1441,13 @@ export async function applyDeclared(desc, declared, opts = {}) {
     // one the type does not import (an announcement already ended) : left out, as a pull leaves it
     if (desc.notImported?.(checked.object)) continue;
     const row = ((await desc.store.rows()) || []).find((r) => nameKey(r.name) === nameKey(checked.object.name));
+    // one a repository holds : git's, never the seed's too (each would undo the other, the seed at
+    // every start, git at every pull) - left as it is, said
+    if (row?.repository) {
+      out.kept.push(checked.object.name);
+      logger.warning(`The config seed declares the ${desc.noun} '${checked.object.name}', which repository '${row.repository}' holds (${row.repo_file}): not applied, the repository's version is kept`);
+      continue;
+    }
     if (!row) {
       await desc.store.insert(checked.object, null, null);
       out.created.push(checked.object.name);
