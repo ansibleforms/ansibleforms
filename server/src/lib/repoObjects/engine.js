@@ -357,8 +357,8 @@ async function waitingOf(desc, object, cache = new Map()) {
  * Reads a type's files of a repository into its table : a new file makes an object, a changed one
  * changes it, a removed one (or one saying state: absent) removes it - unless something uses it
  * (descriptor.usersOf) or it can never be deleted (descriptor.undeletable), then it is kept and
- * the refusal said. A refused file - not valid, a name
- * another object has - changes nothing : an object it made before stays as it was, a new one is
+ * the refusal said. A file renamed (its object's name given by a new file) moves its object to it.
+ * A refused file - not valid, a name another object has - changes nothing : an object it made before stays as it was, a new one is
  * not made. A file that names an object not there yet waits, the same way. Where the file gives
  * no secret, the database's stays.
  *
@@ -426,7 +426,26 @@ export async function syncRepository(desc, name, opts = {}) {
     }
     taken.set(key, `${name}/${f.file}`);
   }
-  // step 4 : the objects whose file is gone (or absent) go first - not one something uses -
+  // step 4 : a file renamed in git (its old file gone, a new one giving the same name) : the
+  // object follows it to its new file, and is changed as a changed file - never removed and made
+  // again, which would lose its secrets kept in the database, its state, and refuse it for good
+  // while something uses it
+  const gone = new Map();
+  for (const [file, row] of own) {
+    if (!files.some((f) => f.file === file)) gone.set(nameKey(row.name), file);
+  }
+  for (const f of files) {
+    if (!f.object || own.has(f.file) || f.adopt) continue;
+    const from = gone.get(nameKey(f.object.name));
+    if (from === undefined) continue;
+    gone.delete(nameKey(f.object.name));
+    const row = own.get(from);
+    await desc.store.link(row.id, name, f.repoFile ?? f.file);
+    own.delete(from);
+    own.set(f.file, { ...row, repo_file: f.repoFile ?? f.file });
+    logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${row.name}' follows its file, renamed in git: ${name}/${from} is now ${name}/${f.file}`);
+  }
+  // step 5 : the objects whose file is gone (or absent) go first - not one something uses -
   // then the changed, then the new
   const present = new Set([...files.filter((f) => f.object).map((f) => f.file), ...kept]);
   for (const [file, row] of own) {

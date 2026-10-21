@@ -116,6 +116,39 @@ describe("a pull reads the credentials folder", () => {
   });
 });
 
+describe("a file renamed in git", () => {
+  test("its object follows it : the same row, its secret kept in the database, its new fields applied", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "git", credential_type: "git", user: "bot", password: "enc:dbonly" });
+    fx.cloneEmpty("creds");
+    await RepoObjects.activate(credentials, "creds", { pull: false });
+    const text = fx.readText("creds", "credentials", "git.yaml");
+    fx.removeFile("creds", "credentials", "git.yaml");
+    fx.writeFile("creds", "credentials", "git-bot.yaml", text.replace("user: bot", "user: robot"));
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(summary.deleted, 0);
+    assert.equal(summary.created, 0);
+    assert.equal(summary.updated, 1);
+    const row = fx.rowNamed("credentials", "git");
+    assert.equal(row.id, 7);
+    assert.equal(row.repo_file, "credentials/git-bot.yaml");
+    assert.equal(row.password, "enc:dbonly");
+    assert.equal(row.user, "robot");
+  });
+
+  test("one a runner uses follows it too, never refused", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.state.tables.runners.push({ id: 50, name: "rte1", type: "rte", credential: "git" });
+    fx.removeFile("creds", "credentials", "git.yaml");
+    fx.writeFile("creds", "credentials", "git-bot.yaml", gitCredential("git"));
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(fx.rowNamed("credentials", "git").repo_file, "credentials/git-bot.yaml");
+  });
+});
+
 describe("a runner names its credential by name", () => {
   test("its credential not there yet : it waits, said ; a pull of the credentials reads it again", async () => {
     fx.writeFile("ops", "runners", "rte1.yaml", rteRunner("rte1", { rte_max_jobs: 4, enabled: false }));
