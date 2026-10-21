@@ -2,9 +2,13 @@
 // The repository-backed objects, as the rest of the app uses them : the engine
 // (lib/repoObjects/engine.js) by type key. A controller tells it what the app saved (appCreated,
 // appUpdated, appDeleted) ; the repository model tells it what git and the usage flags changed.
-// A file that cannot be written is said in the server log, never thrown : what the app saved is
-// saved, and the repository's next pull or Push says the rest.
+// A save is wrapped in the write claim of the repository it writes to (holding), taken before the
+// database changes : a repository a pull or a push holds is waited for a while, then the save is
+// refused with nothing changed - never saved in the app while its file stays as it was, which the
+// next pull would undo. A file that cannot be written otherwise is said in the server log : what
+// the app saved is saved, and the repository's next pull or Push says the rest.
 import logger from "../logger.js";
+import Errors from "../errors.js";
 import Engine from "./engine.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 
@@ -23,6 +27,9 @@ async function appStep(key, what, step) {
   try {
     return await step(await descriptorOf(key));
   } catch (e) {
+    // a repository still busy : said to the user, never a silent success (RepoObjects.holding
+    // takes the claim before the save, so a save it wraps never gets here)
+    if (e instanceof Errors.ConflictError) throw e;
     logger.error(`The ${key} repository could not follow ${what}: ${e.message || e}`);
     return null;
   }
@@ -32,6 +39,40 @@ const RepoObjects = {
   ...Engine,
   BUILT_OBJECT_TYPES,
   descriptorOf,
+
+  /**
+   * Runs a save of the app under the write claim of the repositories it writes to - the types'
+   * repositories, or the one the object is linked to (before) - taken before the save : a pull, a
+   * push or another write on them is waited for a while (engine.js CLAIM_WAIT), then the save is
+   * refused, nothing changed. Its app-to-git steps (appCreated, appUpdated ...) run under the same
+   * claim. A type without a repository, or one not cloned, saves at once.
+   *
+   * Args:
+   *   keys (string|string[]): the type(s) the save writes.
+   *   change (function): async () => the save, and its app-to-git steps.
+   *   before (object|null): the object as it was (its repository), for an edit or a delete.
+   *
+   * Returns:
+   *   Promise<any>: what the change returns.
+   *
+   * Raises:
+   *   Errors.ConflictError: a repository still busy once the wait is over (nothing saved).
+   */
+  async holding(keys, change, before = null) {
+    const names = new Set();
+    if (before?.repository) names.add(before.repository);
+    for (const key of [].concat(keys)) {
+      // its repository not readable (the database down) : the save says the rest
+      const active = await descriptorOf(key)
+        .then((desc) => Engine.activeRepository(desc))
+        .catch((e) => logger.error(`The ${key} repository could not be read before a save: ${e.message || e}`));
+      if (active) names.add(active);
+    }
+    // in one order, so two saves never wait for each other's claim
+    const repositories = [...names].filter((n) => Engine.cloned(n)).sort();
+    const run = (i) => (i < repositories.length ? Engine.withWriteClaim(repositories[i], () => run(i + 1)) : change());
+    return run(0);
+  },
 
   /**
    * A new object of a type made in the app : written to the type's repository, when there is one.
@@ -175,7 +216,7 @@ const RepoObjects = {
 
   /**
    * Runs a change in the app that may touch several objects of a type, the type's repository
-   * following it (rowsOf before, appChangedRows after).
+   * following it (rowsOf before, appChangedRows after), under its write claim (holding).
    *
    * Args:
    *   key (string): the type.
@@ -183,12 +224,17 @@ const RepoObjects = {
    *
    * Returns:
    *   Promise<any>: what the change returns.
+   *
+   * Raises:
+   *   Errors.ConflictError: its repository still busy once the wait is over (nothing changed).
    */
   async following(key, change) {
-    const before = await RepoObjects.rowsOf(key);
-    const out = await change();
-    await RepoObjects.appChangedRows(key, before);
-    return out;
+    return RepoObjects.holding(key, async () => {
+      const before = await RepoObjects.rowsOf(key);
+      const out = await change();
+      await RepoObjects.appChangedRows(key, before);
+      return out;
+    });
   },
 
   /**

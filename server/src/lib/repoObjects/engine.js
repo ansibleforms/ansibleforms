@@ -29,6 +29,7 @@
 // What runs (a schedule's state, a runner's socket ...) stays in the database, never in a file.
 import fs from "fs";
 import path from "path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import logger from "../logger.js";
 import Errors from "../errors.js";
 import mysql from "../../models/db.model.js";
@@ -89,11 +90,46 @@ const holdingOf = (desc) => (desc.file ? titleOf(desc) : `the ${titleOf(desc).to
  * Returns:
  *   boolean: true when it is cloned.
  */
-const cloned = (name) => !!name && Repo.isValidName(name) && fs.existsSync(Repo.folderOf(name));
+export const cloned = (name) => !!name && Repo.isValidName(name) && fs.existsSync(Repo.folderOf(name));
+
+// how long a write waits for a repository a pull, a push or another write holds, and how often it
+// asks again ; then it is refused, nothing saved
+export const CLAIM_WAIT = { totalMs: 20000, everyMs: 250 };
+
+// the write claims this flow of the app holds, by repository : a write inside another on the same
+// repository (an object saved, then its file written) runs under the claim already taken
+const held = new AsyncLocalStorage();
+
+/**
+ * Takes a repository's write claim, waiting a while when a pull, a push or another write holds it.
+ *
+ * Args:
+ *   repository (string): the repository.
+ *
+ * Returns:
+ *   Promise<string|null|undefined>: the status to give back on release (claimForWrite's).
+ *
+ * Raises:
+ *   Errors.ConflictError: still busy once the wait is over.
+ */
+async function claimWaiting(repository) {
+  const until = Date.now() + CLAIM_WAIT.totalMs;
+  for (;;) {
+    try {
+      return await Repository.claimForWrite(repository);
+    } catch (e) {
+      if (Date.now() >= until) {
+        throw new Errors.ConflictError(`Repository '${repository}' is busy (a pull or a push is running): nothing was saved, try again in a moment. (${e.message || e})`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, CLAIM_WAIT.everyMs));
+    }
+  }
+}
 
 /**
  * Runs a write in a repository's working tree under its write claim (no pull, sync or clone on
- * it meanwhile).
+ * it meanwhile) ; a repository busy is waited for a while (CLAIM_WAIT), then the write is refused
+ * - never dropped. Inside another write on the same repository it runs under that one's claim.
  *
  * Args:
  *   repository (string): the repository.
@@ -101,11 +137,16 @@ const cloned = (name) => !!name && Repo.isValidName(name) && fs.existsSync(Repo.
  *
  * Returns:
  *   Promise<any>: what the write returns.
+ *
+ * Raises:
+ *   Errors.ConflictError: the repository is still busy once the wait is over.
  */
 export async function withWriteClaim(repository, write) {
-  const prior = await Repository.claimForWrite(repository);
+  const mine = held.getStore();
+  if (mine?.has(repository)) return write();
+  const prior = await claimWaiting(repository);
   try {
-    return await write();
+    return await held.run(new Set([...(mine || []), repository]), write);
   } finally {
     if (prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));
   }
@@ -1470,6 +1511,7 @@ export function classifyRow(row, name, reasonInApp = null) {
 
 export default {
   nameKey,
+  cloned,
   withWriteClaim,
   fileOf,
   writeNewFile,

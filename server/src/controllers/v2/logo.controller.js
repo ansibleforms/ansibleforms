@@ -46,9 +46,11 @@ const update = function (req, res) {
     }
     try {
       // the branding repository's file, before : its logo written into it after
-      const before = await RepoObjects.snapshot('branding');
-      await BRAND_IMAGES.logo.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
-      await RepoObjects.appUpdated('branding', before);
+      await RepoObjects.holding('branding', async () => {
+        const before = await RepoObjects.snapshot('branding');
+        await BRAND_IMAGES.logo.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+        await RepoObjects.appUpdated('branding', before);
+      });
       logger.notice(`Custom logo updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
     } catch (e) {
@@ -59,9 +61,11 @@ const update = function (req, res) {
 
 const remove = async function (req, res) {
   try {
-    const before = await RepoObjects.snapshot('branding');
-    await BRAND_IMAGES.logo.set(null);
-    await RepoObjects.appUpdated('branding', before);
+    await RepoObjects.holding('branding', async () => {
+      const before = await RepoObjects.snapshot('branding');
+      await BRAND_IMAGES.logo.set(null);
+      await RepoObjects.appUpdated('branding', before);
+    });
     logger.notice(`Custom logo removed, default logo restored`)
     res.json(RestResult.single(null));
   } catch (err) {

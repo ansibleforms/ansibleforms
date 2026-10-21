@@ -220,13 +220,18 @@ const update = async function(req, res) {
             }
           }
           // the branding and links repositories' files, before : their changed fields written after
-          const before = await RepoObjects.snapshots(['branding', 'links']);
-          // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
-          // with no field the model knows is refused
-          if (!(await saveSettingsFields(body))) {
+          // under their repositories' write claims, taken first (RepoObjects.holding)
+          const saved = await RepoObjects.holding(['branding', 'links'], async () => {
+            const before = await RepoObjects.snapshots(['branding', 'links']);
+            // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
+            // with no field the model knows is refused
+            if (!(await saveSettingsFields(body))) return false;
+            await RepoObjects.appUpdatedAll(before);
+            return true;
+          });
+          if (!saved) {
             return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
           }
-          await RepoObjects.appUpdatedAll(before);
           res.json(RestResult.single(null));
         } catch(err) {
           // a branding field the config seed manages : 403, as every seeded object

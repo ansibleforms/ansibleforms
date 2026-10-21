@@ -6643,6 +6643,8 @@
       runners an RTE registered itself or waiting for approval. **The app: back to git.** Editing a linked object
       rewrites only the fields that changed in its file (its `${ENV}` references, comments and other keys kept),
       a new object is written as a new file, deleting one deletes its file; all wait for the repository's Push.
+      A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)
+      with nothing changed, never saved in the app without its file.
       The credential's and the runner's page show **Repository: <name>** for a linked object.
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and read

@@ -109,9 +109,12 @@ const findById = async function (req, res) {
 const create = async function (req, res) {
   try {
     assertBody(req);
-    const id = await Ldap.create({ ...new Ldap(req.body), managed: 0 });
-    // the LDAP repository, when there is one : written to it as a new file, without its password
-    await RepoObjects.appCreated('ldap', id);
+    const id = await RepoObjects.holding('ldap', async () => {
+      const id = await Ldap.create({ ...new Ldap(req.body), managed: 0 });
+      // the LDAP repository, when there is one : written to it as a new file, without its password
+      await RepoObjects.appCreated('ldap', id);
+      return id;
+    });
     res.status(201).json(RestResultv2.single({ id, message: i18n.t(req, 'resources.ldapCreated') }));
   } catch (err) {
     logger.error("Error adding an LDAP directory: ", err);
@@ -139,9 +142,11 @@ const update = async function (req, res) {
     if (await Ldap.connectionOf(record.credential).catch(() => null)) {
       for (const key of CONNECTION_KEYS) record[key] = existing[key] ?? null;
     }
-    await Ldap.updateById(existing.id, record);
-    // one of the LDAP repository : its changed fields written to its file
-    if (existing.repository) await RepoObjects.appUpdated('ldap', existing, existing.id);
+    await RepoObjects.holding([], async () => {
+      await Ldap.updateById(existing.id, record);
+      // one of the LDAP repository : its changed fields written to its file
+      if (existing.repository) await RepoObjects.appUpdated('ldap', existing, existing.id);
+    }, existing);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.ldapUpdated') }));
   } catch (err) {
     logger.error("Error updating the LDAP directory: ", err);
@@ -152,9 +157,11 @@ const update = async function (req, res) {
 const remove = async function (req, res) {
   try {
     const before = await Ldap.findById(req.params.id).catch(() => null);
-    await Ldap.deleteById(req.params.id);
-    // one of the LDAP repository : its file goes too, for the repository's Push
-    if (before?.repository) await RepoObjects.appDeleted('ldap', before);
+    await RepoObjects.holding([], async () => {
+      await Ldap.deleteById(req.params.id);
+      // one of the LDAP repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted('ldap', before);
+    }, before);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.ldapDeleted') }));
   } catch (err) {
     logger.error("Error deleting the LDAP directory: ", err);

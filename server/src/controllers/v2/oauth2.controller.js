@@ -36,9 +36,12 @@ const oauth2Controller = {
   // Create new OAuth2 provider
   async create(req, res) {
     try {
-      const created = await OAuth2.create(req.body);
-      // the SSO repository, when there is one : written to it as a new file, without its secret
-      await RepoObjects.appCreated('sso', created);
+      const created = await RepoObjects.holding('sso', async () => {
+        const created = await OAuth2.create(req.body);
+        // the SSO repository, when there is one : written to it as a new file, without its secret
+        await RepoObjects.appCreated('sso', created);
+        return created;
+      });
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready
       return res.status(201).json(RestResult.single(i18n.t(req, 'resources.oauth2Added'), created));
@@ -62,9 +65,12 @@ const oauth2Controller = {
   async update(req, res) {
     try {
       const before = await OAuth2.findById(req.params.id).catch(() => null);
-      const updated = await OAuth2.update(req.body, req.params.id);
-      // one of the SSO repository : its changed fields written to its file
-      if (before?.repository) await RepoObjects.appUpdated('sso', before, req.params.id);
+      const updated = await RepoObjects.holding([], async () => {
+        const updated = await OAuth2.update(req.body, req.params.id);
+        // one of the SSO repository : its changed fields written to its file
+        if (before?.repository) await RepoObjects.appUpdated('sso', before, req.params.id);
+        return updated;
+      }, before);
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready      
       return res.json(RestResult.single(updated));
@@ -77,9 +83,12 @@ const oauth2Controller = {
   async delete(req, res) {
     try {
       const before = await OAuth2.findById(req.params.id).catch(() => null);
-      const deleted = await OAuth2.delete(req.params.id);
-      // one of the SSO repository : its file goes too, for the repository's Push
-      if (before?.repository) await RepoObjects.appDeleted('sso', before);
+      const deleted = await RepoObjects.holding([], async () => {
+        const deleted = await OAuth2.delete(req.params.id);
+        // one of the SSO repository : its file goes too, for the repository's Push
+        if (before?.repository) await RepoObjects.appDeleted('sso', before);
+        return deleted;
+      }, before);
       await auth_entraid.initialize(); // we wait for Entra ID to be ready
       await auth_oidc.initialize(); // we wait for the oidc to be ready
       return res.json(RestResult.single(deleted));

@@ -125,9 +125,12 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     await guardChannelCredentials(req, null);
-    const id = await NotificationChannel.create(req.body);
-    // the notification channels repository, when there is one : written to it as a new file
-    await RepoObjects.appCreated("notifications", id);
+    const id = await RepoObjects.holding("notifications", async () => {
+      const id = await NotificationChannel.create(req.body);
+      // the notification channels repository, when there is one : written to it as a new file
+      await RepoObjects.appCreated("notifications", id);
+      return id;
+    });
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Notification channel" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -153,9 +156,11 @@ const update = async (req, res) => {
     const existing = await NotificationChannel.findById(req.params.id);
     if (!existing) throw new Errors.NotFoundError(`No notification channel with id ${req.params.id}`);
     await guardChannelCredentials(req, existing);
-    await NotificationChannel.update(req.body, req.params.id);
-    // one of the notification channels repository : its changed fields written to its file
-    if (existing.repository) await RepoObjects.appUpdated("notifications", existing, req.params.id);
+    await RepoObjects.holding([], async () => {
+      await NotificationChannel.update(req.body, req.params.id);
+      // one of the notification channels repository : its changed fields written to its file
+      if (existing.repository) await RepoObjects.appUpdated("notifications", existing, req.params.id);
+    }, existing);
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -165,9 +170,11 @@ const update = async (req, res) => {
 const deleteChannel = async (req, res) => {
   try {
     const before = await NotificationChannel.findById(req.params.id).catch(() => null);
-    await NotificationChannel.delete(req.params.id);
-    // one of the notification channels repository : its file goes too, for the repository's Push
-    if (before?.repository) await RepoObjects.appDeleted("notifications", before);
+    await RepoObjects.holding([], async () => {
+      await NotificationChannel.delete(req.params.id);
+      // one of the notification channels repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("notifications", before);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);

@@ -135,17 +135,21 @@ const saveEnv = async function(req,res){
     // the general, branding, links and MCP repositories' files, before (the language is the
     // branding's, the Designer's link the links', the MCP switches the MCP's) : their changed
     // variables written into them after
-    const before = await RepoObjects.snapshots(['general', 'branding', 'links', 'mcp'])
-    // checked, written, applied, audited : as a General repository's pull (lib/envSave.js)
-    const { restartRequired: restart } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
-    await RepoObjects.appUpdatedAll(before)
+    // under their repositories' write claims, taken first (RepoObjects.holding)
+    const restart = await RepoObjects.holding(['general', 'branding', 'links', 'mcp'], async () => {
+      const before = await RepoObjects.snapshots(['general', 'branding', 'links', 'mcp'])
+      // checked, written, applied, audited : as a General repository's pull (lib/envSave.js)
+      const { restartRequired } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
+      await RepoObjects.appUpdatedAll(before)
+      return restartRequired
+    })
     return res.json(RestResult.single({ message: i18n.t(req, 'config.envVarsSaved'), changed: names, restartRequired: restart }))
   }catch(err){
     if(err instanceof EnvSaveError){
       return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), err.message))
     }
     logger.error(helpers.getError(err))
-    return res.status(500).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), helpers.getError(err)))
+    return res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), helpers.getError(err)))
   }
 }
 

@@ -103,13 +103,16 @@ const update = async function (req, res) {
       return res.status(400).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.message));
     }
     // the chat assistant repository's chat-assistant.yaml, before : its changed fields written into it after
-    const before = await RepoObjects.snapshot('chat_assistant');
-    await ChatSettings.update(record);
-    await RepoObjects.appUpdated('chat_assistant', before);
+    // under its repository's write claim, taken first (RepoObjects.holding)
+    await RepoObjects.holding('chat_assistant', async () => {
+      const before = await RepoObjects.snapshot('chat_assistant');
+      await ChatSettings.update(record);
+      await RepoObjects.appUpdated('chat_assistant', before);
+    });
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.chatSettingsUpdated') }));
   } catch (err) {
     logger.error("Error updating chat settings: ", err);
-    res.status(500).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.toString()));
+    res.status(err instanceof Errors.ApiError ? err.status : 500).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.toString()));
   }
 };
 

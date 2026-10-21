@@ -24,6 +24,8 @@ export const state = {
   // git on the repositories, and the write claims : what the engine asked for, in order
   calls: [],
   pullFails: false,
+  // the repositories a pull or a push holds : how many more claims each refuses (Infinity : all)
+  busy: {},
   // the columns of a table as information_schema gives them, by table : { name, value, nullable }
   columns: {},
 };
@@ -41,6 +43,7 @@ export function reset(tables = {}) {
   state.calls.length = 0;
   state.pullFails = false;
   state.columns = {};
+  state.busy = {};
   fs.rmSync(ROOT, { recursive: true, force: true });
   fs.mkdirSync(ROOT, { recursive: true });
 }
@@ -209,6 +212,11 @@ export const repository = {
     fs.mkdirSync(path.join(ROOT, name), { recursive: true });
   },
   claimForWrite: async (name) => {
+    if (state.busy[name] > 0) {
+      state.busy[name]--;
+      state.calls.push(`busy:${name}`);
+      throw new Error(`Repository '${name}' is busy (a pull or sync is running), try again`);
+    }
     state.calls.push(`claim:${name}`);
     return "success";
   },

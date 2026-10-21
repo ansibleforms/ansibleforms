@@ -23,9 +23,12 @@ const create = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const id = await Label.create(req.body);
-    // the labels repository, when there is one : written to it as a new file (lib/repoObjects)
-    await RepoObjects.appCreated("labels", id);
+    const id = await RepoObjects.holding("labels", async () => {
+      const id = await Label.create(req.body);
+      // the labels repository, when there is one : written to it as a new file (lib/repoObjects)
+      await RepoObjects.appCreated("labels", id);
+      return id;
+    });
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Label" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -48,9 +51,11 @@ const update = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     const before = await Label.findById(req.params.id).catch(() => null);
-    await Label.update(req.body, req.params.id);
-    // one of the labels repository : its changed fields written to its file
-    if (before?.repository) await RepoObjects.appUpdated("labels", before, req.params.id);
+    await RepoObjects.holding([], async () => {
+      await Label.update(req.body, req.params.id);
+      // one of the labels repository : its changed fields written to its file
+      if (before?.repository) await RepoObjects.appUpdated("labels", before, req.params.id);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Label" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -60,9 +65,11 @@ const update = async (req, res) => {
 const deleteLabel = async (req, res) => {
   try {
     const before = await Label.findById(req.params.id).catch(() => null);
-    await Label.delete(req.params.id);
-    // one of the labels repository : its file goes too, for the repository's Push
-    if (before?.repository) await RepoObjects.appDeleted("labels", before);
+    await RepoObjects.holding([], async () => {
+      await Label.delete(req.params.id);
+      // one of the labels repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("labels", before);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Label" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);

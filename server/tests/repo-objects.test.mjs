@@ -10,7 +10,7 @@
 //                removes the file
 //   deactivation the objects unlinked, kept in the app, the files untouched
 //   the rules    one repository per type, the fixed order
-import { test, describe, beforeEach, vi } from "vitest";
+import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 
 process.env.DB_HOST ||= "127.0.0.1";
@@ -26,6 +26,7 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
+const Engine = await import("../src/lib/repoObjects/engine.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
 const types = await import("../src/lib/repoObjects/types.js");
 const credentials = await RepoObjects.descriptorOf("credentials");
@@ -316,6 +317,56 @@ describe("made the credentials repository, it takes the app's credentials", () =
 });
 
 // ─── app to git ────────────────────────────────────────────────────────────────
+describe("a save while the repository is busy", () => {
+  const { CLAIM_WAIT } = Engine;
+  const wait = { ...CLAIM_WAIT };
+  afterEach(() => Object.assign(CLAIM_WAIT, wait));
+
+  test("waits for the claim, taken before the save, then saves and writes the file under it", async () => {
+    Object.assign(CLAIM_WAIT, { totalMs: 2000, everyMs: 1 });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    fx.state.busy.creds = 2;
+    fx.state.calls.length = 0;
+    await RepoObjects.holding([], async () => {
+      fx.state.calls.push("save");
+      fx.rowNamed("credentials", "git").user = "alice";
+      CrudModel.flushAllLocal();
+      await RepoObjects.appUpdated("credentials", before, before.id);
+    }, before);
+    assert.deepEqual(fx.state.calls, ["busy:creds", "busy:creds", "claim:creds", "save", "release:creds"]);
+    assert.equal(fx.readObject("creds", "credentials", "git.yaml").user, "alice");
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).unchanged, 1, "the next pull keeps the edit");
+  });
+
+  test("still busy once the wait is over : refused with a conflict, nothing saved", async () => {
+    Object.assign(CLAIM_WAIT, { totalMs: 20, everyMs: 1 });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    fx.state.busy.creds = Infinity;
+    let saved = false;
+    await assert.rejects(
+      RepoObjects.holding([], async () => {
+        saved = true;
+      }, before),
+      (e) => e.name === "ConflictError" && /Repository 'creds' is busy .*nothing was saved/.test(e.message),
+    );
+    assert.equal(saved, false);
+  });
+
+  test("a file write outside a save, still busy : said to the caller, never a silent success", async () => {
+    Object.assign(CLAIM_WAIT, { totalMs: 20, everyMs: 1 });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    fx.state.busy.creds = Infinity;
+    await assert.rejects(RepoObjects.appUpdated("credentials", before, before.id), { name: "ConflictError" });
+  });
+});
+
 describe("an edit in the app goes to the file", () => {
   test("only the changed fields are written : the ${ENV} reference, the comments and the unknown order kept", async () => {
     fx.writeFile("creds", "credentials", "git.yaml", `# the bot's\nname: git\npassword: \${GIT_PW}\ncredential_type: git\nuser: bot\n`);

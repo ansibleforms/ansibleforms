@@ -91,9 +91,12 @@ const create = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const created = await Runner.create(req.body);
-    // the runners repository, when there is one : written to it as a new file (lib/repoObjects)
-    await RepoObjects.appCreated("runners", created);
+    const created = await RepoObjects.holding("runners", async () => {
+      const created = await Runner.create(req.body);
+      // the runners repository, when there is one : written to it as a new file (lib/repoObjects)
+      await RepoObjects.appCreated("runners", created);
+      return created;
+    });
     // { message, id }, as the other records answer a create
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "resources.runnerAdded"), id: created }));
   } catch (err) {
@@ -118,10 +121,13 @@ const update = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     const before = await Runner.findStoredById(req.params.id).catch(() => null);
-    const updated = await Runner.update(req.body, req.params.id);
-    if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
-    // one of the runners repository : its changed fields written to its file
-    if (before?.repository) await RepoObjects.appUpdated("runners", before, req.params.id);
+    const updated = await RepoObjects.holding([], async () => {
+      const updated = await Runner.update(req.body, req.params.id);
+      if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
+      // one of the runners repository : its changed fields written to its file
+      if (before?.repository) await RepoObjects.appUpdated("runners", before, req.params.id);
+      return updated;
+    }, before);
     // its RTE gets its settings now when this node holds its socket, else at the next renewal
     const saved = await Runner.findById(req.params.id).catch(() => null);
     if (saved) pushSettings(saved);
@@ -137,11 +143,14 @@ const deleteRunner = async (req, res) => {
     // its name first : an RTE's socket on this node is closed at once (another node's closes at
     // its next lease renewal, the runner gone)
     const before = await Runner.findStoredById(req.params.id);
-    const deleted = await Runner.delete(req.params.id);
-    if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
-    if (before?.name) dropSocket(before.name, "deleted under Connections > Runners");
-    // one of the runners repository : its file goes too, for the repository's Push
-    if (before?.repository) await RepoObjects.appDeleted("runners", before);
+    const deleted = await RepoObjects.holding([], async () => {
+      const deleted = await Runner.delete(req.params.id);
+      if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
+      if (before?.name) dropSocket(before.name, "deleted under Connections > Runners");
+      // one of the runners repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("runners", before);
+      return deleted;
+    }, before);
     return res.json(RestResult.single(deleted));
   } catch (err) {
     Errors.ReturnError(res, err);
