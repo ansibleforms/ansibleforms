@@ -161,6 +161,22 @@ describe("a type kept in one file : the chat assistant", () => {
     assert.equal(fx.readText("cfg", ".", "chat-assistant.yaml"), "model: from-git\n");
   });
 
+  test("its file a link that leads outside the repository : never read, never written through", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-"));
+    const target = path.join(outside, "server.yaml");
+    fs.writeFileSync(target, "model: read-from-the-server\n");
+    fx.cloneEmpty("cfg");
+    fs.symlinkSync(target, path.join(fx.ROOT, "cfg", "chat-assistant.yaml"));
+    const out = await RepoObjects.syncText(await desc("chat_assistant"), "cfg");
+    assert.match(out, /not synchronized/);
+    assert.equal(fx.state.tables.chat_settings[0].model ?? "", "");
+    // an edit in the app : the file outside left as it was
+    const before = { ...(await RepoObjects.snapshot("chat_assistant")) };
+    fx.state.tables.chat_settings[0].model = "gpt-6";
+    await RepoObjects.appUpdated("chat_assistant", before);
+    assert.equal(fs.readFileSync(target, "utf8"), "model: read-from-the-server\n");
+  });
+
   test("turned off : read once more, the app keeps its values, the file stays", async () => {
     writeRaw("cfg", "chat-assistant.yaml", "model: last\n");
     const report = await RepoObjects.deactivate(await desc("chat_assistant"), "cfg");
@@ -322,6 +338,17 @@ describe("the branding and its images", () => {
     assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /larger than 256 KB/);
     writeRaw("cfg", "branding.yaml", "logo: ../elsewhere.png\n");
     assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /not a file beside it/);
+  });
+
+  test("an image linked to a file outside the repository is never read", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-"));
+    fs.writeFileSync(path.join(outside, "secret.png"), PNG);
+    fx.cloneEmpty("cfg");
+    fs.symlinkSync(path.join(outside, "secret.png"), path.join(fx.ROOT, "cfg", "logo.png"));
+    writeRaw("cfg", "branding.yaml", "logo: logo.png\n");
+    const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    assert.match(summary.refused[0]?.reasons[0] || "", /not a file beside it/, JSON.stringify(summary));
+    assert.equal(fx.state.tables.settings[0].logo, null);
   });
 
   test("turned on : the app's branding written, its logo beside it as binary ; a new logo rewrites it", async () => {

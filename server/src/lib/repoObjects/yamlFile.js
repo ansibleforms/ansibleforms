@@ -330,7 +330,8 @@ export function filesIn(repoDir, folder, pattern = YAML_FILE) {
 }
 
 /**
- * The absolute path of an object's file, checked to be right in its folder of the repository.
+ * The absolute path of an object's file, checked to be right in its folder of the repository, and
+ * to stay in the repository once its links are followed (staysIn).
  *
  * Args:
  *   repoDir (string): the repository's working tree.
@@ -346,10 +347,46 @@ export function filesIn(repoDir, folder, pattern = YAML_FILE) {
  */
 export function fileIn(repoDir, folder, repoFile, pattern = YAML_FILE) {
   const abs = path.resolve(repoDir, String(repoFile || ""));
-  if (path.dirname(abs) !== path.join(repoDir, folder) || !pattern.test(abs)) {
+  if (path.dirname(abs) !== path.join(repoDir, folder) || !pattern.test(abs) || !staysIn(repoDir, abs)) {
     throw new Error(`'${repoFile}' is not a file of the ${folder} folder`);
   }
   return abs;
+}
+
+/**
+ * Whether a path stays in a folder once its links are followed : the path itself when it is there
+ * (a link that leads nowhere does not), else the nearest folder above it that is (the file will be
+ * made there). A link in a repository - its folder, or its file - that leads outside it is never
+ * read nor written through.
+ *
+ * Args:
+ *   root (string): the folder (a repository's working tree).
+ *   abs (string): the path, inside it as written.
+ *
+ * Returns:
+ *   boolean: true when it stays in it.
+ */
+export function staysIn(root, abs) {
+  try {
+    const base = fs.realpathSync(root);
+    let probe = abs;
+    for (;;) {
+      let there = true;
+      try {
+        fs.lstatSync(probe);
+      } catch {
+        there = false;
+      }
+      if (there) break;
+      const up = path.dirname(probe);
+      if (up === probe) return false;
+      probe = up;
+    }
+    const real = fs.realpathSync(probe);
+    return real === base || real.startsWith(base + path.sep);
+  } catch {
+    return false;
+  }
 }
 
 // ===========================================================================

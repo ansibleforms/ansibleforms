@@ -19,7 +19,7 @@ import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
-import { same, parseMapFile } from "./yamlFile.js";
+import { same, parseMapFile, staysIn } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
 // the environment settings among the appearance fields, by field : their variable, and how the app
@@ -52,12 +52,13 @@ const comparable = (v) => (Array.isArray(v) ? JSON.stringify(v) : typeof v === "
  *   Buffer: its bytes.
  *
  * Raises:
- *   Error: a path that leads outside the folder, or a file that cannot be read.
+ *   Error: a path that leads outside the folder (a link too), or a file that cannot be read.
  */
 function readImage(dir, name) {
   const base = path.resolve(dir || ".");
   const abs = path.resolve(base, String(name));
-  if (!abs.startsWith(base + path.sep)) throw new Error(`'${name}' is not a file beside it`);
+  // inside it once its links are followed too : a link in a repository never reads the server's files
+  if (!abs.startsWith(base + path.sep) || !staysIn(base, abs)) throw new Error(`'${name}' is not a file beside it`);
   try {
     return fs.readFileSync(abs);
   } catch (e) {

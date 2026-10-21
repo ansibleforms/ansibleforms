@@ -12,6 +12,9 @@
 //   the rules    one repository per type, the fixed order
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 process.env.DB_HOST ||= "127.0.0.1";
 process.env.DB_PORT ||= "3306";
@@ -180,6 +183,37 @@ describe("a file renamed in git", () => {
     const summary = await RepoObjects.syncRepository(credentials, "creds");
     assert.deepEqual(summary.refused, []);
     assert.equal(fx.rowNamed("credentials", "git").repo_file, "credentials/git-bot.yaml");
+  });
+});
+
+describe("a link in the repository that leads outside it", () => {
+  test("its folder a link : turning it on writes nothing outside, the credential stays in the app, a pull keeps it", async () => {
+    fx.state.tables.credentials.push({ id: 8, name: "smb", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.cloneEmpty("creds");
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-"));
+    fs.symlinkSync(outside, path.join(fx.ROOT, "creds", "credentials"));
+    const report = await RepoObjects.activate(credentials, "creds", { pull: false });
+    assert.deepEqual(fs.readdirSync(outside), []);
+    assert.deepEqual(report.written, []);
+    assert.match(report.kept[0].reason, /not written/);
+    assert.equal(fx.rowNamed("credentials", "smb").repository ?? null, null);
+    CrudModel.flushAllLocal();
+    await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(fx.rowNamed("credentials", "smb").password, "enc:pw");
+  });
+
+  test("a linked object's file replaced by a link : its edit never written through it", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-")), "x.yaml");
+    fs.writeFileSync(outside, "name: x\n");
+    fx.removeFile("creds", "credentials", "git.yaml");
+    fs.symlinkSync(outside, path.join(fx.ROOT, "creds", "credentials", "git.yaml"));
+    fx.rowNamed("credentials", "git").user = "alice";
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appUpdated("credentials", before, before.id), null);
+    assert.equal(fs.readFileSync(outside, "utf8"), "name: x\n");
   });
 });
 

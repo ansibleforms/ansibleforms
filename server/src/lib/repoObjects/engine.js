@@ -175,6 +175,22 @@ export function fileOf(desc, repository, repoFile) {
 }
 
 /**
+ * The list file of a type kept as a list in one file (repositories.yaml), at the repository's
+ * root : checked to stay in the repository once its links are followed.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *
+ * Returns:
+ *   string: its absolute path.
+ *
+ * Raises:
+ *   Error: a link that leads outside the repository.
+ */
+export const listFileOf = (desc, repository) => fileIn(Repo.folderOf(repository), ".", desc.listFile, /./);
+
+/**
  * Adds a new object's entry to its type's list file (the list mode : repositories.yaml).
  *
  * Args:
@@ -186,7 +202,7 @@ export function fileOf(desc, repository, repoFile) {
  *   string: the list file, relative to the repository (repositories.yaml).
  */
 export function writeListEntry(desc, repository, entry) {
-  const abs = path.join(Repo.folderOf(repository), desc.listFile);
+  const abs = listFileOf(desc, repository);
   const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
   fs.writeFileSync(abs, appendListEntries(text, desc.listKey, [entry], desc.keyOrder), "utf8");
   return desc.listFile;
@@ -206,9 +222,11 @@ export function writeListEntry(desc, repository, entry) {
  */
 export function writeNewFile(desc, repository, name, text) {
   const folder = path.join(Repo.folderOf(repository), desc.folder);
-  fs.mkdirSync(folder, { recursive: true });
   const file = fileNameFor(name, (f) => fs.existsSync(path.join(folder, f)), desc.noun);
-  fs.writeFileSync(path.join(folder, file), text, "utf8");
+  // its folder a link that leads outside the repository : refused before anything is made
+  const abs = fileOf(desc, repository, `${desc.folder}/${file}`);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(abs, text, "utf8");
   return `${desc.folder}/${file}`;
 }
 
@@ -346,7 +364,7 @@ async function readFiles(desc, name, ctx) {
  *     has no such file (the app keeps its objects).
  */
 function readListFile(desc, name) {
-  const abs = path.join(Repo.folderOf(name), desc.listFile);
+  const abs = listFileOf(desc, name);
   if (!fs.existsSync(abs)) return null;
   const { errors, items } = parseListFile(fs.readFileSync(abs, "utf8"), desc.listKey);
   if (errors.length) return [{ file: desc.listFile, errors, object: null, absent: false, whole: true }];
@@ -921,7 +939,7 @@ export async function activate(desc, name, { pull = true } = {}) {
       for (const c of list.filter((x) => x.reason)) report.kept.push(keptOf(desc, c));
       const written = list.filter((x) => !x.reason);
       if (!written.length) return;
-      const abs = path.join(Repo.folderOf(name), desc.listFile);
+      const abs = listFileOf(desc, name);
       const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
       fs.writeFileSync(abs, appendListEntries(text, desc.listKey, written.map((c) => c.object), desc.keyOrder), "utf8");
       for (const c of written) {
@@ -1131,7 +1149,7 @@ export async function appUpdated(desc, before, id) {
   // a type kept as a list in one file : its entry edited, field by field (added when it is gone)
   if (desc.listFile) {
     return withWriteClaim(before.repository, async () => {
-      const abs = path.join(Repo.folderOf(before.repository), desc.listFile);
+      const abs = listFileOf(desc, before.repository);
       const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
       const whole = (await desc.candidateOf({ ...row, repository: null })).object;
       const next = updateListEntry(text, desc.listKey, before.name, desc.entryEdits(row, before), desc.keyOrder, whole);
@@ -1167,7 +1185,7 @@ export async function appDeleted(desc, before) {
   return withWriteClaim(before.repository, async () => {
     // a type kept as a list in one file : its entry removed, the others kept
     if (desc.listFile) {
-      const abs = path.join(Repo.folderOf(before.repository), desc.listFile);
+      const abs = listFileOf(desc, before.repository);
       if (fs.existsSync(abs)) fs.writeFileSync(abs, removeListEntry(fs.readFileSync(abs, "utf8"), desc.listKey, before.name), "utf8");
       logger.info(`Removed ${desc.noun} '${before.name}' from ${before.repository}/${desc.listFile}`);
       return true;
@@ -1198,8 +1216,11 @@ export async function appDeleted(desc, before) {
  *
  * Returns:
  *   string: its absolute path.
+ *
+ * Raises:
+ *   Error: a link that leads outside the repository.
  */
-const singleFileOf = (desc, name) => path.join(Repo.folderOf(name), desc.file);
+const singleFileOf = (desc, name) => fileIn(Repo.folderOf(name), ".", desc.file, /./);
 
 /**
  * Writes a single-file type's YAML and the files beside it : a file whose content is the same is

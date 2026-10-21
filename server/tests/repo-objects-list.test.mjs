@@ -6,6 +6,7 @@
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import YAML from "yaml";
 
@@ -95,6 +96,16 @@ describe("a pull of repositories.yaml", () => {
     assert.equal(summary.updated, 1, JSON.stringify(summary));
     assert.equal(fx.rowNamed("repositories", "forms").use_for_forms, false);
     assert.equal(fx.rowNamed("repositories", "forms").description, "");
+  });
+
+  test("a repositories.yaml that is a link leading outside the repository is never read", async () => {
+    const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-")), "list.yaml");
+    fs.writeFileSync(outside, YAML.stringify({ repositories: [entry("planted")] }));
+    fs.mkdirSync(path.join(fx.ROOT, "hub"), { recursive: true });
+    fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
+    const out = await RepoObjects.syncText(await desc(), "hub");
+    assert.match(out, /not synchronized/);
+    assert.equal(fx.rowNamed("repositories", "planted"), undefined);
   });
 
   test("the holder is never its own file's : its entry not imported, said", async () => {
