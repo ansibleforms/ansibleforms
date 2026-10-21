@@ -201,9 +201,26 @@ const schedules = {
       extraData: extraDataOf(row.extra_vars || ""),
     }),
 
-  // linked to its file, on its rrule
-  linkCandidate: ({ row, rrule }, name, file) =>
-    mysql.do("UPDATE AnsibleForms.`schedule` SET rrule=?, cron=NULL, repository=?, repo_file=? WHERE id=?", [rrule, name, file, row.id]),
+  /**
+   * Links an app's schedule to the file just written for it, the row stored as a pull reads that
+   * file (its extra vars as YAML text, its rrule as written, no cron) : the next pull finds it
+   * unchanged.
+   *
+   * Args:
+   *   c (object): the candidate ({ row, rrule }).
+   *   name (string): the repository.
+   *   file (string): the file, relative to the repository.
+   *
+   * Returns:
+   *   Promise: the update.
+   */
+  linkCandidate: (c, name, file) => {
+    const v = valuesOf(parseScheduleFile(schedules.newFileText(c)).schedule);
+    return mysql.do(
+      "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, cron=NULL, repository=?, repo_file=? WHERE id=?",
+      [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],
+    );
+  },
 
   // the one-time jobs, which stay in the app
   reportExtra: async () => {
