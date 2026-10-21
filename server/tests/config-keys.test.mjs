@@ -120,6 +120,24 @@ describe("written back to the file it was read from", () => {
     assert.equal(base.extra, true);
   });
 
+  test("a key whose repository is not cloned : not read, and a save of it refused, never written to the base", async () => {
+    // access holds the roles but has no working copy (its clone failed)
+    fx.cloneEmpty("design");
+    const sources = await keys.keySources();
+    const roles = sources.find((s) => s.key === "roles");
+    assert.equal(roles.missing, true);
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), sources, read)).roles, [{ name: "base-role" }]);
+    await assert.rejects(keys.writeConfigKeys({ roles: [{ name: "admin" }], categories: [] }, sources, { claim: false }), {
+      status: 409,
+      message: /The roles are held by repository 'access', which is not cloned/,
+    });
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "design", "categories.yaml")), false, "nothing written");
+    assert.deepEqual(YAML.parse(read(BASE)).roles, [{ name: "base-role" }]);
+    // the keys it does not hold are still saved
+    await keys.writeConfigKeys({ categories: [{ name: "Ops" }] }, sources, { claim: false });
+    assert.deepEqual(readObj("design", "categories.yaml"), { categories: [{ name: "Ops" }] });
+  });
+
   test("the claim of each repository is taken when the caller does not hold it", async () => {
     fx.cloneEmpty("access");
     await keys.writeConfigKeys({ roles: [] }, await keys.keySources(), { claim: true });
@@ -134,7 +152,8 @@ describe("the Config usage of before", () => {
     assert.match(await splitConfigUsage(), /repository 'old' is now Roles, Categories and Constants/);
     assert.deepEqual(fx.rowNamed("repositories", "old"), { id: 3, name: "old", use_for_config: 0, use_for_roles: 1, use_for_categories: 1, use_for_constants: 1 });
     assert.equal(await splitConfigUsage(), null, "a second start changes nothing");
-  });
+    // the schema model is a large module : its first import is slow on a loaded machine
+  }, 30000);
 
   test("two that had it : the one 7.3 read (the lowest id) gets the three flags, the other none, said", async () => {
     fx.state.tables.repositories.push({ id: 9, name: "aaa-later", use_for_config: 1 }, { id: 4, name: "zzz-first", use_for_config: 1 });

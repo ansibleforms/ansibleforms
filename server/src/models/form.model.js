@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase } from "../lib/configKeys.js";
+import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable } from "../lib/configKeys.js";
 
 
 const ajv = new Ajv({allErrors: true, allowUnionTypes: true});
@@ -261,7 +261,7 @@ async function getSaveTargets() {
   if (configRepo) names.add(configRepo)
   // and the repositories that hold the roles, the categories or the constants (lib/configKeys.js)
   const sources = await keySources()
-  for (const source of sources) names.add(source.repository)
+  for (const source of sources) if (!source.missing) names.add(source.repository)
   const repoNames = [...names]
   return { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: sources }
 }
@@ -1749,6 +1749,8 @@ Form.save = async function(data){
   }
   assertUniqueFormNames(formsConfig.forms)
   const { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: keySourcesHeld } = await getSaveTargets()
+  // a key held by a repository that is not cloned : refused before anything is written
+  assertKeysWritable(formsConfig, keySourcesHeld)
   logger.info(`Saving forms to ${formsDirs.map(d => d.path).join(", ")}`)
   var groups={}  // key "<repository>\0<source>" -> { repository, source, forms:[] }
 

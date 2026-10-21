@@ -14,6 +14,7 @@ import fs from "fs";
 import path from "path";
 import YAML from "yaml";
 import logger from "./logger.js";
+import Errors from "./errors.js";
 import mysql from "../models/db.model.js";
 import Repo from "../models/repo.model.js";
 import { updateMapFile, newMapFile } from "./repoObjects/yamlFile.js";
@@ -35,11 +36,13 @@ export const LEGACY_FILE = "config.yaml";
 /**
  * Where each key held by a repository is : its repository, the file it is read from (its own, else
  * config.yaml), whether that file is config.yaml (deprecated), whether it exists yet (a repository
- * with neither file gets its own on the first write). A key no repository holds, or whose
- * repository is not cloned, is not listed : the base configuration gives it.
+ * with neither file gets its own on the first write). A key no repository holds is not listed : the
+ * base configuration gives it. A key whose repository is not cloned (a clone that failed, or is
+ * under way) is listed as missing : not read (the base configuration gives it meanwhile), and a
+ * save of it refused (assertKeysWritable), never written to the base in its place.
  *
  * Returns:
- *   Promise<object[]>: [{ key, flag, file, repository, path, deprecated, exists }].
+ *   Promise<object[]>: [{ key, flag, file, repository, path, deprecated, exists, missing }].
  */
 export async function keySources() {
   const rows = await mysql.do(`SELECT name, ${CONFIG_KEYS.map((k) => k.flag).join(", ")} FROM AnsibleForms.\`repositories\` ORDER BY name`);
@@ -48,7 +51,10 @@ export async function keySources() {
     const repo = (rows || []).find((r) => Number(r[k.flag]) && Repo.isValidName(r.name));
     if (!repo) continue;
     const dir = Repo.folderOf(repo.name);
-    if (!fs.existsSync(dir)) continue;
+    if (!fs.existsSync(dir)) {
+      out.push({ ...k, repository: repo.name, path: path.join(dir, k.file), deprecated: false, exists: false, missing: true });
+      continue;
+    }
     const own = path.join(dir, k.file);
     const legacy = path.join(dir, LEGACY_FILE);
     if (fs.existsSync(own)) out.push({ ...k, repository: repo.name, path: own, deprecated: false, exists: true });
@@ -140,6 +146,26 @@ export function composeConfig(baseText, sources, render) {
 // ===========================================================================
 
 /**
+ * Refuses a save of a key whose repository has the flag but no working copy (not cloned yet, or its
+ * clone failed) : written to the base configuration instead, the save would be lost without a word
+ * once the repository is cloned and its file read again.
+ *
+ * Args:
+ *   doc (object): the configuration saved (categories, roles, constants ...).
+ *   sources (object[]): the keys' sources (keySources).
+ *
+ * Raises:
+ *   Errors.ConflictError: a key the save gives is held by a repository that is not cloned, named.
+ */
+export function assertKeysWritable(doc, sources) {
+  const missing = (sources || []).filter((s) => s.missing && doc?.[s.key] !== undefined);
+  if (!missing.length) return;
+  throw new Errors.ConflictError(
+    missing.map((s) => `The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`).join("; "),
+  );
+}
+
+/**
  * Writes the keys a repository holds back to the file each was read from (config.yaml stays
  * config.yaml : only its key changes, the rest of the file kept) or to a new file of its own.
  *
@@ -152,8 +178,12 @@ export function composeConfig(baseText, sources, render) {
  * Returns:
  *   Promise<object>: { rest (the configuration without the keys written : the base's), repositories
  *     (the names written to) }.
+ *
+ * Raises:
+ *   Errors.ConflictError: a key of a repository that is not cloned (assertKeysWritable).
  */
 export async function writeConfigKeys(doc, sources, opts = {}) {
+  assertKeysWritable(doc, sources);
   const rest = { ...doc };
   const byRepo = new Map();
   for (const s of sources) {
