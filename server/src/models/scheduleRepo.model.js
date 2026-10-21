@@ -217,32 +217,39 @@ ScheduleRepo.update = async function (row, data) {
   delete edits.extra_vars;
   if (extraData === undefined) delete edits.extraData;
   if (data.launch_options !== undefined) edits.launchOptions = data.launch_options ?? "";
-  // the options no prompt gives : the row's, or the edit's when it gives them
-  const kept = { ...row, launch_options: edits.launchOptions ?? row.launch_options };
   await withWriteClaim(row.repository, async () => {
-    const abs = fileOf(schedules, row.repository, row.repo_file);
+    // the row read again under the claim : a pull that held it may have removed the schedule (its
+    // file gone from git) or moved it, and its file must not be written back for it
+    const fresh = (await mysql.do("SELECT * FROM AnsibleForms.`schedule` WHERE id = ?", [row.id]))?.[0];
+    if (!fresh) throw new Errors.NotFoundError(`The schedule '${row.name}' is gone: a pull removed it meanwhile.`);
+    if (fresh.repository !== row.repository || fresh.repo_file !== row.repo_file) {
+      throw new Errors.ConflictError(`The schedule '${row.name}' was changed by a pull meanwhile: reload it and save again.`);
+    }
+    // the options no prompt gives : the row's, or the edit's when it gives them
+    const kept = { ...fresh, launch_options: edits.launchOptions ?? fresh.launch_options };
+    const abs = fileOf(schedules, fresh.repository, fresh.repo_file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     let text;
     if (before === null) {
-      const current = { name: row.name, description: row.description || "", form: row.form, rrule: row.rrule, enabled: !!Number(row.enabled ?? 1), extraData: extraDataOf(row.extra_vars || ""), launchOptions: row.launch_options || "" };
+      const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, rrule: fresh.rrule, enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
       text = newScheduleFile({ ...current, ...edits });
     } else {
       try {
         text = updateScheduleFile(before, edits);
       } catch (e) {
-        throw new Errors.BadRequestError(`The file ${row.repository}/${row.repo_file} is not a valid schedule: ${e.message}`);
+        throw new Errors.BadRequestError(`The file ${fresh.repository}/${fresh.repo_file} is not a valid schedule: ${e.message}`);
       }
     }
     const parsed = parseScheduleFile(text);
     if (!parsed.schedule) {
-      throw new Errors.BadRequestError(`The file ${row.repository}/${row.repo_file} is not a valid schedule, fix it in git: ${parsed.errors.join("; ")}`);
+      throw new Errors.BadRequestError(`The file ${fresh.repository}/${fresh.repo_file} is not a valid schedule, fix it in git: ${parsed.errors.join("; ")}`);
     }
     if (text !== before) fs.writeFileSync(abs, text, "utf8");
     const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
         "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, row.id],
+        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, fresh.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same
@@ -251,7 +258,7 @@ ScheduleRepo.update = async function (row, data) {
       throw e;
     }
     CrudModel.changed(MODEL);
-    logger.info(`Saved schedule '${v.name}' into ${row.repository}/${row.repo_file}`);
+    logger.info(`Saved schedule '${v.name}' into ${fresh.repository}/${fresh.repo_file}`);
   });
 };
 

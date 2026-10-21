@@ -29,6 +29,7 @@ const db = {
       return rows.filter((r) => r.name.toLowerCase() === params[0] && (params[1] === null || r.id !== params[2]));
     }
     if (/^SELECT .* FROM AnsibleForms.`schedule`$/.test(sql)) return rows.map((r) => ({ ...r }));
+    if (/^SELECT \* FROM AnsibleForms.`schedule` WHERE id = \?$/.test(sql)) return rows.filter((r) => r.id === params[0]).map((r) => ({ ...r }));
     // the app's recurring schedules (activation)
     if (/WHERE repository IS NULL AND owner IS NULL AND COALESCE\(one_time_run,0\) = 0/.test(sql)) {
       return rows.filter((r) => !r.repository && !r.owner && !Number(r.one_time_run)).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ ...r }));
@@ -468,6 +469,22 @@ describe("an edit in the app goes to the file", () => {
     }
     assert.equal(readFile("ops", "a.yaml"), before);
     assert.deepEqual(claims.slice(-1), [["release", "ops"]]);
+  });
+
+  test("an edit read before a pull that removed its schedule does not bring it back", async () => {
+    writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
+    await ScheduleRepo.syncRepository("ops");
+    // the schedule as the edit read it ...
+    const stale = { ...rows[0] };
+    // ... then a pull, its file gone from git : the schedule goes
+    fs.rmSync(path.join(ROOT, "ops", "schedules", "a.yaml"));
+    await ScheduleRepo.syncRepository("ops");
+    assert.deepEqual(rows, []);
+    await assert.rejects(ScheduleRepo.update(stale, { description: "new" }), { name: "NotFoundError" });
+    // no file written back, the next pull makes nothing
+    assert.equal(fileExists("ops", "a.yaml"), false);
+    assert.equal((await ScheduleRepo.syncRepository("ops")).created, 0);
+    assert.deepEqual(rows, []);
   });
 
   test("a delete removes the file and the row", async () => {
