@@ -147,4 +147,19 @@ describe("a save that would define a form name twice", () => {
     assert.doesNotMatch(String(outcome?.message || ""), /unique|defined twice/i);
     assert.equal(YAML.parse(fs.readFileSync(path.join(ROOT, "forms-team", "forms", "deploy.yaml"), "utf8")).description, "team");
   });
+
+  test("a skipped copy in a file with other forms : kept in its place when that file is saved", async () => {
+    formsRepos = ["forms-team", "forms-ops"];
+    writeForm("forms-team", "deploy.yaml", [form("Deploy", "team"), form("Team Only", "team")]);
+    await save([
+      { ...form("Deploy", "ops"), source: "deploy.yaml", repository: "forms-ops" },
+      { ...form("Other", "ops"), source: "other.yaml", repository: "forms-ops" },
+      { ...form("Team Only", "team, edited"), source: "deploy.yaml", repository: "forms-team" },
+    ]);
+    const team = YAML.parse(fs.readFileSync(path.join(ROOT, "forms-team", "forms", "deploy.yaml"), "utf8"));
+    assert.deepEqual(team.map((f) => [f.name, f.description]), [["Deploy", "team"], ["Team Only", "team, edited"]]);
+    // the copy used is still forms-ops', the other still skipped and said
+    const { forms } = await Form.load(undefined, undefined, true);
+    assert.equal(forms.find((f) => f.name === "Deploy").description, "ops");
+  });
 });

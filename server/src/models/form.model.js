@@ -836,7 +836,7 @@ function collectForms(formsdirs, warn, error) {
           for (const ff of fileForms) ff.repository = formsdir.name
         }
         const place = formPlace(formsdir, item)
-        for (const form of fileForms) out.push({ form, repository: formsdir.name, dir: formsdir, place })
+        for (const form of fileForms) out.push({ form, repository: formsdir.name, dir: formsdir, place, file: item })
       }
       catch (e) {
         error(e.message);
@@ -909,6 +909,66 @@ Form.duplicateLines = async function(repository) {
     logger.debug(`Could not read the forms of repository '${repository}': ${e.message}`)
     return ""
   }
+}
+
+/**
+ * The copies of a form the loader skips, by their file : a name a folder read before already
+ * defines (duplicatesOf). The designer never sees them, so a save never sends them ; they are kept
+ * in their files when the file is written again (withSkippedCopies).
+ *
+ * Args:
+ *   formsDirs (object[]): the forms folders, in the order they are read (formsFolders).
+ *
+ * Returns:
+ *   Map<string, Set<string>>: by the file's absolute path, the names of the copies skipped in it.
+ */
+function skippedCopies(formsDirs) {
+  const entries = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+  const first = new Set()
+  const out = new Map()
+  for (const e of entries) {
+    const name = e.form?.name
+    if (!name) continue
+    if (!first.has(name)) {
+      first.add(name)
+      continue
+    }
+    const abs = path.resolve(e.dir.path, e.file)
+    if (!out.has(abs)) out.set(abs, new Set())
+    out.get(abs).add(name)
+  }
+  return out
+}
+
+/**
+ * The forms a save writes into a file, with the copies the loader skipped in it kept in their
+ * places : each skipped copy as the file has it, each other place taken by the next form saved,
+ * the forms saved left over after them.
+ *
+ * Args:
+ *   target (string): the file's absolute path.
+ *   forms (object[]): the forms the save writes into it.
+ *   skipped (Set<string>|undefined): the names of the copies skipped in it (skippedCopies).
+ *
+ * Returns:
+ *   object[]: the forms to write.
+ */
+function withSkippedCopies(target, forms, skipped) {
+  if (!skipped?.size || !fs.existsSync(target)) return forms
+  let stored
+  try {
+    const parsed = yaml.parse(fs.readFileSync(target, "utf8"))
+    stored = Array.isArray(parsed) ? parsed : [parsed]
+  } catch {
+    return forms
+  }
+  const out = []
+  let next = 0
+  for (const f of stored) {
+    if (f && skipped.has(f.name)) out.push(f)
+    else if (next < forms.length) out.push(forms[next++])
+  }
+  return [...out, ...forms.slice(next)]
 }
 
 /**
@@ -1809,6 +1869,9 @@ Form.save = async function(data){
     const savedFormNames = new Set(
       Object.values(groups).flatMap(g => (g.forms || []).map(f => f?.name)).filter(Boolean)
     )
+    // the copies the loader skipped (a form name another forms folder defines first) : never in
+    // the payload, so a file holding one with other forms would lose it when written again ; kept
+    const skipped = skippedCopies(formsDirs)
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)
@@ -1817,6 +1880,7 @@ Form.save = async function(data){
       // that was emptied before the replacements were written.
       for (const g of dirGroups) {
         const target = path.join(dirEntry.path, g.source)
+<<<<<<< HEAD
         const forms = g.forms
         // the forms of this file the designer never received (no name, failing validation)
         // are written back as they were, in their places : saving another form of the file
@@ -1842,6 +1906,9 @@ Form.save = async function(data){
           kept = formsToKeep(onDisk, savedNames)
           if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load, so the designer never had it`)
         }
+=======
+        const forms = withSkippedCopies(target, g.forms, skipped.get(path.resolve(target)))
+>>>>>>> 7ff9f20f (fix: a designer save keeps the skipped copy of a duplicate form in a file holding other forms)
         logger.debug(`saving ${forms.length==1 ? `single form '${forms[0].name}'` : `forms ${forms.map(x => x.name)}`} to '${target}'`)
         // ensure parent directory exists for nested paths
         fse.ensureDirSync(path.dirname(target));
