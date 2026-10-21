@@ -25,7 +25,7 @@ import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
 import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
-import { designsAllForms, designerConfig, designerSave } from '../../lib/designerForms.js';
+import { designsAllForms, designerConfig, designerSave, assertFilesShown } from '../../lib/designerForms.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -396,6 +396,8 @@ const save = async function(req,res){
       // without designAllForms : what the user sent laid over the forms they do not see, kept as
       // they are ; a hidden form's name, a changed read-only subform, a form without one of their
       // roles refused (lib/designerForms.js)
+      // and without designAllPlaybooks or designAllWorkflows : a form naming a playbook or a workflow
+      // hidden from the user refused, by the forms as they are before this save
       try {
         let sent = null
         try { sent = Form.parse(newConfig) || {} } catch { sent = null }
@@ -405,6 +407,7 @@ const save = async function(req,res){
           const stored = await Form.load(undefined,undefined,true)
           newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
         }
+        if(sent) await assertFilesShown(sent.forms, user)
       } catch (err) {
         if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         throw err

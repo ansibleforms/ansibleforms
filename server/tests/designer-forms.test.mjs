@@ -16,8 +16,16 @@ process.env.DB_PASSWORD ||= "test";
 
 // one forms repository, its working tree a folder of the test's own
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "af-designer-forms-"));
+// the runners as the database gives them back (a workflow node on an rte runner runs a playbook)
+let runners = [];
 vi.mock("../src/models/db.model.js", () => ({
-  default: { do: async (sql) => (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql) ? [{ name: "forms", status: "success", head: "abc" }] : []) },
+  default: {
+    do: async (sql) => {
+      if (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql)) return [{ name: "forms", status: "success", head: "abc" }];
+      if (/FROM AnsibleForms\.`runners`/.test(sql)) return runners;
+      return [];
+    },
+  },
 }));
 vi.mock("../src/models/repo.model.js", () => {
   const folderOf = (name) => path.join(ROOT, name);
@@ -54,6 +62,7 @@ const call = async (handler, req) => {
 };
 
 beforeEach(() => {
+  runners = [];
   for (const name of fs.readdirSync(ROOT)) fs.rmSync(path.join(ROOT, name), { recursive: true, force: true });
   const dir = path.join(ROOT, "forms", "forms");
   fs.mkdirSync(dir, { recursive: true });
@@ -286,5 +295,52 @@ describe("with designAllForms off : no other way to a hidden form", () => {
     assert.equal((await save(limited, naming)).body.details, "The form name 'Team rows' is already taken");
     const taking = [...(await mine()), { name: "Team rows", type: "subform", fields: [{ name: "t", type: "text" }], source: "deploy.yaml" }];
     assert.equal((await save(limited, taking)).code, 409);
+  });
+});
+
+describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidden file", () => {
+  const DIR = () => path.join(ROOT, "forms", "forms");
+  const BASE = { categories: [{ name: "Default", icon: "bars" }], roles: ROLES, constants: {} };
+  const user = { ...limited, options: { ...limited.options, designAllPlaybooks: false, designAllWorkflows: false } };
+  const write = (dir, file, text) => {
+    fs.mkdirSync(path.dirname(path.join(ROOT, dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, dir, file), text);
+  };
+  const flow = (name, nodes) => YAML.stringify({ workflow_job_templates: [{ name, related: { workflow_nodes: nodes.map((n, i) => ({ identifier: `n${i}`, ...n })) } }] });
+  const files = async (kind) => (await designerListing(kind, await ProjectFiles.list(kind), user)).files.map((f) => f.path).sort();
+
+  beforeEach(() => {
+    ansibleConfig.path = path.join(ROOT, "playbooks");
+    appConfig.workflowsPath = path.join(ROOT, "workflows");
+    for (const f of ["x.yaml", "team.yml", "team-node.yml", "rte-node.yml"]) write("playbooks", f, "- hosts: secret\n");
+  });
+
+  test("a form of the user's pointed at a hidden playbook : refused, the playbook still hidden", async () => {
+    fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify(form("Team play", ["team"], { playbook: "team.yml" })));
+    const forms = (await designerConfig(await load(), user)).forms.filter((f) => !f.readOnly).map((f) => (f.name === "Everyone" ? { ...f, playbook: "team.yml" } : f));
+    const res = await call(configController.save, { user: { user }, body: { forms: YAML.stringify({ ...BASE, forms }) }, ip: "::1" });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.details, "Form 'Everyone': the playbook it runs is not available to you");
+    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "read"), { status: 404 });
+  });
+
+  test("a second workflow of a hidden one's name shows neither it nor its playbooks", async () => {
+    fs.writeFileSync(path.join(DIR(), "flows.yaml"), YAML.stringify([{ name: "Team flow", type: "workflow", workflow: "Team flow", roles: ["team"], categories: [], fields: [] }]));
+    write("workflows", "team.yml", flow("Team flow", [{ unified_job_template: { type: "job_template", name: "team-node.yml" } }]));
+    write("workflows", "mine.yml", flow("Team flow", []));
+    // the second one is one the form's reference may mean as well : hidden too
+    assert.deepEqual(await files("workflows"), []);
+    assert.deepEqual(await files("playbooks"), ["rte-node.yml", "team.yml", "x.yaml"]);
+    await assert.rejects(assertFileShown("workflows", "team.yml", user, "read"), { status: 404 });
+  });
+
+  test("a node on an rte runner runs a playbook : hidden with its workflow ; on another runner, a template", async () => {
+    runners = [
+      { name: "edge", type: "rte" },
+      { name: "pipeline", type: "semaphore" },
+    ];
+    fs.writeFileSync(path.join(DIR(), "flows.yaml"), YAML.stringify([{ name: "Team flow", type: "workflow", workflow: "team.yml", roles: ["team"], categories: [], fields: [] }]));
+    write("workflows", "team.yml", flow("Team flow", [{ runner: "edge", unified_job_template: { type: "job_template", name: "rte-node.yml" } }, { runner: "pipeline", unified_job_template: { type: "job_template", name: "team-node.yml" } }]));
+    assert.deepEqual(await files("playbooks"), ["team-node.yml", "team.yml", "x.yaml"]);
   });
 });

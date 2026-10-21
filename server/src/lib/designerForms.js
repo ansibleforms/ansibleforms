@@ -26,9 +26,12 @@
 // the user sees in the designer uses (by the rule above : every form with designAllForms on), and
 // the ones no form uses yet, so a new file stays shown until a form claims it. A form uses a
 // playbook by its playbook (and playbookSubPath), its ansible steps' and the job template nodes of
-// the workflows it runs ; a workflow file by its workflow, and the nested workflows those run. A
+// the workflows it runs (on the app or an rte runner) ; a workflow file by its workflow, and the
+// nested workflows those run - every workflow a reference may mean, when it means several. A
 // hidden file is never listed nor read ; a save of it is refused as a name taken, its delete as a
-// file not found. Edit Playbooks and Edit Workflows still decide whether a shown one is changed.
+// file not found. A form saved naming one hidden from the user is refused, the visibility read from
+// the forms as they were before the save. Edit Playbooks and Edit Workflows still decide whether a
+// shown one is changed.
 //
 // The inventories, the vars files, the categories and the constants stay as they are for every
 // designer.
@@ -36,8 +39,10 @@ import path from "path";
 import _ from "lodash";
 import Form from "../models/form.model.js";
 import ProjectFiles from "../models/projectFiles.model.js";
-import { workflowFiles, findWorkflowIn } from "../models/workflowRun.js";
+import mysql from "../models/db.model.js";
+import { workflowFiles, workflowCandidates } from "../models/workflowRun.js";
 import Errors from "./errors.js";
+import logger from "./logger.js";
 
 // each kind of the designer's files limited by a role option, and that option
 export const FILE_OPTIONS = { playbooks: "designAllPlaybooks", workflows: "designAllWorkflows" };
@@ -260,11 +265,28 @@ export function designerSave(sent, stored, user, unloaded = []) {
 }
 
 /**
+ * The runners a workflow node runs a playbook on (type rte) : by name.
+ *
+ * Returns:
+ *   Promise<Set<string>|null>: their names ; null when they cannot be read (every runner node's
+ *     playbook then counted).
+ */
+async function rteRunners() {
+  try {
+    return new Set((await mysql.do("SELECT name, type FROM AnsibleForms.`runners`")).filter((r) => r?.type === "rte").map((r) => r.name));
+  } catch (e) {
+    logger.warning(`Could not read the runners for the designer's playbooks: ${e.message}`);
+    return null;
+  }
+}
+
+/**
  * The playbooks and the workflow files some forms use, by absolute path.
  *
  * Args:
  *   forms (object[]): the forms.
- *   ctx (object): { playbookRoot (the playbooks folder), workflows (workflowFiles) }.
+ *   ctx (object): { playbookRoot (the playbooks folder), workflows (workflowFiles), rteRunners
+ *     (rteRunners) }.
  *
  * Returns:
  *   object: { playbooks (Set), workflows (Set) }.
@@ -272,27 +294,27 @@ export function designerSave(sent, stored, user, unloaded = []) {
 function usedBy(forms, ctx) {
   const playbooks = new Set();
   const workflows = new Set();
+  const seen = new Set();
   // a playbook named literally (an expression resolves only at launch : nothing to compare)
   const addPlaybook = (playbook, subPath) => {
     if (typeof playbook !== "string" || !playbook.trim() || /\$\(|\{\{/.test(playbook)) return;
     playbooks.add(path.resolve(ctx.playbookRoot, String(subPath || ""), playbook.trim().replace(/^(\.\/|\/)+/, "")));
   };
-  // a workflow and the ones it nests : its file, and the playbooks of its job template nodes
+  // a node running a playbook : on the app, or on an rte runner (every runner when unknown)
+  const runsPlaybook = (node) => node.type === "job_template" && (!node.runner || !ctx.rteRunners || ctx.rteRunners.has(node.runner));
+  // a workflow and the ones it nests : its file, and the playbooks of its job template nodes ;
+  // every workflow the reference may mean (two of a name : the form cannot run either, and a
+  // second one never shows the first)
   const addWorkflow = (ref, depth) => {
     if (!ref || depth > MAX_NESTING) return;
-    let found;
-    try {
-      found = findWorkflowIn(ctx.workflows, ref);
-    } catch {
-      return; // none, or two : the form cannot run it either
-    }
-    const file = path.resolve(found.file);
-    const seen = workflows.has(file) && depth > 0;
-    workflows.add(file);
-    if (seen) return;
-    for (const node of found.workflow.nodes || []) {
-      if (node.type === "job_template" && !node.runner) addPlaybook(node.name);
-      else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
+    for (const found of workflowCandidates(ctx.workflows, ref)) {
+      workflows.add(path.resolve(found.file));
+      if (seen.has(found)) continue;
+      seen.add(found);
+      for (const node of found.workflow.nodes || []) {
+        if (runsPlaybook(node)) addPlaybook(node.name);
+        else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
+      }
     }
   };
   for (const f of forms || []) {
@@ -306,8 +328,32 @@ function usedBy(forms, ctx) {
 }
 
 /**
- * Which files of a kind a user sees in the designer : those a form they see uses, and those no
- * form uses.
+ * Which files of a kind a user sees in the designer, read from the forms as they are stored : those
+ * a form they see uses, and those no form uses (one that does not load counted too).
+ *
+ * Args:
+ *   kind (string): 'playbooks' or 'workflows' ; any other kind is shown whole.
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   Promise<object|null>: { shown ((absolute path) => whether it is shown), ctx (usedBy's) } ;
+ *     null when every one is.
+ */
+async function visibilityOf(kind, user) {
+  const option = FILE_OPTIONS[kind];
+  if (!option || designsAll(user, option)) return null;
+  const forms = (await Form.load(undefined, undefined, true))?.forms || [];
+  const unloaded = (await Form.unloaded()).map((u) => u.form);
+  const { visible } = designerScope(forms, user);
+  const roles = user?.roles || [];
+  const ctx = { playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root, workflows: await workflowFiles(), rteRunners: await rteRunners() };
+  const all = usedBy([...forms, ...unloaded], ctx)[kind];
+  const theirs = usedBy([...forms.filter((f) => visible.has(f.name)), ...unloaded.filter((f) => Form.checkFormRole(rolesOf(f), roles))], ctx)[kind];
+  return { shown: (abs) => !all.has(abs) || theirs.has(abs), ctx };
+}
+
+/**
+ * Which files of a kind a user sees in the designer (visibilityOf).
  *
  * Args:
  *   kind (string): 'playbooks' or 'workflows' ; any other kind is shown whole.
@@ -317,14 +363,30 @@ function usedBy(forms, ctx) {
  *   Promise<function|null>: (absolute path) => whether it is shown ; null when every one is.
  */
 export async function fileVisibility(kind, user) {
-  const option = FILE_OPTIONS[kind];
-  if (!option || designsAll(user, option)) return null;
-  const forms = (await Form.load(undefined, undefined, true))?.forms || [];
-  const { visible } = designerScope(forms, user);
-  const ctx = { playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root, workflows: await workflowFiles() };
-  const all = usedBy(forms, ctx)[kind];
-  const theirs = usedBy(forms.filter((f) => visible.has(f.name)), ctx)[kind];
-  return (abs) => !all.has(abs) || theirs.has(abs);
+  return (await visibilityOf(kind, user))?.shown ?? null;
+}
+
+/**
+ * Refuses a save of forms naming a playbook or a workflow hidden from the user, by the files as the
+ * forms stored before it show them : a form of theirs pointed at one would show it.
+ *
+ * Args:
+ *   forms (object[]): the forms the user sent.
+ *   user (object): the signed-in user.
+ *
+ * Raises:
+ *   Errors.ConflictError: a form naming a file hidden from them (which one not said).
+ */
+export async function assertFilesShown(forms, user) {
+  for (const kind of Object.keys(FILE_OPTIONS)) {
+    const visibility = await visibilityOf(kind, user);
+    if (!visibility) continue;
+    for (const f of forms || []) {
+      if ([...usedBy([f], visibility.ctx)[kind]].some((abs) => !visibility.shown(abs))) {
+        throw new Errors.ConflictError(`Form '${f?.name ?? ""}': the ${kind === "playbooks" ? "playbook" : "workflow"} it runs is not available to you`);
+      }
+    }
+  }
 }
 
 /**
@@ -377,6 +439,7 @@ export default {
   designerConfig,
   designerSave,
   fileVisibility,
+  assertFilesShown,
   designerListing,
   assertFileShown,
 };
