@@ -360,7 +360,8 @@ async function waitingOf(desc, object, cache = new Map()) {
  * the refusal said. A file renamed (its object's name given by a new file) moves its object to it.
  * A refused file - not valid, a name another object has - changes nothing : an object it made before stays as it was, a new one is
  * not made. A file that names an object not there yet waits, the same way. Where the file gives
- * no secret, the database's stays.
+ * no secret, the database's stays ; a field it no longer declares takes the value a new object gets
+ * (descriptor.store.removed).
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -493,13 +494,16 @@ export async function syncRepository(desc, name, opts = {}) {
     const before = f.adopt || row;
     if (before && (desc.secrets || []).some((s) => !given(f.raw?.[s]) && given(before[s]))) summary.secretsKept.push(f.object.name);
     try {
+      // a field the file no longer declares : out of the app too (the value a new object gets)
+      const removed = before && desc.store.removed ? await desc.store.removed(before, f.object) : {};
+      if (Object.keys(removed).length) f.object = { ...f.object, ...removed };
       if (f.adopt) {
         // git's version replaces the app's definition ; what runs it stays
         await desc.store.adopt(f.adopt, f.object, name, f.repoFile ?? f.file);
         summary.matched.push(f.object.name);
         logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' of the app now follows ${name}/${f.file}: git's version replaced it`);
       } else if (row) {
-        if (!desc.store.changed(row, f.object)) {
+        if (!Object.keys(removed).length && !desc.store.changed(row, f.object)) {
           summary.unchanged++;
           continue;
         }
@@ -1408,6 +1412,40 @@ export function linkStore(table, key = "id") {
     rename: async (from, to) => (await mysql.do(`UPDATE ${table} SET repository = ? WHERE repository = ?`, [to, from]))?.affectedRows || 0,
     countLinked: async (repository) => Number((await mysql.do(`SELECT COUNT(*) AS n FROM ${table} WHERE repository = ?`, [repository]))?.[0]?.n || 0),
   };
+}
+
+// the columns of each table, read once : what a row gets when a value is not given
+const columnsByTable = new Map();
+
+/**
+ * The columns of a table as a new row gets them when a value is not given : the default of each,
+ * and whether it may be empty (information_schema, read once per table).
+ *
+ * Args:
+ *   table (string): the table (AnsibleForms.`credentials`).
+ *
+ * Returns:
+ *   Promise<Map<string, object>>: { value (its default ; null : none), nullable } by column.
+ */
+export async function columnDefaults(table) {
+  const bare = String(table).replace(/`/g, "").split(".").pop();
+  if (!columnsByTable.has(bare)) {
+    const rows = await mysql.do(
+      "SELECT COLUMN_NAME AS name, COLUMN_DEFAULT AS value, IS_NULLABLE AS nullable FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'AnsibleForms' AND TABLE_NAME = ?",
+      [bare],
+    );
+    const columns = new Map();
+    for (const r of rows || []) {
+      // MariaDB quotes a text default ('outbound') and says NULL for none ; MySQL gives it as it is
+      let value = r.value === undefined || r.value === "NULL" ? null : r.value;
+      if (typeof value === "string" && /^'.*'$/s.test(value)) value = value.slice(1, -1).replace(/''/g, "'");
+      // an expression (current_timestamp(), now()) : no value a file could give
+      else if (typeof value === "string" && /^(current_timestamp|now|uuid)\b|\)$/i.test(value)) value = null;
+      columns.set(r.name, { value, nullable: String(r.nullable).toUpperCase() === "YES" });
+    }
+    columnsByTable.set(bare, columns);
+  }
+  return columnsByTable.get(bare);
 }
 
 /**

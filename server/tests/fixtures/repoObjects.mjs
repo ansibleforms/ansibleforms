@@ -24,6 +24,8 @@ export const state = {
   // git on the repositories, and the write claims : what the engine asked for, in order
   calls: [],
   pullFails: false,
+  // the columns of a table as information_schema gives them, by table : { name, value, nullable }
+  columns: {},
 };
 
 /**
@@ -38,6 +40,7 @@ export function reset(tables = {}) {
   state.nextId = 100;
   state.calls.length = 0;
   state.pullFails = false;
+  state.columns = {};
   fs.rmSync(ROOT, { recursive: true, force: true });
   fs.mkdirSync(ROOT, { recursive: true });
 }
@@ -67,6 +70,8 @@ export const db = {
     sql = sql.trim();
     const table = tableOf(sql, params);
     const rows = rowsOf(table);
+    // a table's columns and their defaults (lib/repoObjects/engine.js columnDefaults)
+    if (/FROM information_schema\.COLUMNS WHERE TABLE_SCHEMA = 'AnsibleForms' AND TABLE_NAME = \?/.test(sql)) return state.columns[params[0]] || [];
     // a repository's usage : the repositories used for it, and another one used for it
     let m = sql.match(/^SELECT name FROM AnsibleForms\.`repositories` WHERE (use_for_\w+)( AND name <> \?)?/);
     if (m) return rows.filter((r) => Number(r[m[1]]) && (!m[2] || r.name !== params[0])).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ name: r.name }));

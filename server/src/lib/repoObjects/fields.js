@@ -7,6 +7,7 @@
 //   toFile    an object of the app as its file gives it : the seed's fields that are set, its
 //             secrets left out
 //   editText  an app edit written into the file : only the fields it changed
+//   removedOf the fields a file no longer declares, given back the value a new object gets
 import { itemValidator } from "../seed-schema.js";
 import { parseMapFile, newMapFile, updateMapFile, same } from "./yamlFile.js";
 import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
@@ -24,12 +25,13 @@ import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
  *       ISO text, ...), the file's and the app's alike ; none : as it is.
  *
  * Returns:
- *   object: { keys, booleans, check, parse, toFile, newText, editText }.
+ *   object: { keys, booleans, strings, check, parse, toFile, newText, editText, editsOf, removedOf }.
  */
 export function fieldSet(spec) {
   const { secrets = [], skip = [], keepFalse = [], canonical = (o) => o } = spec;
   const { validate, keys, schema } = itemValidator(spec.section);
   const booleans = new Set(keys.filter((k) => schema.properties[k].type === "boolean"));
+  const strings = new Set(keys.filter((k) => schema.properties[k].type === "string"));
   // the fields a file holds, in the seed's order
   const fileKeys = keys.filter((k) => !skip.includes(k));
 
@@ -139,10 +141,37 @@ export function fieldSet(spec) {
     return edits;
   }
 
+  /**
+   * The fields a file no longer declares that the object still has : each given back the value a
+   * new object made from that file gets (fresh), so a key taken out of the file takes its value out
+   * of the app too - as the app writes a field emptied, or a yes or no back to its default, by
+   * leaving it out. The secrets never : a file without one keeps the database's.
+   *
+   * Args:
+   *   row (object): the object as the app has it.
+   *   obj (object): the object the file gives.
+   *   fresh (function): (key) => the value a new object gets for it ; undefined : none known, the
+   *     field left as it is.
+   *
+   * Returns:
+   *   object: { field: value } ; none when the file declares all the object has.
+   */
+  function removedOf(row, obj, fresh) {
+    const current = toFile(row).object;
+    const out = {};
+    for (const k of Object.keys(current)) {
+      if (obj[k] !== undefined) continue;
+      const value = fresh(k);
+      if (value === undefined || same(toFile({ [k]: value }).object[k], current[k])) continue;
+      out[k] = value;
+    }
+    return out;
+  }
+
   // a new file : the seed's fields in the seed's order
   const newText = (obj) => newMapFile(obj, fileKeys);
 
-  return { keys: fileKeys, booleans, check, parse, toFile, newText, editText, editsOf };
+  return { keys: fileKeys, booleans, strings, check, parse, toFile, newText, editText, editsOf, removedOf };
 }
 
 /**

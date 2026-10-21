@@ -6627,7 +6627,9 @@
       secrets come from the database.
 
       **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the files are read
-      in: a new file makes an object, a changed one changes it, a removed one removes it. A file the seed's schema
+      in: a new file makes an object, a changed one changes it, a removed one removes it. A key taken out of a file
+      is taken out of the app too: the field gets the value a new object made from that file gets (a secret
+      excepted, kept in the database). A file renamed keeps its object, which follows it. A file the seed's schema
       or the app's rules refuse (a credential type without its required fields, a runner of another type than its
       credential) is refused alone, said in the pull output. A runner whose credential does not exist yet **waits**,
       said in the pull output, and is read again when the credentials are next pulled. Removing a credential's file

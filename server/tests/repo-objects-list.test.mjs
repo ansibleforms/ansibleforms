@@ -86,6 +86,17 @@ describe("a pull of repositories.yaml", () => {
     assert.ok(fx.state.calls.includes("delete:ops"), "deleted as the app deletes one");
   });
 
+  test("a key taken out of an entry is taken out of the repository : a usage off, a description emptied", async () => {
+    writeList([entry("forms", { use_for_forms: true, description: "the forms" })]);
+    await RepoObjects.syncRepository(await desc(), "hub");
+    writeList([entry("forms")]);
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(await desc(), "hub");
+    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    assert.equal(fx.rowNamed("repositories", "forms").use_for_forms, false);
+    assert.equal(fx.rowNamed("repositories", "forms").description, "");
+  });
+
   test("the holder is never its own file's : its entry not imported, said", async () => {
     writeList([entry("hub", { branch: "other" }), entry("forms")]);
     const summary = await RepoObjects.syncRepository(await desc(), "hub");

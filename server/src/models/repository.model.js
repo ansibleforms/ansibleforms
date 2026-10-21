@@ -275,9 +275,15 @@ class Repository extends CrudModel {
     // schedule (Scheduled pull off) or its credential. Removed with the others, an empty
     // value left the old one in place, so a repository could never stop being pulled on
     // a schedule nor drop its credential.
-    const cleared = Repository.CLEARABLE.filter((key) => key in data && (data[key] === "" || data[key] === null));
+    // A repository's repositories.yaml (opts.fromRepo) clears whatever its entry no longer declares,
+    // each to the value it gives (a description emptied, a column back to null).
+    const cleared = Object.fromEntries(
+      Object.keys(data)
+        .filter((key) => (opts.fromRepo || Repository.CLEARABLE.includes(key)) && (data[key] === "" || data[key] === null))
+        .map((key) => [key, opts.fromRepo ? data[key] : null]),
+    );
     helpers.removeEmptyFields(data);
-    for (const key of cleared) data[key] = null;
+    Object.assign(data, cleared);
     // moved to another address without its password typed again (controllers/v2/repository
     // guardRepositoryCredential) : the stored password stays behind, written empty
     if (opts.dropPassword) data.password = "";

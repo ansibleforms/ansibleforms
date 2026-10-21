@@ -83,6 +83,21 @@ describe("a pull reads the credentials folder", () => {
     assert.equal(row.description, "${GIT_PW}");
   });
 
+  test("a key taken out of the file is taken out of the app : the value a new credential gets", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git", { description: "the bot", url: "https://git" }));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(summary.updated, 1);
+    const row = fx.rowNamed("credentials", "git");
+    assert.equal(row.description, "");
+    assert.equal(row.url ?? null, null);
+    assert.equal(row.password, "enc:s3cret", "a secret the file still gives is kept");
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).unchanged, 1, "then unchanged");
+  });
+
   test("a file the seed's schema refuses, or the app's type rules, is refused alone", async () => {
     fx.writeFile("creds", "credentials", "typo.yaml", { name: "typo", pasword: "x" });
     fx.writeFile("creds", "credentials", "smtp.yaml", { name: "smtp", credential_type: "smtp" });
@@ -113,6 +128,24 @@ describe("a pull reads the credentials folder", () => {
     assert.equal(fx.rowNamed("credentials", "a"), undefined);
     assert.equal(fx.rowNamed("credentials", "b").repository, "creds");
     assert.match(summary.refused[0].reasons[0], /its file is gone, but runner 'rte1' still uses 'b'/);
+  });
+});
+
+describe("the value a new row gets, as information_schema says it", () => {
+  test("a text unquoted, none, an expression as none, whether it may be empty", async () => {
+    fx.state.columns.defaults_probe = [
+      { name: "mode", value: "'outbound'", nullable: "NO" },
+      { name: "note", value: "NULL", nullable: "YES" },
+      { name: "since", value: "current_timestamp()", nullable: "NO" },
+      { name: "enabled", value: "1", nullable: "NO" },
+    ];
+    const columns = await Engine.columnDefaults("AnsibleForms.`defaults_probe`");
+    assert.deepEqual(Object.fromEntries(columns), {
+      mode: { value: "outbound", nullable: false },
+      note: { value: null, nullable: true },
+      since: { value: null, nullable: false },
+      enabled: { value: "1", nullable: false },
+    });
   });
 });
 

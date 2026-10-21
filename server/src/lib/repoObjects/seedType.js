@@ -12,7 +12,7 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import { differs } from "../seedCompare.js";
 import { fieldSet } from "./fields.js";
-import { linkStore, classifyRow } from "./engine.js";
+import { linkStore, classifyRow, columnDefaults } from "./engine.js";
 import { typeOf } from "./types.js";
 
 /**
@@ -138,6 +138,20 @@ export function seedType(spec) {
         return classifyRow(row, name, code ? `an object of this app (${KEPT_REASONS[code] || code})` : null);
       },
       changed: (row, obj) => differs(omit(obj, spec.notCompared), canonical({ ...row })),
+      // the fields its file no longer declares : the value a new object made from the file gets -
+      // the type's default, else its column's, else a yes or no off (on for one written when off),
+      // else empty where the column allows it
+      removed: async (row, obj) => {
+        const columns = await columnDefaults(table);
+        return fields.removedOf({ ...row }, obj, (k) => {
+          if (defaults[k] !== undefined) return defaults[k];
+          const column = columns.get(k);
+          if (column?.value !== null && column?.value !== undefined) return column.value;
+          if (fields.booleans.has(k)) return (spec.keepFalse || []).includes(k);
+          if (!column || column.nullable) return null;
+          return fields.strings.has(k) ? "" : undefined;
+        });
+      },
       insert: async (obj, name, file) => {
         const id = await Model.create({ ...defaults, ...obj }, FROM_REPO);
         if (name) await links.link(id, name, file);

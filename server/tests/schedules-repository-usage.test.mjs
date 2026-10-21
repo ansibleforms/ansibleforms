@@ -129,6 +129,15 @@ describe("turning it on and off", () => {
     assert.equal(report.schedules.deactivated.unlinked, 2);
   });
 
+  test("a repositories.yaml entry emptying a field clears it ; an empty field sent by the app is left out", async () => {
+    repos[1].description = "the forms";
+    await Repository.update({ description: "" }, "forms", { fromRepo: true });
+    assert.equal(repos[1].description, "");
+    repos[1].description = "the forms";
+    await Repository.update({ description: "" }, "forms", {});
+    assert.equal(repos[1].description, "the forms");
+  });
+
   test("unchanged : nothing happens to the schedules", async () => {
     await Repository.update({ description: "x", use_for_schedules: 1 }, "ops", {});
     assert.deepEqual(calls, []);
