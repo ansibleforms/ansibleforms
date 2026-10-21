@@ -8,7 +8,7 @@
 // the files and writes the database.
 import YAML from "yaml";
 import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
-import { setKey as setMapKey, same, fileNameFor as objectFileName, YAML_FILE } from "./repoObjects/yamlFile.js";
+import { setKey as setMapKey, same, fileNameFor as objectFileName, YAML_FILE, editedText } from "./repoObjects/yamlFile.js";
 
 // ===========================================================================
 // CONSTANTS
@@ -401,7 +401,7 @@ export function updateScheduleFile(text, edits) {
     const nujt = natural.get("unified_job_template", true);
     if (edits.form !== undefined && YAML.isMap(nujt) && nujt.get("name") !== edits.form) setKey(doc, nujt, "name", edits.form);
   }
-  return doc.toString({ lineWidth: 0 });
+  return editedText(doc, text);
 }
 
 /**

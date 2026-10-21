@@ -71,6 +71,105 @@ export function setKey(doc, map, key, value, keyOrder = []) {
 }
 
 /**
+ * A line as two are compared to tell an untouched line : its trailing spaces left out, and the
+ * spaces before an inline comment as one (the YAML writer re-spaces them).
+ *
+ * Args:
+ *   line (string): the line.
+ *
+ * Returns:
+ *   string: the line compared.
+ */
+const comparedLine = (line) => line.replace(/\s+$/, "").replace(/(\S)[ \t]+#/g, "$1 #");
+
+/**
+ * A changed line given the spacing of its inline comment as the line it replaces had it : the
+ * same comment after the new value, as far from it as before.
+ *
+ * Args:
+ *   line (string): the line as written now.
+ *   old (string): the line it replaces.
+ *
+ * Returns:
+ *   string: the line, its comment spaced as before (as it is when the comment is not the same).
+ */
+function withCommentSpacing(line, old) {
+  for (let i = old.indexOf("#"); i > 0; i = old.indexOf("#", i + 1)) {
+    if (!/[ \t]/.test(old[i - 1])) continue;
+    const comment = old.slice(i).replace(/\s+$/, "");
+    const at = line.length - comment.length;
+    if (!line.endsWith(comment) || at < 1 || !/[ \t]/.test(line[at - 1])) continue;
+    const gap = old.slice(0, i).match(/[ \t]+$/)[0];
+    return line.slice(0, at).replace(/[ \t]+$/, "") + gap + comment;
+  }
+  return line;
+}
+
+/**
+ * The text the YAML writer gives a file, with every line it did not change as the file had it,
+ * byte for byte (the writer re-spaces inline comments and drops trailing spaces on every line),
+ * and a changed line keeping the spacing of its comment. The lines are matched as a diff matches
+ * them (the longest common sequence of lines compared by comparedLine) ; a run of changed lines
+ * replacing as many lines takes their comments' spacing, line by line.
+ *
+ * Args:
+ *   original (string): the file's text before the edit.
+ *   rendered (string): the text the writer gives it after the edit.
+ *
+ * Returns:
+ *   string: the text to write.
+ */
+export function keepUntouchedLines(original, rendered) {
+  const a = String(original ?? "").split("\n");
+  const b = String(rendered ?? "").split("\n");
+  const ka = a.map(comparedLine);
+  const kb = b.map(comparedLine);
+  // the longest common sequence, by its lengths from the ends
+  const n = a.length;
+  const m = b.length;
+  const len = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) len[i][j] = ka[i] === kb[j] ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
+  }
+  const out = [];
+  let i = 0;
+  let j = 0;
+  // the lines replaced and their replacements, since the last line kept
+  let gone = [];
+  let added = [];
+  const flush = () => {
+    added.forEach((line, k) => out.push(added.length === gone.length ? withCommentSpacing(line, gone[k]) : line));
+    gone = [];
+    added = [];
+  };
+  while (i < n || j < m) {
+    if (i < n && j < m && ka[i] === kb[j]) {
+      flush();
+      out.push(a[i++]);
+      j++;
+    } else if (j < m && (i >= n || len[i][j + 1] >= len[i + 1][j])) added.push(b[j++]);
+    else gone.push(a[i++]);
+  }
+  flush();
+  return out.join("\n");
+}
+
+/**
+ * A document edited in place, as its file's new text : the writer's text, every line the edit
+ * did not change kept as the file had it (keepUntouchedLines).
+ *
+ * Args:
+ *   doc (YAML.Document): the document, edited.
+ *   original (string): the file's text before the edit.
+ *
+ * Returns:
+ *   string: the text to write.
+ */
+export function editedText(doc, original) {
+  return keepUntouchedLines(original, doc.toString({ lineWidth: 0 }));
+}
+
+/**
  * Whether two plain values are the same (a changed field only is written, so a file the app
  * saves with nothing changed stays byte for byte).
  *
@@ -110,7 +209,7 @@ export function updateMapFile(text, edits, keyOrder = []) {
     if (value === undefined) map.delete(key);
     else setKey(doc, map, key, value, keyOrder);
   }
-  return doc.toString({ lineWidth: 0 });
+  return editedText(doc, text);
 }
 
 /**
@@ -317,13 +416,13 @@ export function updateListEntry(text, key, name, edits, keyOrder = [], whole = n
   const entry = entryOf(seq, name);
   if (!entry) {
     if (whole) seq.items.push(doc.createNode(sortedByOrder(whole, keyOrder)));
-    return doc.toString({ lineWidth: 0 });
+    return editedText(doc, text);
   }
   for (const [k, value] of Object.entries(edits)) {
     if (value === undefined) entry.delete(k);
     else setKey(doc, entry, k, value, keyOrder);
   }
-  return doc.toString({ lineWidth: 0 });
+  return editedText(doc, text);
 }
 
 /**
@@ -343,7 +442,7 @@ export function appendListEntries(text, key, entries, keyOrder = []) {
   for (const entry of entries) {
     if (!entryOf(seq, entry.name)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
   }
-  return doc.toString({ lineWidth: 0 });
+  return editedText(doc, text);
 }
 
 /**
@@ -362,7 +461,7 @@ export function removeListEntry(text, key, name) {
   const entry = entryOf(seq, name);
   if (!entry) return text;
   seq.items.splice(seq.items.indexOf(entry), 1);
-  return doc.toString({ lineWidth: 0 });
+  return editedText(doc, text);
 }
 
 /**
