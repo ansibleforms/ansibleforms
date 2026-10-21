@@ -1366,6 +1366,7 @@ export default {
       usageOnKept: 'Questi restano in questa app: {names}.',
       usageOnWithoutSecret:
         'Scritti senza i loro segreti, che restano nel database (git non contiene mai un segreto in chiaro): {names}.',
+      usageOnAppOnly: "Tenute solo nell'app, nessun campo del file della pianificazione le riporta: {names}.",
       usageOnSkipped: 'Già terminati in git, non importati: {count}.',
       formDuplicate:
         "Il modulo '{name}' è definito due volte: viene usato {used}, {skipped} viene ignorato (i nomi dei moduli devono essere unici tra i repository dei moduli)",

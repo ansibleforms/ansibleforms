@@ -6518,8 +6518,10 @@
       new file (`schedules/<name>.yaml`, a number added when the name is taken), waiting for the repository's Push:
       its cron becomes the rrule that fires at the same moments, in the scheduler's time zone (`LOG_TZ`). A cron that
       restricts both the day of the month and the day of the week (a cron fires on either, a rrule only on both), or
-      that uses `L`, `W`, `#` or `?`, stays an app schedule, as do the one-time "Run later" jobs. The result is shown
-      and logged.
+      that uses `L`, `W`, `#` or `?`, stays an app schedule, as do the one-time "Run later" jobs. Its launch
+      options are written as the prompts a pull reads them from (`__limit__` as `limit`, `__check__` as
+      `job_type: check`, its credentials by name ...); an option no prompt gives (a credential mapped under
+      another name) is kept in the app only, and the question says so. The result is shown and logged.
 
       **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
       the worker, its files are read into Jobs > Scheduled: a new

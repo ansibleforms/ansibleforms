@@ -1369,6 +1369,7 @@ export default {
       usageOnKept: 'Aquests es queden en aquesta aplicació: {names}.',
       usageOnWithoutSecret:
         'Escrits sense els seus secrets, que es queden a la base de dades (git mai no guarda un secret en clar): {names}.',
+      usageOnAppOnly: "Es queden només a l'aplicació, cap camp del fitxer de la planificació no els dona: {names}.",
       usageOnSkipped: 'Ja acabats a git, no importats: {count}.',
       formDuplicate:
         "El formulari '{name}' està definit dues vegades: s'utilitza {used} i s'omet {skipped} (els noms de formulari han de ser únics entre els repositoris de formularis)",

@@ -1362,6 +1362,7 @@ export default {
       usageOnKept: 'Te zostają w tej aplikacji: {names}.',
       usageOnWithoutSecret:
         'Zapisane bez sekretów, które zostają w bazie danych (git nigdy nie przechowuje sekretu jawnym tekstem): {names}.',
+      usageOnAppOnly: 'Zachowane tylko w aplikacji, żadne pole pliku harmonogramu ich nie zawiera: {names}.',
       usageOnSkipped: 'Już zakończone w git, niezaimportowane: {count}.',
       formDuplicate:
         "Formularz '{name}' jest zdefiniowany dwukrotnie: używany jest {used}, pominięty {skipped} (nazwy formularzy muszą być unikalne we wszystkich repozytoriach formularzy)",

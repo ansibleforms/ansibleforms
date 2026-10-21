@@ -1354,6 +1354,7 @@ export default {
       usageOnKept: 'These stay in this app: {names}.',
       usageOnWithoutSecret:
         'Written without their secrets, which stay in the database (git never holds a plain secret): {names}.',
+      usageOnAppOnly: 'Kept in the app only, no field of the schedule file gives them: {names}.',
       usageOnSkipped: 'Already ended in git, not imported: {count}.',
       formDuplicate:
         "Form '{name}' is defined twice: {used} is used, {skipped} is skipped (form names must be unique across forms repositories)",

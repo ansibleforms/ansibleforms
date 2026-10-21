@@ -1370,6 +1370,7 @@ export default {
       usageOnKept: 'Estos se quedan en esta aplicación: {names}.',
       usageOnWithoutSecret:
         'Escritos sin sus secretos, que se quedan en la base de datos (git nunca guarda un secreto en claro): {names}.',
+      usageOnAppOnly: 'Se quedan solo en la aplicación, ningún campo del archivo de la programación los da: {names}.',
       usageOnSkipped: 'Ya terminados en git, no importados: {count}.',
       formDuplicate:
         "El formulario '{name}' está definido dos veces: se usa {used} y se omite {skipped} (los nombres de formulario deben ser únicos entre los repositorios de formularios)",

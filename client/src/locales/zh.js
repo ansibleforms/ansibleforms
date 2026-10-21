@@ -1330,6 +1330,7 @@ export default {
       usageOnClashes: 'git 和本应用中同名,git 中的版本替换应用中的:{names}。',
       usageOnKept: '以下保留在本应用中：{names}。',
       usageOnWithoutSecret: '写入时不含其密钥，密钥保留在数据库中（git 中从不保存明文密钥）：{names}。',
+      usageOnAppOnly: '仅保留在应用中，计划文件中没有对应的字段：{names}。',
       usageOnSkipped: '在 git 中已结束，未导入：{count}。',
       formDuplicate: "表单 '{name}' 被定义了两次：使用 {used}，跳过 {skipped}（表单名称在所有表单仓库中必须唯一）",
       configDeprecated: '{key} 从 config.yaml 读取：已弃用，请移至 {file}（8.0.0 起不再读取 config.yaml）',

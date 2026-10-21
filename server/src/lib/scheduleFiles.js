@@ -29,6 +29,7 @@ export const KEY_ORDER = [
   "description",
   "extra_data",
   "inventory",
+  "credentials",
   "scm_branch",
   "job_type",
   "job_tags",
@@ -37,6 +38,7 @@ export const KEY_ORDER = [
   "diff_mode",
   "verbosity",
   "execution_environment",
+  "instance_groups",
   "forks",
   "job_slice_count",
   "timeout",
@@ -51,21 +53,6 @@ export const KEY_ORDER = [
 // { controller_schedules: [...] }
 export const WRAPPER_KEYS = ["schedules", "controller_schedules"];
 
-// the prompts AnsibleForms has an equivalent for : the reserved extra vars a form's job reads
-// (job.model.js pushForminfoToExtravars, the runners)
-export const MAPPED_KEYS = [
-  "inventory",
-  "credentials",
-  "limit",
-  "job_tags",
-  "skip_tags",
-  "verbosity",
-  "diff_mode",
-  "job_type",
-  "scm_branch",
-  "execution_environment",
-  "instance_groups",
-];
 
 // the prompts AnsibleForms has none for : checked, kept in the file, not used
 export const UNMAPPED_KEYS = ["forks", "timeout", "job_slice_count", "labels"];
@@ -157,6 +144,124 @@ function namesOf(value, key) {
   return value.map(nameOf).filter((n) => n.trim());
 }
 
+// ===========================================================================
+// THE PROMPTS : BOTH WAYS
+// ===========================================================================
+
+/**
+ * The prompts of a schedule file and the reserved extra vars (launch options) AnsibleForms' job
+ * reads them as, one row each, both ways : read turns a file's value into the option (or says why
+ * it is refused), write turns an option back into the file's value - undefined when the option
+ * has a shape the field cannot give (a credential map whose keys are not the credentials' names),
+ * which then stays in the app only. A pull reads with it (launchOptionsOf), the app writes with it
+ * (promptsOf), so the two are each other's reverse.
+ *
+ *   field    the file's key
+ *   option   the launch option
+ *   read     (value, obj) => { value } | { error }
+ *   write    (option value) => the file's value, or undefined
+ */
+const asText = (field) => (v) => (typeof v === "object" ? { error: `${field} must be text` } : { value: String(v) });
+const textOption = (v) => (typeof v === "string" || typeof v === "number" ? String(v) : undefined);
+const nameOption = (v) => (typeof v === "string" && v.trim() ? v : undefined);
+export const PROMPTS = [
+  { field: "limit", option: "__limit__", read: asText("limit"), write: textOption },
+  { field: "job_tags", option: "__tags__", read: asText("job_tags"), write: textOption },
+  { field: "skip_tags", option: "__skipTags__", read: asText("skip_tags"), write: textOption },
+  { field: "scm_branch", option: "__scmBranch__", read: asText("scm_branch"), write: textOption },
+  {
+    field: "verbosity",
+    option: "__verbosity__",
+    read: (v) => (VERBOSITY.includes(Number(v)) && String(v).trim() !== "" ? { value: Number(v) } : { error: `verbosity must be one of ${VERBOSITY.join(", ")}` }),
+    write: (v) => (VERBOSITY.includes(Number(v)) ? Number(v) : undefined),
+  },
+  {
+    field: "diff_mode",
+    option: "__diff__",
+    read: (v) => (boolOf(v) === undefined ? { error: "diff_mode must be true or false" } : { value: boolOf(v) }),
+    write: (v) => boolOf(v),
+  },
+  {
+    field: "job_type",
+    option: "__check__",
+    read: (v) => (JOB_TYPES.includes(v) ? { value: v === "check" } : { error: `job_type must be one of ${JOB_TYPES.join(", ")}` }),
+    write: (v) => (boolOf(v) === undefined ? undefined : boolOf(v) ? "check" : "run"),
+  },
+  // the objects it names : by name, or by natural key
+  { field: "inventory", option: "__inventory__", read: (v) => (nameOf(v).trim() ? { value: nameOf(v) } : {}), write: nameOption },
+  { field: "execution_environment", option: "__executionEnvironment__", read: (v) => (nameOf(v).trim() ? { value: nameOf(v) } : {}), write: nameOption },
+  {
+    field: "instance_groups",
+    option: "__instanceGroups__",
+    read: (v) => listRead(v, "instance_groups", (names) => names),
+    write: (v) => (Array.isArray(v) && v.length && v.every((n) => typeof n === "string" && n.trim()) ? [...v] : undefined),
+  },
+  {
+    // each credential under its own name : written by name, as the file names them
+    field: "credentials",
+    option: "__credentials__",
+    read: (v) => listRead(v, "credentials", (names) => Object.fromEntries(names.map((n) => [n, n]))),
+    write: (v) => {
+      const entries = v && typeof v === "object" && !Array.isArray(v) ? Object.entries(v) : [];
+      return entries.length && entries.every(([k, n]) => typeof n === "string" && n.trim() && k === n) ? entries.map(([, n]) => n) : undefined;
+    },
+  },
+];
+
+// the prompts AnsibleForms has an equivalent for : the reserved extra vars a form's job reads
+// (job.model.js pushForminfoToExtravars, the runners)
+export const MAPPED_KEYS = PROMPTS.map((p) => p.field);
+
+/**
+ * A list prompt read : its names, none when it is empty.
+ *
+ * Args:
+ *   value (any): the list.
+ *   key (string): its key, for the error.
+ *   to (function): (names) => the option.
+ *
+ * Returns:
+ *   object: { value } | { error } | {} (no names).
+ */
+function listRead(value, key, to) {
+  try {
+    const names = namesOf(value, key);
+    return names.length ? { value: to(names) } : {};
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+/**
+ * Launch options as a schedule file gives them (the reverse of launchOptionsOf) : the prompts
+ * they are written as, and the options no prompt can give, kept in the app only.
+ *
+ * Args:
+ *   options (object|string): the launch options (the schedule table's JSON, or an object).
+ *
+ * Returns:
+ *   object: { fields ({ prompt: value }), kept ({ option: value } : none of the prompts gives it) }.
+ */
+export function promptsOf(options) {
+  let opts = options;
+  if (typeof opts === "string") {
+    try {
+      opts = opts.trim() ? JSON.parse(opts) : {};
+    } catch {
+      opts = {};
+    }
+  }
+  const fields = {};
+  const kept = {};
+  for (const [option, value] of Object.entries(opts && typeof opts === "object" ? opts : {})) {
+    const prompt = PROMPTS.find((p) => p.option === option);
+    const written = prompt ? prompt.write(value) : undefined;
+    if (written === undefined) kept[option] = value;
+    else fields[prompt.field] = written;
+  }
+  return { fields, kept };
+}
+
 /**
  * The prompts of a schedule as the extra vars AnsibleForms' job reads them : limit as
  * __limit__, job_tags as __tags__, skip_tags as __skipTags__, verbosity as __verbosity__,
@@ -178,55 +283,13 @@ export function launchOptionsOf(obj) {
   const errors = [];
   const ignored = [];
   const given = (key) => obj[key] !== undefined && obj[key] !== null && obj[key] !== "";
-  const text = (key, to) => {
-    if (!given(key)) return;
-    if (typeof obj[key] === "object") errors.push(`${key} must be text`);
-    else options[to] = String(obj[key]);
-  };
-  // text prompts
-  text("limit", "__limit__");
-  text("job_tags", "__tags__");
-  text("skip_tags", "__skipTags__");
-  text("scm_branch", "__scmBranch__");
-  // verbosity : 0 to 5
-  if (given("verbosity")) {
-    const v = Number(obj.verbosity);
-    if (!Number.isInteger(v) || !VERBOSITY.includes(v)) errors.push(`verbosity must be one of ${VERBOSITY.join(", ")}`);
-    else options.__verbosity__ = v;
-  }
-  // diff mode : a yes or no
-  if (given("diff_mode")) {
-    const v = boolOf(obj.diff_mode);
-    if (v === undefined) errors.push("diff_mode must be true or false");
-    else options.__diff__ = v;
-  }
-  // job type : run or check
-  if (given("job_type")) {
-    if (!JOB_TYPES.includes(obj.job_type)) errors.push(`job_type must be one of ${JOB_TYPES.join(", ")}`);
-    else options.__check__ = obj.job_type === "check";
-  }
-  // the objects it names : by name, or by natural key
-  if (given("inventory")) {
-    const name = nameOf(obj.inventory);
-    if (name.trim()) options.__inventory__ = name;
-  }
-  if (given("execution_environment")) {
-    const name = nameOf(obj.execution_environment);
-    if (name.trim()) options.__executionEnvironment__ = name;
-  }
-  try {
-    const groups = namesOf(obj.instance_groups, "instance_groups");
-    if (groups.length) options.__instanceGroups__ = groups;
-  } catch (e) {
-    errors.push(e.message);
-  }
-  try {
+  for (const prompt of PROMPTS) {
     // the module's credentials, else the export's related.credentials
-    const listed = given("credentials") ? obj.credentials : obj.related && typeof obj.related === "object" ? obj.related.credentials : undefined;
-    const credentials = namesOf(listed, "credentials");
-    if (credentials.length) options.__credentials__ = Object.fromEntries(credentials.map((n) => [n, n]));
-  } catch (e) {
-    errors.push(e.message);
+    const value = prompt.field === "credentials" && !given("credentials") && obj.related && typeof obj.related === "object" ? obj.related.credentials : obj[prompt.field];
+    if (value === undefined || value === null || value === "") continue;
+    const read = prompt.read(value, obj);
+    if (read.error) errors.push(read.error);
+    else if (read.value !== undefined) options[prompt.option] = read.value;
   }
   // the prompts AnsibleForms has nothing for : checked, kept, not used
   for (const key of ["forks", "job_slice_count"]) {
@@ -362,7 +425,9 @@ function setKey(doc, map, key, value) {
  *
  * Args:
  *   text (string): the file's text.
- *   edits (object): any of { name, description, rrule, enabled, form, extraData }.
+ *   edits (object): any of { name, description, rrule, enabled, form, extraData, launchOptions
+ *     (the launch options : only the prompts whose value changes rewritten, those no longer
+ *     given removed) }.
  *
  * Returns:
  *   string: the file's new text.
@@ -394,6 +459,16 @@ export function updateScheduleFile(text, edits) {
   }
   if (edits.enabled !== undefined && boolOf(current.enabled ?? true) !== edits.enabled) setKey(doc, node, "enabled", edits.enabled);
   if (edits.rrule !== undefined && edits.rrule !== current.rrule) setKey(doc, node, "rrule", edits.rrule);
+  // the prompts : compared as the file gives them now, read and written back the same way
+  if (edits.launchOptions !== undefined) {
+    const now = promptsOf(launchOptionsOf(current).options).fields;
+    const next = promptsOf(edits.launchOptions).fields;
+    for (const { field } of PROMPTS) {
+      if (same(now[field], next[field])) continue;
+      if (next[field] === undefined) node.delete(field);
+      else setKey(doc, node, field, next[field]);
+    }
+  }
   // the export's natural key names the schedule and its template : it follows them
   const natural = node.get("natural_key", true);
   if (YAML.isMap(natural)) {
@@ -410,23 +485,26 @@ export function updateScheduleFile(text, edits) {
  * AnsibleForms field in it.
  *
  * Args:
- *   values (object): { name, description, rrule, enabled, form, extraData }.
+ *   values (object): { name, description, rrule, enabled, form, extraData, launchOptions (the
+ *     launch options, written as the prompts that give them : promptsOf) }.
  *
  * Returns:
  *   string: the file's text.
  */
-export function newScheduleFile({ name, description = "", rrule, enabled = true, form, extraData = {} }) {
+export function newScheduleFile({ name, description = "", rrule, enabled = true, form, extraData = {}, launchOptions = {} }) {
   const ujt = { name: form, type: "job_template" };
   const obj = {
     name,
     description: description || "",
     extra_data: extraData || {},
+    ...promptsOf(launchOptions).fields,
     unified_job_template: ujt,
     enabled: enabled !== false,
     rrule: normalizeRrule(rrule),
     natural_key: { name, type: "schedule", unified_job_template: { ...ujt } },
   };
-  return YAML.stringify(obj, { lineWidth: 0 });
+  const rank = (k) => (KEY_ORDER.includes(k) ? KEY_ORDER.indexOf(k) : KEY_ORDER.length);
+  return YAML.stringify(Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b))), { lineWidth: 0 });
 }
 
 /**

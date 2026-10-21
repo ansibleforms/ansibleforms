@@ -117,8 +117,8 @@ function withCommentSpacing(line, old) {
  * The text the YAML writer gives a file, with every line it did not change as the file had it,
  * byte for byte (the writer re-spaces inline comments and drops trailing spaces on every line),
  * and a changed line keeping the spacing of its comment. The lines are matched as a diff matches
- * them (the longest common sequence of lines compared by comparedLine) ; a run of changed lines
- * replacing as many lines takes their comments' spacing, line by line.
+ * them (the longest common sequence of lines compared by comparedLine) ; a changed line takes the
+ * comment spacing of the line it replaces : the one of the same key, else the one at its place.
  *
  * Args:
  *   original (string): the file's text before the edit.
@@ -145,8 +145,17 @@ export function keepUntouchedLines(original, rendered) {
   // the lines replaced and their replacements, since the last line kept
   let gone = [];
   let added = [];
+  // a changed line paired with the line it replaces : the one of the same key, else the one at
+  // its place when as many lines are replaced as written
+  const keyOfLine = (line) => (line.match(/^\s*(?:-\s+)?[^\s:#][^:#]*:(?=\s|$)/) || [null])[0];
   const flush = () => {
-    added.forEach((line, k) => out.push(added.length === gone.length ? withCommentSpacing(line, gone[k]) : line));
+    const free = gone.map(() => true);
+    added.forEach((line, k) => {
+      let at = keyOfLine(line) === null ? -1 : gone.findIndex((g, x) => free[x] && keyOfLine(g) === keyOfLine(line));
+      if (at < 0 && added.length === gone.length && free[k]) at = k;
+      if (at >= 0) free[at] = false;
+      out.push(at >= 0 ? withCommentSpacing(line, gone[at]) : line);
+    });
     gone = [];
     added = [];
   };

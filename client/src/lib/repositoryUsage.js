@@ -553,6 +553,10 @@ export function activationLines(t, key, name, p) {
   if ((p.withoutSecret || []).length) {
     lines.push(t('settings.repositories.usageOnWithoutSecret', { names: p.withoutSecret.join(', ') }));
   }
+  // what it takes that no field of its files gives (a schedule's launch options) : kept in the app
+  if ((p.appOnly || []).length) {
+    lines.push(t('settings.repositories.usageOnAppOnly', { names: p.appOnly.join(', ') }));
+  }
   // files the type does not import (announcements already ended) : how many
   if (p.skipped) lines.push(t('settings.repositories.usageOnSkipped', { count: p.skipped }));
   for (const note of TYPE_NOTES[key] || []) lines.push(t(note));

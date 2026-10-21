@@ -1368,6 +1368,7 @@ export default {
       usageOnKept: 'Estes ficam nesta aplicação: {names}.',
       usageOnWithoutSecret:
         'Escritos sem os seus segredos, que ficam na base de dados (o git nunca guarda um segredo em claro): {names}.',
+      usageOnAppOnly: 'Ficam só na aplicação, nenhum campo do ficheiro do agendamento os dá: {names}.',
       usageOnSkipped: 'Já terminados no git, não importados: {count}.',
       formDuplicate:
         "O formulário '{name}' está definido duas vezes: é usado {used}, {skipped} é ignorado (os nomes de formulário devem ser únicos entre os repositórios de formulários)",

@@ -1357,6 +1357,7 @@ export default {
       usageOnKept: '次はこのアプリに残ります：{names}。',
       usageOnWithoutSecret:
         'シークレットなしで書き込まれ、シークレットはデータベースに残ります（git に平文のシークレットが入ることはありません）：{names}。',
+      usageOnAppOnly: 'アプリにのみ保持されます。スケジュールファイルのどのフィールドにも対応しません：{names}。',
       usageOnSkipped: 'git ですでに終了しており、インポートされません：{count}。',
       formDuplicate:
         "フォーム '{name}' が 2 回定義されています: {used} を使用し、{skipped} はスキップします (フォーム名はフォームリポジトリ全体で一意である必要があります)",

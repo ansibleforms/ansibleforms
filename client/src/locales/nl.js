@@ -1364,6 +1364,7 @@ export default {
       usageOnKept: 'Deze blijven in deze app: {names}.',
       usageOnWithoutSecret:
         'Geschreven zonder hun geheimen, die in de database blijven (git bevat nooit een geheim in klare tekst): {names}.',
+      usageOnAppOnly: 'Alleen in de app bewaard, geen veld van het schemabestand geeft ze weer: {names}.',
       usageOnSkipped: 'In git al afgelopen, niet geïmporteerd: {count}.',
       formDuplicate:
         "Formulier '{name}' is twee keer gedefinieerd: {used} wordt gebruikt, {skipped} wordt overgeslagen (formuliernamen moeten uniek zijn over alle formulierrepositories)",

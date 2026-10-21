@@ -380,6 +380,14 @@ describe('Pull all, and a linked object', () => {
   });
 });
 
+describe("a schedule's launch options no field of its file gives", () => {
+  it('are said kept in the app only, before the Schedules usage is turned on', () => {
+    const lines = activationLines(t, 'schedules', 'ops', { written: ['Nightly'], appOnly: ['Nightly (__custom__)'] });
+    expect(lines).toContain('settings.repositories.usageOnAppOnly {"names":"Nightly (__custom__)"}');
+    expect(activationLines(t, 'schedules', 'ops', { written: ['Nightly'] }).join(' ')).not.toContain('usageOnAppOnly');
+  });
+});
+
 describe('the types kept in one file : the chat, the settings, the branding', () => {
   it('say their file : the app written to it, or the one in git applied', () => {
     expect(activationLines(t, 'chat_assistant', 'cfg', { written: ['Chat assistant'] })[0]).toBe(

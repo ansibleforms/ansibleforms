@@ -1370,6 +1370,7 @@ export default {
       usageOnKept: 'Diese bleiben in dieser App: {names}.',
       usageOnWithoutSecret:
         'Ohne ihre Geheimnisse geschrieben, die in der Datenbank bleiben (git enthält nie ein Geheimnis im Klartext): {names}.',
+      usageOnAppOnly: 'Nur in der App behalten, kein Feld der Zeitplandatei gibt sie wieder: {names}.',
       usageOnSkipped: 'In git bereits beendet, nicht importiert: {count}.',
       formDuplicate:
         "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",

@@ -11,7 +11,7 @@ import YAML from "yaml";
 import logger from "../logger.js";
 import mysql from "../../models/db.model.js";
 import Form from "../../models/form.model.js";
-import { SCHEDULES_FOLDER, parseScheduleFile, newScheduleFile, extraDataOf } from "../scheduleFiles.js";
+import { SCHEDULES_FOLDER, parseScheduleFile, newScheduleFile, extraDataOf, promptsOf } from "../scheduleFiles.js";
 import { validateRrule, normalizeRrule } from "../scheduleRrule.js";
 import { cronToRrule } from "../cronToRrule.js";
 import logConfig from "../../../config/log.config.js";
@@ -68,15 +68,17 @@ export async function formNames() {
 }
 
 /**
- * A schedule of a file as the schedule table keeps it.
+ * A schedule of a file as the schedule table keeps it : its launch options the file's, and those
+ * of its row no prompt of a file can give, kept in the app only (promptsOf).
  *
  * Args:
  *   s (object): the schedule, as lib/scheduleFiles.js reads it.
+ *   row (object): its row as it is, if any.
  *
  * Returns:
  *   object: { name, description, form, rrule, enabled, extra_vars, launch_options }.
  */
-function valuesOf(s) {
+export function valuesOf(s, row = null) {
   return {
     name: s.name,
     description: s.description,
@@ -84,7 +86,7 @@ function valuesOf(s) {
     rrule: s.rrule,
     enabled: s.enabled ? 1 : 0,
     extra_vars: extraVarsText(s.extraData),
-    launch_options: launchOptionsText(s.launchOptions),
+    launch_options: launchOptionsText({ ...s.launchOptions, ...promptsOf(row?.launch_options).kept }),
   };
 }
 
@@ -135,7 +137,7 @@ const schedules = {
     // the app's recurring schedules (no repository, not a planned job) can be taken over
     classify: (row, name) => classifyRow(row, name, row.owner || Number(row.one_time_run) ? "a one-time job of this app" : null),
     changed: (row, s) => {
-      const values = valuesOf(s);
+      const values = valuesOf(s, row);
       return Object.keys(values).some((k) => String(row[k] ?? "") !== String(values[k] ?? ""));
     },
     insert: (s, name, file) => {
@@ -146,7 +148,7 @@ const schedules = {
       );
     },
     update: (row, s) => {
-      const v = valuesOf(s);
+      const v = valuesOf(s, row);
       return mysql.do(
         "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, cron=NULL, one_time_run=0, run_at=NULL WHERE id=?",
         [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, row.id],
@@ -154,7 +156,7 @@ const schedules = {
     },
     // git's version replaces the app's definition ; its runs, state and history stay
     adopt: (row, s, name, file) => {
-      const v = valuesOf(s);
+      const v = valuesOf(s, row);
       return mysql.do(
         "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=?, cron=NULL, one_time_run=0, run_at=NULL WHERE id=?",
         [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, name, file, row.id],
@@ -187,6 +189,24 @@ const schedules = {
     return converted.rrule ? { row, rrule: converted.rrule } : { row, reason: converted.reason };
   },
 
+  /**
+   * The launch options of the schedules a repository would take that no prompt of a file gives :
+   * kept in the app only, said before the usage is turned on.
+   *
+   * Args:
+   *   list (object[]): the candidates (written or kept).
+   *
+   * Returns:
+   *   string[]: each schedule with its options (Nightly (__custom__)).
+   */
+  appOnlyOptions(list) {
+    return list
+      .filter((c) => !c.reason)
+      .map((c) => [c.row.name, Object.keys(promptsOf(c.row.launch_options).kept)])
+      .filter(([, kept]) => kept.length)
+      .map(([name, kept]) => `${name} (${kept.join(", ")})`);
+  },
+
   // a cron that stays in the app is said with its cron
   keptExtra: (c) => ({ cron: c.row.cron }),
 
@@ -199,6 +219,7 @@ const schedules = {
       enabled: Number(row.enabled ?? 1) !== 0,
       form: row.form || "",
       extraData: extraDataOf(row.extra_vars || ""),
+      launchOptions: row.launch_options || "",
     }),
 
   /**
@@ -215,7 +236,7 @@ const schedules = {
    *   Promise: the update.
    */
   linkCandidate: (c, name, file) => {
-    const v = valuesOf(parseScheduleFile(schedules.newFileText(c)).schedule);
+    const v = valuesOf(parseScheduleFile(schedules.newFileText(c)).schedule, c.row);
     return mysql.do(
       "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, cron=NULL, repository=?, repo_file=? WHERE id=?",
       [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],
@@ -227,7 +248,7 @@ const schedules = {
     const planned = await mysql.do("SELECT COUNT(*) AS n FROM AnsibleForms.`schedule` WHERE repository IS NULL AND (owner IS NOT NULL OR COALESCE(one_time_run,0) = 1)");
     return { planned: Number(planned?.[0]?.n || 0) };
   },
-  previewExtra: async (name, list) => ({ recurring: list.length, ...(await schedules.reportExtra()) }),
+  previewExtra: async (name, list) => ({ recurring: list.length, appOnly: schedules.appOnlyOptions(list), ...(await schedules.reportExtra()) }),
 };
 
 export default schedules;

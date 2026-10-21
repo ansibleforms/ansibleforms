@@ -25,7 +25,7 @@ import { validateRrule, normalizeRrule } from "../lib/scheduleRrule.js";
 import { cronToRrule } from "../lib/cronToRrule.js";
 import logConfig from "../../config/log.config.js";
 import Engine, { withWriteClaim, fileOf, writeNewFile, nameKey } from "../lib/repoObjects/engine.js";
-import schedules, { extraVarsText, launchOptionsText, formNames } from "../lib/repoObjects/schedules.js";
+import schedules, { extraVarsText, launchOptionsText, formNames, valuesOf } from "../lib/repoObjects/schedules.js";
 
 const MODEL = "schedule";
 
@@ -193,7 +193,9 @@ ScheduleRepo.create = async function (repository, data) {
  *
  * Args:
  *   row (object): the schedule as it is.
- *   data (object): any of { name, description, form, rrule, enabled, extra_vars }.
+ *   data (object): any of { name, description, form, rrule, enabled, extra_vars, launch_options
+ *     (an object, or its JSON : written as the prompts that give them, those no prompt gives kept
+ *     in the app only) }.
  *
  * Returns:
  *   Promise<void>
@@ -214,12 +216,15 @@ ScheduleRepo.update = async function (row, data) {
   const edits = { ...values, extraData };
   delete edits.extra_vars;
   if (extraData === undefined) delete edits.extraData;
+  if (data.launch_options !== undefined) edits.launchOptions = data.launch_options ?? "";
+  // the options no prompt gives : the row's, or the edit's when it gives them
+  const kept = { ...row, launch_options: edits.launchOptions ?? row.launch_options };
   await withWriteClaim(row.repository, async () => {
     const abs = fileOf(schedules, row.repository, row.repo_file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     let text;
     if (before === null) {
-      const current = { name: row.name, description: row.description || "", form: row.form, rrule: row.rrule, enabled: !!Number(row.enabled ?? 1), extraData: extraDataOf(row.extra_vars || "") };
+      const current = { name: row.name, description: row.description || "", form: row.form, rrule: row.rrule, enabled: !!Number(row.enabled ?? 1), extraData: extraDataOf(row.extra_vars || ""), launchOptions: row.launch_options || "" };
       text = newScheduleFile({ ...current, ...edits });
     } else {
       try {
@@ -233,11 +238,11 @@ ScheduleRepo.update = async function (row, data) {
       throw new Errors.BadRequestError(`The file ${row.repository}/${row.repo_file} is not a valid schedule, fix it in git: ${parsed.errors.join("; ")}`);
     }
     if (text !== before) fs.writeFileSync(abs, text, "utf8");
-    const s = parsed.schedule;
+    const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
         "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
-        [s.name, s.description, s.form, s.rrule, s.enabled ? 1 : 0, extraVarsText(s.extraData), launchOptionsText(s.launchOptions), row.id],
+        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, row.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same
@@ -246,7 +251,7 @@ ScheduleRepo.update = async function (row, data) {
       throw e;
     }
     CrudModel.changed(MODEL);
-    logger.info(`Saved schedule '${s.name}' into ${row.repository}/${row.repo_file}`);
+    logger.info(`Saved schedule '${v.name}' into ${row.repository}/${row.repo_file}`);
   });
 };
 
