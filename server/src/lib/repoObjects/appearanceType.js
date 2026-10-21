@@ -19,7 +19,7 @@ import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
-import { same } from "./yamlFile.js";
+import { same, parseMapFile } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
 // the environment settings among the appearance fields, by field : their variable, and how the app
@@ -63,6 +63,42 @@ function readImage(dir, name) {
   } catch (e) {
     throw new Error(`'${name}' cannot be read: ${e.code || e.message}`, { cause: e });
   }
+}
+
+/**
+ * The images an app edit writes into a file that is there : the ones it changed only. Each is
+ * written as <kind>.<extension> beside the YAML (imageFile), and the YAML names it so : where it
+ * named the image by another path (images/logo.png, or logo.png for an image now an SVG), that
+ * field is compared against the name the file gives, so the edit rewrites it. An image the edit
+ * left as it is keeps its file and its name, wherever the file names it : nothing is written for
+ * it, and nothing removed.
+ *
+ * Args:
+ *   images (string[]): the type's images (logo, icon).
+ *   seeded (string[]): the fields the config seed manages (never written).
+ *   declared (object): the file's object as it is.
+ *   after (object): the app's object as saved.
+ *   before (object): the app's object before the edit.
+ *
+ * Returns:
+ *   object: { base (the image fields as the file names them, where the edit must rewrite them),
+ *     extraFiles ([{ name, buffer }] : the images written), gone (string[] : the files the
+ *     object named before and no longer does) }.
+ */
+function imageEdits(images, seeded, declared, after, before) {
+  const out = { base: {}, extraFiles: [], gone: [] };
+  for (const kind of images) {
+    if (seeded.includes(kind) || same(comparable(after?.[kind]), comparable(before?.[kind]))) continue;
+    const file = imageFile(kind, after?.[kind]);
+    if (file) out.extraFiles.push(file);
+    // the name it had : the file's own, compared to the one written, so the YAML follows
+    const named = typeof declared[kind] === "string" ? declared[kind] : undefined;
+    if (named !== undefined && named !== file?.name) out.base[kind] = named;
+    // the image it wrote before, beside the YAML, no longer the one named
+    const old = imageFile(kind, before?.[kind])?.name;
+    if (old && old !== file?.name) out.gone.push(old);
+  }
+  return out;
 }
 
 /**
@@ -130,6 +166,10 @@ export function appearanceType(spec) {
     // its YAML names its images by the file they are written as ; the seed's fields left out
     toFile: (current) => hold.without({ ...current, ...Object.fromEntries(images.map((k) => [k, imageFile(k, current[k])?.name])) }, current),
     extraFiles: (current) => images.filter((k) => !seededOf(current).includes(k)).map((k) => imageFile(k, current[k])).filter(Boolean),
+    // an app edit : only the images it changed written, each as <kind>.<extension> beside the YAML,
+    // the YAML naming it so where it named another file (images/logo.png) ; an image left as it
+    // is keeps its file and its name, wherever the file names it
+    editFiles: (text, after, before) => imageEdits(images, seededOf(after), parseMapFile(text).object || {}, after, before),
     // the images it names read and checked ; its links as the model keeps them
     fromFile: async (declared, { dir } = {}) => {
       const out = { ...declared };

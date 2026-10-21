@@ -38,6 +38,11 @@ import { typeOf } from "./types.js";
  *       beside the YAML read (the branding's images) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
  *       object writes (the branding's images), its YAML naming them.
+ *     editFiles (function): (text, after, before) => { base, extraFiles, gone } - an app edit's
+ *       files beside the YAML, from the file as it is : the files written (those the edit
+ *       changed), the ones it no longer names (removed), and the fields of the YAML compared as
+ *       the file names them (base, over the object before the edit) ; extraFiles(after), all of
+ *       them, when not given.
  *     toFile (function): (current) => the object as its YAML gives it, before fields.js takes its
  *       seed fields (the branding's image names) ; as it is when not given.
  *     fields (object): its own fields when they are no schema's (lib/repoObjects/fields.js
@@ -117,9 +122,20 @@ export function singleType(spec) {
      *   before (object): the app's object before the edit.
      *
      * Returns:
-     *   object: { text, extraFiles: [{ name, buffer }] }.
+     *   object: { text, extraFiles: [{ name, buffer }], gone (string[] : the files beside it no
+     *     longer named, when the type says them ; undefined : those the object named before) }.
      */
     fileEdits(text, after, before) {
+      // the files beside it as the file names them now (the branding's images) : only the ones
+      // the edit changed written, and its YAML naming them where it names another file
+      const files = spec.editFiles ? spec.editFiles(text, after, before || {}) : null;
+      if (files) {
+        return {
+          text: fields.editText(text, toYaml(after), { ...toYaml(before || {}), ...files.base }),
+          extraFiles: files.extraFiles,
+          gone: files.gone,
+        };
+      }
       return {
         text: fields.editText(text, toYaml(after), toYaml(before || {})),
         extraFiles: spec.extraFiles ? spec.extraFiles(after) : [],

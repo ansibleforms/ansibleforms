@@ -1288,7 +1288,9 @@ async function appUpdatedSingle(desc, before) {
   return withWriteClaim(repository, async () => {
     const abs = singleFileOf(desc, repository);
     const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);
-    const gone = desc.fileOf(before).extraFiles.map((f) => f.name);
+    // the files beside it the edit no longer names : those the type says (only the images it
+    // changed), else every one the object named before that it does not write again
+    const gone = out.gone ?? desc.fileOf(before).extraFiles.map((f) => f.name);
     const written = writeSingle(desc, repository, out, gone);
     if (written) logger.info(`Saved the ${desc.title.toLowerCase()} into ${repository}/${desc.file}`);
     return written;

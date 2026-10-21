@@ -322,6 +322,40 @@ describe("the branding and its images", () => {
     assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "logo.png");
   });
 
+  test("a new logo in the app while the file names it elsewhere : written beside it, the YAML naming it", async () => {
+    fx.cloneEmpty("cfg");
+    writeRaw("cfg", "branding.yaml", "app_name: ACME\nlogo: images/logo.png # the team's layout\n");
+    fs.mkdirSync(path.join(fx.ROOT, "cfg", "images"), { recursive: true });
+    writeRaw("cfg", "images/logo.png", PNG);
+    await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    CrudModel.flushAllLocal();
+    const before = await RepoObjects.snapshot("branding");
+    const other = Buffer.concat([PNG, Buffer.from("v2")]);
+    fx.state.tables.settings[0].logo = dataUrl(other);
+    await RepoObjects.appUpdated("branding", before);
+    // the YAML names the image the app wrote : a pull of it gives the new logo, not the old one
+    assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "logo.png");
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), other), 0);
+    assert.match(readRaw("cfg", "branding.yaml").toString(), /app_name: ACME\n/);
+  });
+
+  test("an edit that leaves the logo as it is writes no image : none beside the YAML, none removed", async () => {
+    fx.cloneEmpty("cfg");
+    writeRaw("cfg", "branding.yaml", "app_name: ACME\nlogo: images/logo.png\n");
+    fs.mkdirSync(path.join(fx.ROOT, "cfg", "images"), { recursive: true });
+    writeRaw("cfg", "images/logo.png", PNG);
+    await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    CrudModel.flushAllLocal();
+    const before = await RepoObjects.snapshot("branding");
+    fx.state.tables.settings[0].app_name = "Renamed";
+    await RepoObjects.appUpdated("branding", before);
+    const file = fx.readObject("cfg", ".", "branding.yaml");
+    assert.equal(file.app_name, "Renamed");
+    assert.equal(file.logo, "images/logo.png");
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "logo.png")), false);
+    assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), PNG), 0);
+  });
+
   test("the seed's branding section : read the same way, its image relative to the seed file", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-seed-"));
     fs.mkdirSync(path.join(dir, "img"));
