@@ -689,12 +689,14 @@ export async function syncAll() {
  *
  * Args:
  *   desc (object): the type's descriptor.
+ *   name (string|null): the repository that would take them (the repositories' holder stays in
+ *     the app, before its flag is saved too : the question asked first).
  *
  * Returns:
  *   Promise<object[]>: { row, ... } to write, or { row, reason }.
  */
-async function candidates(desc) {
-  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row)));
+async function candidates(desc, name = null) {
+  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row, name)));
 }
 
 /**
@@ -727,7 +729,7 @@ const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptE
  */
 export async function preview(desc, name) {
   if (desc.file) return previewSingle(desc, name);
-  const list = await candidates(desc);
+  const list = await candidates(desc, name);
   // the files there are now, by name (a pull before the activation may bring more)
   const fileNames = new Set();
   let files = 0;
@@ -834,7 +836,7 @@ export async function activate(desc, name, { pull = true } = {}) {
   report.waiting = summary.waiting;
   report.skipped = summary.skipped;
   // step 3 : the app's other objects, each a new file
-  const list = await candidates(desc);
+  const list = await candidates(desc, name);
   await withWriteClaim(name, async () => {
     // a type kept as a list in one file : every candidate an entry of it, added at its end
     if (desc.listFile) {

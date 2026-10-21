@@ -160,6 +160,16 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.deepEqual(readList(), []);
   });
 
+  test("the question asked before the flag is saved : the repository asked about is the holder, never written", async () => {
+    fx.cloneEmpty("hub");
+    fx.rowNamed("repositories", "hub").use_for_repositories = 0;
+    fx.state.tables.repositories.push({ id: 5, name: "forms", uri: "https://git/forms.git", branch: "main", use_for_forms: 1, description: "" });
+    CrudModel.flushAllLocal();
+    const p = await RepoObjects.preview(await desc(), "hub");
+    assert.deepEqual(p.written, ["forms"]);
+    assert.deepEqual(p.kept, [{ name: "hub", reason: "it holds the repositories itself, never in its own file", code: "holder" }]);
+  });
+
   test("the order : the credentials, then the repositories, then every other type", async () => {
     assert.deepEqual(types.APPLY_ORDER.slice(0, 2), ["credentials", "repositories"]);
     assert.deepEqual(types.USAGE_TYPES.filter((t) => t.category === "connections").map((t) => t.key), [

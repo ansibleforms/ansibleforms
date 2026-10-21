@@ -55,7 +55,8 @@ export default seedType({
   ],
   // the holder itself : never its own file's
   notImported: (o, holder) => (holder && o.name === holder ? "the repository holding this file" : null),
-  keptReason: (row) => (Number(row.use_for_repositories) ? "holder" : null),
+  // the holder : by its flag, or by its name before the flag is saved (the question asked first)
+  keptReason: (row, holder) => (Number(row.use_for_repositories) || (holder && row.name === holder) ? "holder" : null),
   // no chains, and no usage another repository holds
   adjust: async (o) => {
     const out = { ...o };

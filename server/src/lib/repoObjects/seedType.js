@@ -54,8 +54,8 @@ export const KEPT_REASONS = {
  *     skip (string[]): the fields its files leave out (one that follows another, a deprecated one).
  *     keepFalse (string[]): the yes or no fields written when off (on is their default) ; the
  *       others only when on.
- *     keptReason (function): (row) => why an object of the app stays in the app (a code of
- *       KEPT_REASONS), or null.
+ *     keptReason (function): (row, holder) => why an object of the app stays in the app (a code of
+ *       KEPT_REASONS), or null ; holder is the repository that would take it.
  *     usersOf (function): (row) => Promise<string[]> - what uses an object : its file removed while
  *       one does is refused.
  *     defaults (object): the values a new row is made with when its file leaves them out.
@@ -134,7 +134,7 @@ export function seedType(spec) {
       // an object of the app is taken over by a file of its name, unless the config seed manages it
       // or it stays in the app for a reason of its own
       classify: (row, name) => {
-        const code = row.managed ? "seed" : keptReason(row);
+        const code = row.managed ? "seed" : keptReason(row, name);
         return classifyRow(row, name, code ? `an object of this app (${KEPT_REASONS[code] || code})` : null);
       },
       changed: (row, obj) => differs(omit(obj, spec.notCompared), canonical({ ...row })),
@@ -161,12 +161,13 @@ export function seedType(spec) {
      *
      * Args:
      *   row (object): the row.
+     *   holder (string|null): the repository that would take it.
      *
      * Returns:
      *   object: { row, object, withoutSecret, named } or { row, code, reason }.
      */
-    candidateOf(row) {
-      const code = row.managed ? "seed" : keptReason(row);
+    candidateOf(row, holder = null) {
+      const code = row.managed ? "seed" : keptReason(row, holder);
       if (code) return { row, code, reason: KEPT_REASONS[code] || code };
       const named = !row.name && spec.nameFor ? { ...row, name: spec.nameFor(row) } : row;
       return { row: named, named: named !== row, ...fields.toFile(named) };
