@@ -210,6 +210,22 @@ describe("writing a schedule file", () => {
     assert.equal(text, EXPORTED);
   });
 
+  test("a rrule written on several lines stays so while it does not change", () => {
+    const source = `name: Nightly
+unified_job_template: Nightly Workflow
+rrule: |
+  DTSTART;TZID=Europe/Brussels:20261020T020000
+  RRULE:FREQ=DAILY;INTERVAL=1
+`;
+    // the app sends it back on one line, as it keeps it, with the field it changed
+    const { schedule } = parseScheduleFile(source);
+    const text = updateScheduleFile(source, { name: "Nightly rotation", rrule: schedule.rrule });
+    assert.equal(text, source.replace("name: Nightly\n", "name: Nightly rotation\n"));
+    // changed, it is written
+    const changed = updateScheduleFile(source, { rrule: "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1" });
+    assert.equal(YAML.parse(changed).rrule, "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1");
+  });
+
   test("an edit changes those keys only : prompts, unknown keys, comments and the order are kept", () => {
     const source = `# kept by the platform team
 name: Nightly

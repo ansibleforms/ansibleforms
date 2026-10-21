@@ -458,7 +458,9 @@ export function updateScheduleFile(text, edits) {
     else setKey(doc, node, "unified_job_template", { name: edits.form, type: "job_template" });
   }
   if (edits.enabled !== undefined && boolOf(current.enabled ?? true) !== edits.enabled) setKey(doc, node, "enabled", edits.enabled);
-  if (edits.rrule !== undefined && edits.rrule !== current.rrule) setKey(doc, node, "rrule", edits.rrule);
+  // the rrule compared on one line : a file that writes it on several lines keeps them while it
+  // does not change
+  if (edits.rrule !== undefined && normalizeRrule(edits.rrule) !== normalizeRrule(current.rrule)) setKey(doc, node, "rrule", edits.rrule);
   // the prompts : compared as the file gives them now, read and written back the same way
   if (edits.launchOptions !== undefined) {
     const now = promptsOf(launchOptionsOf(current).options).fields;
