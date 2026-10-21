@@ -75,6 +75,14 @@ describe("a pull reads the credentials folder", () => {
     assert.ok(RepoObjects.summaryText(credentials, summary).includes("Refused credentials/plain.yaml:"));
   });
 
+  test("only the secret fields resolve their ${ENV} references : anywhere else a ${NAME} is plain text", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git", { description: "${GIT_PW}" }));
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).created, 1);
+    const row = fx.rowNamed("credentials", "git");
+    assert.equal(row.password, "enc:s3cret");
+    assert.equal(row.description, "${GIT_PW}");
+  });
+
   test("a file the seed's schema refuses, or the app's type rules, is refused alone", async () => {
     fx.writeFile("creds", "credentials", "typo.yaml", { name: "typo", pasword: "x" });
     fx.writeFile("creds", "credentials", "smtp.yaml", { name: "smtp", credential_type: "smtp" });

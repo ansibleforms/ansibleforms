@@ -6620,8 +6620,9 @@
 
       **Secrets are never plain in git.** A credential's `password` (its token or client secret) and `client_key`,
       and a runner's own `token` or `password`, are written as `${ENV}` references only, resolved from the
-      environment as the config seed resolves them. A file holding a plain secret, or naming a variable that is not
-      set, is refused and named in the pull output. An app object written to git (turning the usage on, a new object,
+      environment as the config seed resolves them. Only the secret fields are resolved: in any other field a
+      `${NAME}` stays plain text. A file holding a plain secret, or naming a variable that is not set, is refused and
+      named in the pull output. An app object written to git (turning the usage on, a new object,
       an edit) is written without its secrets, which stay in the database; the pull output lists the objects whose
       secrets come from the database.
 

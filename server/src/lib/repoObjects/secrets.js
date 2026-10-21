@@ -2,8 +2,10 @@
 // The secret rule of the repository-backed objects (lib/repoObjects/engine.js) : a secret is never
 // plain in git. A file gives a secret field as ${ENV} references only, resolved from the process
 // environment as the config seed resolves them (lib/seed-schema.js interpolateEnv) ; a file holding
-// a plain secret is refused. An app object is written to git without its secrets, which stay in
-// the database.
+// a plain secret is refused. Only the secret fields are resolved : anywhere else a ${NAME} is plain
+// text, or whoever can push to the repository could read any variable of the server (its token
+// secret, its database password) through a field the app shows. An app object is written to git
+// without its secrets, which stay in the database.
 import { interpolateEnv } from "../seed-schema.js";
 
 // a ${VAR} reference, as the seed writes it
@@ -36,8 +38,9 @@ export function onlyEnvRefs(value) {
 }
 
 /**
- * Checks a file's object against the secret rule, then resolves its ${ENV} references (every
- * field's, as the seed does).
+ * Checks a file's object against the secret rule, then resolves the ${ENV} references of its
+ * secret fields - only those : the others keep a ${NAME} as plain text (the seed, a local file of
+ * the administrator, resolves every field itself).
  *
  * Args:
  *   obj (object): the object as the file gives it.
@@ -56,7 +59,8 @@ export function resolveSecrets(obj, secretFields = [], env = process.env) {
     };
   }
   try {
-    return { errors: [], object: interpolateEnv(obj, env) };
+    const secrets = Object.fromEntries(secretFields.filter((f) => given(obj[f])).map((f) => [f, obj[f]]));
+    return { errors: [], object: { ...obj, ...interpolateEnv(secrets, env) } };
   } catch (e) {
     // the seed's own words : the variables that are not set
     return { errors: [String(e.message || e).replace(/^Seed file references/, "it references")], object: null };
