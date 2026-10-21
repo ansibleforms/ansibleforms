@@ -107,10 +107,19 @@ export const db = {
       return { affectedRows: hit.length };
     }
     if (/^SELECT COUNT\(\*\) AS n FROM \S+ WHERE repository = \?/.test(sql)) return [{ n: rows.filter((r) => r.repository === params[0]).length }];
-    // the Config usage split into its three keys' (models/schema.model.js splitConfigUsage)
-    if (/^UPDATE AnsibleForms\.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE use_for_config = 1/.test(sql)) {
+    // the Config usage split into its three keys' (models/schema.model.js splitConfigUsage) : the
+    // repositories that had it, the first one given the three flags, the flag cleared on the others
+    if (/^SELECT id, name FROM AnsibleForms\.`repositories` WHERE use_for_config = 1 ORDER BY id/.test(sql)) {
+      return rows.filter((r) => Number(r.use_for_config) === 1).sort((a, b) => a.id - b.id).map((r) => ({ id: r.id, name: r.name }));
+    }
+    if (/^UPDATE AnsibleForms\.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE id = \?/.test(sql)) {
+      const row = rows.find((r) => r.id === Number(params[0]));
+      if (row) Object.assign(row, { use_for_roles: 1, use_for_categories: 1, use_for_constants: 1, use_for_config: 0 });
+      return { affectedRows: row ? 1 : 0 };
+    }
+    if (/^UPDATE AnsibleForms\.`repositories` SET use_for_config = 0 WHERE use_for_config = 1/.test(sql)) {
       const hit = rows.filter((r) => Number(r.use_for_config) === 1);
-      hit.forEach((r) => Object.assign(r, { use_for_roles: 1, use_for_categories: 1, use_for_constants: 1, use_for_config: 0 }));
+      hit.forEach((r) => (r.use_for_config = 0));
       return { affectedRows: hit.length };
     }
     // a runner's credential, and its default

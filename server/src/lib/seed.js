@@ -537,6 +537,9 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   for (const name of configFlag.folded) {
     logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.4.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
   }
+  for (const name of configFlag.dropped) {
+    logger.warning(`The config seed's repository '${name}' uses use_for_config too, deprecated since 7.4.0 and removed in 8: only one repository holds the roles, the categories and the constants, '${configFlag.holder}' has them ; its use_for_config is not applied`);
+  }
   // a runner's own token, or user and password : deprecated since 7.3 in favour of a credential
   // of its kind (credential:), removed in 8. Applied as such a credential, named after the runner
   // The credentials made by hand are reserved : a generated name equal to one of them would

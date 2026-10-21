@@ -180,28 +180,55 @@ export function foldAwxIntoRunners(doc) {
 }
 
 /**
- * A repository's use_for_config in the seed (deprecated since 7.4.0, removed in 8) as the three
- * flags it is now : use_for_roles, use_for_categories and use_for_constants, each the seed's own
- * when it declares it. Returns a new document and the repositories folded ; the warning is the
- * caller's.
+ * A repository's use_for_config (deprecated since 7.4.0, removed in 8) as the three flags it is
+ * now : use_for_roles, use_for_categories and use_for_constants, each the item's own when it
+ * declares it. The one rule for the config seed's repositories (foldConfigFlag) and a
+ * repositories.yaml's entries (lib/repoObjects/repositories.js).
+ *
+ * Args:
+ *   item (object): the repository as declared.
+ *   give (boolean): false : the item's use_for_config is on, but another repository has the three
+ *     flags already (one repository holds each) - dropped, no flag given.
+ *
+ * Returns:
+ *   object: the item, without use_for_config ; as it is when it does not declare it.
+ */
+export function foldConfigItem(item, give = true) {
+  if (item?.use_for_config === undefined) return item;
+  const { use_for_config: on, ...rest } = item;
+  if (on && !give) return rest;
+  return { use_for_roles: on, use_for_categories: on, use_for_constants: on, ...rest };
+}
+
+/**
+ * The config seed's repositories' use_for_config folded (foldConfigItem). 7.3 read its configuration
+ * from the first use_for_config repository and only warned about the others : the first one that
+ * declares it (in the file's order, the order a fresh database made them in, so the one 7.3 used)
+ * gets the three flags, the others none - listed as such, warned by the caller, never a refusal of
+ * the seed. Returns a new document ; the warnings are the caller's.
  *
  * Args:
  *   doc (object): the seed document.
  *
  * Returns:
- *   { doc: object, folded: string[] }: the document, and the repositories whose flag moved.
+ *   { doc: object, folded: string[], dropped: string[], holder: string|null }: the document, the
+ *     repositories whose flag moved, those whose use_for_config was dropped, and the one that has the
+ *     three flags from it.
  */
 export function foldConfigFlag(doc) {
   const items = doc?.repositories?.items || [];
-  if (!items.some((r) => r.use_for_config !== undefined)) return { doc, folded: [] };
+  if (!items.some((r) => r.use_for_config !== undefined)) return { doc, folded: [], dropped: [], holder: null };
   const folded = [];
+  const dropped = [];
+  let holder = null;
   const repositoryItems = items.map((r) => {
     if (r.use_for_config === undefined) return r;
-    const { use_for_config: on, ...rest } = r;
-    folded.push(r.name);
-    return { use_for_roles: on, use_for_categories: on, use_for_constants: on, ...rest };
+    const give = !(r.use_for_config && holder !== null);
+    if (r.use_for_config && give) holder = r.name;
+    (give ? folded : dropped).push(r.name);
+    return foldConfigItem(r, give);
   });
-  return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded };
+  return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded, dropped, holder };
 }
 
 /**

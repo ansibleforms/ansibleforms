@@ -2191,21 +2191,28 @@ export async function dedupeLdapNames() {
 }
 
 /**
- * Splits the Config usage of the repositories into its three keys' (lib/configKeys.js) : a
- * repository that had use_for_config gets use_for_roles, use_for_categories and use_for_constants,
- * so it serves the same configuration as before, and use_for_config goes back to 0 - the column
- * kept, no longer read, so a second start changes nothing.
+ * Splits the Config usage of the repositories into its three keys' (lib/configKeys.js) : the
+ * repository 7.3 read its configuration from gets use_for_roles, use_for_categories and
+ * use_for_constants, so it serves the same configuration as before. 7.3 took the first row of
+ * `WHERE use_for_config` with no order : a scan of the table, in the order of its primary key -
+ * the lowest id. Any other repository that had it (7.3 only warned about them) gets none : one
+ * repository holds each key now. use_for_config goes back to 0 everywhere - the column kept, no
+ * longer read, so a second start changes nothing.
  *
  * Returns:
  *   Promise<string|null>: what it did, null when no repository had it.
  */
 export async function splitConfigUsage() {
-  const res = await mysql.do(
-    "UPDATE AnsibleForms.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE use_for_config = 1",
-  );
-  if (!res?.affectedRows) return null;
-  const message = `The Config usage of ${res.affectedRows} repository(ies) is now Roles, Categories and Constants`;
+  const rows = await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_config = 1 ORDER BY id");
+  if (!rows?.length) return null;
+  const [first, ...others] = rows;
+  await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE id = ?", [first.id]);
+  if (others.length) await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");
+  const message =
+    `The Config usage of repository '${first.name}' is now Roles, Categories and Constants` +
+    (others.length ? ` ; ${others.map((r) => `'${r.name}'`).join(", ")} had it too, unused since 7.3 read the first one : not given` : "");
   logger.notice(message);
+  if (others.length) logger.warning(message);
   return message;
 }
 

@@ -128,12 +128,33 @@ describe("written back to the file it was read from", () => {
 });
 
 describe("the Config usage of before", () => {
-  test("the schema patch sets the three flags on every repository that had use_for_config, once", async () => {
+  test("the schema patch sets the three flags on the repository that had use_for_config, once", async () => {
     fx.state.tables.repositories.push({ id: 3, name: "old", use_for_config: 1 });
     const { splitConfigUsage } = await import("../src/models/schema.model.js");
-    assert.match(await splitConfigUsage(), /1 repository\(ies\) is now Roles, Categories and Constants/);
+    assert.match(await splitConfigUsage(), /repository 'old' is now Roles, Categories and Constants/);
     assert.deepEqual(fx.rowNamed("repositories", "old"), { id: 3, name: "old", use_for_config: 0, use_for_roles: 1, use_for_categories: 1, use_for_constants: 1 });
     assert.equal(await splitConfigUsage(), null, "a second start changes nothing");
+  });
+
+  test("two that had it : the one 7.3 read (the lowest id) gets the three flags, the other none, said", async () => {
+    fx.state.tables.repositories.push({ id: 9, name: "aaa-later", use_for_config: 1 }, { id: 4, name: "zzz-first", use_for_config: 1 });
+    const { splitConfigUsage } = await import("../src/models/schema.model.js");
+    assert.match(await splitConfigUsage(), /'zzz-first' is now Roles, Categories and Constants ; 'aaa-later' had it too/);
+    assert.equal(fx.rowNamed("repositories", "zzz-first").use_for_roles, 1);
+    assert.equal(fx.rowNamed("repositories", "aaa-later").use_for_roles, undefined);
+    assert.equal(fx.rowNamed("repositories", "aaa-later").use_for_config, 0);
+  });
+
+  test("a seed of 7.3 with use_for_config on two repositories : warned, the first one has the flags, never refused", async () => {
+    const { foldConfigFlag, validateSeed } = await import("../src/lib/seed-schema.js");
+    const repo = (name, flags) => ({ name, uri: "https://x/y.git", ...flags });
+    const seed = { repositories: { items: [repo("one", { use_for_config: true }), repo("two", { use_for_config: true })] } };
+    assert.equal(validateSeed(seed), true);
+    const { doc, holder, dropped } = foldConfigFlag(seed);
+    assert.equal(holder, "one");
+    assert.deepEqual(dropped, ["two"]);
+    assert.equal(doc.repositories.items[0].use_for_roles, true);
+    assert.deepEqual(doc.repositories.items[1], { name: "two", uri: "https://x/y.git" });
   });
 
   test("the seed's use_for_config : a deprecated alias of the three, one repository at most each", async () => {
