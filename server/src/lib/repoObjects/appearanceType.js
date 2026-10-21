@@ -19,7 +19,7 @@ import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
-import { same, parseMapFile, staysIn } from "./yamlFile.js";
+import { same, parseMapFile, fileBeside } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
 // the environment settings among the appearance fields, by field : their variable, and how the app
@@ -55,10 +55,7 @@ const comparable = (v) => (Array.isArray(v) ? JSON.stringify(v) : typeof v === "
  *   Error: a path that leads outside the folder (a link too), or a file that cannot be read.
  */
 function readImage(dir, name) {
-  const base = path.resolve(dir || ".");
-  const abs = path.resolve(base, String(name));
-  // inside it once its links are followed too : a link in a repository never reads the server's files
-  if (!abs.startsWith(base + path.sep) || !staysIn(base, abs)) throw new Error(`'${name}' is not a file beside it`);
+  const abs = fileBeside(dir, name);
   try {
     return fs.readFileSync(abs);
   } catch (e) {
@@ -67,12 +64,13 @@ function readImage(dir, name) {
 }
 
 /**
- * The images an app edit writes into a file that is there : the ones it changed only. Each is
- * written as <kind>.<extension> beside the YAML (imageFile), and the YAML names it so : where it
- * named the image by another path (images/logo.png, or logo.png for an image now an SVG), that
- * field is compared against the name the file gives, so the edit rewrites it. An image the edit
- * left as it is keeps its file and its name, wherever the file names it : nothing is written for
- * it, and nothing removed.
+ * The images an app edit writes into a file that is there : the ones it changed only, each where the
+ * YAML names it - its own file rewritten (images/logo.png stays images/logo.png), beside it with the
+ * new type's extension when the type changed (images/logo.svg), and the YAML naming it so ; an image
+ * the YAML does not name yet written as <kind>.<extension> at its side (imageFile). A file the YAML
+ * does not name is never the branding's : one there already with other bytes is refused, never
+ * overwritten (lib/repoObjects/engine.js writeSingle). An image the edit left as it is keeps its file
+ * and its name : nothing is written for it, and nothing removed.
  *
  * Args:
  *   images (string[]): the type's images (logo, icon).
@@ -82,22 +80,28 @@ function readImage(dir, name) {
  *   before (object): the app's object before the edit.
  *
  * Returns:
- *   object: { base (the image fields as the file names them, where the edit must rewrite them),
- *     extraFiles ([{ name, buffer }] : the images written), gone (string[] : the files the
- *     object named before and no longer does) }.
+ *   object: { base (the image fields as the file names them : what the edit is compared with),
+ *     names (the image fields as the edit names them), extraFiles ([{ name, buffer, own }] : the
+ *     images written, own when the YAML names that file), gone (string[] : the files the YAML
+ *     named and no longer does) }.
  */
 function imageEdits(images, seeded, declared, after, before) {
-  const out = { base: {}, extraFiles: [], gone: [] };
+  const out = { base: {}, names: {}, extraFiles: [], gone: [] };
   for (const kind of images) {
     if (seeded.includes(kind) || same(comparable(after?.[kind]), comparable(before?.[kind]))) continue;
+    // the name the YAML gives it, the branding's own file
+    const named = typeof declared[kind] === "string" && declared[kind] ? declared[kind] : undefined;
     const file = imageFile(kind, after?.[kind]);
-    if (file) out.extraFiles.push(file);
-    // the name it had : the file's own, compared to the one written, so the YAML follows
-    const named = typeof declared[kind] === "string" ? declared[kind] : undefined;
-    if (named !== undefined && named !== file?.name) out.base[kind] = named;
-    // the image it wrote before, beside the YAML, no longer the one named
-    const old = imageFile(kind, before?.[kind])?.name;
-    if (old && old !== file?.name) out.gone.push(old);
+    let target;
+    if (file) {
+      // where the YAML names it, with the extension of the type it is now ; else <kind>.<ext>
+      target = named ? path.posix.join(path.posix.dirname(named), `${path.posix.basename(named, path.posix.extname(named))}${path.posix.extname(file.name)}`) : file.name;
+      out.extraFiles.push({ name: target, buffer: file.buffer, own: target === named });
+    }
+    out.base[kind] = named;
+    out.names[kind] = target;
+    // the file it named before, no longer the one named (another type, or no image)
+    if (named && named !== target) out.gone.push(named);
   }
   return out;
 }

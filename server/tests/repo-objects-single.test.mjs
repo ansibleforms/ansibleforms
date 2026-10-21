@@ -436,21 +436,51 @@ describe("the branding and its images", () => {
     assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "logo.png");
   });
 
-  test("a new logo in the app while the file names it elsewhere : written beside it, the YAML naming it", async () => {
+  test("a new logo in the app while the file names it elsewhere : written where it names it, an unrelated logo.png untouched", async () => {
     fx.cloneEmpty("cfg");
     writeRaw("cfg", "branding.yaml", "app_name: ACME\nlogo: images/logo.png # the team's layout\n");
     fs.mkdirSync(path.join(fx.ROOT, "cfg", "images"), { recursive: true });
     writeRaw("cfg", "images/logo.png", PNG);
+    // a logo.png at the root that is not the branding's (the README's)
+    const readme = Buffer.concat([PNG, Buffer.from("readme")]);
+    writeRaw("cfg", "logo.png", readme);
     await RepoObjects.syncRepository(await desc("branding"), "cfg");
     CrudModel.flushAllLocal();
     const before = await RepoObjects.snapshot("branding");
     const other = Buffer.concat([PNG, Buffer.from("v2")]);
     fx.state.tables.settings[0].logo = dataUrl(other);
-    await RepoObjects.appUpdated("branding", before);
-    // the YAML names the image the app wrote : a pull of it gives the new logo, not the old one
-    assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "logo.png");
-    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), other), 0);
-    assert.match(readRaw("cfg", "branding.yaml").toString(), /app_name: ACME\n/);
+    assert.equal(await RepoObjects.appUpdated("branding", before), true);
+    // the YAML still names its own file, which holds the new logo : a pull of it gives the new one
+    assert.equal(readRaw("cfg", "branding.yaml").toString(), "app_name: ACME\nlogo: images/logo.png # the team's layout\n");
+    assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), other), 0);
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0, "the README's logo untouched");
+    // another type : beside it with its extension, the YAML naming it, the old file the branding's gone
+    const before2 = await RepoObjects.snapshot("branding");
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+    fx.state.tables.settings[0].logo = `data:image/svg+xml;base64,${svg.toString("base64")}`;
+    await RepoObjects.appUpdated("branding", before2);
+    assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "images/logo.svg");
+    assert.equal(Buffer.compare(readRaw("cfg", "images/logo.svg"), svg), 0);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "images", "logo.png")), false);
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
+  });
+
+  test("a file of the name an image would be written as, not the branding's : refused, never overwritten", async () => {
+    fx.cloneEmpty("cfg");
+    const readme = Buffer.concat([PNG, Buffer.from("readme")]);
+    writeRaw("cfg", "logo.png", readme);
+    Object.assign(fx.state.tables.settings[0], { app_name: "Mine", logo: dataUrl(PNG) });
+    // turned on : branding.yaml would name the app's logo logo.png
+    await assert.rejects(RepoObjects.activate(await desc("branding"), "cfg", { pull: false }), /'logo.png' is in repository 'cfg' already and is not the one branding.yaml names/);
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "branding.yaml")), false, "nothing written");
+    // an edit of a branding.yaml that names no logo : the same
+    writeRaw("cfg", "branding.yaml", "app_name: Mine\n");
+    const before = await RepoObjects.snapshot("branding");
+    fx.state.tables.settings[0].logo = dataUrl(Buffer.concat([PNG, Buffer.from("v3")]));
+    assert.equal(await RepoObjects.appUpdated("branding", before), null);
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
+    assert.equal(readRaw("cfg", "branding.yaml").toString(), "app_name: Mine\n");
   });
 
   test("an edit that leaves the logo as it is writes no image : none beside the YAML, none removed", async () => {

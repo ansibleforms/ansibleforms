@@ -427,6 +427,28 @@ export function filesIn(repoDir, folder, pattern = YAML_FILE) {
 }
 
 /**
+ * The absolute path of a file a file names beside it (a branding image : logo.png,
+ * images/logo.png), checked to be inside the folder it is named from, and to stay in it once its
+ * links are followed (staysIn) : a link in a repository never reads nor writes the server's files.
+ *
+ * Args:
+ *   dir (string): the folder (the repository's root, the seed file's folder).
+ *   name (string): its path, relative to it.
+ *
+ * Returns:
+ *   string: the path.
+ *
+ * Raises:
+ *   Error: a path that leads outside the folder, a link too.
+ */
+export function fileBeside(dir, name) {
+  const base = path.resolve(dir || ".");
+  const abs = path.resolve(base, String(name));
+  if (!abs.startsWith(base + path.sep) || !staysIn(base, abs)) throw new Error(`'${name}' is not a file beside it`);
+  return abs;
+}
+
+/**
  * The absolute path of an object's file, checked to be right in its folder of the repository, and
  * to stay in the repository once its links are followed (staysIn).
  *

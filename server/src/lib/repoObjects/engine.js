@@ -36,7 +36,7 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
-import { filesIn, fileIn, fileNameFor, parseMapFile, parseListFile, appendListEntries, updateListEntry, removeListEntry } from "./yamlFile.js";
+import { filesIn, fileIn, fileBeside, fileNameFor, parseMapFile, parseListFile, appendListEntries, updateListEntry, removeListEntry } from "./yamlFile.js";
 import { given } from "./secrets.js";
 import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
@@ -1263,19 +1263,33 @@ const singleFileOf = (desc, name) => fileIn(Repo.folderOf(name), ".", desc.file,
 
 /**
  * Writes a single-file type's YAML and the files beside it : a file whose content is the same is
- * left as it is, a file beside it the object no longer names removed.
+ * left as it is, a file beside it the object no longer names removed. A file beside it is written
+ * where the YAML names it (own) ; any other file already there with other bytes is not the type's
+ * (a README's image, a logo of something else) : refused before anything is written, never
+ * overwritten.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *   out (object): { text (null : the YAML left as it is), extraFiles: [{ name, buffer }] }.
- *   gone (string[]): the files beside it the object named before.
+ *   out (object): { text (null : the YAML left as it is), extraFiles: [{ name, buffer, own }] }.
+ *   gone (string[]): the files beside it the YAML named before and no longer does.
  *
  * Returns:
  *   boolean: whether anything was written.
+ *
+ * Raises:
+ *   Error: a file beside it to write that is there already, with other bytes, and not the type's ;
+ *     or a path outside the repository.
  */
 function writeSingle(desc, name, out, gone = []) {
   const dir = path.dirname(singleFileOf(desc, name));
+  const extras = (out.extraFiles || []).map((extra) => ({ ...extra, abs: fileBeside(dir, extra.name) }));
+  // step 1 : nothing written when one of them would overwrite a file that is not the type's
+  for (const extra of extras) {
+    if (extra.own || !fs.existsSync(extra.abs) || Buffer.compare(fs.readFileSync(extra.abs), extra.buffer) === 0) continue;
+    throw new Error(`'${extra.name}' is in repository '${name}' already and is not the one ${desc.file} names: rename or remove it, or name the image in ${desc.file}`);
+  }
+  // step 2 : the YAML, then the files beside it
   let written = false;
   const abs = singleFileOf(desc, name);
   if (out.text !== null && out.text !== undefined && (!fs.existsSync(abs) || fs.readFileSync(abs, "utf8") !== out.text)) {
@@ -1283,16 +1297,18 @@ function writeSingle(desc, name, out, gone = []) {
     written = true;
   }
   const kept = new Set();
-  for (const extra of out.extraFiles || []) {
-    const file = fileIn(dir, ".", extra.name, /./);
-    kept.add(path.basename(file));
-    if (fs.existsSync(file) && Buffer.compare(fs.readFileSync(file), extra.buffer) === 0) continue;
-    fs.writeFileSync(file, extra.buffer);
+  for (const extra of extras) {
+    kept.add(extra.abs);
+    if (fs.existsSync(extra.abs) && Buffer.compare(fs.readFileSync(extra.abs), extra.buffer) === 0) continue;
+    fs.mkdirSync(path.dirname(extra.abs), { recursive: true });
+    fs.writeFileSync(extra.abs, extra.buffer);
     written = true;
   }
+  // step 3 : the files it named before
   for (const old of gone) {
-    if (kept.has(old)) continue;
-    fs.rmSync(fileIn(dir, ".", old, /./), { force: true });
+    const file = fileBeside(dir, old);
+    if (kept.has(file) || !fs.existsSync(file)) continue;
+    fs.rmSync(file, { force: true });
     written = true;
   }
   return written;
@@ -1444,9 +1460,10 @@ async function appUpdatedSingle(desc, before) {
   return withWriteClaim(repository, async () => {
     const abs = singleFileOf(desc, repository);
     const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);
-    // the files beside it the edit no longer names : those the type says (only the images it
-    // changed), else every one the object named before that it does not write again
-    const gone = out.gone ?? desc.fileOf(before).extraFiles.map((f) => f.name);
+    // the files beside it the edit no longer names : those the type says (only the images the YAML
+    // named and the edit changed) ; none when the YAML is gone - a file it does not name is never
+    // the type's to remove
+    const gone = out.gone ?? [];
     const written = writeSingle(desc, repository, out, gone);
     if (written) logger.info(`Saved ${holdingOf(desc)} into ${repository}/${desc.file}`);
     return written;

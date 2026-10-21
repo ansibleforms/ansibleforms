@@ -41,10 +41,11 @@ import { typeOf } from "./types.js";
  *       beside the YAML read (the branding's images) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
  *       object writes (the branding's images), its YAML naming them.
- *     editFiles (function): (text, after, before) => { base, extraFiles, gone } - an app edit's
- *       files beside the YAML, from the file as it is : the files written (those the edit
- *       changed), the ones it no longer names (removed), and the fields of the YAML compared as
- *       the file names them (base, over the object before the edit) ; extraFiles(after), all of
+ *     editFiles (function): (text, after, before) => { base, names, extraFiles, gone } - an app
+ *       edit's files beside the YAML, from the file as it is : the files written (those the edit
+ *       changed, own when the YAML names them), the ones it no longer names (removed), and the
+ *       fields of the YAML compared as the file names them (base, over the object before the edit)
+ *       and as the edit names them (names, over the object after it) ; extraFiles(after), all of
  *       them, when not given.
  *     toFile (function): (current) => the object as its YAML gives it, before fields.js takes its
  *       seed fields (the branding's image names) ; as it is when not given.
@@ -135,7 +136,7 @@ export function singleType(spec) {
       const files = spec.editFiles ? spec.editFiles(text, after, before || {}) : null;
       if (files) {
         return {
-          text: fields.editText(text, toYaml(after), { ...toYaml(before || {}), ...files.base }),
+          text: fields.editText(text, { ...toYaml(after), ...files.names }, { ...toYaml(before || {}), ...files.base }),
           extraFiles: files.extraFiles,
           gone: files.gone,
         };

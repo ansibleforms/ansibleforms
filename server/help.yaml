@@ -6790,8 +6790,11 @@
       `default_theme_color`, `forms_view`, `default_timezone`, `default_date_format`, `default_language`) and the
       logo and the website icon as image files beside it, named by their path. The images are read and written as
       binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
-      256 KB); an empty value restores the bundled one. The config seed has a `branding:` section in the same
-      format, its images relative to the seed file.
+      256 KB); an empty value restores the bundled one. An image changed in the app is written to the file
+      `branding.yaml` names (beside it with the new extension when its type changed), or as `logo.<ext>` /
+      `icon.<ext>` when it names none; a file of that name already there that `branding.yaml` does not name is never
+      overwritten: the write is refused, said in the server log. The config seed has a `branding:` section in the
+      same format, its images relative to the seed file.
       ```yaml
       app_name: ACME Automation
       default_theme: dark
