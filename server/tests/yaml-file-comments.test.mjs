@@ -4,7 +4,7 @@
 // inline comment of the file.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { updateMapFile, updateListEntry, keepUntouchedLines } from "../src/lib/repoObjects/yamlFile.js";
+import { updateMapFile, updateListEntry, keepUntouchedLines, parseMapFile, parseListFile, appendListEntries, removeListEntry } from "../src/lib/repoObjects/yamlFile.js";
 import { updateScheduleFile } from "../src/lib/scheduleFiles.js";
 
 const ALIGNED = [
@@ -51,5 +51,52 @@ describe("the other writers keep untouched lines too", () => {
 
   test("lines the writer did not change are the file's ; lines it changed are its own", () => {
     assert.equal(keepUntouchedLines("a: 1    # x\nb: 2\n", "a: 1 # x\nb: 3\n"), "a: 1    # x\nb: 3\n");
+  });
+});
+
+describe("the file's own form kept, whatever it is", () => {
+  test("a CRLF file stays CRLF, the changed line too", () => {
+    const out = updateMapFile("# head\r\nname: a\r\nuser: bob # who\r\nurl: x\r\n", { user: "alice" });
+    assert.equal(out, "# head\r\nname: a\r\nuser: alice # who\r\nurl: x\r\n");
+  });
+
+  test("its byte order mark kept", () => {
+    assert.equal(updateMapFile("﻿# head\nname: a\nuser: bob\n", { user: "alice" }), "﻿# head\nname: a\nuser: alice\n");
+  });
+
+  test("a value changed only in its spaces before a # is a changed line", () => {
+    const out = updateMapFile('name: a\ndescription: "see  #3"\n', { description: "see #3" });
+    assert.equal(parseMapFile(out).object.description, "see #3");
+  });
+
+  test("an aligned comment after a quoted value with a # in it is still kept as it was", () => {
+    const text = 'name: a\nurl: "http://x/#top"     # the page\nuser: b\n';
+    assert.equal(updateMapFile(text, { user: "c" }), text.replace("user: b", "user: c"));
+  });
+});
+
+describe("a list file", () => {
+  test("an entry removed takes the comment right above it with it ; one apart from it stays", () => {
+    const text = "# top\nrepositories:\n  # about a\n  - name: a\n    uri: x\n  # about b\n  - name: b\n    uri: y\n";
+    assert.equal(removeListEntry(text, "repositories", "a"), "# top\nrepositories:\n  # about b\n  - name: b\n    uri: y\n");
+    assert.equal(removeListEntry(text, "repositories", "b"), "# top\nrepositories:\n  # about a\n  - name: a\n    uri: x\n");
+  });
+
+  test("its key with nothing after it is an empty list, read and added to", () => {
+    assert.deepEqual(parseListFile("repositories:\n", "repositories"), { errors: [], items: [] });
+    assert.deepEqual(parseListFile(appendListEntries("repositories:\n", "repositories", [{ name: "a" }]), "repositories").items, [{ name: "a" }]);
+  });
+});
+
+describe("a large file", () => {
+  test("its lines compared in memory linear in its length", () => {
+    let text = "repositories:\n";
+    for (let i = 0; i < 6000; i++) text += `  - name: r${i}\n    branch: main\n`;
+    const rendered = text.replace("  - name: r5\n    branch: main\n", "  - name: r5\n    branch: dev\n");
+    const before = process.memoryUsage().rss;
+    assert.equal(keepUntouchedLines(text, rendered), rendered);
+    // a table of every pair of lines : 12,000 x 12,000 numbers, 576 MB
+    assert.ok(process.memoryUsage().rss - before < 100 * 1024 * 1024);
+    assert.equal(updateListEntry(text, "repositories", "r5", { branch: "dev" }, ["name", "branch"]), rendered);
   });
 });

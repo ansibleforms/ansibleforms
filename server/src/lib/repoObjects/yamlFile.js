@@ -80,7 +80,8 @@ export function setKey(doc, map, key, value, keyOrder = []) {
 
 /**
  * A line as two are compared to tell an untouched line : its trailing spaces left out, and the
- * spaces before an inline comment as one (the YAML writer re-spaces them).
+ * spaces before its inline comment as one (the YAML writer re-spaces them) - those inside a quoted
+ * value kept, a value changed only there is a changed line.
  *
  * Args:
  *   line (string): the line.
@@ -88,7 +89,44 @@ export function setKey(doc, map, key, value, keyOrder = []) {
  * Returns:
  *   string: the line compared.
  */
-const comparedLine = (line) => line.replace(/\s+$/, "").replace(/(\S)[ \t]+#/g, "$1 #");
+function comparedLine(line) {
+  const text = line.replace(/\s+$/, "");
+  const at = commentAt(text);
+  return at < 0 ? text : `${text.slice(0, at).replace(/[ \t]+$/, "")} ${text.slice(at)}`;
+}
+
+/**
+ * Where a line's inline comment starts : a # after a space, outside a quoted value (a quote opens
+ * a value only where a value starts : the line's start, after a colon, a dash, a bracket or a
+ * comma) - a # inside "a  #b" is the value's, its spaces never taken for the comment's.
+ *
+ * Args:
+ *   line (string): the line.
+ *
+ * Returns:
+ *   number: the index of its #, -1 when it has no comment.
+ */
+function commentAt(line) {
+  let quote = null;
+  let last = "";
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote === '"') {
+      if (c === "\\") i++;
+      else if (c === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (c === "'" && line[i + 1] === "'") i++;
+      else if (c === "'") quote = null;
+      continue;
+    }
+    if ((c === '"' || c === "'") && (last === "" || /[:\-[{,]/.test(last))) quote = c;
+    else if (c === "#" && (i === 0 || /[ \t]/.test(line[i - 1]))) return i;
+    if (!/[ \t]/.test(c)) last = c;
+  }
+  return -1;
+}
 
 /**
  * A changed line given the spacing of its inline comment as the line it replaces had it : the
@@ -102,15 +140,13 @@ const comparedLine = (line) => line.replace(/\s+$/, "").replace(/(\S)[ \t]+#/g, 
  *   string: the line, its comment spaced as before (as it is when the comment is not the same).
  */
 function withCommentSpacing(line, old) {
-  for (let i = old.indexOf("#"); i > 0; i = old.indexOf("#", i + 1)) {
-    if (!/[ \t]/.test(old[i - 1])) continue;
-    const comment = old.slice(i).replace(/\s+$/, "");
-    const at = line.length - comment.length;
-    if (!line.endsWith(comment) || at < 1 || !/[ \t]/.test(line[at - 1])) continue;
-    const gap = old.slice(0, i).match(/[ \t]+$/)[0];
-    return line.slice(0, at).replace(/[ \t]+$/, "") + gap + comment;
-  }
-  return line;
+  const was = commentAt(old);
+  const now = commentAt(line);
+  if (was < 1 || now < 1) return line;
+  const comment = old.slice(was).replace(/\s+$/, "");
+  if (line.slice(now).replace(/\s+$/, "") !== comment) return line;
+  const gap = old.slice(0, was).match(/[ \t]+$/)[0];
+  return line.slice(0, now).replace(/[ \t]+$/, "") + gap + comment;
 }
 
 /**
@@ -132,13 +168,8 @@ export function keepUntouchedLines(original, rendered) {
   const b = String(rendered ?? "").split("\n");
   const ka = a.map(comparedLine);
   const kb = b.map(comparedLine);
-  // the longest common sequence, by its lengths from the ends
-  const n = a.length;
-  const m = b.length;
-  const len = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) len[i][j] = ka[i] === kb[j] ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
-  }
+  // the lines kept, as the longest common sequence pairs them
+  const pairs = commonLines(ka, kb);
   const out = [];
   let i = 0;
   let j = 0;
@@ -159,21 +190,82 @@ export function keepUntouchedLines(original, rendered) {
     gone = [];
     added = [];
   };
-  while (i < n || j < m) {
-    if (i < n && j < m && ka[i] === kb[j]) {
-      flush();
+  for (const [pi, pj] of [...pairs, [a.length, b.length]]) {
+    while (i < pi) gone.push(a[i++]);
+    while (j < pj) added.push(b[j++]);
+    flush();
+    if (pi < a.length) {
       out.push(a[i++]);
       j++;
-    } else if (j < m && (i >= n || len[i][j + 1] >= len[i + 1][j])) added.push(b[j++]);
-    else gone.push(a[i++]);
+    }
   }
-  flush();
   return out.join("\n");
 }
 
 /**
+ * The longest common sequence of two lists of lines, as the pairs of the lines it keeps, in order -
+ * in memory linear in their length (Hirschberg : each half's lengths, one row at a time), the
+ * lines the two share at their start and their end paired first.
+ *
+ * Args:
+ *   ka (string[]): the lines of one, as compared.
+ *   kb (string[]): the lines of the other.
+ *
+ * Returns:
+ *   number[][]: [index in ka, index in kb] for each line kept.
+ */
+function commonLines(ka, kb) {
+  const pairs = [];
+  // the lengths of the common sequences of ka[a0..a1) with each kb[b0..b0+k), one row kept
+  const forward = (a0, a1, b0, b1) => {
+    let row = new Int32Array(b1 - b0 + 1);
+    let next = new Int32Array(b1 - b0 + 1);
+    for (let i = a0; i < a1; i++) {
+      for (let j = b0; j < b1; j++) next[j - b0 + 1] = ka[i] === kb[j] ? row[j - b0] + 1 : Math.max(row[j - b0 + 1], next[j - b0]);
+      [row, next] = [next, row];
+    }
+    return row;
+  };
+  // the same from the ends : with each kb[b0+k..b1)
+  const backward = (a0, a1, b0, b1) => {
+    let row = new Int32Array(b1 - b0 + 1);
+    let next = new Int32Array(b1 - b0 + 1);
+    for (let i = a1 - 1; i >= a0; i--) {
+      for (let j = b1 - 1; j >= b0; j--) next[j - b0] = ka[i] === kb[j] ? row[j - b0 + 1] + 1 : Math.max(row[j - b0], next[j - b0 + 1]);
+      [row, next] = [next, row];
+    }
+    return row;
+  };
+  const walk = (a0, a1, b0, b1) => {
+    const tail = [];
+    while (a0 < a1 && b0 < b1 && ka[a0] === kb[b0]) pairs.push([a0++, b0++]);
+    while (a0 < a1 && b0 < b1 && ka[a1 - 1] === kb[b1 - 1]) tail.unshift([--a1, --b1]);
+    if (a1 - a0 === 1) {
+      for (let j = b0; j < b1; j++) {
+        if (ka[a0] === kb[j]) {
+          pairs.push([a0, j]);
+          break;
+        }
+      }
+    } else if (a0 < a1 && b0 < b1) {
+      const mid = (a0 + a1) >> 1;
+      const left = forward(a0, mid, b0, b1);
+      const right = backward(mid, a1, b0, b1);
+      let cut = b0;
+      for (let k = b0; k <= b1; k++) if (left[k - b0] + right[k - b0] > left[cut - b0] + right[cut - b0]) cut = k;
+      walk(a0, mid, b0, cut);
+      walk(mid, a1, cut, b1);
+    }
+    pairs.push(...tail);
+  };
+  walk(0, ka.length, 0, kb.length);
+  return pairs;
+}
+
+/**
  * A document edited in place, as its file's new text : the writer's text, every line the edit
- * did not change kept as the file had it (keepUntouchedLines).
+ * did not change kept as the file had it (keepUntouchedLines), its byte order mark and its CRLF
+ * line ends kept.
  *
  * Args:
  *   doc (YAML.Document): the document, edited.
@@ -183,7 +275,12 @@ export function keepUntouchedLines(original, rendered) {
  *   string: the text to write.
  */
 export function editedText(doc, original) {
-  return keepUntouchedLines(original, doc.toString({ lineWidth: 0 }));
+  // its byte order mark and its line ends (CRLF) as the file has them, every line alike
+  const text = String(original ?? "");
+  const bom = text.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const crlf = /\r\n/.test(text);
+  const lines = keepUntouchedLines(text.slice(bom.length).replace(/\r\n/g, "\n"), doc.toString({ lineWidth: 0 }));
+  return bom + (crlf ? lines.replace(/\n/g, "\r\n") : lines);
 }
 
 /**
@@ -413,7 +510,9 @@ function listOf(text, key) {
   const doc = YAML.parseDocument(String(text ?? "").trim() ? String(text) : `${key}: []\n`);
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
   if (!YAML.isMap(doc.contents)) throw new Error("the file is not a YAML dictionary");
-  if (!doc.contents.has(key)) doc.contents.set(key, doc.createNode([]));
+  // no list yet, or its key with nothing after it (repositories:) : an empty list
+  const value = doc.contents.get(key, true);
+  if (!doc.contents.has(key) || (YAML.isScalar(value) && (value.value === null || value.value === undefined))) doc.contents.set(key, doc.createNode([]));
   const seq = doc.contents.get(key, true);
   if (!YAML.isSeq(seq)) throw new Error(`'${key}' must be a list`);
   return { doc, seq };
@@ -500,7 +599,7 @@ export function appendListEntries(text, key, entries, keyOrder = []) {
 }
 
 /**
- * Removes an entry of a list file.
+ * Removes an entry of a list file, the comment right above it with it.
  *
  * Args:
  *   text (string): the file's text.
@@ -514,7 +613,11 @@ export function removeListEntry(text, key, name) {
   const { doc, seq } = listOf(text, key);
   const entry = entryOf(seq, name);
   if (!entry) return text;
-  seq.items.splice(seq.items.indexOf(entry), 1);
+  const at = seq.items.indexOf(entry);
+  // the comment right above the first entry is the list's to the writer : it goes with the entry
+  // (one apart from it by an empty line is the list's own, and stays)
+  if (at === 0 && seq.commentBefore && !entry.spaceBefore) seq.commentBefore = undefined;
+  seq.items.splice(at, 1);
   return editedText(doc, text);
 }
 
