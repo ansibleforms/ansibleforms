@@ -655,8 +655,8 @@ function periodsOf(spec, start) {
  *   start (number): the DTSTART, floating ms.
  *
  * Returns:
- *   function: (from, to) => the runs after from and up to to, floating ms, in order, COUNT not
- *     applied.
+ *   function: (from, to, limit) => the runs after from and up to to, floating ms, in order, the
+ *     first limit of them at most (all by default), COUNT not applied.
  */
 function periodWalker(spec, start) {
   const { startOf, endOf, firstFrom } = periodsOf(spec, start);
@@ -665,7 +665,7 @@ function periodWalker(spec, start) {
   // what keeps an hour or a minute : its hour, its minute
   const hours = spec.freq > RRule.DAILY && spec.byhour.length ? new Set(spec.byhour) : null;
   const minutes = spec.freq === RRule.MINUTELY && spec.byminute.length ? new Set(spec.byminute) : null;
-  return (from, to) => {
+  return (from, to, limit = Infinity) => {
     const runs = [];
     const lo = Math.max(from, start - 1);
     const hi = spec.until === null ? to : Math.min(to, spec.until);
@@ -682,7 +682,7 @@ function periodWalker(spec, start) {
     let at = 0;
     for (;;) {
       const p = startOf(k);
-      if (p > hi) break;
+      if (p > hi || runs.length >= limit) break;
       if (days) {
         // the first day kept from the period's on
         while (at < days.length && days[at] < dayOf(p)) at++;
@@ -696,7 +696,7 @@ function periodWalker(spec, start) {
         // a week, a month or a year : the runs of its days, BYSETPOS picking among them
         const set = [];
         for (let i = at; i < days.length && days[i] < endOf(k); i++) for (const time of times) set.push(days[i] + time);
-        for (const t of pickSet(set, spec.bysetpos)) if (t > lo && t <= hi) runs.push(t);
+        for (const t of pickSet(set, spec.bysetpos)) if (t > lo && t <= hi && runs.length < limit) runs.push(t);
         k++;
         continue;
       }
@@ -709,7 +709,7 @@ function periodWalker(spec, start) {
       if (!minutes || minutes.has(f.minute)) {
         for (const time of times) {
           const t = p + time;
-          if (t > lo && t <= hi) runs.push(t);
+          if (t > lo && t <= hi && runs.length < limit) runs.push(t);
         }
       }
       k++;
@@ -735,12 +735,12 @@ function ruleWalker(options, start) {
   if (neverFiresAtAll(spec, start)) return { never: true, between: () => [] };
   const walk = periodWalker(spec, start);
   if (!spec.count) return { never: false, between: walk };
-  // its first COUNT runs, from its DTSTART, a year at a time
+  // its first COUNT runs, from its DTSTART, a year at a time, no more than the COUNT taken (a
+  // minutely rule has half a million runs a year)
   const runs = [];
   for (let from = start - 1; runs.length < spec.count && from < start + HORIZON_MS; from += 366 * DAY) {
-    runs.push(...walk(from, from + 366 * DAY));
+    for (const t of walk(from, from + 366 * DAY, spec.count - runs.length)) runs.push(t);
   }
-  runs.length = Math.min(runs.length, spec.count);
   return { never: false, between: (from, to) => runs.filter((t) => t > from && t <= to) };
 }
 

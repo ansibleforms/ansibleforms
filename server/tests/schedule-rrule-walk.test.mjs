@@ -186,3 +186,19 @@ describe("a rule rrule.js reads otherwise than dateutil gives dateutil's runs", 
     assert.deepEqual(iso(walkRuns(rrule, { after: new Date("2028-10-01T00:00:00Z"), count: 2 })), ["2028-11-07T01:30:00.000Z", "2028-11-14T01:30:00.000Z"]);
   });
 });
+
+describe("a minutely rule with a COUNT", () => {
+  // half a million runs a year : only the COUNT of them taken
+  test("its runs are its first COUNT minutes, and it is valid", () => {
+    const rrule = "DTSTART;TZID=Europe/Brussels:20261022T090000 RRULE:FREQ=MINUTELY;INTERVAL=1;COUNT=10";
+    assert.deepEqual(validateRrule(rrule), []);
+    assert.deepEqual(iso(walkRuns(rrule, { after: new Date("2026-10-22T07:05:30Z"), count: 3 })), ["2026-10-22T07:06:00.000Z", "2026-10-22T07:07:00.000Z", "2026-10-22T07:08:00.000Z"]);
+    assert.deepEqual(walkRuns(rrule, { after: new Date("2026-10-22T07:09:00Z") }), []);
+  });
+
+  test("its BYSETPOS picks among the times of each minute", () => {
+    const rrule = "DTSTART;TZID=Australia/Sydney:20271002T183000 RRULE:FREQ=MINUTELY;INTERVAL=1;BYSETPOS=1;COUNT=19";
+    assert.deepEqual(validateRrule(rrule), []);
+    assert.equal(walkRuns(rrule, { fromStart: true, count: 30 }).length, 19);
+  });
+});
