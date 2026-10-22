@@ -1,6 +1,7 @@
 // The designer's forms save (POST /api/v2/config, Form.save) never writes a form file onto a file a
 // usage type of its repository owns (lib/repoObjects/ownedPaths.js) : a forms repository serving its
-// forms from its root, used for the roles as well, took a form saved as roles.yaml over its roles.
+// forms from its root, used for the roles as well, took a form saved as roles.yaml over its roles. A
+// new file is staged, and the next Push moves it into the forms repository : checked there too.
 import { test, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "fs";
@@ -65,10 +66,15 @@ test("a form saved as roles.yaml is refused, saying why, and the roles stay as t
   assert.equal(fs.readFileSync(ops("roles.yaml"), "utf8"), ROLES_TEXT);
 });
 
-test("a form file of the repository's own still saves ; config.yaml, the roles may be read from, is refused too", async () => {
+test("a form file of the repository's own still saves ; config.yaml, the roles may be read from, is refused even before it is there", async () => {
   const ok = await save([{ ...form("Deploy", "deploy.yaml"), description: "edited" }]);
   assert.equal(ok.code, 200, JSON.stringify(ok.body));
   assert.equal(YAML.parse(fs.readFileSync(ops("deploy.yaml"), "utf8")).description, "edited");
-  // config.yaml : the roles may be read from it too
-  assert.equal((await save([form("Deploy", "deploy.yaml"), form("Other", "config.yaml")])).code, 409);
+  // config.yaml, the roles may be read from, not there yet : the new file would be staged, then
+  // moved onto it by the next Push - refused as well, nothing staged
+  const staged = await save([form("Deploy", "deploy.yaml"), form("Other", "config.yaml")]);
+  assert.equal(staged.code, 409, JSON.stringify(staged.body));
+  assert.match(staged.body.details, /'config\.yaml' belongs to the roles of repository 'ops'/);
+  assert.equal(fs.existsSync(path.join(appConfig.formsStagingPath, "config.yaml")), false);
+  assert.equal(fs.existsSync(ops("config.yaml")), false);
 });

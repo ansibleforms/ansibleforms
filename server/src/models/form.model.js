@@ -1899,9 +1899,13 @@ Form.save = async function(data, options = {}){
     g.dir = resolveTargetDir(g.repository, g.source, formsDirs, (d, src) => fs.existsSync(path.join(d.path, src)))
     // a file a usage type of its repository owns (roles.yaml, config.yaml, general.yaml,
     // credentials/ ... : lib/repoObjects/ownedPaths.js), in a repository serving its forms from its
-    // root : never written as a forms file
-    const owner = g.dir?.name ? await ownerOf(g.dir.name, path.join(g.dir.path, g.source)) : null
-    if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner} of repository '${g.dir.name}': save the form to another file`)
+    // root : never written as a forms file. A new file goes to the staging folder, and a Push moves
+    // it into the forms repository pushed (Repository.flushStagingInto) : checked against each one
+    const into = g.dir?.staging ? formsDirs.filter((d) => d.name) : g.dir?.name ? [g.dir] : []
+    for (const d of into) {
+      const owner = await ownerOf(d.name, path.join(d.path, g.source))
+      if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner} of repository '${d.name}': save the form to another file`)
+    }
   }
 
   // a form name defined twice, or new here and already another forms repository's : refused
