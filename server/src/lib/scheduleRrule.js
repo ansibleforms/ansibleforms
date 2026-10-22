@@ -538,7 +538,8 @@ function dayRuleOf(spec, year) {
 
 /**
  * Whether a rule can never fire, seen without walking it : no day is ever kept, its months never
- * meet a monthly interval, or its hours and minutes never meet an hourly or minutely interval.
+ * meet a monthly interval, its hours and minutes never meet an hourly or minutely interval, or
+ * its BYSETPOS picks none of the times of a daily, hourly or minutely period (BYSETPOS=2 of one).
  *
  * Args:
  *   spec (object): specOf's result.
@@ -549,6 +550,7 @@ function dayRuleOf(spec, year) {
  */
 function neverFiresAtAll(spec, start) {
   const f = fieldsOf(start);
+  if (!timesOf(spec).length) return true;
   // the residues the interval reaches, from the DTSTART's : value - first is a multiple of their gcd
   const reaches = (values, size, first) => values.some((v) => (((v - first) % gcd(spec.interval, size)) + size) % size === 0);
   if (spec.freq === RRule.MONTHLY && spec.bymonth.length && !reaches(spec.bymonth, 12, f.month)) return true;

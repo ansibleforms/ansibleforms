@@ -199,8 +199,18 @@ describe("its runs, in its own time zone", () => {
 
 describe("a rule whose times or days never meet is refused at once", () => {
   // its times never meet its BYHOUR or BYMINUTE (rrule.js would loop for ever), or no day is ever
-  // kept (rrule.js would walk to the year 9999) : seen without walking it, never given up
+  // kept (rrule.js would walk to the year 9999), or its BYSETPOS picks a run past those of every
+  // period : seen without walking it, or walked at once, never given up
   const rules = [
+    "DTSTART:20260101T090000Z RRULE:FREQ=MINUTELY;INTERVAL=1;BYSETPOS=2",
+    "DTSTART:20260101T090000Z RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=9,10;BYSETPOS=-3",
+    "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYSETPOS=2",
+    "DTSTART;TZID=Australia/Sydney:20220627T180026 RRULE:FREQ=WEEKLY;INTERVAL=1;BYHOUR=1,17;BYSETPOS=3",
+    "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=MONTHLY;INTERVAL=1;BYSETPOS=2",
+    "DTSTART;TZID=Australia/Lord_Howe:20200224T020000 RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=-26;BYDAY=SU;BYSETPOS=2;COUNT=200",
+    "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYSETPOS=2",
+    // the days of the year it names are never in the months its interval reaches
+    "DTSTART;TZID=America/Santiago:20220217T201900 RRULE:FREQ=MONTHLY;INTERVAL=3;BYYEARDAY=66,196,202",
     "DTSTART:20260101T000000Z RRULE:FREQ=DAILY;INTERVAL=1;BYMONTH=2;BYMONTHDAY=30",
     "DTSTART:20260101T000000Z RRULE:FREQ=HOURLY;INTERVAL=2;BYHOUR=1",
     "DTSTART:20260101T000000Z RRULE:FREQ=MINUTELY;INTERVAL=60;BYMINUTE=30",
@@ -214,7 +224,7 @@ describe("a rule whose times or days never meet is refused at once", () => {
       // its runs : none
       assert.deepEqual(nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z"), count: 3 }), []);
       assert.equal(nextRun(rrule), null);
-      assert.ok(Date.now() - started < 3000, `at once (${Date.now() - started} ms)`);
+      assert.ok(Date.now() - started < 1000, `at once (${Date.now() - started} ms)`);
     });
   }
 
