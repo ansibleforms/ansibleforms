@@ -49,6 +49,10 @@ const HORIZON_MS = HORIZON_YEARS * 366 * 86400000;
 // the first window runs are looked for in, doubled while it holds none
 const FIRST_WINDOW_MS = 3600000;
 
+// the runs past those asked a rule gives one window at most (some may be taken out by an EXRULE) :
+// a minutely rule's window of months holds no more
+const WINDOW_EXTRA = 50;
+
 // a minute, an hour and a day of the floating time (which has no DST)
 const MINUTE = 60000;
 const HOUR = 3600000;
@@ -727,26 +731,33 @@ function periodWalker(spec, start) {
  *   start (number): the DTSTART, floating ms.
  *
  * Returns:
- *   object: { never (true : it never fires), between: (from, to) => the runs after from and up to
- *     to, floating ms, in order }.
+ *   object: { never (true : it never fires), last (floating ms : no run after it, Infinity when
+ *     it never ends), between: (from, to, limit) => the runs after from and up to to, floating ms,
+ *     in order, the first limit of them at most }.
  */
 function ruleWalker(options, start) {
   const spec = specOf(options, start);
-  if (neverFiresAtAll(spec, start)) return { never: true, between: () => [] };
+  if (neverFiresAtAll(spec, start)) return { never: true, last: -Infinity, between: () => [] };
   const walk = periodWalker(spec, start);
-  if (!spec.count) return { never: false, between: walk };
+  if (!spec.count) return { never: false, last: spec.until === null ? Infinity : spec.until, between: walk };
   // its first COUNT runs, from its DTSTART, a year at a time, no more than the COUNT taken (a
   // minutely rule has half a million runs a year)
   const runs = [];
   for (let from = start - 1; runs.length < spec.count && from < start + HORIZON_MS; from += 366 * DAY) {
     for (const t of walk(from, from + 366 * DAY, spec.count - runs.length)) runs.push(t);
   }
-  return { never: false, between: (from, to) => runs.filter((t) => t > from && t <= to) };
+  return {
+    never: false,
+    last: runs.length ? runs[runs.length - 1] : -Infinity,
+    between: (from, to, limit = Infinity) => runs.filter((t) => t > from && t <= to).slice(0, limit),
+  };
 }
 
 /**
  * The next runs of a rrule, worked out here : looked for in windows that start at an hour and
- * double while they hold none, up to HORIZON_YEARS ahead, a time its zone's clock skips moved
+ * double while they hold none, up to HORIZON_YEARS ahead or the last run its rules may have, a
+ * window cut where a rule gives more runs than asked, an EXRULE asked only of the runs found, a
+ * time its zone's clock skips moved
  * forward. Only the thread of lib/scheduleRruleWorker.js calls it - nextRuns and nextRunsAsync
  * are the guarded calls.
  *
@@ -769,21 +780,25 @@ export function walkRuns(value, { after = new Date(), count = 1, fromStart = fal
   const takes = walkers.filter((w) => w.kind === "rrule" && !w.never);
   const leaves = walkers.filter((w) => w.kind === "exrule" && !w.never);
   const runs = new Set();
-  const end = reference + HORIZON_MS;
+  // no further than the last run a rule may still have (its UNTIL, its COUNT-th run)
+  const end = Math.min(reference + HORIZON_MS, Math.max(-Infinity, ...takes.map((w) => w.last)));
+  // the runs a rule gives a window at most : one that has more ends the window at its last
+  const limit = count + WINDOW_EXTRA;
   let until = end;
   let from = reference;
   let window = FIRST_WINDOW_MS;
   while (takes.length && from < until) {
-    const to = Math.min(from + window, until);
-    const out = new Set(leaves.flatMap((w) => w.between(from, to)));
-    for (const w of takes) {
-      for (const next of w.between(from, to)) {
-        if (out.has(next)) continue;
-        const moment = momentOf(next, compiled.zone);
-        // not after the moment asked (the hour the clock goes back)
-        if (!moment || (!fromStart && moment <= after)) continue;
-        runs.add(moment.getTime());
-      }
+    let to = Math.min(from + window, until);
+    const found = takes.map((w) => w.between(from, to, limit));
+    for (const next of found) if (next.length >= limit) to = Math.min(to, next[next.length - 1]);
+    for (const next of found.flat()) {
+      if (next > to) continue;
+      // a run an EXRULE takes out : asked of each, for that run only
+      if (leaves.some((w) => w.between(next - 1, next, 1)[0] === next)) continue;
+      const moment = momentOf(next, compiled.zone);
+      // not after the moment asked (the hour the clock goes back)
+      if (!moment || (!fromStart && moment <= after)) continue;
+      runs.add(moment.getTime());
     }
     from = to;
     window *= 2;

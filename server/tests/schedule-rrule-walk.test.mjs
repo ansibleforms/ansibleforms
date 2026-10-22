@@ -202,3 +202,27 @@ describe("a minutely rule with a COUNT", () => {
     assert.equal(walkRuns(rrule, { fromStart: true, count: 30 }).length, 19);
   });
 });
+
+describe("a rule is walked no further than it needs", () => {
+  test("one whose UNTIL passed has no run ahead, its minutely EXRULE not walked for years", () => {
+    const rrule = "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20260201T000000 EXRULE:FREQ=MINUTELY;INTERVAL=1;BYDAY=SA,SU";
+    const started = Date.now();
+    assert.deepEqual(nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z") }), []);
+    assert.ok(Date.now() - started < 500, `at once (${Date.now() - started} ms)`);
+    // its EXRULE still takes its weekend runs out
+    assert.deepEqual(iso(walkRuns(rrule, { fromStart: true, count: 3 })), ["2026-01-01T08:00:00.000Z", "2026-01-02T08:00:00.000Z", "2026-01-05T08:00:00.000Z"]);
+  });
+
+  test("a minutely rule of some months finds its next run months ahead in time", () => {
+    const cases = [
+      ["DTSTART;TZID=Europe/Brussels:20260101T000000 RRULE:FREQ=MINUTELY;INTERVAL=1;BYMONTH=1,2,3", "2026-04-01T00:00:00Z", "2026-12-31T23:00:00.000Z"],
+      ["DTSTART;TZID=Europe/Brussels:20260101T000000 RRULE:FREQ=MINUTELY;INTERVAL=1;BYMONTH=1,2,3,4,5,6,7,8,9", "2026-10-01T00:00:00Z", "2026-12-31T23:00:00.000Z"],
+      ["DTSTART;TZID=Australia/Lord_Howe:20290726T074340 RRULE:FREQ=MINUTELY;INTERVAL=1;BYMONTH=2,6;WKST=WE", "2029-07-27T00:00:00Z", "2030-01-31T13:00:40.000Z"],
+    ];
+    for (const [rrule, after, next] of cases) {
+      const started = Date.now();
+      assert.deepEqual(iso(nextRuns(rrule, { after: new Date(after), count: 2 })), [next, new Date(new Date(next).getTime() + 60000).toISOString()], rrule);
+      assert.ok(Date.now() - started < 500, `at once (${Date.now() - started} ms)`);
+    }
+  });
+});
