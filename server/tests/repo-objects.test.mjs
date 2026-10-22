@@ -810,3 +810,58 @@ describe("a fresh clone that turns the usage on, where a file was deleted in git
     assert.equal(fx.fileExists("other", "credentials", "old.yaml"), false);
   });
 });
+
+describe("turning the usage on while the repository is busy", () => {
+  test("the flag is turned off again and the report says so ; saving it again hands the app's objects over", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+    fx.cloneEmpty("other");
+    // saved by Repository.update first
+    fx.rowNamed("repositories", "other").use_for_credentials = 1;
+    const wait = { ...Engine.CLAIM_WAIT };
+    Object.assign(Engine.CLAIM_WAIT, { totalMs: 30, everyMs: 10 });
+    // a push or a long pull holds the claim all the wait
+    fx.state.busy.other = Infinity;
+    let report;
+    try {
+      report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 }, { pull: false });
+    } finally {
+      Object.assign(Engine.CLAIM_WAIT, wait);
+      fx.state.busy = {};
+    }
+    assert.equal(report.credentials.turnedOff, true);
+    assert.match(
+      await RepoObjects.usageReportText(report),
+      /^\nCredentials could not follow the usage: Repository 'other' is busy \(a pull or a push is running\): the usage was not turned on, nothing was read in nor written - save it again in a moment$/,
+    );
+    assert.doesNotMatch(report.credentials.error, /nothing was saved/);
+    assert.equal(fx.rowNamed("repositories", "other").use_for_credentials, 0);
+    assert.equal(fx.rowNamed("credentials", "app-cred").repository ?? null, null);
+    // saved again : the flag changes again, the activation runs
+    fx.rowNamed("repositories", "other").use_for_credentials = 1;
+    CrudModel.flushAllLocal();
+    const again = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 }, { pull: false });
+    assert.deepEqual(again.credentials.activated.written, ["app-cred"]);
+    assert.equal(fx.rowNamed("credentials", "app-cred").repository, "other");
+  });
+
+  test("the flag that cannot be turned off again is said as it is", async () => {
+    fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+    fx.cloneEmpty("other");
+    fx.rowNamed("repositories", "other").use_for_credentials = 1;
+    const wait = { ...Engine.CLAIM_WAIT };
+    Object.assign(Engine.CLAIM_WAIT, { totalMs: 30, everyMs: 10 });
+    fx.state.busy.other = Infinity;
+    fx.state.failing = /^UPDATE AnsibleForms\.`repositories` SET \?/;
+    let report;
+    try {
+      report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 }, { pull: false });
+    } finally {
+      Object.assign(Engine.CLAIM_WAIT, wait);
+      fx.state.busy = {};
+      fx.state.failing = null;
+    }
+    assert.equal(report.credentials.turnedOff, false);
+    assert.match(report.credentials.error, /the usage is saved but nothing was handed over - turn it off, save, and turn it on again/);
+  });
+});

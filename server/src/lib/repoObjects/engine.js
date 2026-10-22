@@ -1466,11 +1466,39 @@ export async function usageReportText(report) {
 }
 
 /**
+ * Turns a usage just saved off again : its activation could not run (the repository busy), and a
+ * flag left on with nothing handed over would never be tried again - saving the repository again
+ * changes no flag, and its pulls only read git in. Off, the usage and what the repository holds
+ * stay one ; saving it again turns it on and hands the objects over.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   e (Error): why the activation did not run.
+ *
+ * Returns:
+ *   Promise<object>: the type's report : { error (what happened), turnedOff (whether the flag is
+ *     off again) }.
+ */
+async function undoActivation(desc, name, e) {
+  const why = `Repository '${name}' is busy (a pull or a push is running)`;
+  try {
+    await mysql.do("UPDATE AnsibleForms.`repositories` SET ? WHERE name = ?", [{ [desc.flag]: 0 }, name]);
+    logger.warning(`${why}: the usage for ${holdingOf(desc)} is turned off again, nothing was handed over (${e.message || e})`);
+    return { error: `${why}: the usage was not turned on, nothing was read in nor written - save it again in a moment`, turnedOff: true };
+  } catch (e2) {
+    logger.error(`${why}, and its usage for ${holdingOf(desc)} could not be turned off again: ${e2.message || e2}`);
+    return { error: `${why}: the usage is saved but nothing was handed over - turn it off, save, and turn it on again (${e2.message || e2})`, turnedOff: false };
+  }
+}
+
+/**
  * Follows a repository made, or no longer, a type's repository : made one, it takes the app's
  * objects (activate) ; no longer one, its objects are unlinked and stay in the app (deactivate) ;
  * several types at once in APPLY_ORDER, the repository pulled once. What it did is put in
  * opts.report, by type, for the answer. A failure is logged, never thrown : the repository
- * itself was saved.
+ * itself was saved. An activation the repository is too busy for is undone (undoActivation) :
+ * its flag turned off again, said in the report.
  *
  * Args:
  *   before (object|null): the repository as it was (null for a new one).
@@ -1503,7 +1531,9 @@ export async function afterUsageChange(before, name, now, opts = {}) {
       } else if (pulled && !r.pull) r.pull = pulled;
     } catch (e) {
       logger.error(`The ${key} of repository '${name}' could not follow its usage: ${e.message || e}`);
-      report[key] = { error: e.message || String(e) };
+      // the repository busy all the wait : nothing read in nor written, the flag turned off again
+      if (isOn && e instanceof Errors.ConflictError) report[key] = await undoActivation(await descriptorOf(key), name, e);
+      else report[key] = { error: e.message || String(e) };
     }
   }
   if (opts.report) Object.assign(opts.report, report);

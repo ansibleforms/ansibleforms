@@ -6674,7 +6674,9 @@
       the database kept when the file gives none), and what stays in the app: objects the config seed manages,
       runners an RTE registered itself or waiting for approval, and an object named as a file of the repository
       that is refused or waits (it follows that file once the file is read in, never a second file of its name).
-      What the pull before it took is said in its report too. **The app: back to git.** Editing a linked object
+      What the pull before it took is said in its report too. A repository a pull or a push holds for the whole
+      wait is not turned on: the usage is turned off again, nothing written, said in its report - save it again in
+      a moment. **The app: back to git.** Editing a linked object
       rewrites only the fields that changed in its file (its `${ENV}` references, comments and other keys kept),
       a new object is written as a new file, deleting one deletes its file; all wait for the repository's Push.
       A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)

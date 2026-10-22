@@ -254,6 +254,8 @@ class Repository extends CrudModel {
       try {
         const objects = await repoObjects()
         const report = await objects.afterUsageChange(null, data.name, data, { pull: false })
+        // a usage its activation turned off again (the repository busy) : the record read fresh
+        if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name: data.name })
         // what it took, said after the clone's own lines : the create answered long ago, so the
         // repository's page is where its admin reads it
         const text = await objects.usageReportText(report)
@@ -363,7 +365,8 @@ class Repository extends CrudModel {
    * credentials, the runners ...) : made one, it takes the app's objects of each ; no longer one,
    * its objects are unlinked and stay in the app (lib/repoObjects/engine.js afterUsageChange, the
    * repository pulled once). What it did is put in opts.report, by type, for the answer. A failure
-   * is logged, never thrown : the repository itself was saved.
+   * is logged, never thrown : the repository itself was saved. A usage whose activation the
+   * repository was too busy for is turned off again (said in the report) : its record read fresh.
    *
    * Args:
    *   before (object): the repository as it was.
@@ -377,7 +380,9 @@ class Repository extends CrudModel {
     try {
       const flags = OBJECT_FLAGS.join(", ")
       const rows = await mysql.do(`SELECT ${flags} FROM AnsibleForms.\`repositories\` WHERE name = ?`, [name])
-      return await (await repoObjects()).afterUsageChange(before, name, rows?.[0] || {}, { report: opts.report })
+      const report = await (await repoObjects()).afterUsageChange(before, name, rows?.[0] || {}, { report: opts.report })
+      if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name })
+      return report
     } catch (e) {
       logger.error(`The objects of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
       return {}
