@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
 
 process.env.DB_HOST ||= "127.0.0.1";
 process.env.DB_PORT ||= "3306";
@@ -220,6 +221,33 @@ describe("a link in the repository that leads outside it", () => {
     CrudModel.flushAllLocal();
     await RepoObjects.syncRepository(credentials, "creds");
     assert.equal(fx.rowNamed("credentials", "smb").password, "enc:pw");
+  });
+
+  test("an object file that is a link leading outside, or a folder : refused in the pull output and the preview, never read", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-")), "x.yaml");
+    fs.writeFileSync(outside, YAML.stringify(gitCredential("planted")));
+    fs.symlinkSync(outside, path.join(fx.ROOT, "creds", "credentials", "planted.yaml"));
+    fs.symlinkSync(path.dirname(outside), path.join(fx.ROOT, "creds", "credentials", "dir.yaml"));
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(summary.created, 1);
+    assert.equal(fx.rowNamed("credentials", "planted"), undefined);
+    assert.deepEqual(summary.refused, [
+      { file: "credentials/dir.yaml", reasons: ["a link that leads outside the repository: never read"] },
+      { file: "credentials/planted.yaml", reasons: ["a link that leads outside the repository: never read"] },
+    ]);
+    assert.match(RepoObjects.summaryText(credentials, summary), /Refused credentials\/planted\.yaml: a link that leads outside the repository/);
+    // a folder in the repository named as a file
+    fs.mkdirSync(path.join(fx.ROOT, "creds", "credentials", "inside.yaml"));
+    const preview = await RepoObjects.preview(credentials, "creds");
+    assert.deepEqual(
+      preview.refused.map((r) => [r.file, r.reasons[0]]),
+      [
+        ["credentials/dir.yaml", "a link that leads outside the repository: never read"],
+        ["credentials/inside.yaml", "not a file (a folder, or a link to one): never read"],
+        ["credentials/planted.yaml", "a link that leads outside the repository: never read"],
+      ],
+    );
   });
 
   test("a linked object's file replaced by a link : its edit never written through it", async () => {

@@ -396,17 +396,19 @@ export function fileNameFor(name, taken = () => false, fallback = "object") {
 
 /**
  * The object files of a folder of a repository : the yaml files right in it, sorted ; a link that
- * leads outside the repository, a folder or anything else is left out.
+ * leads outside the repository (or nowhere), a folder (or a link to one) or anything else is left
+ * out - each said in `refused` when given, as its pull and its preview refuse it.
  *
  * Args:
  *   repoDir (string): the repository's working tree.
  *   folder (string): the folder, relative to it (credentials).
  *   pattern (RegExp): the file names taken (YAML_FILE when not given).
+ *   refused (object[]|null): filled with each entry of that name left out : { file, reason }.
  *
  * Returns:
  *   string[]: the files, relative to the repository (credentials/git.yaml).
  */
-export function filesIn(repoDir, folder, pattern = YAML_FILE) {
+export function filesIn(repoDir, folder, pattern = YAML_FILE, refused = null) {
   const dir = path.join(repoDir, folder);
   let entries;
   try {
@@ -418,15 +420,21 @@ export function filesIn(repoDir, folder, pattern = YAML_FILE) {
   for (const entry of entries) {
     if (!pattern.test(entry.name)) continue;
     const abs = path.join(dir, entry.name);
+    const file = `${folder}/${entry.name}`;
+    let reason = null;
     try {
       // a link is followed only when it stays in the repository
       const real = fs.realpathSync(abs);
-      if (!real.startsWith(fs.realpathSync(repoDir) + path.sep)) continue;
-      if (!fs.statSync(real).isFile()) continue;
+      if (!real.startsWith(fs.realpathSync(repoDir) + path.sep)) reason = "a link that leads outside the repository: never read";
+      else if (!fs.statSync(real).isFile()) reason = "not a file (a folder, or a link to one): never read";
     } catch {
+      reason = "a link that leads nowhere, or not readable: never read";
+    }
+    if (reason) {
+      refused?.push({ file, reason });
       continue;
     }
-    files.push(`${folder}/${entry.name}`);
+    files.push(file);
   }
   return files.sort();
 }

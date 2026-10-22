@@ -349,8 +349,10 @@ async function namesOf(key) {
  */
 async function readFiles(desc, name, ctx) {
   const repoDir = Repo.folderOf(name);
-  // a type kept as a list in one file : its entries, each as a file of its own would be
-  const files = desc.listFile ? readListFile(desc, name) : filesIn(repoDir, desc.folder).map((file) => {
+  // a type kept as a list in one file : its entries, each as a file of its own would be ; a file
+  // that is a link leading outside the repository, or a folder, refused (said, never read)
+  const links = [];
+  const files = desc.listFile ? readListFile(desc, name) : filesIn(repoDir, desc.folder, undefined, links).map((file) => {
     let text;
     try {
       text = fs.readFileSync(path.join(repoDir, file), "utf8");
@@ -365,6 +367,8 @@ async function readFiles(desc, name, ctx) {
     }
   });
   if (files === null) return null;
+  for (const l of links) files.push({ file: l.file, errors: [l.reason], object: null, absent: false });
+  files.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
   // a file the type does not import (an announcement already ended : descriptor.notImported) : not
   // refused, said on a line of its own ; its object, if the app has it, goes
   for (const f of files) {
@@ -1248,10 +1252,11 @@ export async function preview(desc, name) {
     // a list file's entries, or each file of the folder ; a list file that cannot be read (a link
     // that leads outside the repository) is said refused, as its sync refuses it
     let parsedFiles = [];
+    const links = [];
     try {
       parsedFiles = desc.listFile
         ? readListFile(desc, name) || []
-        : filesIn(Repo.folderOf(name), desc.folder).map((file) => {
+        : filesIn(Repo.folderOf(name), desc.folder, undefined, links).map((file) => {
             try {
               return desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
             } catch {
@@ -1261,6 +1266,8 @@ export async function preview(desc, name) {
     } catch (e) {
       refused.push({ file: desc.listFile, reasons: [e.message || String(e)] });
     }
+    // a file that is a link leading outside, or a folder : refused, as its sync refuses it
+    refused.push(...links.map((l) => ({ file: l.file, reasons: [l.reason] })));
     for (const parsed of parsedFiles) {
       try {
         // one the type does not import (an announcement already ended) : counted apart
