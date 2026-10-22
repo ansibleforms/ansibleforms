@@ -17,6 +17,7 @@ import Settings, { validHeaderLinks } from "../../models/settings.model.js";
 import appConfig from "../../../config/app.config.js";
 import { saveSettingsFields } from "../appearance.js";
 import { saveEnvValues } from "../envSave.js";
+import EnvSettings from "../envSettings.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
 import { same, parseMapFile, fileBeside } from "./yamlFile.js";
@@ -141,8 +142,9 @@ export function appearanceType(spec) {
    *   string[]: the fields.
    */
   function changedFields(declared, current, opts = {}) {
-    const seeded = opts.fromSeed ? [] : seededOf(current);
-    return Object.keys(declared).filter((k) => !seeded.includes(k) && !same(comparable(declared[k]), comparable(current?.[k])));
+    // the seed's fields, and those set in the real environment (that value wins : never applied)
+    const held = opts.fromSeed ? [] : [...seededOf(current), ...(current?._envSet || [])];
+    return Object.keys(declared).filter((k) => !held.includes(k) && !same(comparable(declared[k]), comparable(current?.[k])));
   }
 
   return singleType({
@@ -160,7 +162,12 @@ export function appearanceType(spec) {
         out.header_links = validHeaderLinks(row.header_links || "[]");
         if (!out.header_links.length) out.header_links = null;
       }
-      for (const field of envFields) out[field] = ENV[field].read();
+      // a variable set in the real environment is not the app's to save : none here, never written
+      // to the repository (_envSet : not applied from it, said)
+      const managed = envFields.length ? await EnvSettings.readManaged() : null;
+      const envSet = envFields.filter((field) => EnvSettings.isOverridden(ENV[field].name, managed));
+      for (const field of envFields) out[field] = envSet.includes(field) ? null : ENV[field].read();
+      Object.defineProperty(out, "_envSet", { value: envSet });
       for (const kind of images) out[kind] = await BRAND_IMAGES[kind].get();
       // the fields the config seed manages : the seed's, never the repository's
       out._seedManaged = await hold.managed();
@@ -190,19 +197,27 @@ export function appearanceType(spec) {
       const changed = changedFields(declared, current, opts);
       // the settings row's fields, as the pages save them
       const row = Object.fromEntries(changed.filter((k) => rowFields.includes(k)).map((k) => [k, declared[k]]));
-      if (Object.keys(row).length) await saveSettingsFields(row, opts);
       // the environment settings, as their pages save them
       const env = Object.fromEntries(changed.filter((k) => envFields.includes(k)).map((k) => [ENV[k].name, ENV[k].write(declared[k])]));
       const notes = [];
+      const who = { user: opts.fromSeed ? "config seed" : "repository" };
+      // the environment settings checked before anything is saved : a file refused whole, never
+      // applied by halves
+      if (Object.keys(env).length) await saveEnvValues(env, who, { ...opts, dryRun: true });
+      if (Object.keys(row).length) await saveSettingsFields(row, opts);
       if (Object.keys(env).length) {
-        const { restartRequired } = await saveEnvValues(env, { user: opts.fromSeed ? "config seed" : "repository" }, opts);
+        const { restartRequired } = await saveEnvValues(env, who, opts);
         if (restartRequired.length) notes.push(`Saved ; applied at the next restart: ${restartRequired.join(", ")}`);
       }
       // the images : the one named, or the bundled one
       for (const kind of images) if (changed.includes(kind)) await BRAND_IMAGES[kind].set(declared[kind], opts);
       return notes;
     },
-    // a repository's file declaring a field the seed manages : not applied, said
-    notesOf: hold.notesOf,
+    // a repository's file declaring a field the seed manages, or one set in the environment : not
+    // applied, said
+    notesOf: (declared, current) => {
+      const envSet = Object.keys(declared).filter((k) => (current?._envSet || []).includes(k));
+      return [...hold.notesOf(declared, current), ...(envSet.length ? [`Set in the environment, not applied: ${envSet.map((k) => ENV[k].name).join(", ")}`] : [])];
+    },
   });
 }

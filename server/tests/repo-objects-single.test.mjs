@@ -534,6 +534,39 @@ describe("the branding and its images", () => {
 });
 
 // ─── the log lines of a type kept in one file ───────────────────────────────────
+describe("the branding's language, an environment setting", () => {
+  test("set in the real environment : never written to the repository, a file's not applied (said), its other fields applied", async () => {
+    process.env.DEFAULT_LANGUAGE = "fr";
+    try {
+      fx.cloneEmpty("cfg");
+      await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
+      assert.equal(fx.readObject("cfg", ".", "branding.yaml").default_language, undefined, "the deployment's value is not the repository's");
+      writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_language: de\n");
+      const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+      assert.deepEqual(summary.refused, []);
+      assert.equal(fx.state.tables.settings[0].app_name, "From git");
+      assert.equal(process.env.DEFAULT_LANGUAGE, "fr");
+      assert.match(RepoObjects.summaryText(await desc("branding"), summary), /Set in the environment, not applied: DEFAULT_LANGUAGE/);
+      assert.equal((await RepoObjects.syncRepository(await desc("branding"), "cfg")).unchanged, 1);
+    } finally {
+      delete process.env.DEFAULT_LANGUAGE;
+    }
+  });
+
+  test("the environment settings not editable (ALLOW_ENV_EDIT=0) : the file refused whole, nothing of it applied", async () => {
+    const { default: appConfig } = await import("./__mocks__/app.config.js");
+    appConfig.allowEnvEdit = false;
+    try {
+      writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_language: de\n");
+      const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+      assert.equal(summary.refused.length, 1, JSON.stringify(summary));
+      assert.equal(fx.state.tables.settings[0].app_name, "Old name", "never applied by halves");
+    } finally {
+      appConfig.allowEnvEdit = true;
+    }
+  });
+});
+
 describe("the log names a type kept in one file by its label", () => {
   test("turned on, applied from git, saved from the app : sentences that read as such", async () => {
     const lines = [];

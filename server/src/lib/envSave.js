@@ -129,7 +129,8 @@ export function onSettingsPage(name, docs) {
  * Args:
  *   updates (object): { NAME: value } ; an empty value clears it (back to its default).
  *   who (object): { user, ip } for the audit entry.
- *   opts (object): { fromSeed (true : the config seed's own write) }.
+ *   opts (object): { fromSeed (true : the config seed's own write), dryRun (true : checked only,
+ *     nothing written) }.
  *
  * Returns:
  *   Promise<object>: { changed: [name], restartRequired: [name] }.
@@ -177,6 +178,8 @@ export async function saveEnvValues(updates, who = {}, opts = {}) {
     const problem = EnvSettings.validate(name, updates[name], docs.get(name));
     if (problem) throw new EnvSaveError(400, problem);
   }
+  // only checked (opts.dryRun) : a caller that saves more checks these first, before anything
+  if (opts.dryRun) return { changed: names, restartRequired: [] };
 
   // PERSIST FIRST, then apply. applyLive mutates the running process - the log level, the paths,
   // the db pool size, the TLS context - and writeManaged can still fail after that (a read-only
