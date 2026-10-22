@@ -281,8 +281,7 @@ class Repository extends CrudModel {
         if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name: data.name })
         // what it took, said after the clone's own lines : the create answered long ago, so the
         // repository's page is where its admin reads it
-        const text = await objects.usageReportText(report)
-        if (text) await Repository.writeState("update AnsibleForms.`repositories` set pull_output = CONCAT(COALESCE(pull_output, ''), ?) where name = ?", [text, data.name], { name: data.name })
+        await Repository.appendUsageReport(data.name, report)
       } catch (e) {
         logger.error(`Repository '${data.name}' could not take the objects of its usages: ${helpers.getError(e)}`)
       }
@@ -406,10 +405,34 @@ class Repository extends CrudModel {
       const rows = await mysql.do(`SELECT ${flags} FROM AnsibleForms.\`repositories\` WHERE name = ?`, [name])
       const report = await (await repoObjects()).afterUsageChange(before, name, rows?.[0] || {}, { report: opts.report })
       if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name })
+      // what it did after the lines of the pull it ran : its page's last pull output tells it all
+      await Repository.appendUsageReport(name, report)
       return report
     } catch (e) {
       logger.error(`The objects of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
       return {}
+    }
+  }
+
+  /**
+   * Adds what turning a repository's usages on or off did (lib/repoObjects/engine.js
+   * usageReportText : the objects written, read in, kept, unlinked) to its last pull output, after
+   * the lines of the pull or clone it ran : its page shows the files the activation wrote, never
+   * only a pull saying they are not there. A failure is logged, never thrown.
+   *
+   * Args:
+   *   name (string): the repository.
+   *   report (object): what it did, by type (afterUsageChange's).
+   *
+   * Returns:
+   *   Promise<void>
+   */
+  static async appendUsageReport(name, report) {
+    try {
+      const text = await (await repoObjects()).usageReportText(report)
+      if (text) await Repository.writeState("update AnsibleForms.`repositories` set pull_output = CONCAT(COALESCE(pull_output, ''), ?) where name = ?", [text, name], { name })
+    } catch (e) {
+      logger.error(`What the usages of repository '${name}' did could not be added to its pull output: ${helpers.getError(e)}`)
     }
   }
 

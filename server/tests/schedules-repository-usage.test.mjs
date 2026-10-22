@@ -13,6 +13,8 @@ process.env.DB_PASSWORD ||= "test";
 // the repositories as the database holds them
 let repos;
 const calls = [];
+// the statements run, for the pull output written
+const queries = [];
 vi.mock("../src/models/repo.model.js", () => ({
   default: {
     rename: () => true,
@@ -48,6 +50,7 @@ vi.mock("../src/models/crud.model.js", () => {
 vi.mock("../src/models/db.model.js", () => ({
   default: {
     do: async (sql, vars = []) => {
+      queries.push({ sql, vars });
       if (/SELECT name FROM AnsibleForms.`repositories` WHERE use_for_schedules AND name <> \?/.test(sql)) {
         return repos.filter((r) => Number(r.use_for_schedules) && r.name !== vars[0]).map((r) => ({ name: r.name }));
       }
@@ -87,6 +90,7 @@ const { listSections } = await import("../src/lib/seed.js");
 
 beforeEach(() => {
   calls.length = 0;
+  queries.length = 0;
   repos = [
     { id: 1, name: "ops", use_for_schedules: 1, status: "success" },
     { id: 2, name: "forms", use_for_schedules: 0, status: "success" },
@@ -137,6 +141,11 @@ describe("turning it on and off", () => {
     await Repository.update({ use_for_schedules: 1 }, "forms", { report });
     assert.deepEqual(calls, ["activate:forms:pull"]);
     assert.deepEqual(report.schedules.activated.written, ["Nightly"]);
+    // its last pull output tells what the activation wrote, after the lines of the pull it ran
+    const write = queries.find((q) => /set pull_output = CONCAT\(COALESCE\(pull_output, ''\), \?\)/.test(q.sql));
+    assert.ok(write, "the pull output is added to");
+    assert.equal(write.vars[1], "forms");
+    assert.match(write.vars[0], /^\nNow holds the schedules: .*1 written to it/);
   });
 
   test("off : its schedules are unlinked, kept in the app", async () => {
