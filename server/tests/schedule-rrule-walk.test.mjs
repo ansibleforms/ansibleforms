@@ -1,8 +1,9 @@
 // The runs of a rrule are walked from now, never from a DTSTART of years ago, and give the runs a
-// walk from the DTSTART gives (lib/scheduleRrule.js walkRuns) : a weekly, monthly or yearly rule
-// by rrule.js from the period now is in, a daily, hourly or minutely one day by day here - rrule.js
-// loses its way in a minutely or hourly rule whose days and hours are both filtered (Monday to
-// Friday, 9 to 17), skipping days or walking for ever.
+// walk from the DTSTART gives (lib/scheduleRrule.js walkRuns) : every rule period by period here,
+// from the period now is in - rrule.js loses its way in a minutely or hourly rule whose days and
+// hours are both filtered (Monday to Friday, 9 to 17), skipping days or walking for ever, takes
+// the first run for a BYSETPOS counted from the end past a period's runs, and keeps a BYEASTER in
+// periods the INTERVAL never reaches.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
 import rrulePkg from "rrule";
@@ -161,4 +162,27 @@ describe("a minutely or hourly rule whose days and hours are filtered", () => {
       }
     });
   }
+});
+
+describe("a rule rrule.js reads otherwise than dateutil gives dateutil's runs", () => {
+  // each rule, and its first runs as python-dateutil gives them
+  const cases = [
+    // the first Saturday of the months with five : none in a month with four
+    ["DTSTART:20260101T090000Z RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=SA;BYSETPOS=-5", ["2026-01-03T09:00:00.000Z", "2026-05-02T09:00:00.000Z", "2026-08-01T09:00:00.000Z", "2026-10-03T09:00:00.000Z"]],
+    ["DTSTART:20260101T090000Z RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-23", ["2026-07-01T09:00:00.000Z", "2026-12-01T09:00:00.000Z", "2027-03-01T09:00:00.000Z", "2027-12-01T09:00:00.000Z"]],
+    // BYEASTER only in the months and weeks the INTERVAL reaches
+    ["DTSTART:20231006T010050Z RRULE:FREQ=MONTHLY;INTERVAL=7;BYEASTER=-3;BYHOUR=1", ["2034-04-06T01:00:50.000Z", "2041-04-18T01:00:50.000Z", "2048-04-02T01:00:50.000Z", "2051-03-30T01:00:50.000Z"]],
+    ["DTSTART:20250330T000013Z RRULE:FREQ=MONTHLY;INTERVAL=3;BYEASTER=-1", ["2027-03-27T00:00:13.000Z", "2029-03-31T00:00:13.000Z", "2032-03-27T00:00:13.000Z", "2035-03-24T00:00:13.000Z"]],
+    ["DTSTART:20260119T023032Z RRULE:FREQ=WEEKLY;INTERVAL=7;BYEASTER=0", ["2032-03-28T02:30:32.000Z", "2043-03-29T02:30:32.000Z", "2054-03-29T02:30:32.000Z", "2056-04-02T02:30:32.000Z"]],
+  ];
+  for (const [rrule, runs] of cases) {
+    test(rrule, () => {
+      assert.deepEqual(iso(walkRuns(rrule, { fromStart: true, count: 4 })), runs);
+    });
+  }
+
+  test("a week a BYMONTH leaves one day of has no second-to-last run", () => {
+    const rrule = "DTSTART;TZID=UTC:20260702T013000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU,FR;BYMONTH=11,12;BYSETPOS=-2";
+    assert.deepEqual(iso(walkRuns(rrule, { after: new Date("2028-10-01T00:00:00Z"), count: 2 })), ["2028-11-07T01:30:00.000Z", "2028-11-14T01:30:00.000Z"]);
+  });
 });

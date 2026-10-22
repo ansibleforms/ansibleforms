@@ -11,13 +11,14 @@
 //     -1 ...), WKST a weekday
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
 //   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
-//   every rule is walked from now, never from a DTSTART of years ago : a weekly, monthly or
-//     yearly rule from the period now is in, a daily, hourly or minutely one from the day,
-//     hour or minute now is in
-//   a daily, hourly or minutely rule is walked here, day by day (its days kept by their BYMONTH,
-//     BYMONTHDAY, BYYEARDAY, BYWEEKNO and BYDAY, its times by its BYHOUR, BYMINUTE, BYSECOND and
-//     BYSETPOS) : rrule.js loses its way in one whose days are filtered and whose hours are too
-//     (Monday to Friday, 9 to 17) ; a weekly, monthly or yearly one by rrule.js
+//   every rule is walked from now, never from a DTSTART of years ago : from the period (the
+//     year, month, week, day, hour or minute) now is in
+//   every rule is walked here, period by period (its days kept by their BYMONTH, BYMONTHDAY,
+//     BYYEARDAY, BYWEEKNO, BYDAY and BYEASTER, its times by its BYHOUR, BYMINUTE and BYSECOND,
+//     BYSETPOS picking among the runs of each period, as dateutil does) : rrule.js loses its way
+//     in one whose days are filtered and whose hours are too (Monday to Friday, 9 to 17), takes
+//     the first run for a BYSETPOS counted from the end past the runs a period has (BYSETPOS=-5
+//     of four Saturdays) and keeps a BYEASTER in periods its INTERVAL never reaches
 //   a rule whose times or days can never meet (FREQ=HOURLY;INTERVAL=2;BYHOUR=1 from midnight,
 //     BYMONTH=2;BYMONTHDAY=30) is seen at once as one that never fires
 //   its runs are looked for in growing windows up to 50 years ahead, in a thread of their own
@@ -28,9 +29,9 @@
 //     the first
 //   a preview shows the next ten runs
 //
-// rrule.js is a port of python-dateutil's rrule : the BYxxx parts expand as dateutil expands
-// them. It is given the rule in the zone's wall clock (a "floating" time), and luxon turns each
-// run into the moment it is in that zone.
+// rrule.js is a port of python-dateutil's rrule : it reads the rule, and keeps the days of a year
+// a rule's BYxxx parts name (dayRuleOf). The rule is walked in the zone's wall clock (a
+// "floating" time), and luxon turns each run into the moment it is in that zone.
 import { Worker, MessageChannel, receiveMessageOnPort } from "node:worker_threads";
 import rrulePkg from "rrule";
 import { DateTime } from "luxon";
@@ -562,10 +563,90 @@ function neverFiresAtAll(spec, start) {
 }
 
 /**
- * A daily, hourly or minutely rule walked here : its periods (days, hours or minutes, every
- * INTERVAL of them from the DTSTART's), each kept when its day is (dayRuleOf) and, for an hour or
- * a minute, its hour and minute are, then its times in it (BYHOUR, BYMINUTE, BYSECOND, as many as
- * its period holds), BYSETPOS picking among them.
+ * The runs BYSETPOS picks among the runs of a period, in order : the n-th from the start, or from
+ * the end when negative ; one past the runs the period has picks none.
+ *
+ * Args:
+ *   set (number[]): the runs of the period, in order.
+ *   bysetpos (number[]): the rule's BYSETPOS (empty : every run).
+ *
+ * Returns:
+ *   number[]: the runs picked, in order.
+ */
+function pickSet(set, bysetpos) {
+  if (!bysetpos.length) return set;
+  const picked = bysetpos.map((p) => set[p > 0 ? p - 1 : set.length + p]).filter((t) => t !== undefined);
+  return [...new Set(picked)].sort((a, b) => a - b);
+}
+
+/**
+ * The times of a rule's runs from the start of the day (a weekly, monthly or yearly rule : its
+ * BYHOUR, BYMINUTE and BYSECOND) or of its period (a daily, hourly or minutely one : as many of
+ * them as the period holds, BYSETPOS picking among them, the period's runs being these times).
+ *
+ * Args:
+ *   spec (object): specOf's result.
+ *
+ * Returns:
+ *   number[]: the times, ms, in order.
+ */
+function timesOf(spec) {
+  const product = (lists) => lists.reduce((acc, [values, size]) => acc.flatMap((a) => values.map((v) => a + v * size)), [0]);
+  const parts = [[spec.bysecond, 1000]];
+  if (spec.freq !== RRule.MINUTELY) parts.unshift([spec.byminute, MINUTE]);
+  if (spec.freq <= RRule.DAILY) parts.unshift([spec.byhour, HOUR]);
+  const times = [...new Set(product(parts))].sort((a, b) => a - b);
+  return spec.freq >= RRule.DAILY ? pickSet(times, spec.bysetpos) : times;
+}
+
+/**
+ * The periods of a rule, every INTERVAL of them from the DTSTART's : a minute, an hour, a day or
+ * a week (from its WKST) of a fixed length, a month or a year of the calendar.
+ *
+ * Args:
+ *   spec (object): specOf's result.
+ *   start (number): the DTSTART, floating ms.
+ *
+ * Returns:
+ *   object: { startOf (k => where the k-th period starts), endOf (k => where it ends), firstFrom
+ *     (t => the first period that ends after t) }.
+ */
+function periodsOf(spec, start) {
+  const f = fieldsOf(start);
+  let startOf;
+  let endOf;
+  let indexOf;
+  if (spec.freq === RRule.MONTHLY || spec.freq === RRule.YEARLY) {
+    const months = spec.freq === RRule.YEARLY ? 12 : 1;
+    const step = spec.interval * months;
+    const first = f.year * 12 + (spec.freq === RRule.YEARLY ? 0 : f.month - 1);
+    const monthStart = (m) => Date.UTC(Math.floor(m / 12), m % 12, 1);
+    startOf = (k) => monthStart(first + k * step);
+    endOf = (k) => monthStart(first + k * step + months);
+    indexOf = (t) => {
+      const g = fieldsOf(t);
+      return Math.floor((g.year * 12 + g.month - 1 - first) / step);
+    };
+  } else {
+    const unit = { [RRule.WEEKLY]: 7 * DAY, [RRule.DAILY]: DAY, [RRule.HOURLY]: HOUR, [RRule.MINUTELY]: MINUTE }[spec.freq];
+    const step = spec.interval * unit;
+    const base = spec.freq === RRule.WEEKLY ? dayOf(start) - ((f.weekday - spec.wkst + 7) % 7) * DAY : Math.floor(start / unit) * unit;
+    startOf = (k) => base + k * step;
+    endOf = (k) => base + k * step + unit;
+    indexOf = (t) => Math.floor((t - base) / step);
+  }
+  const firstFrom = (t) => {
+    const k = Math.max(0, indexOf(t));
+    return endOf(k) <= t ? k + 1 : k;
+  };
+  return { startOf, endOf, firstFrom };
+}
+
+/**
+ * A rule walked here : its periods (every INTERVAL of them from the DTSTART's), the days each
+ * holds that are kept (dayRuleOf), its times on them (timesOf), BYSETPOS picking among the runs of
+ * a weekly, monthly or yearly period as it does among the times of a shorter one. An hour or a
+ * minute is kept when its hour and minute are too.
  *
  * Args:
  *   spec (object): specOf's result.
@@ -576,53 +657,56 @@ function neverFiresAtAll(spec, start) {
  *     applied.
  */
 function periodWalker(spec, start) {
-  const unit = { [RRule.DAILY]: DAY, [RRule.HOURLY]: HOUR, [RRule.MINUTELY]: MINUTE }[spec.freq];
-  const base = Math.floor(start / unit) * unit;
-  const step = spec.interval * unit;
-  // the times of a period, from its start
-  const product = (lists) => lists.reduce((acc, [values, size]) => acc.flatMap((a) => values.map((v) => a + v * size)), [0]);
-  const parts = [[spec.bysecond, 1000]];
-  if (spec.freq !== RRule.MINUTELY) parts.unshift([spec.byminute, MINUTE]);
-  if (spec.freq === RRule.DAILY) parts.unshift([spec.byhour, HOUR]);
-  let offsets = [...new Set(product(parts))].sort((a, b) => a - b);
-  if (spec.bysetpos.length) {
-    const picked = spec.bysetpos.map((p) => offsets[p > 0 ? p - 1 : offsets.length + p]).filter((o) => o !== undefined);
-    offsets = [...new Set(picked)].sort((a, b) => a - b);
-  }
+  const { startOf, endOf, firstFrom } = periodsOf(spec, start);
+  const short = spec.freq >= RRule.DAILY;
+  const times = timesOf(spec);
   // what keeps an hour or a minute : its hour, its minute
-  const hours = spec.freq !== RRule.DAILY && spec.byhour.length ? new Set(spec.byhour) : null;
+  const hours = spec.freq > RRule.DAILY && spec.byhour.length ? new Set(spec.byhour) : null;
   const minutes = spec.freq === RRule.MINUTELY && spec.byminute.length ? new Set(spec.byminute) : null;
   return (from, to) => {
     const runs = [];
     const lo = Math.max(from, start - 1);
     const hi = spec.until === null ? to : Math.min(to, spec.until);
     if (hi <= lo) return runs;
-    // the days kept between the two, in order
-    const dayRule = dayRuleOf(spec, fieldsOf(lo).year);
-    const days = dayRule ? dayRule.between(new Date(dayOf(lo)), new Date(dayOf(hi)), true).map((d) => d.getTime()) : null;
+    let k = firstFrom(lo);
+    // the days kept in the periods between the two, in order : every day of the periods each
+    // end is in, BYSETPOS counting the runs of a whole period
+    const dayRule = dayRuleOf(spec, fieldsOf(startOf(k)).year);
+    const kh = firstFrom(hi);
+    const last = startOf(kh) <= hi ? Math.max(hi, endOf(kh) - 1) : hi;
+    let days = dayRule ? dayRule.between(new Date(dayOf(startOf(k))), new Date(dayOf(last)), true).map((d) => d.getTime()) : null;
+    // a weekly, monthly or yearly rule names its days (specOf) : every day all the same
+    if (!days && !short) days = Array.from({ length: (dayOf(last) - dayOf(startOf(k))) / DAY + 1 }, (_, i) => dayOf(startOf(k)) + i * DAY);
     let at = 0;
-    let k = Math.max(0, Math.floor((lo - base) / step));
     for (;;) {
-      const p = base + k * step;
+      const p = startOf(k);
       if (p > hi) break;
       if (days) {
         // the first day kept from the period's on
         while (at < days.length && days[at] < dayOf(p)) at++;
         if (at >= days.length) break;
-        if (days[at] !== dayOf(p)) {
-          k = Math.max(k + 1, Math.ceil((days[at] - base) / step));
+        if (days[at] >= endOf(k)) {
+          k = Math.max(k + 1, firstFrom(days[at]));
           continue;
         }
+      }
+      if (!short) {
+        // a week, a month or a year : the runs of its days, BYSETPOS picking among them
+        const set = [];
+        for (let i = at; i < days.length && days[i] < endOf(k); i++) for (const time of times) set.push(days[i] + time);
+        for (const t of pickSet(set, spec.bysetpos)) if (t > lo && t <= hi) runs.push(t);
+        k++;
+        continue;
       }
       const f = hours || minutes ? fieldsOf(p) : null;
       if (hours && !hours.has(f.hour)) {
         // a minute : on to the next hour
-        k = spec.freq === RRule.MINUTELY ? Math.max(k + 1, Math.ceil((Math.floor(p / HOUR) * HOUR + HOUR - base) / step)) : k + 1;
+        k = spec.freq === RRule.MINUTELY ? Math.max(k + 1, firstFrom(Math.floor(p / HOUR) * HOUR + HOUR)) : k + 1;
         continue;
       }
       if (!minutes || minutes.has(f.minute)) {
-        for (const offset of offsets) {
-          const t = p + offset;
+        for (const time of times) {
+          const t = p + time;
           if (t > lo && t <= hi) runs.push(t);
         }
       }
@@ -633,66 +717,29 @@ function periodWalker(spec, start) {
 }
 
 /**
- * How a rule is walked from a reference : a daily, hourly or minutely one here (periodWalker), a
- * weekly, monthly or yearly one by rrule.js from the start of the period the reference is in (its
- * parts written out, specOf, so it is the same rule), a rule with a COUNT from its DTSTART.
+ * How a rule is walked : here (periodWalker) from the period a moment is in, a rule with a COUNT
+ * from its DTSTART.
  *
  * Args:
  *   options (object): the rule's options, as ruleOptions reads them.
  *   start (number): the DTSTART, floating ms.
- *   reference (number): the reference, floating ms.
  *
  * Returns:
  *   object: { never (true : it never fires), between: (from, to) => the runs after from and up to
  *     to, floating ms, in order }.
  */
-function ruleWalker(options, start, reference) {
+function ruleWalker(options, start) {
   const spec = specOf(options, start);
   if (neverFiresAtAll(spec, start)) return { never: true, between: () => [] };
-  if (spec.freq >= RRule.DAILY) {
-    const walk = periodWalker(spec, start);
-    if (!spec.count) return { never: false, between: walk };
-    // its first COUNT runs, from its DTSTART, a year at a time
-    const runs = [];
-    for (let from = start - 1; runs.length < spec.count && from < start + HORIZON_MS; from += 366 * DAY) {
-      runs.push(...walk(from, from + 366 * DAY));
-    }
-    runs.length = Math.min(runs.length, spec.count);
-    return { never: false, between: (from, to) => runs.filter((t) => t > from && t <= to) };
+  const walk = periodWalker(spec, start);
+  if (!spec.count) return { never: false, between: walk };
+  // its first COUNT runs, from its DTSTART, a year at a time
+  const runs = [];
+  for (let from = start - 1; runs.length < spec.count && from < start + HORIZON_MS; from += 366 * DAY) {
+    runs.push(...walk(from, from + 366 * DAY));
   }
-  // the start of the period the reference is in, a whole number of intervals from the DTSTART's
-  let dtstart = start;
-  if (!spec.count && reference > start) {
-    const s = fieldsOf(start);
-    const r = fieldsOf(reference);
-    const whole = (n) => Math.floor(n / spec.interval) * spec.interval;
-    let moved;
-    if (spec.freq === RRule.YEARLY) {
-      moved = Date.UTC(s.year + whole(r.year - s.year), 0, 1);
-    } else if (spec.freq === RRule.MONTHLY) {
-      moved = Date.UTC(s.year, s.month - 1 + whole((r.year - s.year) * 12 + r.month - s.month), 1);
-    } else {
-      const weekStart = (ms) => dayOf(ms) - ((fieldsOf(ms).weekday - spec.wkst + 7) % 7) * DAY;
-      moved = weekStart(start) + whole(Math.floor((weekStart(reference) - weekStart(start)) / (7 * DAY))) * 7 * DAY;
-    }
-    if (moved > start) dtstart = moved;
-  }
-  const opts = { freq: spec.freq, interval: spec.interval, wkst: spec.wkst, dtstart: new Date(dtstart) };
-  for (const key of ["bysetpos", "bymonth", "bymonthday", "byyearday", "byweekno", "byweekday", "byhour", "byminute", "bysecond"]) {
-    if (spec[key].length) opts[key] = spec[key];
-  }
-  if (spec.byeaster !== null) opts.byeaster = spec.byeaster;
-  if (spec.count) opts.count = spec.count;
-  if (spec.until !== null) opts.until = new Date(spec.until);
-  const rule = new RRule(opts);
-  return {
-    never: false,
-    between: (from, to) =>
-      rule
-        .between(new Date(from), new Date(to), true)
-        .map((d) => d.getTime())
-        .filter((t) => t > from),
-  };
+  runs.length = Math.min(runs.length, spec.count);
+  return { never: false, between: (from, to) => runs.filter((t) => t > from && t <= to) };
 }
 
 /**
@@ -716,7 +763,7 @@ export function walkRuns(value, { after = new Date(), count = 1, fromStart = fal
   const compiled = typeof value === "string" ? compileRrule(value) : value;
   // from just before its DTSTART, or from the moment asked, as the zone's wall clock shows it
   const reference = fromStart ? compiled.start - 1000 : floatingOf(after, compiled.zone);
-  const walkers = compiled.rules.map((r) => ({ kind: r.kind, ...ruleWalker(r.options, compiled.start, reference) }));
+  const walkers = compiled.rules.map((r) => ({ kind: r.kind, ...ruleWalker(r.options, compiled.start) }));
   const takes = walkers.filter((w) => w.kind === "rrule" && !w.never);
   const leaves = walkers.filter((w) => w.kind === "exrule" && !w.never);
   const runs = new Set();

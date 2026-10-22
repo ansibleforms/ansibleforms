@@ -72,7 +72,8 @@ const RRULES = [
     "BYSETPOS=0",
     "BYSETPOS=1",
     "BYSETPOS=-1",
-    "BYSETPOS=366",
+    // the last position there is, in a month that has that many runs
+    `BYSETPOS=366;BYDAY=MO,TU,WE,TH,FR,SA,SU;BYHOUR=${[...Array(24).keys()].join(",")}`,
     "BYSETPOS=367",
     "BYSETPOS=-367",
     "bysetpos=0",
