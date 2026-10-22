@@ -272,6 +272,19 @@ describe("what the new types bring to the engine", () => {
   });
 });
 
+describe("a value as the database gives it", () => {
+  test("an SSO provider's extra, a JSON column read back parsed : written as its JSON text, the next pull unchanged", async () => {
+    fx.state.tables.oauth2_providers.push({ id: 30, name: "google", provider: "oidc", issuer: "https://accounts.google.com", client_id: "id", client_secret: "enc:sec", enable: 1, extra: { prompt: "login" } });
+    const desc = await RepoObjects.descriptorOf("sso");
+    await RepoObjects.activate(desc, repoOf("sso"));
+    assert.equal(fx.readObject(repoOf("sso"), "sso", "google.yaml").extra, '{"prompt":"login"}');
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(desc, repoOf("sso"));
+    assert.deepEqual(summary.refused, []);
+    assert.equal(summary.unchanged, 1);
+  });
+});
+
 describe("a change in the app that changes other objects of the type too", () => {
   test("a runner made the default : the former default's file says so too", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });

@@ -54,7 +54,8 @@ export function fieldSet(spec) {
         const on = !!Number(v === true ? 1 : v === false ? 0 : v);
         if (on || keepFalse.includes(k)) obj[k] = on;
       } else if (given(v)) {
-        obj[k] = v;
+        // a JSON column read back parsed (oauth2_providers.extra) for a text field : its JSON text
+        obj[k] = strings.has(k) && typeof v === "object" ? JSON.stringify(v) : v;
       }
     }
     return withoutSecrets(obj, secrets);
