@@ -1399,6 +1399,7 @@ export default {
         registered: 'enregistré par son RTE',
         pending: "en attente d'approbation",
         holder: 'il contient les dépôts, jamais dans son propre fichier',
+        uriSecret: 'son uri contient un utilisateur ou un jeton : donnez-lui plutôt un identifiant',
         noSchedule: "il n'a ni cron ni rrule",
         cron: "son cron ne peut pas s'écrire en rrule",
         notWritten: 'non écrit : {error}',

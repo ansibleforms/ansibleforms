@@ -1390,6 +1390,7 @@ export default {
         registered: 'geregistreerd door zijn RTE',
         pending: 'wacht op goedkeuring',
         holder: 'het bevat de repositories, nooit in zijn eigen bestand',
+        uriSecret: 'zijn uri bevat een gebruiker of een token: geef het in plaats daarvan een credential',
         noSchedule: 'het heeft geen cron en geen rrule',
         cron: 'zijn cron kan niet als rrule geschreven worden',
         notWritten: 'niet geschreven: {error}',

@@ -1394,6 +1394,7 @@ export default {
         registered: 'registado pelo seu RTE',
         pending: 'à espera de aprovação',
         holder: 'contém os repositórios, nunca no seu próprio ficheiro',
+        uriSecret: 'o seu uri contém um utilizador ou um token: atribua-lhe antes uma credencial',
         noSchedule: 'não tem cron nem rrule',
         cron: 'o seu cron não pode ser escrito como rrule',
         notWritten: 'não escrito: {error}',

@@ -89,3 +89,14 @@ describe("a new repository of object types", () => {
     assert.equal(queries.filter((q) => /pull_output/.test(q.sql)).length, 0);
   });
 });
+
+describe("a repository a repositories.yaml holds", () => {
+  test("its uri edited in the app to carry a user or a token : refused, its secret never goes to git", async () => {
+    vi.spyOn(Repository, "findByName").mockResolvedValue({ id: 3, name: "forms", uri: "https://git/forms.git", repository: "hub", repo_file: "repositories.yaml" });
+    await assert.rejects(
+      Repository.update({ uri: "https://bot:ghp_secret@github.com/org/forms.git" }, "forms"),
+      /kept in hub\/repositories.yaml: its uri must not carry a user or a token/,
+    );
+    assert.equal(queries.length, 0, "nothing saved");
+  });
+});

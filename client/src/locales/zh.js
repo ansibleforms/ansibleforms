@@ -1350,6 +1350,7 @@ export default {
         registered: '由其 RTE 注册',
         pending: '等待批准',
         holder: '它本身保存这些仓库，从不写入自己的文件',
+        uriSecret: '它的 uri 包含用户或令牌：请改为为它指定凭据',
         noSchedule: '它既没有 cron 也没有 rrule',
         cron: '它的 cron 无法写成 rrule',
         notWritten: '未写入：{error}',

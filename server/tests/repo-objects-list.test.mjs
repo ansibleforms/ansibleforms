@@ -211,6 +211,24 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.deepEqual(readList(), []);
   });
 
+  test("one whose uri carries a user or a token : kept in the app, never written to git", async () => {
+    fx.cloneEmpty("hub");
+    fx.state.tables.repositories.push({ id: 5, name: "forms", uri: "https://bot:ghp_secret@github.com/org/forms.git", branch: "main", description: "" });
+    const why = { name: "forms", reason: "its uri carries a user or a token: give it a credential instead", code: "uriSecret" };
+    const p = await RepoObjects.preview(await desc(), "hub");
+    assert.deepEqual(p.written, []);
+    assert.deepEqual(p.kept.filter((k) => k.name === "forms"), [why]);
+    const report = await RepoObjects.activate(await desc(), "hub", { pull: false });
+    assert.deepEqual(report.written, []);
+    assert.deepEqual(report.kept.filter((k) => k.name === "forms"), [why]);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "hub", "repositories.yaml")), false);
+    assert.equal(fx.rowNamed("repositories", "forms").repository ?? null, null);
+    // made in the app later : stays in the app too
+    fx.state.tables.repositories.push({ id: 6, name: "ops", uri: "https://ops:tok@git/ops.git", branch: "main", description: "" });
+    assert.equal(await RepoObjects.appCreated("repositories", 6), null);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "hub", "repositories.yaml")), false);
+  });
+
   test("the question asked before the flag is saved : the repository asked about is the holder, never written", async () => {
     fx.cloneEmpty("hub");
     fx.rowNamed("repositories", "hub").use_for_repositories = 0;

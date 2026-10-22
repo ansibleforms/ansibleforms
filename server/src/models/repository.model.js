@@ -15,6 +15,7 @@ import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES } from '../lib/repoObjects/types.js';
 import { deprecationLines } from '../lib/configKeys.js';
+import { uriCarriesSecret } from '../lib/repoObjects/secrets.js';
 
 // the flags of the object types : a repository's that turn on or off make it take the app's
 // objects, or let them go (lib/repoObjects/engine.js)
@@ -276,6 +277,10 @@ class Repository extends CrudModel {
     // one repository at most per object type : turned on here while another one has it, refused ;
     // a usage of a later version too
     await (await repoObjects()).assertUsageAllowed(data, name, repo);
+    // one a repositories.yaml holds : its uri goes to git, so it never carries a user or a token
+    if (repo.repository && !opts.fromRepo && uriCarriesSecret(data.uri)) {
+      throw new Errors.BadRequestError(`Repository '${name}' is kept in ${repo.repository}/${repo.repo_file}: its uri must not carry a user or a token, give it a credential instead`);
+    }
 
     // Remove empty fields - but a field the dialog can clear, sent empty, is cleared : its
     // schedule (Scheduled pull off) or its credential. Removed with the others, an empty

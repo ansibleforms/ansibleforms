@@ -55,6 +55,7 @@ export const KEPT_REASONS = {
   registered: "registered by its RTE",
   pending: "waiting for approval",
   holder: "it holds the repositories itself, never in its own file",
+  uriSecret: "its uri carries a user or a token: give it a credential instead",
 };
 
 /**

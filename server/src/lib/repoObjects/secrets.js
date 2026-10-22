@@ -87,3 +87,18 @@ export function withoutSecrets(obj, secretFields = []) {
   }
   return { object: out, withoutSecret };
 }
+
+// a user and a secret, or any user of an http address : a secret in a repository's uri
+const SECRET_IN_URI = /^https?:\/\/[^/@\s]+@|:\/\/[^/@:\s]+:[^/@\s]+@/i;
+
+/**
+ * Whether a repository's address carries a user or a token (https://bot:token@host/...) : never
+ * written to git, nor read from it.
+ *
+ * Args:
+ *   uri (any): the address.
+ *
+ * Returns:
+ *   boolean: true when it does.
+ */
+export const uriCarriesSecret = (uri) => SECRET_IN_URI.test(String(uri || ""));

@@ -1381,6 +1381,7 @@ export default {
         registered: 'RTE によって登録',
         pending: '承認待ち',
         holder: 'リポジトリを保持するリポジトリ自身のため、自身のファイルには書き込まれません',
+        uriSecret: 'URI にユーザーまたはトークンが含まれています。代わりに資格情報を指定してください',
         noSchedule: 'cron も rrule もありません',
         cron: 'その cron は rrule として書けません',
         notWritten: '書き込まれていません: {error}',

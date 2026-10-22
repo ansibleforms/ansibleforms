@@ -27,6 +27,7 @@ import Repository from "../../models/repository.model.js";
 import { seedType } from "./seedType.js";
 import { ONE_ONLY_FLAGS, typeOfFlag, flagOn } from "./types.js";
 import { foldConfigItem } from "../seed-schema.js";
+import { uriCarriesSecret } from "./secrets.js";
 
 // the repositories as the app saves them, by their name (the model works by name)
 const RepositoryModel = {
@@ -34,9 +35,6 @@ const RepositoryModel = {
   update: async (d, id, opts) => Repository.update(d, (await Repository.findById(id)).name, opts),
   delete: async (id, opts) => Repository.delete((await Repository.findById(id)).name, opts),
 };
-
-// a user and a secret, or any user of an http address : a secret in the uri
-const SECRET_IN_URI = /^https?:\/\/[^/@\s]+@|:\/\/[^/@:\s]+:[^/@\s]+@/i;
 
 export default seedType({
   key: "repositories",
@@ -54,12 +52,13 @@ export default seedType({
   // a credential by name only
   validate: (o) => [
     ...(o.password !== undefined || o.user !== undefined ? ["user and password are refused: give the repository's credential by name"] : []),
-    ...(SECRET_IN_URI.test(String(o.uri || "")) ? ["uri must not carry a user or a token: give the repository's credential by name"] : []),
+    ...(uriCarriesSecret(o.uri) ? ["uri must not carry a user or a token: give the repository's credential by name"] : []),
   ],
   // the holder itself : never its own file's
   notImported: (o, holder) => (holder && o.name === holder ? "the repository holding this file" : null),
-  // the holder : by its flag, or by its name before the flag is saved (the question asked first)
-  keptReason: (row, holder) => (Number(row.use_for_repositories) || (holder && row.name === holder) ? "holder" : null),
+  // the holder : by its flag, or by its name before the flag is saved (the question asked first) ;
+  // one whose uri carries a user or a token : its secret never goes to git
+  keptReason: (row, holder) => (Number(row.use_for_repositories) || (holder && row.name === holder) ? "holder" : uriCarriesSecret(row.uri) ? "uriSecret" : null),
   // no chains, and no usage another repository holds
   adjust: async (o) => {
     // use_for_config (deprecated since 7.4.0, removed in 8) : the three flags it is now, as the

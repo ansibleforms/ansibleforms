@@ -1388,6 +1388,7 @@ export default {
         registered: 'zarejestrowany przez swój RTE',
         pending: 'czeka na zatwierdzenie',
         holder: 'przechowuje repozytoria, nigdy we własnym pliku',
+        uriSecret: 'jego uri zawiera użytkownika lub token: przypisz mu zamiast tego poświadczenie',
         noSchedule: 'nie ma ani crona, ani rrule',
         cron: 'jego crona nie da się zapisać jako rrule',
         notWritten: 'nie zapisano: {error}',
