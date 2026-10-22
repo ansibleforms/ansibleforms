@@ -681,8 +681,29 @@ export function summaryText(desc, summary) {
     `${titleOf(desc)}: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.unchanged} unchanged, ${summary.refused.length} refused${waiting.length ? `, ${waiting.length} waiting` : ""}`,
   ];
   if (summary.matched.length) lines.push(`Replaced by the file of the same name: ${summary.matched.join(", ")}`);
-  lines.push(...fileLines(summary));
-  for (const i of summary.ignored) lines.push(`${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`);
+  lines.push(...detailLines(summary));
+  return "\n" + lines.join("\n");
+}
+
+/**
+ * What a sync or an activation says besides its counts, a line each : the refused and the waiting
+ * files with why, the fields a file gives that the app keeps but does not use, the objects whose
+ * secrets stay the database's, the files not imported, and the notes (a usage an entry may not
+ * set, an object kept in the app).
+ *
+ * Args:
+ *   summary (object): { refused, waiting, ignored, secretsKept, skipped, notes } (syncRepository's,
+ *     or activate's report).
+ *
+ * Returns:
+ *   string[]: the lines.
+ */
+function detailLines(summary) {
+  const lines = [
+    ...(summary.refused || []).map((r) => `Refused ${r.file}: ${r.reasons.join("; ")}`),
+    ...(summary.waiting || []).map((w) => `Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`),
+    ...(summary.ignored || []).map((i) => `${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`),
+  ];
   if (summary.secretsKept?.length) lines.push(`Not in git, their secrets kept from the database: ${summary.secretsKept.join(", ")}`);
   // the files not imported, by why : an information, not a refusal
   const skipped = summary.skipped || [];
@@ -690,23 +711,41 @@ export function summaryText(desc, summary) {
     lines.push(`Not imported, ${reason}: ${skipped.filter((k) => k.reason === reason).map((k) => `${k.name} (${k.file})`).join(", ")}`);
   }
   lines.push(...(summary.notes || []));
-  return "\n" + lines.join("\n");
+  return lines;
 }
 
+// what the last pull (or clone) of a repository read in of each type it holds, by type and
+// repository : an activation that follows it says what that pull took (git winning on a name), its
+// own read finding nothing left to take. Taken by the activation, dropped when the type is let go.
+const synced = new Map();
+
 /**
- * The refused and the waiting files of a sync or an activation, a line each with why.
+ * The key of a type of a repository in what was read in (synced).
  *
  * Args:
- *   summary (object): { refused, waiting } (syncRepository's, or activate's report).
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
  *
  * Returns:
- *   string[]: the lines.
+ *   string: the key.
  */
-function fileLines(summary) {
-  return [
-    ...(summary.refused || []).map((r) => `Refused ${r.file}: ${r.reasons.join("; ")}`),
-    ...(summary.waiting || []).map((w) => `Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`),
-  ];
+const syncedKey = (desc, name) => `${desc.key}\u0000${name}`;
+
+/**
+ * What the last pull of a repository read in of a type, taken : said once, by the activation that
+ * follows it.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   object|null: syncRepository's summary, null when none was kept.
+ */
+function takeSynced(desc, name) {
+  const summary = synced.get(syncedKey(desc, name)) || null;
+  synced.delete(syncedKey(desc, name));
+  return summary;
 }
 
 /**
@@ -723,7 +762,9 @@ function fileLines(summary) {
  */
 export async function syncText(desc, name, opts = {}) {
   try {
-    return summaryText(desc, await syncRepository(desc, name, opts));
+    const summary = await syncRepository(desc, name, opts);
+    synced.set(syncedKey(desc, name), summary);
+    return summaryText(desc, summary);
   } catch (e) {
     logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);
     return `\n${titleOf(desc)} not synchronized: ${e.message || e}`;
@@ -1089,7 +1130,7 @@ function newReport(name) {
 async function activatedText(desc, name, opts = {}) {
   try {
     const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name), opts));
-    return ["", `Now holds ${activationText(desc, report)}`, ...fileLines(report)].join("\n");
+    return ["", `Now holds ${activationText(desc, report)}`, ...detailLines(report)].join("\n");
   } catch (e) {
     logger.error(`Repository '${name}' could not take ${holdingOf(desc)}: ${e.message || e}`);
     return `\n${titleOf(desc)} could not follow the usage: ${e.message || e}`;
@@ -1111,13 +1152,20 @@ async function activatedText(desc, name, opts = {}) {
  *   Promise<object>: the report.
  */
 async function activateFolder(desc, name, report, opts = {}) {
-  // step 2 : its files read in (again : the pull may not have run), git wins on a name
+  // step 2 : its files read in (again : the pull may not have run), git wins on a name ; what the
+  // pull before it read in is said with it - that read found nothing left to take
   const summary = await syncRepository(desc, name, { reset: opts.reset });
-  report.created = summary.created;
-  report.matched = summary.matched;
+  const pulled = takeSynced(desc, name) || newSummary();
+  const both = (field) => [...new Set([...(pulled[field] || []), ...(summary[field] || [])])];
+  report.created = pulled.created + summary.created;
+  report.deleted = pulled.deleted + summary.deleted;
+  report.matched = both("matched");
+  report.secretsKept = both("secretsKept");
+  report.notes = both("notes");
   report.refused = summary.refused;
   report.waiting = summary.waiting;
   report.skipped = summary.skipped;
+  report.ignored = summary.ignored;
   // step 3 : the app's other objects, each a new file
   const list = await candidates(desc, name);
   // written in one step (a list file at once, else a file each), its returns ending that step only
@@ -1195,6 +1243,8 @@ export async function unlinkRepository(desc, name) {
  */
 export async function deactivate(desc, name, { pull = true } = {}) {
   const report = { repository: name, pull: "", unlinked: 0 };
+  // what its pulls read in is no activation's to say any more
+  synced.delete(syncedKey(desc, name));
   if (cloned(name)) {
     if (pull) {
       try {
@@ -1233,6 +1283,7 @@ export async function deactivate(desc, name, { pull = true } = {}) {
 export async function renameRepository(from, to) {
   for (const key of BUILT_OBJECT_TYPES) {
     const desc = await descriptorOf(key);
+    synced.delete(syncedKey(desc, from));
     if (await desc.store.rename(from, to)) CrudModel.changed(desc.model);
   }
 }
@@ -1253,7 +1304,7 @@ function activationText(desc, report) {
   if (desc.file) return `${holdingOf(desc)} (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`;
   const kept = report.kept || [];
   const withoutSecret = report.withoutSecret || [];
-  return `${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.written.length} written to it (waiting for Push${withoutSecret.length ? `, ${withoutSecret.length} without their secrets, kept in the database` : ""}), ${kept.length} kept in the app${kept.length ? ` (${kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`;
+  return `${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.deleted ? `${report.deleted} removed (their files gone), ` : ""}${report.written.length} written to it (waiting for Push${withoutSecret.length ? `, ${withoutSecret.length} without their secrets, kept in the database` : ""}), ${kept.length} kept in the app${kept.length ? ` (${kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`;
 }
 
 /**
@@ -1275,7 +1326,7 @@ export async function usageReportText(report) {
     const desc = await descriptorOf(key);
     if (r.error) out += `\n${titleOf(desc)} could not follow the usage: ${r.error}`;
     else if (r.activated?.notCloned || r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
-    else if (r.activated) out += `\nNow holds ${activationText(desc, r.activated)}`;
+    else if (r.activated) out += ["", `Now holds ${activationText(desc, r.activated)}`, ...detailLines(r.activated)].join("\n");
     else if (r.deactivated) {
       out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
       // its latest files not read in first (still busy) : the objects stay as the last pull left them
@@ -1655,6 +1706,8 @@ async function previewSingle(desc, name) {
  *   Promise<object>: the report.
  */
 async function activateSingle(desc, name, report) {
+  // what the pull before it read in : its file applied then, said by the read below as well
+  takeSynced(desc, name);
   const current = await desc.current();
   report.kept = desc.kept(current);
   if (desc.heldBySeed(current)) {
@@ -1666,6 +1719,7 @@ async function activateSingle(desc, name, report) {
     const summary = await syncSingle(desc, name);
     report.refused = summary.refused;
     report.waiting = summary.waiting;
+    report.notes = summary.notes;
     if (!summary.refused.length && !summary.waiting.length) report.matched = [desc.title];
   } else {
     const out = desc.fileOf(await desc.current());

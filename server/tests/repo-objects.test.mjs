@@ -626,6 +626,32 @@ describe("a repository not cloned when it is made the credentials repository", (
   });
 });
 
+describe("what turning the usage on did, the repository read in by its pull first", () => {
+  test("says what that pull took : git's version replacing the app's, the files read in, the files gone", async () => {
+    fx.state.tables.credentials.push(
+      { id: 7, name: "git", credential_type: "git", user: "app", password: "enc:pw" },
+      { id: 8, name: "old", credential_type: "git", user: "u", password: "enc:x", repository: "creds", repo_file: "credentials/old.yaml" },
+    );
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    fx.writeFile("creds", "credentials", "new.yaml", gitCredential("new"));
+    // its clone (or pull) reads the files in, then the usage follows, not pulled again
+    await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 });
+    CrudModel.flushAllLocal();
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 }, { pull: false });
+    assert.deepEqual(report.credentials.activated.matched, ["git"]);
+    assert.equal(report.credentials.activated.created, 1);
+    assert.match(await RepoObjects.usageReportText(report), /^\nNow holds the credentials: 1 read from its files, 1 replaced by a file of the same name, 1 removed \(their files gone\), 0 written to it/);
+    // said once : the next activation's report is its own
+    fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+    await RepoObjects.afterUsageChange({ use_for_credentials: 1 }, "creds", { use_for_credentials: 0 }, { pull: false });
+    fx.rowNamed("repositories", "creds").use_for_credentials = 1;
+    CrudModel.flushAllLocal();
+    const again = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 }, { pull: false });
+    assert.deepEqual(again.credentials.activated.matched, ["git", "new"]);
+    assert.equal(again.credentials.activated.created, 0);
+  });
+});
+
 describe("a usage turned off while a pull of the repository runs", () => {
   test("the pull's sync, its row read before, never takes back the objects let go meanwhile ; why they were not read in is said", async () => {
     fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));

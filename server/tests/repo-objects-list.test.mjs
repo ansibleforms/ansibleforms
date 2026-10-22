@@ -220,6 +220,16 @@ describe("a pull of repositories.yaml", () => {
   });
 });
 
+describe("what turning it on did", () => {
+  test("says what its read said : a usage an entry may not set, as a pull says it", async () => {
+    fx.state.tables.repositories.push({ id: 2, name: "creds", uri: "https://git/c.git", use_for_credentials: 1 });
+    writeList([entry("x", { use_for_credentials: true })]);
+    const text = await RepoObjects.afterGit("hub", { name: "hub", use_for_repositories: 1 }, { activate: true });
+    assert.match(text, /^\nNow holds the repositories: 1 read from its files/);
+    assert.match(text, /\nrepositories\.yaml#x: use_for_credentials refused: repository 'creds' holds the credentials already/);
+  });
+});
+
 describe("the app's repositories to repositories.yaml", () => {
   test("turned on : written to it, never the holder ; an edit and a delete follow", async () => {
     fx.cloneEmpty("hub");
