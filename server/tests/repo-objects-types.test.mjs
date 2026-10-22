@@ -486,6 +486,25 @@ describe("a flag one object at most has, that two files give", () => {
     assert.equal(Number(fx.rowNamed(c.table, "a")[c.field]), 1);
   });
 
+  test.each(CLASHES)("$what : the one holding it whose file takes it off while two others take it keeps it, said ; never none", async (c) => {
+    const repo = repoOf(c.key);
+    const linked = (row) => ({ ...row, repository: repo, repo_file: `${c.folder}/${row.name}.yaml` });
+    fx.state.tables[c.table].push(linked(c.row(51, "a", 1)), linked(c.row(52, "b", 0)), linked(c.row(53, "c", 0)));
+    fx.writeFile(repo, c.folder, "a.yaml", { ...c.file("a"), [c.field]: false });
+    fx.writeFile(repo, c.folder, "b.yaml", c.file("b"));
+    fx.writeFile(repo, c.folder, "c.yaml", c.file("c"));
+    const desc = await RepoObjects.descriptorOf(c.key);
+    const first = await RepoObjects.syncRepository(desc, repo);
+    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/b.yaml, ${c.folder}/c.yaml each say it.*\\(${c.folder}/a.yaml keeps it until then\\)`));
+    assert.deepEqual(["a", "b", "c"].map((n) => Number(fx.rowNamed(c.table, n)[c.field] || 0)), [1, 0, 0]);
+    // c's file fixed : b alone says it, a's file takes it off, both applied
+    fx.writeFile(repo, c.folder, "c.yaml", { ...c.file("c"), [c.field]: false });
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(desc, repo);
+    assert.deepEqual(second.notes, []);
+    assert.deepEqual(["a", "b", "c"].map((n) => Number(fx.rowNamed(c.table, n)[c.field] || 0)), [0, 1, 0]);
+  });
+
   test("two new runner files of a type, both the default : neither made the default, both made", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     process.env.RTE_TOKEN_A = "t";

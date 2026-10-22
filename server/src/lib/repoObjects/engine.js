@@ -700,8 +700,10 @@ export async function syncRepository(desc, name, opts = {}) {
  * mail channel, the provider of a type used for sign-in, the disclaimer version in force) that
  * several files of a pull give, as the config seed refuses them (lib/seed-schema.js
  * assertSingletonFlags) : applied from none of them, each object keeping the value it has (a new
- * one without it), the rest of each file applied - the pull changes nothing of that flag until one
- * file only gives it, and the next pull is the same. Said in the pull output.
+ * one without it), the one holding it now keeping it even when its file takes it off in the same
+ * pull (never none left with it), the rest of each file applied - the pull changes nothing of that
+ * flag until one file only gives it, and the next pull is the same. Said in the pull output, with
+ * the one that keeps it.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -728,8 +730,18 @@ function oneOnlyClashes(desc, files, own, summary, name) {
         const before = f.adopt || own.get(f.file);
         f.object = { ...f.object, [rule.field]: before ? on(before[rule.field]) : false };
       }
+      // the one holding it now whose file takes it off in the same pull : it keeps it too - the
+      // flag changes not at all until one file only gives it, never left on none of them
+      const keeps = files.filter((f) => {
+        if (!f.object || list.includes(f) || on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) return false;
+        if (rule.by && String(f.object[rule.by] ?? "") !== scope) return false;
+        const before = f.adopt || own.get(f.file);
+        return !!before && on(before[rule.field]);
+      });
+      for (const f of keeps) f.object = { ...f.object, [rule.field]: true };
       const what = `${rule.label}${rule.by ? ` (${rule.by} ${scope})` : ""}`;
-      const line = `${rule.field} not applied: ${list.map((f) => f.file).join(", ")} each say it, one ${desc.noun} at most is ${what} - say it in one file only`;
+      const kept = keeps.length ? `${keeps.map((f) => f.file).join(", ")} keeps it until then` : `the ${desc.noun} holding it now, if any, keeps it until then`;
+      const line = `${rule.field} not applied: ${list.map((f) => f.file).join(", ")} each say it, one ${desc.noun} at most is ${what} - say it in one file only (${kept})`;
       summary.notes.push(line);
       logger.warning(`${titleOf(desc)} of repository '${name}': ${line}`);
     }
