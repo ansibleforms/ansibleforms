@@ -446,7 +446,8 @@ async function waitingOf(desc, object, cache = new Map()) {
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
  *   opts (object): { context (the descriptor's context, read when not given), reset (true : the
- *     working tree was just cloned again by a reset - an object whose file is not there is
+ *     working tree was just cloned where there was none - a reset, or a tree that was gone : a
+ *     file the app wrote may never have been pushed - an object whose file is not there is
  *     unlinked and kept in the app, never deleted) }.
  *
  * Returns:
@@ -572,13 +573,14 @@ export async function syncRepository(desc, name, opts = {}) {
       continue;
     }
     try {
-      // a reset : a file not in the repository may never have been pushed (written by the app) -
+      // cloned again (a reset, a tree that was gone) : a file not in the repository may never have
+      // been pushed (written by the app) -
       // its object stays in the app, unlinked, never deleted with the secrets it keeps
       if (opts.reset && !files.some((f) => f.file === file)) {
         await desc.store.link(row.id, null, null);
         relinked++;
-        summary.notes.push(`${file}: not in the repository after the reset (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
-        logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its file ${name}/${file} is not in the repository after the reset`);
+        summary.notes.push(`${file}: not in the repository as cloned again (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
+        logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its file ${name}/${file} is not in the repository as cloned again`);
         continue;
       }
       await desc.store.remove(row);
@@ -788,7 +790,7 @@ async function retryDependents(keys, except) {
  *   name (string): the repository.
  *   repo (object): its row (its use_for_* flags).
  *   opts (object): { activate (true : its first clone, its claim held by the caller), reset
- *     (true : cloned again by a reset, syncRepository's) }.
+ *     (true : cloned where there was no working tree, a reset too : syncRepository's) }.
  *
  * Returns:
  *   Promise<string>: the lines for the pull output.
@@ -798,7 +800,7 @@ export async function afterGit(name, repo, opts = {}) {
   let out = "";
   for (const key of keys) {
     const desc = await descriptorOf(key);
-    out += opts.activate ? await activatedText(desc, name) : await syncText(desc, name, { reset: opts.reset });
+    out += opts.activate ? await activatedText(desc, name, { reset: opts.reset }) : await syncText(desc, name, { reset: opts.reset });
   }
   try {
     out += await retryDependents(keys, name);
@@ -1058,13 +1060,14 @@ function newReport(name) {
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
+ *   opts (object): activateFolder's ({ reset }).
  *
  * Returns:
  *   Promise<string>: the lines.
  */
-async function activatedText(desc, name) {
+async function activatedText(desc, name, opts = {}) {
   try {
-    const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name)));
+    const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name), opts));
     return ["", `Now holds ${activationText(desc, report)}`, ...fileLines(report)].join("\n");
   } catch (e) {
     logger.error(`Repository '${name}' could not take ${holdingOf(desc)}: ${e.message || e}`);
@@ -1080,13 +1083,15 @@ async function activatedText(desc, name) {
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
  *   report (object): the report so far (activate's), filled in.
+ *   opts (object): { reset (true : cloned where there was no working tree - an object of it whose
+ *     file is not there is unlinked, never deleted : syncRepository's) }.
  *
  * Returns:
  *   Promise<object>: the report.
  */
-async function activateFolder(desc, name, report) {
+async function activateFolder(desc, name, report, opts = {}) {
   // step 2 : its files read in (again : the pull may not have run), git wins on a name
-  const summary = await syncRepository(desc, name);
+  const summary = await syncRepository(desc, name, { reset: opts.reset });
   report.created = summary.created;
   report.matched = summary.matched;
   report.refused = summary.refused;

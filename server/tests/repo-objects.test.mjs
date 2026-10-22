@@ -636,10 +636,24 @@ describe("a reset clones the repository again from its remote", () => {
     CrudModel.flushAllLocal();
     const text = await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 }, { reset: true });
     assert.match(text, /0 deleted/);
-    assert.match(text, /credentials\/app-cred\.yaml: not in the repository after the reset \(never pushed\?\): 'app-cred' kept in the app, no longer linked to it/);
+    assert.match(text, /credentials\/app-cred\.yaml: not in the repository as cloned again \(never pushed\?\): 'app-cred' kept in the app, no longer linked to it/);
     const row = fx.rowNamed("credentials", "app-cred");
     assert.equal(row.repository, null);
     assert.equal(row.password, "enc:pw");
+  });
+
+  test("a first clone where the working tree was gone : a credential never pushed kept in the app, unlinked", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.cloneEmpty("creds");
+    await RepoObjects.activate(credentials, "creds", { pull: false });
+    // the tree gone (a reset whose clone failed, a volume lost), then cloned again : a first clone
+    fs.rmSync(path.join(fx.ROOT, "creds"), { recursive: true, force: true });
+    fx.cloneEmpty("creds");
+    CrudModel.flushAllLocal();
+    const text = await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 }, { activate: true, reset: true });
+    assert.match(text, /^\nNow holds the credentials/);
+    const row = fx.rowNamed("credentials", "app-cred");
+    assert.equal(row?.password, "enc:pw");
   });
 
   test("a plain pull still removes a credential whose file is gone", async () => {

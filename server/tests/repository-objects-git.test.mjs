@@ -94,9 +94,9 @@ beforeEach(() => {
 });
 
 describe("the clone of a repository holding credentials", () => {
-  test("its first clone takes the app's credentials (activate)", async () => {
+  test("its first clone takes the app's credentials (activate), its files read as cloned again", async () => {
     await Repository.clone("creds");
-    assert.deepEqual(asked, [["afterGit", "creds", { activate: true, reset: false }]]);
+    assert.deepEqual(asked, [["afterGit", "creds", { activate: true, reset: true }]]);
   });
 
   test("a clone over a working tree already there only reads its files", async () => {
@@ -105,9 +105,9 @@ describe("the clone of a repository holding credentials", () => {
     assert.deepEqual(asked, [["afterGit", "creds", { activate: false, reset: false }]]);
   });
 
-  test("a clone whose caller activates it itself only reads its files", async () => {
+  test("a clone whose caller activates it itself only reads its files, as cloned again", async () => {
     await Repository.clone("creds", false, { activate: false });
-    assert.deepEqual(asked, [["afterGit", "creds", { activate: false, reset: false }]]);
+    assert.deepEqual(asked, [["afterGit", "creds", { activate: false, reset: true }]]);
   });
 
   test("a reset clones it again as a reset : never an activation, its gone files unlinked", async () => {

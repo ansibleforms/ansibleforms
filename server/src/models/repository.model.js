@@ -778,11 +778,14 @@ class Repository extends CrudModel {
   // opts.activate (default true) : its first clone - no working tree before it - takes the app's
   // objects of the types it holds (lib/repoObjects/engine.js afterGit), so a repository that was
   // not cloned when its usage was turned on takes them once it is ; false when the caller
-  // activates it itself. opts.reset : cloned again by a reset (an object whose file is not there
-  // is unlinked and kept in the app, never deleted)
+  // activates it itself. opts.reset : cloned again by a reset. A reset, as any clone where there
+  // was no working tree (one that was gone, a reset whose clone failed), reads the files as cloned
+  // again : an object whose file is not there may never have been pushed, it is unlinked and kept
+  // in the app, never deleted
   static async clone(name, claimed = false, opts = {}) {
     var output, status, head, repo
-    const first = !claimed && opts.activate !== false && Repo.isValidName(name) && !fs.existsSync(Repo.folderOf(name))
+    const fresh = Repo.isValidName(name) && !fs.existsSync(Repo.folderOf(name))
+    const first = !claimed && opts.activate !== false && fresh
     if (!claimed) {
       // the settings' Pull runs a clone, which pulls a repository already cloned
       // (Repo.clone) : the same rule as a pull (assertNoLocalChanges). A reset deletes
@@ -807,7 +810,7 @@ class Repository extends CrudModel {
       // its object types read into their tables, still under the claim ; its first clone takes
       // the app's objects of each
       if (objectTypesOf(repo).length) {
-        output += await (await repoObjects()).afterGit(name, repo, { activate: first, reset: !!opts.reset })
+        output += await (await repoObjects()).afterGit(name, repo, { activate: first, reset: !!opts.reset || fresh })
       }
       // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
       output += await deprecationLines(name)
