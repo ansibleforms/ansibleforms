@@ -8,7 +8,7 @@
 //     EXRULE takes runs out, EXDATE and RDATE are refused ; each rule needs an INTERVAL of 1 or
 //     more, no SECONDLY, no BYDAY with a number (5MO), not COUNT and UNTIL together, COUNT 999
 //     at most ; each BYxxx number in its range (BYHOUR 0 to 23, BYSETPOS 1 to 366 or -366 to
-//     -1 ...), WKST a weekday
+//     -1, BYEASTER -80 to 250 ...), WKST a weekday
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
 //   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
 //   a COUNT rule's runs are counted from its DTSTART, up to 50 years after now
@@ -102,7 +102,9 @@ const PARTS = [
 ];
 
 // the parts that hold whole numbers, and their range : from min to max, or (signed) from 1 to max
-// and from -max to -1
+// and from -max to -1 ; a BYEASTER names a day of Easter's own year whatever the year (Easter is
+// between the 22nd of March and the 25th of April) : further, dateutil takes a day of another
+// part of the year or fails
 const NUMBER_PARTS = {
   BYSECOND: { min: 0, max: 59 },
   BYMINUTE: { min: 0, max: 59 },
@@ -112,7 +114,7 @@ const NUMBER_PARTS = {
   BYYEARDAY: { max: 366, signed: true },
   BYWEEKNO: { max: 53, signed: true },
   BYSETPOS: { max: 366, signed: true },
-  BYEASTER: { min: -366, max: 366 },
+  BYEASTER: { min: -80, max: 250 },
 };
 
 // ===========================================================================

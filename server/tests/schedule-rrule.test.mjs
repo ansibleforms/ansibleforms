@@ -47,6 +47,10 @@ describe("a refused rrule is refused, with the reason", () => {
     ["DTSTART;TZID=US-Eastern:19961105T090000 RRULE:FREQ=MINUTELY;INTERVAL=10;COUNT=5", "A valid TZID must be provided"],
     ["DTSTART:20300308T050000Z RRULE:FREQ=REGULARLY;INTERVAL=1", "rrule parsing failed validation: invalid 'FREQ': REGULARLY"],
     ["DTSTART;TZID=America/New_York:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1", "rrule parsing failed validation"],
+    // a BYEASTER past a day of Easter's own year : its range said, not that it never fires
+    ["DTSTART;TZID=Pacific/Auckland:19760619T145153 RRULE:BYMINUTE=4,20,40;BYEASTER=-229;FREQ=YEARLY;INTERVAL=1", "BYEASTER must be whole numbers from -80 to 250: BYEASTER=-229"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=300", "BYEASTER must be whole numbers from -80 to 250: BYEASTER=300"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=-100", "BYEASTER must be whole numbers from -80 to 250: BYEASTER=-100"],
     // the checks on what was read, whatever the case of the keys or the sign of a number
     ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=-1", "INTERVAL must be a positive integer"],
     ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;interval=0", "INTERVAL must be a positive integer"],

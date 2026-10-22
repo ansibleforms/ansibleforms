@@ -39,7 +39,9 @@ const PARTS = [
 const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
 // the parts that hold whole numbers, and their range : from min to max, or (signed) from 1 to max
-// and from -max to -1
+// and from -max to -1 ; a BYEASTER names a day of Easter's own year whatever the year (Easter is
+// between the 22nd of March and the 25th of April) : further, dateutil takes a day of another
+// part of the year or fails
 const NUMBER_PARTS = {
   BYSECOND: { min: 0, max: 59 },
   BYMINUTE: { min: 0, max: 59 },
@@ -49,7 +51,7 @@ const NUMBER_PARTS = {
   BYYEARDAY: { max: 366, signed: true },
   BYWEEKNO: { max: 53, signed: true },
   BYSETPOS: { max: 366, signed: true },
-  BYEASTER: { min: -366, max: 366 },
+  BYEASTER: { min: -80, max: 250 },
 };
 
 /**

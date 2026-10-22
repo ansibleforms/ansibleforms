@@ -3257,6 +3257,46 @@
     1793606400000,
     1793613600000
    ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=-80",
+   "after": 2127427200000,
+   "count": 3,
+   "runs": [
+    2148883200000,
+    2179123200000,
+    2209968000000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=250",
+   "after": 2127427200000,
+   "count": 3,
+   "runs": [
+    2144131200000,
+    2177395200000,
+    2207635200000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:22800101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=-80",
+   "after": 9922003200000,
+   "count": 3,
+   "runs": [
+    9940521600000,
+    9973785600000,
+    10004630400000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:22800101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYEASTER=250",
+   "after": 9922003200000,
+   "count": 3,
+   "runs": [
+    9938793600000,
+    9969033600000,
+    10002297600000
+   ]
   }
  ]
 }
