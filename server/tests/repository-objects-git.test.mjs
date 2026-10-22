@@ -5,6 +5,8 @@
 //                 itself (a new repository, a usage turned on), only reads its files
 //   reset         cloned again by a reset : an object whose file is not in the remote is unlinked,
 //                 never deleted
+//   push          a Push into a missing working tree clones it as every clone into a missing tree :
+//                 its files read as cloned again, the app's other objects taken, before the commit
 //   delete        its objects unlinked only once the delete holds the repository : a delete refused
 //                 (a pull running) leaves them linked
 import { test, describe, beforeEach, vi } from "vitest";
@@ -29,6 +31,7 @@ vi.mock("../src/models/repo.model.js", () => ({
       return "cloned";
     },
     pull: async () => "pulled",
+    sync: async () => "pushed",
     delete: async (name) => fs.rmSync(path.join(ROOT, name), { recursive: true, force: true }),
     info: async () => "abc123",
     hasChanges: async () => false,
@@ -114,6 +117,20 @@ describe("the clone of a repository holding credentials", () => {
     fs.mkdirSync(path.join(ROOT, "creds"));
     await Repository.reset("creds");
     assert.deepEqual(asked, [["afterGit", "creds", { activate: false, reset: true }]]);
+  });
+});
+
+describe("the push of a repository holding credentials", () => {
+  test("into a missing working tree : cloned, its files read as every fresh clone reads them, before the commit", async () => {
+    const output = await Repository.sync("creds", "admin");
+    assert.deepEqual(asked, [["afterGit", "creds", { activate: true, reset: true }]]);
+    assert.match(output, /^cloned\npushed$/);
+  });
+
+  test("into a working tree already there : nothing read, only pushed", async () => {
+    fs.mkdirSync(path.join(ROOT, "creds"));
+    assert.equal(await Repository.sync("creds", "admin"), "pushed");
+    assert.deepEqual(asked, []);
   });
 });
 

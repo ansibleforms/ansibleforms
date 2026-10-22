@@ -6657,8 +6657,9 @@
 
       **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the files are read
       in: a new file makes an object, a changed one changes it, a removed one removes it. After a **Reset**, or any
-      clone where the working tree was gone, an object whose file is not in the remote (written by the app, never
-      pushed) is unlinked and kept in the app with its secrets, never deleted. A key taken out of a file
+      clone where the working tree was gone (a Pull or a Push included), an object whose file is not in the remote
+      (deleted in git, or written by the app and never pushed) is unlinked and kept in the app with its secrets,
+      never deleted, and never written back by the usage that clone turns on. A key taken out of a file
       is taken out of the app too: the field gets the value a new object made from that file gets (a secret
       excepted, kept in the database). A file renamed keeps its object, which follows it. A file the seed's schema
       or the app's rules refuse (a credential type without its required fields, a runner of another type than its

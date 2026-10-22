@@ -131,6 +131,27 @@ async function repoObjects() {
 }
 
 /**
+ * Reads a repository's object types into their tables once a clone made its working tree where
+ * there was none, under the claim the caller holds (lib/repoObjects/engine.js afterGit) : what
+ * every clone into a missing tree does, whichever operation made it (a clone, a Pull, a Push).
+ * An object whose file is not in the repository as cloned (deleted in git, or never pushed) is
+ * unlinked and kept in the app, never deleted nor written back ; a first clone takes the app's
+ * other objects of each type (activate).
+ *
+ * Args:
+ *   name (string): the repository.
+ *   repo (object): its record (its use_for_* flags).
+ *   activate (boolean): whether the clone takes the app's objects (its first clone).
+ *
+ * Returns:
+ *   Promise<string>: the lines for its output, '' when it holds no object type.
+ */
+async function objectsAfterFreshClone(name, repo, activate) {
+  if (!objectTypesOf(repo).length) return ""
+  return (await repoObjects()).afterGit(name, repo, { activate, reset: true })
+}
+
+/**
  * The forms model, loaded when first needed : it imports this model, so a static import would be
  * a cycle.
  *
@@ -814,10 +835,10 @@ class Repository extends CrudModel {
         output += await (await formModel()).duplicateLines(name)
       }
       // its object types read into their tables, still under the claim ; its first clone takes
-      // the app's objects of each
-      if (objectTypesOf(repo).length) {
-        output += await (await repoObjects()).afterGit(name, repo, { activate: first, reset: !!opts.reset || fresh })
-      }
+      // the app's objects of each, a clone into a missing tree (or a reset) reads them as cloned
+      // again (objectsAfterFreshClone)
+      if (fresh || opts.reset) output += await objectsAfterFreshClone(name, repo, first)
+      else if (objectTypesOf(repo).length) output += await (await repoObjects()).afterGit(name, repo, { activate: false, reset: false })
       // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
       output += await deprecationLines(name)
       // a form name it shares with another forms repository : which copy is used, which skipped
@@ -1178,9 +1199,13 @@ class Repository extends CrudModel {
         throw new Error(`Repository '${name}' is used for nothing the app writes to (forms, config, playbooks, workflows, inventories, or objects such as schedules)`)
       }
       const repoDir = Repo.folderOf(name)
+      let cloned = ""
       if (!fs.existsSync(repoDir)) {
-        // first sync : clone it (an empty remote repository is fine)
-        await Repo.clone(syncRepo.uri, name, syncRepo.branch || undefined, Repository.gitAuth(syncRepo))
+        // first sync : clone it (an empty remote repository is fine), its objects read as every
+        // clone into a missing tree reads them (objectsAfterFreshClone) before anything is
+        // committed : a file deleted in git is never pushed back, the app's other objects go too
+        cloned = await Repo.clone(syncRepo.uri, name, syncRepo.branch || undefined, Repository.gitAuth(syncRepo))
+        cloned = `${cloned || ""}${await objectsAfterFreshClone(name, syncRepo, true)}`
       }
       // bind the new staged forms to this repository before committing (only a
       // forms repo receives staged forms ; a config-only repo just pushes config)
@@ -1188,7 +1213,7 @@ class Repository extends CrudModel {
       // a repository that only holds objects (schedules, credentials ...) says which in its commit
       const objects = objectTypesOf(syncRepo).map((key) => typeOf(key).label)
       const what = !syncRepo.use_for_forms && objects.length ? objects.join(", ").replace(/^./, (c) => c.toUpperCase()) : "Forms"
-      output = await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
+      output = (cloned ? `${cloned}\n` : "") + await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
       status = "success"
     } catch (e) {
       output = e.message
