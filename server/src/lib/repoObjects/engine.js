@@ -1552,14 +1552,20 @@ async function syncSingle(desc, name) {
     return summary;
   }
   summary.notes.push(...desc.notesOf(checked.object, current));
-  const secrets = desc.secretsOf ? desc.secretsOf(current) : desc.secrets || [];
-  if (secrets.some((s) => !given(raw[s]) && given(current?.[s]))) summary.secretsKept.push(desc.title);
+  // a secret the file does not give that the app still holds (after the apply : one it let go is
+  // not kept), said in the pull output
+  const keptSecrets = (now) => {
+    const secrets = desc.secretsOf ? desc.secretsOf(now) : desc.secrets || [];
+    if (secrets.some((s) => !given(raw[s]) && given(now?.[s]))) summary.secretsKept.push(desc.title);
+  };
   if (!desc.changed(checked.object, current)) {
+    keptSecrets(current);
     summary.unchanged = 1;
     return summary;
   }
   try {
     summary.notes.push(...((await desc.apply(checked.object, current)) || []));
+    keptSecrets(await desc.current());
     summary.updated = 1;
     CrudModel.changed(desc.model);
     logger.notice(`Applied ${name}/${desc.file}: the app follows git for ${holdingOf(desc)} from now on`);

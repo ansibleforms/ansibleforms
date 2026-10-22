@@ -30,8 +30,24 @@ export default singleType({
   kept: (current) => (Number(current?.managed ?? 0) ? [{ name: "Chat assistant", whole: true, code: "seed", reason: KEPT_REASONS.seed }] : []),
   // compared as the seed compares : its extra headers as the model keeps them
   changed: (declared, current) => differs(ChatSettings.declared(declared).cfg, current || {}),
-  apply: async (declared) => {
+  // a file that moves the chat to another provider, base url or certificate check without giving
+  // its key (or its credential) : the stored one stays behind, as on the chat page - it never goes
+  // to a place the file chose
+  apply: async (declared, current, opts = {}) => {
     await ChatSettings.assertCredentialUsable(declared.credential);
-    await ChatSettings.update(ChatSettings.declared(declared).record);
+    const { record } = ChatSettings.declared(declared);
+    const notes = [];
+    if (!opts.fromSeed && !ChatSettings.sameTarget(current, { ...current, ...declared })) {
+      if (declared.api_key === undefined && current?.api_key) {
+        record.api_key = "";
+        notes.push("Its stored api key was cleared: the file moves the chat to another provider or address, give its api_key there (an ${ENV} reference)");
+      }
+      if (declared.credential === undefined && current?.credential) {
+        record.credential = null;
+        notes.push(`Its credential '${current.credential}' was let go: the file moves the chat to another provider or address, name its credential there`);
+      }
+    }
+    await ChatSettings.update(record);
+    return notes;
   },
 });

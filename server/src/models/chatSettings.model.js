@@ -2,6 +2,7 @@
 import logger from "../lib/logger.js";
 import mysql from "./db.model.js";
 import crypto from "../lib/crypto.js";
+import { stripTrailingSlashes } from "../lib/url.js";
 import { CHAT_VENDORS, CHAT_PROVIDERS, effectiveSettings } from "../chat/vendors.js";
 
 export { CHAT_VENDORS, CHAT_PROVIDERS, effectiveSettings };
@@ -90,6 +91,26 @@ ChatSettings.declared = function (declared) {
     record[key] = converted[key];
   }
   return { cfg, record };
+};
+
+/**
+ * Whether settings send their key to the same place as the saved ones : the same provider, base
+ * url and certificate check. A stored key (the row's own, or its credential's) only goes there,
+ * as the settings page's mail check keeps the stored mail password for the stored server.
+ *
+ * Args:
+ *   saved (object): the row as it is stored.
+ *   wanted (object): the settings as they would be used.
+ *
+ * Returns:
+ *   boolean: true when the key would go to the saved target.
+ */
+ChatSettings.sameTarget = function (saved, wanted) {
+  const text = (v) => stripTrailingSlashes(v === null || v === undefined ? '' : String(v).trim());
+  const flag = (v) => v === true || Number(v) === 1;
+  return text(saved?.provider) === text(wanted?.provider)
+    && text(saved?.base_url) === text(wanted?.base_url)
+    && flag(saved?.ignore_certs) === flag(wanted?.ignore_certs);
 };
 
 ChatSettings.update = async function (record) {

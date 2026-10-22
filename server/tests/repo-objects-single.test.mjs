@@ -136,6 +136,28 @@ describe("a type kept in one file : the chat assistant", () => {
     assert.match(waiting.waiting[0].reasons[0], /waits for the credential 'missing-key'/);
   });
 
+  test("a file that moves the chat to another address : its stored key and credential stay behind, unless it gives them", async () => {
+    Object.assign(fx.state.tables.chat_settings[0], { provider: "openai", model: "gpt-5", base_url: "", credential: "chat-key" });
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\nmodel: gpt-5\nbase_url: https://collector.example/v1\n");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    const row = fx.state.tables.chat_settings[0];
+    assert.equal(row.base_url, "https://collector.example/v1");
+    assert.equal(row.api_key, "", "the stored key never goes to the address the file chose");
+    assert.equal(row.credential, null);
+    assert.deepEqual(summary.secretsKept, []);
+    assert.match(summary.notes.join("\n"), /stored api key was cleared/);
+    assert.match(summary.notes.join("\n"), /credential 'chat-key' was let go/);
+    // the same address with its key given : taken
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\nmodel: gpt-5\nbase_url: https://collector.example/v1/\napi_key: ${CHAT_KEY}\n");
+    await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.equal(row.api_key, "enc:sk-from-env");
+    // another model, the address the same : the key stays
+    writeRaw("cfg", "chat-assistant.yaml", "provider: openai\nmodel: gpt-6\nbase_url: https://collector.example/v1\n");
+    await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.equal(row.model, "gpt-6");
+    assert.equal(row.api_key, "enc:sk-from-env");
+  });
+
   test("no file : turning it on writes the app's values, without the key ; an edit rewrites what changed", async () => {
     fx.cloneEmpty("cfg");
     Object.assign(fx.state.tables.chat_settings[0], { provider: "openai", model: "gpt-5" });

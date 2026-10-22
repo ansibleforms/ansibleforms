@@ -8,31 +8,10 @@ import { checkProvider } from '../../chat/providers/index.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
-import { stripTrailingSlashes } from '../../lib/url.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
 
 // the mask the key is shown as (lib/secretMask.js)
 const MASK = SECRET_MASK;
-
-/**
- * Whether settings send their key to the same place as the saved ones : the same provider, base
- * url and certificate check. A stored key (the row's own, or its credential's) only goes there,
- * as the settings page's mail check keeps the stored mail password for the stored server.
- *
- * Args:
- *   saved (object): the row as it is stored.
- *   wanted (object): the settings as they would be used.
- *
- * Returns:
- *   boolean: true when the key would go to the saved target.
- */
-function sameTarget(saved, wanted) {
-  const text = (v) => stripTrailingSlashes(v === null || v === undefined ? '' : String(v).trim());
-  const flag = (v) => v === true || Number(v) === 1;
-  return text(saved?.provider) === text(wanted?.provider)
-    && text(saved?.base_url) === text(wanted?.base_url)
-    && flag(saved?.ignore_certs) === flag(wanted?.ignore_certs);
-}
 
 /**
  * Refuses a credential only an admin may name (models/credential.model.v2.js isAdminGuarded : a
@@ -83,7 +62,7 @@ const update = async function (req, res) {
     // moved to another provider, base url or certificate check by a user who is not an admin : the
     // stored key and the credential stay behind unless typed or chosen again (another credential
     // than the saved one is a choice ; the saved one sent back as it is, is not)
-    if (!isAdminRequest(req) && !sameTarget(existing, { ...existing, ...body })) {
+    if (!isAdminRequest(req) && !ChatSettings.sameTarget(existing, { ...existing, ...body })) {
       if (body.api_key === undefined || isMasked(body.api_key)) body.api_key = '';
       if ((body.credential ?? existing.credential ?? '') === (existing.credential ?? '')) body.credential = '';
     }
@@ -134,7 +113,7 @@ const check = async function (req, res) {
     const given = req.body?.api_key;
     const ownKeyTyped = typeof given === 'string' && given !== '' && !isMasked(given);
     const sendsStoredKey = !!body.credential || !ownKeyTyped;
-    if (sendsStoredKey && !sameTarget(existing, body)) {
+    if (sendsStoredKey && !ChatSettings.sameTarget(existing, body)) {
       return res.status(400).json(RestResultv2.error(i18n.t(req, 'resources.chatCheckFailed'), i18n.t(req, 'resources.storedKeyOtherProvider')));
     }
     if (!ownKeyTyped) body.api_key = existing.api_key;
