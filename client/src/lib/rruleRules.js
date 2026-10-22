@@ -38,6 +38,20 @@ const PARTS = [
 // the weekdays a BYDAY names
 const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
+// the parts that hold whole numbers, and their range : from min to max, or (signed) from 1 to max
+// and from -max to -1
+const NUMBER_PARTS = {
+  BYSECOND: { min: 0, max: 59 },
+  BYMINUTE: { min: 0, max: 59 },
+  BYHOUR: { min: 0, max: 23 },
+  BYMONTH: { min: 1, max: 12 },
+  BYMONTHDAY: { max: 31, signed: true },
+  BYYEARDAY: { max: 366, signed: true },
+  BYWEEKNO: { max: 53, signed: true },
+  BYSETPOS: { max: 366, signed: true },
+  BYEASTER: { min: -366, max: 366 },
+};
+
 /**
  * A number of a rule's part as the server reads it : an integer, a sign allowed ; NaN when it is
  * none (1.5, abc).
@@ -54,8 +68,8 @@ function numberOf(text) {
 
 /**
  * Why one rule (RRULE or EXRULE) is refused once it is read, in the order the server finds it :
- * an UNTIL that is no date and time, a FREQ that does not exist, a part that is not a rule's or a
- * weekday with a number that is not one, no FREQ, an INTERVAL under 1, SECONDLY, COUNT with UNTIL,
+ * an UNTIL that is no date and time, a FREQ that does not exist, a part that is not a rule's, a
+ * weekday with a number that is not one, a BYxxx out of its range or a WKST that is no weekday, no FREQ, an INTERVAL under 1, SECONDLY, COUNT with UNTIL,
  * a COUNT under 1 or above 999, a weekday that is not one, BYDAY with a number.
  *
  * Args:
@@ -84,14 +98,27 @@ function ruleProblem(kind, text) {
   // step 2 : a FREQ that does not exist
   if (values.FREQ !== undefined && !FREQS.includes(values.FREQ.toUpperCase()))
     return failed(`invalid 'FREQ': ${values.FREQ}`);
-  // step 3 : read part by part, a part that is not a rule's, a weekday with a number not one
-  for (const { key, value } of parts) {
+  // step 3 : read part by part, a part that is not a rule's, a weekday with a number not one, a
+  // BYxxx that is not whole numbers in its range, a WKST that is no weekday
+  for (const { part, key, value } of parts) {
     if (key === 'UNTIL') continue;
     if (!PARTS.includes(key)) return failed(`Unknown RRULE property '${key}'`);
     if (key === 'BYDAY' || key === 'BYWEEKDAY') {
-      const bad = value.split(',').find((d) => /\d/.test(d) && !/^[+-]?\d{1,2}[A-Z]{2}$/.test(d));
+      const bad = value.split(',').find((d) => d === '' || (/\d/.test(d) && !/^[+-]?\d{1,2}[A-Z]{2}$/.test(d)));
       if (bad !== undefined) return failed(`Invalid weekday string: ${bad}`);
     }
+    const range = NUMBER_PARTS[key];
+    if (range) {
+      const fits = (n) => (range.signed ? n !== 0 && Math.abs(n) <= range.max : n >= range.min && n <= range.max);
+      if (!value.split(',').every((v) => /^[+-]?\d+$/.test(v) && fits(Number(v)))) {
+        return failed(
+          range.signed
+            ? `${key} must be whole numbers from 1 to ${range.max} or from -${range.max} to -1: ${part}`
+            : `${key} must be whole numbers from ${range.min} to ${range.max}: ${part}`,
+        );
+      }
+    }
+    if (key === 'WKST' && !WEEKDAYS.includes(value.toUpperCase())) return failed(`invalid 'WKST': ${value}`);
   }
   if (values.FREQ === undefined) return failed('a rule needs a FREQ');
   // step 4 : what was read
@@ -121,7 +148,8 @@ function ruleProblem(kind, text) {
  * Why a rrule is refused, on its text alone : no DTSTART, a naive one, several, no RRULE, an
  * EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix, COUNT with UNTIL, a COUNT under 1 or above 999, a part that is not a rule's, a
- * TZID that is no time zone - the server's reasons, in its order.
+ * BYxxx number out of its range (BYSETPOS=0), a WKST that is no weekday, a TZID that is no time
+ * zone - the server's reasons, in its order.
  *
  * Args:
  *   value (string): the rrule.
