@@ -6654,9 +6654,9 @@
       secrets come from the database.
 
       **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the files are read
-      in: a new file makes an object, a changed one changes it, a removed one removes it. After a **Reset**, an
-      object whose file is not in the remote (written by the app, never pushed) is unlinked and kept in the app with
-      its secrets, never deleted. A key taken out of a file
+      in: a new file makes an object, a changed one changes it, a removed one removes it. After a **Reset**, or any
+      clone where the working tree was gone, an object whose file is not in the remote (written by the app, never
+      pushed) is unlinked and kept in the app with its secrets, never deleted. A key taken out of a file
       is taken out of the app too: the field gets the value a new object made from that file gets (a secret
       excepted, kept in the database). A file renamed keeps its object, which follows it. A file the seed's schema
       or the app's rules refuse (a credential type without its required fields, a runner of another type than its
@@ -6670,7 +6670,9 @@
       **Turning it on** shows what it will do first: the app's objects written to the repository (those whose
       secrets stay in the database said), the files whose name an app object has (git's version wins, the secret in
       the database kept when the file gives none), and what stays in the app: objects the config seed manages,
-      runners an RTE registered itself or waiting for approval. **The app: back to git.** Editing a linked object
+      runners an RTE registered itself or waiting for approval, and an object named as a file of the repository
+      that is refused or waits (it follows that file once the file is read in, never a second file of its name).
+      What the pull before it took is said in its report too. **The app: back to git.** Editing a linked object
       rewrites only the fields that changed in its file (its `${ENV}` references, comments and other keys kept),
       a new object is written as a new file, deleting one deletes its file; all wait for the repository's Push.
       A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)
@@ -6722,7 +6724,8 @@
       A repository with the **Repositories** usage (`use_for_repositories`, one repository at most) holds the other
       repositories in its `repositories.yaml`: a `repositories:` list, each item in the config seed's format for
       its `repositories:` section (name, uri, branch, description, `credential` by name, the `use_for_*` flags, the
-      pull schedule `cron`, `rebase_on_start`).
+      pull schedule `cron`, `rebase_on_start`). As in the seed, an entry may leave out its `branch`: the
+      remote's default branch is used.
       ```yaml
       repositories:
         - name: forms
@@ -6752,7 +6755,9 @@
       - **Secrets**: a credential by name only. An entry with a `user` or a `password`, or a user and token in
         its `uri` (`https://user:token@...`), is refused.
 
-      A missing `repositories.yaml`, or one whose `repositories:` is not a list, changes nothing in the app.
+      A `repositories:` that is not a list changes nothing in the app. A missing `repositories.yaml` deletes
+      nothing either: the repositories it listed stay in the app, no longer linked to it (said in the pull
+      output), so an entry the app writes next makes a file that never deletes the others.
 
   - name: Settings, chat, branding, links, announcements and the disclaimer kept in a git repository
     short: The last usage types, four of them one file each
