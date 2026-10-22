@@ -1372,6 +1372,8 @@ export default {
         "Il modulo '{name}' è definito due volte: viene usato {used}, {skipped} viene ignorato (i nomi dei moduli devono essere unici tra i repository dei moduli)",
       configDeprecated:
         '{key} letti da config.yaml: deprecato, spostali in {file} (config.yaml non viene più letto dalla 8.0.0)',
+      configNotRead:
+        '{file} non viene letto ({reason}): si usano i {key} letti per ultimi da esso, altrimenti quelli della configurazione di base, finché non viene corretto in git',
       usagePreviewFailed:
         'Non è stato possibile leggere dal server cosa farà questa modifica: viene comunque applicata se continui.',
       usageOnNewRepository:

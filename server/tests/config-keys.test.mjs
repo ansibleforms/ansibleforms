@@ -313,3 +313,53 @@ describe("the Config usage of before", () => {
     assert.throws(() => validateSeed({ repositories: { items: [repo("a", { use_for_config: true }), repo("b", { use_for_roles: true })] } }), /use_for_roles on more than one repository: a, b/);
   });
 });
+
+describe("a key file with anchors, or one that is not read", () => {
+  test("a 7.3 config.yaml whose roles name an anchor of its constants : laid as the values they read as", async () => {
+    writeRaw("access", "config.yaml", "constants:\n  admins: &admins\n    - local/admin\nroles:\n  - name: admin\n    groups: *admins\n");
+    const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
+    assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admin"] }]);
+    assert.deepEqual(doc.constants, { base: 1 }, "the constants are not the access repository's");
+  });
+
+  test("a base whose replaced key has an anchor another key names : the base read as it was, that key replaced", async () => {
+    writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    const base = "constants: &c\n  base: 1\nextra: *c\n";
+    const doc = YAML.parse(keys.composeConfig(base, await keys.keySources(), read));
+    assert.deepEqual(doc, { constants: { env: "prod" }, extra: { base: 1 } });
+  });
+
+  test("a key file that is not read : its key as last read, else the base's ; said on its page and in its pull output", async () => {
+    writeRaw("access", "roles.yaml", { roles: [{ name: "admin" }] });
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles, [{ name: "admin" }]);
+    // a top-level list, then not YAML at all : the roles last read stay
+    for (const broken of ["- name: admin\n", "roles: [\n", "roles:\n  admin: {}\n"]) {
+      writeRaw("access", "roles.yaml", broken);
+      const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
+      assert.deepEqual(doc.roles, [{ name: "admin" }], broken);
+    }
+    assert.match((await keys.repositoryKeyProblems("access"))[0].reason, /its roles must be a list/);
+    assert.match(await keys.deprecationLines("access"), /\nNot read: roles\.yaml: its roles must be a list/);
+    // never read before (a repository of its own) : the base's
+    fx.rowNamed("repositories", "design").use_for_categories = 0;
+    fx.state.tables.repositories.push({ id: 3, name: "late", use_for_categories: 1 });
+    writeRaw("late", "categories.yaml", "- Ops\n");
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).categories, [{ name: "Base" }]);
+    assert.deepEqual(await keys.repositoryKeyProblems("late"), [{ key: "categories", file: "categories.yaml", reason: "not a YAML dictionary" }]);
+    // a save of its key : refused, the file never overwritten by halves
+    const sources = await keys.keySources();
+    assert.throws(() => keys.assertKeysWritable({ categories: [{ name: "New" }] }, sources, {}), {
+      status: 409,
+      message: /late\/categories\.yaml, which is not read \(not a YAML dictionary\): fix it in git/,
+    });
+  });
+
+  test("the forms load with a key file broken in git : the roles last read served, never a failure", async () => {
+    fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role", groups: [] }], categories: [{ name: "Default", icon: "bars" }], constants: {} }));
+    writeRaw("access", "roles.yaml", { roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }] });
+    const { default: Form } = await import("../src/models/form.model.js");
+    assert.deepEqual((await Form.load(["admin"], "", false, true)).roles.map((r) => r.name), ["admin", "default"]);
+    writeRaw("access", "roles.yaml", "- name: admin\n");
+    assert.deepEqual((await Form.load(["admin"], "", false, true)).roles.map((r) => r.name), ["admin", "default"]);
+  });
+});

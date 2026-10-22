@@ -1334,6 +1334,8 @@ export default {
       usageOnSkipped: '在 git 中已结束，未导入：{count}。',
       formDuplicate: "表单 '{name}' 被定义了两次：使用 {used}，跳过 {skipped}（表单名称在所有表单仓库中必须唯一）",
       configDeprecated: '{key} 从 config.yaml 读取：已弃用，请移至 {file}（8.0.0 起不再读取 config.yaml）',
+      configNotRead:
+        '{file} 未被读取（{reason}）：在 git 中修复之前，使用最后一次从中读取的 {key}（若无则使用基础配置中的）',
       usagePreviewFailed: '无法从服务器读取此更改将执行的操作：如果继续，更改仍会应用。',
       usageOnNewRepository:
         '{name} 尚未克隆：如果远程仓库已有这些文件，git 中的版本优先，并替换本应用中的版本。克隆后，其拉取输出会说明取用了什么。',

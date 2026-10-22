@@ -1363,6 +1363,8 @@ export default {
         "フォーム '{name}' が 2 回定義されています: {used} を使用し、{skipped} はスキップします (フォーム名はフォームリポジトリ全体で一意である必要があります)",
       configDeprecated:
         '{key} を config.yaml から読み込み：非推奨です。{file} に移動してください（8.0.0 では config.yaml は読まれません）',
+      configNotRead:
+        '{file} は読み込まれません（{reason}）：git で修正されるまで、最後に読み込んだ {key}（なければ基本構成のもの）が使われます',
       usagePreviewFailed:
         'この変更で何が行われるかをサーバーから読み取れませんでした。続行すると変更はそのまま適用されます。',
       usageOnNewRepository:

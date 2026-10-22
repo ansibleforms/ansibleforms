@@ -1368,6 +1368,8 @@ export default {
         "Formularz '{name}' jest zdefiniowany dwukrotnie: używany jest {used}, pominięty {skipped} (nazwy formularzy muszą być unikalne we wszystkich repozytoriach formularzy)",
       configDeprecated:
         '{key} czytane z config.yaml: przestarzałe, przenieś je do {file} (config.yaml nie jest czytany od 8.0.0)',
+      configNotRead:
+        '{file} nie jest czytany ({reason}): używane są {key} ostatnio z niego odczytane, a w ich braku te z konfiguracji bazowej, dopóki plik nie zostanie poprawiony w git',
       usagePreviewFailed:
         'Nie udało się odczytać z serwera, co zrobi ta zmiana: i tak zostanie zastosowana, jeśli kontynuujesz.',
       usageOnNewRepository:

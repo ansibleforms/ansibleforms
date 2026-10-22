@@ -482,6 +482,12 @@ onMounted(async () => {
                 t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })
               }}
             </div>
+            <!-- a roles, categories or constants file it holds that is not read : why, what is used meanwhile -->
+            <div v-for="d in repo.keyProblems || []" :key="'k' + d.key" class="alert alert-danger py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{
+                t('settings.repositories.configNotRead', { key: usageLabel(t, d.key), file: d.file, reason: d.reason })
+              }}
+            </div>
             <!-- a form name it shares with another forms repository : the copy used, the one skipped -->
             <div v-for="d in repo.formDuplicates || []" :key="d.skipped.place" class="alert alert-warning py-2">
               <FaIcon icon="triangle-exclamation" class="me-2" />{{

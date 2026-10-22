@@ -1375,6 +1375,8 @@ export default {
       formDuplicate:
         "El formulario '{name}' está definido dos veces: se usa {used} y se omite {skipped} (los nombres de formulario deben ser únicos entre los repositorios de formularios)",
       configDeprecated: '{key} leídos de config.yaml: obsoleto, muévelos a {file} (config.yaml ya no se lee en 8.0.0)',
+      configNotRead:
+        '{file} no se lee ({reason}): se usan los {key} leídos de él por última vez, si no los de la configuración base, hasta que se corrija en git',
       usagePreviewFailed: 'No se pudo leer del servidor lo que hará este cambio: se aplica igualmente si continúas.',
       usageOnNewRepository:
         '{name} aún no está clonado: si el remoto ya tiene estos archivos, gana la versión de git y reemplaza la de esta aplicación. Su salida de pull dice lo que tomó una vez clonado.',

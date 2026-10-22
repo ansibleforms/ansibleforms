@@ -1379,6 +1379,8 @@ export default {
         "Le formulaire '{name}' est défini deux fois : {used} est utilisé, {skipped} est ignoré (les noms de formulaire doivent être uniques entre les dépôts de formulaires)",
       configDeprecated:
         "{key} lus depuis config.yaml : obsolète, déplacez-les dans {file} (config.yaml n'est plus lu en 8.0.0)",
+      configNotRead:
+        "{file} n'est pas lu ({reason}) : les {key} lus en dernier depuis ce fichier, sinon ceux de la configuration de base, sont utilisés jusqu'à sa correction dans git",
       usagePreviewFailed:
         "Ce que fera ce changement n'a pas pu être lu sur le serveur : il est tout de même appliqué si vous continuez.",
       usageOnNewRepository:

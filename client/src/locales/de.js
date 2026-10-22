@@ -1376,6 +1376,8 @@ export default {
         "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",
       configDeprecated:
         '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie nach {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
+      configNotRead:
+        '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen {key}, sonst die der Basiskonfiguration, werden verwendet, bis die Datei in git korrigiert ist',
       usagePreviewFailed:
         'Was diese Änderung bewirkt, konnte nicht vom Server gelesen werden: Sie wird trotzdem angewendet, wenn Sie fortfahren.',
       usageOnNewRepository:

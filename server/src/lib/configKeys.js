@@ -25,10 +25,11 @@ import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js
 // ===========================================================================
 
 // each key : its usage type, its flag, its own file
+// ... and what its value is : a list (roles, categories) or a dictionary (constants)
 export const CONFIG_KEYS = [
-  { key: "roles", flag: "use_for_roles", file: "roles.yaml" },
-  { key: "categories", flag: "use_for_categories", file: "categories.yaml" },
-  { key: "constants", flag: "use_for_constants", file: "constants.yaml" },
+  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true },
+  { key: "categories", flag: "use_for_categories", file: "categories.yaml", list: true },
+  { key: "constants", flag: "use_for_constants", file: "constants.yaml", list: false },
 ];
 
 // the one file the three keys were in before (use_for_config) : still read, deprecated
@@ -106,7 +107,8 @@ export async function repositoryDeprecations(name) {
 }
 
 /**
- * The lines a repository's pull output says of its keys read from config.yaml.
+ * The lines a repository's pull output says of its keys read from config.yaml, and of its key files
+ * that are not read (repositoryKeyProblems).
  *
  * Args:
  *   name (string): the repository.
@@ -116,7 +118,8 @@ export async function repositoryDeprecations(name) {
  */
 export async function deprecationLines(name) {
   try {
-    return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("");
+    const problems = (await repositoryKeyProblems(name)).map((p) => `\nNot read: ${p.file}: ${p.reason} - the ${p.key} last read from it (else the base configuration's) are used until it is fixed`);
+    return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("") + problems.join("");
   } catch (e) {
     logger.debug(`Could not read the configuration keys of repository '${name}': ${e.message}`);
     return "";
@@ -157,6 +160,11 @@ function mapDocument(text) {
  * configuration shown is the base with each repository's key as its file writes it, and a key
  * saved from that text is written to its file with the comments it was given.
  *
+ * The text written always reads as the text with that key's value : a value naming an anchor
+ * outside it (constants: &admins ... roles: groups: *admins), or an anchor of the text that goes
+ * with its old value, is laid as the value it reads as instead (its comments lost) ; the whole
+ * text so read, its keys in their order, when its own aliases still name the value it loses.
+ *
  * Args:
  *   text (string): the text to change.
  *   key (string): the key.
@@ -172,20 +180,39 @@ function withKeyOf(text, key, from) {
   const pair = from.contents.items.find((p) => keyOf(p) === key);
   if (!pair) return text;
   const original = String(text ?? "");
-  const doc = mapDocument(original);
-  const value = YAML.isNode(pair.value) ? pair.value.clone() : pair.value;
-  const there = doc.contents.items.find((p) => keyOf(p) === key);
-  if (there) {
-    there.value = value;
-    // the comment above the key : the one of the text it comes from, when it has one
-    if (YAML.isNode(pair.key) && pair.key.commentBefore) {
-      if (!YAML.isNode(there.key)) there.key = doc.createNode(there.key);
-      there.key.commentBefore = pair.key.commentBefore;
+  // what the text must read as : its keys, that one's value the one `from` reads as
+  const wanted = { ...(mapDocument(original).toJS() || {}), [key]: (from.toJS() || {})[key] };
+  const laid = (valueOf) => {
+    const doc = mapDocument(original);
+    const value = valueOf(doc);
+    const there = doc.contents.items.find((p) => keyOf(p) === key);
+    if (there) {
+      there.value = value;
+      // the comment above the key : the one of the text it comes from, when it has one
+      if (YAML.isNode(pair.key) && pair.key.commentBefore) {
+        if (!YAML.isNode(there.key)) there.key = doc.createNode(there.key);
+        there.key.commentBefore = pair.key.commentBefore;
+      }
+    } else {
+      doc.contents.items.push(doc.createPair(YAML.isNode(pair.key) ? pair.key.clone() : key, value));
     }
-  } else {
-    doc.contents.items.push(doc.createPair(YAML.isNode(pair.key) ? pair.key.clone() : key, value));
+    return original.trim() ? editedText(doc, original) : doc.toString({ lineWidth: 0 });
+  };
+  const readsAsWanted = (out) => {
+    const doc = YAML.parseDocument(out);
+    return !doc.errors.length && _.isEqual(doc.toJS(), wanted);
+  };
+  // its node as written, then the value it reads as
+  const values = [() => (YAML.isNode(pair.value) ? pair.value.clone() : pair.value), (doc) => doc.createNode(wanted[key])];
+  for (const valueOf of values) {
+    try {
+      const out = laid(valueOf);
+      if (readsAsWanted(out)) return out;
+    } catch {
+      // an alias left without its anchor : the next way
+    }
   }
-  return original.trim() ? editedText(doc, original) : doc.toString({ lineWidth: 0 });
+  return YAML.stringify(wanted, { lineWidth: 0 });
 }
 
 /**
@@ -206,6 +233,11 @@ const unchanged = (doc, key, served) => served !== undefined && served !== null 
 // READ : THE KEYS LAID OVER THE BASE CONFIGURATION
 // ===========================================================================
 
+// the document of each key file last read whole, by its path : a file broken in git afterwards
+// keeps its keys as they were (composeConfig) ; and what was last said of a file that is not read
+const lastRead = new Map();
+const reported = new Map();
+
 /**
  * The base configuration with the keys of the repositories laid over it.
  *
@@ -217,10 +249,9 @@ const unchanged = (doc, key, served) => served !== undefined && served !== null 
  * Returns:
  *   string: the configuration's text : the base's, each key a repository holds as its file writes
  *     it (its comments, a ytt directive among them, kept), the base's other lines as they are ; the
- *     base as it is when no key comes from a repository.
- *
- * Raises:
- *   Error: a file that is not valid YAML, named.
+ *     base as it is when no key comes from a repository. A key file that is not read (not valid
+ *     YAML, not a dictionary, its key not a list or a dictionary as it should be) gives its key as
+ *     it was last read, else the base's : said, never a failure of the whole configuration.
  */
 export function composeConfig(baseText, sources, render) {
   const present = sources.filter((s) => s.exists);
@@ -229,13 +260,87 @@ export function composeConfig(baseText, sources, render) {
   for (const s of present) {
     let from;
     try {
-      from = mapDocument(render(s.path));
+      from = keyDocument(s, render(s.path));
+      lastRead.set(s.path, from);
+      reported.delete(s.path);
     } catch (e) {
-      throw new Error(`${s.repository}/${path.basename(s.path)} is not valid YAML: ${e.message}`, { cause: e });
+      // a file that cannot be read : its key as it was last read, else the base's - never the whole
+      // configuration lost with it (said once in the server log, in its pull output and on its page)
+      from = lastRead.get(s.path);
+      const line = `${s.repository}/${path.basename(s.path)} is not read: ${e.message} - the ${s.key} ${from ? "last read from it" : "of the base configuration"} are used until it is fixed`;
+      if (reported.get(s.path) !== line) logger.error(line);
+      reported.set(s.path, line);
+      if (!from) continue;
     }
     text = withKeyOf(text, s.key, from);
   }
   return text;
+}
+
+/**
+ * A key file's text as the document it gives, checked : valid YAML, a dictionary, every alias
+ * resolvable, and the key, when it gives it, of its kind (a list of roles or categories, a
+ * dictionary of constants).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *   text (string): the file's text (read, or rendered with ytt).
+ *
+ * Returns:
+ *   YAML.Document: the document (mapDocument).
+ *
+ * Raises:
+ *   Error: why it is not read.
+ */
+function keyDocument(source, text) {
+  const doc = mapDocument(text);
+  const value = (doc.toJS() || {})[source.key];
+  const list = CONFIG_KEYS.find((k) => k.key === source.key)?.list;
+  if (value === undefined || value === null || list === undefined) return doc;
+  if (list && !Array.isArray(value)) throw new Error(`its ${source.key} must be a list`);
+  if (!list && (typeof value !== "object" || Array.isArray(value))) throw new Error(`its ${source.key} must be a dictionary`);
+  return doc;
+}
+
+/**
+ * Why a key file of a repository is not read, as it is now in its working tree : the file as it is
+ * written (a ytt template is not checked here, its expansion is when it is loaded).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string|null: why, null when it is read (or not there).
+ */
+export function keyFileProblem(source) {
+  if (!source.exists) return null;
+  try {
+    const text = fs.readFileSync(source.path, "utf8");
+    if (isTemplate(text)) return null;
+    keyDocument(source, text);
+    return null;
+  } catch (e) {
+    return e.message || String(e);
+  }
+}
+
+/**
+ * The key files of a repository that are not read (keyFileProblem), for its pull output and its
+ * page.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<object[]>: [{ key, file, reason }] ; none when each is read.
+ */
+export async function repositoryKeyProblems(name) {
+  const out = [];
+  for (const s of (await keySources()).filter((x) => x.repository === name)) {
+    const reason = keyFileProblem(s);
+    if (reason) out.push({ key: s.key, file: path.basename(s.path), reason });
+  }
+  return out;
 }
 
 // ===========================================================================
@@ -264,6 +369,7 @@ export function assertKeysWritable(doc, sources, served) {
   for (const s of changed) {
     if (s.missing) refused.push(`The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`);
     else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${path.basename(s.path)}, a ytt template: change them in git`);
+    else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${path.basename(s.path)}, which is not read (${keyFileProblem(s)}): fix it in git`);
   }
   if (refused.length) throw new Errors.ConflictError(refused.join("; "));
 }

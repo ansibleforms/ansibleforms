@@ -1375,6 +1375,8 @@ export default {
         "El formulari '{name}' està definit dues vegades: s'utilitza {used} i s'omet {skipped} (els noms de formulari han de ser únics entre els repositoris de formularis)",
       configDeprecated:
         '{key} llegits de config.yaml: obsolet, mou-los a {file} (config.yaml ja no es llegeix a la 8.0.0)',
+      configNotRead:
+        "{file} no es llegeix ({reason}): s'utilitzen els {key} llegits d'aquest fitxer per última vegada, si no els de la configuració base, fins que es corregeixi a git",
       usagePreviewFailed: "No s'ha pogut llegir del servidor què farà aquest canvi: s'aplica igualment si continues.",
       usageOnNewRepository:
         "{name} encara no està clonat: si el remot ja té aquests fitxers, guanya la versió de git i substitueix la d'aquesta aplicació. La seva sortida de pull diu què ha pres un cop clonat.",
