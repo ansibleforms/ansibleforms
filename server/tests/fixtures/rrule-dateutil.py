@@ -12,6 +12,11 @@
 # fold=0 does both). A naive UNTIL is read in the DTSTART's zone (dateutil wants it in UTC : it is
 # written so). A rule dateutil walks for more than two seconds is left out.
 #
+# After the random rules come the rules of FIXED, each asked its runs after a moment of its own :
+# cases a review found where the runs once differed from dateutil's. The random rules depend on how
+# fast dateutil walks (the two seconds), so a fixed case can be added to the file without making it
+# again : `tests/fixtures/rrule-dateutil.py --fixed` writes the fixed cases alone.
+#
 # To make the fixture again (from the server folder) :
 #
 #   python3 -m venv /tmp/rrule-venv && /tmp/rrule-venv/bin/pip install python-dateutil
@@ -45,6 +50,15 @@ BACK_DAYS = {"YEARLY": 20 * 365, "MONTHLY": 10 * 365, "WEEKLY": 5 * 365, "DAILY"
 
 # the first moment the runs are asked after
 EPOCH = datetime(2026, 10, 22, tzinfo=timezone.utc)
+
+# the rules always in the file, each with the moment its runs are asked after and how many
+FIXED = [
+    # a COUNT rule whose runs go on more than 50 years after its DTSTART
+    ("DTSTART;TZID=Europe/Brussels:19750101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;COUNT=100", "2026-10-22T07:00:00", 3),
+    ("DTSTART;TZID=Europe/Brussels:19750101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;COUNT=100", "2073-06-01T00:00:00", 3),
+    ("DTSTART;TZID=Europe/Brussels:19760301T090000 RRULE:FREQ=MONTHLY;INTERVAL=1;COUNT=999", "2049-12-31T00:00:00", 3),
+    ("DTSTART;TZID=America/New_York:19700105T060000 RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=999", "2007-12-20T00:00:00", 3),
+]
 
 
 class TooSlow(Exception):
@@ -242,8 +256,28 @@ def reference_runs(text, zone_name, now, count):
     return [int(round(t * 1000)) for t in sorted(set(runs))[:count]]
 
 
+def fixed_cases():
+    """The cases of FIXED, their runs as dateutil gives them.
+
+    Returns:
+        list: the cases ({rrule, after, count, runs}).
+    """
+    cases = []
+    for text, after, count in FIXED:
+        zone_name = re.search(r"TZID=([^:]+):", text).group(1) if "TZID=" in text else "UTC"
+        now = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
+        runs = reference_runs(text, zone_name, now, count)
+        cases.append({"rrule": text, "after": int(now.timestamp() * 1000), "count": count, "runs": runs})
+    return cases
+
+
 def main():
-    """Writes the fixture : the cases, as JSON, to the standard output."""
+    """Writes the fixture : the cases, as JSON, to the standard output (the fixed cases alone
+    with --fixed)."""
+    if "--fixed" in sys.argv[1:]:
+        json.dump(fixed_cases(), sys.stdout, indent=1)
+        sys.stdout.write("\n")
+        return
     rng = random.Random(SEED)
     signal.signal(signal.SIGALRM, too_slow)
     cases = []
@@ -265,6 +299,7 @@ def main():
                 signal.alarm(0)
             cases.append({"rrule": text, "after": int(now.timestamp() * 1000), "count": count, "runs": runs})
             made += 1
+    cases += fixed_cases()
     json.dump({"dateutil": dateutil.__version__, "seed": SEED, "cases": cases}, sys.stdout, indent=1)
     sys.stdout.write("\n")
 

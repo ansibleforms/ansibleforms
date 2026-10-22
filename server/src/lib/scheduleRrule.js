@@ -11,6 +11,7 @@
 //     -1 ...), WKST a weekday
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
 //   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
+//   a COUNT rule's runs are counted from its DTSTART, up to 50 years after now
 //   every rule is walked from now, never from a DTSTART of years ago : from the period (the
 //     year, month, week, day, hour or minute) now is in
 //   every rule is walked here, period by period (its days kept by their BYMONTH, BYMONTHDAY,
@@ -724,27 +725,31 @@ function periodWalker(spec, start) {
 
 /**
  * How a rule is walked : here (periodWalker) from the period a moment is in, a rule with a COUNT
- * from its DTSTART.
+ * from its DTSTART, its runs counted from there up to HORIZON_YEARS after the moment its runs are
+ * asked from (a COUNT=100 yearly rule from 1975 still runs in 2027).
  *
  * Args:
  *   options (object): the rule's options, as ruleOptions reads them.
  *   start (number): the DTSTART, floating ms.
+ *   reference (number): the moment its runs are asked from, floating ms (its DTSTART by default).
  *
  * Returns:
  *   object: { never (true : it never fires), last (floating ms : no run after it, Infinity when
  *     it never ends), between: (from, to, limit) => the runs after from and up to to, floating ms,
  *     in order, the first limit of them at most }.
  */
-function ruleWalker(options, start) {
+function ruleWalker(options, start, reference = start) {
   const spec = specOf(options, start);
   if (neverFiresAtAll(spec, start)) return { never: true, last: -Infinity, between: () => [] };
   const walk = periodWalker(spec, start);
   if (!spec.count) return { never: false, last: spec.until === null ? Infinity : spec.until, between: walk };
-  // its first COUNT runs, from its DTSTART, a year at a time, no more than the COUNT taken (a
-  // minutely rule has half a million runs a year)
+  // its first COUNT runs, from its DTSTART, in spans that start at a year and double (a rule from
+  // decades ago gets there in a few), no more than the COUNT taken (a minutely rule has half a
+  // million runs a year), up to HORIZON_YEARS after the moment asked or its DTSTART
   const runs = [];
-  for (let from = start - 1; runs.length < spec.count && from < start + HORIZON_MS; from += 366 * DAY) {
-    for (const t of walk(from, from + 366 * DAY, spec.count - runs.length)) runs.push(t);
+  const bound = Math.max(start, reference) + HORIZON_MS;
+  for (let from = start - 1, span = 366 * DAY; runs.length < spec.count && from < bound; from += span, span *= 2) {
+    for (const t of walk(from, Math.min(from + span, bound), spec.count - runs.length)) runs.push(t);
   }
   return {
     never: false,
@@ -776,7 +781,7 @@ export function walkRuns(value, { after = new Date(), count = 1, fromStart = fal
   const compiled = typeof value === "string" ? compileRrule(value) : value;
   // from just before its DTSTART, or from the moment asked, as the zone's wall clock shows it
   const reference = fromStart ? compiled.start - 1000 : floatingOf(after, compiled.zone);
-  const walkers = compiled.rules.map((r) => ({ kind: r.kind, ...ruleWalker(r.options, compiled.start) }));
+  const walkers = compiled.rules.map((r) => ({ kind: r.kind, ...ruleWalker(r.options, compiled.start, reference) }));
   const takes = walkers.filter((w) => w.kind === "rrule" && !w.never);
   const leaves = walkers.filter((w) => w.kind === "exrule" && !w.never);
   const runs = new Set();
