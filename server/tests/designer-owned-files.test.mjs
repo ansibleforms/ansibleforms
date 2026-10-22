@@ -97,6 +97,16 @@ describe("a file a usage type of the repository owns", () => {
     await ProjectFiles.write("workflows", "ops/deploy.yml", "workflow_job_templates: [] # edited\n");
   });
 
+  test("is never made through a linked folder : a new roles.yaml or credential lands where its link leads", async () => {
+    // a link committed in git, to the repository's own root
+    fs.rmSync(path.join(fx.ROOT, "ops", "roles.yaml"));
+    fs.symlinkSync(".", path.join(fx.ROOT, "ops", "sub"));
+    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/roles.yaml", ESCALATE, true), denied);
+    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/credentials/evil.yaml", "name: evil\n", true), denied);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "roles.yaml")), false);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "credentials", "evil.yaml")), false);
+  });
+
   test("belongs to the type only while the repository is used for it", async () => {
     fx.reset({ repositories: [{ id: 1, name: "ops", use_for_workflows: 1 }] });
     await ProjectFiles.write("workflows", "ops/roles.yaml", "# notes\n");

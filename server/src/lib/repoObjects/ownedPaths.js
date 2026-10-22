@@ -36,6 +36,32 @@ function relativeTo(root, abs) {
 }
 
 /**
+ * A path as the disk resolves it, links followed : the deepest part of it that exists resolved
+ * (realpath), the rest added as written. A file not made yet is resolved through the folders it
+ * would be made in, so a link to a folder (sub -> .) cannot hide where it lands.
+ *
+ * Args:
+ *   abs (string): the path, absolute.
+ *
+ * Returns:
+ *   string: the path resolved ; as written when nothing of it resolves.
+ */
+export function realPathOf(abs) {
+  let probe = path.resolve(abs);
+  const rest = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(probe), ...rest);
+    } catch {
+      const parent = path.dirname(probe);
+      if (parent === probe) return path.resolve(abs);
+      rest.unshift(path.basename(probe));
+      probe = parent;
+    }
+  }
+}
+
+/**
  * What a repository's usage types own in it, by path relative to its working tree.
  *
  * Args:
@@ -115,12 +141,8 @@ export async function ownerTest(repository) {
   return (abs) => {
     const found = match(relativeTo(dir, abs));
     if (found) return found;
-    // a link to one of them
-    try {
-      return match(relativeTo(realDir, fs.realpathSync(abs)));
-    } catch {
-      return null;
-    }
+    // a link to one of them, or a new file made through a linked folder
+    return match(relativeTo(realDir, realPathOf(abs)));
   };
 }
 
@@ -154,4 +176,4 @@ export async function assertNotOwned(repository, abs, name) {
   if (label) throw new Errors.AccessDeniedError(`'${name}' holds the ${label} of repository '${repository}': it is not read nor written in the designer`);
 }
 
-export default { ownerTest, ownerOf, assertNotOwned };
+export default { realPathOf, ownerTest, ownerOf, assertNotOwned };
