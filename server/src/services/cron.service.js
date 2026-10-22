@@ -264,19 +264,23 @@ class CronService {
             logger.error(`Error in schedule rrule job for ${name} (ID: ${id}):`, err);
           }
         });
+        // a run that passed while it was worked out (its thread busy with other rules) : run at
+        // once, a task for a moment gone would never fire
+        const at = next.getTime() > Date.now() ? next : new Date(Date.now() + 1000);
         // croner's own class : the run is guarded above, and the next one registered whatever it did
-        const task = new Croner(next, { paused: true, protect: true }, async () => {
+        const task = new Croner(at, { paused: true, protect: true }, async () => {
           await queue();
           // still the task registered for it (not removed or replaced meanwhile) : the next run
-          // (after this one, even if the timer fired a little early : never the same run twice)
+          // (after this one, even if the timer fired a little early : never the same run twice,
+          // and a run a second later still taken)
           if (this.jobs.schedules.get(id) === task && this.active) {
             task.stop();
             this.jobs.schedules.delete(id);
-            await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), next.getTime()) + 1000));
+            await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), next.getTime())));
           }
         });
         register(task);
-        logger.info(`Added rrule job for schedule: ${name} (ID: ${id}), next run at ${next.toISOString()}`);
+        logger.info(`Added rrule job for schedule: ${name} (ID: ${id}), next run at ${at.toISOString()}`);
       },
       (err) => {
         if (!current()) return;

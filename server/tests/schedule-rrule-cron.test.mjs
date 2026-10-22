@@ -179,6 +179,27 @@ describe("a rrule schedule is registered at its next run", () => {
     assert.equal(queued, 0);
   });
 
+  test("a run that passed while it was worked out runs at once, never registered in the past", async () => {
+    // worked out from two minutes ago (the thread busy meanwhile) : its run a minute ago
+    await cronService.addRruleSchedule(7, "Every minute", "DTSTART;TZID=UTC:20200101T000000 RRULE:FREQ=MINUTELY;INTERVAL=1", new Date(Date.now() - 120000));
+    const [task] = live();
+    assert.ok(task.pattern > new Date(), "a moment ahead");
+    assert.ok(task.pattern - Date.now() <= 1000, "at once");
+    await task.fn();
+    assert.equal(queued, 1);
+  });
+
+  test("the run after one is taken a second later still", async () => {
+    // its next run at the start of a minute ahead, then one a second later
+    const minute = Math.ceil(Date.now() / 60000) * 60000 + 60000;
+    await cronService.addRruleSchedule(7, "Twice a minute", "DTSTART;TZID=UTC:20200101T000000 RRULE:FREQ=MINUTELY;INTERVAL=1;BYSECOND=0,1", new Date(minute - 500));
+    const [first] = live();
+    assert.equal(first.pattern.getTime(), minute);
+    await first.fn();
+    const [second] = live();
+    assert.equal(second.pattern.getTime(), minute + 1000);
+  });
+
   test("a schedule removed while its next run is worked out is not registered", async () => {
     const pending = cronService.addSchedule(7, "Nightly", null, 0, null, RRULE);
     cronService.removeSchedule(7);
