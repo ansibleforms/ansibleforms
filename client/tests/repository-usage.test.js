@@ -303,6 +303,34 @@ describe('one question when a save turns several object types on or off', () => 
       'settings.repositories.usageFailed {"type":"settings.repositories.usageTypes.credentials","error":"disk full"}',
     ]);
   });
+
+  it('a pull that failed, files refused or the files not read in before letting go : in red, with why', () => {
+    usageToast(t, { schedules: { deactivated: { pull: 'pulled', unlinked: 3, error: 'not read in: bad yaml' } } });
+    expect(toasts[0][0]).toBe('error');
+    expect(toasts[0][1]).toContain('settings.repositories.usageNotReadIn {"error":"bad yaml"}');
+    usageToast(t, {
+      credentials: {
+        activated: {
+          pull: 'pulled',
+          written: [],
+          matched: [],
+          kept: [],
+          refused: [{ file: 'a.yaml', reasons: ['bad'] }],
+        },
+      },
+    });
+    expect(toasts[1][0]).toBe('error');
+    expect(toasts[1][1]).toContain('settings.repositories.usageRefused {"files":"a.yaml (bad)"}');
+    // the server's reason once, never "not pulled (not pulled: ...)"
+    usageToast(t, {
+      schedules: { activated: { pull: 'not pulled: auth failed', written: [], matched: [], kept: [] } },
+    });
+    expect(toasts[2][0]).toBe('error');
+    expect(toasts[2][1]).toContain('settings.repositories.usageNotPulled {"reason":"auth failed"}');
+    // a repository let go of that was never cloned : said, not a failure
+    usageToast(t, { schedules: { deactivated: { pull: 'not cloned', unlinked: 1 } } });
+    expect(toasts[3][0]).toBe('success');
+  });
 });
 
 describe("the repositories list's Usage column", () => {
@@ -409,7 +437,8 @@ describe('what the question can and cannot know', () => {
     expect(d[0]).toBe('settings.repositories.usagePreviewFailed');
     expect(d.filter((x) => x.heading)).toEqual([]);
     const text = d.join(' ');
-    for (const key of ['usageOnWritten', 'usageOnReadFile', 'usageOnGitWins', 'usageOffKept']) expect(text).not.toContain(key);
+    for (const key of ['usageOnWritten', 'usageOnReadFile', 'usageOnGitWins', 'usageOffKept'])
+      expect(text).not.toContain(key);
     // what is true of every type is still said
     expect(d).toContain('settings.repositories.usageOnAfter');
     expect(d).toContain('settings.repositories.usageOffPull');
@@ -423,7 +452,12 @@ describe('why an object stays in the app', () => {
     const lines = activationLines(t, 'schedules', 'ops', {
       written: [],
       kept: [
-        { name: 'Weekly', code: 'cron', cron: '0 0 1 * 1', reason: 'both the day of the month and the day of the week' },
+        {
+          name: 'Weekly',
+          code: 'cron',
+          cron: '0 0 1 * 1',
+          reason: 'both the day of the month and the day of the week',
+        },
         { name: 'Empty', code: 'noSchedule', cron: null, reason: 'it has no cron nor rrule' },
         { name: 'Broken', code: 'notWritten', cron: '0 1 * * *', error: 'disk full', reason: 'not written: disk full' },
       ],
@@ -480,7 +514,9 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     });
     expect(lines.join(' ')).not.toContain('usageOnReadFile');
     expect(lines.join(' ')).not.toContain('usageOnWrittenFile');
-    expect(lines).toContain('settings.repositories.usageOnKept {"names":"sidebar.chat (settings.repositories.usageKeptWhy.seed)"}');
+    expect(lines).toContain(
+      'settings.repositories.usageOnKept {"names":"sidebar.chat (settings.repositories.usageKeptWhy.seed)"}',
+    );
   });
 
   it('their pages say which repository holds them, the record pages which file', async () => {

@@ -1375,6 +1375,9 @@ export default {
       usageOffUnpushed: '注意: まだプッシュされていない変更があります。それらは git に送られません。',
       usageOffDone: '{type}：{count} 件の git とのリンクを解除しました。このアプリに残ります。',
       usageNotPulled: 'リポジトリはプルされませんでした ({reason})。',
+      usageRefused: '拒否されたファイル：{files}。',
+      usageNotReadIn:
+        '最新のファイルが先に読み込まれませんでした ({error})。オブジェクトは前回のプルの状態のままです。',
       usageFailed: '{type} は変更に追従できませんでした：{error}',
       usageKeptWhy: {
         seed: '構成シードで管理',

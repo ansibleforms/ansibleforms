@@ -1386,6 +1386,9 @@ export default {
       usageOffUnpushed: 'Attenzione: ha modifiche non ancora inviate con push. Non vengono inviate a git.',
       usageOffDone: '{type}: {count} scollegati da git, restano in questa app.',
       usageNotPulled: 'Il pull del repository non è stato eseguito ({reason}).',
+      usageRefused: 'File rifiutati: {files}.',
+      usageNotReadIn:
+        "I suoi file più recenti non sono stati letti prima ({error}): gli oggetti restano come li ha lasciati l'ultimo pull.",
       usageFailed: '{type} non ha potuto seguire la modifica: {error}',
       usageKeptWhy: {
         seed: 'gestito dal seed di configurazione',

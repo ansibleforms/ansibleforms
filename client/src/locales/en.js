@@ -1374,6 +1374,8 @@ export default {
       usageOffUnpushed: 'Warning: it has changes that are not pushed yet. They are not sent to git.',
       usageOffDone: '{type}: {count} unlinked from git, they stay in this app.',
       usageNotPulled: 'The repository was not pulled ({reason}).',
+      usageRefused: 'Files refused: {files}.',
+      usageNotReadIn: 'Its latest files were not read in first ({error}): the objects stay as the last pull left them.',
       usageFailed: '{type} could not follow the change: {error}',
       usageKeptWhy: {
         seed: 'managed by the config seed',

@@ -1388,6 +1388,9 @@ export default {
       usageOffUnpushed: "Atenció: té canvis que encara no s'han enviat amb push. No s'envien a git.",
       usageOffDone: '{type}: {count} desvinculats de git, es queden en aquesta aplicació.',
       usageNotPulled: "No s'ha fet pull del repositori ({reason}).",
+      usageRefused: 'Fitxers rebutjats: {files}.',
+      usageNotReadIn:
+        "Els seus darrers fitxers no s'han llegit abans ({error}): els objectes queden com els va deixar l'últim pull.",
       usageFailed: '{type} no ha pogut seguir el canvi: {error}',
       usageKeptWhy: {
         seed: 'gestionat pel seed de configuració',

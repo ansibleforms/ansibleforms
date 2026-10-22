@@ -1388,6 +1388,9 @@ export default {
       usageOffUnpushed: 'Atención: tiene cambios que aún no se han enviado con push. No se envían a git.',
       usageOffDone: '{type}: {count} desvinculados de git, se quedan en esta aplicación.',
       usageNotPulled: 'No se hizo pull del repositorio ({reason}).',
+      usageRefused: 'Archivos rechazados: {files}.',
+      usageNotReadIn:
+        'Sus últimos archivos no se leyeron antes ({error}): los objetos quedan como los dejó el último pull.',
       usageFailed: '{type} no ha podido seguir el cambio: {error}',
       usageKeptWhy: {
         seed: 'gestionado por el seed de configuración',

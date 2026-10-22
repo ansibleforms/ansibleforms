@@ -1390,6 +1390,9 @@ export default {
       usageOffUnpushed: 'Achtung: Es hat Änderungen, die noch nicht gepusht sind. Sie werden nicht an git gesendet.',
       usageOffDone: '{type}: {count} von git gelöst, sie bleiben in dieser App.',
       usageNotPulled: 'Das Repository wurde nicht gepullt ({reason}).',
+      usageRefused: 'Abgelehnte Dateien: {files}.',
+      usageNotReadIn:
+        'Die neuesten Dateien wurden vorher nicht eingelesen ({error}): die Objekte bleiben, wie der letzte Pull sie hinterlassen hat.',
       usageFailed: '{type} konnte der Änderung nicht folgen: {error}',
       usageKeptWhy: {
         seed: 'vom Konfigurations-Seed verwaltet',

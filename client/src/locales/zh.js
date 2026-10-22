@@ -1344,6 +1344,8 @@ export default {
       usageOffUnpushed: '注意:它有尚未推送的更改。这些更改不会发送到 git。',
       usageOffDone: '{type}：{count} 个已与 git 解除关联，保留在本应用中。',
       usageNotPulled: '仓库未被拉取({reason})。',
+      usageRefused: '被拒绝的文件：{files}。',
+      usageNotReadIn: '未能先读入其最新文件（{error}）：对象保持上次拉取后的状态。',
       usageFailed: '{type} 未能跟随此更改：{error}',
       usageKeptWhy: {
         seed: '由配置种子管理',

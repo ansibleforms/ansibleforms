@@ -710,7 +710,23 @@ export async function confirmUsageDelete(t, repo) {
 }
 
 /**
- * Says what turning the types on or off did (the answer of the save or the delete), in a toast.
+ * Why the repository was not pulled before a type followed its usage, as the toast says it : the
+ * server's reason without its leading "not pulled: " (the sentence already says it), or '' when it
+ * was pulled (or cloned).
+ *
+ * Args:
+ *   pull (string): the report's pull ('pulled', 'cloned', 'not cloned', 'not pulled: <why>').
+ *
+ * Returns:
+ *   string: the reason, '' for none.
+ */
+const notPulledReason = (pull) =>
+  pull && !['pulled', 'cloned'].includes(pull) ? String(pull).replace(/^not pulled:\s*/, '') : '';
+
+/**
+ * Says what turning the types on or off did (the answer of the save or the delete), in a toast :
+ * in red when one of them did not go as asked (an error, a pull that failed, files refused, the
+ * latest files not read in before letting go), with why.
  *
  * Args:
  *   t (function): vue-i18n's t.
@@ -731,23 +747,43 @@ export function usageToast(t, data) {
       lines.push(t('settings.repositories.usageFailed', { type, error: s.error }));
       continue;
     }
-    let text = '';
+    const parts = [];
+    const r = s.activated || s.deactivated;
     if (s.activated) {
       const a = s.activated;
-      text = t('settings.repositories.usageOnDone', {
-        type,
-        written: (a.written || []).length,
-        matched: (a.matched || []).length,
-        kept: (a.kept || []).length,
-      });
-      if (a.pull && !['pulled', 'cloned'].includes(a.pull))
-        text += ` ${t('settings.repositories.usageNotPulled', { reason: a.pull })}`;
+      parts.push(
+        t('settings.repositories.usageOnDone', {
+          type,
+          written: (a.written || []).length,
+          matched: (a.matched || []).length,
+          kept: (a.kept || []).length,
+        }),
+      );
+      // files of the repository the type could not take : named, each with why
+      if ((a.refused || []).length) {
+        failed = true;
+        const files = a.refused.map((f) => `${f.file} (${(f.reasons || []).join('; ')})`).join(', ');
+        parts.push(t('settings.repositories.usageRefused', { files }));
+      }
     } else if (s.deactivated) {
-      const d = s.deactivated;
-      text = t('settings.repositories.usageOffDone', { type, count: d.unlinked ?? 0 });
-      if (d.pull && d.pull !== 'pulled') text += ` ${t('settings.repositories.usageNotPulled', { reason: d.pull })}`;
+      parts.push(t('settings.repositories.usageOffDone', { type, count: s.deactivated.unlinked ?? 0 }));
+      // the latest files not read in before letting go : the objects stay as the last pull left them
+      if (s.deactivated.error) {
+        failed = true;
+        parts.push(
+          t('settings.repositories.usageNotReadIn', {
+            error: String(s.deactivated.error).replace(/^not read in:\s*/, ''),
+          }),
+        );
+      }
     }
-    if (text) lines.push(text);
+    const reason = notPulledReason(r?.pull);
+    if (r && reason) {
+      // a repository let go of that was never cloned : nothing to read in, said only
+      if (!(s.deactivated && r.pull === 'not cloned')) failed = true;
+      parts.push(t('settings.repositories.usageNotPulled', { reason }));
+    }
+    if (parts.length) lines.push(parts.join(' '));
   }
   const text = lines.join(' ');
   if (!text) return '';

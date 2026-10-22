@@ -1384,6 +1384,9 @@ export default {
       usageOffUnpushed: 'Let op: er zijn wijzigingen die nog niet gepusht zijn. Ze worden niet naar git gestuurd.',
       usageOffDone: '{type}: {count} losgekoppeld van git, ze blijven in deze app.',
       usageNotPulled: 'De repository is niet gepulld ({reason}).',
+      usageRefused: 'Geweigerde bestanden: {files}.',
+      usageNotReadIn:
+        'De nieuwste bestanden zijn niet eerst ingelezen ({error}): de objecten blijven zoals de laatste pull ze achterliet.',
       usageFailed: '{type} kon de wijziging niet volgen: {error}',
       usageKeptWhy: {
         seed: 'beheerd door de configuratie-seed',

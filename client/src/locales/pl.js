@@ -1382,6 +1382,9 @@ export default {
       usageOffUnpushed: 'Uwaga: ma zmiany, które nie zostały jeszcze wypchnięte. Nie są wysyłane do gita.',
       usageOffDone: '{type}: {count} odłączono od git, zostają w tej aplikacji.',
       usageNotPulled: 'Repozytorium nie zostało pobrane ({reason}).',
+      usageRefused: 'Odrzucone pliki: {files}.',
+      usageNotReadIn:
+        'Najnowsze pliki nie zostały najpierw wczytane ({error}): obiekty zostają takie, jak zostawił je ostatni pull.',
       usageFailed: '{type}: nie udało się zastosować zmiany: {error}',
       usageKeptWhy: {
         seed: 'zarządzane przez seed konfiguracji',
