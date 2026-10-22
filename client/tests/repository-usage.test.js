@@ -533,8 +533,14 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
 
   it('their pages say which repository holds them, the record pages which file', async () => {
     const axios = (await import('axios')).default;
-    axios.get.mockImplementationOnce(async () => ({ data: { records: [{ name: 'cfg', use_for_branding: 1 }] } }));
+    // read with the settings (source_<type>), never from the repositories a part of the settings
+    // on its own cannot read
+    axios.get.mockImplementationOnce(async (url) => ({
+      data: url === '/api/v2/settings/' ? { source_branding: { repository: 'cfg', repo_file: 'branding.yaml' } } : {},
+    }));
     expect(await singleTypeSource('branding')).toEqual({ repository: 'cfg', repo_file: 'branding.yaml' });
+    axios.get.mockImplementationOnce(async () => ({ data: { source_mcp: null } }));
+    expect(await singleTypeSource('mcp')).toBeNull();
     expect(await singleTypeSource('forms')).toBeNull();
     for (const [page, type] of [
       ['pages/admin/chat.vue', 'chat_assistant'],

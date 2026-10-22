@@ -164,6 +164,31 @@ const RepoObjects = {
   },
 
   /**
+   * Where a type kept in one file is (the branding's, the settings', the chat assistant's ...) :
+   * the repository holding it and its file, for the Repository line of its page - read with the
+   * settings (controllers/v2/settings.controller.js), so a page shows it without reading the
+   * repositories.
+   *
+   * Args:
+   *   key (string): the type (branding).
+   *
+   * Returns:
+   *   Promise<object|null>: { repository, repo_file }, null when no repository holds it (or it
+   *     cannot be read).
+   */
+  async singleSource(key) {
+    try {
+      const desc = await descriptorOf(key);
+      if (!desc.file) return null;
+      const repository = await Engine.activeRepository(desc);
+      return repository ? { repository, repo_file: desc.file } : null;
+    } catch (e) {
+      logger.error(`The repository of the ${key} could not be read: ${e.message || e}`);
+      return null;
+    }
+  },
+
+  /**
    * A type's objects as they are now (its rows, as the engine reads them) : what appChangedRows
    * compares them with after a change that may touch several (a move, a version enabled).
    *

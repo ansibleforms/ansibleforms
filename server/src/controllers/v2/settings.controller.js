@@ -44,6 +44,9 @@ const refuseWhileDesignerLocked = async function(req, res) {
 // a latent bug waiting for someone to "improve" one of them
 const configHash = auditConfigHash;
 
+// the types kept in one file of a repository, whose page says which (source_<type> in the settings)
+const SINGLE_FILE_TYPES = ['general', 'branding', 'links', 'mcp', 'chat_assistant'];
+
 const find = async function(req, res) {
     try {
       const settings = await Settings.find();
@@ -51,6 +54,10 @@ const find = async function(req, res) {
       // knows whether the active config lives in the database.
       if (settings) {
         settings.enableConfigInDatabase = appConfig.enableConfigInDatabase;
+        // where each type kept in one file is (source_branding : { repository, repo_file }, or
+        // null) : the Repository line of its page, read by whoever reads that page's settings
+        const sources = await Promise.all(SINGLE_FILE_TYPES.map((key) => RepoObjects.singleSource(key)));
+        SINGLE_FILE_TYPES.forEach((key, i) => (settings[`source_${key}`] = sources[i]));
       }
       // a part of the settings on its own (lib/settingsSections.js) : only its fields
       const readable = readableSettingsFields(req);

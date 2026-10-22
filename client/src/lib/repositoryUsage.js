@@ -840,6 +840,8 @@ export function repositorySourceFields(t, row) {
 /**
  * Where a type kept in one file is (the chat's, the settings', the branding's) : the repository
  * used for it and its file, as a record of a repository says it ; none when no repository holds it.
+ * Read with the settings (source_<type>), so a page of a part of the settings on its own shows it
+ * without reading the repositories.
  *
  * Args:
  *   key (string): the type.
@@ -848,12 +850,11 @@ export function repositorySourceFields(t, row) {
  *   Promise<object|null>: { repository, repo_file }, or null.
  */
 export async function singleTypeSource(key) {
-  const type = usageType(key);
-  if (!type?.file) return null;
+  if (!usageType(key)?.file) return null;
   try {
-    const res = await axios.get('/api/v2/repository/');
-    const repo = (res.data?.records || []).find((r) => flagOn(r[type.flag]));
-    return repo ? { repository: repo.name, repo_file: type.file } : null;
+    const res = await axios.get('/api/v2/settings/');
+    const source = res.data?.[`source_${key}`];
+    return source?.repository ? { repository: source.repository, repo_file: source.repo_file } : null;
   } catch {
     return null;
   }
