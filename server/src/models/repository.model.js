@@ -14,7 +14,7 @@ import { SECRET_MASK } from '../lib/secretMask.js';
 import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES } from '../lib/repoObjects/types.js';
-import { deprecationLines } from '../lib/configKeys.js';
+import { deprecationLines, CONFIG_KEYS } from '../lib/configKeys.js';
 import { uriCarriesSecret } from '../lib/repoObjects/secrets.js';
 
 // the flags of the object types : a repository's that turn on or off make it take the app's
@@ -937,25 +937,53 @@ class Repository extends CrudModel {
 
   // the repository that holds config.yaml (categories/roles/constants) ; config
   // is written to and pushed from there. Returns null when config is local.
+  // With the roles, the categories and the constants each in a repository of their own
+  // (lib/configKeys.js), the first of them the designer writes : the categories', the
+  // constants', then the roles'.
   static async getConfigRepoName() {
     const configPath = await Repository.getConfigPath()
-    return configRepoFromPath(configPath, appConfig.repoPath)
+    return configRepoFromPath(configPath, appConfig.repoPath) || (await Repository.findKeyRepositories())[0]?.name || null
+  }
+
+  /**
+   * The repositories holding the roles, the categories or the constants (lib/configKeys.js) : a
+   * designer save writes those keys into them, so they are pushed from the designer as the forms
+   * repositories are.
+   *
+   * Returns:
+   *   Promise<object[]>: [{ name, status, head }], the categories' first, then the constants',
+   *     then the roles' ; none when no repository holds them (or they cannot be read).
+   */
+  static async findKeyRepositories() {
+    try {
+      // the roles last : the admin's, the designer saves them unchanged
+      const flags = [...CONFIG_KEYS.filter((k) => k.key !== "roles"), ...CONFIG_KEYS.filter((k) => k.key === "roles")].map((k) => k.flag)
+      const rows = sortedByName(await mysql.do(`SELECT name,status,head,${flags.join(",")} FROM AnsibleForms.\`repositories\` WHERE ${flags.join(" OR ")} ORDER BY name`))
+      // by the key, then by name : the one the designer writes the most first
+      return flags.flatMap((flag) => rows.filter((r) => Number(r[flag]))).filter((r, i, all) => all.findIndex((x) => x.name === r.name) === i).map(({ name, status, head }) => ({ name, status, head }))
+    } catch (e) {
+      logger.error("Failed to get the repositories of the roles, the categories and the constants: ", e)
+      return []
+    }
   }
 
   // the repositories the designer can push to : the forms repos plus the
-  // config-origin repo when config lives in a separate use_for_config repo, so
-  // config edits made in the designer can be committed and flagged as unpushed
+  // config-origin repo when config lives in a separate use_for_config repo, and the
+  // repositories holding the roles, the categories or the constants, so config edits
+  // made in the designer can be committed and flagged as unpushed
   static async findPushableRepositories() {
     const repos = await Repository.findFormsRepositories()
-    const configRepo = await Repository.getConfigRepoName()
-    if (configRepo && !repos.some(r => r.name === configRepo)) {
+    const add = (r) => { if (r && !repos.some(x => x.name === r.name)) repos.push(r) }
+    const configRepo = configRepoFromPath(await Repository.getConfigPath(), appConfig.repoPath)
+    if (configRepo) {
       try {
         const cfg = await mysql.do("SELECT name,status,head FROM AnsibleForms.`repositories` WHERE name = ?", [configRepo])
-        if (cfg.length) repos.push(cfg[0])
+        add(cfg[0])
       } catch (e) {
         logger.error("Failed to add config repository to the pushable set: ", e)
       }
     }
+    for (const r of await Repository.findKeyRepositories()) add(r)
     return repos
   }
 
