@@ -912,6 +912,10 @@ async function pullFor(desc, name, why) {
  * Returns:
  *   Promise<object>: { repository, pull, created, matched: [name], written: [name],
  *     withoutSecret: [name], kept: [{ name, reason }], refused, waiting, ...what the type adds }.
+ *
+ * Raises:
+ *   Errors.ConflictError: the repository still busy once the wait is over : nothing read in nor
+ *     written (afterUsageChange says it in its report).
  */
 export async function activate(desc, name, { pull = true } = {}) {
   const report = { repository: name, pull: "", created: 0, matched: [], written: [], withoutSecret: [], kept: [], refused: [], waiting: [] };
@@ -922,8 +926,25 @@ export async function activate(desc, name, { pull = true } = {}) {
     logger.warning(`Repository '${name}' is not cloned yet: ${holdingOf(desc)} will be read from it once it is`);
     return report;
   }
-  // a type kept in one file : its own mode
-  if (desc.file) return activateSingle(desc, name, report);
+  // the reads and the writes under the repository's write claim : no pull, push nor app write on
+  // it meanwhile ; one busy is waited for a while, then the activation fails, said (its report's
+  // error), never dropped
+  return withWriteClaim(name, () => (desc.file ? activateSingle(desc, name, report) : activateFolder(desc, name, report)));
+}
+
+/**
+ * Makes a repository a folder or a list type's (pulled already, its write claim held) : its files
+ * read in, git winning on a name, then the app's other objects written to it.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   report (object): the report so far (activate's), filled in.
+ *
+ * Returns:
+ *   Promise<object>: the report.
+ */
+async function activateFolder(desc, name, report) {
   // step 2 : its files read in (again : the pull may not have run), git wins on a name
   const summary = await syncRepository(desc, name);
   report.created = summary.created;
@@ -933,7 +954,8 @@ export async function activate(desc, name, { pull = true } = {}) {
   report.skipped = summary.skipped;
   // step 3 : the app's other objects, each a new file
   const list = await candidates(desc, name);
-  await withWriteClaim(name, async () => {
+  // written in one step (a list file at once, else a file each), its returns ending that step only
+  await (async () => {
     // a type kept as a list in one file : every candidate an entry of it, added at its end
     if (desc.listFile) {
       for (const c of list.filter((x) => x.reason)) report.kept.push(keptOf(desc, c));
@@ -963,7 +985,7 @@ export async function activate(desc, name, { pull = true } = {}) {
         report.kept.push({ ...keptOf(desc, c), reason: `not written: ${e.message || e}` });
       }
     }
-  });
+  })();
   if (desc.reportExtra) Object.assign(report, await desc.reportExtra(name));
   if (report.written.length || report.matched.length) CrudModel.changed(desc.model);
   logger.notice(
@@ -1020,8 +1042,10 @@ export async function deactivate(desc, name, { pull = true } = {}) {
       }
     }
     try {
-      await syncRepository(desc, name);
+      // under its write claim : no pull, push nor app write on it meanwhile
+      await withWriteClaim(name, () => syncRepository(desc, name));
     } catch (e) {
+      report.error = `not read in: ${e.message || e}`;
       logger.error(`Could not read in ${holdingOf(desc)} of repository '${name}' before it lets go of them: ${e.message || e}`);
     }
   } else {

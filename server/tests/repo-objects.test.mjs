@@ -391,6 +391,29 @@ describe("a save while the repository is busy", () => {
     assert.equal(saved, false);
   });
 
+  test("turning the usage on reads and writes under the claim, a busy repository waited for", async () => {
+    Object.assign(CLAIM_WAIT, { totalMs: 2000, everyMs: 1 });
+    fx.state.tables.credentials.push({ id: 7, name: "app", credential_type: "git", user: "u", password: "enc:p" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    fx.state.busy.creds = 2;
+    fx.state.calls.length = 0;
+    const report = await RepoObjects.activate(credentials, "creds", { pull: false });
+    assert.deepEqual(fx.state.calls, ["busy:creds", "busy:creds", "claim:creds", "release:creds"]);
+    assert.equal(report.created, 1);
+    assert.deepEqual(report.written, ["app"]);
+  });
+
+  test("turning the usage on while it stays busy : nothing read in nor written, the error in the report", async () => {
+    Object.assign(CLAIM_WAIT, { totalMs: 20, everyMs: 1 });
+    fx.state.tables.credentials.push({ id: 7, name: "app", credential_type: "git", user: "u", password: "enc:p" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    fx.state.busy.creds = Infinity;
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 }, { pull: false });
+    assert.match(report.credentials.error, /Repository 'creds' is busy/);
+    assert.equal(fx.rowNamed("credentials", "git"), undefined);
+    assert.equal(fx.rowNamed("credentials", "app").repository ?? null, null);
+  });
+
   test("a file write outside a save, still busy : said to the caller, never a silent success", async () => {
     Object.assign(CLAIM_WAIT, { totalMs: 20, everyMs: 1 });
     fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
