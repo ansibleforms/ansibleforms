@@ -16,7 +16,8 @@
 //     year, month, week, day, hour or minute) now is in
 //   every rule is walked here, period by period (its days kept by their BYMONTH, BYMONTHDAY,
 //     BYYEARDAY, BYWEEKNO, BYDAY and BYEASTER, its times by its BYHOUR, BYMINUTE and BYSECOND,
-//     BYSETPOS picking among the runs of each period, as dateutil does) : rrule.js loses its way
+//     BYSETPOS picking among the runs of each period, as dateutil does - the DTSTART's week
+//     counted from its day only) : rrule.js loses its way
 //     in one whose days are filtered and whose hours are too (Monday to Friday, 9 to 17), takes
 //     the first run for a BYSETPOS counted from the end past the runs a period has (BYSETPOS=-5
 //     of four Saturdays) and keeps a BYEASTER in periods its INTERVAL never reaches
@@ -698,9 +699,11 @@ function periodWalker(spec, start) {
         }
       }
       if (!short) {
-        // a week, a month or a year : the runs of its days, BYSETPOS picking among them
+        // a week, a month or a year : the runs of its days, BYSETPOS picking among them ; the
+        // DTSTART's week from its day on only, as dateutil counts it (its month or year whole)
         const set = [];
-        for (let i = at; i < days.length && days[i] < endOf(k); i++) for (const time of times) set.push(days[i] + time);
+        const from = spec.freq === RRule.WEEKLY && k === 0 ? dayOf(start) : -Infinity;
+        for (let i = at; i < days.length && days[i] < endOf(k); i++) if (days[i] >= from) for (const time of times) set.push(days[i] + time);
         for (const t of pickSet(set, spec.bysetpos)) if (t > lo && t <= hi && runs.length < limit) runs.push(t);
         k++;
         continue;
