@@ -50,6 +50,7 @@ import ProjectFiles from "../models/projectFiles.model.js";
 import mysql from "../models/db.model.js";
 import { workflowFiles, workflowCandidates } from "../models/workflowRun.js";
 import { workflowsOf } from "./workflowDefs.js";
+import { runsOnServer } from "./expressionPolicy.js";
 import Errors from "./errors.js";
 import logger from "./logger.js";
 
@@ -291,6 +292,58 @@ export function designerSave(sent, stored, user, unloaded = []) {
     else if (next < own.length) out.push(own[next++]);
   }
   return [...out, ...own.slice(next)].map((f) => _.omit(f, ["readOnly"]));
+}
+
+/**
+ * The code a form has the server run : each expression evaluated there (runsOnServer) and each
+ * query with the database it runs on, wherever they are in the form (its fields, a table's).
+ *
+ * Args:
+ *   form (object): the form.
+ *
+ * Returns:
+ *   Set<string>: the code, one entry each.
+ */
+function serverCodeOf(form) {
+  const out = new Set();
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object") return;
+    if (runsOnServer(node)) out.add(`expression:${node.expression}`);
+    if (typeof node.query === "string" && node.query) out.add(`query:${JSON.stringify(node.dbConfig ?? null)}:${node.query}`);
+    Object.values(node).forEach(walk);
+  };
+  walk(form);
+  return out;
+}
+
+/**
+ * Refuses a save that gives a form server code it does not have yet, to a designer some forms,
+ * playbooks or workflows are hidden from : an expression runs with the server's reach
+ * (fn.fnReadYamlFile reads any file, the hidden ones too), as a raw expression does, which they
+ * may not run either (lib/expressionPolicy.js mayRunRawExpression). The expressions and queries a
+ * form of theirs has already (an admin's, a designer's of every form) stay, moved or not ; a new
+ * one, a changed one, or one copied into another form is refused.
+ *
+ * Args:
+ *   sent (object[]): the forms the user sent.
+ *   stored (object[]): every form as stored (Form.load(undefined, undefined, true)).
+ *   user (object): the signed-in user.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: a form given an expression or a query it does not have.
+ */
+export function assertServerCodeKept(sent, stored, user) {
+  if (designsEverything(user)) return;
+  const storedByName = new Map((stored || []).map((f) => [f.name, f]));
+  for (const f of sent || []) {
+    const kept = serverCodeOf(storedByName.get(f?.name));
+    if ([...serverCodeOf(f)].some((code) => !kept.has(code))) {
+      throw new Errors.AccessDeniedError(
+        `Form '${f?.name ?? ""}': an expression or a query the server runs is only added or changed by a designer who sees every form, playbook and workflow`,
+      );
+    }
+  }
 }
 
 /**
@@ -579,6 +632,7 @@ export default {
   duplicateShown,
   designerConfig,
   designerSave,
+  assertServerCodeKept,
   fileVisibility,
   assertFilesShown,
   assertWorkflowFileShown,

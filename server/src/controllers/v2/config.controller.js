@@ -25,7 +25,7 @@ import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
 import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
-import { designsAllForms, designerConfig, designerSave, assertFilesShown } from '../../lib/designerForms.js';
+import { designsAllForms, designsEverything, designerConfig, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -397,15 +397,18 @@ const save = async function(req,res){
       // they are ; a hidden form's name, a changed read-only subform, a form without one of their
       // roles refused (lib/designerForms.js)
       // and without designAllPlaybooks or designAllWorkflows : a form naming a playbook or a workflow
-      // hidden from the user refused, by the forms as they are before this save
+      // hidden from the user refused, by the forms as they are before this save ; and without any of
+      // the three, a new or changed expression or query the server runs (lib/designerForms.js)
       try {
         let sent = null
         try { sent = Form.parse(newConfig) || {} } catch { sent = null }
-        if(!designsAllForms(user)){
+        if(!designsEverything(user)){
           // not read : refused as Form.save would refuse it, nothing laid over
           if(sent === null) Form.parse(newConfig)
           const stored = await Form.load(undefined,undefined,true)
-          newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
+          // no expression nor query the forms do not have already (it would read the hidden files)
+          assertServerCodeKept(sent.forms, stored.forms, user)
+          if(!designsAllForms(user)) newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
         }
         if(sent) await assertFilesShown(sent.forms, user)
       } catch (err) {

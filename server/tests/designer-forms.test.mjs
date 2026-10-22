@@ -364,6 +364,33 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     await ProjectFiles.write("workflows", "forms/notes.txt", "notes\n", true);
   });
 
+  test("a new or changed expression the server runs : refused while something is hidden from them, theirs kept", async () => {
+    const READ = "fn.fnReadYamlFile('/app/dist/persistent/playbooks/team.yml')";
+    // saved in the forms repository (never the staging folder, which is the server's own)
+    const probe = (fields, name = "Probe") => form(name, ["ops"], { source: `${name.toLowerCase()}.yaml`, repository: "forms", fields });
+    const save = (u, forms) => call(configController.save, { user: { user: u }, body: { forms: YAML.stringify({ ...BASE, forms }) }, ip: "::1" });
+    const mine = async (u) => (await designerConfig(await load(), u)).forms.filter((f) => !f.readOnly);
+    for (const u of [user, { ...limited, options: { ...limited.options, designAllForms: true, designAllPlaybooks: false } }]) {
+      const res = await save(u, [...(await mine(u)), probe([{ name: "leak", type: "expression", expression: READ }])]);
+      assert.equal(res.code, 403, JSON.stringify(res.body));
+      assert.match(res.body.details, /Form 'Probe': an expression or a query the server runs is only added or changed by a designer who sees every form, playbook and workflow/);
+      // a query, the same
+      assert.equal((await save(u, [...(await mine(u)), probe([{ name: "q", type: "enum", query: "select 1", dbConfig: { name: "db" } }])])).code, 403);
+    }
+    // the browser's own expressions stay theirs
+    const local = await save(user, [...(await mine(user)), probe([{ name: "l", type: "expression", expression: "1+1", runLocal: true }])]);
+    assert.equal(local.code, 200, JSON.stringify(local.body));
+    // a form of theirs an admin gave an expression : kept on their saves, never changed
+    fs.writeFileSync(path.join(DIR(), "probe.yaml"), YAML.stringify(probe([{ name: "e", type: "expression", expression: "fn.fnTime()" }])));
+    const kept = (await mine(user)).map((f) => (f.name === "Probe" ? { ...f, description: "edited" } : f));
+    assert.equal((await save(user, kept)).code, 200);
+    const changed = (await mine(user)).map((f) => (f.name === "Probe" ? { ...f, fields: [{ name: "e", type: "expression", expression: READ }] } : f));
+    assert.equal((await save(user, changed)).code, 403);
+    // a designer of everything adds any
+    const all = { ...limited, options: { ...limited.options, designAllForms: true } };
+    assert.equal((await save(all, [...(await mine(all)), probe([{ name: "leak", type: "expression", expression: READ }], "Other")])).code, 200);
+  });
+
   test("a form of the user's pointed at a hidden playbook : refused, the playbook still hidden", async () => {
     fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify(form("Team play", ["team"], { playbook: "team.yml" })));
     const forms = (await designerConfig(await load(), user)).forms.filter((f) => !f.readOnly).map((f) => (f.name === "Everyone" ? { ...f, playbook: "team.yml" } : f));
