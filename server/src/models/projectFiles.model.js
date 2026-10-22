@@ -9,6 +9,10 @@
 // A kind has one root ; the inventories have the local folder (one folder per inventory) and
 // a root per inventories repository, each an inventory of its own : its paths start with its name
 // (production/inventory.yaml), as a local inventory's start with its folder's.
+//
+// A repository's files its usage types own (roles.yaml, credentials/, general.yaml ... :
+// lib/repoObjects/ownedPaths.js) are never listed, read, written nor deleted here, in a repository
+// used for these files as well.
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -19,6 +23,7 @@ import Repository from "./repository.model.js";
 import Repo from "./repo.model.js";
 import { configRepoFromPath } from "../lib/forms-git.js";
 import { FILE_KINDS, MAX_FILE_BYTES, MAX_LISTED_FILES, safeRelativePath, isInside, isTextBuffer } from "../lib/projectFiles.js";
+import { ownerTest, assertNotOwned } from "../lib/repoObjects/ownedPaths.js";
 
 const ProjectFiles = {};
 
@@ -196,7 +201,7 @@ ProjectFiles.list = async function (kind) {
   // breadth first, one folder at a time, at most 12 deep
   // a local inventory's folder named as an inventories repository is hidden by it
   const repoNames = new Set(roots.map((r) => r.prefix).filter(Boolean));
-  const walk = async (dir, rel, depth, prefix) => {
+  const walk = async (dir, rel, depth, prefix, owned) => {
     if (depth > 12 || truncated) return;
     let entries;
     try {
@@ -215,8 +220,10 @@ ProjectFiles.list = async function (kind) {
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
       const childAbs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        await walk(childAbs, childRel, depth + 1, prefix);
+        await walk(childAbs, childRel, depth + 1, prefix, owned);
       } else if (entry.isFile()) {
+        // a file a usage type of the repository owns : not the designer's
+        if (owned(childAbs)) continue;
         if (files.length >= MAX_LISTED_FILES) {
           truncated = true;
           return;
@@ -231,7 +238,7 @@ ProjectFiles.list = async function (kind) {
   for (const r of roots) {
     const here = fs.existsSync(r.root);
     exists = exists || here;
-    if (here) await walk(r.root, "", 0, r.prefix);
+    if (here) await walk(r.root, "", 0, r.prefix, await ownerTest(r.repository));
     if (r.repository) {
       let dirty = false;
       if (here) {
@@ -267,11 +274,13 @@ ProjectFiles.list = async function (kind) {
  *
  * Raises:
  *   NotFoundError: there is no such file.
+ *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js).
  *   BadRequestError: the path is not valid, the file is too big or not text.
  */
 ProjectFiles.read = async function (kind, rel) {
-  const { root, prefix, inner } = await rootOf(kind, rel);
+  const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
+  await assertNotOwned(repository, file.abs, shown(prefix, file.rel));
   const stat = await fs.promises.stat(file.abs).catch(() => null);
   if (!stat || !stat.isFile()) throw new Errors.NotFoundError(`File '${shown(prefix, file.rel)}' not found`);
   if (stat.size > MAX_FILE_BYTES) throw new Errors.BadRequestError(`File '${shown(prefix, file.rel)}' is too big to edit here`);
@@ -308,6 +317,7 @@ async function withWriteClaim(repository, write) {
  * Raises:
  *   BadRequestError: the path or the content is not valid.
  *   ConflictError: onlyNew and the file exists.
+ *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js).
  */
 ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   if (typeof content !== "string") throw new Errors.BadRequestError("The content must be text");
@@ -315,6 +325,7 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
+  await assertNotOwned(repository, file.abs, name);
   return withWriteClaim(repository, async () => {
     if (fs.existsSync(file.abs)) {
       if (onlyNew) throw new Errors.ConflictError(`File '${name}' exists already`);
@@ -339,11 +350,13 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
  *
  * Raises:
  *   NotFoundError: there is no such file.
+ *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js).
  */
 ProjectFiles.remove = async function (kind, rel) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
+  await assertNotOwned(repository, file.abs, name);
   return withWriteClaim(repository, async () => {
     const stat = await fs.promises.lstat(file.abs).catch(() => null);
     if (!stat || !stat.isFile()) throw new Errors.NotFoundError(`File '${name}' not found`);

@@ -4822,7 +4822,7 @@
           "designer"
         ],
         "summary": "The designer's files of a kind",
-        "description": "The files of the playbooks, the vars files, the inventories or the workflows. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed.",
+        "description": "The files of the playbooks, the vars files, the inventories or the workflows. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the branding's images) is never listed, read, written nor deleted here (403).",
         "security": [
           {
             "bearerAuth": []
@@ -4857,7 +4857,7 @@
           "designer"
         ],
         "summary": "Read a file",
-        "description": "A file's content. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404.",
+        "description": "A file's content. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the branding's images) is never listed, read, written nor deleted here (403).",
         "security": [
           {
             "bearerAuth": []
@@ -4901,7 +4901,7 @@
           "designer"
         ],
         "summary": "Save a file",
-        "description": "Writes a file; needs the designer lock and the kind's edit option (Edit Playbooks, Edit Workflows ...). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already.",
+        "description": "Writes a file; needs the designer lock and the kind's edit option (Edit Playbooks, Edit Workflows ...). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the branding's images) is never listed, read, written nor deleted here (403).",
         "security": [
           {
             "bearerAuth": []
@@ -4958,7 +4958,7 @@
           "designer"
         ],
         "summary": "Create a file",
-        "description": "A new file; refused when it exists. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already.",
+        "description": "A new file; refused when it exists. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the branding's images) is never listed, read, written nor deleted here (403).",
         "security": [
           {
             "bearerAuth": []
@@ -5015,7 +5015,7 @@
           "designer"
         ],
         "summary": "Delete a file",
-        "description": "Deletes a file. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404.",
+        "description": "Deletes a file. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file answers 404. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the branding's images) is never listed, read, written nor deleted here (403).",
         "security": [
           {
             "bearerAuth": []

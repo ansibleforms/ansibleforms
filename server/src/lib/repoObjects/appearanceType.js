@@ -169,6 +169,8 @@ export function appearanceType(spec) {
     title: spec.title,
     noun: spec.noun,
     keepFalse: spec.keepFalse || [],
+    // its images are files beside its YAML, named in it
+    besides: images,
     // as the Appearance pages show them : the images as data urls, none for the bundled ones
     current: async () => {
       const row = await Settings.find();

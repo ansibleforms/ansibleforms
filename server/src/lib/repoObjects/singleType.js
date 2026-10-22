@@ -49,6 +49,8 @@ import { typeOf } from "./types.js";
  *       them, when not given.
  *     toFile (function): (current) => the object as its YAML gives it, before fields.js takes its
  *       seed fields (the branding's image names) ; as it is when not given.
+ *     besides (string[]): the fields of its YAML naming a file beside it (the branding's images) :
+ *       those files are the type's, as its YAML is (lib/repoObjects/ownedPaths.js).
  *     fields (object): its own fields when they are no schema's (lib/repoObjects/fields.js
  *       mapFieldSet : the settings by their environment names).
  *     secretsOf (function): (current) => its secret fields when they depend on what it holds (the
@@ -73,6 +75,7 @@ export function singleType(spec) {
     secrets: spec.secrets || [],
     secretsOf: spec.secretsOf,
     references: spec.references || [],
+    besides: spec.besides || [],
     keyOrder: fields.keys,
 
     /**
