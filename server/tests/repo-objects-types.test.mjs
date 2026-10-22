@@ -285,6 +285,20 @@ describe("a value as the database gives it", () => {
   });
 });
 
+describe("a yes or no whose default is on", () => {
+  test("a webhook channel's certificate not checked : written off, a new app made from the file keeps it off", async () => {
+    fx.state.tables.notification_channels.push({ id: 30, name: "hook", type: "webhook", url: "https://hook.example.com", method: "POST", verify_tls: 0, enabled: 1, description: "" });
+    const desc = await RepoObjects.descriptorOf("notifications");
+    await RepoObjects.activate(desc, repoOf("notifications"));
+    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "hook.yaml").verify_tls, false);
+    // the same file pulled into an app without the channel (another instance, a database rebuilt)
+    fx.state.tables.notification_channels = [];
+    CrudModel.flushAllLocal();
+    await RepoObjects.syncRepository(desc, repoOf("notifications"));
+    assert.equal(Number(fx.rowNamed("notification_channels", "hook").verify_tls), 0);
+  });
+});
+
 describe("a change in the app that changes other objects of the type too", () => {
   test("a runner made the default : the former default's file says so too", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });

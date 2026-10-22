@@ -22,8 +22,8 @@ export default seedType({
     { field: "credential", type: "credentials" },
     { field: "token_credential", type: "credentials" },
   ],
-  // turned off is what a file says : on is the default
-  keepFalse: ["enabled"],
+  // turned off is what a file says : on is the default (a webhook's certificate checked too)
+  keepFalse: ["enabled", "verify_tls"],
   // notification_channels.description has no default in the table
   defaults: { description: "" },
 });
