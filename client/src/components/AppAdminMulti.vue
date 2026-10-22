@@ -1126,10 +1126,16 @@ const isInvalidPassword = computed(() => {
 // BsDataTable mode (always on — BsDataTable is the only table renderer)
 // the list's delete action : with one, the rows get checkboxes, to delete several at once
 const deleteAction = computed(() => actions.value.find((a) => a.name === 'delete') || null);
-// checkboxes : a list that is selectable (the default), one whose rows can be deleted, or one that
-// asks for them (checkboxes : a read-only list, the rows ticked exported)
+// deleting several at once : not for a list whose delete asks a question of its own per record
+// (settings.confirmDelete : a repository holding objects says what stays in the app, and its
+// answer is said after) - each is deleted from its row, its question asked
+const bulkDeleteAction = computed(() =>
+  typeof props.settings.confirmDelete === 'function' ? null : deleteAction.value,
+);
+// checkboxes : a list that is selectable (the default), one whose rows can be deleted several at
+// once, or one that asks for them (checkboxes : a read-only list, the rows ticked exported)
 const dataTableSelectable = computed(
-  () => props.settings.selectable !== false || !!deleteAction.value || !!props.settings.checkboxes,
+  () => props.settings.selectable !== false || !!bulkDeleteAction.value || !!props.settings.checkboxes,
 );
 // the table's controls on the title line (BsDataTable's toolbar), their widths in pixels as their
 // labels make them : the search, Select all on a list whose rows can be ticked, the columns, the
@@ -1500,6 +1506,8 @@ function onDataTableRowClick(item) {
 }
 
 async function bulkDelete() {
+  // a delete that asks per record (settings.confirmDelete) is never done several at once
+  if (!bulkDeleteAction.value) return;
   // only what is still on screen : a selected row that has since disappeared must not
   // be guessed at, and the count in the confirmation has to be the count acted on
   const present = new Map(itemList.value.map((r) => [r[idKey], r]));
@@ -1692,7 +1700,7 @@ defineExpose({
               >{{ action.title }} ({{ bulkRows(action).length }})</BsButton
             >
           </template>
-          <BsButton v-if="count && deleteAction" icon="trash" @click="bulkDelete">
+          <BsButton v-if="count && bulkDeleteAction" icon="trash" @click="bulkDelete">
             {{ t('common.delete') }} ({{ count }})
           </BsButton>
         </template>

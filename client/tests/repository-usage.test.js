@@ -216,6 +216,18 @@ describe('a group box ticks every type of it that can be ticked', () => {
     );
     expect(read('pages/admin/repository.vue')).toContain('<AppRepositoryUsage v-model="edit"');
   });
+
+  it('repositories are deleted one by one, each asked its own question : no bulk delete', () => {
+    expect(typeof settings.repositories.confirmDelete).toBe('function');
+    const multi = read('components/AppAdminMulti.vue');
+    // a list whose delete asks per record has no bulk delete, nor checkboxes for it
+    expect(multi).toMatch(
+      /const bulkDeleteAction = computed\(\(\) =>\s+typeof props\.settings\.confirmDelete === 'function' \? null : deleteAction\.value/,
+    );
+    expect(multi).toContain('!!bulkDeleteAction.value || !!props.settings.checkboxes');
+    expect(multi).toContain('v-if="count && bulkDeleteAction" icon="trash" @click="bulkDelete"');
+    expect(multi).not.toContain('v-if="count && deleteAction"');
+  });
 });
 
 describe('one question when a save turns several object types on or off', () => {
