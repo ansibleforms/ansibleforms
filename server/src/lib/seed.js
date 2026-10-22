@@ -196,12 +196,35 @@ export function buildRecord(section, item, isCreate) {
     : { ...item, managed: true };
 }
 
+/**
+ * Says that the config seed declares an object a repository holds : not applied, the
+ * repository's version kept (the same words as RepoObjects.applyDeclared's).
+ *
+ * Args:
+ *   label (string): what it is (credential, runner, ldap).
+ *   name (string): its name.
+ *   row (object): the row as stored ({ repository, repo_file }).
+ *
+ * Returns:
+ *   void
+ */
+function warnHeldByRepository(label, name, row) {
+  logger.warning(`The config seed declares the ${label} '${name}', which repository '${row.repository}' holds (${row.repo_file}): not applied, the repository's version is kept`);
+}
+
 async function applyListSection(section, cfg, summary) {
   const items = cfg.items || [];
   const declared = new Set(items.map((i) => i.name));
 
   for (const item of items) {
     const existing = await CrudModel.findByName(section.modelName, item.name);
+    // one a repository holds : git's, never the seed's too (each would undo the other, the seed at
+    // every start, git at every pull, refusing a row the seed made managed) - left as it is, said,
+    // as the sections read through the repository types are (RepoObjects.applyDeclared)
+    if (existing?.repository) {
+      warnHeldByRepository(section.label, item.name, existing);
+      continue;
+    }
     if (existing) {
       const data = buildRecord(section, item, false);
       // already managed and unchanged : leave the row alone entirely. Compared without the fields
@@ -293,6 +316,11 @@ async function applyLdap(cfg, summary) {
   // hand-configured LDAP set enable=0 and destroyed the group mapping - it stopped
   // directory logins. So take only the keys the seed actually declared, with the
   // constructor's conversion applied. Same rule as applySettings, and as buildRecord.
+  // a directory a repository holds : git's, never the seed's too (applyListSection)
+  if (stored?.repository) {
+    warnHeldByRepository("ldap", stored.name, stored);
+    return;
+  }
   const record = Ldap.declared(cfg);
   // compare against what was declared, not against the freshly encrypted record
   if (stored?.managed && !differs(cfg, stored)) {
@@ -906,5 +934,5 @@ async function logApply(seedPath, summary, outcome) {
   }
 }
 
-export { listSections, applyListSection };
+export { listSections, applyListSection, applyLdap };
 export default { applyConfigSeed, reloadConfigSeed, getSeedState };
