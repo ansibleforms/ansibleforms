@@ -437,3 +437,32 @@ describe("the config seed applied with use_for_config", () => {
     }
   });
 });
+
+describe("the editor saved after a key file's anchors were laid as their values", () => {
+  test("the keys not touched keep their text in the base : their comments, their aliases", async () => {
+    // the constants held by a repository ; the base's roles name an anchor of the base's constants :
+    // the configuration shown is the whole text as read, its comments and aliases gone
+    const base = "# my config\ncategories:\n  # the ops team\n  - name: Ops # main\n    icon: bars\nconstants: &c\n  admins: &admins\n    - local/admins\nroles:\n  # admin role\n  - name: admin\n    groups: *admins\n";
+    const sources = [{ key: "constants", repository: "design", path: "/x/constants.yaml", exists: true }];
+    const shown = keys.composeConfig(base, sources, () => "constants:\n  env: prod\n");
+    assert.doesNotMatch(shown, /# admin role/);
+    const served = YAML.parse(shown);
+    // a category added, nothing else changed
+    const text = shown.replace("icon: bars", "icon: bars\n  - name: Dev\n    icon: code");
+    const next = keys.mergeIntoBase(base, keys.withoutHeldKeys(YAML.parse(text), sources), served, { text, servedText: shown, held: ["constants"] });
+    assert.match(next, /roles:\n {2}# admin role\n {2}- name: admin\n {4}groups: \*admins\n/);
+    assert.match(next, /^# my config\n/);
+    assert.deepEqual(YAML.parse(next).categories, [{ name: "Ops", icon: "bars" }, { name: "Dev", icon: "code" }]);
+    // only a comment changed : written as the text has it
+    // the settings' editor : the same, the text it showed being the one served
+    fx.rowNamed("repositories", "access").use_for_roles = 0;
+    fs.writeFileSync(BASE, base);
+    writeRaw("design", "constants.yaml", "constants:\n  env: prod\n");
+    const { default: Settings } = await import("../src/models/settings.model.js");
+    const editor = await Settings.getActiveConfig();
+    await Settings.saveActiveConfig(editor.replace("icon: bars", "icon: bars\n  - name: Dev\n    icon: code"), { ignoreDesignerLock: true });
+    assert.match(read(BASE), /roles:\n {2}# admin role\n {2}- name: admin\n {4}groups: \*admins\n/);
+    const commented = shown.replace("categories:", "# the teams\ncategories:");
+    assert.match(keys.mergeIntoBase(base, keys.withoutHeldKeys(YAML.parse(commented), sources), served, { text: commented, servedText: shown, held: ["constants"] }), /# the teams\ncategories:/);
+  });
+});

@@ -229,6 +229,25 @@ function withKeyOf(text, key, from) {
  */
 const unchanged = (doc, key, served) => served !== undefined && served !== null && _.isEqual(doc?.[key], served?.[key]);
 
+/**
+ * A key as a text writes it : the comment above it, the key and its value with their comments ;
+ * what tells a key left as it was served in the editor from one whose comments were changed.
+ *
+ * Args:
+ *   doc (YAML.Document): the text's document (mapDocument).
+ *   text (string): the text.
+ *   key (string): the key.
+ *
+ * Returns:
+ *   string|null: its text ; null when the text has no such key, or its place is not known.
+ */
+function keyText(doc, text, key) {
+  const pair = doc.contents.items.find((p) => keyOf(p) === key);
+  if (!pair || !YAML.isNode(pair.key) || !pair.key.range) return null;
+  const end = YAML.isNode(pair.value) && pair.value.range ? pair.value.range[2] : pair.key.range[2];
+  return `${pair.key.commentBefore ?? ""}\n${String(text).slice(pair.key.range[0], end)}`;
+}
+
 // ===========================================================================
 // READ : THE KEYS LAID OVER THE BASE CONFIGURATION
 // ===========================================================================
@@ -447,9 +466,11 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
  *   served (object): the configuration served now : only a key that differs is written ; none :
  *     each one is.
  *   opts (object): { text (the text the configuration was saved as : each key written as it has
- *     it ; none : as YAML writes its value), held (string[] : the keys the repositories hold - a
- *     key served now that the save no longer gives, none of these, is taken out of the base ; none
- *     : no key taken out) }.
+ *     it ; none : as YAML writes its value), servedText (the text served now, the one the editor
+ *     showed : a key the text gives as it is there, value and text, is left as it is in the base ;
+ *     none : each key is written as the text has it), held (string[] : the keys the repositories
+ *     hold - a key served now that the save no longer gives, none of these, is taken out of the
+ *     base ; none : no key taken out) }.
  *
  * Returns:
  *   string|null: the base configuration's new text ; null when no key changed (nothing to write).
@@ -471,9 +492,20 @@ export function mergeIntoBase(baseText, rest, served, opts = {}) {
     saved = null;
   }
   if (saved) {
+    // the text served (the configuration shown in the editor) : a key the save gives as it is
+    // there, value and text, was not touched - its text in the base left as it is, never replaced
+    // by the one shown (the values a key file's anchors read as, when its aliases could not be laid
+    // as written, lose the base's comments and aliases)
+    let shown = null;
+    try {
+      shown = opts.servedText !== undefined ? mapDocument(opts.servedText) : null;
+    } catch {
+      shown = null;
+    }
+    const untouched = (key) => shown !== null && unchanged(rest, key, served) && keyText(saved, opts.text, key) === keyText(shown, opts.servedText, key);
     // each key as the text has it : a text the same as the base's is not written
     let next = base;
-    for (const key of Object.keys(rest)) next = withKeyOf(next, key, saved);
+    for (const key of Object.keys(rest)) if (!untouched(key)) next = withKeyOf(next, key, saved);
     if (removed.length) next = updateMapFile(next, gone);
     return next === base ? null : next;
   }

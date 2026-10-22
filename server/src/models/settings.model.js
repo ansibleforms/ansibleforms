@@ -457,15 +457,19 @@ Settings.saveActiveConfig = async function(yamlStr, options = {}) {
   const sources = await keySources()
   if (sources.length && !isTemplate(yamlStr)) {
     const doc = yaml.parse(yamlStr) || {}
-    // the configuration served now ; one that cannot be read : every key is a change
+    // the configuration served now (its text : what the editor showed) ; one that cannot be read :
+    // every key is a change
     let served
+    let servedText
     try {
-      served = yaml.parse((await Settings.getActiveConfig()) || '') || {}
+      servedText = (await Settings.getActiveConfig()) || ''
+      served = yaml.parse(servedText) || {}
     } catch {
       served = undefined
+      servedText = undefined
     }
     // the base's text first : a change it refuses (a ytt template) refused before a file is written
-    const base = mergeIntoBase(await activeBaseText(), withoutHeldKeys(doc, sources), served, { text: yamlStr, held: sources.map((s) => s.key) })
+    const base = mergeIntoBase(await activeBaseText(), withoutHeldKeys(doc, sources), served, { text: yamlStr, servedText, held: sources.map((s) => s.key) })
     await writeConfigKeys(doc, sources, { claim: true, served, text: yamlStr })
     // none of the base's keys changed : nothing more to write
     if (base === null) return
