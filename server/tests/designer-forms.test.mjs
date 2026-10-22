@@ -36,7 +36,7 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: Form, duplicateNotice } = await import("../src/models/form.model.js");
-const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
+const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, assertWorkflowFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
 const { default: ansibleConfig } = await import("../config/ansible.config.js");
 const { default: ProjectFiles } = await import("../src/models/projectFiles.model.js");
 const { listWorkflows } = await import("../src/models/workflowRun.js");
@@ -342,6 +342,35 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     fs.writeFileSync(path.join(DIR(), "flows.yaml"), YAML.stringify([{ name: "Team flow", type: "workflow", workflow: "team.yml", roles: ["team"], categories: [], fields: [] }]));
     write("workflows", "team.yml", flow("Team flow", [{ runner: "edge", unified_job_template: { type: "job_template", name: "rte-node.yml" } }, { runner: "pipeline", unified_job_template: { type: "job_template", name: "team-node.yml" } }]));
     assert.deepEqual(await files("playbooks"), ["team-node.yml", "team.yml", "x.yaml"]);
+  });
+
+  test("a workflow of the user's saved or made with a node running a hidden playbook or workflow : refused, both still hidden", async () => {
+    fs.writeFileSync(
+      path.join(DIR(), "flows.yaml"),
+      YAML.stringify([
+        form("Team play", ["team"], { playbook: "team.yml" }),
+        { name: "Ops flow", type: "workflow", workflow: "mine.yml", roles: ["ops"], categories: [], fields: [] },
+        { name: "Team flow", type: "workflow", workflow: "team-flow.yml", roles: ["team"], categories: [], fields: [] },
+      ]),
+    );
+    write("workflows", "mine.yml", flow("Mine", []));
+    write("workflows", "team-flow.yml", flow("Team flow", []));
+    const job = (name) => ({ unified_job_template: { type: "job_template", name } });
+    const nested = (name) => ({ unified_job_template: { type: "workflow_job_template", name } });
+    // the user's own workflow (one of their forms runs it), naming the hidden playbook or workflow
+    const err = await assertWorkflowFileShown(flow("Mine", [job("team.yml")]), user).catch((e) => e);
+    assert.equal(err.status, 409);
+    assert.equal(err.message, "The workflow runs a playbook that is not available to you");
+    await assert.rejects(assertWorkflowFileShown(flow("Mine", [nested("team-flow.yml")]), user), { status: 409, message: "The workflow runs a workflow that is not available to you" });
+    await assert.rejects(assertWorkflowFileShown(flow("Mine", [nested("Team flow")]), user), { status: 409 });
+    // a new workflow file one of their forms will run : the same
+    await assert.rejects(assertWorkflowFileShown(flow("New", [job("team.yml")]), user), { status: 409 });
+    assert.deepEqual(await files("playbooks"), ["rte-node.yml", "team-node.yml", "x.yaml"]);
+    assert.deepEqual(await files("workflows"), ["mine.yml"]);
+    // a node running a shown one, or nothing at all, passes ; so does a designer who sees every file
+    await assertWorkflowFileShown(flow("Mine", [job("x.yaml"), nested("mine.yml")]), user);
+    await assertWorkflowFileShown("not: [valid", user);
+    await assertWorkflowFileShown(flow("Mine", [job("team.yml")]), limited);
   });
 
   test("a hidden file answers as a missing one, or as one there already, in the same words", async () => {

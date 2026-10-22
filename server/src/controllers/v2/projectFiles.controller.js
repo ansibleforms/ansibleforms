@@ -2,15 +2,16 @@
 // The designer's Playbooks and Vars files sections (models/projectFiles.model.js) : reading is
 // open to every designer user, a change (save, new file, delete, push) only to the one holding
 // the designer lock - as a change of the forms. Without designAllPlaybooks or designAllWorkflows,
-// the playbooks or the workflow files a user does not see are never listed nor read, and a request
-// aimed at one is refused saying nothing of it (lib/designerForms.js).
+// the playbooks or the workflow files a user does not see are never listed nor read, a request
+// aimed at one is refused saying nothing of it, and so is a workflow file naming one in its nodes
+// (lib/designerForms.js).
 import RestResult from '../../models/restResult.model.v2.js';
 import ProjectFiles from '../../models/projectFiles.model.js';
 import Lock from '../../models/lock.model.js';
 import { listWorkflows, sharedWorkflowNames } from '../../models/workflowRun.js';
 import Errors from '../../lib/errors.js';
 import i18n from '../../lib/i18n.js';
-import { fileVisibility, designerListing, assertFileShown, designerGitOutput } from '../../lib/designerForms.js';
+import { fileVisibility, designerListing, assertFileShown, assertWorkflowFileShown, designerGitOutput } from '../../lib/designerForms.js';
 
 /**
  * Answers 423 (and returns false) unless the caller holds the designer lock.
@@ -62,6 +63,8 @@ const projectFilesController = {
     try {
       if (!(await holdsLock(req, res))) return;
       await assertFileShown(req.params.kind, req.body?.path, req.user?.user, 'save');
+      // a workflow whose nodes run a playbook or a workflow hidden from the user : refused
+      if (req.params.kind === 'workflows') await assertWorkflowFileShown(req.body?.content, req.user?.user);
       const saved = await ProjectFiles.write(req.params.kind, req.body?.path, req.body?.content);
       // a workflow named as one in another file : a form running it by name would stop
       if (req.params.kind === 'workflows') saved.sharedNames = await sharedWorkflowNames(req.body?.content).catch(() => []);
@@ -74,6 +77,7 @@ const projectFilesController = {
     try {
       if (!(await holdsLock(req, res))) return;
       await assertFileShown(req.params.kind, req.body?.path, req.user?.user, 'create');
+      if (req.params.kind === 'workflows') await assertWorkflowFileShown(req.body?.content ?? '', req.user?.user);
       res.status(201).json(RestResult.single(await ProjectFiles.write(req.params.kind, req.body?.path, req.body?.content ?? '', true)));
     } catch (err) {
       Errors.ReturnError(res, err);

@@ -30,7 +30,9 @@
 // nested workflows those run - every workflow a reference may mean, when it means several. A
 // hidden file is never listed nor read : a read or a delete of it answers as a file not found, a
 // save or a new file as a file there already, in the words of a real one. A form saved naming one
-// hidden from the user is refused, the visibility read from the forms as they were before the save.
+// hidden from the user is refused, the visibility read from the forms as they were before the save ;
+// so is a workflow file saved or made whose nodes run one (a workflow a form of theirs runs would
+// show it), read from the forms and the workflows as they were before the write.
 // Edit Playbooks and Edit Workflows still decide whether a shown one is changed.
 //
 // The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
@@ -44,6 +46,7 @@ import Form from "../models/form.model.js";
 import ProjectFiles from "../models/projectFiles.model.js";
 import mysql from "../models/db.model.js";
 import { workflowFiles, workflowCandidates } from "../models/workflowRun.js";
+import { workflowsOf } from "./workflowDefs.js";
 import Errors from "./errors.js";
 import logger from "./logger.js";
 
@@ -304,19 +307,21 @@ async function rteRunners() {
 }
 
 /**
- * The playbooks and the workflow files some forms use, by absolute path.
+ * The playbooks and the workflow files some forms use, by absolute path, and those some workflows
+ * run (a workflow file about to be saved : its nodes, and the nested workflows they run).
  *
  * Args:
  *   forms (object[]): the forms.
  *   ctx (object): { playbookRoot (the playbooks folder), workflows (workflowFiles), rteRunners
  *     (rteRunners) }.
+ *   workflows (object[]): workflows read from a file's text (workflowsOf) ; none when not given.
  *
  * Returns:
  *   object: { playbooks (Set), workflows (Set) }.
  */
-function usedBy(forms, ctx) {
+function usedBy(forms, ctx, workflows = []) {
   const playbooks = new Set();
-  const workflows = new Set();
+  const files = new Set();
   const seen = new Set();
   // a playbook named literally (an expression resolves only at launch : nothing to compare)
   const addPlaybook = (playbook, subPath) => {
@@ -328,16 +333,19 @@ function usedBy(forms, ctx) {
   // a workflow and the ones it nests : its file, and the playbooks of its job template nodes ;
   // every workflow the reference may mean (two of a name : the form cannot run either, and a
   // second one never shows the first)
+  const addNodes = (workflow, depth) => {
+    for (const node of workflow.nodes || []) {
+      if (runsPlaybook(node)) addPlaybook(node.name);
+      else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
+    }
+  };
   const addWorkflow = (ref, depth) => {
     if (!ref || depth > MAX_NESTING) return;
     for (const found of workflowCandidates(ctx.workflows, ref)) {
-      workflows.add(path.resolve(found.file));
+      files.add(path.resolve(found.file));
       if (seen.has(found)) continue;
       seen.add(found);
-      for (const node of found.workflow.nodes || []) {
-        if (runsPlaybook(node)) addPlaybook(node.name);
-        else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
-      }
+      addNodes(found.workflow, depth);
     }
   };
   for (const f of forms || []) {
@@ -347,7 +355,8 @@ function usedBy(forms, ctx) {
     }
     if (f?.type === "workflow") addWorkflow(f.workflow, 0);
   }
-  return { playbooks, workflows };
+  for (const workflow of workflows || []) addNodes(workflow, 0);
+  return { playbooks, workflows: files };
 }
 
 /**
@@ -408,6 +417,36 @@ export async function assertFilesShown(forms, user) {
       if ([...usedBy([f], visibility.ctx)[kind]].some((abs) => !visibility.shown(abs))) {
         throw new Errors.ConflictError(`Form '${f?.name ?? ""}': the ${kind === "playbooks" ? "playbook" : "workflow"} it runs is not available to you`);
       }
+    }
+  }
+}
+
+/**
+ * Refuses a workflow file saved (or made) naming a playbook or a workflow hidden from the user, by
+ * the files as the forms and the workflows stored before it show them : a workflow a form of theirs
+ * runs would show what its nodes run.
+ *
+ * Args:
+ *   content (string): the file's new text.
+ *   user (object): the signed-in user.
+ *
+ * Raises:
+ *   Errors.ConflictError: a node running a file hidden from them (which one not said).
+ */
+export async function assertWorkflowFileShown(content, user) {
+  let workflows;
+  try {
+    workflows = workflowsOf(content);
+  } catch {
+    // not read as workflows : it runs nothing
+    return;
+  }
+  if (!workflows.length) return;
+  for (const kind of Object.keys(FILE_OPTIONS)) {
+    const visibility = await visibilityOf(kind, user);
+    if (!visibility) continue;
+    if ([...usedBy([], visibility.ctx, workflows)[kind]].some((abs) => !visibility.shown(abs))) {
+      throw new Errors.ConflictError(`The workflow runs a ${kind === "playbooks" ? "playbook" : "workflow"} that is not available to you`);
     }
   }
 }
@@ -510,6 +549,7 @@ export default {
   designerSave,
   fileVisibility,
   assertFilesShown,
+  assertWorkflowFileShown,
   designerListing,
   assertFileShown,
   designerGitOutput,
