@@ -13,7 +13,7 @@ import { repositoryDeprecations, repositoryKeyProblems } from '../../lib/configK
 import Form from '../../models/form.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import _ from 'lodash';
-import { USAGE_FLAGS, typeOf, flagOn, normalizeUsageFlags } from '../../lib/repoObjects/types.js';
+import { USAGE_FLAGS, typeOf, flagOn, normalizeUsageFlags, mayReadType } from '../../lib/repoObjects/types.js';
 import { foldConfigItem } from '../../lib/seed-schema.js';
 
 /**
@@ -294,7 +294,8 @@ const deleteRepository = async function(req, res) {
  * asked (?types=schedules,credentials), the app's objects it would write to it, those that stay in
  * the app and why, those written without their secrets, the files whose name an app's object has
  * (git wins), the objects it holds now ; and whether it has changes not pushed yet. For the one
- * question its dialog and page ask before the flags are saved.
+ * question its dialog and page ask before the flags are saved. A type whose page the user may not
+ * read (mayReadType : the SSO providers, the syslog servers to a connections user) is left out.
  *
  * Args:
  *   req (object): the request, /:name (one not made yet may be named too : its files are none),
@@ -304,7 +305,8 @@ const deleteRepository = async function(req, res) {
 const usagePreview = async function(req, res) {
   try {
     const name = req.params.name ? String(req.params.name) : null;
-    const keys = String(req.query?.types || '').split(',').map((k) => k.trim()).filter((k) => typeOf(k)?.objects);
+    // only the types whose page the user may read : the preview names their objects
+    const keys = String(req.query?.types || '').split(',').map((k) => k.trim()).filter((k) => typeOf(k)?.objects && mayReadType(k, req.user?.user));
     const types = await RepoObjects.previewTypes(name, keys);
     let unpushed = false;
     if (name) {

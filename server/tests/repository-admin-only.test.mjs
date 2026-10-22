@@ -175,3 +175,34 @@ describe("a usage flag", () => {
     expect(calls).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// What turning usages on would do : each type with its own page's right
+// ---------------------------------------------------------------------------------------------
+
+describe("the usage preview", () => {
+  test("names the objects of a type only to who may read that type's page", async () => {
+    const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
+    const asked = [];
+    const spy = vi.spyOn(RepoObjects, "previewTypes").mockImplementation(async (name, keys) => {
+      asked.push(keys);
+      return Object.fromEntries(keys.map((k) => [k, {}]));
+    });
+    const types = "credentials,runners,sso,ldap,syslog,disclaimer,schedules,general,branding,labels";
+    // the request's query : the helper above sends none, so the request is made here
+    const callWith = (user) =>
+      new Promise((resolve) => {
+        const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, json(data) { resolve({ status: this.statusCode, data }); return this; } };
+        controller.usagePreview({ params: { name: "forms" }, query: { types }, user: { user } }, res);
+      });
+    await callWith(ops);
+    await callWith({ username: "art", roles: ["art"], options: { showConnectionsSettings: true, showAppearanceSettings: true, allowScheduledJobs: true } });
+    await callWith(admin);
+    expect(asked).toEqual([
+      ["credentials", "runners"],
+      ["credentials", "runners", "schedules", "branding", "labels"],
+      types.split(","),
+    ]);
+    spy.mockRestore();
+  });
+});

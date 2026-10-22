@@ -34,6 +34,7 @@ export const CATEGORIES = ["designer", "jobs", "system", "appearance", "access",
 //   label      how the server's messages name it
 //   references the object types its objects name (a runner its credential) : read again when
 //              those are pulled, an object waiting for what it names finds it then
+//   options    the role options that open its page, when not its category's (CATEGORY_OPTIONS)
 export const USAGE_TYPES = [
   { key: "categories", flag: "use_for_categories", category: "designer", oneOnly: true, label: "categories" },
   { key: "constants", flag: "use_for_constants", category: "designer", oneOnly: true, label: "constants" },
@@ -58,8 +59,19 @@ export const USAGE_TYPES = [
   { key: "notifications", references: ["credentials"], flag: "use_for_notifications", category: "connections", objects: true, oneOnly: true, label: "notifications" },
   { key: "chat_assistant", references: ["credentials"], flag: "use_for_chat_assistant", category: "connections", objects: true, oneOnly: true, label: "chat assistant" },
   { key: "mcp", flag: "use_for_mcp", category: "connections", objects: true, oneOnly: true, label: "MCP settings" },
-  { key: "syslog", flag: "use_for_syslog", category: "connections", objects: true, oneOnly: true, label: "syslog servers" },
+  // its page is the admin settings' (a server added receives every log line and audit entry)
+  { key: "syslog", flag: "use_for_syslog", category: "connections", objects: true, oneOnly: true, label: "syslog servers", options: ["showSettings"] },
 ];
+
+// the role options that open the pages of each category's types (lib/middleware.js), any one of
+// them ; a type whose page another option opens names its own (options)
+const CATEGORY_OPTIONS = {
+  jobs: ["allowScheduledJobs"],
+  system: ["showSettings"],
+  appearance: ["showSettings", "showAppearanceSettings"],
+  access: ["showSettings"],
+  connections: ["showSettings", "showConnectionsSettings"],
+};
 
 // every usage flag, as the repositories table, its API and the config seed know them
 export const USAGE_FLAGS = USAGE_TYPES.map((t) => t.flag);
@@ -184,6 +196,25 @@ export function normalizeUsageFlags(data) {
 }
 
 /**
+ * Whether a user may read what a type's page shows : an admin, or one of the role options that
+ * open that page (CATEGORY_OPTIONS, a type's own options). What a repository's usage would take of
+ * a type names its objects, so it is read with that page's right.
+ *
+ * Args:
+ *   key (string): the type.
+ *   user (object): the signed-in user ({ roles, options }).
+ *
+ * Returns:
+ *   boolean: true when they may.
+ */
+export function mayReadType(key, user) {
+  const type = typeOf(key);
+  if (!type) return false;
+  if ((user?.roles || []).includes("admin")) return true;
+  return (type.options || CATEGORY_OPTIONS[type.category] || []).some((option) => !!user?.options?.[option]);
+}
+
+/**
  * The object types a repository is used for, in APPLY_ORDER.
  *
  * Args:
@@ -199,4 +230,4 @@ export function objectTypesOf(repo) {
   });
 }
 
-export default { CATEGORIES, USAGE_TYPES, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, objectTypesOf };
+export default { CATEGORIES, USAGE_TYPES, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, mayReadType, objectTypesOf };
