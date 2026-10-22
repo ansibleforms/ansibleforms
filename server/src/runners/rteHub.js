@@ -622,9 +622,9 @@ export async function authenticate(headers, opts = {}) {
         const stored = await storeToken(name, token, url, runner.credential, repinned ? cert : null);
         const named = stored.name !== runner.credential ? { credential: stored.name } : {};
         // step 2 : the runner itself, when its mode, its credential or its registration changed
-        if (moved || named.credential) await Runner.update({ rte_mode: "inbound", uri: "", ...named, ...registered }, runner.id, { fromRte: true });
+        if (moved || named.credential) await updateHeld("runners", runner, { rte_mode: "inbound", uri: "", ...named, ...registered });
       } else {
-        await Runner.update({ ...fields, ...pin, ...registered }, runner.id, { fromRte: true });
+        await updateHeld("runners", runner, { ...fields, ...pin, ...registered });
       }
       if (moved && fromDatabase) {
         logger.notice(`Runner '${name}' moved from database mode to ${mode}${mode === "inbound" ? ` at ${url}` : ""}: its RTE signed in with the runner's own token`);
@@ -662,7 +662,7 @@ export async function authenticate(headers, opts = {}) {
   if (runner) {
     // a runner still waiting for approval (an approved one was refused above) : a new token,
     // still waiting for an admin
-    await Runner.update({ credential, token: null, rte_mode: fields.rte_mode, ...(mode === "inbound" ? { uri: "" } : {}) }, runner.id, { fromRte: true });
+    await updateHeld("runners", runner, { credential, token: null, rte_mode: fields.rte_mode, ...(mode === "inbound" ? { uri: "" } : {}) });
     logger.notice(`Runner '${name}', waiting for approval, got a new token (credential '${credential}') through the join token '${used.name}'`);
   } else {
     await Runner.create({ name, type: "rte", uri: "", credential, rte_mode: fields.rte_mode, description: `Joined with the join token '${used.name}'` }, { fromRte: true });
@@ -756,6 +756,34 @@ function samePem(pem) {
   }
 }
 
+// ─── a runner or a credential a repository holds ──────────────────────────────
+
+/**
+ * Writes what an RTE changes of its runner or of its runner's credential (its mode, its address,
+ * its certificate) as the RTE hub writes it, and - one a repository holds - into its file too
+ * (lib/repoObjects : appUpdated, under the repository's write claim), so the repository's next
+ * pull does not undo it. The file is written in the background : a registration never waits for
+ * a pull or a push of that repository ; a failure is said in the server log.
+ *
+ * Args:
+ *   key (string): the type, runners or credentials.
+ *   row (object): the runner or the credential, as read (its id, its repository).
+ *   data (object): the fields to write.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+async function updateHeld(key, row, data) {
+  const Model = key === "runners" ? Runner : Credential;
+  // as stored, before the change : what its file is compared with
+  const before = row?.repository ? await (key === "runners" ? Runner.findStoredById(row.id) : Credential.findById(row.id)).catch(() => null) : null;
+  await Model.update(data, row.id, { fromRte: true });
+  if (!before) return;
+  import("../lib/repoObjects/index.js")
+    .then(({ default: RepoObjects }) => RepoObjects.holding([], () => RepoObjects.appUpdated(key, before, row.id), before))
+    .catch((e) => logger.warning(`The file of ${key === "runners" ? "runner" : "credential"} '${row.name}' in repository '${before.repository}' does not follow its RTE yet: ${e.message || e}`));
+}
+
 /**
  * Keeps an RTE's token in a credential of type rte : the one its runner names already, else a
  * new one named after the runner (<runner>-rte, a number added when that name is taken). An
@@ -788,7 +816,7 @@ async function storeToken(runnerName, token, url, current, cert = null) {
         pinned = false;
       }
       const pin = pinned ? { ca_bundle: cert, ignore_certs: 0, rte_cert_sha256: bundleDigest(cert) } : {};
-      await Credential.update({ password: token, url: url || null, ...pin }, cred.id, { fromRte: true });
+      await updateHeld("credentials", cred, { password: token, url: url || null, ...pin });
       return { name: current, pinned };
     }
   }
