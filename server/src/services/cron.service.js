@@ -21,7 +21,7 @@ import { nodeId } from '../lib/role.js';
 import { purgeRevocations } from '../lib/tokenRevocation.js';
 import ApiToken from '../models/apiToken.model.js';
 import { resumeAbandoned } from '../lib/jobResume.js';
-import { nextRun as rruleNextRun } from '../lib/scheduleRrule.js';
+import { nextRunsAsync, limits as rruleLimits, TIMEOUT as RRULE_TIMEOUT } from '../lib/scheduleRrule.js';
 // the stored jobs cleanup's query : expired, or unused for longer than their days
 import { cleanupQuery } from '../lib/storedJobExpiry.js';
 
@@ -87,6 +87,8 @@ class CronService {
       repositories: new Map(),
       schedules: new Map(),
     };
+    // the registration of each rrule schedule under way : one made or removed meanwhile ends it
+    this.rruleTurns = new Map();
     this.active = false;
     // the system tasks (initializeSystemTasks) run on this node : what scheduleConfigSeedReload
     // checks before rescheduling
@@ -220,10 +222,12 @@ class CronService {
 
   /**
    * Registers a repository schedule's next run, worked out from its iCal rrule in the rrule's own
-   * zone (lib/scheduleRrule.js) : a one-shot task at that moment that queues it, as a cron task
-   * does, then registers the run after it. The queueing is the worker's only (whileWorker) ; the
-   * next run is registered either way, so a process that holds the worker lock again later still
-   * has the schedule. A rule with no run ahead (its COUNT or UNTIL passed) registers nothing.
+   * zone (lib/scheduleRrule.js, awaited : the process goes on meanwhile) : a one-shot task at that
+   * moment that queues it, as a cron task does, then registers the run after it. The queueing is
+   * the worker's only (whileWorker) ; the next run is registered either way, so a process that
+   * holds the worker lock again later still has the schedule. A rule with no run ahead (its COUNT
+   * or UNTIL passed) registers nothing. A rule whose runs took too long to work out is not dropped
+   * : a task tries again once the rule is no longer given up.
    *
    * Args:
    *   id (number): the schedule.
@@ -232,36 +236,66 @@ class CronService {
    *   after (Date): the moment its next run is after (now by default).
    *
    * Returns:
-   *   void
+   *   Promise<void>: settled once it is registered (never rejected).
    */
   addRruleSchedule(id, name, rrule, after = new Date()) {
-    const next = rruleNextRun(rrule, after);
-    if (!next) {
-      logger.info(`Schedule ${name} (ID: ${id}) has no run ahead in its rrule, nothing to register`);
-      return;
-    }
-    const queue = whileWorker(async () => {
-      logger.info(`Rrule triggered for schedule: ${name} (ID: ${id})`);
-      try {
-        await this.queueIfIdle(id, name);
-      } catch (err) {
-        logger.error(`Error in schedule rrule job for ${name} (ID: ${id}):`, err);
-      }
-    });
-    // croner's own class : the run is guarded above, and the next one registered whatever it did
-    const task = new Croner(next, { paused: true, protect: true }, async () => {
-      await queue();
-      // still the task registered for it (not removed or replaced meanwhile) : the next run
-      // (after this one, even if the timer fired a little early : never the same run twice)
-      if (this.jobs.schedules.get(id) === task && this.active) {
-        this.removeSchedule(id);
-        this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), next.getTime()) + 1000));
-      }
-    });
-    task.resume();
-    this.jobs.schedules.set(id, task);
+    // this registration's turn, and its rrule taken now : a resync meanwhile leaves it to it
+    const turn = {};
+    this.rruleTurns.set(id, turn);
     this.signatures.schedules.set(id, scheduleSignature(0, null, null, rrule));
-    logger.info(`Added rrule job for schedule: ${name} (ID: ${id}), next run at ${next.toISOString()}`);
+    const current = () => this.rruleTurns.get(id) === turn && this.active;
+    // a task in the registry : the one a removeSchedule stops
+    const register = (task) => {
+      task.resume();
+      this.jobs.schedules.set(id, task);
+    };
+    return nextRunsAsync(rrule, { after, count: 1 }).then(
+      ([next]) => {
+        if (!current()) return;
+        if (!next) {
+          logger.info(`Schedule ${name} (ID: ${id}) has no run ahead in its rrule, nothing to register`);
+          return;
+        }
+        const queue = whileWorker(async () => {
+          logger.info(`Rrule triggered for schedule: ${name} (ID: ${id})`);
+          try {
+            await this.queueIfIdle(id, name);
+          } catch (err) {
+            logger.error(`Error in schedule rrule job for ${name} (ID: ${id}):`, err);
+          }
+        });
+        // croner's own class : the run is guarded above, and the next one registered whatever it did
+        const task = new Croner(next, { paused: true, protect: true }, async () => {
+          await queue();
+          // still the task registered for it (not removed or replaced meanwhile) : the next run
+          // (after this one, even if the timer fired a little early : never the same run twice)
+          if (this.jobs.schedules.get(id) === task && this.active) {
+            task.stop();
+            this.jobs.schedules.delete(id);
+            await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), next.getTime()) + 1000));
+          }
+        });
+        register(task);
+        logger.info(`Added rrule job for schedule: ${name} (ID: ${id}), next run at ${next.toISOString()}`);
+      },
+      (err) => {
+        if (!current()) return;
+        if (err?.code !== RRULE_TIMEOUT) {
+          logger.error(`Failed to add rrule job for schedule ${name} (ID: ${id}): ${err?.message || err}`);
+          return;
+        }
+        // given up a while : tried again once it is walked again, from then
+        const at = new Date(Date.now() + rruleLimits.givenUpMs + 1000);
+        logger.warning(`The next run of schedule ${name} (ID: ${id}) could not be worked out in time, tried again at ${at.toISOString()}`);
+        const retry = new Croner(at, { paused: true }, async () => {
+          if (this.jobs.schedules.get(id) !== retry || !this.active) return;
+          retry.stop();
+          this.jobs.schedules.delete(id);
+          await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), after.getTime())));
+        });
+        register(retry);
+      },
+    );
   }
 
   /**
@@ -274,8 +308,8 @@ class CronService {
       this.removeSchedule(id);
 
       if (Number(oneTimeRun) !== 1 && rrule && String(rrule).trim() !== '') {
-        // a repository schedule : timed by its rrule
-        this.addRruleSchedule(id, name, rrule);
+        // a repository schedule : timed by its rrule, registered once its next run is known
+        return this.addRruleSchedule(id, name, rrule);
       } else if (oneTimeRun === 1 && runAt) {
         // One-time schedule: check every minute if it's time to run
         const task = new Cron('* * * * *', {
@@ -348,6 +382,7 @@ class CronService {
    */
   removeSchedule(id) {
     this.signatures.schedules.delete(id);
+    this.rruleTurns.delete(id);
     const task = this.jobs.schedules.get(id);
     if (task) {
       task.stop();
@@ -407,11 +442,14 @@ class CronService {
       for (const id of [...this.jobs.schedules.keys()]) {
         if (!wanted.has(id)) this.removeSchedule(id);
       }
+      // a rrule schedule is registered once its next run is worked out : awaited, all together
+      const registering = [];
       for (const [id, r] of wanted) {
         if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.run_at, r.rrule)) {
-          this.addSchedule(r.id, r.name, r.cron, r.one_time_run, r.run_at, r.rrule);
+          registering.push(this.addSchedule(r.id, r.name, r.cron, r.one_time_run, r.run_at, r.rrule));
         }
       }
+      await Promise.all(registering);
       logger.debug(`Schedule cron jobs in sync: ${this.jobs.schedules.size}`);
     } catch (err) {
       logger.error('Failed to sync the schedule cron jobs:', err);
@@ -759,6 +797,7 @@ class CronService {
       logger.debug(`Stopped schedule cron job: ${id}`);
     });
     this.jobs.schedules.clear();
+    this.rruleTurns.clear();
 
     this.jobs.system.forEach((task, name) => {
       task.stop();

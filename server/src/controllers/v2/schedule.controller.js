@@ -7,7 +7,7 @@ import cronService from "../../services/cron.service.js";
 import logger from "../../lib/logger.js";
 import i18n from "../../lib/i18n.js";
 import ScheduleRepo from "../../models/scheduleRepo.model.js";
-import { validateRrule, nextRuns, zoneOf } from "../../lib/scheduleRrule.js";
+import { validateRruleAsync, nextRunsAsync, zoneOf } from "../../lib/scheduleRrule.js";
 
 // how many runs a rrule's preview shows
 const PREVIEW_RUNS = 10;
@@ -123,12 +123,12 @@ const scheduleController = {
   async previewRrule(req, res) {
     try {
       const rrule = String(req.query?.rrule ?? "");
-      const errors = validateRrule(rrule);
+      const errors = await validateRruleAsync(rrule);
       let next = [];
-      // its runs from now, in their thread : one that cannot be worked out in time is refused
+      // its runs from now, in their thread, awaited : one that cannot be worked out in time says so
       if (!errors.length) {
         try {
-          next = nextRuns(rrule, { count: PREVIEW_RUNS }).map((d) => d.toISOString());
+          next = (await nextRunsAsync(rrule, { count: PREVIEW_RUNS })).map((d) => d.toISOString());
         } catch (e) {
           errors.push(e.message);
         }

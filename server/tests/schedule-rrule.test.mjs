@@ -98,10 +98,22 @@ describe("its runs, in its own time zone", () => {
     ]);
   });
 
-  test("a time the DST change skips is left out", () => {
+  test("a time the DST change skips runs when the clock reaches it, as a cron does", () => {
     assert.deepEqual(runs("DTSTART;TZID=America/New_York:20300303T023000 RRULE:FREQ=WEEKLY;BYDAY=SU;INTERVAL=1;COUNT=3"), [
       "2030-03-03T07:30:00.000Z",
+      "2030-03-10T07:30:00.000Z", // 02:30 does not exist that night : 03:30 -04:00
       "2030-03-17T06:30:00.000Z",
+    ]);
+  });
+
+  test("an hourly rule across the skipped hour runs once at the hour after it", () => {
+    assert.deepEqual(runs("DTSTART;TZID=Europe/Brussels:20270328T000000 RRULE:FREQ=MINUTELY;INTERVAL=30;COUNT=8"), [
+      "2027-03-27T23:00:00.000Z", // 00:00 +01:00
+      "2027-03-27T23:30:00.000Z",
+      "2027-03-28T00:00:00.000Z", // 01:00 +01:00
+      "2027-03-28T00:30:00.000Z",
+      "2027-03-28T01:00:00.000Z", // 02:00 and 03:00 are the same moment : once
+      "2027-03-28T01:30:00.000Z", // 02:30 and 03:30 too
     ]);
   });
 
@@ -185,9 +197,9 @@ describe("its runs, in its own time zone", () => {
   });
 });
 
-describe("a rule rrule.js would walk for ever never blocks the process", () => {
-  // its times never meet its BYHOUR or BYMINUTE (rrule.js loops for ever), or no day is ever
-  // kept (walked to the year 9999) : refused, and its runs given up after a second
+describe("a rule whose times or days never meet is refused at once", () => {
+  // its times never meet its BYHOUR or BYMINUTE (rrule.js would loop for ever), or no day is ever
+  // kept (rrule.js would walk to the year 9999) : seen without walking it, never given up
   const rules = [
     "DTSTART:20260101T000000Z RRULE:FREQ=DAILY;INTERVAL=1;BYMONTH=2;BYMONTHDAY=30",
     "DTSTART:20260101T000000Z RRULE:FREQ=HOURLY;INTERVAL=2;BYHOUR=1",
@@ -198,11 +210,11 @@ describe("a rule rrule.js would walk for ever never blocks the process", () => {
       const started = Date.now();
       const errors = validateRrule(rrule);
       assert.ok(errors.length, "refused");
-      assert.match(errors[0], /No run of this rrule could be worked out|never fires/);
-      // its runs : given up, at once once known
-      assert.throws(() => nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z"), count: 3 }), /No run of this rrule could be worked out/);
+      assert.match(errors[0], /never fires/);
+      // its runs : none
+      assert.deepEqual(nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z"), count: 3 }), []);
       assert.equal(nextRun(rrule), null);
-      assert.ok(Date.now() - started < 3000, `given up in time (${Date.now() - started} ms)`);
+      assert.ok(Date.now() - started < 3000, `at once (${Date.now() - started} ms)`);
     });
   }
 

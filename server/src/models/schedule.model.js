@@ -14,7 +14,7 @@ const LAUNCH_MAX_MINUTES = 10;
 import Form from './form.model.js';
 import Errors from '../lib/errors.js';
 import ScheduleRepo from './scheduleRepo.model.js';
-import { nextRun as rruleNextRun, validateRrule, normalizeRrule } from '../lib/scheduleRrule.js';
+import { nextRun as rruleNextRun, nextRunAsync as rruleNextRunAsync, validateRruleAsync, normalizeRrule } from '../lib/scheduleRrule.js';
 
 // where a schedule comes from and what its file says : the schedules repository's to write
 // (models/scheduleRepo.model.js), never a request body's
@@ -30,11 +30,12 @@ import { storedJobOfLaunch } from '../lib/storedJobUse.js';
  *
  * Args:
  *   row (object): a schedule as read from the table.
+ *   rruleNext (Date|null): its rrule's next run, when it was worked out already (withNextRunAsync).
  *
  * Returns:
  *   object: the schedule with next_run.
  */
-function withNextRun(row) {
+function withNextRun(row, rruleNext = undefined) {
   let next = null;
   // turned off : it does not run next
   if (row.enabled !== undefined && row.enabled !== null && !Number(row.enabled)) return { ...row, next_run: null };
@@ -42,7 +43,7 @@ function withNextRun(row) {
     if (row.one_time_run) {
       if (row.run_at && new Date(row.run_at) > new Date()) next = new Date(row.run_at);
     } else if (row.rrule) {
-      next = rruleNextRun(row.rrule);
+      next = rruleNext === undefined ? rruleNextRun(row.rrule) : rruleNext;
     } else if (row.cron) {
       const cron = new Cron(row.cron, { paused: true, timezone: cronService.timezone });
       next = cron.nextRun();
@@ -90,6 +91,22 @@ function isLaunchRefusal(err) {
 }
 
 /**
+ * withNextRun, a rrule's next run awaited (lib/scheduleRrule.js nextRunAsync) : the process goes
+ * on while the schedules list is worked out.
+ *
+ * Args:
+ *   row (object): a schedule as read from the table.
+ *
+ * Returns:
+ *   Promise<object>: the schedule with next_run.
+ */
+async function withNextRunAsync(row) {
+  const on = row.enabled === undefined || row.enabled === null || !!Number(row.enabled);
+  if (on && !row.one_time_run && row.rrule) return withNextRun(row, await rruleNextRunAsync(row.rrule));
+  return withNextRun(row);
+}
+
+/**
  * Checks the rrule a schedule kept in the app is given (one a schedules repository it came from
  * left it, or one typed for it) : refused when it is not a valid rrule, or sent with a one time
  * run ; with one, it runs on it, not on a cron. A cron or a one time run sent without a rrule
@@ -98,10 +115,13 @@ function isLaunchRefusal(err) {
  * Args:
  *   data (object): the request body (changed in place).
  *
+ * Returns:
+ *   Promise<void>
+ *
  * Raises:
  *   Errors.BadRequestError: the rrule is refused, or sent with a one time run.
  */
-function checkAppRrule(data) {
+async function checkAppRrule(data) {
   const once = data.one_time_run === true || Number(data.one_time_run) === 1;
   if (data.rrule === undefined) {
     // timed otherwise : the rrule it had goes
@@ -114,7 +134,7 @@ function checkAppRrule(data) {
     return;
   }
   if (once) throw new Errors.BadRequestError("A one time run has no rrule: send either, not both.");
-  const errors = validateRrule(rrule);
+  const errors = await validateRruleAsync(rrule);
   if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
   data.rrule = rrule;
   data.cron = null;
@@ -175,7 +195,7 @@ class Schedule extends CrudModel {
       if (active) return ScheduleRepo.create(active, data);
     }
     // kept in the app : a cron, a rrule (checked) or a one time run
-    checkAppRrule(data);
+    await checkAppRrule(data);
     // `owner` is written by plan() alone. A request body that carries one is somebody
     // choosing which user a schedule runs as - drop it, like the internal fields below.
     delete data.owner
@@ -326,7 +346,7 @@ class Schedule extends CrudModel {
       return ScheduleRepo.update(current, data);
     }
     // an app's : timed by a cron, a rrule (one a repository left it, checked) or once
-    checkAppRrule(data);
+    await checkAppRrule(data);
     return super.update(this.modelName, data, id);
   }
   static async delete(id) {
@@ -341,7 +361,7 @@ class Schedule extends CrudModel {
   static async findAll() {
     logger.info("Finding all schedules");
     const rows = await super.findAll(this.modelName);
-    return Array.isArray(rows) ? rows.map(withNextRun) : rows;
+    return Array.isArray(rows) ? Promise.all(rows.map(withNextRunAsync)) : rows;
   }
   static async findById(id) {
     logger.info(`Finding schedule ${id}`);

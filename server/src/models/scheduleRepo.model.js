@@ -21,7 +21,7 @@ import CrudModel from "./crud.model.js";
 import Repo from "./repo.model.js";
 import Errors from "../lib/errors.js";
 import { parseScheduleFile, updateScheduleFile, newScheduleFile, extraDataOf } from "../lib/scheduleFiles.js";
-import { validateRrule, normalizeRrule } from "../lib/scheduleRrule.js";
+import { validateRruleAsync, normalizeRrule } from "../lib/scheduleRrule.js";
 import { cronToRrule } from "../lib/cronToRrule.js";
 import logConfig from "../../config/log.config.js";
 import Engine, { withWriteClaim, fileOf, writeNewFile, nameKey } from "../lib/repoObjects/engine.js";
@@ -102,7 +102,7 @@ async function checkValues(values, id) {
     if (forms && !forms.has(values.form)) throw new Errors.BadRequestError(`The form '${values.form}' does not exist.`);
   }
   if (values.rrule !== undefined) {
-    const errors = validateRrule(values.rrule);
+    const errors = await validateRruleAsync(values.rrule);
     if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
   }
   if (values.extra_vars !== undefined) {

@@ -56,6 +56,8 @@ let held = true;
 vi.mock("../src/lib/workerLock.js", () => ({ confirmWorkerLock: async () => held }));
 
 const { default: cronService } = await import("../src/services/cron.service.js");
+const { limits } = await import("../src/lib/scheduleRrule.js");
+const LIMITS = { ...limits };
 
 const RRULE = "DTSTART;TZID=Europe/Brussels:20200101T020000 RRULE:FREQ=DAILY;INTERVAL=1";
 const live = () => tasks.filter((t) => !t.stopped);
@@ -69,6 +71,7 @@ beforeEach(() => {
   cronService.active = true;
 });
 afterEach(() => {
+  Object.assign(limits, LIMITS);
   cronService.stopAll();
   cronService.active = false;
   cronService.signatures.schedules.clear();
@@ -149,5 +152,38 @@ describe("a rrule schedule is registered at its next run", () => {
     schedules = [{ ...schedules[0], rrule: "DTSTART;TZID=UTC:20200101T060000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2" }];
     await cronService.resync();
     assert.equal(live().length, 0);
+  });
+
+  test("a rule whose next run took too long to work out is tried again, not dropped", async () => {
+    // a rule walked for a while (every minute of the working week since 2016, as a weekly rule),
+    // of this test's own : the given up ones are remembered by their text
+    const all = (n) => [...Array(n).keys()].join(",");
+    const rrule = `DTSTART;TZID=UTC:20160104T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;WKST=SA;BYDAY=MO,TU,WE,TH,FR;BYHOUR=${all(24)};BYMINUTE=${all(60)}`;
+    schedules = [{ ...schedules[0], rrule }];
+    limits.walkMs = 0;
+    limits.givenUpMs = 0;
+    const started = Date.now();
+    await cronService.resync();
+    const [retry] = live();
+    assert.ok(retry, "a task to try again");
+    assert.ok(retry.pattern - started >= 1000 && retry.pattern - started < 5000, "once the rule is walked again");
+    // the resync leaves it to its retry
+    await cronService.resync();
+    assert.deepEqual(live(), [retry]);
+    limits.walkMs = LIMITS.walkMs;
+    await retry.fn();
+    const [task] = live();
+    assert.notEqual(task, retry);
+    assert.ok(task.pattern > new Date() && task.pattern - Date.now() < 4 * 86400000, "its next run");
+    assert.equal(cronService.jobs.schedules.get(7), task);
+    assert.equal(queued, 0);
+  });
+
+  test("a schedule removed while its next run is worked out is not registered", async () => {
+    const pending = cronService.addSchedule(7, "Nightly", null, 0, null, RRULE);
+    cronService.removeSchedule(7);
+    await pending;
+    assert.equal(live().length, 0);
+    assert.equal(cronService.jobs.schedules.size, 0);
   });
 });

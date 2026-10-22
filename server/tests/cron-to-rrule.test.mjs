@@ -100,3 +100,25 @@ describe("a cron a rrule cannot express is refused, saying why", () => {
     });
   }
 });
+
+describe("across a DST change, the rrule fires when croner fires the cron", () => {
+  // the nights the clock goes forward (02:00 to 03:00) and back (03:00 to 02:00) in Brussels
+  const NIGHTS = [new Date("2027-03-27T12:00:00Z"), new Date("2026-10-24T12:00:00Z")];
+  const crons = ["30 2 * * *", "0 2 * * *", "15 2 * * 0", "0 * * * *", "*/30 * * * *", "30 1,2,3 * * *", "0 2 28 3 *"];
+  for (const cron of crons) {
+    test(cron, () => {
+      for (const after of NIGHTS) {
+        const task = new Cron(cron, { timezone: ZONE, paused: true });
+        // a moment croner lists twice (02:30 moved onto 03:30) is one run
+        const expected = [...new Set(task.nextRuns(8, after).map((d) => d.toISOString()))].slice(0, 6);
+        task.stop();
+        const { rrule } = cronToRrule(cron, ZONE, new Date("2026-01-05T12:00:00Z"));
+        assert.deepEqual(
+          nextRuns(rrule, { after, count: 6 }).map((d) => d.toISOString()),
+          expected,
+          `after ${after.toISOString()}`,
+        );
+      }
+    });
+  }
+});
