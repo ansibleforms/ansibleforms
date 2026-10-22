@@ -40,6 +40,8 @@ vi.mock("../src/models/credential.model.v2.js", () => ({
 vi.mock("../src/services/cron.service.js", () => ({ default: { addRepository() {}, removeRepository() {} } }));
 
 const { default: controller } = await import("../src/controllers/v2/repository.controller.js");
+const { default: Repository } = await import("../src/models/repository.model.js");
+const { default: logger } = await import("../src/lib/logger.js");
 
 /**
  * Calls a controller handler as the given user, and answers what it sent.
@@ -151,6 +153,23 @@ describe("use_for_config sent by a client of before", () => {
       ["create", undefined, 1, 1, 1],
       ["update", undefined, 0, 0, 0],
     ]);
+  });
+
+  test("said applied in the server log only when the save is : never for one refused", async () => {
+    const warning = vi.spyOn(logger, "warning").mockImplementation(() => {});
+    try {
+      // refused : another repository holds the roles (the model's 400)
+      const refused = Object.assign(new Error("Repository 'other' is already used for roles"), { status: 400 });
+      vi.spyOn(Repository, "update").mockRejectedValueOnce(refused);
+      const r = await call(controller.update, admin, { body: { use_for_config: true } });
+      expect(r.status).toBe(400);
+      expect(warning.mock.calls.filter(([m]) => /use_for_config/.test(m))).toEqual([]);
+      // applied
+      await call(controller.update, admin, { body: { use_for_config: true } });
+      expect(warning.mock.calls.filter(([m]) => /applied as use_for_roles/.test(m)).length).toBe(1);
+    } finally {
+      warning.mockRestore();
+    }
   });
 });
 

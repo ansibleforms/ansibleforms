@@ -142,25 +142,39 @@ function assertRepositoryAdminFields(req, existing) {
  * A request's use_for_config (deprecated since 7.4.0, removed in 8) as the three flags it is now,
  * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
  * repositories.yaml take it (foldConfigItem) : before anything reads the request's flags, so the
- * admin rule and the one-repository rule apply to them. Said in the server log. Then every flag as
- * the table stores it (normalizeUsageFlags).
+ * admin rule and the one-repository rule apply to them. Said in the server log once the save is
+ * applied (configUsageApplied), never for a save refused. Then every flag as the table stores it
+ * (normalizeUsageFlags).
  *
  * Args:
  *   req (object): the request ; its body replaced when it sends use_for_config.
  *
  * Returns:
- *   void
+ *   boolean: true when it sent use_for_config.
  *
  * Raises:
  *   Errors.BadRequestError: a flag that is neither on nor off.
  */
 function foldConfigUsage(req) {
-  if (req.body?.use_for_config !== undefined) {
-    logger.warning(`The repository '${req.body.name ?? req.params?.name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
-    req.body = foldConfigItem(req.body);
-  }
+  const folded = req.body?.use_for_config !== undefined;
+  if (folded) req.body = foldConfigItem(req.body);
   // every flag as the table stores it, so the admin rule reads what is written ('yes' refused)
   normalizeUsageFlags(req.body);
+  return folded;
+}
+
+/**
+ * Says in the server log that a save sent use_for_config and that it was applied as the three
+ * flags it is now : once the save is done.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   void
+ */
+function configUsageApplied(name) {
+  logger.warning(`The repository '${name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
 }
 
 const find = async function(req, res) {
@@ -178,7 +192,7 @@ const create = async function(req, res) {
     return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
   }
   try {
-    foldConfigUsage(req);
+    const folded = foldConfigUsage(req);
     // a new repository is a new source of configuration, forms or playbooks : an admin's
     assertRepositoryAdminFields(req, null);
     await guardRepositoryCredential(req, null);
@@ -188,6 +202,7 @@ const create = async function(req, res) {
       await RepoObjects.appCreated('repositories', id);
       return id;
     });
+    if (folded) configUsageApplied(req.body.name);
     // Fetch the created record to get all fields including cron
     const created = await Repository.findByName(req.body.name);
     // Add to cron service if cron expression exists
@@ -231,7 +246,7 @@ const update = async function(req, res) {
   try {
     const existing = await Repository.findByName(req.params.name);
     if (!existing) throw new Errors.NotFoundError(i18n.t(req, 'resources.failedFindRepository'));
-    foldConfigUsage(req);
+    const folded = foldConfigUsage(req);
     // its address, branch and use_for_* flags : an admin's (the rest is the connections user's too)
     assertRepositoryAdminFields(req, existing);
     const { dropPassword } = await guardRepositoryCredential(req, existing);
@@ -243,6 +258,7 @@ const update = async function(req, res) {
       // one of the repositories repository : its entry of repositories.yaml rewritten where it changed
       if (existing.repository) await RepoObjects.appUpdated('repositories', existing, existing.id);
     }, existing);
+    if (folded) configUsageApplied(req.params.name);
     // The record may have been RENAMED : `name` is an editable field on the repositories
     // page. Reading it back by req.params.name found nothing and threw, so a rename that
     // had already committed was reported as a 500 - and neither cron call below ran, so
