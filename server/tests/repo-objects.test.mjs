@@ -537,3 +537,23 @@ describe("an edit or a delete read before a pull that renamed its file", () => {
     assert.equal((await RepoObjects.syncRepository(credentials, "creds")).created, 0);
   });
 });
+
+describe("a file that renames its credential", () => {
+  test("refused while something uses it by its name, said ; taken once nothing does", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.state.tables.runners.push({ id: 50, name: "rte1", type: "rte", credential: "git" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git-bot"));
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(summary.updated, 0);
+    assert.match(summary.refused[0].reasons[0], /it renames 'git' to 'git-bot', but runner 'rte1' still uses 'git': kept as it was until nothing uses it/);
+    assert.ok(fx.rowNamed("credentials", "git"));
+    assert.match(RepoObjects.summaryText(credentials, summary), /Refused credentials\/git\.yaml: it renames 'git'/);
+    // nothing uses it any more : the rename is taken
+    fx.state.tables.runners = [];
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).updated, 1);
+    assert.ok(fx.rowNamed("credentials", "git-bot"));
+  });
+});

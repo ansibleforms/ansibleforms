@@ -466,6 +466,18 @@ export async function syncRepository(desc, name, opts = {}) {
       taken.set(nameKey(own.get(f.file).name), `${f.file} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
     }
   }
+  // a file that gives its object a new name while something uses it by its name (a credential a
+  // runner names) : refused, the object kept as it was - renamed, what uses it would name nothing
+  for (const f of desc.usersOf ? files : []) {
+    const row = f.object && own.get(f.file);
+    if (!row || nameKey(row.name) === nameKey(f.object.name)) continue;
+    const users = await desc.usersOf(row);
+    if (!users.length) continue;
+    f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${users.join(", ")} still uses '${row.name}': kept as it was until nothing uses it`];
+    f.object = null;
+    kept.add(f.file);
+    taken.set(nameKey(row.name), `${f.file} (refused, kept as it was)`);
+  }
   // step 3 : the names, in file order : the first file to name an object has it ; a file that has
   // no object yet and names one of the app takes it over
   for (const f of files) {
