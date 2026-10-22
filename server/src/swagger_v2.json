@@ -383,7 +383,8 @@
                   "properties": {
                     "config_yaml": { "type": "string", "description": "The active config.yaml content (empty string when there is none yet)" },
                     "forms_yaml": { "type": "string", "deprecated": true, "description": "The same content as config_yaml, under its name before 7.6 (deprecated, removed in 8)" },
-                    "baseHash": { "type": "string", "description": "sha256 fingerprint of config_yaml, for optimistic concurrency on save" }
+                    "baseHash": { "type": "string", "description": "sha256 fingerprint of config_yaml, for optimistic concurrency on save" },
+                    "templated": { "type": "boolean", "description": "The base config or a file a repository holds the roles, categories or constants in is a ytt template: the editors are read only" }
                   }
                 }
               }

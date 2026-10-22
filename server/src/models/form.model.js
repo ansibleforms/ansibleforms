@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable } from "../lib/configKeys.js";
+import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
 const ajv = new Ajv({allErrors: true, allowUnionTypes: true});
@@ -130,14 +130,17 @@ async function resolveRestoreInDatabase(){
 // Settings.saveActiveConfig resolve it. When that file lives in a repository
 // working tree, claim its write-lock so this write can't race a concurrent
 // scheduled pull/sync (issue #414).
-async function restoreConfigFile(snapshot){
+// text : the text to write in its place (the snapshot's base, its keys held by repositories
+// written back to their files, restoreActiveSnapshot) ; none : the snapshot copied as it is
+async function restoreConfigFile(snapshot, text){
   const targetConfigPath = (await Repository.getConfigPath()) || appConfig.configPath
   logger.debug(`Copying config file '${snapshot}'->'${targetConfigPath}'`)
   const repoName = configRepoFromPath(targetConfigPath, appConfig.repoPath)
   const token = repoName ? await Repository.claimForWrite(repoName) : undefined
   try{
     fse.ensureDirSync(path.dirname(targetConfigPath))
-    fse.copySync(snapshot,targetConfigPath)
+    if(text === undefined) fse.copySync(snapshot,targetConfigPath)
+    else fs.writeFileSync(targetConfigPath, text)
   }finally{
     if(repoName && token !== undefined){
       await Repository.releaseWrite(repoName, token).catch(e => logger.error(`Failed to release write-lock on '${repoName}': ${e.message}`))
@@ -1720,6 +1723,44 @@ Form.remove = function(backupName){
     fse.removeSync(backupformsdir)
   }
 }
+/**
+ * The keys of an 'active' config snapshot a repository holds now (the roles, the categories, the
+ * constants : lib/configKeys.js), each written back to its file - its claim taken - when the
+ * snapshot's differs from what is served : the snapshot is the configuration as it was served,
+ * the base with those keys laid over it. Copied whole onto the base, those keys would land in the
+ * base, where the repository's file hides them, and the restore would change nothing of them.
+ *
+ * Args:
+ *   snapshot (string): the snapshot file.
+ *   toDatabase (boolean): whether the base is the database copy (else the config file).
+ *
+ * Returns:
+ *   Promise<string|null|undefined>: the base's text to write ; null when the base's keys are the
+ *     ones there (nothing to write) ; undefined when no repository holds a key, or the snapshot is
+ *     a ytt template (the snapshot written as it is, as before).
+ *
+ * Raises:
+ *   Errors.ConflictError: a key that cannot be written (its repository not cloned, its file or the
+ *     base a ytt template).
+ */
+async function restoreHeldKeys(snapshot, toDatabase){
+  const sources = await keySources()
+  const text = fs.readFileSync(snapshot,'utf8')
+  if(!sources.length || isTemplate(text)) return undefined
+  const doc = yaml.parse(text) || {}
+  let served
+  try{
+    served = yaml.parse((await Settings.getActiveConfig()) || '') || {}
+  }catch{
+    served = undefined
+  }
+  const targetConfigPath = (await Repository.getConfigPath()) || appConfig.configPath
+  const baseText = toDatabase ? (await Settings.findFormsYaml()).forms_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath,'utf8') : '')
+  // the base's text first : a change it refuses (a ytt template) refused before a file is written
+  const base = mergeIntoBase(baseText, withoutHeldKeys(doc, sources), served)
+  await writeConfigKeys(doc, sources, { claim: true, served, text })
+  return base
+}
 Form.restoreBackup = async function(backupName,configOnly=false){
   const targetFormsPath = formsPath()
   const suffix = getBackupSuffix(backupName)
@@ -1733,18 +1774,23 @@ Form.restoreBackup = async function(backupName,configOnly=false){
   // Restore config.yaml
   if(fs.existsSync(backupconfigfile)){
     const toDatabase = configSource==='database' || (configSource==='active' && await resolveRestoreInDatabase())
-    if(toDatabase){
+    // an 'active' snapshot is the configuration as it was served : the keys a repository holds
+    // now go back to their files, the rest to the base (null : the base unchanged)
+    const text = configSource==='active' ? await restoreHeldKeys(backupconfigfile, toDatabase) : undefined
+    if(text === null){
+      logger.debug(`The base config of '${backupconfigfile}' is the one there : not written`)
+    }else if(toDatabase){
       // the base config lives in the database : reinstate the snapshot into the
       // settings row (writing only to disk would leave the DB config untouched). A
       // 'database' snapshot (Settings.importConfig) goes here even when a file is
       // what currently serves the config.
       logger.debug(`Restoring database config from '${backupconfigfile}'`)
-      await Settings.update({ config_yaml: fs.readFileSync(backupconfigfile,'utf8') })
+      await Settings.update({ config_yaml: text ?? fs.readFileSync(backupconfigfile,'utf8') })
     }else{
       // a 'file' snapshot (Settings.exportConfig) goes back onto the config file,
       // which is what undoing that export means - reinstating it into the database
       // would replace the live config with a stale disk copy instead
-      await restoreConfigFile(backupconfigfile)
+      await restoreConfigFile(backupconfigfile, text)
     }
   }
 
@@ -1805,8 +1851,13 @@ Form.save = async function(data, options = {}){
   }
   assertUniqueFormNames(formsConfig.forms)
   const { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: keySourcesHeld } = await getSaveTargets()
-  // a key held by a repository that is not cloned : refused before anything is written
-  assertKeysWritable(formsConfig, keySourcesHeld)
+  // the configuration served now : a key a repository holds is written only when the save changes
+  // it (the designer sends every key with each save of a form), the base only when one of its keys
+  // changed (lib/configKeys.js)
+  const served = keySourcesHeld.length ? await getBaseConfig().catch(() => undefined) : undefined
+  // a key changed that cannot be written (its repository not cloned, its file a ytt template) :
+  // refused before anything is written
+  assertKeysWritable(formsConfig, keySourcesHeld, served)
   logger.info(`Saving forms to ${formsDirs.map(d => d.path).join(", ")}`)
   var groups={}  // key "<repository>\0<source>" -> { repository, source, forms:[] }
 
@@ -1995,12 +2046,16 @@ Form.save = async function(data, options = {}){
     // above), the rest into the base config, its other keys kept (lib/configKeys.js)
     let configYaml = yaml.stringify(formsConfig)
     if (keySourcesHeld.length) {
-      const { rest } = await writeConfigKeys(formsConfig, keySourcesHeld, { claim: false })
       const baseText = useDatabase ? configSettings.config_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath, 'utf8') : '')
-      configYaml = mergeIntoBase(baseText, rest)
+      // the base's text first : a change it refuses (a ytt template) refused before a file is
+      // written ; null : none of its keys changed, nothing to write
+      configYaml = mergeIntoBase(baseText, withoutHeldKeys(formsConfig, keySourcesHeld), served)
+      await writeConfigKeys(formsConfig, keySourcesHeld, { claim: false, served })
     }
 
-    if (useDatabase) {
+    if (configYaml === null) {
+      logger.debug("The base config is unchanged: not written")
+    } else if (useDatabase) {
       logger.debug("Writing base config to database")
       await Settings.update({ config_yaml: configYaml })
     } else {

@@ -17,7 +17,8 @@ import logger from "./logger.js";
 import Errors from "./errors.js";
 import mysql from "../models/db.model.js";
 import Repo from "../models/repo.model.js";
-import { updateMapFile, newMapFile } from "./repoObjects/yamlFile.js";
+import _ from "lodash";
+import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js";
 
 // ===========================================================================
 // THE KEYS
@@ -32,6 +33,21 @@ export const CONFIG_KEYS = [
 
 // the one file the three keys were in before (use_for_config) : still read, deprecated
 export const LEGACY_FILE = "config.yaml";
+
+// a ytt template : a line starting (after spaces) with #@, the test the settings pages, the
+// designer and the health page use
+const YTT_DIRECTIVE = /^\s*#@/m;
+
+/**
+ * Whether a configuration's text is a ytt template.
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   boolean: true when a line of it is a ytt directive.
+ */
+export const isTemplate = (text) => YTT_DIRECTIVE.test(String(text ?? ""));
 
 /**
  * Where each key held by a repository is : its repository, the file it is read from (its own, else
@@ -108,6 +124,85 @@ export async function deprecationLines(name) {
 }
 
 // ===========================================================================
+// ONE KEY OF A FILE, AS IT IS WRITTEN
+// ===========================================================================
+
+// the plain key of a map's pair
+const keyOf = (pair) => (YAML.isScalar(pair.key) ? pair.key.value : pair.key);
+
+/**
+ * A YAML document's text, parsed as a map : an empty text (or one of comments only) is an empty
+ * map.
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   YAML.Document: the document, its contents a map.
+ *
+ * Raises:
+ *   Error: not valid YAML, or not a map.
+ */
+function mapDocument(text) {
+  const doc = YAML.parseDocument(String(text ?? ""));
+  if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
+  if (doc.contents === null || doc.contents === undefined) doc.contents = doc.createNode({});
+  if (!YAML.isMap(doc.contents)) throw new Error("not a YAML dictionary");
+  return doc;
+}
+
+/**
+ * A text with one key as another text has it, as written there : its value with its comments, the
+ * comment above it ; the rest of the text kept line for line (yamlFile.js editedText). The
+ * configuration shown is the base with each repository's key as its file writes it, and a key
+ * saved from that text is written to its file with the comments it was given.
+ *
+ * Args:
+ *   text (string): the text to change.
+ *   key (string): the key.
+ *   from (YAML.Document): the document that gives it (mapDocument).
+ *
+ * Returns:
+ *   string: the text, as it is when `from` has no such key.
+ *
+ * Raises:
+ *   Error: the text is not valid YAML, or not a map.
+ */
+function withKeyOf(text, key, from) {
+  const pair = from.contents.items.find((p) => keyOf(p) === key);
+  if (!pair) return text;
+  const original = String(text ?? "");
+  const doc = mapDocument(original);
+  const value = YAML.isNode(pair.value) ? pair.value.clone() : pair.value;
+  const there = doc.contents.items.find((p) => keyOf(p) === key);
+  if (there) {
+    there.value = value;
+    // the comment above the key : the one of the text it comes from, when it has one
+    if (YAML.isNode(pair.key) && pair.key.commentBefore) {
+      if (!YAML.isNode(there.key)) there.key = doc.createNode(there.key);
+      there.key.commentBefore = pair.key.commentBefore;
+    }
+  } else {
+    doc.contents.items.push(doc.createPair(YAML.isNode(pair.key) ? pair.key.clone() : key, value));
+  }
+  return original.trim() ? editedText(doc, original) : doc.toString({ lineWidth: 0 });
+}
+
+/**
+ * Whether a key's value is the one served now : such a key is not written (a file is never
+ * rewritten for nothing, a ytt template never turned into its expansion), nor refused.
+ *
+ * Args:
+ *   doc (object): the configuration saved.
+ *   key (string): the key.
+ *   served (object|undefined): the configuration served now ; none : every key is a change.
+ *
+ * Returns:
+ *   boolean: true when it is unchanged.
+ */
+const unchanged = (doc, key, served) => served !== undefined && served !== null && _.isEqual(doc?.[key], served?.[key]);
+
+// ===========================================================================
 // READ : THE KEYS LAID OVER THE BASE CONFIGURATION
 // ===========================================================================
 
@@ -120,25 +215,27 @@ export async function deprecationLines(name) {
  *   render (function): (file) => its text (the file read, or rendered with ytt).
  *
  * Returns:
- *   string: the configuration's text (the base as it is when no key comes from a repository).
+ *   string: the configuration's text : the base's, each key a repository holds as its file writes
+ *     it (its comments, a ytt directive among them, kept), the base's other lines as they are ; the
+ *     base as it is when no key comes from a repository.
  *
  * Raises:
  *   Error: a file that is not valid YAML, named.
  */
 export function composeConfig(baseText, sources, render) {
-  if (!sources.length) return baseText;
-  const doc = (baseText && String(baseText).trim() ? YAML.parse(baseText) : {}) || {};
-  for (const s of sources) {
-    if (!s.exists) continue;
-    let parsed;
+  const present = sources.filter((s) => s.exists);
+  if (!present.length) return baseText;
+  let text = String(baseText ?? "");
+  for (const s of present) {
+    let from;
     try {
-      parsed = YAML.parse(render(s.path)) || {};
+      from = mapDocument(render(s.path));
     } catch (e) {
       throw new Error(`${s.repository}/${path.basename(s.path)} is not valid YAML: ${e.message}`, { cause: e });
     }
-    if (parsed[s.key] !== undefined) doc[s.key] = parsed[s.key];
+    text = withKeyOf(text, s.key, from);
   }
-  return YAML.stringify(doc);
+  return text;
 }
 
 // ===========================================================================
@@ -146,49 +243,70 @@ export function composeConfig(baseText, sources, render) {
 // ===========================================================================
 
 /**
- * Refuses a save of a key whose repository has the flag but no working copy (not cloned yet, or its
- * clone failed) : written to the base configuration instead, the save would be lost without a word
- * once the repository is cloned and its file read again.
+ * Refuses a save that changes a key it cannot write : one whose repository has the flag but no
+ * working copy (not cloned yet, or its clone failed) - written to the base configuration instead,
+ * the save would be lost without a word once the repository is cloned and its file read again -
+ * or one whose file is a ytt template (written, the template would become its expansion). A key
+ * the save gives as it is served now is never refused : the designer sends every key with each
+ * save of a form.
  *
  * Args:
  *   doc (object): the configuration saved (categories, roles, constants ...).
  *   sources (object[]): the keys' sources (keySources).
+ *   served (object): the configuration served now ; none : every key the save gives is a change.
  *
  * Raises:
- *   Errors.ConflictError: a key the save gives is held by a repository that is not cloned, named.
+ *   Errors.ConflictError: a key the save changes cannot be written, named with why.
  */
-export function assertKeysWritable(doc, sources) {
-  const missing = (sources || []).filter((s) => s.missing && doc?.[s.key] !== undefined);
-  if (!missing.length) return;
-  throw new Errors.ConflictError(
-    missing.map((s) => `The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`).join("; "),
-  );
+export function assertKeysWritable(doc, sources, served) {
+  const changed = (sources || []).filter((s) => doc?.[s.key] !== undefined && !unchanged(doc, s.key, served));
+  const refused = [];
+  for (const s of changed) {
+    if (s.missing) refused.push(`The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`);
+    else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${path.basename(s.path)}, a ytt template: change them in git`);
+  }
+  if (refused.length) throw new Errors.ConflictError(refused.join("; "));
 }
 
 /**
+ * A configuration without the keys the repositories hold : what goes to the base configuration.
+ *
+ * Args:
+ *   doc (object): the configuration.
+ *   sources (object[]): the keys' sources (keySources).
+ *
+ * Returns:
+ *   object: a copy, without those keys.
+ */
+export const withoutHeldKeys = (doc, sources) => _.omit(doc, sources.map((s) => s.key));
+
+/**
  * Writes the keys a repository holds back to the file each was read from (config.yaml stays
- * config.yaml : only its key changes, the rest of the file kept) or to a new file of its own.
+ * config.yaml : only its key changes, the rest of the file kept) or to a new file of its own. A key
+ * as it is served now is not written.
  *
  * Args:
  *   doc (object): the configuration (categories, roles, constants ...).
  *   sources (object[]): the keys' sources (keySources).
  *   opts (object): { claim (true : each repository's write claim taken here ; false : the caller
- *     holds them, as a designer save does) }.
+ *     holds them, as a designer save does), served (the configuration served now : a key the same
+ *     is not written ; none : every key given is), text (the text the configuration was saved as :
+ *     each key written as it has it, its comments with it ; none : as YAML writes its value) }.
  *
  * Returns:
- *   Promise<object>: { rest (the configuration without the keys written : the base's), repositories
- *     (the names written to) }.
+ *   Promise<object>: { rest (the configuration without the keys the repositories hold : the
+ *     base's), repositories (the names written to) }.
  *
  * Raises:
- *   Errors.ConflictError: a key of a repository that is not cloned (assertKeysWritable).
+ *   Errors.ConflictError: a key that cannot be written (assertKeysWritable).
  */
 export async function writeConfigKeys(doc, sources, opts = {}) {
-  assertKeysWritable(doc, sources);
-  const rest = { ...doc };
+  assertKeysWritable(doc, sources, opts.served);
+  const saved = opts.text !== undefined ? mapDocument(opts.text) : null;
   const byRepo = new Map();
   for (const s of sources) {
     if (doc[s.key] === undefined) continue;
-    delete rest[s.key];
+    if (unchanged(doc, s.key, opts.served)) continue;
     if (!byRepo.has(s.repository)) byRepo.set(s.repository, []);
     byRepo.get(s.repository).push(s);
   }
@@ -198,7 +316,9 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
     try {
       for (const s of list) {
         const text = fs.existsSync(s.path) ? fs.readFileSync(s.path, "utf8") : "";
-        const next = text.trim() ? updateMapFile(text, { [s.key]: doc[s.key] }) : newMapFile({ [s.key]: doc[s.key] });
+        let next;
+        if (saved) next = withKeyOf(text, s.key, saved);
+        else next = text.trim() ? updateMapFile(text, { [s.key]: doc[s.key] }) : newMapFile({ [s.key]: doc[s.key] });
         if (next !== text) fs.writeFileSync(s.path, next, "utf8");
         logger.info(`Saved the ${s.key} into ${repository}/${path.basename(s.path)}`);
       }
@@ -206,26 +326,35 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
       if (opts.claim && prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));
     }
   }
-  return { rest, repositories: [...byRepo.keys()] };
+  return { rest: withoutHeldKeys(doc, sources), repositories: [...byRepo.keys()] };
 }
 
 /**
  * The base configuration with the keys a save gives that no repository holds : the base's other
- * keys, and the ones the repositories hold, kept as they are.
+ * keys, its comments and the ones the repositories hold kept as they are.
  *
  * Args:
  *   baseText (string): the base configuration's text.
  *   rest (object): the keys to write (writeConfigKeys' rest).
+ *   served (object): the configuration served now : only a key that differs is written ; none :
+ *     each one is.
  *
  * Returns:
- *   string: the base configuration's new text.
+ *   string|null: the base configuration's new text ; null when no key changed (nothing to write).
+ *
+ * Raises:
+ *   Errors.ConflictError: a key changed while the base configuration is a ytt template.
  */
-export function mergeIntoBase(baseText, rest) {
-  let doc;
-  try {
-    doc = (baseText && String(baseText).trim() ? YAML.parse(baseText) : {}) || {};
-  } catch {
-    doc = {};
+export function mergeIntoBase(baseText, rest, served) {
+  const edits = Object.fromEntries(Object.entries(rest).filter(([key]) => !unchanged(rest, key, served)));
+  if (served !== undefined && served !== null && !Object.keys(edits).length) return null;
+  if (isTemplate(baseText)) {
+    throw new Errors.ConflictError(`The base configuration is a ytt template: change ${Object.keys(edits).join(", ")} where it is kept`);
   }
-  return YAML.stringify({ ...doc, ...rest });
+  try {
+    return String(baseText ?? "").trim() ? updateMapFile(baseText, edits) : newMapFile(edits);
+  } catch {
+    // a base that is not a map of valid YAML : the keys alone, as before
+    return YAML.stringify(rest);
+  }
 }

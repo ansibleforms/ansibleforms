@@ -570,9 +570,8 @@ const configMode = async function(req,res){
 // they could not already get from the designer's own load.
 const configTemplated = async function(req,res){
   try{
-    const raw = await Settings.getActiveConfig()
-    // the same test the settings pages and useFormsConfig use
-    res.json(RestResult.single({ templated: /^\s*#@/m.test(raw || '') }))
+    // its base and each file a repository holds a key in, as they are written (Settings.isTemplated)
+    res.json(RestResult.single({ templated: await Settings.isTemplated() }))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }

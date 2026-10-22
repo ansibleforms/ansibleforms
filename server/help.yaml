@@ -6587,9 +6587,12 @@
       the `CONFIG_PATH` file), as before; the keys of the repositories are laid over it. The designer saving the
       categories or the constants, and a save of the roles, writes each key back into the file it was read from
       (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own when the repository
-      has neither; the repository's Push sends it as before. While the repository holding a key is not cloned (its
-      clone failed, or is under way), the base configuration gives that key and a save of it is refused, never
-      written to the base in its place. An install upgraded from before gets the three flags on the repository it
+      has neither; the repository's Push sends it as before. A key is written only when the save changes it, with
+      the comments it was given in the config editor, which shows each key as its file writes it. While the
+      repository holding a key is not cloned (its clone failed, or is under way), the base configuration gives that
+      key and a save that changes it is refused, never written to the base in its place. A file holding a key that
+      is a ytt template makes the configuration read only, as a templated base does, and a change to that key is
+      refused. A designer backup restored puts each key back into the file of the repository holding it. An install upgraded from before gets the three flags on the repository it
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
       the server log. None gets them when the configuration was kept in the database (Config source), which was
       then served whole: the log says so, and Roles, Categories or Constants can be turned on by hand. The config

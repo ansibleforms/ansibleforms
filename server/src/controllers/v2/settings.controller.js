@@ -281,10 +281,11 @@ const exportConfig = async function(req, res) {
 const getConfig = async function(req, res) {
     try {
       const yaml = await Settings.getActiveConfig();
-      // baseHash lets the client detect a concurrent change on save (see saveConfig)
+      // baseHash lets the client detect a concurrent change on save (see saveConfig) ; templated :
+      // the base or a file a repository holds a key in is a ytt template, the editors read only ;
       // config_yaml, and forms_yaml as before 7.6 (deprecated, removed in 8) for the clients
       // that still read it
-      res.json(RestResult.single({ config_yaml: yaml, forms_yaml: yaml, baseHash: configHash(yaml) }));
+      res.json(RestResult.single({ config_yaml: yaml, forms_yaml: yaml, baseHash: configHash(yaml), templated: await Settings.isTemplated() }));
     } catch(err) {
       res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedFindSettings'), Helpers.getError(err)));
     }
@@ -378,7 +379,8 @@ const saveConfig = async function(req, res) {
       });
       res.json(RestResult.single(null));
     } catch(err) {
-      res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
+      // a refusal (a key that cannot be written : lib/configKeys.js) keeps its status
+      res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
     }
 };
 

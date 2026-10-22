@@ -29,6 +29,8 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 const fx = await import("./fixtures/repoObjects.mjs");
 const keys = await import("../src/lib/configKeys.js");
 const appConfig = (await import("./__mocks__/app.config.js")).default;
+// the models that import it as ./../../config/app.config.js read the real one
+const realConfig = (await import("../config/app.config.js")).default;
 
 // the base configuration : a file of the test's own
 const BASE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-config-")), "config.yaml");
@@ -50,6 +52,7 @@ beforeEach(() => {
   });
   fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role" }], categories: [{ name: "Base" }], constants: { base: 1 } }));
   appConfig.configPath = BASE;
+  realConfig.configPath = BASE;
 });
 
 describe("each key from its own file", () => {
@@ -145,6 +148,91 @@ describe("written back to the file it was read from", () => {
   });
 });
 
+describe("as it is written : its comments, a ytt template", () => {
+  const COMMENTED = "# who may do what\nroles:\n  # the admins\n  - name: admin\n    groups:\n      - local/admins\n";
+
+  test("the configuration shown has each key as its file writes it, and a save from it keeps the comments, the new ones too", async () => {
+    writeRaw("access", "config.yaml", COMMENTED);
+    const { default: Settings } = await import("../src/models/settings.model.js");
+    const shown = await Settings.getActiveConfig();
+    assert.match(shown, /# who may do what\nroles:\n {2}# the admins\n {2}- name: admin/);
+    // the base's own keys and comments kept around it
+    assert.match(shown, /categories:\n {2}- name: Base/);
+    // a role added in the editor, with a comment of its own : the file keeps both
+    const edited = shown.replace("      - local/admins\n", "      - local/admins\n  # the operators\n  - name: ops\n    groups:\n      - local/ops\n");
+    await Settings.saveActiveConfig(edited, { ignoreDesignerLock: true });
+    const file = read(path.join(fx.ROOT, "access", "config.yaml"));
+    assert.match(file, /^# who may do what\nroles:\n {2}# the admins\n {2}- name: admin/);
+    assert.match(file, /# the operators\n {2}- name: ops/);
+    // the base unchanged : not written
+    assert.deepEqual(YAML.parse(read(BASE)), { roles: [{ name: "base-role" }], categories: [{ name: "Base" }], constants: { base: 1 } });
+  });
+
+  test("a key file that is a ytt template : said templated, never written over, the same value saved left alone", async () => {
+    const TEMPLATE = '#@ load("@ytt:data", "data")\nconstants:\n  env: #@ data.values.env\n';
+    writeRaw("design", "constants.yaml", TEMPLATE);
+    fx.cloneEmpty("access");
+    const { default: Settings } = await import("../src/models/settings.model.js");
+    assert.equal(await Settings.isTemplated(), true);
+    // the configuration shown keeps the directive of the value
+    assert.match(await Settings.getActiveConfig(), /env: #@ data\.values\.env/);
+    const sources = await keys.keySources();
+    // the designer sends every key : the constants as served (ytt's expansion here) are not written
+    const served = { roles: [{ name: "base-role" }], categories: [{ name: "Base" }], constants: { env: "prod" } };
+    await keys.writeConfigKeys({ ...served, roles: [{ name: "admin" }] }, sources, { claim: false, served });
+    assert.equal(read(path.join(fx.ROOT, "design", "constants.yaml")), TEMPLATE);
+    // changed : refused, nothing written
+    await assert.rejects(keys.writeConfigKeys({ ...served, constants: { env: "dev" } }, sources, { claim: false, served }), {
+      status: 409,
+      message: /The constants are in design\/constants\.yaml, a ytt template: change them in git/,
+    });
+    assert.equal(read(path.join(fx.ROOT, "design", "constants.yaml")), TEMPLATE);
+    // the base a ytt template : a key it holds changed is refused, unchanged it is not written
+    const base = "#@ load(\"@ytt:data\", \"data\")\nextra: #@ data.values.extra\n";
+    assert.equal(keys.mergeIntoBase(base, { extra: "x" }, { extra: "x" }), null);
+    assert.throws(() => keys.mergeIntoBase(base, { extra: "y" }, { extra: "x" }), { status: 409, message: /The base configuration is a ytt template/ });
+    // a plain base : its comments kept, only the key changed written
+    assert.equal(keys.mergeIntoBase("# ours\nextra: 1\nother: 2\n", { extra: 3, other: 2 }, { extra: 1, other: 2 }), "# ours\nextra: 3\nother: 2\n");
+    fs.writeFileSync(BASE, base);
+    assert.equal(await Settings.isTemplated(), true);
+    fs.writeFileSync(BASE, "roles: []\n");
+    fs.rmSync(path.join(fx.ROOT, "design", "constants.yaml"));
+    assert.equal(await Settings.isTemplated(), false);
+  });
+
+  test("a save giving a key of a repository not cloned as it is served : not refused (the designer sends every key)", async () => {
+    fx.cloneEmpty("design");
+    const sources = await keys.keySources();
+    const served = YAML.parse(keys.composeConfig(read(BASE), sources, read));
+    assert.doesNotThrow(() => keys.assertKeysWritable(served, sources, served));
+    const { rest } = await keys.writeConfigKeys({ ...served, categories: [{ name: "Ops" }] }, sources, { claim: false, served });
+    assert.equal(rest.roles, undefined, "never written to the base in its place");
+    assert.deepEqual(readObj("design", "categories.yaml"), { categories: [{ name: "Ops" }] });
+    assert.throws(() => keys.assertKeysWritable({ ...served, roles: [{ name: "admin" }] }, sources, served), { status: 409, message: /held by repository 'access', which is not cloned/ });
+  });
+
+  test("a designer backup restored : the keys a repository holds go back to its file, not into the base", async () => {
+    writeRaw("access", "roles.yaml", "# the roles\nroles:\n  - name: admin\n");
+    fx.cloneEmpty("design");
+    const backups = fs.mkdtempSync(path.join(os.tmpdir(), "af-config-backups-"));
+    realConfig.formsBackupPath = backups;
+    realConfig.formsFolderPath = path.join(backups, "forms-folder");
+    realConfig.oldBackupDays = 3650;
+    const { default: Form } = await import("../src/models/form.model.js");
+    const name = await Form.backup(true);
+    assert.ok(name);
+    // changed since : in git and in the base
+    writeRaw("access", "roles.yaml", "# the roles\nroles:\n  - name: admin\n  - name: later\n");
+    fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role" }], categories: [{ name: "Base" }], constants: { base: 2 } }));
+    await Form.restoreBackup(name, true);
+    assert.equal(read(path.join(fx.ROOT, "access", "roles.yaml")), "# the roles\nroles:\n  - name: admin\n");
+    assert.deepEqual(YAML.parse(read(BASE)).roles, [{ name: "base-role" }], "the repository's roles not baked into the base");
+    // the constants design holds (no file of its own yet) : given one, as a save would
+    assert.deepEqual(readObj("design", "constants.yaml"), { constants: { base: 1 } });
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { base: 1 });
+  });
+});
+
 describe("the Config usage of before", () => {
   test("the schema patch sets the three flags on the repository that had use_for_config, once", async () => {
     fx.state.tables.repositories.push({ id: 3, name: "old", use_for_config: 1 });
@@ -166,7 +254,7 @@ describe("the Config usage of before", () => {
 
   test("the configuration kept in the database : 7.3 read no repository, so none gets the flags, said", async () => {
     fx.state.tables.repositories.push({ id: 3, name: "old", use_for_config: 1 });
-    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "roles:\n  - name: db-role\n" }];
+    fx.state.tables.settings = [{ id: 1, config_source: "database", config_yaml: "roles:\n  - name: db-role\n" }];
     const { splitConfigUsage } = await import("../src/models/schema.model.js");
     assert.match(await splitConfigUsage(), /kept in the database: the Config usage of 'old' was not read and is not given/);
     assert.equal(fx.rowNamed("repositories", "old").use_for_roles, undefined);
@@ -174,7 +262,7 @@ describe("the Config usage of before", () => {
     assert.equal(await splitConfigUsage(), null, "a second start changes nothing");
     // an empty database copy : 7.3 fell back to the repository's file, so it gets them
     fx.state.tables.repositories.push({ id: 4, name: "other", use_for_config: 1 });
-    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "  " }];
+    fx.state.tables.settings = [{ id: 1, config_source: "database", config_yaml: "  " }];
     assert.match(await splitConfigUsage(), /'other' is now Roles, Categories and Constants/);
   });
 

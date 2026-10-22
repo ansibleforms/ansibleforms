@@ -111,7 +111,9 @@ export function useFormsConfig() {
       baseHash.value = result.data.baseHash || null;
       // ytt-templated configs are read-only here: a section merge would still
       // corrupt the template. Show the parsed data but block edits/saves.
-      isTemplated.value = yttDirectiveRegex.test(item.value.config_yaml || '');
+      // the server tests the base and each file a repository holds a key in, as
+      // written (a directive above a file's key is not in the text shown)
+      isTemplated.value = item.value.templated ?? yttDirectiveRegex.test(item.value.config_yaml || '');
       if (isTemplated.value) {
         toast.warning(t('settings.settingsPage.configTemplated'));
       }
