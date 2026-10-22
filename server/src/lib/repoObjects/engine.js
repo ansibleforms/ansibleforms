@@ -462,9 +462,13 @@ export async function syncRepository(desc, name, opts = {}) {
   const ctx = opts.context !== undefined ? opts.context : await desc.context?.();
   // step 1 : the files, read and checked on their own, and what they name
   const files = await readFiles(desc, name, ctx);
-  // a type kept as a list in one file, the repository without that file : the app keeps its objects
+  // a type kept as a list in one file, the repository without that file : the app keeps its objects,
+  // unlinked - left linked, the next entry the app writes would make a file of that one entry, and
+  // the pull after its Push would delete every other one
   if (files === null) {
-    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps ${holdingOf(desc)} as it has them`);
+    const unlinked = await desc.store.unlink(name);
+    if (unlinked) CrudModel.changed(desc.model);
+    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps ${holdingOf(desc)} as it has them${unlinked ? `, ${unlinked} no longer linked to it` : ""}`);
     return summary;
   }
   // step 2 : the objects there are : this repository's by file, the names of the others

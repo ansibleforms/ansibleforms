@@ -191,6 +191,33 @@ describe("a pull of repositories.yaml", () => {
     assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).deleted, 0);
     assert.ok(fx.rowNamed("repositories", "forms"));
   });
+
+  test("no repositories.yaml : its repositories unlinked, so an entry the app writes next never deletes the others", async () => {
+    fx.state.tables.repositories.push(
+      { id: 5, name: "forms-a", uri: "https://git/a.git", branch: "main", description: "" },
+      { id: 6, name: "forms-b", uri: "https://git/b.git", branch: "main", description: "" },
+    );
+    fx.cloneEmpty("hub");
+    await RepoObjects.activate(await desc(), "hub", { pull: false });
+    assert.equal(fx.rowNamed("repositories", "forms-a").repository, "hub");
+    // reset : its repositories.yaml was never pushed
+    fs.rmSync(path.join(fx.ROOT, "hub"), { recursive: true, force: true });
+    fx.cloneEmpty("hub");
+    CrudModel.flushAllLocal();
+    const text = await RepoObjects.afterGit("hub", { name: "hub", use_for_repositories: 1 }, { reset: true });
+    assert.match(text, /No repositories\.yaml in the repository: the app keeps the repositories as it has them, 2 no longer linked to it/);
+    assert.equal(fx.rowNamed("repositories", "forms-a").repository, null);
+    // one made in the app, pushed, then pulled : the others stay
+    fx.state.tables.repositories.push({ id: 9, name: "new-one", uri: "https://git/n.git", branch: "main", description: "" });
+    CrudModel.flushAllLocal();
+    await RepoObjects.appCreated("repositories", 9);
+    assert.deepEqual(readList().map((e) => e.name), ["new-one"]);
+    CrudModel.flushAllLocal();
+    const pulled = await RepoObjects.syncRepository(await desc(), "hub");
+    assert.equal(pulled.deleted, 0);
+    assert.deepEqual(fx.state.calls.filter((c) => c.startsWith("delete:")), []);
+    assert.ok(fx.rowNamed("repositories", "forms-a") && fx.rowNamed("repositories", "forms-b"));
+  });
 });
 
 describe("the app's repositories to repositories.yaml", () => {
