@@ -56,7 +56,7 @@ let held = true;
 vi.mock("../src/lib/workerLock.js", () => ({ confirmWorkerLock: async () => held }));
 
 const { default: cronService } = await import("../src/services/cron.service.js");
-const { limits } = await import("../src/lib/scheduleRrule.js");
+const { limits, rruleThreads } = await import("../src/lib/scheduleRrule.js");
 const LIMITS = { ...limits };
 
 const RRULE = "DTSTART;TZID=Europe/Brussels:20200101T020000 RRULE:FREQ=DAILY;INTERVAL=1";
@@ -177,6 +177,22 @@ describe("a rrule schedule is registered at its next run", () => {
     assert.ok(task.pattern > new Date() && task.pattern - Date.now() < 4 * 86400000, "its next run");
     assert.equal(cronService.jobs.schedules.get(7), task);
     assert.equal(queued, 0);
+  });
+
+  test("a rule whose next run failed otherwise (its thread did not start) is registered at the next resync", async () => {
+    // a new thread, given no time to start
+    await rruleThreads().async?.terminate();
+    await new Promise((resolve) => setImmediate(resolve));
+    limits.startMs = 0;
+    await cronService.resync();
+    assert.equal(live().length, 0, "not registered");
+    assert.equal(cronService.signatures.schedules.has(7), false, "forgotten");
+    // the next resync (every 5 minutes, or a change notice) registers it, on a thread that starts
+    limits.startMs = LIMITS.startMs;
+    await cronService.resync();
+    const [task] = live();
+    assert.ok(task, "registered");
+    assert.equal(cronService.jobs.schedules.get(7), task);
   });
 
   test("a run that passed while it was worked out runs at once, never registered in the past", async () => {

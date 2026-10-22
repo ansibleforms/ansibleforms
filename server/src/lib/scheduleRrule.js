@@ -1214,7 +1214,13 @@ function startAsyncThread() {
   thread.queue = Promise.resolve();
   thread.pending = null;
   thread.ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("The runs of the rrule could not be worked out: their thread did not start.")), limits.startMs);
+    // not started in time : stopped, the next call starts a new one (this one would refuse every
+    // call for ever)
+    const timer = setTimeout(() => {
+      stopThread(thread);
+      if (asyncThread === thread) asyncThread = null;
+      reject(new Error("The runs of the rrule could not be worked out: their thread did not start."));
+    }, limits.startMs);
     timer.unref?.();
     thread.readyDone = () => {
       clearTimeout(timer);

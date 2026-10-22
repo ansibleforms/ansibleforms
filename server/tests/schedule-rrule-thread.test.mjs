@@ -72,6 +72,17 @@ describe("a thread that stops", () => {
   });
 });
 
+describe("an awaited thread that does not start in time", () => {
+  test("fails its call, and the next call is served by a new one", async () => {
+    await rruleThreads().async?.terminate();
+    await new Promise((resolve) => setImmediate(resolve));
+    limits.startMs = 0;
+    await assert.rejects(nextRunsAsync(daily(9), { after: AFTER }), (e) => e.code !== TIMEOUT && /did not start/.test(e.message));
+    limits.startMs = DEFAULTS.startMs;
+    assert.equal((await nextRunsAsync(daily(10), { after: AFTER }))[0].toISOString(), "2026-10-25T10:00:00.000Z");
+  });
+});
+
 test("an awaited call leaves the process free while the runs are worked out", async () => {
   await nextRunsAsync(daily(8), { after: AFTER });
   let ticks = 0;

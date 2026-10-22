@@ -227,7 +227,8 @@ class CronService {
    * the worker's only (whileWorker) ; the next run is registered either way, so a process that
    * holds the worker lock again later still has the schedule. A rule with no run ahead (its COUNT
    * or UNTIL passed) registers nothing. A rule whose runs took too long to work out is not dropped
-   * : a task tries again once the rule is no longer given up.
+   * : a task tries again once the rule is no longer given up. One that failed otherwise (its thread
+   * did not start or stopped) is forgotten, so the next resync registers it again.
    *
    * Args:
    *   id (number): the schedule.
@@ -285,7 +286,9 @@ class CronService {
       (err) => {
         if (!current()) return;
         if (err?.code !== RRULE_TIMEOUT) {
-          logger.error(`Failed to add rrule job for schedule ${name} (ID: ${id}): ${err?.message || err}`);
+          // not registered : its signature dropped, or no resync or change notice would try again
+          this.signatures.schedules.delete(id);
+          logger.error(`Failed to add rrule job for schedule ${name} (ID: ${id}), tried again at the next resync: ${err?.message || err}`);
           return;
         }
         // given up a while : tried again once it is walked again, from then
