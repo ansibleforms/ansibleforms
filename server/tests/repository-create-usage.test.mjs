@@ -39,6 +39,8 @@ vi.mock("../src/models/db.model.js", () => ({
 // the engine : what the activation reports, and the lines it reads as
 let report = {};
 const asked = [];
+// the background clones the engine is told of : a pull waits for them (engine.js afterClones)
+const tracked = [];
 vi.mock("../src/lib/repoObjects/index.js", () => ({
   default: {
     assertUsageAllowed: async () => {},
@@ -47,6 +49,7 @@ vi.mock("../src/lib/repoObjects/index.js", () => ({
       return report;
     },
     usageReportText: async (r) => (Object.keys(r).length ? `\nNow holds the schedules: ${JSON.stringify(r)}` : ""),
+    trackClone: (name, done) => tracked.push({ name, done }),
   },
 }));
 
@@ -69,6 +72,7 @@ async function create(data) {
 beforeEach(() => {
   queries.length = 0;
   asked.length = 0;
+  tracked.length = 0;
   report = {};
 });
 
@@ -107,5 +111,22 @@ describe("a repository a repositories.yaml makes", () => {
     assert.equal(await Repository.create({ name: "forms", uri: "https://git/forms.git" }, { fromRepo: true }), 9);
     // one made in the app still needs its branch
     await assert.rejects(Repository.create({ name: "other", uri: "https://git/other.git" }), /Missing required field: branch/);
+  });
+});
+
+describe("the background clone of a new repository", () => {
+  test("the engine is told of it, done once its usages took the app's objects ; a failed clone done too, never rejected", async () => {
+    let finish;
+    vi.spyOn(Repository, "clone").mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await Repository.create({ name: "jobs", branch: "main", uri: "https://git/x.git", use_for_schedules: 1 });
+    assert.deepEqual(tracked.map((t) => t.name), ["jobs"]);
+    assert.equal(asked.length, 0, "still cloning");
+    finish();
+    await tracked[0].done;
+    assert.equal(asked.length, 1, "done after the activation");
+    vi.spyOn(Repository, "clone").mockRejectedValue(new Error("remote unreachable"));
+    await Repository.create({ name: "forms", branch: "main", uri: "https://git/x.git", use_for_forms: 1 });
+    await tracked[1].done;
+    assert.ok(queries.some((q) => /status = 'failed'/.test(q.sql) && q.vars[1] === "forms"));
   });
 });

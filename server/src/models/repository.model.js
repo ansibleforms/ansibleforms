@@ -252,7 +252,8 @@ class Repository extends CrudModel {
     normalizeUsageFlags(data);
     // one repository at most per object type (the schedules, the credentials ...), and no usage of
     // a later version
-    await (await repoObjects()).assertUsageAllowed(data, data.name, null);
+    const objects = await repoObjects()
+    await objects.assertUsageAllowed(data, data.name, null);
     const insertId = await super.create(this.modelName, data, opts);
     // Don't await - clone happens in background (it can take minutes and the API has to
     // answer the create now). But the rejection must not escape: clone() throws before it
@@ -260,8 +261,10 @@ class Repository extends CrudModel {
     // output at all, the process-level handler in app.js only logged it, and the
     // repositories page showed a repository stuck blank with the reason nowhere the user
     // could reach. Record it where they are already looking.
-    // the activation below takes the app's objects and says what it did : the clone only reads
-    Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
+    // the activation below takes the app's objects and says what it did : the clone only reads.
+    // Tracked until it is done : a pull whose repositories.yaml made it waits for it (a while)
+    // before reading what names its content (lib/repoObjects/engine.js afterClones)
+    const done = Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
       try {
         await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
@@ -273,7 +276,6 @@ class Repository extends CrudModel {
       // takes the app's objects of each (activate), the clone just made read as it is
       if (!objectTypesOf(data).length) return
       try {
-        const objects = await repoObjects()
         const report = await objects.afterUsageChange(null, data.name, data, { pull: false })
         // a usage its activation turned off again (the repository busy) : the record read fresh
         if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name: data.name })
@@ -285,6 +287,7 @@ class Repository extends CrudModel {
         logger.error(`Repository '${data.name}' could not take the objects of its usages: ${helpers.getError(e)}`)
       }
     });
+    objects.trackClone(data.name, done);
     return insertId;
   }
 

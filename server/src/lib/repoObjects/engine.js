@@ -989,6 +989,65 @@ async function usagesNow(name, repo) {
   }
 }
 
+// ===========================================================================
+// THE CLONES OF NEW REPOSITORIES
+// ===========================================================================
+
+// how long a pull waits for the repositories it made to be cloned, before the types read after
+// them : a clone that takes longer (or hangs) never holds the pull, its types are read again once
+// it is done
+export const CLONE_WAIT = { totalMs: 60000 };
+
+// the clones of new repositories running in the background (models/repository.model.js create),
+// by repository : the clone and the activation of its usages
+const clones = new Map();
+
+/**
+ * Records the background clone of a repository just made, until it is done.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   done (Promise): its clone and the activation of its usages.
+ */
+export function trackClone(name, done) {
+  clones.set(name, done);
+  const forget = () => {
+    if (clones.get(name) === done) clones.delete(name);
+  };
+  done.then(forget, forget);
+}
+
+/**
+ * Waits for the background clones running (CLONE_WAIT at most), then the types given are read :
+ * the repositories a repositories.yaml made are there for them. A clone still running is said,
+ * and the types read again in their repositories once it is done.
+ *
+ * Args:
+ *   keys (string[]): the types read after the repositories.
+ *
+ * Returns:
+ *   Promise<string>: the lines for the pull output ; none when every clone is done.
+ */
+async function afterClones(keys) {
+  if (!clones.size) return "";
+  const running = [...clones.entries()];
+  const settled = new Set();
+  const all = Promise.all(running.map(([n, done]) => done.then(() => settled.add(n), () => settled.add(n))));
+  let timer;
+  const timeout = new Promise((resolve) => (timer = setTimeout(resolve, CLONE_WAIT.totalMs)));
+  await Promise.race([all, timeout]);
+  clearTimeout(timer);
+  const late = running.map(([n]) => n).filter((n) => !settled.has(n));
+  if (!late.length) return "";
+  // read again once they are cloned, each type in its repositories under their claims
+  all
+    .then(async () => {
+      for (const key of keys) await syncAllOf(await descriptorOf(key));
+    })
+    .catch((e) => logger.error(`The objects read after repositories ${late.join(", ")} were cloned could not be read again: ${e.message || e}`));
+  return `\nRepositories ${late.map((n) => `'${n}'`).join(", ")} still cloning after ${Math.round(CLONE_WAIT.totalMs / 1000)} s: what names their content is read again once they are cloned`;
+}
+
 /**
  * Syncs every object type of a repository after git changed its working tree (a pull, a clone,
  * a reset), in APPLY_ORDER, then reads again the types that name them in other repositories :
@@ -1008,9 +1067,12 @@ async function usagesNow(name, repo) {
 export async function afterGit(name, repo, opts = {}) {
   const keys = objectTypesOf(await usagesNow(name, repo));
   let out = "";
-  for (const key of keys) {
+  for (const [i, key] of keys.entries()) {
     const desc = await descriptorOf(key);
     out += opts.activate ? await activatedText(desc, name, { reset: opts.reset }) : await syncText(desc, name, { reset: opts.reset });
+    // the repositories its repositories.yaml just made : cloned before the types read after them
+    // (a schedule naming a form of one of them)
+    if (key === "repositories" && i < keys.length - 1) out += await afterClones(keys.slice(i + 1));
   }
   try {
     out += await retryDependents(keys, name);
@@ -2165,6 +2227,7 @@ export default {
   summaryText,
   syncText,
   afterGit,
+  trackClone,
   syncAllOf,
   syncAll,
   preview,

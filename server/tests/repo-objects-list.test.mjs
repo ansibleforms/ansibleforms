@@ -17,6 +17,8 @@ process.env.DB_PASSWORD ||= "test";
 
 // the repositories as the app saves them : the fixture's table, each call recorded
 const unpushed = new Set();
+// a repository made : its clone in the background, as the model runs it (none : no clone tracked)
+const cloning = { of: null };
 vi.mock("../src/models/repository.model.js", async () => {
   const fx = await import("./fixtures/repoObjects.mjs");
   const rows = () => fx.state.tables.repositories;
@@ -27,6 +29,7 @@ vi.mock("../src/models/repository.model.js", async () => {
         const id = fx.state.nextId++;
         rows().push({ id, repository: null, repo_file: null, ...d });
         fx.state.calls.push(`create:${d.name}`);
+        if (cloning.of) (await import("../src/lib/repoObjects/index.js")).default.trackClone(d.name, cloning.of(d));
         return id;
       },
       update: async (d, name) => {
@@ -51,6 +54,7 @@ const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
 const types = await import("../src/lib/repoObjects/types.js");
+const Engine = await import("../src/lib/repoObjects/engine.js");
 const desc = () => RepoObjects.descriptorOf("repositories");
 
 const writeList = (items) => {
@@ -62,6 +66,7 @@ const entry = (name, extra = {}) => ({ name, uri: `https://git.example.com/${nam
 
 beforeEach(() => {
   unpushed.clear();
+  cloning.of = null;
   fx.reset({
     repositories: [{ id: 1, name: "hub", uri: "https://git/hub.git", use_for_repositories: 1 }],
     credentials: [{ id: 1, name: "git-bot", credential_type: "git", password: "enc:p" }],
@@ -330,5 +335,53 @@ describe("the app's repositories to repositories.yaml", () => {
     const { itemValidator, chatFileItem } = await import("../src/lib/seed-schema.js");
     assert.deepEqual(notifications.keyOrder, itemValidator("notification_channels").keys);
     assert.deepEqual(chat.keyOrder, itemValidator(chatFileItem).keys);
+  });
+});
+
+describe("a repository a pull of repositories.yaml makes, and what names its content", () => {
+  // the hub holds the runners too ; c2, made by its repositories.yaml, holds the credentials : its
+  // clone (in the background) reads the credential a runner of the hub names
+  const runnerFile = () => {
+    fs.mkdirSync(path.join(fx.ROOT, "hub", "runners"), { recursive: true });
+    fs.writeFileSync(path.join(fx.ROOT, "hub", "runners", "r.yaml"), YAML.stringify({ name: "r", type: "rte", rte_mode: "outbound", credential: "c2-cred" }));
+  };
+  const cloneTaking = (ms) => () =>
+    new Promise((resolve) =>
+      setTimeout(() => {
+        fx.state.tables.credentials.push({ id: 50, name: "c2-cred", credential_type: "rte", password: "enc:t", repository: "c2", repo_file: "credentials/c2-cred.yaml" });
+        CrudModel.flushAllLocal();
+        resolve();
+      }, ms),
+    );
+  const hub = () => Object.assign(fx.rowNamed("repositories", "hub"), { use_for_runners: 1 });
+
+  test("cloned before the types read after the repositories : the runner finds its credential in the same pull", async () => {
+    hub();
+    writeList([entry("c2", { use_for_credentials: true })]);
+    runnerFile();
+    // the types loaded first : the pull itself takes no time worth the name
+    await RepoObjects.descriptorOf("runners");
+    cloning.of = cloneTaking(300);
+    const out = await RepoObjects.afterGit("hub", fx.rowNamed("repositories", "hub"));
+    assert.equal(fx.rowNamed("runners", "r")?.credential, "c2-cred", out);
+    assert.doesNotMatch(out, /waits for the credential/);
+  });
+
+  test("a clone that takes too long never holds the pull : said, and what names it read again once it is cloned", async () => {
+    const wait = Engine.CLONE_WAIT.totalMs;
+    Engine.CLONE_WAIT.totalMs = 20;
+    try {
+      hub();
+      writeList([entry("c2", { use_for_credentials: true })]);
+      runnerFile();
+      cloning.of = cloneTaking(80);
+      const out = await RepoObjects.afterGit("hub", fx.rowNamed("repositories", "hub"));
+      assert.match(out, /Repositories 'c2' still cloning after 0 s: what names their content is read again once they are cloned/);
+      assert.match(out, /waits for the credential 'c2-cred'/);
+      assert.equal(fx.rowNamed("runners", "r"), undefined);
+      await vi.waitFor(() => assert.equal(fx.rowNamed("runners", "r")?.credential, "c2-cred"), { timeout: 2000 });
+    } finally {
+      Engine.CLONE_WAIT.totalMs = wait;
+    }
   });
 });
