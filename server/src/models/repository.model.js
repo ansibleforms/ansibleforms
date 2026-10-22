@@ -385,10 +385,17 @@ class Repository extends CrudModel {
     if (!opts.fromSeed) await CrudModel.assertNotManaged(this.modelName, repo.id);
 
     // the repository of object types (the schedules, the credentials ...) : pulled once more, its
-    // files read in, and its objects unlinked - they stay in the app (the files in git are not
-    // touched)
-    if (objectTypesOf(repo).length) {
-      await (await repoObjects()).afterUsageChange(repo, name, {}, { report: opts.report })
+    // files read in by the pull itself - before the claim below, which the pull takes too
+    const holds = objectTypesOf(repo).length > 0
+    let pulled = "not cloned"
+    if (holds && Repo.isValidName(name) && fs.existsSync(Repo.folderOf(name))) {
+      try {
+        await Repository.pull(name)
+        pulled = "pulled"
+      } catch (e) {
+        pulled = `not pulled: ${helpers.getError(e)}`
+        logger.warning(`Repository '${name}' could not be pulled before it is deleted, its working copy is read as it is: ${helpers.getError(e)}`)
+      }
     }
 
     // Claim the repo BEFORE deleting the tree, exactly as reset() does and for the same
@@ -405,6 +412,14 @@ class Repository extends CrudModel {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
     try {
+      // its objects unlinked - they stay in the app (the files in git are not touched) - only now
+      // the delete holds the claim : one refused (busy) never leaves them unlinked while the
+      // repository still holds them. Read in once more under that claim, never waiting for it
+      if (holds) {
+        const objects = await repoObjects()
+        const report = await objects.asHolding(name, () => objects.afterUsageChange(repo, name, {}, { report: opts.report, pull: false }))
+        for (const r of Object.values(report)) if (r.deactivated && !r.deactivated.pull) r.deactivated.pull = pulled
+      }
       // awaited : it was fire-and-forget, so a validateRepoName throw became an unhandled
       // rejection while the record was removed anyway
       await Repo.delete(name);

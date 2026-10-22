@@ -5,6 +5,8 @@
 //                 itself (a new repository, a usage turned on), only reads its files
 //   reset         cloned again by a reset : an object whose file is not in the remote is unlinked,
 //                 never deleted
+//   delete        its objects unlinked only once the delete holds the repository : a delete refused
+//                 (a pull running) leaves them linked
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -112,5 +114,27 @@ describe("the clone of a repository holding credentials", () => {
     fs.mkdirSync(path.join(ROOT, "creds"));
     await Repository.reset("creds");
     assert.deepEqual(asked, [["afterGit", "creds", { activate: false, reset: true }]]);
+  });
+});
+
+describe("the delete of a repository holding credentials", () => {
+  test("refused while a pull runs : its credentials never unlinked", async () => {
+    busy = true;
+    await assert.rejects(() => Repository.delete("creds"), /already running/);
+    assert.deepEqual(
+      asked.filter((a) => a[0] === "afterUsageChange"),
+      [],
+    );
+  });
+
+  test("pulled first, then its credentials unlinked under the delete's claim, the pull said", async () => {
+    fs.mkdirSync(path.join(ROOT, "creds"));
+    const report = {};
+    await Repository.delete("creds", { report });
+    assert.deepEqual(asked.filter((a) => a[0] === "afterUsageChange"), [["afterUsageChange", "creds", false]]);
+    const claim = queries.findIndex((q) => /set status = 'running'/.test(q.sql) && q.vars?.[1] === "creds");
+    const removed = queries.findIndex((q) => /DELETE FROM AnsibleForms.`repositories`/.test(q.sql));
+    assert.ok(claim >= 0 && removed > claim);
+    assert.equal(fs.existsSync(path.join(ROOT, "creds")), false);
   });
 });
