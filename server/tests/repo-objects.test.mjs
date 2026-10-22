@@ -501,3 +501,39 @@ describe("the rules of the usages", () => {
     assert.equal(await RepoObjects.usageReportText({}), "");
   });
 });
+
+describe("an edit or a delete read before a pull that renamed its file", () => {
+  // the controller reads the credential, then waits for the claim a pull holds ; the pull renames
+  // git.yaml to github.yaml in git, the credential following it
+  async function renamedMeanwhile() {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    fx.removeFile("creds", "credentials", "git.yaml");
+    fx.writeFile("creds", "credentials", "github.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    return before;
+  }
+
+  test("the edit goes to the file it follows now, its old file never written back", async () => {
+    const before = await renamedMeanwhile();
+    const row = fx.rowNamed("credentials", "git");
+    assert.equal(row.repo_file, "credentials/github.yaml");
+    row.description = "edited";
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appUpdated("credentials", before, row.id), true);
+    assert.deepEqual(fx.listFiles("creds", "credentials"), ["github.yaml"]);
+    assert.equal(fx.readObject("creds", "credentials", "github.yaml").description, "edited");
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).refused.length, 0);
+  });
+
+  test("the delete removes the file it follows now : the next pull does not make it again", async () => {
+    const before = await renamedMeanwhile();
+    fx.state.tables.credentials = fx.state.tables.credentials.filter((r) => r.id !== before.id);
+    assert.equal(await RepoObjects.appDeleted("credentials", before), true);
+    assert.deepEqual(fx.listFiles("creds", "credentials"), []);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).created, 0);
+  });
+});

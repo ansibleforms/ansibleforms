@@ -1227,26 +1227,30 @@ export async function appUpdated(desc, before, id) {
   if (!before?.repository || !before.repo_file) return false;
   const row = await desc.store.byId(id);
   if (!row) return false;
+  // where it is linked now, read after the save (under the claim) : a pull that held the claim
+  // before it may have moved its file or unlinked it - its old file is never written back
+  const at = "repo_file" in row ? row : before;
+  if (!at.repository || !at.repo_file) return false;
   // a type kept as a list in one file : its entry edited, field by field (added when it is gone)
   if (desc.listFile) {
-    return withWriteClaim(before.repository, async () => {
-      const abs = listFileOf(desc, before.repository);
+    return withWriteClaim(at.repository, async () => {
+      const abs = listFileOf(desc, at.repository);
       const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
       const whole = (await desc.candidateOf({ ...row, repository: null })).object;
       const next = updateListEntry(text, desc.listKey, before.name, desc.entryEdits(row, before), desc.keyOrder, whole);
       if (next === text) return false;
       fs.writeFileSync(abs, next, "utf8");
-      logger.info(`Saved ${desc.noun} '${row.name}' into ${before.repository}/${desc.listFile}`);
+      logger.info(`Saved ${desc.noun} '${row.name}' into ${at.repository}/${desc.listFile}`);
       return true;
     });
   }
-  return withWriteClaim(before.repository, async () => {
-    const abs = fileOf(desc, before.repository, before.repo_file);
+  return withWriteClaim(at.repository, async () => {
+    const abs = fileOf(desc, at.repository, at.repo_file);
     const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     const next = text === null ? desc.newFileText(await desc.candidateOf({ ...row, repository: null })) : desc.fileEdits(text, row, before);
     if (next === text) return false;
     fs.writeFileSync(abs, next, "utf8");
-    logger.info(`Saved ${desc.noun} '${row.name}' into ${before.repository}/${before.repo_file}`);
+    logger.info(`Saved ${desc.noun} '${row.name}' into ${at.repository}/${at.repo_file}`);
     return true;
   });
 }
@@ -1271,10 +1275,43 @@ export async function appDeleted(desc, before) {
       logger.info(`Removed ${desc.noun} '${before.name}' from ${before.repository}/${desc.listFile}`);
       return true;
     }
-    fs.rmSync(fileOf(desc, before.repository, before.repo_file), { force: true });
-    logger.info(`Deleted the file ${before.repository}/${before.repo_file} of ${desc.noun} '${before.name}'`);
+    // its file now : a pull that held the claim before the delete may have moved it
+    const file = fileNaming(desc, before.repository, before);
+    if (!file) return false;
+    fs.rmSync(fileOf(desc, before.repository, file), { force: true });
+    logger.info(`Deleted the file ${before.repository}/${file} of ${desc.noun} '${before.name}'`);
     return true;
   });
+}
+
+/**
+ * The file of an object read before a pull that may have moved it (renamed in git) : the file it
+ * was linked to while that file still names it - or names nothing that can be read - else the file
+ * of its folder that names it now.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   before (object): the object as it was read (its name and repo_file).
+ *
+ * Returns:
+ *   string|null: the file, relative to the repository ; null when no file names it.
+ */
+function fileNaming(desc, repository, before) {
+  const dir = Repo.folderOf(repository);
+  const nameIn = (file) => {
+    try {
+      const parsed = desc.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+      return (parsed.object || parsed.raw)?.name;
+    } catch {
+      return undefined;
+    }
+  };
+  if (fs.existsSync(fileOf(desc, repository, before.repo_file))) {
+    const named = nameIn(before.repo_file);
+    if (named === undefined || nameKey(named) === nameKey(before.name)) return before.repo_file;
+  }
+  return filesIn(dir, desc.folder).find((file) => nameKey(nameIn(file)) === nameKey(before.name)) || null;
 }
 
 // ===========================================================================
