@@ -763,3 +763,50 @@ describe("a reset clones the repository again from its remote", () => {
     assert.equal((await RepoObjects.syncRepository(credentials, "creds")).deleted, 1);
   });
 });
+
+describe("a fresh clone that turns the usage on, where a file was deleted in git", () => {
+  test("its object is unlinked and kept in the app, never written back to the repository by that activation", async () => {
+    // 'old' lives in git, linked ; someone deletes credentials/old.yaml in git and pushes
+    fx.writeFile("creds", "credentials", "old.yaml", gitCredential("old"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(fx.rowNamed("credentials", "old").repository, "creds");
+    // an object the app holds that was never in the repository : that one moves
+    fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
+    // the tree gone (a reset whose clone failed) ; the Pull button clones it fresh, without old.yaml
+    fs.rmSync(path.join(fx.ROOT, "creds"), { recursive: true, force: true });
+    fx.cloneEmpty("creds");
+    CrudModel.flushAllLocal();
+    const text = await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 }, { activate: true, reset: true });
+    const row = fx.rowNamed("credentials", "old");
+    assert.equal(row.repository ?? null, null);
+    assert.equal(row.password, "enc:s3cret");
+    assert.equal(fx.fileExists("creds", "credentials", "old.yaml"), false);
+    assert.match(text, /old: its file is not in the repository as cloned again \(deleted in git, or never pushed\): kept in the app, not written back/);
+    assert.equal(fx.rowNamed("credentials", "app-cred").repository, "creds");
+    assert.deepEqual(fx.listFiles("creds", "credentials"), ["app-cred.yaml"]);
+  });
+
+  test("the same when the activation's own pull made the fresh clone", async () => {
+    fx.writeFile("other", "credentials", "old.yaml", gitCredential("old"));
+    await RepoObjects.syncRepository(credentials, "other");
+    fs.rmSync(path.join(fx.ROOT, "other"), { recursive: true, force: true });
+    // the clone the activation runs reads the empty tree as cloned again (Repository.clone's afterGit)
+    const clone = fx.repository.clone;
+    fx.repository.clone = async (name) => {
+      await clone(name);
+      await RepoObjects.afterGit(name, { name, use_for_credentials: 1 }, { reset: true });
+    };
+    try {
+      fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+      fx.rowNamed("repositories", "other").use_for_credentials = 1;
+      CrudModel.flushAllLocal();
+      const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 });
+      assert.deepEqual(report.credentials.activated.written, []);
+      assert.deepEqual(report.credentials.activated.kept.map((k) => k.name), ["old"]);
+    } finally {
+      fx.repository.clone = clone;
+    }
+    assert.equal(fx.rowNamed("credentials", "old").repository ?? null, null);
+    assert.equal(fx.fileExists("other", "credentials", "old.yaml"), false);
+  });
+});

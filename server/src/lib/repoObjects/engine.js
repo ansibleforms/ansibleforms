@@ -471,7 +471,8 @@ async function waitingOf(desc, object, cache = new Map()) {
  *   Promise<object>: { created, updated, deleted, unchanged (counts), matched: [name], refused:
  *     [{ file, reasons }], waiting: [{ file, reasons }], ignored: [{ file, keys }], secretsKept:
  *     [name], skipped: [{ file, name, reason }] (files the type does not import : descriptor.notImported),
- *     notes }.
+ *     notes, unread, unlinked: [name] (the objects a reset unlinked, their files not in the
+ *     repository as cloned again) }.
  */
 export async function syncRepository(desc, name, opts = {}) {
   // a type kept in one file : its own mode
@@ -600,6 +601,7 @@ export async function syncRepository(desc, name, opts = {}) {
       if (opts.reset && !files.some((f) => f.file === file)) {
         await desc.store.link(row.id, null, null);
         relinked++;
+        summary.unlinked.push(row.name);
         summary.notes.push(`${file}: not in the repository as cloned again (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
         logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its file ${name}/${file} is not in the repository as cloned again`);
         continue;
@@ -693,7 +695,8 @@ export async function syncRepository(desc, name, opts = {}) {
  *
  * Returns:
  *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
- *     secretsKept, notes, unread (the names refused or waiting files declare : [{ name, file }]) }.
+ *     secretsKept, notes, unread (the names refused or waiting files declare : [{ name, file }]),
+ *     unlinked (the objects a reset unlinked : [name]) }.
  */
 /**
  * The flags one object at most has (descriptor.oneOnly : the default runner of a type, the active
@@ -749,7 +752,7 @@ function oneOnlyClashes(desc, files, own, summary, name) {
 }
 
 function newSummary() {
-  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [] };
+  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [], unlinked: [] };
 }
 
 export function summaryText(desc, summary) {
@@ -1014,23 +1017,50 @@ export async function syncAll() {
  *   desc (object): the type's descriptor.
  *   name (string|null): the repository that would take them (the repositories' holder stays in
  *     the app, before its flag is saved too : the question asked first).
- *   unread (Map<string, string>): the names files of the repository declare that are not read in
- *     (refused, waiting), as nameKey keys them, to the file : an object of that name stays in the
- *     app - a second file of its name would be refused on every pull - and follows that file once
- *     it is read in.
+ *   stay (Map<string, string>): the objects that stay in the app whatever they are, as nameKey
+ *     keys their names, to why (stayReasons : a file of the repository has the name but is not read
+ *     in, or the object was unlinked by the fresh clone just read).
  *
  * Returns:
  *   Promise<object[]>: { row, ... } to write, or { row, reason }.
  */
-async function candidates(desc, name = null, unread = new Map()) {
+async function candidates(desc, name = null, stay = new Map()) {
   const taken = await takenNames(desc);
   return Promise.all(
     (await desc.store.appRows()).map(async (row) => {
       const c = await desc.candidateOf(row, name, taken);
-      const file = !c.reason && unread.get(nameKey(c.row.name));
-      return file ? { row: c.row, reason: `${name}/${file} has its name but is not read in (refused or waiting): it follows that file once it is` } : c;
+      const reason = !c.reason && stay.get(nameKey(c.row.name));
+      return reason ? { row: c.row, reason } : c;
     }),
   );
+}
+
+/**
+ * The app's objects an activation leaves in the app whatever they are, by name, with why :
+ *   - a name a file of the repository declares that is not read in (refused, waiting) : a second
+ *     file of its name would be refused on every pull ; the object follows that file once it is
+ *     read in
+ *   - an object the fresh clone just read unlinked (its file not in the repository as cloned
+ *     again : deleted in git, or never pushed) : written back, a file deleted in git would come
+ *     back with the next Push ; only what was never in the repository moves
+ *
+ * Args:
+ *   name (string): the repository.
+ *   summaries (object[]): the syncs read before the activation (syncRepository's : unread,
+ *     unlinked).
+ *
+ * Returns:
+ *   Map<string, string>: why each stays, by nameKey.
+ */
+function stayReasons(name, summaries) {
+  const stay = new Map();
+  for (const s of summaries) {
+    for (const u of s.unread || []) stay.set(nameKey(u.name), `${name}/${u.file} has its name but is not read in (refused or waiting): it follows that file once it is`);
+    for (const n of s.unlinked || []) {
+      stay.set(nameKey(n), `its file is not in the repository as cloned again (deleted in git, or never pushed): kept in the app, not written back`);
+    }
+  }
+  return stay;
 }
 
 /**
@@ -1264,8 +1294,9 @@ async function activateFolder(desc, name, report, opts = {}) {
   report.waiting = summary.waiting;
   report.skipped = summary.skipped;
   report.ignored = summary.ignored;
-  // step 3 : the app's other objects, each a new file - none beside a file of its name not read in
-  const list = await candidates(desc, name, new Map(summary.unread.map((u) => [nameKey(u.name), u.file])));
+  // step 3 : the app's other objects, each a new file - none beside a file of its name not read in,
+  // none the fresh clone unlinked (the pull before it, or the read above)
+  const list = await candidates(desc, name, stayReasons(name, [pulled, summary]));
   // written in one step (a list file at once, else a file each), its returns ending that step only
   await (async () => {
     // a type kept as a list in one file : every candidate an entry of it, added at its end
