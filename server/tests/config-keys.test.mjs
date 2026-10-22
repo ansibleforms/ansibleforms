@@ -397,3 +397,43 @@ describe("the base configuration saved from a text while a repository holds a ke
     assert.equal(keys.mergeIntoBase(base, { categories: served.categories }, served), null);
   });
 });
+
+describe("the config seed's use_for_config checked as it is applied", () => {
+  const repo = (name, flags) => ({ name, uri: "https://x/y.git", ...flags });
+  const seed = () => ({ repositories: { items: [repo("a", { use_for_config: true }), repo("b", { use_for_roles: true })] } });
+
+  test("the configuration kept in the database, or another repository holding the keys : not refused", async () => {
+    const { validateSeed, foldConfigFlag } = await import("../src/lib/seed-schema.js");
+    assert.equal(validateSeed(seed(), { inDatabase: true }), true);
+    assert.equal(validateSeed(seed(), { held: ["b"] }), true);
+    assert.deepEqual(foldConfigFlag(seed(), ["b"]).dropped, ["a"]);
+    // a fresh database : a would get the roles too, refused as before
+    assert.throws(() => validateSeed(seed()), /use_for_roles on more than one repository: a, b/);
+  });
+});
+
+describe("the config seed applied with use_for_config", () => {
+  test("the configuration kept in the database : a seed whose other repository has use_for_roles starts", async () => {
+    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "roles: []\n" }];
+    // made on an earlier start : updated, the database's repository model is not the fixture's
+    fx.state.tables.repositories = [
+      { id: 1, name: "a", uri: "https://x/a.git", branch: "main", managed: 1 },
+      { id: 2, name: "b", uri: "https://x/b.git", branch: "main", use_for_roles: 1, managed: 1 },
+    ];
+    const seedPath = path.join(path.dirname(BASE), "seed.yaml");
+    fs.writeFileSync(seedPath, YAML.stringify({ repositories: { items: [{ name: "a", uri: "https://x/a.git", branch: "main", use_for_config: true }, { name: "b", uri: "https://x/b.git", branch: "main", use_for_roles: true }] } }));
+    for (const config of [appConfig, realConfig]) config.configSeedPath = seedPath;
+    try {
+      const { applyConfigSeed, _resetSeedState } = await import("../src/lib/seed.js");
+      _resetSeedState();
+      // the sections after the repositories go to tables the fixture does not know : what matters
+      // is that the validation let it through, and what the repositories' section applied
+      const outcome = await applyConfigSeed().catch((e) => e);
+      assert.doesNotMatch(String(outcome?.message ?? ""), /Seed file/);
+      assert.ok(Number(fx.rowNamed("repositories", "b").use_for_roles));
+      assert.ok(!Number(fx.rowNamed("repositories", "a").use_for_roles));
+    } finally {
+      for (const config of [appConfig, realConfig]) config.configSeedPath = undefined;
+    }
+  });
+});

@@ -565,20 +565,22 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     throw new Error("Seed file must contain a yaml mapping at the top level");
   }
   doc = interpolateEnv(doc);
-  validateSeed(doc);
-  if (doc.awx) {
-    logger.warning("The config seed's awx: section is deprecated since 7 and removed in 8: declare those connections under runners: with type: awx");
-    doc = foldAwxIntoRunners(doc);
-  }
   // a repository's use_for_config : deprecated since 7.4.0, removed in 8 - the roles, the categories
   // and the constants, each a flag of its own now
   // the repository holding them already (the one the schema patch gave them to) keeps them ; the
-  // configuration kept in the database : 7.3 read none of them, none gets the flags
-  const declaresConfig = (doc.repositories?.items || []).some((r) => r.use_for_config !== undefined);
+  // configuration kept in the database : 7.3 read none of them, none gets the flags. Read before the
+  // validation : it checks the flags as the apply gives them (foldConfigFlag), never stricter
+  const declaresConfig = Array.isArray(doc.repositories?.items) && doc.repositories.items.some((r) => r?.use_for_config !== undefined);
   const held = declaresConfig
     ? (await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY id")).map((r) => r.name)
     : [];
   const inDatabase = declaresConfig && (await configKeptInDatabase());
+  validateSeed(doc, { held, inDatabase });
+  if (doc.awx) {
+    logger.warning("The config seed's awx: section is deprecated since 7 and removed in 8: declare those connections under runners: with type: awx");
+    doc = foldAwxIntoRunners(doc);
+  }
+  // use_for_config folded as the validation checked it
   const configFlag = foldConfigFlag(doc, held, { inDatabase });
   doc = configFlag.doc;
   if (inDatabase) {

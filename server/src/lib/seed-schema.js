@@ -937,7 +937,10 @@ export function itemValidator(section) {
 
 // Validates the parsed seed document. Throws with every message combined, so one
 // restart tells the operator everything that is wrong instead of the first thing.
-export function validateSeed(doc) {
+// opts : { held, inDatabase } - the repositories holding the configuration's keys in the database
+// now and whether it is kept there, as the apply folds use_for_config with them (foldConfigFlag) :
+// a seed is refused only for what the apply would really give ; none (a fresh database) as before
+export function validateSeed(doc, opts = {}) {
   if (!validator(doc)) {
     const details = schemaErrors(validator.errors);
     throw new Error(`Seed file validation failed: ${details}`);
@@ -946,7 +949,7 @@ export function validateSeed(doc) {
   // keys of the settings as the channel and credential they become
   const folded = foldMailSettingsIntoChannel(foldAwxIntoRunners(doc)).doc;
   // a repository's use_for_config counts as the three flags it is now
-  const flags = foldConfigFlag(folded).doc;
+  const flags = foldConfigFlag(folded, opts.held || [], { inDatabase: !!opts.inDatabase }).doc;
   assertUniqueNames(flags);
   assertSingletonFlags(flags);
   return true;
