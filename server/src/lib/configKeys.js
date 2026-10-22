@@ -320,8 +320,8 @@ export function composeConfig(baseText, sources, render) {
 
 /**
  * A key file's text as the document it gives, checked : valid YAML, a dictionary, every alias
- * resolvable, and the key, when it gives it, of its kind (a list of roles or categories, a
- * dictionary of constants).
+ * resolvable, the key given by its own file (config.yaml of before may leave it out), and the key,
+ * when it gives it, of its kind (a list of roles or categories, a dictionary of constants).
  *
  * Args:
  *   source (object): the key's source (keySources).
@@ -336,6 +336,9 @@ export function composeConfig(baseText, sources, render) {
 function keyDocument(source, text) {
   const doc = mapDocument(text);
   const value = (doc.toJS() || {})[source.key];
+  // a key's own file without its key (a plain map, a typo in the key) : not read - taken as it is,
+  // it would serve the base's value without a word ; config.yaml of before may give some keys only
+  if (value === undefined && !source.deprecated) throw new Error(`it does not give its ${source.key} (a top-level '${source.key}:' key)`);
   const list = CONFIG_KEYS.find((k) => k.key === source.key)?.list;
   if (value === undefined || value === null || list === undefined) return doc;
   if (list && !Array.isArray(value)) throw new Error(`its ${source.key} must be a list`);

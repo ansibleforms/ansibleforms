@@ -354,6 +354,26 @@ describe("a key file with anchors, or one that is not read", () => {
     });
   });
 
+  test("a key's own file without its key (a plain map, a typo) : not read, said ; config.yaml of before may leave keys out", async () => {
+    writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { env: "prod" });
+    // the plain map : the constants last read stay, never the base's
+    writeRaw("design", "constants.yaml", { env: "test" });
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { env: "prod" });
+    assert.deepEqual(await keys.repositoryKeyProblems("design"), [{ key: "constants", file: "constants.yaml", reason: "it does not give its constants (a top-level 'constants:' key)" }]);
+    // a typo in the roles' key : the roles last read (else closed), never the base's
+    writeRaw("access", "roles.yaml", { role: [{ name: "everyone", groups: ["local/users"] }] });
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles.map((r) => r.name), ["admin"]);
+    assert.match(await keys.deprecationLines("access"), /\nNot read: roles\.yaml: it does not give its roles/);
+    // config.yaml of before giving the roles only : read, the categories the base's
+    fs.rmSync(path.join(fx.ROOT, "access", "roles.yaml"));
+    writeRaw("access", "config.yaml", { roles: [{ name: "old" }] });
+    fx.rowNamed("repositories", "access").use_for_categories = 1;
+    fx.rowNamed("repositories", "design").use_for_categories = 0;
+    assert.deepEqual(await keys.repositoryKeyProblems("access"), []);
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).categories, [{ name: "Base" }]);
+  });
+
   test("the forms load with a key file broken in git : the roles last read served, never a failure", async () => {
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role", groups: [] }], categories: [{ name: "Default", icon: "bars" }], constants: {} }));
     writeRaw("access", "roles.yaml", { roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }] });
