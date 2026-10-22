@@ -294,6 +294,36 @@ describe("a job handed over", () => {
   });
 });
 
+describe("the folders a job's run message names", () => {
+  test("the playbooks of the repository the app takes them from : the one added first, not the first by name", async () => {
+    // the job's credentials : none
+    const { default: Credential } = await import("../src/models/credential.model.v2.js");
+    Credential.resolveCredentialMap = async () => ({});
+    const doBefore = mysql.do;
+    mysql.do = async (sql, params) => {
+      if (sql.startsWith("SELECT form, extravars, credentials")) return [{ form: "f", extravars: "{}", credentials: "{}" }];
+      // the rows in any order : by name here
+      if (sql.includes("WHERE use_for_playbooks")) return [{ id: 7, name: "aaa-later" }, { id: 3, name: "zzz-first" }];
+      return doBefore(sql, params);
+    };
+    try {
+      const entry = entryOf({ ...runners["dmz-1"], rte_files: "local" });
+      const handed = hub.sendJob(51, entry);
+      await settle();
+      const run = entry.session.sent.find((m) => m.t === "run");
+      assert.ok(run, "the job is sent");
+      assert.equal(run.paths.playbookRepo, "zzz-first");
+      // its answer : refused, the hand-over over
+      const claim = hub.claims.get(51);
+      clearTimeout(claim?.timer);
+      claim?.resolve({ claimed: false, error: "test over" });
+      await handed;
+    } finally {
+      mysql.do = doBefore;
+    }
+  });
+});
+
 describe("an abort of a socket-mode job", () => {
   // the aborts the database holds (dispatch's second query) : the job, its RTE and its runner
   const withAborts = async (list, fn) => {

@@ -1195,9 +1195,12 @@ async function runMessage(jobId, entry) {
   // the output is masked here, where it is stored : the credentials, the ansible and vault
   // passwords, and the form's password fields
   await registerMask(jobId, rows[0].form, extravars, secrets);
-  const repos = await mysql.do("SELECT name, use_for_playbooks, use_for_inventories FROM AnsibleForms.`repositories` WHERE use_for_playbooks OR use_for_inventories ORDER BY name");
-  const playbookRepo = (repos || []).find((r) => r.use_for_playbooks)?.name || null;
-  const inventoryRepos = (repos || []).filter((r) => r.use_for_inventories).map((r) => r.name);
+  // the playbooks of the repository the app takes them from (the one added first), the inventories
+  // of each by name
+  const { default: Repository } = await import("../models/repository.model.js");
+  const playbookRepo = (await Repository.playbooksRepositories())[0]?.name || null;
+  const repos = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name");
+  const inventoryRepos = (repos || []).map((r) => r.name);
   const msg = {
     t: "run",
     jobId,
