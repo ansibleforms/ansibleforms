@@ -24,9 +24,14 @@ export const state = {
   // git on the repositories, and the write claims : what the engine asked for, in order
   calls: [],
   pullFails: false,
+  // a clone that fails : recorded on the repository, never thrown (Repository.clone), no tree
+  cloneFails: false,
+  // the statements the database refuses (a busy row, a constraint) : a regular expression
+  failing: null,
   // the repositories a pull or a push holds : how many more claims each refuses (Infinity : all)
   busy: {},
-  // the columns of a table as information_schema gives them, by table : { name, value, nullable }
+  // the columns of a table as information_schema gives them, by table : { name, value, nullable,
+  // type (its DATA_TYPE : tinyint, varchar ...) }
   columns: {},
 };
 

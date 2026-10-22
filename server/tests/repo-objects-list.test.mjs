@@ -66,7 +66,23 @@ beforeEach(() => {
     repositories: [{ id: 1, name: "hub", uri: "https://git/hub.git", use_for_repositories: 1 }],
     credentials: [{ id: 1, name: "git-bot", credential_type: "git", password: "enc:p" }],
   });
+  // the usage flags as information_schema describes them : a tinyint, its default the text "0"
+  // (read once per table and kept : the same for every test of this file)
+  fx.state.columns.repositories = types.USAGE_FLAGS.map((name) => ({ name, value: "0", nullable: "NO", type: "tinyint" }));
   CrudModel.flushAllLocal();
+});
+
+describe("a usage taken out of an entry", () => {
+  test("turns it off - the number 0, never the text '0' the model would save as on - and the next pull changes nothing", async () => {
+    writeList([entry("forms", { use_for_forms: true, use_for_workflows: true })]);
+    await RepoObjects.syncRepository(await desc(), "hub");
+    writeList([entry("forms", { use_for_forms: true })]);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).updated, 1);
+    assert.strictEqual(fx.rowNamed("repositories", "forms").use_for_workflows, 0);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).updated, 0);
+  });
 });
 
 describe("a pull of repositories.yaml", () => {
@@ -94,7 +110,7 @@ describe("a pull of repositories.yaml", () => {
     CrudModel.flushAllLocal();
     const summary = await RepoObjects.syncRepository(await desc(), "hub");
     assert.equal(summary.updated, 1, JSON.stringify(summary));
-    assert.equal(fx.rowNamed("repositories", "forms").use_for_forms, false);
+    assert.equal(Number(fx.rowNamed("repositories", "forms").use_for_forms), 0);
     assert.equal(fx.rowNamed("repositories", "forms").description, "");
   });
 

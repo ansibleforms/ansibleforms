@@ -1602,9 +1602,14 @@ export function linkStore(table, key = "id") {
 // the columns of each table, read once : what a row gets when a value is not given
 const columnsByTable = new Map();
 
+// the column types whose default is a number (a yes or no field is a tinyint) : information_schema
+// gives every default as a text, and a text "0" is a yes to whatever reads it as one
+const NUMERIC_TYPES = /^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double|real|bit)$/i;
+
 /**
  * The columns of a table as a new row gets them when a value is not given : the default of each,
- * and whether it may be empty (information_schema, read once per table).
+ * a number for a column of numbers (a yes or no field's 0 or 1), and whether it may be empty
+ * (information_schema, read once per table).
  *
  * Args:
  *   table (string): the table (AnsibleForms.`credentials`).
@@ -1616,7 +1621,7 @@ export async function columnDefaults(table) {
   const bare = String(table).replace(/`/g, "").split(".").pop();
   if (!columnsByTable.has(bare)) {
     const rows = await mysql.do(
-      "SELECT COLUMN_NAME AS name, COLUMN_DEFAULT AS value, IS_NULLABLE AS nullable FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'AnsibleForms' AND TABLE_NAME = ?",
+      "SELECT COLUMN_NAME AS name, COLUMN_DEFAULT AS value, IS_NULLABLE AS nullable, DATA_TYPE AS type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'AnsibleForms' AND TABLE_NAME = ?",
       [bare],
     );
     const columns = new Map();
@@ -1626,6 +1631,11 @@ export async function columnDefaults(table) {
       if (typeof value === "string" && /^'.*'$/s.test(value)) value = value.slice(1, -1).replace(/''/g, "'");
       // an expression (current_timestamp(), now()) : no value a file could give
       else if (typeof value === "string" && /^(current_timestamp|now|uuid)\b|\)$/i.test(value)) value = null;
+      // a number column's default as the number it is (a bit's b'1' too)
+      if (value !== null && NUMERIC_TYPES.test(String(r.type || ""))) {
+        const n = Number(String(value).replace(/^b'([01]+)'$/i, (m, bits) => String(parseInt(bits, 2))));
+        value = Number.isFinite(n) ? n : null;
+      }
       columns.set(r.name, { value, nullable: String(r.nullable).toUpperCase() === "YES" });
     }
     columnsByTable.set(bare, columns);

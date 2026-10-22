@@ -141,14 +141,14 @@ describe("the value a new row gets, as information_schema says it", () => {
       { name: "mode", value: "'outbound'", nullable: "NO" },
       { name: "note", value: "NULL", nullable: "YES" },
       { name: "since", value: "current_timestamp()", nullable: "NO" },
-      { name: "enabled", value: "1", nullable: "NO" },
+      { name: "enabled", value: "1", nullable: "NO", type: "tinyint" },
     ];
     const columns = await Engine.columnDefaults("AnsibleForms.`defaults_probe`");
     assert.deepEqual(Object.fromEntries(columns), {
       mode: { value: "outbound", nullable: false },
       note: { value: null, nullable: true },
       since: { value: null, nullable: false },
-      enabled: { value: "1", nullable: false },
+      enabled: { value: 1, nullable: false },
     });
   });
 });
