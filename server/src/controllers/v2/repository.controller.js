@@ -14,6 +14,7 @@ import Form from '../../models/form.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import _ from 'lodash';
 import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
+import { foldConfigItem } from '../../lib/seed-schema.js';
 
 /**
  * Whether a credential carries what git signs in with : a password or a token (stored, or read
@@ -137,6 +138,24 @@ function assertRepositoryAdminFields(req, existing) {
   }
 }
 
+/**
+ * A request's use_for_config (deprecated since 7.4.0, removed in 8) as the three flags it is now,
+ * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
+ * repositories.yaml take it (foldConfigItem) : before anything reads the request's flags, so the
+ * admin rule and the one-repository rule apply to them. Said in the server log.
+ *
+ * Args:
+ *   req (object): the request ; its body replaced when it sends use_for_config.
+ *
+ * Returns:
+ *   void
+ */
+function foldConfigUsage(req) {
+  if (req.body?.use_for_config === undefined) return;
+  logger.warning(`The repository '${req.body.name ?? req.params?.name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
+  req.body = foldConfigItem(req.body);
+}
+
 const find = async function(req, res) {
   try {
     const repositories = await Repository.withUnpushed(await Repository.findAll());
@@ -152,6 +171,7 @@ const create = async function(req, res) {
     return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
   }
   try {
+    foldConfigUsage(req);
     // a new repository is a new source of configuration, forms or playbooks : an admin's
     assertRepositoryAdminFields(req, null);
     await guardRepositoryCredential(req, null);
@@ -202,6 +222,7 @@ const update = async function(req, res) {
   try {
     const existing = await Repository.findByName(req.params.name);
     if (!existing) throw new Errors.NotFoundError(i18n.t(req, 'resources.failedFindRepository'));
+    foldConfigUsage(req);
     // its address, branch and use_for_* flags : an admin's (the rest is the connections user's too)
     assertRepositoryAdminFields(req, existing);
     const { dropPassword } = await guardRepositoryCredential(req, existing);

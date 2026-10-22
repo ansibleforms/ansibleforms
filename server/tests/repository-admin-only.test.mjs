@@ -96,6 +96,8 @@ describe("a connections user", () => {
     // its schedules run as the Schedule Service, with the admin role
     ["use_for_schedules on", { use_for_schedules: 1 }],
     ["use_for_forms off", { use_for_forms: false }],
+    // deprecated, the three flags it is now
+    ["use_for_config on", { use_for_config: true }],
   ])("may not change %s", async (_label, body) => {
     expect((await call(controller.update, ops, { body })).status).toBe(403);
     expect(calls).toEqual([]);
@@ -127,5 +129,20 @@ describe("an admin", () => {
     expect((await call(controller.update, admin, { body: { uri: "https://git/new.git", branch: "dev", use_for_roles: 1 } })).status).toBeLessThan(300);
     expect((await call(controller.delete, admin)).status).toBeLessThan(300);
     expect(calls.map((c) => c[0])).toEqual(["create", "update", "delete"]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// use_for_config, deprecated
+// ---------------------------------------------------------------------------------------------
+
+describe("use_for_config sent by a client of before", () => {
+  test("is applied as use_for_roles, use_for_categories and use_for_constants, on a create and an update", async () => {
+    await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_config: 1 } });
+    await call(controller.update, admin, { body: { use_for_config: false } });
+    expect(calls.map((c) => [c[0], c[1].use_for_config, c[1].use_for_roles, c[1].use_for_categories, c[1].use_for_constants])).toEqual([
+      ["create", undefined, 1, 1, 1],
+      ["update", undefined, false, false, false],
+    ]);
   });
 });
