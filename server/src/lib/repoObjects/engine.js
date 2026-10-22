@@ -780,6 +780,27 @@ async function retryDependents(keys, except) {
 }
 
 /**
+ * A repository's usages as saved now, read again once git is done : a usage turned off while a
+ * long pull ran had its objects let go meanwhile (deactivate), and the row the pull read at its
+ * start would take them back, linked to a repository that no longer holds them.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   repo (object): its row as read before git ran (kept when it cannot be read again).
+ *
+ * Returns:
+ *   Promise<object>: its row now.
+ */
+async function usagesNow(name, repo) {
+  try {
+    return (await mysql.do("SELECT * FROM AnsibleForms.`repositories` WHERE name = ?", [name]))?.[0] || repo;
+  } catch (e) {
+    logger.warning(`The usages of repository '${name}' could not be read again, those read before its pull are used: ${e.message || e}`);
+    return repo;
+  }
+}
+
+/**
  * Syncs every object type of a repository after git changed its working tree (a pull, a clone,
  * a reset), in APPLY_ORDER, then reads again the types that name them in other repositories :
  * what it did, for its pull output. Its first clone takes the app's objects of each type
@@ -796,7 +817,7 @@ async function retryDependents(keys, except) {
  *   Promise<string>: the lines for the pull output.
  */
 export async function afterGit(name, repo, opts = {}) {
-  const keys = objectTypesOf(repo);
+  const keys = objectTypesOf(await usagesNow(name, repo));
   let out = "";
   for (const key of keys) {
     const desc = await descriptorOf(key);
@@ -1255,7 +1276,11 @@ export async function usageReportText(report) {
     if (r.error) out += `\n${titleOf(desc)} could not follow the usage: ${r.error}`;
     else if (r.activated?.notCloned || r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
     else if (r.activated) out += `\nNow holds ${activationText(desc, r.activated)}`;
-    else if (r.deactivated) out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
+    else if (r.deactivated) {
+      out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
+      // its latest files not read in first (still busy) : the objects stay as the last pull left them
+      if (r.deactivated.error) out += ` (${r.deactivated.error}: they stay as the last pull left them)`;
+    }
   }
   return out;
 }

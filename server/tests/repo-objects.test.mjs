@@ -609,6 +609,8 @@ describe("a repository not cloned when it is made the credentials repository", (
   test("its clone failed : said not cloned, never 'now holds' ; its first clone then takes the app's credentials", async () => {
     fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
     fx.state.cloneFails = true;
+    // the flag saved first, as Repository.update saves it
+    fx.rowNamed("repositories", "other").use_for_credentials = 1;
     const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 });
     assert.equal(report.credentials.activated.pull, "not cloned");
     assert.equal(await RepoObjects.usageReportText(report), "\nNot cloned: the credentials will be taken once it is");
@@ -621,6 +623,29 @@ describe("a repository not cloned when it is made the credentials repository", (
     assert.ok(fx.fileExists("other", "credentials", "app-cred.yaml"));
     // under the clone's claim : never waited for nor taken again
     assert.deepEqual(fx.state.calls.filter((c) => /^(claim|busy):other/.test(c)), []);
+  });
+});
+
+describe("a usage turned off while a pull of the repository runs", () => {
+  test("the pull's sync, its row read before, never takes back the objects let go meanwhile ; why they were not read in is said", async () => {
+    fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    // the flag saved off while a long pull holds the claim : the deactivation waits, then lets go
+    const wait = { ...Engine.CLAIM_WAIT };
+    Object.assign(Engine.CLAIM_WAIT, { totalMs: 30, everyMs: 10 });
+    try {
+      fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+      fx.state.busy.creds = Infinity;
+      const report = await RepoObjects.afterUsageChange({ use_for_credentials: 1 }, "creds", { use_for_credentials: 0 }, { pull: false });
+      assert.match(await RepoObjects.usageReportText(report), /No longer holds the credentials: 1 unlinked, kept in the app \(not read in: .*busy.*: they stay as the last pull left them\)/);
+    } finally {
+      Object.assign(Engine.CLAIM_WAIT, wait);
+      fx.state.busy = {};
+    }
+    // the pull read its row with the flag on, before the change ; git done, it reads its files in
+    CrudModel.flushAllLocal();
+    await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 });
+    assert.equal(fx.rowNamed("credentials", "a").repository, null);
   });
 });
 
