@@ -28,8 +28,12 @@ export default singleType({
   // page - never written to the repository's file, its file not applied (said)
   heldBySeed: (current) => !!Number(current?.managed ?? 0),
   kept: (current) => (Number(current?.managed ?? 0) ? [{ name: "Chat assistant", whole: true, code: "seed", reason: KEPT_REASONS.seed }] : []),
-  // compared as the seed compares : its extra headers as the model keeps them
-  changed: (declared, current) => differs(ChatSettings.declared(declared).cfg, current || {}),
+  // compared as the seed compares, each field as the model keeps it (a number clamped, its extra
+  // headers) - its key as declared, the stored one encrypted anew on every write
+  changed: (declared, current) => {
+    const { cfg, record } = ChatSettings.declared(declared);
+    return differs({ ...record, api_key: cfg.api_key }, current || {});
+  },
   // a file that moves the chat to another provider, base url or certificate check without giving
   // its key (or its credential) : the stored one stays behind, as on the chat page - it never goes
   // to a place the file chose

@@ -534,6 +534,30 @@ describe("the branding and its images", () => {
 });
 
 // ─── the log lines of a type kept in one file ───────────────────────────────────
+describe("a file whose values the app keeps otherwise : the next pull changes nothing", () => {
+  test("the branding's name with spaces around it and an unknown forms view", async () => {
+    writeRaw("cfg", "branding.yaml", "app_name: '  ACME  '\nforms_view: nonsense\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("branding"), "cfg")).updated, 1);
+    assert.equal(fx.state.tables.settings[0].app_name, "ACME");
+    const second = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    assert.equal(second.updated, 0, JSON.stringify(second));
+    assert.equal(second.unchanged, 1);
+  });
+
+  test("the chat's number of turns above its limit", async () => {
+    writeRaw("cfg", "chat-assistant.yaml", "max_turns: 500\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).updated, 1);
+    assert.equal(fx.state.tables.chat_settings[0].max_turns, 200);
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).unchanged, 1);
+  });
+
+  test("an empty list of links, the app without links : nothing to change", async () => {
+    writeRaw("cfg", "links.yaml", "header_links: []\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("links"), "cfg")).unchanged, 1);
+    assert.equal((await RepoObjects.syncRepository(await desc("links"), "cfg")).unchanged, 1);
+  });
+});
+
 describe("the branding's language, an environment setting", () => {
   test("set in the real environment : never written to the repository, a file's not applied (said), its other fields applied", async () => {
     process.env.DEFAULT_LANGUAGE = "fr";

@@ -31,8 +31,8 @@ const ENV = {
 };
 
 /**
- * A field's value as two are compared : a list as its JSON, a yes or no as true or false, no
- * value as ''.
+ * A field's value as two are compared : a list as its JSON (an empty one as none), a yes or no as
+ * true or false, no value as ''.
  *
  * Args:
  *   v (any): the value.
@@ -40,7 +40,7 @@ const ENV = {
  * Returns:
  *   any: the value compared.
  */
-const comparable = (v) => (Array.isArray(v) ? JSON.stringify(v) : typeof v === "boolean" ? v : v === null || v === undefined ? "" : String(v));
+const comparable = (v) => (Array.isArray(v) ? (v.length ? JSON.stringify(v) : "") : typeof v === "boolean" ? v : v === null || v === undefined ? "" : String(v));
 
 /**
  * An image file a file names, read as binary : inside the folder it is named from.
@@ -144,7 +144,22 @@ export function appearanceType(spec) {
   function changedFields(declared, current, opts = {}) {
     // the seed's fields, and those set in the real environment (that value wins : never applied)
     const held = opts.fromSeed ? [] : [...seededOf(current), ...(current?._envSet || [])];
-    return Object.keys(declared).filter((k) => !held.includes(k) && !same(comparable(declared[k]), comparable(current?.[k])));
+    return Object.keys(declared).filter((k) => !held.includes(k) && !same(comparable(asStored(k, declared[k])), comparable(current?.[k])));
+  }
+
+  /**
+   * A field's value as the app stores it (the settings row's : as its model converts it - a name
+   * trimmed, an unknown forms view none) : a file's value compared with the stored one.
+   *
+   * Args:
+   *   k (string): the field.
+   *   v (any): the value declared.
+   *
+   * Returns:
+   *   any: the value as stored.
+   */
+  function asStored(k, v) {
+    return rowFields.includes(k) && k !== "header_links" ? new Settings({ [k]: v })[k] : v;
   }
 
   return singleType({
