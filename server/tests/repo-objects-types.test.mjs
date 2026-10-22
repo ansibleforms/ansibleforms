@@ -361,6 +361,33 @@ describe("a file leaves out what the model would choose for a new object of the 
   });
 });
 
+describe("a runner's file with an address its model keeps otherwise : the next pull changes nothing", () => {
+  test("its address with a slash at its end", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    process.env.RTE_TOKEN_A = "t";
+    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000/", token: "${RTE_TOKEN_A}" });
+    const desc = await RepoObjects.descriptorOf("runners");
+    await RepoObjects.syncRepository(desc, "run-repo");
+    assert.equal(fx.rowNamed("runners", "a").uri, "https://a:8000");
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(desc, "run-repo")).unchanged, 1);
+  });
+
+  test("its own address beside a credential that gives one : the credential's, said", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    fx.state.tables.credentials.push({ id: 8, name: "rte-login", credential_type: "rte", url: "https://cred:8000", password: "enc:t" });
+    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", rte_mode: "inbound", uri: "https://own:8000", credential: "rte-login" });
+    const desc = await RepoObjects.descriptorOf("runners");
+    const first = await RepoObjects.syncRepository(desc, "run-repo");
+    assert.equal(first.created, 1, JSON.stringify(first));
+    assert.match(first.notes.join("\n"), /uri not used: its credential 'rte-login' gives its address/);
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(desc, "run-repo");
+    assert.equal(second.updated, 0, JSON.stringify(second));
+    assert.equal(second.unchanged, 1);
+  });
+});
+
 describe("a change in the app that changes other objects of the type too", () => {
   test("a runner made the default : the former default's file says so too", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
