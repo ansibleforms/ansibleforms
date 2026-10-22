@@ -6,7 +6,8 @@
 // The app reads them as configuration, objects and secrets : the designer's file explorers
 // (models/projectFiles.model.js) never list, read, write nor delete them, even in a repository used
 // for workflows, inventories, playbooks or vars files as well - writing roles.yaml there made a
-// designer an admin.
+// designer an admin ; nor does its forms save (models/form.model.js) write a form file onto one, in
+// a repository serving its forms from its root.
 import fs from "fs";
 import path from "path";
 import mysql from "../../models/db.model.js";
@@ -124,6 +125,20 @@ export async function ownerTest(repository) {
 }
 
 /**
+ * Which usage type of a repository owns a path (ownerTest), for one path.
+ *
+ * Args:
+ *   repository (string|null): the repository the path is in.
+ *   abs (string): the path.
+ *
+ * Returns:
+ *   Promise<string|null>: the owning type's label, or null.
+ */
+export async function ownerOf(repository, abs) {
+  return (await ownerTest(repository))(abs);
+}
+
+/**
  * Refuses a path a usage type of its repository owns.
  *
  * Args:
@@ -135,8 +150,8 @@ export async function ownerTest(repository) {
  *   Errors.AccessDeniedError: a usage type of the repository owns it, which one said.
  */
 export async function assertNotOwned(repository, abs, name) {
-  const label = (await ownerTest(repository))(abs);
+  const label = await ownerOf(repository, abs);
   if (label) throw new Errors.AccessDeniedError(`'${name}' holds the ${label} of repository '${repository}': it is not read nor written in the designer`);
 }
 
-export default { ownerTest, assertNotOwned };
+export default { ownerTest, ownerOf, assertNotOwned };

@@ -20,6 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
+import { ownerOf } from "../lib/repoObjects/ownedPaths.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
@@ -1896,6 +1897,11 @@ Form.save = async function(data, options = {}){
   // resolve the target folder per group (own repo, then existing holder, then staging)
   for (const g of Object.values(groups)) {
     g.dir = resolveTargetDir(g.repository, g.source, formsDirs, (d, src) => fs.existsSync(path.join(d.path, src)))
+    // a file a usage type of its repository owns (roles.yaml, config.yaml, general.yaml,
+    // credentials/ ... : lib/repoObjects/ownedPaths.js), in a repository serving its forms from its
+    // root : never written as a forms file
+    const owner = g.dir?.name ? await ownerOf(g.dir.name, path.join(g.dir.path, g.source)) : null
+    if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner} of repository '${g.dir.name}': save the form to another file`)
   }
 
   // a form name defined twice, or new here and already another forms repository's : refused
