@@ -6592,7 +6592,8 @@
       written to the base in its place. An install upgraded from before gets the three flags on the repository it
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
       the server log. The config seed and a `repositories.yaml` still take `use_for_config` as a deprecated alias of
-      the three, with a warning; a seed declaring it on several repositories gives the three to the first one.
+      the three, with a warning; a seed declaring it on several repositories leaves the three on the one holding
+      them already (the one the upgrade gave them to), else gives them to the first one.
 
       Every other type is an object type, one repository at most per type: one object
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,

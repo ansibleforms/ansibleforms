@@ -17,7 +17,7 @@ process.env.DB_PASSWORD ||= "test";
 
 vi.mock("../src/models/db.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).db }));
 vi.mock("../src/models/repo.model.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).repo, repoFolder: (await import("./fixtures/repoObjects.mjs")).repo.folderOf }));
-vi.mock("../src/models/repository.model.js", async () => ({ default: { ...(await import("./fixtures/repoObjects.mjs")).repository, getConfigPath: async () => "", getFormsFolders: async () => [] } }));
+vi.mock("../src/models/repository.model.js", async () => ({ default: { ...(await import("./fixtures/repoObjects.mjs")).repository, getConfigPath: async () => "", getFormsFolders: async () => [], afterUsageChange: async () => null } }));
 // the warnings, recorded : the server log of the models (aliased to the test logger) and of lib/
 const warnings = [];
 vi.mock("./__mocks__/logger.js", async (importOriginal) => {
@@ -175,6 +175,32 @@ describe("the Config usage of before", () => {
     assert.equal(doc.repositories.items[0].use_for_roles, true);
     assert.deepEqual(doc.repositories.items[1], { name: "two", uri: "https://x/y.git" });
   });
+
+  test("a seed of 7.3 naming another use_for_config repository first than the one the patch chose : the patch's keeps them, the seed applied", async () => {
+    fx.state.tables.repositories = [
+      { id: 1, name: "aaa", use_for_config: 1, managed: 1 },
+      { id: 2, name: "bbb", use_for_config: 1, managed: 1 },
+    ];
+    const { splitConfigUsage } = await import("../src/models/schema.model.js");
+    await splitConfigUsage();
+    const { foldConfigFlag } = await import("../src/lib/seed-schema.js");
+    const { listSections } = await import("../src/lib/seed.js");
+    const section = listSections.find((s) => s.key === "repositories");
+    const repo = (name) => ({ name, uri: "https://x/y.git", branch: "main", use_for_config: true });
+    for (const items of [[repo("bbb"), repo("aaa")], [repo("bbb")]]) {
+      const { doc, holder, dropped } = foldConfigFlag({ repositories: { items } }, ["aaa"]);
+      assert.equal(holder, "aaa");
+      assert.deepEqual(dropped, ["bbb"]);
+      // what the seed's update does with each : never refused
+      for (const item of doc.repositories.items) await section.update({ ...item, managed: true }, fx.rowNamed("repositories", item.name));
+      assert.equal(fx.rowNamed("repositories", "aaa").use_for_roles, 1);
+      assert.ok(!Number(fx.rowNamed("repositories", "bbb").use_for_roles));
+    }
+    // the seed taking them off the one holding them : the next one declaring it gets them
+    const moved = foldConfigFlag({ repositories: { items: [repo("bbb"), { ...repo("aaa"), use_for_config: false }] } }, ["aaa"]);
+    assert.equal(moved.holder, "bbb");
+    assert.deepEqual(moved.doc.repositories.items[1].use_for_roles, false);
+  }, 30000);
 
   test("the seed's use_for_config : a deprecated alias of the three, one repository at most each", async () => {
     const { foldConfigFlag, validateSeed } = await import("../src/lib/seed-schema.js");

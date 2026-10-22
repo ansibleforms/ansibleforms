@@ -532,7 +532,11 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   }
   // a repository's use_for_config : deprecated since 7.4.0, removed in 8 - the roles, the categories
   // and the constants, each a flag of its own now
-  const configFlag = foldConfigFlag(doc);
+  // the repository holding them already (the one the schema patch gave them to) keeps them
+  const held = (doc.repositories?.items || []).some((r) => r.use_for_config !== undefined)
+    ? (await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY id")).map((r) => r.name)
+    : [];
+  const configFlag = foldConfigFlag(doc, held);
   doc = configFlag.doc;
   for (const name of configFlag.folded) {
     logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.4.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
