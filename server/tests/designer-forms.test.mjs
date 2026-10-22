@@ -315,6 +315,55 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     for (const f of ["x.yaml", "team.yml", "team-node.yml", "rte-node.yml"]) write("playbooks", f, "- hosts: secret\n");
   });
 
+  test("another explorer whose folder holds the forms and the playbooks shows neither a hidden playbook nor a form file", async () => {
+    fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify(form("Team play", ["team"], { playbook: "team.yml" })));
+    // the workflows' folder : the whole tree, as a repository used for forms, playbooks and workflows is
+    appConfig.workflowsPath = ROOT;
+    const listed = await files("workflows");
+    assert.ok(listed.includes("playbooks/x.yaml"), "a playbook of theirs stays");
+    assert.equal(listed.includes("playbooks/team.yml"), false, "the hidden playbook");
+    assert.deepEqual(listed.filter((f) => f.startsWith("forms/")), [], "the form files");
+    await assert.rejects(assertFileShown("workflows", "playbooks/team.yml", user, "read"), { status: 404 });
+    await assert.rejects(assertFileShown("workflows", "forms/forms/team.yaml", user, "read"), { status: 404 });
+    await assert.rejects(assertFileShown("workflows", "forms/forms/team.yaml", user, "save"), { status: 409 });
+    // a designer of every form reads them, as before
+    const all = { ...limited, options: { ...limited.options, designAllForms: true } };
+    assert.ok((await designerListing("workflows", await ProjectFiles.list("workflows"), all)).files.some((f) => f.path === "forms/forms/team.yaml"));
+  });
+
+  test("a form file is never written through another explorer, for anyone : neither changed, made nor deleted", async () => {
+    appConfig.workflowsPath = ROOT;
+    const denied = { status: 403, message: /is a form file: it is written by the designer's forms, where it is checked/ };
+    const before = fs.readFileSync(path.join(DIR(), "deploy.yaml"), "utf8");
+    // a hidden form given the user's role, a new form of a hidden one's name : Form.save's checks skipped
+    await assert.rejects(ProjectFiles.write("workflows", "forms/forms/deploy.yaml", YAML.stringify(form("Team deploy", ["team", "ops"]))), denied);
+    await assert.rejects(ProjectFiles.write("workflows", "forms/forms/a.yaml", YAML.stringify(form("Team deploy", ["ops"])), true), denied);
+    // the staging folder, not made yet (the forms model reads its own configuration)
+    const { default: formsConfig } = await import("../config/app.config.js");
+    const staging = formsConfig.formsStagingPath;
+    formsConfig.formsStagingPath = path.join(ROOT, "staging");
+    try {
+      await assert.rejects(ProjectFiles.write("workflows", "staging/new.yaml", YAML.stringify(form("New", ["ops"])), true), denied);
+    } finally {
+      formsConfig.formsStagingPath = staging;
+    }
+    await assert.rejects(ProjectFiles.remove("workflows", "forms/forms/deploy.yaml"), denied);
+    assert.equal(fs.readFileSync(path.join(DIR(), "deploy.yaml"), "utf8"), before);
+    assert.equal(fs.existsSync(path.join(DIR(), "a.yaml")), false);
+    // read : the designer of every form still may
+    assert.equal((await ProjectFiles.read("workflows", "forms/forms/deploy.yaml")).content, before);
+    // the rest of the tree stays writable
+    await ProjectFiles.write("workflows", "playbooks/x.yaml", "- hosts: all\n");
+  });
+
+  test("a forms repository serving its forms from its root : its yaml files are form files, its other files are not", async () => {
+    fs.renameSync(DIR(), path.join(ROOT, "forms", "flat"));
+    appConfig.workflowsPath = ROOT;
+    await assert.rejects(ProjectFiles.write("workflows", "forms/flat/deploy.yaml", "x: 1\n"), { status: 403 });
+    await assert.rejects(ProjectFiles.write("workflows", "forms/new.yml", "x: 1\n", true), { status: 403 });
+    await ProjectFiles.write("workflows", "forms/notes.txt", "notes\n", true);
+  });
+
   test("a form of the user's pointed at a hidden playbook : refused, the playbook still hidden", async () => {
     fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify(form("Team play", ["team"], { playbook: "team.yml" })));
     const forms = (await designerConfig(await load(), user)).forms.filter((f) => !f.readOnly).map((f) => (f.name === "Everyone" ? { ...f, playbook: "team.yml" } : f));

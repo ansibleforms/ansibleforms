@@ -33,13 +33,16 @@
 // hidden from the user is refused, the visibility read from the forms as they were before the save ;
 // so is a workflow file saved or made whose nodes run one (a workflow a form of theirs runs would
 // show it), read from the forms and the workflows as they were before the write.
-// Edit Playbooks and Edit Workflows still decide whether a shown one is changed.
+// Edit Playbooks and Edit Workflows still decide whether a shown one is changed. Each rule applies in
+// every explorer (a repository's whole working tree is the workflows' and the inventories' folder) ;
+// without designAllForms the form files are in none of them either (Form.formsFileTest).
 //
 // The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
 // the lines naming files, and the form names defined twice they are not told of.
 //
 // The inventories, the vars files, the categories and the constants stay as they are for every
 // designer.
+import fs from "fs";
 import path from "path";
 import _ from "lodash";
 import Form from "../models/form.model.js";
@@ -399,6 +402,31 @@ export async function fileVisibility(kind, user) {
 }
 
 /**
+ * Which files a user may not see in any of the designer's explorers, whatever explorer lists them :
+ * a playbook or a workflow file hidden from them (visibilityOf, each kind's rule), and without
+ * designAllForms a form file (Form.formsFileTest) - an explorer whose folder holds playbooks,
+ * workflows or forms of another kind (a repository's whole working tree for the workflows and the
+ * inventories) would show them otherwise.
+ *
+ * Args:
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   Promise<object|null>: { hidden ((absolute path) => whether it is hidden), formFile ((absolute
+ *     path) => whether it is hidden as a form file) } ; null when nothing is.
+ */
+async function hiddenFiles(user) {
+  const tests = [];
+  for (const kind of Object.keys(FILE_OPTIONS)) {
+    const visibility = await visibilityOf(kind, user);
+    if (visibility) tests.push((abs) => !visibility.shown(abs));
+  }
+  const formFile = designsAllForms(user) ? () => false : await Form.formsFileTest();
+  if (!tests.length && designsAllForms(user)) return null;
+  return { hidden: (abs) => formFile(abs) || tests.some((test) => test(abs)), formFile };
+}
+
+/**
  * Refuses a save of forms naming a playbook or a workflow hidden from the user, by the files as the
  * forms stored before it show them : a form of theirs pointed at one would show it.
  *
@@ -463,10 +491,10 @@ export async function assertWorkflowFileShown(content, user) {
  *   Promise<object>: the listing (the same one when every file is shown).
  */
 export async function designerListing(kind, listing, user) {
-  const shown = await fileVisibility(kind, user);
-  if (!shown) return listing;
+  const files = await hiddenFiles(user);
+  if (!files) return listing;
   const abs = await ProjectFiles.absolutes(kind, listing.files.map((f) => f.path));
-  return { ...listing, files: listing.files.filter((f) => abs.has(f.path) && shown(abs.get(f.path))) };
+  return { ...listing, files: listing.files.filter((f) => abs.has(f.path) && !files.hidden(abs.get(f.path))) };
 }
 
 /**
@@ -486,11 +514,14 @@ export async function designerListing(kind, listing, user) {
  *   Errors.BadRequestError: the path is not valid (as the request itself would answer).
  */
 export async function assertFileShown(kind, rel, user, action) {
-  const shown = await fileVisibility(kind, user);
-  if (!shown) return;
+  const files = await hiddenFiles(user);
+  if (!files) return;
   const { abs, name } = await ProjectFiles.locate(kind, rel);
-  if (shown(abs)) return;
+  if (!files.hidden(abs)) return;
   if (action === "read" || action === "delete") throw new Errors.NotFoundError(`File '${name}' not found`);
+  // a form file only : no file of anyone's named, the write refused as it is for everyone
+  // (ProjectFiles.write : a form file is the designer's forms')
+  if (files.formFile(abs) && !fs.existsSync(abs)) return;
   throw new Errors.ConflictError(`File '${name}' exists already`);
 }
 

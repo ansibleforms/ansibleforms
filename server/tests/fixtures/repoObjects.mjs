@@ -249,6 +249,17 @@ export const repository = {
   releaseWrite: async (name) => {
     state.calls.push(`release:${name}`);
   },
+  // the forms repositories' forms folders, as the model gives them : the forms subfolder when there
+  // is one (dedicated), else the root
+  getFormsFolders: async () =>
+    (state.tables.repositories || [])
+      .filter((r) => Number(r.use_for_forms))
+      .sort((a, b) => a.id - b.id)
+      .map((r) => {
+        const root = path.join(ROOT, r.name);
+        const sub = path.join(root, "forms");
+        return fs.existsSync(sub) ? { name: r.name, path: sub, dedicated: true } : { name: r.name, path: root, dedicated: false };
+      }),
 };
 
 // a secret as the database keeps it : marked, so a test sees it was encrypted

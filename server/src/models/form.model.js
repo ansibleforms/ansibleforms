@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { ownerOf } from "../lib/repoObjects/ownedPaths.js";
+import { ownerOf, realPathOf } from "../lib/repoObjects/ownedPaths.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
@@ -942,6 +942,33 @@ function skippedCopies(formsDirs) {
     out.get(abs).add(name)
   }
   return out
+}
+
+/**
+ * Which paths are form files, as the loader reads them (formsFolders) : anything in a folder that
+ * is the forms' own (a forms repository's forms folder, the staging folder, the local forms
+ * folder, those two whether they are read now or not), and every yaml file of a forms repository serving its forms from its root. The
+ * designer's other explorers (models/projectFiles.model.js) never write one : a form written there
+ * skips every check of Form.save (its name, its roles, its validation, the forms hidden from a
+ * designer).
+ *
+ * Returns:
+ *   Promise<function>: (absolute path) => whether it is a form file, by the path as written and
+ *     as the disk resolves it (links followed).
+ */
+Form.formsFileTest = async function() {
+  const inside = (root, p) => {
+    const rel = path.relative(root, p)
+    return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel)
+  }
+  // the forms repositories' folders, and the staging and the local forms folders whether they are
+  // read now or not (a file made there is a form once they are) ; a folder not configured holds none
+  const folders = [...(await Repository.getFormsFolders()), { name: null, path: appConfig.formsStagingPath }, { name: null, path: appConfig.formsFolderPath }]
+  const roots = folders.filter((d) => d.path).map((d) => ({ own: !d.name || !!d.staging || !!d.dedicated, paths: [path.resolve(d.path), realPathOf(d.path)] }))
+  return (abs) => {
+    const candidates = [path.resolve(abs), realPathOf(abs)]
+    return roots.some((r) => candidates.some((p) => r.paths.some((root) => inside(root, p)) && (r.own || /\.(yaml|yml)$/i.test(p))))
+  }
 }
 
 /**

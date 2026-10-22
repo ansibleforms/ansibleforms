@@ -12,7 +12,9 @@
 //
 // A repository's files its usage types own (roles.yaml, credentials/, general.yaml ... :
 // lib/repoObjects/ownedPaths.js) are never listed, read, written nor deleted here, in a repository
-// used for these files as well.
+// used for these files as well. A form file (Form.formsFileTest : a forms folder's, every yaml file
+// of a forms repository serving its forms from its root) is never written nor deleted here : the
+// designer's forms write it, checked.
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -24,6 +26,7 @@ import Repo from "./repo.model.js";
 import { configRepoFromPath } from "../lib/forms-git.js";
 import { FILE_KINDS, MAX_FILE_BYTES, MAX_LISTED_FILES, safeRelativePath, isInside, isTextBuffer } from "../lib/projectFiles.js";
 import { ownerTest, assertNotOwned } from "../lib/repoObjects/ownedPaths.js";
+import Form from "./form.model.js";
 
 const ProjectFiles = {};
 
@@ -178,6 +181,24 @@ ProjectFiles.locate = async function (kind, rel) {
   return { abs: file.abs, name: shown(prefix, file.rel) };
 };
 
+/**
+ * Refuses a write of a form file (Form.formsFileTest) : the designer's forms write them, checked
+ * (their names, their roles, their validation, the forms hidden from a designer) ; here none of it
+ * would apply.
+ *
+ * Args:
+ *   abs (string): the path.
+ *   name (string): the path as the request names it.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: it is a form file.
+ */
+async function assertNotFormsFile(abs, name) {
+  if ((await Form.formsFileTest())(abs)) {
+    throw new Errors.AccessDeniedError(`'${name}' is a form file: it is written by the designer's forms, where it is checked`);
+  }
+}
+
 /** A path as the explorer shows it : its root's prefix first, when the kind has several. */
 const shown = (prefix, rel) => (prefix ? `${prefix}/${rel}` : rel);
 
@@ -317,7 +338,8 @@ async function withWriteClaim(repository, write) {
  * Raises:
  *   BadRequestError: the path or the content is not valid.
  *   ConflictError: onlyNew and the file exists.
- *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js).
+ *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js),
+ *     or it is a form file (Form.formsFileTest).
  */
 ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   if (typeof content !== "string") throw new Errors.BadRequestError("The content must be text");
@@ -326,6 +348,7 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
   await assertNotOwned(repository, file.abs, name);
+  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     if (fs.existsSync(file.abs)) {
       if (onlyNew) throw new Errors.ConflictError(`File '${name}' exists already`);
@@ -350,13 +373,15 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
  *
  * Raises:
  *   NotFoundError: there is no such file.
- *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js).
+ *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js),
+ *     or it is a form file (Form.formsFileTest).
  */
 ProjectFiles.remove = async function (kind, rel) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
   await assertNotOwned(repository, file.abs, name);
+  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     const stat = await fs.promises.lstat(file.abs).catch(() => null);
     if (!stat || !stat.isFile()) throw new Errors.NotFoundError(`File '${name}' not found`);
