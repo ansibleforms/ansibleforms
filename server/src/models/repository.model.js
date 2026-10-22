@@ -143,9 +143,9 @@ async function formModel() {
 
 /**
  * Repositories in one fixed order : by name, as the database's ORDER BY name compares them (case
- * left aside), then exactly. Where several repositories of one usage are read in turn (the forms
- * folders, the first config file, the first vars folder ...) the first one wins, so the order is
- * fixed here too : whatever order the rows come in, the same repository wins every time.
+ * left aside), then exactly. Where several repositories of one usage are all read (the inventories,
+ * the workflows) the order is fixed here too : whatever order the rows come in, the same every
+ * time. Where the first one wins, sortedById.
  *
  * Args:
  *   rows (object[]): the repositories ({ name, ... }).
@@ -162,9 +162,11 @@ export function sortedByName(rows) {
 }
 
 /**
- * Repositories in the order they were added : by id, whatever order the rows come in - where
- * several of one usage are read in turn and the first one wins (the playbooks, the forms folders
- * - and with them a form name defined twice - and the first config.yaml of a forms repository).
+ * Repositories in the order they were added : by id, as 7.3 read them where several of one usage
+ * are read in turn and the first one wins (the forms folders - and with them a form name defined
+ * twice, the vars folder - the first config file, the playbooks). Its queries had no order, the
+ * database scanned the table by its primary key : the same repository keeps winning after an
+ * upgrade, and whatever order the rows come in, every time.
  *
  * Args:
  *   rows (object[]): the repositories ({ id, name, ... }).
@@ -570,8 +572,8 @@ class Repository extends CrudModel {
     if (keyRepositories.length > 0) return ""
 
     // Fall back to old behavior: check use_for_forms repositories (backwards compatibility)
-    // by name : the first one holding a config.yaml wins, the same one every time
-    var repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
+    // in the order they were added : the first one holding a config.yaml wins, the same one every time
+    var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
   }
   
   if(repositories.length === 0){
@@ -619,8 +621,9 @@ class Repository extends CrudModel {
     //
     // Failing loudly is the only honest answer, and it is the rule this codebase already
     // applies to health.model's authenticationFacts.
-    // by name : a form name defined in two of them resolves to the first one's, every time
-    const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
+    // in the order they were added : a form name defined in two of them resolves to the first one's,
+    // every time
+    const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
 
     return repositories.map(repo => {
       const repoPath = Repo.folderOf(repo.name)
@@ -924,8 +927,8 @@ class Repository extends CrudModel {
 
   static async findFormsRepositories() {
     try {
-      // by name, as the forms folders are read (getFormsFolders)
-      return sortedByName(await mysql.do("SELECT name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY name"))
+      // in the order they were added, as the forms folders are read (getFormsFolders)
+      return sortedById(await mysql.do("SELECT id,name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
     } catch (e) {
       logger.error("Failed to get forms repositories: ", e)
       return []

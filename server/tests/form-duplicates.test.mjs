@@ -1,5 +1,6 @@
 // A form name defined in two forms repositories : the forms repositories read in one fixed order
-// (by name, whatever order the database returns them in), so the same copy wins every time - in
+// (the order they were added, as 7.3 read them, whatever order the database returns them in), so
+// the same copy wins every time - in
 // the list, a single form and the designer alike. The warning names both copies (the one used,
 // the one skipped), and each repository involved says so in its pull output and on its page. A
 // new form whose name another forms repository already defines is refused by the save.
@@ -17,12 +18,15 @@ process.env.DB_PASSWORD ||= "test";
 
 // the repositories' working trees : a folder of the test's own
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "af-form-dups-"));
-// the forms repositories as the database gives them back : in no particular order
+// the forms repositories as the database gives them back : in no particular order ; their ids (the
+// order they were added in)
 let formsRepos = [];
+let ids = {};
 vi.mock("../src/models/db.model.js", () => ({
   default: {
     do: async (sql) => {
-      if (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql)) return formsRepos.map((name) => ({ name, status: "success", head: "abc" }));
+      if (/FROM AnsibleForms\.`repositories` WHERE use_for_playbooks/.test(sql)) return formsRepos.map((name) => ({ id: ids[name], name }));
+      if (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql)) return formsRepos.map((name) => ({ id: ids[name], name, status: "success", head: "abc" }));
       return [];
     },
   },
@@ -42,7 +46,7 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: Form } = await import("../src/models/form.model.js");
-const { default: Repository, sortedByName } = await import("../src/models/repository.model.js");
+const { default: Repository, sortedByName, sortedById } = await import("../src/models/repository.model.js");
 
 const BASE = path.join(ROOT, "config.yaml");
 const ROLES = [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }];
@@ -60,30 +64,50 @@ beforeEach(() => {
   appConfig.configPath = BASE;
   appConfig.formsStagingPath = path.join(ROOT, "staging");
   appConfig.useYtt = false;
+  ids = { "forms-ops": 1, "forms-team": 2, "forms-alone": 3 };
   writeForm("forms-team", "deploy.yaml", form("Deploy", "team"));
   writeForm("forms-ops", "deploy.yaml", form("Deploy", "ops"));
   writeForm("forms-ops", "other.yaml", form("Other", "ops"));
 });
 
 describe("the forms repositories in one fixed order", () => {
-  test("by name, whatever order the database returns them in", async () => {
+  test("in the order they were added, whatever order the database returns them in", async () => {
     for (const order of [["forms-team", "forms-ops"], ["forms-ops", "forms-team"]]) {
       formsRepos = order;
       assert.deepEqual((await Repository.getFormsFolders()).map((f) => f.name), ["forms-ops", "forms-team"]);
       assert.deepEqual((await Repository.findFormsRepositories()).map((r) => r.name), ["forms-ops", "forms-team"]);
+      // not by name : the one added first, the one 7.3 read first
+      ids = { "forms-team": 1, "forms-ops": 2 };
+      assert.deepEqual((await Repository.getFormsFolders()).map((f) => f.name), ["forms-team", "forms-ops"]);
+      ids = { "forms-ops": 1, "forms-team": 2 };
     }
+    assert.deepEqual(sortedById([{ id: 3, name: "a" }, { id: 1, name: "c" }, { id: 2, name: "b" }]).map((r) => r.name), ["c", "b", "a"]);
     assert.deepEqual(sortedByName([{ name: "b" }, { name: "A" }, { name: "a" }]).map((r) => r.name), ["A", "a", "b"]);
   });
 
-  test("the first by name wins, in the list, a single form and the designer alike", async () => {
-    for (const order of [["forms-team", "forms-ops"], ["forms-ops", "forms-team"]]) {
-      formsRepos = order;
-      const list = await Form.load(["admin"]);
-      assert.deepEqual(list.forms.filter((f) => f.name === "Deploy").map((f) => f.description), ["ops"]);
-      assert.equal((await Form.load(["admin"], "Deploy")).forms[0].description, "ops");
-      const designer = await Form.load(["admin"], "", true);
-      assert.deepEqual(designer.forms.filter((f) => f.name === "Deploy").map((f) => [f.description, f.repository]), [["ops", "forms-ops"]]);
+  test("the one added first wins, in the list, a single form and the designer alike", async () => {
+    for (const [first, second, description] of [["forms-ops", "forms-team", "ops"], ["forms-team", "forms-ops", "team"]]) {
+      ids = { [first]: 1, [second]: 2 };
+      for (const order of [["forms-team", "forms-ops"], ["forms-ops", "forms-team"]]) {
+        formsRepos = order;
+        const list = await Form.load(["admin"]);
+        assert.deepEqual(list.forms.filter((f) => f.name === "Deploy").map((f) => f.description), [description]);
+        assert.equal((await Form.load(["admin"], "Deploy")).forms[0].description, description);
+        const designer = await Form.load(["admin"], "", true);
+        assert.deepEqual(designer.forms.filter((f) => f.name === "Deploy").map((f) => [f.description, f.repository]), [[description, first]]);
+      }
     }
+  });
+});
+
+describe("where the first one wins, the one added first", () => {
+  test("the playbooks and the config.yaml of a forms repository : the one 7.3 read, not the first by name", async () => {
+    ids = { "forms-team": 1, "forms-ops": 2 };
+    formsRepos = ["forms-ops", "forms-team"];
+    fs.writeFileSync(path.join(ROOT, "forms-ops", "config.yaml"), "roles: []\n");
+    fs.writeFileSync(path.join(ROOT, "forms-team", "config.yaml"), "roles: []\n");
+    assert.equal(await Repository.getAnsiblePath(), path.join(ROOT, "forms-team"));
+    assert.equal(await Repository.getConfigPath(), path.join(ROOT, "forms-team", "config.yaml"));
   });
 });
 

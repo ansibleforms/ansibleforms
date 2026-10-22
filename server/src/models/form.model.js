@@ -742,7 +742,7 @@ function checkFormRole(form, userRoles) {
 
 /**
  * The folders the forms are read from, in the order they are read : each forms repository's
- * (by name, Repository.getFormsFolders), then the staging folder (new forms not pushed yet) ; the
+ * (in the order they were added, Repository.getFormsFolders), then the staging folder (new forms not pushed yet) ; the
  * local forms folder when no repository is used for forms.
  *
  * Returns:
@@ -1026,7 +1026,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   var warnings = []
   
   // the forms folders with their repository name, in the order they are read (formsFolders) :
-  // the forms repositories by name, then the staging folder ; or the local folder
+  // the forms repositories in the order they were added, then the staging folder ; or the local folder
   const formsdirs = await formsFolders()
 
   logger.debug(`Loading forms from ${formsdirs.length} folder(s): ${formsdirs.map(d => d.path).join(", ")}`)
@@ -1106,7 +1106,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         continue
       }
       if(firstOf.has(f.name)){
-        // both copies named : the one used (the first read : its repository first by name) and
+        // both copies named : the one used (the first read : its repository added first) and
         // the one skipped
         warn(duplicateNotice(f.name, firstOf.get(f.name), entry))
         continue
