@@ -8,6 +8,7 @@ import i18n from "../../lib/i18n.js";
 import logger from "../../lib/logger.js";
 // the disclaimer repository follows every change of the versions (lib/repoObjects)
 import RepoObjects from "../../lib/repoObjects/index.js";
+import _ from "lodash";
 
 // ─── every signed-in user ────────────────────────────────────────────────────
 
@@ -76,10 +77,12 @@ const version = async (req, res) => {
   }
 };
 
-// a disclaimer added : a new version, not enabled
+// a disclaimer added : a new version, not enabled ; numbered the next one, never by the request
+// (a number is a disclaimer repository's file's, or the seed's)
 const createVersion = async (req, res) => {
   try {
-    const version = await RepoObjects.following("disclaimer", () => Disclaimer.createVersion(req.body, req.user?.user?.username));
+    const data = _.omit(req.body || {}, "version");
+    const version = await RepoObjects.following("disclaimer", () => Disclaimer.createVersion(data, req.user?.user?.username));
     return res.json(RestResult.single({ id: version, version }));
   } catch (err) {
     Errors.ReturnError(res, err);
