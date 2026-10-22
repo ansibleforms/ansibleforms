@@ -23,6 +23,8 @@ export default seedType({
   references: [{ field: "credential", type: "credentials" }],
   // turned off is what a file says : on is the default
   keepFalse: ["enabled"],
+  // one default runner per type
+  oneOnly: [{ field: "is_default", label: "the default", by: "type" }],
   // runners.description has no default in the table
   defaults: { description: "" },
   keptReason: (row) => (Number(row.pending) ? "pending" : row.node_id ? "registered" : null),

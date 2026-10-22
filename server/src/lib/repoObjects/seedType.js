@@ -103,6 +103,9 @@ export const KEPT_REASONS = {
  *       may not set taken out before it is saved, each said (a usage another repository holds).
  *     notCompared (string[]): the fields a file gives that are no field of the object (a
  *       disclaimer's ask_again : how a changed text is applied) : never compared.
+ *     oneOnly (object[]): the yes or no fields one object at most has on (lib/repoObjects/engine.js
+ *       oneOnlyClashes) : [{ field, label (what it makes the object : the default), by (the field
+ *       each one is per : a runner's type), when ((object) => whether the rule is the object's) }].
  *
  * Returns:
  *   object: the descriptor (lib/repoObjects/engine.js).
@@ -227,5 +230,6 @@ export function seedType(spec) {
     notImported: spec.notImported,
     canonical,
     order: spec.order,
+    oneOnly: spec.oneOnly,
   };
 }

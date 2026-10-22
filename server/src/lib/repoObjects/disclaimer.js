@@ -72,5 +72,7 @@ export default seedType({
   skip: ["ask_again"],
   notCompared: ["ask_again"],
   canonical,
+  // one version in force
+  oneOnly: [{ field: "enabled", label: "the one in force" }],
   order: "version",
 });

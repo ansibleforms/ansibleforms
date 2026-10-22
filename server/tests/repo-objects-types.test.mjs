@@ -434,3 +434,76 @@ describe("a change in the app that changes other objects of the type too", () =>
     assert.equal(fx.readObject(repoOf("sso"), "sso", "one.yaml").enable, undefined, "one is turned off : no longer used for sign-in");
   });
 });
+
+describe("a flag one object at most has, that two files give", () => {
+  // the object holding it in the app, the other one ; each file says it : the pull applies it from
+  // neither, said, and the next pull changes nothing (it flipped on every pull before)
+  const CLASHES = [
+    {
+      what: "the default runner of a type",
+      key: "runners",
+      folder: "runners",
+      table: "runners",
+      field: "is_default",
+      row: (id, name, on) => ({ id, name, type: "rte", uri: `https://${name}:8000`, token: "enc:t", is_default: on, enabled: 1, description: "" }),
+      file: (name) => ({ name, type: "rte", uri: `https://${name}:8000`, enabled: true, is_default: true }),
+    },
+    {
+      what: "the active mail channel",
+      key: "notifications",
+      folder: "notifications",
+      table: "notification_channels",
+      field: "is_active",
+      row: (id, name, on) => ({ id, name, type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: 1, is_active: on, description: "" }),
+      file: (name) => ({ name, type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true, is_active: true }),
+    },
+    {
+      what: "the provider of a type used for sign-in",
+      key: "sso",
+      folder: "sso",
+      table: "oauth2_providers",
+      field: "enable",
+      row: (id, name, on) => ({ id, name, provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable: on, managed: 0 }),
+      file: (name) => ({ name, provider: "oidc", issuer: "https://idp", client_id: "id", enable: true }),
+    },
+  ];
+
+  test.each(CLASHES)("$what : the one holding it keeps it, the pull says why, the next one changes nothing", async (c) => {
+    const repo = repoOf(c.key);
+    const linked = (row) => ({ ...row, repository: repo, repo_file: `${c.folder}/${row.name}.yaml` });
+    fx.state.tables[c.table].push(linked(c.row(51, "a", 1)), linked(c.row(52, "b", 0)));
+    fx.writeFile(repo, c.folder, "a.yaml", c.file("a"));
+    // b's file edited in git to take the flag, a's left as it is
+    fx.writeFile(repo, c.folder, "b.yaml", c.file("b"));
+    const desc = await RepoObjects.descriptorOf(c.key);
+    const first = await RepoObjects.syncRepository(desc, repo);
+    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/a.yaml, ${c.folder}/b.yaml each say it`));
+    assert.equal(Number(fx.rowNamed(c.table, "a")[c.field]), 1);
+    assert.equal(Number(fx.rowNamed(c.table, "b")[c.field] || 0), 0);
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(desc, repo);
+    assert.equal(second.updated, 0, JSON.stringify(second));
+    assert.equal(Number(fx.rowNamed(c.table, "a")[c.field]), 1);
+  });
+
+  test("two new runner files of a type, both the default : neither made the default, both made", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    process.env.RTE_TOKEN_A = "t";
+    for (const name of ["a", "b"]) fx.writeFile("run-repo", "runners", `${name}.yaml`, { name, type: "rte", uri: `https://${name}:8000`, token: "${RTE_TOKEN_A}", is_default: true });
+    const desc = await RepoObjects.descriptorOf("runners");
+    assert.equal((await RepoObjects.syncRepository(desc, "run-repo")).created, 2);
+    assert.equal(Number(fx.rowNamed("runners", "a").is_default || 0) + Number(fx.rowNamed("runners", "b").is_default || 0), 0);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(desc, "run-repo")).updated, 0);
+  });
+
+  test("two runner files, the default of different types : both applied", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    process.env.RTE_TOKEN_A = "t";
+    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}", is_default: true });
+    fx.writeFile("run-repo", "runners", "b.yaml", { name: "b", type: "semaphore", uri: "https://b", token: "${RTE_TOKEN_A}", is_default: true });
+    const summary = await RepoObjects.syncRepository(await RepoObjects.descriptorOf("runners"), "run-repo");
+    assert.deepEqual(summary.notes, []);
+    assert.equal(Number(fx.rowNamed("runners", "a").is_default), 1);
+  });
+});

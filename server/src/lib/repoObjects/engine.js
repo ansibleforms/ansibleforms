@@ -571,6 +571,10 @@ export async function syncRepository(desc, name, opts = {}) {
     own.set(f.file, { ...row, repo_file: f.repoFile ?? f.file });
     logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${row.name}' follows its file, renamed in git: ${name}/${from} is now ${name}/${f.file}`);
   }
+  // step 4b : a flag one object at most has (the default runner of a type, the active mail
+  // channel ...) that several files give : each write would take it off the others, the next pull
+  // giving it back, for ever - applied from none of them, each object keeping what it has, said
+  oneOnlyClashes(desc, files, own, summary, name);
   // step 5 : the objects whose file is gone (or absent) go first - not one something uses -
   // then the changed, then the new
   const present = new Set([...files.filter((f) => f.object).map((f) => f.file), ...kept]);
@@ -691,6 +695,47 @@ export async function syncRepository(desc, name, opts = {}) {
  *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
  *     secretsKept, notes, unread (the names refused or waiting files declare : [{ name, file }]) }.
  */
+/**
+ * The flags one object at most has (descriptor.oneOnly : the default runner of a type, the active
+ * mail channel, the provider of a type used for sign-in, the disclaimer version in force) that
+ * several files of a pull give, as the config seed refuses them (lib/seed-schema.js
+ * assertSingletonFlags) : applied from none of them, each object keeping the value it has (a new
+ * one without it), the rest of each file applied - the pull changes nothing of that flag until one
+ * file only gives it, and the next pull is the same. Said in the pull output.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   files (object[]): the files read (readFiles), their objects changed in place.
+ *   own (Map): the repository's objects, by file.
+ *   summary (object): the sync's summary, its notes added to.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   void
+ */
+function oneOnlyClashes(desc, files, own, summary, name) {
+  const on = (v) => v === true || (v !== false && v !== null && v !== undefined && !!Number(v));
+  for (const rule of desc.oneOnly || []) {
+    const groups = new Map();
+    for (const f of files) {
+      if (!f.object || !on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) continue;
+      const scope = rule.by ? String(f.object[rule.by] ?? "") : "";
+      groups.set(scope, [...(groups.get(scope) || []), f]);
+    }
+    for (const [scope, list] of groups) {
+      if (list.length < 2) continue;
+      for (const f of list) {
+        const before = f.adopt || own.get(f.file);
+        f.object = { ...f.object, [rule.field]: before ? on(before[rule.field]) : false };
+      }
+      const what = `${rule.label}${rule.by ? ` (${rule.by} ${scope})` : ""}`;
+      const line = `${rule.field} not applied: ${list.map((f) => f.file).join(", ")} each say it, one ${desc.noun} at most is ${what} - say it in one file only`;
+      summary.notes.push(line);
+      logger.warning(`${titleOf(desc)} of repository '${name}': ${line}`);
+    }
+  }
+}
+
 function newSummary() {
   return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [] };
 }

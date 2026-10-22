@@ -20,4 +20,6 @@ export default seedType({
   noun: "SSO provider",
   secrets: ["client_secret"],
   references: [{ field: "credential", type: "credentials" }],
+  // one provider of a type used for sign-in
+  oneOnly: [{ field: "enable", label: "used for sign-in", by: "provider" }],
 });

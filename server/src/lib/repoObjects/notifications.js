@@ -24,6 +24,8 @@ export default seedType({
   ],
   // turned off is what a file says : on is the default (a webhook's certificate checked too)
   keepFalse: ["enabled", "verify_tls"],
+  // one active mail channel
+  oneOnly: [{ field: "is_active", label: "the active mail channel", when: (o) => o.type === "mail" }],
   // notification_channels.description has no default in the table
   defaults: { description: "" },
 });
