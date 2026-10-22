@@ -73,6 +73,11 @@ describe("the file's own form kept, whatever it is", () => {
     const text = 'name: a\nurl: "http://x/#top"     # the page\nuser: b\n';
     assert.equal(updateMapFile(text, { user: "c" }), text.replace("user: b", "user: c"));
   });
+
+  test("an empty map ({}) written into : its keys one below the other, never on one line", () => {
+    assert.equal(updateMapFile("{}\n", { app_name: "X", theme: "dark" }), "app_name: X\ntheme: dark\n");
+    assert.equal(updateMapFile("# the branding\n{}\n", { app_name: "X" }), "# the branding\napp_name: X\n");
+  });
 });
 
 describe("a list file", () => {

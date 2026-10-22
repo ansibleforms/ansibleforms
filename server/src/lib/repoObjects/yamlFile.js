@@ -319,6 +319,8 @@ export function updateMapFile(text, edits, keyOrder = []) {
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
   if (!YAML.isMap(doc.contents)) throw new Error("the file is not a YAML dictionary");
   const map = doc.contents;
+  // an empty map ({}) : its keys written one below the other, never all on one line
+  if (!map.items.length) map.flow = false;
   for (const [key, value] of Object.entries(edits)) {
     if (value === undefined) map.delete(key);
     else setKey(doc, map, key, value, keyOrder);
