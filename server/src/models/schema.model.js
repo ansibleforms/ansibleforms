@@ -2196,8 +2196,11 @@ export async function dedupeLdapNames() {
  * use_for_constants, so it serves the same configuration as before. 7.3 took the first row of
  * `WHERE use_for_config` with no order : a scan of the table, in the order of its primary key -
  * the lowest id. Any other repository that had it (7.3 only warned about them) gets none : one
- * repository holds each key now. use_for_config goes back to 0 everywhere - the column kept, no
- * longer read, so a second start changes nothing.
+ * repository holds each key now. 7.3 read none of them when the configuration was kept in the
+ * database (Settings > Config source, ENABLE_CONFIG_IN_DATABASE) and the database held one : the
+ * database copy was served whole, so none gets the flags then, or its keys would be laid over the
+ * database copy (said, so they can be turned on). use_for_config goes back to 0 everywhere - the
+ * column kept, no longer read, so a second start changes nothing.
  *
  * Returns:
  *   Promise<string|null>: what it did, null when no repository had it.
@@ -2205,6 +2208,18 @@ export async function dedupeLdapNames() {
 export async function splitConfigUsage() {
   const rows = await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_config = 1 ORDER BY id");
   if (!rows?.length) return null;
+  // the configuration served from the database : no repository was read (models/form.model.js
+  // getBaseConfig reads the database copy first, Settings.resolveConfigInDatabase)
+  const [settings] = await mysql.do("SELECT config_source, forms_yaml FROM AnsibleForms.`settings` limit 1");
+  const { default: Settings } = await import("./settings.model.js");
+  if (settings && Settings.resolveConfigInDatabase(settings) && String(settings.forms_yaml ?? "").trim()) {
+    await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");
+    const message =
+      `The configuration is kept in the database: the Config usage of ${rows.map((r) => `'${r.name}'`).join(", ")} was not read ` +
+      "and is not given (turn on Roles, Categories or Constants on a repository to read them from it)";
+    logger.warning(message);
+    return message;
+  }
   const [first, ...others] = rows;
   await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE id = ?", [first.id]);
   if (others.length) await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");

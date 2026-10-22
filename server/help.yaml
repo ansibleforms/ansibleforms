@@ -6591,7 +6591,8 @@
       clone failed, or is under way), the base configuration gives that key and a save of it is refused, never
       written to the base in its place. An install upgraded from before gets the three flags on the repository it
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
-      the server log. The config seed and a `repositories.yaml` still take `use_for_config` as a deprecated alias of
+      the server log. None gets them when the configuration was kept in the database (Config source), which was
+      then served whole: the log says so, and Roles, Categories or Constants can be turned on by hand. The config seed and a `repositories.yaml` still take `use_for_config` as a deprecated alias of
       the three, with a warning; a seed declaring it on several repositories leaves the three on the one holding
       them already (the one the upgrade gave them to), else gives them to the first one.
 

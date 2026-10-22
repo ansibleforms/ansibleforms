@@ -164,6 +164,20 @@ describe("the Config usage of before", () => {
     assert.equal(fx.rowNamed("repositories", "aaa-later").use_for_config, 0);
   });
 
+  test("the configuration kept in the database : 7.3 read no repository, so none gets the flags, said", async () => {
+    fx.state.tables.repositories.push({ id: 3, name: "old", use_for_config: 1 });
+    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "roles:\n  - name: db-role\n" }];
+    const { splitConfigUsage } = await import("../src/models/schema.model.js");
+    assert.match(await splitConfigUsage(), /kept in the database: the Config usage of 'old' was not read and is not given/);
+    assert.equal(fx.rowNamed("repositories", "old").use_for_roles, undefined);
+    assert.equal(fx.rowNamed("repositories", "old").use_for_config, 0);
+    assert.equal(await splitConfigUsage(), null, "a second start changes nothing");
+    // an empty database copy : 7.3 fell back to the repository's file, so it gets them
+    fx.state.tables.repositories.push({ id: 4, name: "other", use_for_config: 1 });
+    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "  " }];
+    assert.match(await splitConfigUsage(), /'other' is now Roles, Categories and Constants/);
+  });
+
   test("a seed of 7.3 with use_for_config on two repositories : warned, the first one has the flags, never refused", async () => {
     const { foldConfigFlag, validateSeed } = await import("../src/lib/seed-schema.js");
     const repo = (name, flags) => ({ name, uri: "https://x/y.git", ...flags });
