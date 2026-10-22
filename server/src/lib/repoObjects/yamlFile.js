@@ -542,6 +542,8 @@ function listOf(text, key) {
   if (!doc.contents.has(key) || (YAML.isScalar(value) && (value.value === null || value.value === undefined))) doc.contents.set(key, doc.createNode([]));
   const seq = doc.contents.get(key, true);
   if (!YAML.isSeq(seq)) throw new Error(`'${key}' must be a list`);
+  // an empty list ([]) : its entries written one below the other, never all on one line
+  if (!seq.items.length) seq.flow = false;
   return { doc, seq };
 }
 

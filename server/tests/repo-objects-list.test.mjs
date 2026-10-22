@@ -211,6 +211,19 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.deepEqual(readList(), []);
   });
 
+  test("a new repositories.yaml lists its entries one below the other, never on one line", async () => {
+    fx.cloneEmpty("hub");
+    fx.state.tables.repositories.push(
+      { id: 5, name: "forms", uri: "https://git/forms.git", branch: "main", description: "" },
+      { id: 6, name: "ops", uri: "https://git/ops.git", branch: "main", description: "" },
+    );
+    await RepoObjects.activate(await desc(), "hub", { pull: false });
+    assert.equal(
+      fs.readFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "utf8"),
+      "repositories:\n  - name: forms\n    uri: https://git/forms.git\n    branch: main\n  - name: ops\n    uri: https://git/ops.git\n    branch: main\n",
+    );
+  });
+
   test("one whose uri carries a user or a token : kept in the app, never written to git", async () => {
     fx.cloneEmpty("hub");
     fx.state.tables.repositories.push({ id: 5, name: "forms", uri: "https://bot:ghp_secret@github.com/org/forms.git", branch: "main", description: "" });
