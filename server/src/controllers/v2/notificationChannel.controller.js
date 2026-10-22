@@ -125,12 +125,10 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     await guardChannelCredentials(req, null);
-    const id = await RepoObjects.holding("notifications", async () => {
-      const id = await NotificationChannel.create(req.body);
-      // the notification channels repository, when there is one : written to it as a new file
-      await RepoObjects.appCreated("notifications", id);
-      return id;
-    });
+    // the notification channels repository follows (lib/repoObjects) : the new channel a new file,
+    // and the others' files where they changed - the active mail channel is one, so making this
+    // one active clears it on the others
+    const id = await RepoObjects.following("notifications", () => NotificationChannel.create(req.body));
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Notification channel" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -156,11 +154,9 @@ const update = async (req, res) => {
     const existing = await NotificationChannel.findById(req.params.id);
     if (!existing) throw new Errors.NotFoundError(`No notification channel with id ${req.params.id}`);
     await guardChannelCredentials(req, existing);
-    await RepoObjects.holding([], async () => {
-      await NotificationChannel.update(req.body, req.params.id);
-      // one of the notification channels repository : its changed fields written to its file
-      if (existing.repository) await RepoObjects.appUpdated("notifications", existing, req.params.id);
-    }, existing);
+    // the notification channels repository follows : this channel's changed fields written to its
+    // file, and the others' where it changed them (made the active one, it is no longer theirs)
+    await RepoObjects.following("notifications", () => NotificationChannel.update(req.body, req.params.id));
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);

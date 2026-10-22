@@ -317,6 +317,22 @@ describe("a change in the app that changes other objects of the type too", () =>
     assert.equal(fx.rowNamed("runners", "b").is_default, 1);
   });
 
+  test("a mail channel made the active one : the former active one's file says so too", async () => {
+    const channel = (id, name, active) => ({ id, name, type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: 1, is_active: active, description: "", repository: repoOf("notifications"), repo_file: `notifications/${name}.yaml` });
+    fx.state.tables.notification_channels.push(channel(71, "a", 1), channel(72, "b", 0));
+    fx.writeFile(repoOf("notifications"), "notifications", "a.yaml", { name: "a", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true, is_active: true });
+    fx.writeFile(repoOf("notifications"), "notifications", "b.yaml", { name: "b", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true });
+    const { default: controller } = await import("../src/controllers/v2/notificationChannel.controller.js");
+    const r = await asAdmin(controller.update, { body: { is_active: 1 }, params: { id: "72" } });
+    assert.ok(r.status < 300, JSON.stringify(r.data));
+    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "b.yaml").is_active, true);
+    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "a.yaml").is_active, undefined, "a is no longer the active one");
+    // and the next pull changes nothing : the user's choice stays
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("notifications"), repoOf("notifications"))).updated, 0);
+    assert.equal(Number(fx.rowNamed("notification_channels", "b").is_active), 1);
+  });
+
   test("an SSO provider enabled : the other provider of its type turned off in its file too", async () => {
     const provider = (id, name, enable) => ({ id, name, provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable, managed: 0, repository: repoOf("sso"), repo_file: `sso/${name}.yaml` });
     fx.state.tables.oauth2_providers.push(provider(61, "one", 1), provider(62, "two", 0));
