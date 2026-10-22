@@ -799,7 +799,60 @@ function detailLines(summary) {
 // what the last pull (or clone) of a repository read in of each type it holds, by type and
 // repository : an activation that follows it says what that pull took (git winning on a name), its
 // own read finding nothing left to take. Taken by the activation, dropped when the type is let go.
+// Kept in this node's memory only : each one stamped with the working tree it read (treeStamp,
+// on the volume every node shares), and taken only while the tree is still that one - a pull of
+// another node since, or a deactivation there, leaves a summary that no longer says the truth.
 const synced = new Map();
+
+/**
+ * The commit a working tree is on, read from its .git folder (no git process) : its HEAD, the
+ * branch it names resolved from its ref file or packed-refs.
+ *
+ * Args:
+ *   dir (string): the working tree.
+ *
+ * Returns:
+ *   string: the commit (or what HEAD says), '' when it cannot be read.
+ */
+function headOf(dir) {
+  try {
+    const head = fs.readFileSync(path.join(dir, ".git", "HEAD"), "utf8").trim();
+    const ref = head.match(/^ref:\s*(\S+)$/)?.[1];
+    if (!ref) return head;
+    const loose = path.join(dir, ".git", ref);
+    if (fs.existsSync(loose)) return fs.readFileSync(loose, "utf8").trim();
+    const packed = fs.existsSync(path.join(dir, ".git", "packed-refs")) ? fs.readFileSync(path.join(dir, ".git", "packed-refs"), "utf8") : "";
+    return packed.split("\n").find((l) => l.endsWith(` ${ref}`))?.split(" ")[0] || head;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * What a repository's working tree holds of a type now, as one text : its commit and each of the
+ * type's files with its size and time. Two reads of the tree give the same stamp only when no
+ * pull (of any node : the volume is shared) changed it between them.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   string|null: the stamp, null when the tree cannot be read (never the same as another).
+ */
+function treeStamp(desc, name) {
+  try {
+    const dir = Repo.folderOf(name);
+    const files = desc.file ? [desc.file] : desc.listFile ? [desc.listFile] : filesIn(dir, desc.folder);
+    const parts = files.map((file) => {
+      const st = fs.statSync(path.join(dir, file), { throwIfNoEntry: false });
+      return st ? `${file}:${st.size}:${st.mtimeMs}` : `${file}:-`;
+    });
+    return [headOf(dir), ...parts].join("\n");
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The key of a type of a repository in what was read in (synced).
@@ -815,7 +868,8 @@ const syncedKey = (desc, name) => `${desc.key}\u0000${name}`;
 
 /**
  * What the last pull of a repository read in of a type, taken : said once, by the activation that
- * follows it.
+ * follows it - while the working tree is still the one that pull read (treeStamp) ; changed since
+ * (another node pulled, the files moved on), it is no longer what the activation found.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -825,9 +879,11 @@ const syncedKey = (desc, name) => `${desc.key}\u0000${name}`;
  *   object|null: syncRepository's summary, null when none was kept.
  */
 function takeSynced(desc, name) {
-  const summary = synced.get(syncedKey(desc, name)) || null;
+  const kept = synced.get(syncedKey(desc, name)) || null;
   synced.delete(syncedKey(desc, name));
-  return summary;
+  if (!kept) return null;
+  const now = treeStamp(desc, name);
+  return now !== null && now === kept.stamp ? kept.summary : null;
 }
 
 /**
@@ -845,7 +901,7 @@ function takeSynced(desc, name) {
 export async function syncText(desc, name, opts = {}) {
   try {
     const summary = await syncRepository(desc, name, opts);
-    synced.set(syncedKey(desc, name), summary);
+    synced.set(syncedKey(desc, name), { summary, stamp: treeStamp(desc, name) });
     return summaryText(desc, summary);
   } catch (e) {
     logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);

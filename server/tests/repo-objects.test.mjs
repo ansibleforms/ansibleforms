@@ -865,3 +865,46 @@ describe("turning the usage on while the repository is busy", () => {
     assert.match(report.credentials.error, /the usage is saved but nothing was handed over - turn it off, save, and turn it on again/);
   });
 });
+
+describe("the pull summary an activation reports", () => {
+  test("one kept from before the working tree changed (another node's deactivation and pull) is not reported", async () => {
+    // this node pulled 'creds' while it held the credentials : git took 'git' over
+    fx.state.tables.credentials.push({ id: 7, name: "git", credential_type: "git", user: "app", password: "enc:pw" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 });
+    // turned off on another node (this node's memory untouched), the file gone in git since
+    fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+    await RepoObjects.unlinkRepository(credentials, "creds");
+    fx.removeFile("creds", "credentials", "git.yaml");
+    // turned on here again, its pull failing
+    fx.rowNamed("repositories", "creds").use_for_credentials = 1;
+    fx.state.pullFails = true;
+    CrudModel.flushAllLocal();
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 });
+    assert.deepEqual(report.credentials.activated.matched, []);
+    assert.equal(report.credentials.activated.created, 0);
+  });
+
+  test("one whose working tree moved to another commit is not reported either", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "git", credential_type: "git", user: "app", password: "enc:pw" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    fs.mkdirSync(path.join(fx.ROOT, "creds", ".git", "refs", "heads"), { recursive: true });
+    fs.writeFileSync(path.join(fx.ROOT, "creds", ".git", "HEAD"), "ref: refs/heads/main\n");
+    fs.writeFileSync(path.join(fx.ROOT, "creds", ".git", "refs", "heads", "main"), "aaaa\n");
+    await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 });
+    // another node pulled : the same files, another commit
+    fs.writeFileSync(path.join(fx.ROOT, "creds", ".git", "refs", "heads", "main"), "bbbb\n");
+    CrudModel.flushAllLocal();
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 }, { pull: false });
+    assert.deepEqual(report.credentials.activated.matched, []);
+  });
+
+  test("one of the tree as it still is, its pull just before, is reported", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "git", credential_type: "git", user: "app", password: "enc:pw" });
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 });
+    CrudModel.flushAllLocal();
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "creds", { use_for_credentials: 1 }, { pull: false });
+    assert.deepEqual(report.credentials.activated.matched, ["git"]);
+  });
+});
