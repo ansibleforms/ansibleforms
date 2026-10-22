@@ -117,12 +117,14 @@ const schedules = {
    *   forms (Set<string>|null|undefined): the forms there are ; none : not checked.
    *
    * Returns:
-   *   object: { errors, absent, object (the schedule, null when refused), ignored }.
+   *   object: { errors, absent, object (the schedule, null when refused), raw (the name a refused
+   *     one declares), ignored }.
    */
   parse(text, forms) {
     const parsed = parseScheduleFile(text);
     if (parsed.schedule && forms && !forms.has(parsed.schedule.form)) {
-      return { errors: [`the form '${parsed.schedule.form}' (unified_job_template.name) does not exist`], absent: false, object: null };
+      // its name kept : no schedule of the app is written beside it under that name
+      return { errors: [`the form '${parsed.schedule.form}' (unified_job_template.name) does not exist`], absent: false, object: null, raw: { name: parsed.schedule.name } };
     }
     return { errors: parsed.errors, absent: parsed.absent, object: parsed.schedule, ignored: parsed.schedule?.ignored || [] };
   },

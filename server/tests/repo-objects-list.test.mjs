@@ -220,6 +220,26 @@ describe("a pull of repositories.yaml", () => {
   });
 });
 
+describe("the question asked before it is turned on", () => {
+  test("a repositories.yaml, or a one-file type's file, that is a link leading outside : said refused, never an error", async () => {
+    fx.cloneEmpty("hub");
+    const outside = path.join(os.tmpdir(), `af-outside-${process.pid}.yaml`);
+    fs.writeFileSync(outside, "repositories: []\n");
+    try {
+      fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
+      const p = await RepoObjects.preview(await desc(), "hub");
+      assert.match(p.refused[0].reasons[0], /'repositories\.yaml' is not a file/);
+      fx.state.tables.settings = [{ id: 1 }];
+      fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "links.yaml"));
+      const links = await RepoObjects.preview(await RepoObjects.descriptorOf("links"), "hub");
+      assert.equal(links.refused[0].file, "links.yaml");
+      assert.deepEqual(links.written, []);
+    } finally {
+      fs.rmSync(outside, { force: true });
+    }
+  });
+});
+
 describe("what turning it on did", () => {
   test("says what its read said : a usage an entry may not set, as a pull says it", async () => {
     fx.state.tables.repositories.push({ id: 2, name: "creds", uri: "https://git/c.git", use_for_credentials: 1 });

@@ -57,6 +57,22 @@ import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 export const nameKey = (name) => String(name || "").trim().toLowerCase();
 
 /**
+ * The name a file (or an entry of a list file) declares, read or not : its object's, else the one
+ * its text gives (a file refused, or waiting for what it names).
+ *
+ * Args:
+ *   f (object): the file as read ({ object, raw }).
+ *
+ * Returns:
+ *   string|null: the name, null when it gives none.
+ */
+const declaredName = (f) => {
+  const raw = f?.raw && typeof f.raw === "object" && !Array.isArray(f.raw) ? f.raw : null;
+  const n = f?.object?.name ?? raw?.name;
+  return n === undefined || n === null || String(n).trim() === "" ? null : String(n);
+};
+
+/**
  * A type's title, for the pull output and the log (Schedules, Credentials).
  *
  * Args:
@@ -363,6 +379,7 @@ async function readFiles(desc, name, ctx) {
     const waiting = await waitingOf(desc, f.object, cache);
     if (waiting.length) {
       f.waiting = waiting;
+      f.raw = f.raw ?? f.object;
       f.object = null;
     }
   }
@@ -596,6 +613,9 @@ export async function syncRepository(desc, name, opts = {}) {
   }
   for (const f of files) {
     if (!f.object) {
+      // the name a refused or waiting file declares : no object of the app is written beside it
+      // under that name (activateFolder) - its file follows once it is read in
+      if (!f.skipped && !f.absent && declaredName(f)) summary.unread.push({ name: declaredName(f), file: f.file });
       if (f.skipped) {
         summary.skipped.push({ file: f.file, ...f.skipped });
       } else if (f.waiting) {
@@ -669,10 +689,10 @@ export async function syncRepository(desc, name, opts = {}) {
  *
  * Returns:
  *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
- *     secretsKept, notes }.
+ *     secretsKept, notes, unread (the names refused or waiting files declare : [{ name, file }]) }.
  */
 function newSummary() {
-  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [] };
+  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [] };
 }
 
 export function summaryText(desc, summary) {
@@ -937,13 +957,23 @@ export async function syncAll() {
  *   desc (object): the type's descriptor.
  *   name (string|null): the repository that would take them (the repositories' holder stays in
  *     the app, before its flag is saved too : the question asked first).
+ *   unread (Map<string, string>): the names files of the repository declare that are not read in
+ *     (refused, waiting), as nameKey keys them, to the file : an object of that name stays in the
+ *     app - a second file of its name would be refused on every pull - and follows that file once
+ *     it is read in.
  *
  * Returns:
  *   Promise<object[]>: { row, ... } to write, or { row, reason }.
  */
-async function candidates(desc, name = null) {
+async function candidates(desc, name = null, unread = new Map()) {
   const taken = await takenNames(desc);
-  return Promise.all((await desc.store.appRows()).map((row) => desc.candidateOf(row, name, taken)));
+  return Promise.all(
+    (await desc.store.appRows()).map(async (row) => {
+      const c = await desc.candidateOf(row, name, taken);
+      const file = !c.reason && unread.get(nameKey(c.row.name));
+      return file ? { row: c.row, reason: `${name}/${file} has its name but is not read in (refused or waiting): it follows that file once it is` } : c;
+    }),
+  );
 }
 
 /**
@@ -995,18 +1025,25 @@ export async function preview(desc, name) {
   const fileNames = new Set();
   let files = 0;
   let skipped = 0;
+  const refused = [];
   if (cloned(name)) {
     const ctx = await desc.previewContext?.();
-    // a list file's entries, or each file of the folder
-    const parsedFiles = desc.listFile
-      ? readListFile(desc, name) || []
-      : filesIn(Repo.folderOf(name), desc.folder).map((file) => {
-          try {
-            return desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
-          } catch {
-            return {};
-          }
-        });
+    // a list file's entries, or each file of the folder ; a list file that cannot be read (a link
+    // that leads outside the repository) is said refused, as its sync refuses it
+    let parsedFiles = [];
+    try {
+      parsedFiles = desc.listFile
+        ? readListFile(desc, name) || []
+        : filesIn(Repo.folderOf(name), desc.folder).map((file) => {
+            try {
+              return desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
+            } catch {
+              return {};
+            }
+          });
+    } catch (e) {
+      refused.push({ file: desc.listFile, reasons: [e.message || String(e)] });
+    }
     for (const parsed of parsedFiles) {
       try {
         // one the type does not import (an announcement already ended) : counted apart
@@ -1014,6 +1051,9 @@ export async function preview(desc, name) {
         else if (parsed.object) {
           files++;
           fileNames.add(nameKey(parsed.object.name));
+        } else if (declaredName(parsed)) {
+          // a file refused declaring a name : the app's object of that name is not written beside it
+          fileNames.add(nameKey(declaredName(parsed)));
         }
       } catch {
         // an unreadable file is refused by the sync, said then
@@ -1032,6 +1072,7 @@ export async function preview(desc, name) {
     clashes,
     files,
     skipped,
+    ...(refused.length ? { refused } : {}),
     linked: name ? await desc.store.countLinked(name) : 0,
     ...(desc.previewExtra ? await desc.previewExtra(name, list) : {}),
   };
@@ -1166,8 +1207,8 @@ async function activateFolder(desc, name, report, opts = {}) {
   report.waiting = summary.waiting;
   report.skipped = summary.skipped;
   report.ignored = summary.ignored;
-  // step 3 : the app's other objects, each a new file
-  const list = await candidates(desc, name);
+  // step 3 : the app's other objects, each a new file - none beside a file of its name not read in
+  const list = await candidates(desc, name, new Map(summary.unread.map((u) => [nameKey(u.name), u.file])));
   // written in one step (a list file at once, else a file each), its returns ending that step only
   await (async () => {
     // a type kept as a list in one file : every candidate an entry of it, added at its end
@@ -1674,12 +1715,20 @@ async function syncSingle(desc, name) {
  *   Promise<object>: as preview's.
  */
 async function previewSingle(desc, name) {
-  const exists = cloned(name) && fs.existsSync(singleFileOf(desc, name));
+  // its file a link that leads outside the repository : said refused, as its sync refuses it ;
+  // nothing written over it
+  let exists = false;
+  let refused = null;
+  try {
+    exists = cloned(name) && fs.existsSync(singleFileOf(desc, name));
+  } catch (e) {
+    refused = [{ file: desc.file, reasons: [e.message || String(e)] }];
+  }
   const current = await desc.current();
   const { withoutSecret } = desc.fileOf(current);
   const active = (await activeRepository(desc)) || null;
   // written when the repository has no file, unless the config seed holds the whole object
-  const writes = !exists && !desc.heldBySeed(current);
+  const writes = !exists && !refused && !desc.heldBySeed(current);
   return {
     repository: name || null,
     active,
@@ -1689,6 +1738,7 @@ async function previewSingle(desc, name) {
     kept: desc.kept(current),
     clashes: exists ? [desc.title] : [],
     files: exists ? 1 : 0,
+    ...(refused ? { refused } : {}),
     linked: name && active === name ? 1 : 0,
   };
 }
