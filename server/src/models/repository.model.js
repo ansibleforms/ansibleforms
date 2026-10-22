@@ -222,9 +222,9 @@ class Repository extends CrudModel {
     if (!Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
-    // the branch it pulls and pushes is required, as its name ; the seed's own may leave it out
-    // (the remote's default)
-    if (!opts.fromSeed && !String(data.branch ?? "").trim()) {
+    // the branch it pulls and pushes is required, as its name ; the seed's own, and a
+    // repositories.yaml's entry (in the seed's format), may leave it out (the remote's default)
+    if (!opts.fromSeed && !opts.fromRepo && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
     // one repository at most per object type (the schedules, the credentials ...), and no usage of

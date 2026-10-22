@@ -100,3 +100,12 @@ describe("a repository a repositories.yaml holds", () => {
     assert.equal(queries.length, 0, "nothing saved");
   });
 });
+
+describe("a repository a repositories.yaml makes", () => {
+  test("without a branch : made, on the remote's default branch, as the config seed makes one", async () => {
+    vi.spyOn(Repository, "clone").mockResolvedValue();
+    assert.equal(await Repository.create({ name: "forms", uri: "https://git/forms.git" }, { fromRepo: true }), 9);
+    // one made in the app still needs its branch
+    await assert.rejects(Repository.create({ name: "other", uri: "https://git/other.git" }), /Missing required field: branch/);
+  });
+});
