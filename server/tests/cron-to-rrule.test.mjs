@@ -5,8 +5,9 @@
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
 import { Cron } from "croner";
+import { DateTime } from "luxon";
 import { cronToRrule } from "../src/lib/cronToRrule.js";
-import { nextRuns, validateRrule } from "../src/lib/scheduleRrule.js";
+import { nextRuns, validateRrule, walkRuns } from "../src/lib/scheduleRrule.js";
 
 const ZONE = "Europe/Brussels";
 // a day with no DST change in the forty runs that follow
@@ -119,6 +120,56 @@ describe("across a DST change, the rrule fires when croner fires the cron", () =
           `after ${after.toISOString()}`,
         );
       }
+    });
+  }
+});
+
+describe("random crons become rrules that fire as croner fires them, a DST change among their runs", () => {
+  // seeded : the same crons each run
+  let seed = 20261022;
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const between = (a, b) => a + Math.floor(random() * (b - a + 1));
+  // a field : a star, a step, a value, a range, a range with a step, a name, a list
+  const field = (min, max, names) => {
+    const r = random();
+    if (r < 0.35) return "*";
+    if (r < 0.5) return `*/${between(2, Math.min(15, max))}`;
+    if (r < 0.65) return `${between(min, max)}`;
+    const a = between(min, max - 1);
+    if (r < 0.75) return `${a}-${between(a, max)}`;
+    if (r < 0.85) return `${a}-${between(a, max)}/${between(2, 5)}`;
+    if (r < 0.9 && names) return names[between(0, names.length - 1)];
+    return [...new Set([between(min, max), between(min, max), between(min, max)])].join(",");
+  };
+  // not Pacific/Chatham : its clock goes from 02:45 to 03:45, and croner leaves out the 03:45 to
+  // 03:59 that do exist that night, a rrule keeps them
+  const zones = ["UTC", "Europe/Brussels", "America/New_York", "Australia/Lord_Howe", "America/Santiago", "Asia/Kolkata", "Australia/Sydney"];
+  // the offset of a zone at a moment, in minutes
+  const offset = (ms, zone) => DateTime.fromMillis(ms, { zone }).offset;
+  const cases = [];
+  while (cases.length < 150) {
+    const seconds = random() < 0.2 ? `${field(0, 59)} ` : "";
+    // the hours a DST change moves, often
+    const hour = random() < 0.5 ? `${between(0, 3)}` : field(0, 23);
+    const cron = `${seconds}${field(0, 59)} ${hour} ${field(1, 31)} ${field(1, 12, ["JAN", "MAR", "OCT"])} ${field(0, 7, ["MON", "SUN", "SAT"])}`;
+    const zone = zones[between(0, zones.length - 1)];
+    // a few hours before the zone's next DST change
+    let t = Date.UTC(2026, 9, 22) + between(0, 3 * 365) * 86400000;
+    for (let k = 0; k < 400 && offset(t + 86400000, zone) === offset(t, zone); k++) t += 86400000;
+    for (let k = 0; k < 24 && offset(t + 3600000, zone) === offset(t, zone); k++) t += 3600000;
+    const now = new Date(t - between(0, 6 * 3600) * 1000);
+    const converted = cronToRrule(cron, zone, now);
+    if (converted.rrule) cases.push({ cron, zone, now, rrule: converted.rrule });
+  }
+  for (const { cron, zone, now, rrule } of cases) {
+    test(`${cron} in ${zone} from ${now.toISOString()}`, () => {
+      const task = new Cron(cron, { timezone: zone, paused: true });
+      const want = task.nextRuns(10, now).map((d) => d.toISOString());
+      task.stop();
+      assert.deepEqual(walkRuns(rrule, { after: now, count: 10 }).map((d) => d.toISOString()), want, rrule);
     });
   }
 });
