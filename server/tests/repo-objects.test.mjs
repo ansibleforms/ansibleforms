@@ -79,6 +79,26 @@ describe("a pull reads the credentials folder", () => {
     assert.ok(RepoObjects.summaryText(credentials, summary).includes("Refused credentials/plain.yaml:"));
   });
 
+  test("a secret naming one of the server's own variables is refused, never read : its token secret, its database password", async () => {
+    process.env.ACCESS_TOKEN_SECRET ||= "jwt-key";
+    process.env.DB_PASSWORD ||= "db-pw";
+    process.env.RTE_JOIN_TOKEN = "join";
+    process.env.VAULT_TOKEN = "vault";
+    fx.writeFile("creds", "credentials", "jwt.yaml", gitCredential("jwt", { password: "${ACCESS_TOKEN_SECRET}" }));
+    fx.writeFile("creds", "credentials", "db.yaml", gitCredential("db", { password: "${DB_PASSWORD}", client_key: "${ENCRYPTION_SECRET}" }));
+    fx.writeFile("creds", "credentials", "join.yaml", gitCredential("join", { password: "${RTE_JOIN_TOKEN}" }));
+    // a token an object is meant to carry : the Vault's
+    fx.writeFile("creds", "credentials", "vault.yaml", gitCredential("vault", { password: "${VAULT_TOKEN}" }));
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.deepEqual(summary.refused.map((r) => r.file), ["credentials/db.yaml", "credentials/join.yaml", "credentials/jwt.yaml"]);
+    assert.match(summary.refused[0].reasons[0], /it references DB_PASSWORD, ENCRYPTION_SECRET, the server's own: a repository's object never reads them/);
+    assert.match(summary.refused[2].reasons[0], /ACCESS_TOKEN_SECRET/);
+    assert.equal(fx.rowNamed("credentials", "jwt"), undefined);
+    assert.equal(fx.rowNamed("credentials", "vault").password, "enc:vault");
+    delete process.env.RTE_JOIN_TOKEN;
+    delete process.env.VAULT_TOKEN;
+  });
+
   test("only the secret fields resolve their ${ENV} references : anywhere else a ${NAME} is plain text", async () => {
     fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git", { description: "${GIT_PW}" }));
     assert.equal((await RepoObjects.syncRepository(credentials, "creds")).created, 1);

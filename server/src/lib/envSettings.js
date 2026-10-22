@@ -89,6 +89,29 @@ export const OWNED_ELSEWHERE =
 // A General repository writes these only as ${ENV} references.
 export const SECRET_ENV_NAME = /_PASSWORD$|_SECRET$|_TOKEN$|_SECRET_PREVIOUS$/;
 
+// The server's own variables : its database, its token and encryption secrets, its local admin, the
+// token RTEs join with, its metrics token, and every variable it refuses to edit (REFUSED). A
+// repository's object never reads one into a secret field (lib/repoObjects/secrets.js) : whoever
+// may push to the repository would have it sent where their file says (a credential's host, a
+// channel's url), the token secret making them an admin. The tokens an object is meant to carry
+// stay readable : an RTE's (RTE_TOKEN, the credential of its runner), the Vault's (VAULT_TOKEN, a
+// secret store's).
+const SERVER_OWN_VARIABLE = /^(DB_|ACCESS_TOKEN_|ENCRYPTION_|ADMIN_|MYSQL)|^(METRICS_TOKEN|RTE_JOIN_TOKEN)$/;
+
+/**
+ * Whether a variable is one of the server's own (SERVER_OWN_VARIABLE, REFUSED) : never read into a
+ * repository's object.
+ *
+ * Args:
+ *   name (string): the variable.
+ *
+ * Returns:
+ *   boolean: true when it is.
+ */
+export function isServerOwnVariable(name) {
+  return SERVER_OWN_VARIABLE.test(String(name)) || Object.prototype.hasOwnProperty.call(REFUSED, String(name));
+}
+
 // Why the whole page is read only, when it is. Distinct from a per-variable refusal :
 // nothing here is wrong with the variable, the store itself is not ours to write.
 export const ENV_EDIT_DISABLED_REASON =
@@ -586,4 +609,4 @@ export async function writeManaged(map) {
   return text;
 }
 
-export default { MANAGED_ENV_PATH, OWNED_ELSEWHERE, SECRET_ENV_NAME, REFUSED, ENV_EDIT_DISABLED_REASON, RELOCATES, RUNNER_PAGE, classify, isOverridden, serialize, parseEnvFile, readManaged, validate, applyLive, writeManaged };
+export default { MANAGED_ENV_PATH, OWNED_ELSEWHERE, SECRET_ENV_NAME, REFUSED, isServerOwnVariable, ENV_EDIT_DISABLED_REASON, RELOCATES, RUNNER_PAGE, classify, isOverridden, serialize, parseEnvFile, readManaged, validate, applyLive, writeManaged };

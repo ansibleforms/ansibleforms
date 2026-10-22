@@ -4,9 +4,12 @@
 // environment as the config seed resolves them (lib/seed-schema.js interpolateEnv) ; a file holding
 // a plain secret is refused. Only the secret fields are resolved : anywhere else a ${NAME} is plain
 // text, or whoever can push to the repository could read any variable of the server (its token
-// secret, its database password) through a field the app shows. An app object is written to git
-// without its secrets, which stay in the database.
+// secret, its database password) through a field the app shows ; nor does a secret field name one
+// of the server's own variables (lib/envSettings.js isServerOwnVariable), which the object would
+// send where the file says. An app object is written to git without its secrets, which stay in
+// the database.
 import { interpolateEnv } from "../seed-schema.js";
+import { isServerOwnVariable } from "../envSettings.js";
 
 // a ${VAR} reference, as the seed writes it
 const ENV_REF = /\$\{[A-Za-z_][A-Za-z0-9_]*\}/g;
@@ -40,7 +43,8 @@ export function onlyEnvRefs(value) {
 /**
  * Checks a file's object against the secret rule, then resolves the ${ENV} references of its
  * secret fields - only those : the others keep a ${NAME} as plain text (the seed, a local file of
- * the administrator, resolves every field itself).
+ * the administrator, resolves every field itself) ; a reference to one of the server's own
+ * variables (isServerOwnVariable) is refused.
  *
  * Args:
  *   obj (object): the object as the file gives it.
@@ -55,6 +59,14 @@ export function resolveSecrets(obj, secretFields = [], env = process.env) {
   if (plain.length) {
     return {
       errors: [`${plain.join(", ")} must be an \${ENV} reference: a secret is never written plain in git`],
+      object: null,
+    };
+  }
+  // the server's own variables : never read into an object
+  const own = [...new Set(secretFields.flatMap((f) => (typeof obj[f] === "string" ? [...obj[f].matchAll(ENV_REF)].map((m) => m[0].slice(2, -1)) : [])).filter(isServerOwnVariable))];
+  if (own.length) {
+    return {
+      errors: [`it references ${own.sort().join(", ")}, the server's own: a repository's object never reads them`],
       object: null,
     };
   }

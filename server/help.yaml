@@ -6648,7 +6648,9 @@
       and a runner's own `token` or `password`, are written as `${ENV}` references only, resolved from the
       environment as the config seed resolves them. Only the secret fields are resolved: in any other field a
       `${NAME}` stays plain text. A file holding a plain secret, or naming a variable that is not set, is refused and
-      named in the pull output. A file or a folder that is a link leading outside the repository is never read nor
+      named in the pull output; so is one naming a variable of the server itself (`DB_*`, `ACCESS_TOKEN_*`,
+      `ENCRYPTION_*`, `ADMIN_*`, `METRICS_TOKEN`, `RTE_JOIN_TOKEN` and the variables Settings > System > General
+      refuses), which the object would send wherever the file says. `RTE_TOKEN` and `VAULT_TOKEN` stay readable. A file or a folder that is a link leading outside the repository is never read nor
       written through. An app object written to git (turning the usage on, a new object,
       an edit) is written without its secrets, which stay in the database; the pull output lists the objects whose
       secrets come from the database.
