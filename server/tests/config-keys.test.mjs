@@ -466,3 +466,55 @@ describe("the editor saved after a key file's anchors were laid as their values"
     assert.match(keys.mergeIntoBase(base, keys.withoutHeldKeys(YAML.parse(commented), sources), served, { text: commented, servedText: shown, held: ["constants"] }), /# the teams\ncategories:/);
   });
 });
+
+describe("a config.yaml of before giving several keys, one of them not read", () => {
+  // the roles and the categories of one config.yaml : each read and checked on its own, its last
+  // good value its own
+  const sources = (dir) => {
+    const p = path.join(fx.ROOT, dir, "config.yaml");
+    return [
+      { key: "roles", repository: dir, path: p, exists: true, deprecated: true },
+      { key: "categories", repository: dir, path: p, exists: true, deprecated: true },
+    ];
+  };
+  const base = "roles:\n  - name: base-role\ncategories:\n  - name: Base\n";
+
+  test("its roles broken : the roles last read, never the broken ones the categories' read of the same file kept", async () => {
+    let file = "roles:\n  - name: admin\n    groups: [local/admins]\ncategories:\n  - name: Ops\n";
+    const src = sources("legacy-roles");
+    assert.deepEqual(YAML.parse(keys.composeConfig(base, src, () => file)).roles, [{ name: "admin", groups: ["local/admins"] }]);
+    file = "roles:\n  admin:\n    groups: [local/admins]\ncategories:\n  - name: Ops\n";
+    for (let i = 0; i < 3; i++) {
+      const doc = YAML.parse(keys.composeConfig(base, src, () => file));
+      assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }], `read ${i + 1}`);
+      assert.deepEqual(doc.categories, [{ name: "Ops" }]);
+    }
+  });
+
+  test("its categories broken, its roles read : the categories last read, not the broken ones", async () => {
+    let file = "roles:\n  - name: admin\ncategories:\n  - name: Ops\n";
+    const src = sources("legacy-categories");
+    keys.composeConfig(base, src, () => file);
+    file = "roles:\n  - name: admin\ncategories:\n  Ops: {}\n";
+    assert.deepEqual(YAML.parse(keys.composeConfig(base, src, () => file)).categories, [{ name: "Ops" }]);
+  });
+});
+
+describe("a roles file never read on this node, broken", () => {
+  test("closed : only the admin role of local/admins, never the base configuration's roles ; said so", async () => {
+    fx.rowNamed("repositories", "access").use_for_roles = 0;
+    fx.state.tables.repositories.push({ id: 3, name: "fresh-roles", use_for_roles: 1 });
+    fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "admin", groups: ["corp/everyone"] }, { name: "default", groups: [] }], categories: [{ name: "Base" }] }));
+    writeRaw("fresh-roles", "roles.yaml", "roles:\n  admin: {}\n");
+    const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
+    assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }]);
+    assert.deepEqual(doc.categories, [{ name: "Base" }], "the other keys untouched");
+    assert.match(await keys.deprecationLines("fresh-roles"), /the roles last read from it \(else only the admin role of local\/admins\) are used/);
+    // the users : a member of corp/everyone is no admin, a local admin still is
+    const { default: User } = await import("../src/models/user.model.js");
+    const everyone = await User.getRolesAndOptions(["corp/everyone"], { username: "joe", type: "ldap" });
+    assert.ok(!everyone.roles.includes("admin"));
+    const local = await User.getRolesAndOptions(["local/admins"], { username: "admin", type: "local" });
+    assert.ok(local.roles.includes("admin"));
+  });
+});

@@ -1365,6 +1365,8 @@ export default {
         '{key} を config.yaml から読み込み：非推奨です。{file} に移動してください（8.0.0 では config.yaml は読まれません）',
       configNotRead:
         '{file} は読み込まれません（{reason}）：git で修正されるまで、最後に読み込んだ {key}（なければ基本構成のもの）が使われます',
+      configRolesNotRead:
+        '{file} は読み込まれません（{reason}）：git で修正されるまで、最後に読み込んだロールが使われます。なければ local/admins の admin ロールのみで、基本構成のロールは使われません',
       usagePreviewFailed:
         'この変更で何が行われるかをサーバーから読み取れませんでした。続行すると変更はそのまま適用されます。',
       usageOnNewRepository:

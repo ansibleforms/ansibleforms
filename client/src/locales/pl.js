@@ -1370,6 +1370,8 @@ export default {
         '{key} czytane z config.yaml: przestarzałe, przenieś je do {file} (config.yaml nie jest czytany od 8.0.0)',
       configNotRead:
         '{file} nie jest czytany ({reason}): używane są {key} ostatnio z niego odczytane, a w ich braku te z konfiguracji bazowej, dopóki plik nie zostanie poprawiony w git',
+      configRolesNotRead:
+        '{file} nie jest czytany ({reason}): używane są role ostatnio z niego odczytane, dopóki plik nie zostanie poprawiony w git, a w ich braku tylko rola admin grupy local/admins, nigdy te z konfiguracji bazowej',
       usagePreviewFailed:
         'Nie udało się odczytać z serwera, co zrobi ta zmiana: i tak zostanie zastosowana, jeśli kontynuujesz.',
       usageOnNewRepository:

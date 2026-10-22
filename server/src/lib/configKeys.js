@@ -26,8 +26,11 @@ import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js
 
 // each key : its usage type, its flag, its own file
 // ... and what its value is : a list (roles, categories) or a dictionary (constants)
+// ... and, for the roles, what is served when its file is not read and was never read on this node
+// (closed) : the local admins' admin role only - never the base configuration's roles, which the
+// repository's replaced and may grant more than they do (composeConfig)
 export const CONFIG_KEYS = [
-  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true },
+  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: [{ name: "admin", groups: ["local/admins"] }] },
   { key: "categories", flag: "use_for_categories", file: "categories.yaml", list: true },
   { key: "constants", flag: "use_for_constants", file: "constants.yaml", list: false },
 ];
@@ -118,7 +121,7 @@ export async function repositoryDeprecations(name) {
  */
 export async function deprecationLines(name) {
   try {
-    const problems = (await repositoryKeyProblems(name)).map((p) => `\nNot read: ${p.file}: ${p.reason} - the ${p.key} last read from it (else the base configuration's) are used until it is fixed`);
+    const problems = (await repositoryKeyProblems(name)).map((p) => `\nNot read: ${p.file}: ${p.reason} - the ${p.key} last read from it (else ${meanwhile(p.key)}) are used until it is fixed`);
     return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("") + problems.join("");
   } catch (e) {
     logger.debug(`Could not read the configuration keys of repository '${name}': ${e.message}`);
@@ -252,10 +255,24 @@ function keyText(doc, text, key) {
 // READ : THE KEYS LAID OVER THE BASE CONFIGURATION
 // ===========================================================================
 
-// the document of each key file last read whole, by its path : a file broken in git afterwards
-// keeps its keys as they were (composeConfig) ; and what was last said of a file that is not read
+// the document of each key file last read whole, by its path and its key (a config.yaml of before
+// gives several keys, each read and checked on its own) : a file broken in git afterwards keeps its
+// keys as they were (composeConfig) ; and what was last said of a file that is not read
 const lastRead = new Map();
 const reported = new Map();
+const readKey = (source) => `${source.path}\n${source.key}`;
+
+/**
+ * What a key whose file is not read, and was never read on this node, is served as : the roles
+ * closed (the local admins' admin role only), the others the base configuration's.
+ *
+ * Args:
+ *   key (string): the key.
+ *
+ * Returns:
+ *   string: said in the server log and the pull output.
+ */
+const meanwhile = (key) => (CONFIG_KEYS.find((k) => k.key === key)?.closed ? "only the admin role of local/admins" : "those of the base configuration");
 
 /**
  * The base configuration with the keys of the repositories laid over it.
@@ -270,7 +287,9 @@ const reported = new Map();
  *     it (its comments, a ytt directive among them, kept), the base's other lines as they are ; the
  *     base as it is when no key comes from a repository. A key file that is not read (not valid
  *     YAML, not a dictionary, its key not a list or a dictionary as it should be) gives its key as
- *     it was last read, else the base's : said, never a failure of the whole configuration.
+ *     it was last read on this node, else the base's - the roles closed instead (the local admins'
+ *     admin role only : a node started while the file is broken never grants the base's roles the
+ *     repository replaced) : said, never a failure of the whole configuration.
  */
 export function composeConfig(baseText, sources, render) {
   const present = sources.filter((s) => s.exists);
@@ -280,15 +299,18 @@ export function composeConfig(baseText, sources, render) {
     let from;
     try {
       from = keyDocument(s, render(s.path));
-      lastRead.set(s.path, from);
-      reported.delete(s.path);
+      lastRead.set(readKey(s), from);
+      reported.delete(readKey(s));
     } catch (e) {
-      // a file that cannot be read : its key as it was last read, else the base's - never the whole
-      // configuration lost with it (said once in the server log, in its pull output and on its page)
-      from = lastRead.get(s.path);
-      const line = `${s.repository}/${path.basename(s.path)} is not read: ${e.message} - the ${s.key} ${from ? "last read from it" : "of the base configuration"} are used until it is fixed`;
-      if (reported.get(s.path) !== line) logger.error(line);
-      reported.set(s.path, line);
+      // a file that cannot be read : its key as it was last read, else the base's (the roles closed)
+      // - never the whole configuration lost with it (said once in the server log, in its pull
+      // output and on its page)
+      from = lastRead.get(readKey(s));
+      const closed = CONFIG_KEYS.find((k) => k.key === s.key)?.closed;
+      const line = `${s.repository}/${path.basename(s.path)} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
+      if (reported.get(readKey(s)) !== line) logger.error(line);
+      reported.set(readKey(s), line);
+      if (!from && closed) from = mapDocument(YAML.stringify({ [s.key]: closed }));
       if (!from) continue;
     }
     text = withKeyOf(text, s.key, from);

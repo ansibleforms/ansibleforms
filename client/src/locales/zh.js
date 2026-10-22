@@ -1336,6 +1336,8 @@ export default {
       configDeprecated: '{key} 从 config.yaml 读取：已弃用，请移至 {file}（8.0.0 起不再读取 config.yaml）',
       configNotRead:
         '{file} 未被读取（{reason}）：在 git 中修复之前，使用最后一次从中读取的 {key}（若无则使用基础配置中的）',
+      configRolesNotRead:
+        '{file} 未被读取（{reason}）：在 git 中修复之前，使用最后一次从中读取的角色；若无则仅使用 local/admins 的 admin 角色，绝不使用基础配置中的角色',
       usagePreviewFailed: '无法从服务器读取此更改将执行的操作：如果继续，更改仍会应用。',
       usageOnNewRepository:
         '{name} 尚未克隆：如果远程仓库已有这些文件，git 中的版本优先，并替换本应用中的版本。克隆后，其拉取输出会说明取用了什么。',

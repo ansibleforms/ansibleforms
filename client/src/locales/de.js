@@ -1378,6 +1378,8 @@ export default {
         '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie nach {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
       configNotRead:
         '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen {key}, sonst die der Basiskonfiguration, werden verwendet, bis die Datei in git korrigiert ist',
+      configRolesNotRead:
+        '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen Rollen werden verwendet, bis die Datei in git korrigiert ist, sonst nur die Admin-Rolle von local/admins, nie die der Basiskonfiguration',
       usagePreviewFailed:
         'Was diese Änderung bewirkt, konnte nicht vom Server gelesen werden: Sie wird trotzdem angewendet, wenn Sie fortfahren.',
       usageOnNewRepository:

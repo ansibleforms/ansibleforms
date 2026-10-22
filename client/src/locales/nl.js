@@ -1372,6 +1372,8 @@ export default {
         '{key} gelezen uit config.yaml: verouderd, verplaats ze naar {file} (config.yaml wordt vanaf 8.0.0 niet meer gelezen)',
       configNotRead:
         '{file} wordt niet gelezen ({reason}): de {key} die er het laatst uit gelezen zijn, anders die van de basisconfiguratie, worden gebruikt tot het in git is hersteld',
+      configRolesNotRead:
+        '{file} wordt niet gelezen ({reason}): de rollen die er het laatst uit gelezen zijn worden gebruikt tot het in git is hersteld, anders alleen de admin-rol van local/admins, nooit die van de basisconfiguratie',
       usagePreviewFailed:
         'Wat deze wijziging doet kon niet van de server gelezen worden: ze wordt toch toegepast als je doorgaat.',
       usageOnNewRepository:

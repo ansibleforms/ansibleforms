@@ -1374,6 +1374,8 @@ export default {
         '{key} letti da config.yaml: deprecato, spostali in {file} (config.yaml non viene più letto dalla 8.0.0)',
       configNotRead:
         '{file} non viene letto ({reason}): si usano i {key} letti per ultimi da esso, altrimenti quelli della configurazione di base, finché non viene corretto in git',
+      configRolesNotRead:
+        '{file} non viene letto ({reason}): si usano i ruoli letti per ultimi da esso finché non viene corretto in git, altrimenti solo il ruolo admin di local/admins, mai quelli della configurazione di base',
       usagePreviewFailed:
         'Non è stato possibile leggere dal server cosa farà questa modifica: viene comunque applicata se continui.',
       usageOnNewRepository:

@@ -1376,6 +1376,8 @@ export default {
         '{key} lidos de config.yaml: obsoleto, mova-os para {file} (config.yaml deixa de ser lido na 8.0.0)',
       configNotRead:
         '{file} não é lido ({reason}): são usados os {key} lidos dele pela última vez, senão os da configuração base, até ser corrigido no git',
+      configRolesNotRead:
+        '{file} não é lido ({reason}): são usadas as funções lidas dele pela última vez até ser corrigido no git, senão apenas a função admin de local/admins, nunca as da configuração base',
       usagePreviewFailed:
         'Não foi possível ler do servidor o que esta alteração fará: é aplicada na mesma se continuar.',
       usageOnNewRepository:

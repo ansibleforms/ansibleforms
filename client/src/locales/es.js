@@ -1377,6 +1377,8 @@ export default {
       configDeprecated: '{key} leídos de config.yaml: obsoleto, muévelos a {file} (config.yaml ya no se lee en 8.0.0)',
       configNotRead:
         '{file} no se lee ({reason}): se usan los {key} leídos de él por última vez, si no los de la configuración base, hasta que se corrija en git',
+      configRolesNotRead:
+        '{file} no se lee ({reason}): se usan los roles leídos de él por última vez hasta que se corrija en git, si no solo el rol admin de local/admins, nunca los de la configuración base',
       usagePreviewFailed: 'No se pudo leer del servidor lo que hará este cambio: se aplica igualmente si continúas.',
       usageOnNewRepository:
         '{name} aún no está clonado: si el remoto ya tiene estos archivos, gana la versión de git y reemplaza la de esta aplicación. Su salida de pull dice lo que tomó una vez clonado.',
