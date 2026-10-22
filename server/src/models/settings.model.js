@@ -451,9 +451,9 @@ Settings.saveActiveConfig = async function(yamlStr, options = {}) {
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
   // the keys a repository holds : each written back to the file it was read from, as the text has
-  // it (its comments with it), the rest into the base configuration, its other keys and its
-  // comments kept ; only what changed is written (lib/configKeys.js). A ytt template is written as
-  // it is
+  // it (its comments with it), the rest into the base configuration as the text has them too, a key
+  // the text no longer gives taken out of it ; only what changed is written (lib/configKeys.js). A
+  // ytt template is written as it is
   const sources = await keySources()
   if (sources.length && !isTemplate(yamlStr)) {
     const doc = yaml.parse(yamlStr) || {}
@@ -465,7 +465,7 @@ Settings.saveActiveConfig = async function(yamlStr, options = {}) {
       served = undefined
     }
     // the base's text first : a change it refuses (a ytt template) refused before a file is written
-    const base = mergeIntoBase(await activeBaseText(), withoutHeldKeys(doc, sources), served)
+    const base = mergeIntoBase(await activeBaseText(), withoutHeldKeys(doc, sources), served, { text: yamlStr, held: sources.map((s) => s.key) })
     await writeConfigKeys(doc, sources, { claim: true, served, text: yamlStr })
     // none of the base's keys changed : nothing more to write
     if (base === null) return

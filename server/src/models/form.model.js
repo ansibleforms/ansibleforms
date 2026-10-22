@@ -1758,7 +1758,7 @@ async function restoreHeldKeys(snapshot, toDatabase){
   const targetConfigPath = (await Repository.getConfigPath()) || appConfig.configPath
   const baseText = toDatabase ? (await Settings.findFormsYaml()).forms_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath,'utf8') : '')
   // the base's text first : a change it refuses (a ytt template) refused before a file is written
-  const base = mergeIntoBase(baseText, withoutHeldKeys(doc, sources), served)
+  const base = mergeIntoBase(baseText, withoutHeldKeys(doc, sources), served, { text, held: sources.map((s) => s.key) })
   await writeConfigKeys(doc, sources, { claim: true, served, text })
   return base
 }

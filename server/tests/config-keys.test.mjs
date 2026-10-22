@@ -376,3 +376,24 @@ describe("the config seed's use_for_config, the configuration kept in the databa
     assert.deepEqual(doc.repositories.items, [repo("cfg"), repo("off"), repo("forms", { use_for_forms: true })]);
   });
 });
+
+describe("the base configuration saved from a text while a repository holds a key", () => {
+  const served = { categories: [{ name: "Default", icon: "bars" }], constants: { old: 1 }, roles: [{ name: "admin" }] };
+  const base = "categories:\n  - name: Default\n    icon: bars\nconstants:\n  old: 1\n";
+  const held = ["roles"];
+
+  test("a key the text no longer gives : taken out of the base ; its new comments kept", async () => {
+    const text = "# my categories\ncategories:\n  - name: Default # the main one\n    icon: bars\nroles:\n  - name: admin\n";
+    const next = keys.mergeIntoBase(base, keys.withoutHeldKeys(YAML.parse(text), [{ key: "roles" }]), served, { text, held });
+    assert.equal(next, "# my categories\ncategories:\n  - name: Default # the main one\n    icon: bars\n");
+  });
+
+  test("the text as served : nothing written ; a held key or one never served is never taken out", async () => {
+    const text = "categories:\n  - name: Default\n    icon: bars\nconstants:\n  old: 1\nroles:\n  - name: admin\n";
+    assert.equal(keys.mergeIntoBase(base, keys.withoutHeldKeys(YAML.parse(text), [{ key: "roles" }]), served, { text, held }), null);
+    const withStale = `${base}roles:\n  - name: stale\n`;
+    assert.equal(keys.mergeIntoBase(withStale, keys.withoutHeldKeys(YAML.parse(text), [{ key: "roles" }]), served, { text, held }), null);
+    // the designer's save (no text, no held keys) : a key it leaves out stays
+    assert.equal(keys.mergeIntoBase(base, { categories: served.categories }, served), null);
+  });
+});

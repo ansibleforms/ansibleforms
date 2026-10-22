@@ -437,13 +437,19 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
 
 /**
  * The base configuration with the keys a save gives that no repository holds : the base's other
- * keys, its comments and the ones the repositories hold kept as they are.
+ * keys, its comments and the ones the repositories hold kept as they are. Saved from a text (the
+ * configuration's editor, a backup restored), each key is written as that text has it, its comments
+ * with it, and a key of the base the text no longer gives is taken out of it.
  *
  * Args:
  *   baseText (string): the base configuration's text.
  *   rest (object): the keys to write (writeConfigKeys' rest).
  *   served (object): the configuration served now : only a key that differs is written ; none :
  *     each one is.
+ *   opts (object): { text (the text the configuration was saved as : each key written as it has
+ *     it ; none : as YAML writes its value), held (string[] : the keys the repositories hold - a
+ *     key served now that the save no longer gives, none of these, is taken out of the base ; none
+ *     : no key taken out) }.
  *
  * Returns:
  *   string|null: the base configuration's new text ; null when no key changed (nothing to write).
@@ -451,14 +457,33 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
  * Raises:
  *   Errors.ConflictError: a key changed while the base configuration is a ytt template.
  */
-export function mergeIntoBase(baseText, rest, served) {
-  const edits = Object.fromEntries(Object.entries(rest).filter(([key]) => !unchanged(rest, key, served)));
+export function mergeIntoBase(baseText, rest, served, opts = {}) {
+  const base = String(baseText ?? "");
+  // the keys taken out : served now, no longer given, none a repository holds
+  const known = served !== undefined && served !== null && Array.isArray(opts.held);
+  const removed = known ? Object.keys(served).filter((key) => rest[key] === undefined && !opts.held.includes(key)) : [];
+  const gone = Object.fromEntries(removed.map((key) => [key, undefined]));
+  let saved;
+  try {
+    saved = opts.text !== undefined && base.trim() && !isTemplate(base) ? mapDocument(opts.text) : null;
+  } catch {
+    // a text that is not a map of valid YAML : its values, as before
+    saved = null;
+  }
+  if (saved) {
+    // each key as the text has it : a text the same as the base's is not written
+    let next = base;
+    for (const key of Object.keys(rest)) next = withKeyOf(next, key, saved);
+    if (removed.length) next = updateMapFile(next, gone);
+    return next === base ? null : next;
+  }
+  const edits = { ...Object.fromEntries(Object.entries(rest).filter(([key]) => !unchanged(rest, key, served))), ...gone };
   if (served !== undefined && served !== null && !Object.keys(edits).length) return null;
   if (isTemplate(baseText)) {
     throw new Errors.ConflictError(`The base configuration is a ytt template: change ${Object.keys(edits).join(", ")} where it is kept`);
   }
   try {
-    return String(baseText ?? "").trim() ? updateMapFile(baseText, edits) : newMapFile(edits);
+    return base.trim() ? updateMapFile(baseText, edits) : newMapFile(edits);
   } catch {
     // a base that is not a map of valid YAML : the keys alone, as before
     return YAML.stringify(rest);
