@@ -28,10 +28,13 @@
 // playbook by its playbook (and playbookSubPath), its ansible steps' and the job template nodes of
 // the workflows it runs (on the app or an rte runner) ; a workflow file by its workflow, and the
 // nested workflows those run - every workflow a reference may mean, when it means several. A
-// hidden file is never listed nor read ; a save of it is refused as a name taken, its delete as a
-// file not found. A form saved naming one hidden from the user is refused, the visibility read from
-// the forms as they were before the save. Edit Playbooks and Edit Workflows still decide whether a
-// shown one is changed.
+// hidden file is never listed nor read : a read or a delete of it answers as a file not found, a
+// save or a new file as a file there already, in the words of a real one. A form saved naming one
+// hidden from the user is refused, the visibility read from the forms as they were before the save.
+// Edit Playbooks and Edit Workflows still decide whether a shown one is changed.
+//
+// The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
+// the lines naming files, and the form names defined twice they are not told of.
 //
 // The inventories, the vars files, the categories and the constants stay as they are for every
 // designer.
@@ -51,6 +54,12 @@ const MAX_NESTING = 5;
 
 // the fields the loader adds to a form, never part of it : its file, its repository, read only
 const PLACEMENT = ["source", "repository", "readOnly"];
+
+// the lines of git's output naming a file : a commit's summary (a file made, removed, renamed,
+// copied, its mode changed) and a pull's diffstat ( forms/deploy.yaml | 3 ++)
+const GIT_FILE_LINE = /^\s*(create mode|delete mode|rename |copy |mode change )|^\s\S.*\s\|\s+(\d+ ?[+-]*|Bin \d+ -> \d+ bytes)\s*$/;
+// a pull output's line of a form name defined twice (Form.duplicateLines)
+const DUPLICATE_LINE = /^Warning: Form '.*' is defined twice: /;
 
 /**
  * Whether a user designs every form : the role option designAllForms (on unless a role turns it
@@ -79,6 +88,20 @@ export function designsAllForms(user) {
  */
 export function designsAll(user, option) {
   return (user?.roles || []).includes("admin") || user?.options?.[option] !== false;
+}
+
+/**
+ * Whether a user designs every form, every playbook and every workflow : nothing is left out of
+ * what they read.
+ *
+ * Args:
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   boolean: true when none of the three options is off for them.
+ */
+function designsEverything(user) {
+  return designsAllForms(user) && Object.values(FILE_OPTIONS).every((option) => designsAll(user, option));
 }
 
 /** A form's roles as a role check reads them : a form that does not load may hold anything there. */
@@ -409,7 +432,8 @@ export async function designerListing(kind, listing, user) {
 
 /**
  * Refuses a request aimed at a file hidden from the user, saying nothing of it : a read or a
- * delete as a file not found, a save or a new file as a name taken.
+ * delete as a file not found, a save or a new file as a file there already - each in the words
+ * ProjectFiles answers a real one in.
  *
  * Args:
  *   kind (string): the kind.
@@ -420,14 +444,60 @@ export async function designerListing(kind, listing, user) {
  * Raises:
  *   Errors.NotFoundError: a read or a delete of a hidden file.
  *   Errors.ConflictError: a save or a new file of a hidden one's name.
+ *   Errors.BadRequestError: the path is not valid (as the request itself would answer).
  */
 export async function assertFileShown(kind, rel, user, action) {
   const shown = await fileVisibility(kind, user);
   if (!shown) return;
-  const abs = (await ProjectFiles.absolutes(kind, [rel])).get(rel);
-  if (!abs || shown(abs)) return;
-  if (action === "read" || action === "delete") throw new Errors.NotFoundError(`File '${rel}' not found`);
-  throw new Errors.ConflictError(`The name '${rel}' is already taken`);
+  const { abs, name } = await ProjectFiles.locate(kind, rel);
+  if (shown(abs)) return;
+  if (action === "read" || action === "delete") throw new Errors.NotFoundError(`File '${name}' not found`);
+  throw new Errors.ConflictError(`File '${name}' exists already`);
+}
+
+/**
+ * A git output as a user reads it : without the lines naming files when a role option leaves some
+ * out for them.
+ *
+ * Args:
+ *   output (string): the output (a commit and push, a pull).
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   string: the output (the same one when they design everything).
+ */
+export function designerGitOutput(output, user) {
+  if (typeof output !== "string" || designsEverything(user)) return output;
+  return output
+    .split("\n")
+    .filter((line) => !GIT_FILE_LINE.test(line))
+    .join("\n");
+}
+
+/**
+ * Repositories as a user reads them : their pull and push outputs without the lines naming files
+ * (designerGitOutput), and without the form names defined twice they are not told of
+ * (duplicateShown) - the outputs are stored once, for every reader, so they are filtered here.
+ *
+ * Args:
+ *   rows (object[]): the repositories.
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   Promise<object[]>: the repositories (the same ones when they design everything).
+ */
+export async function designerRepositories(rows, user) {
+  if (designsEverything(user)) return rows;
+  // the duplicate lines they may read : those of now, naming no form hidden from them
+  const shownLines = designsAllForms(user)
+    ? null
+    : new Set((await Form.duplicates().catch(() => [])).filter((d) => duplicateShown(d, user)).map((d) => `Warning: ${d.notice}`));
+  const clean = (text) => {
+    if (typeof text !== "string") return text;
+    const lines = designerGitOutput(text, user).split("\n");
+    return (shownLines ? lines.filter((line) => !DUPLICATE_LINE.test(line) || shownLines.has(line)) : lines).join("\n");
+  };
+  return (rows || []).map((r) => (r ? { ...r, pull_output: clean(r.pull_output), push_output: clean(r.push_output) } : r));
 }
 
 export default {
@@ -442,4 +512,6 @@ export default {
   assertFilesShown,
   designerListing,
   assertFileShown,
+  designerGitOutput,
+  designerRepositories,
 };

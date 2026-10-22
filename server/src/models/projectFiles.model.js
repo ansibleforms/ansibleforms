@@ -152,6 +152,27 @@ ProjectFiles.absolutes = async function (kind, rels) {
   return out;
 };
 
+/**
+ * A file of a kind as a read, a save or a delete resolves it : its absolute path, and its path as
+ * those name it in what they answer. A request refused for a file hidden from the user answers in
+ * the same words (lib/designerForms.js).
+ *
+ * Args:
+ *   kind (string): the kind.
+ *   rel (string): the file's path, as the explorer shows it.
+ *
+ * Returns:
+ *   Promise<object>: { abs, name }.
+ *
+ * Raises:
+ *   BadRequestError: the path names no root of the kind, is not valid, or leads out of it.
+ */
+ProjectFiles.locate = async function (kind, rel) {
+  const { root, prefix, inner } = await rootOf(kind, rel);
+  const file = await resolveIn(root, inner);
+  return { abs: file.abs, name: shown(prefix, file.rel) };
+};
+
 /** A path as the explorer shows it : its root's prefix first, when the kind has several. */
 const shown = (prefix, rel) => (prefix ? `${prefix}/${rel}` : rel);
 

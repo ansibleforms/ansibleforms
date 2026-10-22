@@ -4848,7 +4848,7 @@
           "designer"
         ],
         "summary": "Save a file",
-        "description": "Writes a file; needs the designer lock and the kind's edit option (Edit Playbooks, Edit Workflows ...). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, the name already taken.",
+        "description": "Writes a file; needs the designer lock and the kind's edit option (Edit Playbooks, Edit Workflows ...). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already.",
         "security": [
           {
             "bearerAuth": []
@@ -4905,7 +4905,7 @@
           "designer"
         ],
         "summary": "Create a file",
-        "description": "A new file; refused when it exists. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, the name already taken.",
+        "description": "A new file; refused when it exists. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. A hidden file's name answers 409, as a file there already.",
         "security": [
           {
             "bearerAuth": []

@@ -35,8 +35,8 @@ vi.mock("../src/models/settings.model.js", () => ({ default: { findConfigYaml: a
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
-const { default: Form } = await import("../src/models/form.model.js");
-const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown } = await import("../src/lib/designerForms.js");
+const { default: Form, duplicateNotice } = await import("../src/models/form.model.js");
+const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
 const { default: ansibleConfig } = await import("../config/ansible.config.js");
 const { default: ProjectFiles } = await import("../src/models/projectFiles.model.js");
 const { listWorkflows } = await import("../src/models/workflowRun.js");
@@ -233,7 +233,7 @@ describe("designAllPlaybooks and designAllWorkflows : what the user's forms use,
     const user = { ...limited, options: { ...limited.options, designAllPlaybooks: false, designAllWorkflows: false } };
     await assert.rejects(assertFileShown("playbooks", "team.yml", user, "read"), { status: 404, message: "File 'team.yml' not found" });
     await assert.rejects(assertFileShown("playbooks", "team.yml", user, "delete"), { status: 404 });
-    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "save"), { status: 409, message: "The name 'team.yml' is already taken" });
+    await assert.rejects(assertFileShown("playbooks", "team.yml", user, "save"), { status: 409, message: "File 'team.yml' exists already" });
     await assert.rejects(assertFileShown("workflows", "team.yml", user, "create"), { status: 409 });
     await assertFileShown("playbooks", "x.yaml", user, "save");
     write("playbooks", "brand-new.yml", "- hosts: all\n");
@@ -342,5 +342,31 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     fs.writeFileSync(path.join(DIR(), "flows.yaml"), YAML.stringify([{ name: "Team flow", type: "workflow", workflow: "team.yml", roles: ["team"], categories: [], fields: [] }]));
     write("workflows", "team.yml", flow("Team flow", [{ runner: "edge", unified_job_template: { type: "job_template", name: "rte-node.yml" } }, { runner: "pipeline", unified_job_template: { type: "job_template", name: "team-node.yml" } }]));
     assert.deepEqual(await files("playbooks"), ["team-node.yml", "team.yml", "x.yaml"]);
+  });
+
+  test("a hidden file answers as a missing one, or as one there already, in the same words", async () => {
+    fs.writeFileSync(path.join(DIR(), "team.yaml"), YAML.stringify(form("Team play", ["team"], { playbook: "team.yml" })));
+    const missing = await ProjectFiles.read("playbooks", "/nope.yml").catch((e) => e);
+    const hidden = await assertFileShown("playbooks", "/team.yml", user, "read").catch((e) => e);
+    assert.equal(hidden.status, missing.status);
+    assert.equal(hidden.message, missing.message.replace("nope.yml", "team.yml"));
+    const there = await ProjectFiles.write("playbooks", "x.yaml", "", true).catch((e) => e);
+    const created = await assertFileShown("playbooks", "team.yml", user, "create").catch((e) => e);
+    assert.equal(created.status, there.status);
+    assert.equal(created.message, there.message.replace("x.yaml", "team.yml"));
+  });
+
+  test("git outputs : the lines naming files and the duplicates naming a hidden form left out", async () => {
+    const push = "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\n create mode 100644 team.yml\n delete mode 100644 old.yml\n rename a.yml => b.yml (100%)\nTo origin";
+    assert.equal(designerGitOutput(push, user), "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\nTo origin");
+    assert.equal(designerGitOutput(push, everything), push);
+    // a form name defined twice, one copy the team's : its line left out of the pull output (a line
+    // stored by an earlier pull too : only those naming forms the user reaches now are kept)
+    const d = { notice: duplicateNotice("Team deploy", { place: "forms/forms/deploy.yaml" }, { place: "staging/dup.yaml" }) };
+    const pull = `Updating 1..2\n forms/team.yaml | 3 ++-\n 1 file changed\nWarning: ${d.notice}`;
+    const [row] = await designerRepositories([{ name: "forms", pull_output: pull, push_output: push }], limited);
+    assert.equal(row.pull_output, "Updating 1..2\n 1 file changed");
+    assert.doesNotMatch(row.push_output, /team\.yml/);
+    assert.equal((await designerRepositories([{ pull_output: pull }], everything))[0].pull_output, pull);
   });
 });

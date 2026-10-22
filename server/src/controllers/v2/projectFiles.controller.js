@@ -10,7 +10,7 @@ import Lock from '../../models/lock.model.js';
 import { listWorkflows, sharedWorkflowNames } from '../../models/workflowRun.js';
 import Errors from '../../lib/errors.js';
 import i18n from '../../lib/i18n.js';
-import { fileVisibility, designerListing, assertFileShown } from '../../lib/designerForms.js';
+import { fileVisibility, designerListing, assertFileShown, designerGitOutput } from '../../lib/designerForms.js';
 
 /**
  * Answers 423 (and returns false) unless the caller holds the designer lock.
@@ -91,7 +91,9 @@ const projectFilesController = {
   async push(req, res) {
     try {
       if (!(await holdsLock(req, res))) return;
-      res.json(RestResult.single(await ProjectFiles.push(req.params.kind, req.user.user.username)));
+      const pushed = await ProjectFiles.push(req.params.kind, req.user.user.username);
+      // without the lines naming files, to a user some are hidden from
+      res.json(RestResult.single({ ...pushed, output: designerGitOutput(pushed.output, req.user.user) }));
     } catch (err) {
       Errors.ReturnError(res, err);
     }

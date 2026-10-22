@@ -11,7 +11,7 @@ import { isAdminRequest } from '../../lib/adminGrants.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
 import { repositoryDeprecations } from '../../lib/configKeys.js';
 import Form from '../../models/form.model.js';
-import { duplicateShown } from '../../lib/designerForms.js';
+import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import _ from 'lodash';
 import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
 
@@ -140,7 +140,8 @@ function assertRepositoryAdminFields(req, existing) {
 const find = async function(req, res) {
   try {
     const repositories = await Repository.withUnpushed(await Repository.findAll());
-    res.json(RestResult.list(repositories));
+    // their pull and push outputs as the user reads them (lib/designerForms.js)
+    res.json(RestResult.list(await designerRepositories(repositories, req.user?.user)));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepositories'), err.message || String(err)));
   }
@@ -175,7 +176,8 @@ const create = async function(req, res) {
 
 const findByName = async function(req, res) {
   try {
-    const [repository] = await Repository.withUnpushed([await Repository.findByName(req.params.name)]);
+    // its pull and push outputs as the user reads them (lib/designerForms.js)
+    const [repository] = await designerRepositories(await Repository.withUnpushed([await Repository.findByName(req.params.name)]), req.user?.user);
     // its roles, categories or constants read from config.yaml : deprecated, said on its page
     if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
     // a form name it shares with another forms repository : which copy is used, which skipped
@@ -315,7 +317,8 @@ const pull = async function(req, res) {
 const sync = async function(req, res) {
   try {
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    res.json(RestResult.single({ output }));
+    // without the lines naming files, to a user some are hidden from
+    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -340,7 +343,8 @@ const formsRepoSync = async function(req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.noFormsRepositories')));
     }
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    res.json(RestResult.single({ output }));
+    // without the lines naming files, to a user some are hidden from
+    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -358,7 +362,7 @@ const formsRepoSyncAll = async function(req, res) {
     for (const repo of repositories) {
       try {
         const output = await Repository.sync(repo.name, req.user?.user?.username);
-        results.push({ name: repo.name, status: "success", output });
+        results.push({ name: repo.name, status: "success", output: designerGitOutput(output, req.user?.user) });
       } catch (e) {
         failed = true;
         results.push({ name: repo.name, status: "failed", output: e.message });
