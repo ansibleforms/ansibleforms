@@ -938,37 +938,34 @@ class BackupModel {
   }
 
   /**
-   * Resolves a backup folder NAME to the folder on disk, refusing anything that is not one.
-   *
-   * The name must be the 14 digits of a backup's timestamp (YYYYMMDDHHmmss), like every
-   * sibling method checks : no dot, no slash, so it can never leave the backup path.
+   * A backup folder's name as the backup path lists it : the name asked for is only compared,
+   * never put into a path, so whatever a request sends can never point outside the backup path.
    *
    * Args:
-   *   folder (string): The backup folder name.
+   *   folder (string): the folder asked for (YYYYMMDDHHmmss).
    *
    * Returns:
-   *   Promise<string>: The absolute path of the backup folder.
+   *   Promise<string>: the folder's name, read from the backup path.
    *
    * Raises:
-   *   BadRequestError: When the name is missing or not a backup folder name.
-   *   NotFoundError: When there is no such folder.
+   *   Errors.BadRequestError: not the 14 digits of a backup's timestamp.
+   *   Errors.NotFoundError: no such backup folder.
    */
-  static async resolveBackupFolder(folder) {
+  static async backupFolderName(folder) {
     if (!folder || !/^\d{14}$/.test(folder)) throw new Errors.BadRequestError('Invalid or missing backup folder');
-    const backupFolder = path.join(appConfig.backupPath, folder);
-    let stat;
+    let entries;
     try {
-      stat = await fs.stat(backupFolder);
+      entries = await fs.readdir(appConfig.backupPath, { withFileTypes: true });
     } catch {
       throw new Errors.NotFoundError('Backup folder not found');
     }
-    if (!stat.isDirectory()) throw new Errors.NotFoundError('Backup folder not found');
-    return backupFolder;
+    const found = entries.find((entry) => entry.isDirectory() && entry.name === folder);
+    if (!found) throw new Errors.NotFoundError('Backup folder not found');
+    return found.name;
   }
 
   static async getBackupByFolder(folder) {
-    await this.resolveBackupFolder(folder);
-    return await describeBackup(folder);
+    return await describeBackup(await this.backupFolderName(folder));
   }
 
   /**
@@ -998,7 +995,8 @@ class BackupModel {
    *   NotFoundError: When there is no such folder.
    */
   static async archiveBackup(folder) {
-    await this.resolveBackupFolder(folder);
+    // the folder's name as the backup path lists it, never the name the request sent
+    const name = await this.backupFolderName(folder);
     // step 1 : from the backup path, so every entry starts with the folder's name
     const stream = createTar(
       {
@@ -1010,10 +1008,10 @@ class BackupModel {
         follow: false,
         filter: (_entry, stat) => stat.isFile() || stat.isDirectory(),
       },
-      [folder]
+      [name]
     );
     // step 2 : the name it is downloaded as
-    return { stream, fileName: `ansibleforms-backup-${folder}.tar.gz` };
+    return { stream, fileName: `ansibleforms-backup-${name}.tar.gz` };
   }
 }
 
