@@ -16,6 +16,8 @@
 //                   (lib/repoObjects/engine.js), one repository at most, refused by the API and
 //                   the seed
 
+import Errors from "../errors.js";
+
 // ===========================================================================
 // THE TYPES
 // ===========================================================================
@@ -120,8 +122,31 @@ export function typeOfFlag(flag) {
   return USAGE_TYPES.find((t) => t.flag === flag);
 }
 
+// a usage flag sent as text : the words it may be (any case, spaces around)
+const FLAG_WORDS = { 1: true, true: true, 0: false, false: false };
+
 /**
- * Whether a usage flag is on, whatever it is sent as (true, 1, '1', 'true').
+ * A usage flag as on or off, whatever it is sent as : true, 1, '1' or 'true' is on ; false, 0,
+ * '0', 'false' (and none) is off ; anything else is neither. The one reading of a flag : the
+ * table stores any truthy value as on (CrudModel.getFieldValues), so a value read here as off
+ * but stored as on ('yes', 2) passed the admin rule and the one-repository rule while it turned
+ * the usage on.
+ *
+ * Args:
+ *   v (any): the flag.
+ *
+ * Returns:
+ *   boolean|undefined: true when on, false when off, undefined when it is neither.
+ */
+export function flagValue(v) {
+  if (v === true || v === 1) return true;
+  if (v === false || v === 0 || v === null || v === undefined) return false;
+  if (typeof v === "string") return FLAG_WORDS[v.trim().toLowerCase()];
+  return undefined;
+}
+
+/**
+ * Whether a usage flag is on (flagValue).
  *
  * Args:
  *   v (any): the flag.
@@ -130,7 +155,32 @@ export function typeOfFlag(flag) {
  *   boolean: true when it is on.
  */
 export function flagOn(v) {
-  return v === true || v === 1 || v === "1" || v === "true";
+  return flagValue(v) === true;
+}
+
+/**
+ * A repository's usage flags as the table stores them (1 or 0), before anything reads them : the
+ * admin rule, the one-repository rule and the write all see the same value. A flag not sent, or
+ * sent empty (left as it is by an update), is not touched.
+ *
+ * Args:
+ *   data (object): the repository written (changed in place).
+ *
+ * Returns:
+ *   object: the same data.
+ *
+ * Raises:
+ *   Errors.BadRequestError: a flag that is neither on nor off.
+ */
+export function normalizeUsageFlags(data) {
+  for (const flag of USAGE_FLAGS) {
+    const v = data?.[flag];
+    if (v === undefined || v === null || v === "") continue;
+    const on = flagValue(v);
+    if (on === undefined) throw new Errors.BadRequestError(`${flag} must be true or false: '${v}' is neither`);
+    data[flag] = on ? 1 : 0;
+  }
+  return data;
 }
 
 /**
@@ -149,4 +199,4 @@ export function objectTypesOf(repo) {
   });
 }
 
-export default { CATEGORIES, USAGE_TYPES, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagOn, objectTypesOf };
+export default { CATEGORIES, USAGE_TYPES, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, objectTypesOf };

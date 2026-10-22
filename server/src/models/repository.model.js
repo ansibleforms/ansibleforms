@@ -13,7 +13,7 @@ import Errors from '../lib/errors.js';
 import { SECRET_MASK } from '../lib/secretMask.js';
 import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
-import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES } from '../lib/repoObjects/types.js';
+import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES, normalizeUsageFlags } from '../lib/repoObjects/types.js';
 import { deprecationLines, CONFIG_KEYS } from '../lib/configKeys.js';
 import { uriCarriesSecret } from '../lib/repoObjects/secrets.js';
 
@@ -227,6 +227,8 @@ class Repository extends CrudModel {
     if (!opts.fromSeed && !opts.fromRepo && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories.yaml)
+    normalizeUsageFlags(data);
     // one repository at most per object type (the schedules, the credentials ...), and no usage of
     // a later version
     await (await repoObjects()).assertUsageAllowed(data, data.name, null);
@@ -276,6 +278,8 @@ class Repository extends CrudModel {
     if (data.name !== undefined && data.name !== name && !Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories.yaml)
+    normalizeUsageFlags(data);
     // one repository at most per object type : turned on here while another one has it, refused ;
     // a usage of a later version too
     await (await repoObjects()).assertUsageAllowed(data, name, repo);

@@ -13,7 +13,7 @@ import { repositoryDeprecations, repositoryKeyProblems } from '../../lib/configK
 import Form from '../../models/form.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import _ from 'lodash';
-import { USAGE_FLAGS, typeOf } from '../../lib/repoObjects/types.js';
+import { USAGE_FLAGS, typeOf, flagOn, normalizeUsageFlags } from '../../lib/repoObjects/types.js';
 import { foldConfigItem } from '../../lib/seed-schema.js';
 
 /**
@@ -128,8 +128,8 @@ function assertRepositoryAdminFields(req, existing) {
   const data = req.body || {};
   // text compared trimmed, so the dialog sending the same value back is no change
   const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
-  // a flag compared as on or off, whatever it is sent as (true, 1, '1', 'true', or off)
-  const flag = (v) => v === true || v === 1 || v === '1' || v === 'true';
+  // a flag compared as on or off, as it is stored (normalizeUsageFlags ran first)
+  const flag = flagOn;
   for (const field of SOURCE_FIELDS) {
     if (data[field] !== undefined && text(data[field]) !== text(existing[field])) refuse();
   }
@@ -142,18 +142,25 @@ function assertRepositoryAdminFields(req, existing) {
  * A request's use_for_config (deprecated since 7.4.0, removed in 8) as the three flags it is now,
  * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
  * repositories.yaml take it (foldConfigItem) : before anything reads the request's flags, so the
- * admin rule and the one-repository rule apply to them. Said in the server log.
+ * admin rule and the one-repository rule apply to them. Said in the server log. Then every flag as
+ * the table stores it (normalizeUsageFlags).
  *
  * Args:
  *   req (object): the request ; its body replaced when it sends use_for_config.
  *
  * Returns:
  *   void
+ *
+ * Raises:
+ *   Errors.BadRequestError: a flag that is neither on nor off.
  */
 function foldConfigUsage(req) {
-  if (req.body?.use_for_config === undefined) return;
-  logger.warning(`The repository '${req.body.name ?? req.params?.name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
-  req.body = foldConfigItem(req.body);
+  if (req.body?.use_for_config !== undefined) {
+    logger.warning(`The repository '${req.body.name ?? req.params?.name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
+    req.body = foldConfigItem(req.body);
+  }
+  // every flag as the table stores it, so the admin rule reads what is written ('yes' refused)
+  normalizeUsageFlags(req.body);
 }
 
 const find = async function(req, res) {

@@ -103,6 +103,13 @@ describe("a connections user", () => {
     expect(calls).toEqual([]);
   });
 
+  // the table stores any truthy value as on : a value the rule read as off turned the usage on
+  test.each([["yes"], [2], ["on"], ["TRUE "], [[1]], [{}]])("may not turn a usage on with %j, nor have it stored", async (v) => {
+    const r = await call(controller.update, ops, { body: { use_for_roles: v, use_for_repositories: v, use_for_general: v } });
+    expect([400, 403]).toContain(r.status);
+    expect(calls).toEqual([]);
+  });
+
   test("may save it with those fields sent back unchanged, and change its description", async () => {
     const body = { ...repos.forms, uri: " https://git.local/forms.git ", use_for_forms: true, use_for_roles: false, description: "ours" };
     const r = await call(controller.update, ops, { body });
@@ -142,7 +149,29 @@ describe("use_for_config sent by a client of before", () => {
     await call(controller.update, admin, { body: { use_for_config: false } });
     expect(calls.map((c) => [c[0], c[1].use_for_config, c[1].use_for_roles, c[1].use_for_categories, c[1].use_for_constants])).toEqual([
       ["create", undefined, 1, 1, 1],
-      ["update", undefined, false, false, false],
+      ["update", undefined, 0, 0, 0],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// A flag, read one way everywhere
+// ---------------------------------------------------------------------------------------------
+
+describe("a usage flag", () => {
+  test("is stored as it is read : on, off, or refused", async () => {
+    const { normalizeUsageFlags, flagOn } = await import("../src/lib/repoObjects/types.js");
+    expect(normalizeUsageFlags({ use_for_roles: "true", use_for_forms: " 1", use_for_general: "False", use_for_sso: 0, use_for_ldap: "" })).toEqual({
+      use_for_roles: 1, use_for_forms: 1, use_for_general: 0, use_for_sso: 0, use_for_ldap: "",
+    });
+    for (const v of ["yes", 2, "on", {}]) expect(() => normalizeUsageFlags({ use_for_roles: v })).toThrow(/use_for_roles must be true or false/);
+    expect(flagOn("TRUE")).toBe(true);
+    expect(flagOn("yes")).toBe(false);
+  });
+
+  test("an admin's 'yes' is refused too : it would skip the one-repository rule", async () => {
+    const r = await call(controller.update, admin, { body: { use_for_roles: "yes" } });
+    expect(r.status).toBe(400);
+    expect(calls).toEqual([]);
   });
 });
