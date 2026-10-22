@@ -103,7 +103,7 @@ export function designsAll(user, option) {
  * Returns:
  *   boolean: true when none of the three options is off for them.
  */
-function designsEverything(user) {
+export function designsEverything(user) {
   return designsAllForms(user) && Object.values(FILE_OPTIONS).every((option) => designsAll(user, option));
 }
 
@@ -543,6 +543,7 @@ export default {
   FILE_OPTIONS,
   designsAll,
   designsAllForms,
+  designsEverything,
   designerScope,
   duplicateShown,
   designerConfig,
