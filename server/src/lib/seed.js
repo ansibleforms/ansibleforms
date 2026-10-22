@@ -407,6 +407,18 @@ export function applyConfigSeed(opts) {
   return oneAtATime(() => applySeedNow(opts));
 }
 
+/**
+ * Whether the configuration is kept in the database and the database holds one : what 7.3 served
+ * then, whatever repository had use_for_config (models/form.model.js getBaseConfig).
+ *
+ * Returns:
+ *   Promise<boolean>: true when it is.
+ */
+async function configKeptInDatabase() {
+  const [settings] = (await mysql.do("SELECT config_source, forms_yaml FROM AnsibleForms.`settings` limit 1")) || [];
+  return !!settings && Settings.resolveConfigInDatabase(settings) && !!String(settings.forms_yaml ?? "").trim();
+}
+
 export function reloadConfigSeed(opts) {
   return oneAtATime(() => reloadSeedNow(opts));
 }
@@ -560,12 +572,21 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   }
   // a repository's use_for_config : deprecated since 7.4.0, removed in 8 - the roles, the categories
   // and the constants, each a flag of its own now
-  // the repository holding them already (the one the schema patch gave them to) keeps them
-  const held = (doc.repositories?.items || []).some((r) => r.use_for_config !== undefined)
+  // the repository holding them already (the one the schema patch gave them to) keeps them ; the
+  // configuration kept in the database : 7.3 read none of them, none gets the flags
+  const declaresConfig = (doc.repositories?.items || []).some((r) => r.use_for_config !== undefined);
+  const held = declaresConfig
     ? (await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY id")).map((r) => r.name)
     : [];
-  const configFlag = foldConfigFlag(doc, held);
+  const inDatabase = declaresConfig && (await configKeptInDatabase());
+  const configFlag = foldConfigFlag(doc, held, { inDatabase });
   doc = configFlag.doc;
+  if (inDatabase) {
+    for (const name of configFlag.dropped) {
+      logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.4.0 and removed in 8: the configuration is kept in the database, which was served instead of it, so it is not applied (declare use_for_roles, use_for_categories or use_for_constants to read them from it)`);
+    }
+    configFlag.dropped = [];
+  }
   for (const name of configFlag.folded) {
     logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.4.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
   }

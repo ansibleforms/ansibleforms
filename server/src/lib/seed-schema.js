@@ -207,22 +207,31 @@ export function foldConfigItem(item, give = true) {
  * 7.3 read) keeps them when the seed declares use_for_config on it ; while it holds them, the
  * others declaring it get none. With none holding them, the first one that declares it (in the
  * file's order, the order a fresh database made them in) gets them. The others are listed as such,
- * warned by the caller, never a refusal of the seed. Returns a new document ; the warnings are the
- * caller's.
+ * warned by the caller, never a refusal of the seed. With the configuration kept in the database,
+ * 7.3 read none of them (the database copy was served whole) : every use_for_config is dropped,
+ * none gets the flags, as the schema patch gives none then (models/schema.model.js
+ * splitConfigUsage). Returns a new document ; the warnings are the caller's.
  *
  * Args:
  *   doc (object): the seed document.
  *   held (string[]): the repositories holding use_for_roles, use_for_categories or
  *     use_for_constants in the database now ; none for a fresh one (and the schema check).
+ *   opts (object): { inDatabase (true : the configuration is kept in the database, and it holds
+ *     one) }.
  *
  * Returns:
  *   { doc: object, folded: string[], dropped: string[], holder: string|null }: the document, the
  *     repositories whose flag moved, those whose use_for_config was dropped, and the one that has the
  *     three flags from it.
  */
-export function foldConfigFlag(doc, held = []) {
+export function foldConfigFlag(doc, held = [], opts = {}) {
   const items = doc?.repositories?.items || [];
   if (!items.some((r) => r.use_for_config !== undefined)) return { doc, folded: [], dropped: [], holder: null };
+  if (opts.inDatabase) {
+    const dropped = items.filter((r) => r.use_for_config !== undefined).map((r) => r.name);
+    const repositoryItems = items.map(({ use_for_config: _dropped, ...rest }) => rest);
+    return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded: [], dropped, holder: null };
+  }
   // the one holding them now, unless this seed takes them off it (use_for_config: false)
   const turnedOff = new Set(items.filter((r) => r.use_for_config !== undefined && !r.use_for_config).map((r) => r.name));
   const current = held.filter((name) => !turnedOff.has(name));

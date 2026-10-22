@@ -363,3 +363,16 @@ describe("a key file with anchors, or one that is not read", () => {
     assert.deepEqual((await Form.load(["admin"], "", false, true)).roles.map((r) => r.name), ["admin", "default"]);
   });
 });
+
+describe("the config seed's use_for_config, the configuration kept in the database", () => {
+  test("7.3 served the database copy : no repository gets the flags, each said", async () => {
+    const { foldConfigFlag } = await import("../src/lib/seed-schema.js");
+    const repo = (name, flags) => ({ name, uri: "https://x/y.git", ...flags });
+    const seed = { repositories: { items: [repo("cfg", { use_for_config: true }), repo("off", { use_for_config: false }), repo("forms", { use_for_forms: true })] } };
+    const { doc, holder, dropped, folded } = foldConfigFlag(seed, [], { inDatabase: true });
+    assert.equal(holder, null);
+    assert.deepEqual(dropped, ["cfg", "off"]);
+    assert.deepEqual(folded, []);
+    assert.deepEqual(doc.repositories.items, [repo("cfg"), repo("off"), repo("forms", { use_for_forms: true })]);
+  });
+});
