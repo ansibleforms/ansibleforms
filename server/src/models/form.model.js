@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { ownerOf, realPathOf } from "../lib/repoObjects/ownedPaths.js";
+import { findOwner, realPathOf } from "../lib/repoObjects/ownedPaths.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
@@ -1913,10 +1913,12 @@ Form.save = async function(data, options = {}){
   })
 
   // a form 'source' is client-controlled ; reject any that would escape its
-  // forms folder (path traversal / absolute path) before it is used as a path
+  // forms folder (path traversal / absolute path) before it is used as a path.
+  // No '..' part at all : the folder it is joined to may be a repository's root, where
+  // '../other/roles.yaml' reached the next repository's files
   for (const g of Object.values(groups)) {
     const probe = path.resolve(formsPath(), g.source)
-    if (g.source.includes("\0") || path.isAbsolute(g.source) || !probe.startsWith(path.resolve(formsPath()) + path.sep)) {
+    if (g.source.includes("\0") || path.isAbsolute(g.source) || path.win32.isAbsolute(g.source) || g.source.split(/[\\/]/).includes("..") || !probe.startsWith(path.resolve(formsPath()) + path.sep)) {
       throw new Errors.BadRequestError(`Invalid form source '${g.source}': must be a path inside the forms folder`)
     }
   }
@@ -1924,14 +1926,16 @@ Form.save = async function(data, options = {}){
   // resolve the target folder per group (own repo, then existing holder, then staging)
   for (const g of Object.values(groups)) {
     g.dir = resolveTargetDir(g.repository, g.source, formsDirs, (d, src) => fs.existsSync(path.join(d.path, src)))
-    // a file a usage type of its repository owns (roles.yaml, config.yaml, general.yaml,
-    // credentials/ ... : lib/repoObjects/ownedPaths.js), in a repository serving its forms from its
-    // root : never written as a forms file. A new file goes to the staging folder, and a Push moves
-    // it into the forms repository pushed (Repository.flushStagingInto) : checked against each one
-    const into = g.dir?.staging ? formsDirs.filter((d) => d.name) : g.dir?.name ? [g.dir] : []
+    // A new file goes to the staging folder, and a Push moves it into the forms repository pushed
+    // (Repository.flushStagingInto) : each check below is made where it is written, and in each one
+    const into = [...(g.dir ? [g.dir] : []), ...(g.dir?.staging ? formsDirs.filter((d) => d.name) : [])]
     for (const d of into) {
-      const owner = await ownerOf(d.name, path.join(d.path, g.source))
-      if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner} of repository '${d.name}': save the form to another file`)
+      const target = path.join(d.path, g.source)
+      // a file a usage type of a repository owns (roles.yaml, config.yaml, general.yaml,
+      // credentials/ ... : lib/repoObjects/ownedPaths.js), in whichever repository the file
+      // really lands (links followed) : never written as a forms file
+      const owner = await findOwner(target)
+      if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner.label} of repository '${owner.repository}': save the form to another file`)
     }
   }
 

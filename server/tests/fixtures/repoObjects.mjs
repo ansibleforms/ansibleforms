@@ -84,8 +84,12 @@ export const db = {
     // a table's columns and their defaults (lib/repoObjects/engine.js columnDefaults)
     if (/FROM information_schema\.COLUMNS WHERE TABLE_SCHEMA = 'AnsibleForms' AND TABLE_NAME = \?/.test(sql)) return state.columns[params[0]] || [];
     // a repository's usage : the repositories used for it, and another one used for it
-    let m = sql.match(/^SELECT name FROM AnsibleForms\.`repositories` WHERE (use_for_\w+)( AND name <> \?)?/);
-    if (m) return rows.filter((r) => Number(r[m[1]]) && (!m[2] || r.name !== params[0])).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ name: r.name }));
+    // (several usages : any of them), and the ones used for it by id (the first one wins)
+    let m = sql.match(/^SELECT name FROM AnsibleForms\.`repositories` WHERE (use_for_\w+(?: OR use_for_\w+)*)( AND name <> \?)?/);
+    const usedFor = (r, flags) => flags.split(" OR ").some((flag) => Number(r[flag]));
+    if (m) return rows.filter((r) => usedFor(r, m[1]) && (!m[2] || r.name !== params[0])).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ name: r.name }));
+    m = sql.match(/^SELECT id, name FROM AnsibleForms\.`repositories` WHERE (use_for_\w+) ORDER BY id$/);
+    if (m) return rows.filter((r) => usedFor(r, m[1])).sort((a, b) => a.id - b.id).map((r) => ({ id: r.id, name: r.name }));
     if (/^SELECT 1 FROM \?\? WHERE \?\? = \?/.test(sql)) return rows.filter((r) => String(r[params[1]]) === String(params[2])).map(() => ({ 1: 1 }));
     if (/^SELECT managed FROM \?\? WHERE \?\? = \?/.test(sql)) return rows.filter((r) => String(r[params[1]]) === String(params[2])).map((r) => ({ managed: r.managed || 0 }));
     // what uses a credential (Credential.usersOf)

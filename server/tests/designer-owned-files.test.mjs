@@ -24,9 +24,12 @@ vi.mock("../src/models/repository.model.js", async () => {
   const fx = await import("./fixtures/repoObjects.mjs");
   const path = await import("path");
   const ops = { repository: "ops", root: path.join(fx.ROOT, "ops") };
+  // the files the base configuration may be served from, as the model gives them
+  const { default: actual } = await vi.importActual("../src/models/repository.model.js");
   return {
     default: {
       ...fx.repository,
+      getConfigCandidates: actual.getConfigCandidates,
       // the workflows and the inventories : a local folder, then the repository's root
       getWorkflowsRoots: async () => [{ repository: null, root: path.join(fx.ROOT, "local") }, ops],
       getInventoryRoots: async () => [{ repository: null, root: path.join(fx.ROOT, "local") }, ops],
@@ -111,5 +114,57 @@ describe("a file a usage type of the repository owns", () => {
     fx.reset({ repositories: [{ id: 1, name: "ops", use_for_workflows: 1 }] });
     await ProjectFiles.write("workflows", "ops/roles.yaml", "# notes\n");
     assert.equal((await ProjectFiles.read("workflows", "ops/roles.yaml")).content, "# notes\n");
+  });
+});
+
+describe("the file the whole base configuration is served from (no repository holds the roles)", () => {
+  // the 7.3 layout : the roles in the forms repository's config.yaml, no repository flagged for the
+  // roles, the categories nor the constants ; the repository used for workflows and playbooks too
+  beforeEach(() => {
+    fx.reset({ repositories: [{ id: 1, name: "ops", use_for_forms: 1, use_for_workflows: 1, use_for_playbooks: 1, use_for_inventories: 1 }] });
+    write("forms/a.yaml", "name: a\n");
+    write("config.yaml", ROLES);
+    appConfig.formsStagingPath = path.join(fx.ROOT, "staging");
+    appConfig.formsFolderPath = path.join(fx.ROOT, "localforms");
+  });
+
+  test("is never read, written nor deleted : a designer cannot add themselves to the admin role", async () => {
+    const owned = { status: 403, message: "'ops/config.yaml' holds the configuration of repository 'ops': it is not read nor written in the designer" };
+    await assert.rejects(ProjectFiles.read("workflows", "ops/config.yaml"), owned);
+    await assert.rejects(ProjectFiles.write("workflows", "ops/config.yaml", ESCALATE), owned);
+    await assert.rejects(ProjectFiles.write("playbooks", "config.yaml", ESCALATE), denied);
+    await assert.rejects(ProjectFiles.remove("inventories", "ops/config.yaml"), denied);
+    assert.equal(fs.readFileSync(path.join(fx.ROOT, "ops", "config.yaml"), "utf8"), ROLES);
+    assert.equal((await ProjectFiles.list("workflows")).files.some((f) => f.path === "ops/config.yaml"), false);
+  });
+
+  test("is never made either : a config.yaml written there would be served", async () => {
+    fs.rmSync(path.join(fx.ROOT, "ops", "config.yaml"));
+    await assert.rejects(ProjectFiles.write("workflows", "ops/config.yaml", ESCALATE, true), denied);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "config.yaml")), false);
+  });
+
+  test("is the designer's again once a repository holds the roles : it is no longer served", async () => {
+    fx.reset({ repositories: [{ id: 1, name: "ops", use_for_forms: 1, use_for_workflows: 1 }, { id: 2, name: "keys", use_for_roles: 1 }] });
+    write("forms/a.yaml", "name: a\n");
+    await ProjectFiles.write("workflows", "ops/config.yaml", "# notes\n");
+    assert.equal((await ProjectFiles.read("workflows", "ops/config.yaml")).content, "# notes\n");
+  });
+});
+
+describe("a local folder holding the repositories' folder", () => {
+  test("never reaches a repository's owned files through it", async () => {
+    // the local playbooks folder (ANSIBLE_PATH) a parent of the repositories' root
+    fx.reset({ repositories: [{ id: 1, name: "ops", use_for_roles: 1 }] });
+    write("roles.yaml", ROLES);
+    const { default: Repository } = await import("../src/models/repository.model.js");
+    const spy = vi.spyOn(Repository, "getAnsiblePath").mockResolvedValue(path.dirname(fx.ROOT));
+    try {
+      const rel = `${path.basename(fx.ROOT)}/ops/roles.yaml`;
+      await assert.rejects(ProjectFiles.write("playbooks", rel, ESCALATE), denied);
+      assert.equal(fs.readFileSync(path.join(fx.ROOT, "ops", "roles.yaml"), "utf8"), ROLES);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

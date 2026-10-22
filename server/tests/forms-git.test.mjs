@@ -32,6 +32,9 @@ test("configRepoFromPath returns the repo holding config, or null", () => {
   // missing inputs -> null, no crash
   assert.equal(configRepoFromPath("", repoRoot), null);
   assert.equal(configRepoFromPath(path.join(repoRoot, "x", "config.yaml"), ""), null);
+  // a folder whose name only starts like the root's is not in it ; nor is the root itself
+  assert.equal(configRepoFromPath("/data/persistent/repositories2/x/config.yaml", repoRoot), null);
+  assert.equal(configRepoFromPath(repoRoot, repoRoot), null);
 });
 
 test("resolveTargetDir prefers the form's own repository, then holder, then staging", () => {

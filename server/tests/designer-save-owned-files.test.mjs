@@ -14,16 +14,21 @@ process.env.DB_PORT ||= "3306";
 process.env.DB_USER ||= "test";
 process.env.DB_PASSWORD ||= "test";
 
-// one repository, 'ops' : its forms at its root (no forms folder), and the roles
+// one repository, 'ops' : its forms at its root (no forms folder), and the roles ; a test may add
+// others (REPOS)
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "af-designer-owned-"));
-const OPS = { name: "ops", status: "success", head: "abc", use_for_forms: 1, use_for_roles: 1, use_for_categories: 0, use_for_constants: 0 };
+const OPS = { id: 1, name: "ops", status: "success", head: "abc", use_for_forms: 1, use_for_roles: 1, use_for_categories: 0, use_for_constants: 0 };
+const REPOS = [];
+const used = (flag) => REPOS.filter((r) => Number(r[flag]));
 vi.mock("../src/models/db.model.js", () => ({
   default: {
-    do: async (sql) => {
-      if (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql)) return [OPS];
-      if (/SELECT name, use_for_roles, use_for_categories, use_for_constants FROM/.test(sql)) return [OPS];
-      if (/WHERE use_for_roles OR use_for_categories OR use_for_constants/.test(sql)) return [OPS];
-      if (/^SELECT \* FROM AnsibleForms\.`repositories` WHERE name = \?/.test(sql)) return [OPS];
+    do: async (sql, args = []) => {
+      if (/FROM AnsibleForms\.`repositories` WHERE use_for_forms/.test(sql)) return used("use_for_forms");
+      if (/FROM AnsibleForms\.`repositories` WHERE use_for_playbooks/.test(sql)) return used("use_for_playbooks");
+      if (/SELECT name, use_for_roles, use_for_categories, use_for_constants FROM/.test(sql)) return [...REPOS];
+      if (/WHERE use_for_roles OR use_for_categories OR use_for_constants/.test(sql)) return REPOS.filter((r) => r.use_for_roles || r.use_for_categories || r.use_for_constants);
+      if (/^SELECT \* FROM AnsibleForms\.`repositories` WHERE name = \?/.test(sql)) return REPOS.filter((r) => r.name === args[0]);
+      if (/^SELECT \* FROM AnsibleForms\.`repositories`$/.test(sql)) return [...REPOS];
       return [];
     },
   },
@@ -34,6 +39,8 @@ vi.mock("../src/models/repo.model.js", () => {
 });
 vi.mock("../src/models/settings.model.js", () => ({ default: { findFormsYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => "" } }));
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
+// the forms model's own import of the configuration ('./../../config/app.config.js') : the mock too
+vi.mock("../config/app.config.js", async () => await import("./__mocks__/app.config.js"));
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: configController } = await import("../src/controllers/v2/config.controller.js");
@@ -50,12 +57,15 @@ const save = async (forms) => {
 const ops = (file) => path.join(ROOT, "ops", file);
 
 beforeEach(() => {
+  REPOS.splice(0, REPOS.length, { ...OPS });
   for (const name of fs.readdirSync(ROOT)) fs.rmSync(path.join(ROOT, name), { recursive: true, force: true });
   fs.mkdirSync(path.join(ROOT, "ops", ".git"), { recursive: true });
   fs.writeFileSync(ops("roles.yaml"), ROLES_TEXT);
   fs.writeFileSync(ops("deploy.yaml"), YAML.stringify(form("Deploy")));
   appConfig.configPath = path.join(ROOT, "config.yaml");
   appConfig.formsStagingPath = path.join(ROOT, "staging");
+  appConfig.formsFolderPath = path.join(ROOT, "local", "forms");
+  appConfig.formsBackupPath = path.join(ROOT, "backups");
   appConfig.useYtt = false;
 });
 
@@ -77,4 +87,34 @@ test("a form file of the repository's own still saves ; config.yaml, the roles m
   assert.match(staged.body.details, /'config\.yaml' belongs to the roles of repository 'ops'/);
   assert.equal(fs.existsSync(path.join(appConfig.formsStagingPath, "config.yaml")), false);
   assert.equal(fs.existsSync(ops("config.yaml")), false);
+});
+
+test("a form file outside its folder is refused : '../forms/roles.yaml' never reaches the next repository's roles", async () => {
+  // 'ops' serves its forms from its root ; 'forms', beside it, holds the roles
+  REPOS.splice(0, REPOS.length, { ...OPS, use_for_roles: 0 }, { id: 2, name: "forms", status: "success", head: "abc", use_for_forms: 0, use_for_roles: 1, use_for_categories: 0, use_for_constants: 0 });
+  fs.rmSync(ops("roles.yaml"));
+  fs.mkdirSync(path.join(ROOT, "forms", ".git"), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, "forms", "config.yaml"), ROLES_TEXT);
+  const escalate = { ...form("Escalate", "../forms/roles.yaml"), roles: [{ name: "admin", groups: ["local/admins"], users: ["local/eve"] }] };
+  const res = await save([form("Deploy", "deploy.yaml"), escalate]);
+  assert.equal(res.code, 400, JSON.stringify(res.body));
+  assert.match(res.body.details, /Invalid form source '\.\.\/forms\/roles\.yaml': must be a path inside the forms folder/);
+  assert.equal(fs.existsSync(path.join(ROOT, "forms", "roles.yaml")), false);
+  // a link committed in 'ops' to the next repository : checked where the file really lands
+  fs.symlinkSync(path.join("..", "forms"), ops("sub"));
+  const linked = await save([form("Deploy", "deploy.yaml"), form("Escalate", "sub/roles.yaml")]);
+  assert.equal(linked.code, 409, JSON.stringify(linked.body));
+  assert.match(linked.body.details, /The form file 'sub\/roles\.yaml' belongs to the roles of repository 'forms': save the form to another file/);
+  assert.equal(fs.existsSync(path.join(ROOT, "forms", "roles.yaml")), false);
+});
+
+test("config.yaml serving the whole configuration (no repository holds the roles) is refused as a form file", async () => {
+  // the 7.3 layout : the roles in the forms repository's config.yaml, no repository flagged for them
+  REPOS.splice(0, REPOS.length, { ...OPS, use_for_roles: 0 });
+  fs.rmSync(ops("roles.yaml"));
+  fs.writeFileSync(ops("config.yaml"), ROLES_TEXT);
+  const res = await save([form("Deploy", "deploy.yaml"), form("Escalate", "config.yaml")]);
+  assert.equal(res.code, 409, JSON.stringify(res.body));
+  assert.match(res.body.details, /The form file 'config\.yaml' belongs to the configuration of repository 'ops'/);
+  assert.equal(fs.readFileSync(ops("config.yaml"), "utf8"), ROLES_TEXT);
 });

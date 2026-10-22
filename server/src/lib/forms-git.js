@@ -20,12 +20,12 @@ export function friendlyPullError(message, name, unpushed = false) {
 // Given the absolute path config.yaml was resolved to, and the repositories
 // root, return the name of the repository that holds config (its first path
 // segment under the root), or null when config lives outside any repository.
+// Compared by path segments : /app/repos2/x is not under /app/repos.
 export function configRepoFromPath(configPath, repoPath) {
-  if (configPath && repoPath && configPath.startsWith(repoPath)) {
-    const seg = path.relative(repoPath, configPath).split(path.sep)[0];
-    return seg || null;
-  }
-  return null;
+  if (!configPath || !repoPath) return null;
+  const rel = path.relative(path.resolve(repoPath), path.resolve(configPath));
+  if (!rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return null;
+  return rel.split(path.sep)[0] || null;
 }
 
 // Resolve which folder a form file is written to on save, in priority order:

@@ -2,16 +2,21 @@
 // The paths of a repository its usage types own (lib/repoObjects/types.js) : the roles', the
 // categories' and the constants' files (lib/configKeys.js, config.yaml included), and each object
 // type's folder (credentials/, runners/ ...), its list file (repositories.yaml) or its single file
-// (general.yaml, branding.yaml) with the files beside it that file names (the branding's images).
+// (general.yaml, branding.yaml) with the files beside it that file names (the branding's images) ;
+// and the file the whole base configuration may be served from, roles included, when no repository
+// holds those keys (a forms repository's config.yaml, Repository.getConfigCandidates).
 // The app reads them as configuration, objects and secrets : the designer's file explorers
 // (models/projectFiles.model.js) never list, read, write nor delete them, even in a repository used
 // for workflows, inventories, playbooks or vars files as well - writing roles.yaml there made a
 // designer an admin ; nor does its forms save (models/form.model.js) write a form file onto one, in
-// a repository serving its forms from its root.
+// a repository serving its forms from its root. A path is checked against every repository whose
+// working tree it is in, as the disk resolves it : a local folder holding the repositories' root, or
+// a form file named '../other/roles.yaml', reaches another repository's files.
 import fs from "fs";
 import path from "path";
 import mysql from "../../models/db.model.js";
 import Repo from "../../models/repo.model.js";
+import Repository from "../../models/repository.model.js";
 import logger from "../logger.js";
 import Errors from "../errors.js";
 import { USAGE_TYPES } from "./types.js";
@@ -66,13 +71,21 @@ export function realPathOf(abs) {
  *
  * Args:
  *   row (object): the repository's row (its name and its use_for_* flags).
+ *   configFiles (object[]): the files the base configuration may be served from
+ *     (Repository.getConfigCandidates : [{ repo, path }]).
  *
  * Returns:
  *   Promise<object[]>: [{ rel, folder (a whole folder), label (the type's, as the server names it) }].
  */
-async function ownedOf(row) {
+async function ownedOf(row, configFiles = []) {
   const dir = Repo.folderOf(row.name);
   const out = [];
+  // the base configuration, roles included, served from this repository's file (no repository holds
+  // the roles, the categories nor the constants : the 7.3 layout)
+  for (const c of configFiles) {
+    const rel = c.repo === row.name ? relativeTo(dir, path.resolve(c.path)) : null;
+    if (rel) out.push({ rel, folder: false, label: "configuration" });
+  }
   for (const type of USAGE_TYPES) {
     if (!Number(row[type.flag] ?? 0)) continue;
     // the roles, the categories, the constants : their own file, and config.yaml they may be read from
@@ -109,71 +122,102 @@ async function ownedOf(row) {
 }
 
 /**
- * Which usage type of a repository owns a path, by the path as written and as the disk resolves it
- * (links followed) : a test made once per repository, for a listing as for one file.
- *
- * Args:
- *   repository (string|null): the repository ; none (a local folder) owns nothing.
+ * Which repository's usage type owns a path, by the path as written and as the disk resolves it
+ * (links followed), in every repository whose working tree holds it : a test made once, for a
+ * listing as for one file.
  *
  * Returns:
- *   Promise<function>: (absolute path) => the owning type's label, or null.
+ *   Promise<function>: (absolute path) => { repository, label (the owning type's) }, or null.
  */
-export async function ownerTest(repository) {
-  if (!repository || !Repo.isValidName(repository)) return () => null;
+async function ownersTest() {
   let rows = [];
+  let configFiles = [];
   try {
-    rows = await mysql.do("SELECT * FROM AnsibleForms.`repositories` WHERE name = ?", [repository]);
+    rows = await mysql.do("SELECT * FROM AnsibleForms.`repositories`");
+    configFiles = await Repository.getConfigCandidates();
   } catch (e) {
-    logger.warning(`Could not read the usages of repository '${repository}': ${e.message}`);
+    logger.warning(`Could not read the usages of the repositories: ${e.message}`);
   }
-  if (!rows?.length) return () => null;
-  const owned = await ownedOf(rows[0]);
-  if (!owned.length) return () => null;
-  const dir = Repo.folderOf(repository);
-  const realDir = (() => {
+  const trees = [];
+  for (const row of rows || []) {
+    if (!Repo.isValidName(row.name)) continue;
+    const owned = await ownedOf(row, configFiles);
+    if (!owned.length) continue;
+    const dir = Repo.folderOf(row.name);
+    let realDir = dir;
     try {
-      return fs.realpathSync(dir);
+      realDir = fs.realpathSync(dir);
     } catch {
-      return dir;
+      // not cloned yet : as written
     }
-  })();
-  const match = (rel) => owned.find((o) => rel !== null && (rel === o.rel || (o.folder && rel.startsWith(`${o.rel}/`))))?.label || null;
+    trees.push({ repository: row.name, dir, realDir, owned });
+  }
+  if (!trees.length) return () => null;
+  const match = (tree, rel) => tree.owned.find((o) => rel !== null && (rel === o.rel || (o.folder && rel.startsWith(`${o.rel}/`))))?.label || null;
   return (abs) => {
-    const found = match(relativeTo(dir, abs));
-    if (found) return found;
-    // a link to one of them, or a new file made through a linked folder
-    return match(relativeTo(realDir, realPathOf(abs)));
+    const real = realPathOf(abs);
+    for (const tree of trees) {
+      // as written ; else a link to one of them, or a new file made through a linked folder
+      const label = match(tree, relativeTo(tree.dir, path.resolve(abs))) || match(tree, relativeTo(tree.realDir, real));
+      if (label) return { repository: tree.repository, label };
+    }
+    return null;
   };
 }
 
 /**
- * Which usage type of a repository owns a path (ownerTest), for one path.
+ * Which usage type owns a path (ownersTest), as a test made once for many paths : checked against
+ * every repository, whatever folder the caller lists (a local folder may hold the repositories').
+ *
+ * Returns:
+ *   Promise<function>: (absolute path) => the owning type's label, or null.
+ */
+export async function ownerTest() {
+  const test = await ownersTest();
+  return (abs) => test(abs)?.label || null;
+}
+
+/**
+ * Which repository's usage type owns a path (ownersTest), for one path.
  *
  * Args:
- *   repository (string|null): the repository the path is in.
+ *   abs (string): the path.
+ *
+ * Returns:
+ *   Promise<object|null>: { repository, label }, or null.
+ */
+export async function findOwner(abs) {
+  return (await ownersTest())(abs);
+}
+
+/**
+ * Which usage type owns a path (ownersTest), for one path.
+ *
+ * Args:
+ *   repository (string|null): the repository the path is in (every repository is checked).
  *   abs (string): the path.
  *
  * Returns:
  *   Promise<string|null>: the owning type's label, or null.
  */
 export async function ownerOf(repository, abs) {
-  return (await ownerTest(repository))(abs);
+  return (await findOwner(abs))?.label || null;
 }
 
 /**
- * Refuses a path a usage type of its repository owns.
+ * Refuses a path a usage type of a repository owns.
  *
  * Args:
- *   repository (string|null): the repository the path is in.
+ *   repository (string|null): the repository the path is in (every repository is checked).
  *   abs (string): the path.
  *   name (string): the path as the request names it.
  *
  * Raises:
- *   Errors.AccessDeniedError: a usage type of the repository owns it, which one said.
+ *   Errors.AccessDeniedError: a usage type of a repository owns it, which one said.
  */
 export async function assertNotOwned(repository, abs, name) {
-  const label = await ownerOf(repository, abs);
-  if (label) throw new Errors.AccessDeniedError(`'${name}' holds the ${label} of repository '${repository}': it is not read nor written in the designer`);
+  const owner = await findOwner(abs);
+  if (owner) throw new Errors.AccessDeniedError(`'${name}' holds the ${owner.label} of repository '${owner.repository}': it is not read nor written in the designer`);
 }
 
-export default { realPathOf, ownerTest, ownerOf, assertNotOwned };
+export default { realPathOf, ownerTest, findOwner, ownerOf, assertNotOwned };

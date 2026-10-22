@@ -564,48 +564,45 @@ class Repository extends CrudModel {
   }
 
   static async getConfigPath() {
-  // No catch that answers "" - same reasoning as getFormsFolders above. "" means "use the
-  // local config file", so a database blip made every config write land in
-  // persistent/config.yaml while the repository copy kept being served, discarding the
-  // edit silently. Let it throw; the caller reports the real cause.
-  {
+    // No catch that answers "" - same reasoning as getFormsFolders above. "" means "use the
+    // local config file", so a database blip made every config write land in
+    // persistent/config.yaml while the repository copy kept being served, discarding the
+    // edit silently. Let it throw; the caller reports the real cause.
+    const foundConfigs = (await Repository.getConfigCandidates()).filter((c) => fs.existsSync(c.path))
+    if (foundConfigs.length === 0) {
+      return ""
+    }
+    if (foundConfigs.length > 1) {
+      const configList = foundConfigs.map(c => `${c.repo}/${path.basename(c.path)}`).join(", ")
+      logger.warning(`Multiple config files found in repositories: ${configList}. Using first one: ${foundConfigs[0].repo}/${path.basename(foundConfigs[0].path)}`)
+    }
+    return foundConfigs[0].path
+  }
+
+  /**
+   * The files the base configuration may be served from (getConfigPath), in the order they are
+   * tried : the config.yaml of every forms repository, in the order they were added (the 7.3
+   * layout, kept for backwards compatibility) ; none when a repository holds the roles, the
+   * categories or the constants, then the base is the local CONFIG_PATH (or the database copy).
+   * One not there yet is a candidate too : made, it would be served. The designer's explorers and
+   * its forms save never write one (lib/repoObjects/ownedPaths.js).
+   *
+   * Returns:
+   *   Promise<object[]>: [{ repo (its repository), path (absolute) }].
+   *
+   * Raises:
+   *   Error: the repositories could not be read (never answered as "none", see getConfigPath).
+   */
+  static async getConfigCandidates() {
     // The roles, the categories and the constants : each from its own repository (use_for_roles,
     // use_for_categories, use_for_constants, lib/configKeys.js), laid over the base configuration -
     // which then is the local CONFIG_PATH (or the database copy), never a repository's file
     const keyRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY name")
-    if (keyRepositories.length > 0) return ""
-
-    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility)
-    // in the order they were added : the first one holding a config.yaml wins, the same one every time
-    var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
-  }
-  
-  if(repositories.length === 0){
-    return ""
-  }
-  
-  var foundConfigs = []
-  
-  // Loop through all form repositories to find config files
-  for(const repo of repositories){
-    var repoPath = Repo.folderOf(repo.name)
-    
-    const configPath = path.join(repoPath, "config.yaml")
-    if(fs.existsSync(configPath)){
-      foundConfigs.push({ repo: repo.name, path: configPath })
-    }
-  }
-  
-  if(foundConfigs.length === 0){
-    return ""
-  }
-  
-  if(foundConfigs.length > 1){
-    const configList = foundConfigs.map(c => `${c.repo}/${path.basename(c.path)}`).join(", ")
-    logger.warning(`Multiple config files found in repositories: ${configList}. Using first one: ${foundConfigs[0].repo}/${path.basename(foundConfigs[0].path)}`)
-  }
-  
-    return foundConfigs[0].path
+    if (keyRepositories.length > 0) return []
+    // Fall back to old behavior: the use_for_forms repositories (backwards compatibility), in the
+    // order they were added : the first one holding a config.yaml wins, the same one every time
+    const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
+    return repositories.map((repo) => ({ repo: repo.name, path: path.join(Repo.folderOf(repo.name), "config.yaml") }))
   }
 
   // Return the forms folder of every forms repository, with the repository

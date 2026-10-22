@@ -219,10 +219,12 @@ ProjectFiles.list = async function (kind) {
   const roots = await ProjectFiles.roots(kind);
   const files = [];
   let truncated = false;
+  // what the repositories' usage types own, wherever a root is (a local folder may hold them)
+  const owned = await ownerTest();
   // breadth first, one folder at a time, at most 12 deep
   // a local inventory's folder named as an inventories repository is hidden by it
   const repoNames = new Set(roots.map((r) => r.prefix).filter(Boolean));
-  const walk = async (dir, rel, depth, prefix, owned) => {
+  const walk = async (dir, rel, depth, prefix) => {
     if (depth > 12 || truncated) return;
     let entries;
     try {
@@ -241,7 +243,7 @@ ProjectFiles.list = async function (kind) {
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
       const childAbs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        await walk(childAbs, childRel, depth + 1, prefix, owned);
+        await walk(childAbs, childRel, depth + 1, prefix);
       } else if (entry.isFile()) {
         // a file a usage type of the repository owns : not the designer's
         if (owned(childAbs)) continue;
@@ -259,7 +261,7 @@ ProjectFiles.list = async function (kind) {
   for (const r of roots) {
     const here = fs.existsSync(r.root);
     exists = exists || here;
-    if (here) await walk(r.root, "", 0, r.prefix, await ownerTest(r.repository));
+    if (here) await walk(r.root, "", 0, r.prefix);
     if (r.repository) {
       let dirty = false;
       if (here) {
