@@ -604,3 +604,48 @@ describe("a pull goes on past what fails", () => {
     assert.match(summary.refused[0].reasons[0], /^not valid YAML: Excessive alias count/);
   });
 });
+
+describe("a repository not cloned when it is made the credentials repository", () => {
+  test("its clone failed : said not cloned, never 'now holds' ; its first clone then takes the app's credentials", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.state.cloneFails = true;
+    const report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 });
+    assert.equal(report.credentials.activated.pull, "not cloned");
+    assert.equal(await RepoObjects.usageReportText(report), "\nNot cloned: the credentials will be taken once it is");
+    assert.equal(fx.rowNamed("credentials", "app-cred").repository ?? null, null);
+    // its first clone (Repository.clone, the claim held) : the app's credential written and linked
+    fx.cloneEmpty("other");
+    const text = await RepoObjects.afterGit("other", { name: "other", use_for_credentials: 1 }, { activate: true });
+    assert.match(text, /^\nNow holds the credentials: 0 read from its files, 0 replaced by a file of the same name, 1 written to it/);
+    assert.equal(fx.rowNamed("credentials", "app-cred").repo_file, "credentials/app-cred.yaml");
+    assert.ok(fx.fileExists("other", "credentials", "app-cred.yaml"));
+    // under the clone's claim : never waited for nor taken again
+    assert.deepEqual(fx.state.calls.filter((c) => /^(claim|busy):other/.test(c)), []);
+  });
+});
+
+describe("a reset clones the repository again from its remote", () => {
+  test("a credential whose file was never pushed is kept in the app, unlinked, its secret with it", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "app-cred", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.cloneEmpty("creds");
+    await RepoObjects.activate(credentials, "creds", { pull: false });
+    assert.equal(fx.rowNamed("credentials", "app-cred").repository, "creds");
+    // the reset : the working tree as the (empty) remote has it
+    fs.rmSync(path.join(fx.ROOT, "creds"), { recursive: true, force: true });
+    fx.cloneEmpty("creds");
+    CrudModel.flushAllLocal();
+    const text = await RepoObjects.afterGit("creds", { name: "creds", use_for_credentials: 1 }, { reset: true });
+    assert.match(text, /0 deleted/);
+    assert.match(text, /credentials\/app-cred\.yaml: not in the repository after the reset \(never pushed\?\): 'app-cred' kept in the app, no longer linked to it/);
+    const row = fx.rowNamed("credentials", "app-cred");
+    assert.equal(row.repository, null);
+    assert.equal(row.password, "enc:pw");
+  });
+
+  test("a plain pull still removes a credential whose file is gone", async () => {
+    fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.removeFile("creds", "credentials", "a.yaml");
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).deleted, 1);
+  });
+});

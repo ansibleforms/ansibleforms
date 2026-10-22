@@ -234,7 +234,8 @@ class Repository extends CrudModel {
     // output at all, the process-level handler in app.js only logged it, and the
     // repositories page showed a repository stuck blank with the reason nowhere the user
     // could reach. Record it where they are already looking.
-    Repository.clone(data.name).catch(async (e) => {
+    // the activation below takes the app's objects and says what it did : the clone only reads
+    Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
       try {
         await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
@@ -455,7 +456,9 @@ class Repository extends CrudModel {
     }
     try {
       await Repo.delete(name); // delete the repo on disk
-      await Repository.clone(name, true); // recreate it ; clone writes the final status
+      // recreate it ; clone writes the final status. The objects whose file is not in the
+      // remote (written by the app, never pushed) are unlinked and kept, never deleted
+      await Repository.clone(name, true, { reset: true });
     } catch (e) {
       // release the claim so a delete failure doesn't wedge the repo at 'running'
       await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [e.message, name], { name })
@@ -748,8 +751,15 @@ class Repository extends CrudModel {
   // when claimed=true the caller already holds the atomic status='running' lock
   // (e.g. reset, which must claim before it deletes the tree) ; this avoids a
   // double-claim that would otherwise fail its own guard (issue #414)
-  static async clone(name, claimed = false) {
+  //
+  // opts.activate (default true) : its first clone - no working tree before it - takes the app's
+  // objects of the types it holds (lib/repoObjects/engine.js afterGit), so a repository that was
+  // not cloned when its usage was turned on takes them once it is ; false when the caller
+  // activates it itself. opts.reset : cloned again by a reset (an object whose file is not there
+  // is unlinked and kept in the app, never deleted)
+  static async clone(name, claimed = false, opts = {}) {
     var output, status, head, repo
+    const first = !claimed && opts.activate !== false && Repo.isValidName(name) && !fs.existsSync(Repo.folderOf(name))
     if (!claimed) {
       // the settings' Pull runs a clone, which pulls a repository already cloned
       // (Repo.clone) : the same rule as a pull (assertNoLocalChanges). A reset deletes
@@ -771,9 +781,10 @@ class Repository extends CrudModel {
         // a form name it shares with another forms repository : which copy is used, which skipped
         output += await (await formModel()).duplicateLines(name)
       }
-      // its schedules folder read into the schedule table, still under the claim
+      // its object types read into their tables, still under the claim ; its first clone takes
+      // the app's objects of each
       if (objectTypesOf(repo).length) {
-        output += await (await repoObjects()).afterGit(name, repo)
+        output += await (await repoObjects()).afterGit(name, repo, { activate: first, reset: !!opts.reset })
       }
       // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
       output += await deprecationLines(name)

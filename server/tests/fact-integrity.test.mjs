@@ -150,13 +150,13 @@ describe("the background clone cannot vanish", () => {
   const fn = slice("static async create(data, opts = {})", "static async update(data, name, opts = {})");
 
   test("the slice really is the function, so these assertions are not vacuous", () => {
-    assert.match(fn, /Repository\.clone\(data\.name\)/);
+    assert.match(fn, /Repository\.clone\(data\.name\b[^)]*\)/);
   });
 
   test("its rejection is caught and recorded on the row", () => {
     // clone() throws BEFORE writing any status when the claim fails, so the row was left
     // with no status and no output and the reason reached only the process-level logger
-    assert.match(fn, /Repository\.clone\(data\.name\)\.catch\(/);
+    assert.match(fn, /Repository\.clone\(data\.name\b[^)]*\)\.catch\(/);
     assert.match(fn, /status = 'failed'/);
   });
 });

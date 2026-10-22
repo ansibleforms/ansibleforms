@@ -142,14 +142,29 @@ async function claimWaiting(repository) {
  *   Errors.ConflictError: the repository is still busy once the wait is over.
  */
 export async function withWriteClaim(repository, write) {
-  const mine = held.getStore();
-  if (mine?.has(repository)) return write();
+  if (held.getStore()?.has(repository)) return write();
   const prior = await claimWaiting(repository);
   try {
-    return await held.run(new Set([...(mine || []), repository]), write);
+    return await asHolding(repository, write);
   } finally {
     if (prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));
   }
+}
+
+/**
+ * Runs a step under a repository's write claim its caller holds already (a clone, a reset, a
+ * delete claim it themselves) : the writes inside it (withWriteClaim) run under that claim, never
+ * waiting for it.
+ *
+ * Args:
+ *   repository (string): the repository whose claim the caller holds.
+ *   run (function): the step.
+ *
+ * Returns:
+ *   Promise<any>: what the step returns.
+ */
+export function asHolding(repository, run) {
+  return held.run(new Set([...(held.getStore() || []), repository]), run);
 }
 
 /**
@@ -430,7 +445,9 @@ async function waitingOf(desc, object, cache = new Map()) {
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *   opts (object): { context (the descriptor's context, read when not given) }.
+ *   opts (object): { context (the descriptor's context, read when not given), reset (true : the
+ *     working tree was just cloned again by a reset - an object whose file is not there is
+ *     unlinked and kept in the app, never deleted) }.
  *
  * Returns:
  *   Promise<object>: { created, updated, deleted, unchanged (counts), matched: [name], refused:
@@ -551,6 +568,15 @@ export async function syncRepository(desc, name, opts = {}) {
       continue;
     }
     try {
+      // a reset : a file not in the repository may never have been pushed (written by the app) -
+      // its object stays in the app, unlinked, never deleted with the secrets it keeps
+      if (opts.reset && !files.some((f) => f.file === file)) {
+        await desc.store.link(row.id, null, null);
+        relinked++;
+        summary.notes.push(`${file}: not in the repository after the reset (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
+        logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its file ${name}/${file} is not in the repository after the reset`);
+        continue;
+      }
       await desc.store.remove(row);
     } catch (e) {
       // not removed (its model refused, the database busy) : kept, said, the others go on
@@ -649,8 +675,7 @@ export function summaryText(desc, summary) {
     `${titleOf(desc)}: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.unchanged} unchanged, ${summary.refused.length} refused${waiting.length ? `, ${waiting.length} waiting` : ""}`,
   ];
   if (summary.matched.length) lines.push(`Replaced by the file of the same name: ${summary.matched.join(", ")}`);
-  for (const r of summary.refused) lines.push(`Refused ${r.file}: ${r.reasons.join("; ")}`);
-  for (const w of waiting) lines.push(`Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`);
+  lines.push(...fileLines(summary));
   for (const i of summary.ignored) lines.push(`${i.file}: kept in the file, not used by AnsibleForms: ${i.keys.join(", ")}`);
   if (summary.secretsKept?.length) lines.push(`Not in git, their secrets kept from the database: ${summary.secretsKept.join(", ")}`);
   // the files not imported, by why : an information, not a refusal
@@ -663,19 +688,36 @@ export function summaryText(desc, summary) {
 }
 
 /**
+ * The refused and the waiting files of a sync or an activation, a line each with why.
+ *
+ * Args:
+ *   summary (object): { refused, waiting } (syncRepository's, or activate's report).
+ *
+ * Returns:
+ *   string[]: the lines.
+ */
+function fileLines(summary) {
+  return [
+    ...(summary.refused || []).map((r) => `Refused ${r.file}: ${r.reasons.join("; ")}`),
+    ...(summary.waiting || []).map((w) => `Waiting ${w.file}: ${w.reasons.join("; ")} (read again when it is pulled)`),
+  ];
+}
+
+/**
  * Syncs one type of a repository, its lines for the pull output ; a failure is said there too,
  * never thrown.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
+ *   opts (object): syncRepository's ({ reset }).
  *
  * Returns:
  *   Promise<string>: the lines.
  */
-export async function syncText(desc, name) {
+export async function syncText(desc, name, opts = {}) {
   try {
-    return summaryText(desc, await syncRepository(desc, name));
+    return summaryText(desc, await syncRepository(desc, name, opts));
   } catch (e) {
     logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);
     return `\n${titleOf(desc)} not synchronized: ${e.message || e}`;
@@ -734,20 +776,26 @@ async function retryDependents(keys, except) {
 /**
  * Syncs every object type of a repository after git changed its working tree (a pull, a clone,
  * a reset), in APPLY_ORDER, then reads again the types that name them in other repositories :
- * what it did, for its pull output. A failure is said there too, never thrown : the git operation
- * itself worked.
+ * what it did, for its pull output. Its first clone takes the app's objects of each type
+ * instead (activation : a repository not cloned when its usage was turned on takes them once it
+ * is). A failure is said there too, never thrown : the git operation itself worked.
  *
  * Args:
  *   name (string): the repository.
  *   repo (object): its row (its use_for_* flags).
+ *   opts (object): { activate (true : its first clone, its claim held by the caller), reset
+ *     (true : cloned again by a reset, syncRepository's) }.
  *
  * Returns:
  *   Promise<string>: the lines for the pull output.
  */
-export async function afterGit(name, repo) {
+export async function afterGit(name, repo, opts = {}) {
   const keys = objectTypesOf(repo);
   let out = "";
-  for (const key of keys) out += await syncText(await descriptorOf(key), name);
+  for (const key of keys) {
+    const desc = await descriptorOf(key);
+    out += opts.activate ? await activatedText(desc, name) : await syncText(desc, name, { reset: opts.reset });
+  }
   try {
     out += await retryDependents(keys, name);
   } catch (e) {
@@ -939,8 +987,10 @@ async function pullFor(desc, name, why) {
       await Repository.pull(name);
       return "pulled";
     }
-    await Repository.clone(name);
-    return "cloned";
+    // the activation that follows takes the app's objects itself, saying what it did ; a clone
+    // that failed is recorded on the repository, never thrown : no working tree is "not cloned"
+    await Repository.clone(name, false, { activate: false });
+    return fs.existsSync(Repo.folderOf(name)) ? "cloned" : "not cloned";
   } catch (e) {
     logger.warning(`Repository '${name}' could not be pulled ${why}, its working copy is used as it is: ${e.message || e}`);
     return `not pulled: ${e.message || e}`;
@@ -967,11 +1017,13 @@ async function pullFor(desc, name, why) {
  *     written (afterUsageChange says it in its report).
  */
 export async function activate(desc, name, { pull = true } = {}) {
-  const report = { repository: name, pull: "", created: 0, matched: [], written: [], withoutSecret: [], kept: [], refused: [], waiting: [] };
+  const report = newReport(name);
   // step 1 : the latest files (a pull of the repository reads them in itself)
   if (pull) report.pull = await pullFor(desc, name, `to take ${holdingOf(desc)}`);
   if (!fs.existsSync(Repo.folderOf(name))) {
+    // its first clone takes them (afterGit), said so
     report.pull = report.pull || "not cloned";
+    report.notCloned = true;
     logger.warning(`Repository '${name}' is not cloned yet: ${holdingOf(desc)} will be read from it once it is`);
     return report;
   }
@@ -979,6 +1031,41 @@ export async function activate(desc, name, { pull = true } = {}) {
   // it meanwhile ; one busy is waited for a while, then the activation fails, said (its report's
   // error), never dropped
   return withWriteClaim(name, () => (desc.file ? activateSingle(desc, name, report) : activateFolder(desc, name, report)));
+}
+
+/**
+ * An empty activation report.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   object: { repository, pull, created, matched, written, withoutSecret, kept, refused, waiting }.
+ */
+function newReport(name) {
+  return { repository: name, pull: "", created: 0, matched: [], written: [], withoutSecret: [], kept: [], refused: [], waiting: [] };
+}
+
+/**
+ * Makes a repository just cloned for the first time a type's repository (its claim held by the
+ * clone) : what activate does once pulled, as lines for its pull output. A failure is said there,
+ * never thrown.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<string>: the lines.
+ */
+async function activatedText(desc, name) {
+  try {
+    const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name)));
+    return ["", `Now holds ${activationText(desc, report)}`, ...fileLines(report)].join("\n");
+  } catch (e) {
+    logger.error(`Repository '${name}' could not take ${holdingOf(desc)}: ${e.message || e}`);
+    return `\n${titleOf(desc)} could not follow the usage: ${e.message || e}`;
+  }
 }
 
 /**
@@ -1157,7 +1244,7 @@ export async function usageReportText(report) {
     if (!r) continue;
     const desc = await descriptorOf(key);
     if (r.error) out += `\n${titleOf(desc)} could not follow the usage: ${r.error}`;
-    else if (r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
+    else if (r.activated?.notCloned || r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
     else if (r.activated) out += `\nNow holds ${activationText(desc, r.activated)}`;
     else if (r.deactivated) out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
   }
@@ -1738,6 +1825,7 @@ export default {
   nameKey,
   cloned,
   withWriteClaim,
+  asHolding,
   fileOf,
   writeNewFile,
   repositories,

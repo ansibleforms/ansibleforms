@@ -6607,7 +6607,8 @@
       already has these files, the version in git wins and replaces the app's. Once the clone is done, in the
       background, its pull output says what each type took, for example `Now holds the schedules: 0 read from its
       files, 0 replaced by a file of the same name, 2 written to it (waiting for Push), 1 kept in the app`, or why
-      one could not follow. When what a change will do cannot be read from the server, the question says so in
+      one could not follow. A repository that could not be cloned then (or when its usage was turned on) says it is
+      not cloned, and takes the app's objects on its first clone. When what a change will do cannot be read from the server, the question says so in
       one line instead of each type's section, and the change is still applied if confirmed.
   - name: Credentials and runners kept in a git repository
     short: One YAML file per credential or runner, in the seed's format
@@ -6644,14 +6645,17 @@
       secrets come from the database.
 
       **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the files are read
-      in: a new file makes an object, a changed one changes it, a removed one removes it. A key taken out of a file
+      in: a new file makes an object, a changed one changes it, a removed one removes it. After a **Reset**, an
+      object whose file is not in the remote (written by the app, never pushed) is unlinked and kept in the app with
+      its secrets, never deleted. A key taken out of a file
       is taken out of the app too: the field gets the value a new object made from that file gets (a secret
       excepted, kept in the database). A file renamed keeps its object, which follows it. A file the seed's schema
       or the app's rules refuse (a credential type without its required fields, a runner of another type than its
       credential) is refused alone, said in the pull output. A runner whose credential does not exist yet **waits**,
       said in the pull output, and is read again when the credentials are next pulled. Removing a credential's file
       while a runner, a repository, a secret store, a channel or a sign-in still uses it is refused: the credential
-      stays, the pull output says what uses it. At the worker's start the types are read in a fixed order:
+      stays, the pull output says what uses it; renaming it in its file while something uses it is refused the same
+      way. At the worker's start the types are read in a fixed order:
       credentials, secret stores, what signs in with them (runners ...), then the others.
 
       **Turning it on** shows what it will do first: the app's objects written to the repository (those whose

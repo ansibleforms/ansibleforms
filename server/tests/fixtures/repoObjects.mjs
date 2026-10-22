@@ -234,6 +234,7 @@ export const repository = {
   },
   clone: async (name) => {
     state.calls.push(`clone:${name}`);
+    if (state.cloneFails) return;
     fs.mkdirSync(path.join(ROOT, name), { recursive: true });
   },
   claimForWrite: async (name) => {
