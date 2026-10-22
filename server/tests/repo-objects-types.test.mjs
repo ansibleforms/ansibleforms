@@ -299,6 +299,22 @@ describe("a yes or no whose default is on", () => {
   });
 });
 
+describe("an RTE that asked to join, rejected", () => {
+  test("its credential a credentials repository holds : its file goes too, the next pull does not make it again", async () => {
+    fx.state.tables.repositories.push({ id: 91, name: "creds", use_for_credentials: 1 });
+    fx.state.tables.credentials.push({ id: 9, name: "edge-rte", credential_type: "rte", password: "enc:t", description: "", managed: 0, repository: "creds", repo_file: "credentials/edge-rte.yaml" });
+    fx.writeFile("creds", "credentials", "edge-rte.yaml", { name: "edge-rte", credential_type: "rte" });
+    fx.state.tables.runners.push({ id: 55, name: "edge", type: "rte", credential: "edge-rte", pending: 1 });
+    const { default: Runner } = await import("../src/models/runner.model.js");
+    await Runner.reject(55);
+    assert.equal(fx.rowNamed("runners", "edge"), undefined);
+    assert.equal(fx.rowNamed("credentials", "edge-rte"), undefined);
+    assert.equal(fx.fileExists("creds", "credentials", "edge-rte.yaml"), false);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("credentials"), "creds")).created, 0);
+  });
+});
+
 describe("a change in the app that changes other objects of the type too", () => {
   test("a runner made the default : the former default's file says so too", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });

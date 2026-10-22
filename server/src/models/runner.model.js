@@ -340,16 +340,27 @@ class Runner extends CrudModel {
 
   /**
    * Removes a runner that asked to join, and the credential made for its token then (never one
-   * the config seed manages).
+   * the config seed manages) ; that credential's file too when a credentials repository holds it
+   * (lib/repoObjects), under the repository's write claim - or its next pull would make it again.
    *
    * Args:
    *   row (object): the runner as stored.
+   *
+   * Raises:
+   *   Errors.ConflictError: the credentials repository still busy once the wait is over (nothing
+   *     removed).
    */
   static async removeWithCredential(row) {
-    await mysql.do('DELETE FROM AnsibleForms.`runners` WHERE id = ?', [row.id]);
-    if (row.credential) {
-      await mysql.do('DELETE FROM AnsibleForms.`credentials` WHERE name = ? AND credential_type = ? AND COALESCE(managed, 0) = 0', [row.credential, 'rte']);
-    }
+    const rows = row.credential ? await mysql.do('SELECT * FROM AnsibleForms.`credentials` WHERE name = ?', [row.credential]) : [];
+    const credential = (rows || []).find((c) => c.name === row.credential && c.credential_type === 'rte' && !Number(c.managed || 0));
+    const { default: RepoObjects } = await import('../lib/repoObjects/index.js');
+    await RepoObjects.holding([], async () => {
+      await mysql.do('DELETE FROM AnsibleForms.`runners` WHERE id = ?', [row.id]);
+      if (credential) {
+        await mysql.do('DELETE FROM AnsibleForms.`credentials` WHERE id = ?', [credential.id]);
+        if (credential.repository) await RepoObjects.appDeleted('credentials', credential);
+      }
+    }, credential || null);
     this.changed(this.modelName);
   }
 
