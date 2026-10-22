@@ -557,3 +557,50 @@ describe("a file that renames its credential", () => {
     assert.ok(fx.rowNamed("credentials", "git-bot"));
   });
 });
+
+describe("a pull goes on past what fails", () => {
+  test("a credential its file removed that cannot be removed : said, the other files still applied", async () => {
+    fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));
+    fx.writeFile("creds", "credentials", "b.yaml", gitCredential("b"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.removeFile("creds", "credentials", "a.yaml");
+    fx.writeFile("creds", "credentials", "b.yaml", gitCredential("b", { description: "changed" }));
+    fx.writeFile("creds", "credentials", "c.yaml", gitCredential("c"));
+    CrudModel.flushAllLocal();
+    fx.state.failing = /^DELETE FROM/;
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.match(summary.refused[0].reasons[0], /its file is gone, but 'a' could not be removed: Lock wait timeout exceeded/);
+    assert.equal(fx.rowNamed("credentials", "a").repository, "creds");
+    assert.equal(fx.rowNamed("credentials", "b").description, "changed");
+    assert.ok(fx.rowNamed("credentials", "c"));
+  });
+
+  test("a renamed file its credential cannot follow : refused, the credential kept on its old file", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    fx.writeFile("creds", "credentials", "b.yaml", gitCredential("b"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.removeFile("creds", "credentials", "git.yaml");
+    fx.writeFile("creds", "credentials", "github.yaml", gitCredential("git"));
+    fx.writeFile("creds", "credentials", "b.yaml", gitCredential("b", { description: "changed" }));
+    CrudModel.flushAllLocal();
+    fx.state.failing = /^UPDATE \S+ SET repository = \?, repo_file = \?/;
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    fx.state.failing = null;
+    assert.deepEqual(summary.refused.map((r) => r.file), ["credentials/github.yaml"]);
+    assert.equal(summary.deleted, 0);
+    assert.equal(fx.rowNamed("credentials", "git").repo_file, "credentials/git.yaml");
+    assert.equal(fx.rowNamed("credentials", "b").description, "changed");
+  });
+
+  test("a file of too many aliases (an alias bomb) is refused alone, the others still read", async () => {
+    fx.writeFile("creds", "credentials", "good.yaml", gitCredential("good"));
+    const lines = ["a: &a [x, x, x, x, x, x, x, x, x, x]"];
+    for (const [i, n] of ["b", "c", "d", "e", "f", "g"].entries()) lines.push(`${n}: &${n} [${Array(10).fill(`*${"abcdef"[i]}`).join(", ")}]`);
+    fs.mkdirSync(path.join(fx.ROOT, "creds", "credentials"), { recursive: true });
+    fs.writeFileSync(path.join(fx.ROOT, "creds", "credentials", "bomb.yaml"), [...lines, "name: bomb", "credential_type: git", ""].join("\n"));
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.equal(summary.created, 1);
+    assert.ok(fx.rowNamed("credentials", "good"));
+    assert.match(summary.refused[0].reasons[0], /^not valid YAML: Excessive alias count/);
+  });
+});

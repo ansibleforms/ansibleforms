@@ -324,7 +324,12 @@ async function readFiles(desc, name, ctx) {
     } catch (e) {
       return { file, errors: [`cannot be read: ${e.code || e.message}`], object: null, absent: false };
     }
-    return { file, ...desc.parse(text, ctx) };
+    // a file its reading throws on (an alias bomb) : refused alone, the others still read
+    try {
+      return { file, ...desc.parse(text, ctx) };
+    } catch (e) {
+      return { file, errors: [`cannot be read: ${e.message || e}`], object: null, absent: false };
+    }
   });
   if (files === null) return null;
   // a file the type does not import (an announcement already ended : descriptor.notImported) : not
@@ -503,6 +508,7 @@ export async function syncRepository(desc, name, opts = {}) {
   // again, which would lose its secrets kept in the database, its state, and refuse it for good
   // while something uses it
   const gone = new Map();
+  let relinked = 0;
   for (const [file, row] of own) {
     if (!files.some((f) => f.file === file)) gone.set(nameKey(row.name), file);
   }
@@ -512,7 +518,16 @@ export async function syncRepository(desc, name, opts = {}) {
     if (from === undefined) continue;
     gone.delete(nameKey(f.object.name));
     const row = own.get(from);
-    await desc.store.link(row.id, name, f.repoFile ?? f.file);
+    try {
+      await desc.store.link(row.id, name, f.repoFile ?? f.file);
+    } catch (e) {
+      // not moved : the new file refused, the object kept on its old one, the others go on
+      f.errors = [`not saved: ${e.message || e}`];
+      f.object = null;
+      kept.add(from);
+      continue;
+    }
+    relinked++;
     own.delete(from);
     own.set(f.file, { ...row, repo_file: f.repoFile ?? f.file });
     logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${row.name}' follows its file, renamed in git: ${name}/${from} is now ${name}/${f.file}`);
@@ -535,7 +550,14 @@ export async function syncRepository(desc, name, opts = {}) {
       logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${users.join(", ")} still uses it`);
       continue;
     }
-    await desc.store.remove(row);
+    try {
+      await desc.store.remove(row);
+    } catch (e) {
+      // not removed (its model refused, the database busy) : kept, said, the others go on
+      summary.refused.push({ file, reasons: [`its file is gone, but '${row.name}' could not be removed: ${e.message || e}`] });
+      logger.warning(`Could not remove ${desc.noun} '${row.name}' of ${name}/${file}: ${e.message || e}`);
+      continue;
+    }
     const skipped = files.find((f) => f.file === file && f.skipped);
     logger.notice(`Removed ${desc.noun} '${row.name}': ${skipped ? `its file ${name}/${file} says it is ${skipped.skipped.reason}` : `its file ${name}/${file} is gone`}`);
     summary.deleted++;
@@ -591,7 +613,7 @@ export async function syncRepository(desc, name, opts = {}) {
       logger.warning(`Could not save the ${desc.noun} of ${name}/${f.file}: ${e.message || e}`);
     }
   }
-  if (summary.created || summary.updated || summary.deleted || summary.matched.length) CrudModel.changed(desc.model);
+  if (summary.created || summary.updated || summary.deleted || summary.matched.length || relinked) CrudModel.changed(desc.model);
   logger.info(
     `${titleOf(desc)} of repository '${name}': ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.refused.length} refused${summary.waiting.length ? `, ${summary.waiting.length} waiting` : ""}`,
   );

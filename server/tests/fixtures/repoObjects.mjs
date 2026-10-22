@@ -47,6 +47,8 @@ export function reset(tables = {}) {
   state.nextId = 100;
   state.calls.length = 0;
   state.pullFails = false;
+  state.cloneFails = false;
+  state.failing = null;
   state.columns = {};
   state.busy = {};
   fs.rmSync(ROOT, { recursive: true, force: true });
@@ -76,6 +78,7 @@ const lower = (s) => String(s ?? "").toLowerCase();
 export const db = {
   do: async (sql, params = []) => {
     sql = sql.trim();
+    if (state.failing?.test(sql)) throw new Error("Lock wait timeout exceeded");
     const table = tableOf(sql, params);
     const rows = rowsOf(table);
     // a table's columns and their defaults (lib/repoObjects/engine.js columnDefaults)

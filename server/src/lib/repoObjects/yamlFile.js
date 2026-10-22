@@ -355,7 +355,12 @@ export function parseMapFile(text) {
   const doc = YAML.parseDocument(String(text ?? ""), { prettyErrors: false });
   if (doc.errors.length) return { errors: [`not valid YAML: ${doc.errors[0].message}`], object: null };
   if (!YAML.isMap(doc.contents)) return { errors: ["the file is not a YAML dictionary"], object: null };
-  return { errors: [], object: doc.contents.toJS(doc) || {} };
+  // its aliases expanded : too many (an alias bomb) is refused, said, never thrown
+  try {
+    return { errors: [], object: doc.contents.toJS(doc) || {} };
+  } catch (e) {
+    return { errors: [`not valid YAML: ${e.message || e}`], object: null };
+  }
 }
 
 // ===========================================================================
