@@ -21,6 +21,7 @@ import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
 import { findOwner, realPathOf } from "../lib/repoObjects/ownedPaths.js";
+import { isInside } from "../lib/projectFiles.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
@@ -48,6 +49,9 @@ const formsSchema = (() => {
   schema.properties.forms = { type: "array", default: [], items: formItems };
   return schema;
 })();
+// the types a form is of (form_schema.json, one branch each) : a file whose entries are of none of
+// them is not a forms file (a playbook's plays, an inventory)
+const FORM_TYPES = new Set((formSchema.oneOf || []).flatMap((branch) => branch?.properties?.type?.enum || []));
 const jsonSchemaDraft6 = JSON.parse(fs.readFileSync(path.join(__dirname, "../../node_modules/ajv/lib/refs/json-schema-draft-06.json"), "utf8"));
 
 // The paths, read from appConfig each time they are used : the settings page changes
@@ -1923,6 +1927,12 @@ Form.save = async function(data, options = {}){
     }
   }
 
+  // the folders other usages own inside a forms repository serving its forms from its root : its
+  // playbooks folder, its vars folder (Repository.getAnsiblePath, getVarsFilesPath)
+  const otherFolders = formsDirs.some((d) => d.name && !d.dedicated)
+    ? [await Repository.getAnsiblePath(), await Repository.getVarsFilesPath()].filter(Boolean).map((f) => path.resolve(f))
+    : []
+
   // resolve the target folder per group (own repo, then existing holder, then staging)
   for (const g of Object.values(groups)) {
     g.dir = resolveTargetDir(g.repository, g.source, formsDirs, (d, src) => fs.existsSync(path.join(d.path, src)))
@@ -1936,6 +1946,17 @@ Form.save = async function(data, options = {}){
       // really lands (links followed) : never written as a forms file
       const owner = await findOwner(target)
       if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner.label} of repository '${owner.repository}': save the form to another file`)
+      // the playbooks or the vars files of a repository serving its forms from its root, or a file
+      // there holding no form (a playbook, an inventory) : not the forms', saving a form named
+      // like one of its plays would replace it. A forms folder of its own holds forms only.
+      if (!d.name || d.dedicated) continue
+      if (otherFolders.some((f) => isInside(path.resolve(d.path), f) && (isInside(f, target) || isInside(f, realPathOf(target))))) {
+        throw new Errors.ConflictError(`The form file '${g.source}' is in the playbooks or the vars files folder: save the form to another file`)
+      }
+      const onDisk = fs.existsSync(target) ? readFileForms(target, g.source) : null
+      if (onDisk?.forms.length && !onDisk.forms.some((f) => f.isForm)) {
+        throw new Errors.ConflictError(`The file '${g.source}' holds no forms: save the form to another file`)
+      }
     }
   }
 
@@ -2168,8 +2189,8 @@ function notLoaded(item, filename) {
  *   filename (string): the file, relative to its forms folder.
  *
  * Returns:
- *   object|null: { forms: [{ name, notLoaded, text }], single (the file holds one form, not
- *   a list) } ; null when the file cannot be read or parsed as forms (the loader then left
+ *   object|null: { forms: [{ name, notLoaded, isForm (of a form type, FORM_TYPES), text }],
+ *   single (the file holds one form, not a list) } ; null when the file cannot be read or parsed as forms (the loader then left
  *   the whole file out).
  */
 function readFileForms(fullPath, filename) {
@@ -2216,7 +2237,7 @@ function readFileForms(fullPath, filename) {
       text = String(one)
     }
     const value = values[i]
-    return { name: value?.name, notLoaded: notLoaded(value, filename), text }
+    return { name: value?.name, notLoaded: notLoaded(value, filename), isForm: FORM_TYPES.has(value?.type), text }
   })
   return { forms, single: !yaml.isSeq(contents) }
 }

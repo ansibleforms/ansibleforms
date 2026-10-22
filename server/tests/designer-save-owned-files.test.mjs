@@ -118,3 +118,28 @@ test("config.yaml serving the whole configuration (no repository holds the roles
   assert.match(res.body.details, /The form file 'config\.yaml' belongs to the configuration of repository 'ops'/);
   assert.equal(fs.readFileSync(ops("config.yaml"), "utf8"), ROLES_TEXT);
 });
+
+test("a playbook, the playbooks folder and the vars folder of a forms repository's root are not form files", async () => {
+  REPOS.splice(0, REPOS.length, { ...OPS, use_for_playbooks: 1 });
+  fs.mkdirSync(ops("playbooks"));
+  fs.mkdirSync(ops("vars"));
+  // a new form file in a folder of its own saves (staged, for the next Push)
+  const ok = await save([form("Deploy", "deploy.yaml"), form("New", "team/new.yaml")]);
+  assert.equal(ok.code, 200, JSON.stringify(ok.body));
+  assert.match(fs.readFileSync(path.join(appConfig.formsStagingPath, "team", "new.yaml"), "utf8"), /name: New/);
+  // a playbook at the root : a form named like one of its plays would replace that play
+  const PLAYS = "- name: Site\n  hosts: all\n  tasks: []\n";
+  fs.writeFileSync(ops("site.yml"), PLAYS);
+  const play = await save([form("Deploy", "deploy.yaml"), form("Site", "site.yml")]);
+  assert.equal(play.code, 409, JSON.stringify(play.body));
+  assert.match(play.body.details, /The file 'site\.yml' holds no forms: save the form to another file/);
+  assert.equal(fs.readFileSync(ops("site.yml"), "utf8"), PLAYS);
+  // the playbooks folder, the vars folder : another usage's
+  for (const folder of ["playbooks", "vars"]) {
+    const res = await save([form("Deploy", "deploy.yaml"), form("New", `${folder}/new.yaml`)]);
+    assert.equal(res.code, 409, JSON.stringify(res.body));
+    assert.match(res.body.details, new RegExp(`The form file '${folder}/new\\.yaml' is in the playbooks or the vars files folder`));
+    assert.equal(fs.existsSync(ops(`${folder}/new.yaml`)), false);
+  }
+
+});
