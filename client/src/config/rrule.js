@@ -6,6 +6,7 @@
 
 import { ref } from 'vue';
 import axios from 'axios';
+import { rruleProblem as textProblem } from '@/lib/rruleRules';
 
 // the schedules repository, when there is one : a new recurring schedule goes to it, edited as a
 // rrule (read by loadScheduleRepository, on the schedules list)
@@ -28,9 +29,8 @@ export async function loadScheduleRepository() {
 }
 
 /**
- * Why a rrule is refused, on its text alone : no DTSTART, a naive one, several, no RRULE, an
- * EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
- * numeric prefix, COUNT with UNTIL, COUNT above 999, a TZID that is no time zone.
+ * Why a rrule is refused, on its text alone : the server's rules and reasons
+ * (lib/rruleRules.js), its TZID checked against the zones the browser knows.
  *
  * Args:
  *   value (string): the rrule.
@@ -39,29 +39,7 @@ export async function loadScheduleRepository() {
  *   string: the reason, '' when the text passes.
  */
 export function rruleProblem(value) {
-  const text = String(value ?? '').trim();
-  if (!text) return '';
-  const dtstarts = text.match(/DTSTART(;[^:]+)?:[0-9]+T[0-9]+Z?/g) || [];
-  if (!dtstarts.length) return 'Valid DTSTART required in rrule. Value should start with: DTSTART:YYYYMMDDTHHMMSSZ';
-  if (/DTSTART:[0-9]+T[0-9]+(\s|$)/.test(text))
-    return 'DTSTART cannot be a naive datetime. Specify ;TZID= or end it in Z.';
-  if (dtstarts.length > 1) return 'Multiple DTSTART is not supported.';
-  if (!/rrule:/i.test(text)) return 'One or more rule required in rrule.';
-  if (/exdate:/i.test(text)) return 'EXDATE not allowed in rrule.';
-  if (/rdate:/i.test(text)) return 'RDATE not allowed in rrule.';
-  for (const rule of text.match(/RULE:[^\s]*/g) || []) {
-    if (!/interval/i.test(rule)) return `INTERVAL required in rrule: ${rule}`;
-    const interval = rule.match(/INTERVAL=([0-9]+)/);
-    if (interval && Number(interval[1]) < 1) return `INTERVAL must be a positive integer: ${rule}`;
-    if (/secondly/i.test(rule)) return `SECONDLY is not supported: ${rule}`;
-    if (/BYDAY[:=][0-9]+[a-zA-Z]{2}/.test(rule)) return `BYDAY with numeric prefix not supported: ${rule}`;
-    if (rule.includes('COUNT') && rule.includes('UNTIL')) return `RRULE may not contain both COUNT and UNTIL: ${rule}`;
-    const count = rule.match(/COUNT=([0-9]+)/);
-    if (count && Number(count[1]) > 999) return `COUNT > 999 is unsupported: ${rule}`;
-  }
-  const zone = zoneOf(text);
-  if (zone && !validZone(zone)) return `A valid TZID must be provided (e.g., America/New_York). Invalid: ${zone}`;
-  return '';
+  return textProblem(value, validZone);
 }
 
 /**

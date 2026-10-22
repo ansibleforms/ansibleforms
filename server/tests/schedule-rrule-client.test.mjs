@@ -1,0 +1,78 @@
+// The rrule editor's early answer (client/src/lib/rruleRules.js) and the server's check
+// (lib/scheduleRrule.js validateRrule) apply the same rules : each rrule below gets the same
+// verdict, with the same reason, from both - whatever the case of the keys or the sign of a
+// number. Only what the client cannot say on the text (a rule that never fires) is the server's.
+import { test, describe } from "vitest";
+import assert from "node:assert/strict";
+import { validateRrule } from "../src/lib/scheduleRrule.js";
+import { rruleProblem } from "../../client/src/lib/rruleRules.js";
+
+// the zones the browser knows : Intl's, as the client checks them
+const validZone = (zone) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const D = "DTSTART:20300308T050000Z";
+const RRULES = [
+  // taken
+  `DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1`,
+  `${D} RRULE:freq=daily;interval=2`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=+2`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;count=5`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;until=20310101T000000Z`,
+  `${D} RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR EXRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=WE`,
+  // the text
+  "DTSTART:NONSENSE",
+  "DTSTART:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1",
+  "DTSTART:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1 ",
+  `${D} DTSTART:20310308T050000Z RRULE:FREQ=DAILY;INTERVAL=1`,
+  D,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1 EXDATE:20300401T000000Z`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1 exdate:20300401T000000Z`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1 rdate:20300401T000000Z`,
+  `${D} RRULE:FREQ=DAILY`,
+  // INTERVAL of 1 or more
+  `${D} RRULE:FREQ=DAILY;INTERVAL=0`,
+  `${D} RRULE:FREQ=DAILY;interval=0`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=-1`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1.5`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=abc`,
+  // COUNT between 1 and 999, not with UNTIL
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2000`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;count=5000`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;COUNT=0`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;COUNT=-3`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;COUNT=5;UNTIL=20310101T000000Z`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;count=5;until=20310101T000000Z`,
+  // SECONDLY
+  `${D} RRULE:FREQ=SECONDLY;INTERVAL=5`,
+  `${D} RRULE:freq=secondly;interval=5`,
+  // BYDAY with a number, a weekday that is not one
+  `${D} RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=5MO`,
+  `${D} RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=+1MO`,
+  `${D} RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1FR`,
+  `${D} RRULE:FREQ=MONTHLY;INTERVAL=1;byday=1mo`,
+  `${D} RRULE:FREQ=WEEKLY;INTERVAL=1;byday=mo`,
+  // what reading it says
+  `${D} RRULE:FREQ=REGULARLY;INTERVAL=1`,
+  `${D} RRULE:INTERVAL=1`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;FOO=1`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20310101`,
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1 NONSENSE`,
+  "DTSTART;TZID=America/New_York:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1",
+  "DTSTART;TZID=Not/AZone:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1",
+  `${D} RRULE:FREQ=DAILY;INTERVAL=1 EXRULE:FREQ=WEEKLY;INTERVAL=-2`,
+];
+
+describe("the client and the server refuse the same rrules, saying the same", () => {
+  for (const rrule of RRULES) {
+    test(rrule, () => {
+      assert.equal(rruleProblem(rrule, validZone), validateRrule(rrule)[0] ?? "");
+    });
+  }
+});

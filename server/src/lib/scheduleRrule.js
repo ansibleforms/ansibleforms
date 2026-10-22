@@ -215,6 +215,10 @@ function ruleOptions(text, zone, fail, label = `RRULE:${text}`) {
     if (options.count > MAX_COUNT) throw new Error(`COUNT > 999 is unsupported: ${label}`);
   }
   const byday = options.byweekday === undefined || options.byweekday === null ? [] : [].concat(options.byweekday);
+  // a weekday rrule.js does not know (mo, in lower case) is read as nothing : named
+  if (byday.some((d) => d === undefined || d === null)) {
+    throw fail(`Invalid weekday string: ${parts.map((part) => part.match(/^BY(?:WEEK)?DAY=(.*)$/i)).find(Boolean)?.[1]}`);
+  }
   if (byday.some((d) => d && typeof d === "object" && d.n)) throw new Error(`BYDAY with numeric prefix not supported: ${label}`);
   // rrule.js reads both BYDAY and BYWEEKDAY ; no time zone of its own (the wall clock is ours)
   delete options.tzid;

@@ -273,6 +273,15 @@ describe('a rrule is checked on its text', () => {
     ['DTSTART:20300308T050000Z RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=5MO', 'BYDAY with numeric prefix'],
     ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2000', 'COUNT > 999'],
     ['DTSTART;TZID=Not/AZone:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1', 'A valid TZID'],
+    // the server's rules, whatever the case of the keys or the sign of a number
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=-1', 'INTERVAL must be a positive integer'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;interval=0', 'INTERVAL must be a positive integer'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;count=5000', 'COUNT > 999'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;COUNT=0', 'COUNT must be a positive integer'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;count=5;until=20310101T000000Z', 'both COUNT and UNTIL'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=+1MO', 'BYDAY with numeric prefix'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1 rdate:20300401T000000Z', 'RDATE'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;FOO=1', "Unknown RRULE property 'FOO'"],
   ])('refuses %s', (rrule, reason) => {
     expect(rruleProblem(rrule)).toContain(reason);
     expect(rruleValidationMessage(t, rrule)).toContain('settings.schedules.rruleInvalid');
