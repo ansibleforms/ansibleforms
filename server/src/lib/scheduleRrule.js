@@ -25,15 +25,18 @@
 //     BYMONTH=2;BYMONTHDAY=30) is seen at once as one that never fires
 //   its runs are looked for in growing windows up to 50 years ahead, in a thread of their own
 //     (lib/scheduleRruleWorker.js) given one second at most : no rule blocks the process. One
-//     that takes longer is given up for a minute, never refused for it
+//     that takes longer is given up for a minute and refused when it is checked (a rule already
+//     saved is tried again by the scheduler once the minute is over)
 //   a time a DST change skips runs when the clock reaches it (02:30 on the night the clock goes
 //     from 02:00 to 03:00 runs at 03:30, as a cron does), a time the clock shows twice runs at
 //     the first
 //   a preview shows the next ten runs
 //
-// rrule.js is a port of python-dateutil's rrule : it reads the rule, and keeps the days of a year
-// a rule's BYxxx parts name (dayRuleOf). The rule is walked in the zone's wall clock (a
-// "floating" time), and luxon turns each run into the moment it is in that zone.
+// rrule.js is a port of python-dateutil's rrule : it reads the rule. The days of a year a rule's
+// BYxxx parts keep are worked out here as dateutil keeps them (keptDaysOfYear), in one pass over
+// the year, so a rule that keeps no day is seen at once (rrule.js walks to the year 9999 for it).
+// The rule is walked in the zone's wall clock (a "floating" time), and luxon turns each run into
+// the moment it is in that zone.
 import { Worker, MessageChannel, receiveMessageOnPort } from "node:worker_threads";
 import rrulePkg from "rrule";
 import { DateTime } from "luxon";
@@ -69,7 +72,8 @@ const SHIFT_MS = 3 * HOUR;
 // rrules are remembered at most : tests change them
 export const limits = { walkMs: 1000, startMs: 10000, givenUpMs: 60000, maxGivenUp: 200 };
 
-// the code of the error a call that took too long throws : the rule is not refused for it
+// the code of the error a call that took too long throws : a check refuses the rule for it, the
+// scheduler tries it again later
 export const TIMEOUT = "RRULE_TIMEOUT";
 
 // the weekdays, as rrule.js numbers them (Monday 0)
@@ -166,8 +170,8 @@ function readErrors(value) {
  * Why a rrule is refused : no DTSTART, a naive one (neither a TZID nor a Z), more than one, no RRULE,
  * an EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix (20MO), COUNT and UNTIL together, COUNT above 999, a BYxxx number out of its range,
- * a TZID that is no time zone, whatever does not parse, and a rule with no run in the HORIZON_YEARS
- * after its DTSTART. A rule whose runs could not be worked out in time is not refused for it.
+ * a TZID that is no time zone, whatever does not parse, a rule with no run in the HORIZON_YEARS
+ * after its DTSTART, and a rule whose runs could not be worked out in limits.walkMs (said so).
  *
  * Args:
  *   value (string): the rrule, written on one line (DTSTART;TZID=Europe/Brussels:
@@ -180,11 +184,12 @@ export function validateRrule(value) {
   const { errors, text } = readErrors(value);
   if (errors.length) return errors;
   // step 3 : it fires - a run in the years after its DTSTART (its runs may all be past : one that
-  // ended is still a valid rule)
+  // ended is still a valid rule) ; one whose runs take too long to work out is refused, saying so
+  // (the scheduler would only ever give it up)
   try {
     if (!nextRuns(text, { fromStart: true }).length) errors.push(neverFires());
   } catch (e) {
-    if (e.code !== TIMEOUT) errors.push(e.message);
+    errors.push(e.message);
   }
   return errors;
 }
@@ -204,7 +209,7 @@ export async function validateRruleAsync(value) {
   try {
     if (!(await nextRunsAsync(text, { fromStart: true })).length) errors.push(neverFires());
   } catch (e) {
-    if (e.code !== TIMEOUT) errors.push(e.message);
+    errors.push(e.message);
   }
   return errors;
 }
@@ -517,29 +522,250 @@ function specOf(options, start) {
       spec.byweekday = [f.weekday];
     }
   }
+  // what its days are remembered by : its day parts (null when it names none, every day kept)
+  const dayParts = [spec.bymonth, spec.bymonthday, spec.byyearday, spec.byweekno, spec.byweekday];
+  spec.dayKey = dayParts.some((list) => list.length) || spec.byeaster !== null ? JSON.stringify([...dayParts, spec.byeaster, spec.wkst]) : null;
   return spec;
 }
 
+// the days of a year a rule keeps, by its day parts and the year, and whether its day parts keep
+// no day ever, by its day parts : worked out once, the oldest forgotten past their size
+const yearDays = new Map();
+const noDayEver = new Map();
+const MAX_YEAR_DAYS = 2000;
+const MAX_NO_DAY = 500;
+
+// the Gregorian calendar repeats every 400 years : day parts that keep no day in 400 of them keep
+// none ever
+const CALENDAR_YEARS = 400;
+
 /**
- * The rule rrule.js keeps the days of a rule with : a yearly rule with its BYMONTH, BYMONTHDAY,
- * BYYEARDAY, BYWEEKNO, BYDAY and BYEASTER, one run a day ; null when it names no day (every day
+ * Remembers a value in a cache, the oldest entry forgotten past its size.
+ *
+ * Args:
+ *   cache (Map): the cache.
+ *   key (string): the key.
+ *   value (*): the value.
+ *   size (number): the most entries it keeps.
+ *
+ * Returns:
+ *   *: the value.
+ */
+function remember(cache, key, value, size) {
+  if (cache.size >= size) cache.delete(cache.keys().next().value);
+  cache.set(key, value);
+  return value;
+}
+
+/**
+ * The day of the year (0 for the 1st of January) Easter Sunday is on (the Western Easter, as
+ * dateutil's and rrule.js's BYEASTER count from it).
+ *
+ * Args:
+ *   year (number): the year.
+ *
+ * Returns:
+ *   number: the day of the year.
+ */
+function easterDayOf(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
+  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return (Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1)) / DAY;
+}
+
+/**
+ * The days of a year a BYWEEKNO keeps, as dateutil numbers the weeks (week 1 is the first with
+ * four days or more of the year, from the WKST ; the last week of the year before and week 1 of the
+ * next counted too).
+ *
+ * Args:
+ *   spec (object): specOf's result.
+ *   year (number): the year.
+ *
+ * Returns:
+ *   Uint8Array: 1 for each day of the year (and 7 after it) the BYWEEKNO keeps.
+ */
+function weekMaskOf(spec, year) {
+  const yearLength = (y) => (Date.UTC(y + 1, 0, 1) - Date.UTC(y, 0, 1)) / DAY;
+  const weekdayOf = (y) => (new Date(Date.UTC(y, 0, 1)).getUTCDay() + 6) % 7;
+  const yearlen = yearLength(year);
+  const yearweekday = weekdayOf(year);
+  const wkst = spec.wkst;
+  const mask = new Uint8Array(yearlen + 7);
+  // the weekday of a day of the year (and of the 7 after it)
+  const weekday = (i) => (yearweekday + i) % 7;
+  // a week from a day : up to the day before the next WKST
+  const markWeek = (from) => {
+    let i = from;
+    for (let j = 0; j < 7; j++) {
+      mask[i] = 1;
+      i++;
+      if (weekday(i) === wkst) break;
+    }
+  };
+  const firstwkst = (7 - yearweekday + wkst) % 7;
+  let no1wkst = firstwkst;
+  let wyearlen;
+  if (no1wkst >= 4) {
+    no1wkst = 0;
+    wyearlen = yearlen + ((yearweekday - wkst + 7) % 7);
+  } else {
+    wyearlen = yearlen - no1wkst;
+  }
+  const numweeks = Math.floor(wyearlen / 7) + Math.floor((wyearlen % 7) / 4);
+  for (const value of spec.byweekno) {
+    const n = value < 0 ? value + numweeks + 1 : value;
+    if (!(n > 0 && n <= numweeks)) continue;
+    let i;
+    if (n > 1) {
+      i = no1wkst + (n - 1) * 7;
+      if (no1wkst !== firstwkst) i -= 7 - firstwkst;
+    } else {
+      i = no1wkst;
+    }
+    markWeek(i);
+  }
+  if (spec.byweekno.includes(1)) {
+    // week 1 of the next year, when it starts in this one
+    let i = no1wkst + numweeks * 7;
+    if (no1wkst !== firstwkst) i -= 7 - firstwkst;
+    if (i < yearlen) markWeek(i);
+  }
+  if (no1wkst) {
+    // the days before week 1 : the last week of the year before
+    let lnumweeks;
+    if (!spec.byweekno.includes(-1)) {
+      const lyearweekday = weekdayOf(year - 1);
+      const lno1wkst = (7 - lyearweekday + wkst) % 7;
+      const lyearlen = yearLength(year - 1);
+      if (lno1wkst >= 4) {
+        lnumweeks = 52 + Math.floor(((lyearlen + ((lyearweekday - wkst + 7) % 7)) % 7) / 4);
+      } else {
+        lnumweeks = 52 + Math.floor(((yearlen - no1wkst) % 7) / 4);
+      }
+    } else {
+      lnumweeks = -1;
+    }
+    if (spec.byweekno.includes(lnumweeks)) for (let i = 0; i < no1wkst; i++) mask[i] = 1;
+  }
+  return mask;
+}
+
+/**
+ * The days of a year a rule keeps, worked out here as dateutil keeps them (a day is kept when
+ * each of its BYMONTH, BYWEEKNO, BYDAY, BYEASTER, BYMONTHDAY and BYYEARDAY keeps it), without
+ * walking : one pass over the days of that year, whatever the rule.
+ *
+ * Args:
+ *   spec (object): specOf's result.
+ *   year (number): the year.
+ *
+ * Returns:
+ *   number[]: the days kept, floating ms of their start, in order.
+ */
+function keptDaysOfYear(spec, year) {
+  const first = Date.UTC(year, 0, 1);
+  const yearlen = (Date.UTC(year + 1, 0, 1) - first) / DAY;
+  const yearweekday = (new Date(first).getUTCDay() + 6) % 7;
+  const only = (list) => (list.length ? new Set(list) : null);
+  const months = only(spec.bymonth);
+  const weekdays = only(spec.byweekday);
+  const monthdays = only(spec.bymonthday);
+  const yeardays = only(spec.byyearday);
+  const weeks = spec.byweekno.length ? weekMaskOf(spec, year) : null;
+  const easter = spec.byeaster === null ? null : easterDayOf(year) + spec.byeaster;
+  const days = [];
+  for (let d = 0; d < yearlen; d++) {
+    const ms = first + d * DAY;
+    const date = new Date(ms);
+    const month = date.getUTCMonth();
+    if (months && !months.has(month + 1)) continue;
+    if (weeks && !weeks[d]) continue;
+    if (weekdays && !weekdays.has((yearweekday + d) % 7)) continue;
+    if (easter !== null && d !== easter) continue;
+    if (monthdays) {
+      const day = date.getUTCDate();
+      const monthlen = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      if (!monthdays.has(day) && !monthdays.has(day - monthlen - 1)) continue;
+    }
+    if (yeardays && !yeardays.has(d + 1) && !yeardays.has(d - yearlen)) continue;
+    days.push(ms);
+  }
+  return days;
+}
+
+/**
+ * The days of a year a rule keeps (keptDaysOfYear), remembered.
+ *
+ * Args:
+ *   spec (object): specOf's result (its dayKey not null).
+ *   year (number): the year.
+ *
+ * Returns:
+ *   number[]: the days kept, floating ms of their start, in order.
+ */
+function daysOfYear(spec, year) {
+  const key = `${spec.dayKey}|${year}`;
+  return yearDays.get(key) || remember(yearDays, key, keptDaysOfYear(spec, year), MAX_YEAR_DAYS);
+}
+
+/**
+ * The days a rule keeps between two days, both included ; null when it names no day (every day
  * is kept).
  *
  * Args:
  *   spec (object): specOf's result.
- *   year (number): the year it starts in.
+ *   from (number): the first day, floating ms of its start.
+ *   to (number): the last day, floating ms of its start.
  *
  * Returns:
- *   RRule|null: the rule.
+ *   number[]|null: the days kept, floating ms of their start, in order.
  */
-function dayRuleOf(spec, year) {
-  const opts = { freq: RRule.YEARLY, interval: 1, dtstart: new Date(Date.UTC(year, 0, 1)), wkst: spec.wkst, byhour: [0], byminute: [0], bysecond: [0] };
-  for (const key of ["bymonth", "bymonthday", "byyearday", "byweekno", "byweekday"]) if (spec[key].length) opts[key] = spec[key];
-  if (spec.byeaster !== null) opts.byeaster = spec.byeaster;
-  if (Object.keys(opts).length === 7) return null;
-  // only months : every day of them (a yearly rule would take only the day of its DTSTART)
-  if (!opts.bymonthday && !opts.byyearday && !opts.byweekno && !opts.byweekday && opts.byeaster === undefined) opts.byweekday = [0, 1, 2, 3, 4, 5, 6];
-  return new RRule(opts);
+function keptDays(spec, from, to) {
+  if (spec.dayKey === null) return null;
+  // the first index of a sorted list whose value is at least t
+  const firstAt = (list, t) => {
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (list[mid] < t) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const days = [];
+  const last = new Date(to).getUTCFullYear();
+  for (let year = new Date(from).getUTCFullYear(); year <= last; year++) {
+    const list = daysOfYear(spec, year);
+    for (let i = firstAt(list, from); i < list.length && list[i] <= to; i++) days.push(list[i]);
+  }
+  return days;
+}
+
+/**
+ * Whether a rule's day parts keep no day ever : none in the CALENDAR_YEARS from a year on (the
+ * first years at once for a rule that fires), remembered.
+ *
+ * Args:
+ *   spec (object): specOf's result.
+ *   year (number): the year to look from.
+ *
+ * Returns:
+ *   boolean: true when no day is ever kept.
+ */
+function keepsNoDay(spec, year) {
+  if (spec.dayKey === null) return false;
+  if (noDayEver.has(spec.dayKey)) return noDayEver.get(spec.dayKey);
+  let none = true;
+  for (let y = year; none && y < year + CALENDAR_YEARS; y++) if (keptDaysOfYear(spec, y).length) none = false;
+  return remember(noDayEver, spec.dayKey, none, MAX_NO_DAY);
 }
 
 /**
@@ -566,8 +792,7 @@ function neverFiresAtAll(spec, start) {
     const minutes = spec.byminute.length ? spec.byminute : [...Array(60).keys()];
     if (!reaches(hours.flatMap((h) => minutes.map((m) => h * 60 + m)), 1440, f.hour * 60 + f.minute)) return true;
   }
-  const days = dayRuleOf(spec, f.year);
-  return !!days && days.after(new Date(Date.UTC(f.year, 0, 1)), true) === null;
+  return keepsNoDay(spec, f.year);
 }
 
 /**
@@ -652,7 +877,7 @@ function periodsOf(spec, start) {
 
 /**
  * A rule walked here : its periods (every INTERVAL of them from the DTSTART's), the days each
- * holds that are kept (dayRuleOf), its times on them (timesOf), BYSETPOS picking among the runs of
+ * holds that are kept (keptDays), its times on them (timesOf), BYSETPOS picking among the runs of
  * a weekly, monthly or yearly period as it does among the times of a shorter one. An hour or a
  * minute is kept when its hour and minute are too.
  *
@@ -679,10 +904,9 @@ function periodWalker(spec, start) {
     let k = firstFrom(lo);
     // the days kept in the periods between the two, in order : every day of the periods each
     // end is in, BYSETPOS counting the runs of a whole period
-    const dayRule = dayRuleOf(spec, fieldsOf(startOf(k)).year);
     const kh = firstFrom(hi);
     const last = startOf(kh) <= hi ? Math.max(hi, endOf(kh) - 1) : hi;
-    let days = dayRule ? dayRule.between(new Date(dayOf(startOf(k))), new Date(dayOf(last)), true).map((d) => d.getTime()) : null;
+    let days = keptDays(spec, dayOf(startOf(k)), dayOf(last));
     // a weekly, monthly or yearly rule names its days (specOf) : every day all the same
     if (!days && !short) days = Array.from({ length: (dayOf(last) - dayOf(startOf(k))) / DAY + 1 }, (_, i) => dayOf(startOf(k)) + i * DAY);
     let at = 0;
@@ -831,13 +1055,13 @@ let asyncThread = null;
 const givenUp = new Map();
 
 /**
- * The error of a call that took too long : the rule is given up a while, not refused.
+ * The error of a call that took too long : the rule is given up a while (refused when checked).
  *
  * Returns:
  *   Error: the error, its code TIMEOUT.
  */
 function tooSlow() {
-  const e = new Error(`No run of this rrule could be worked out in ${limits.walkMs / 1000} second: does it ever fire?`);
+  const e = new Error(`The runs of this rrule could not be worked out in ${limits.walkMs / 1000} second: simplify it (fewer rules or BYxxx values).`);
   e.code = TIMEOUT;
   return e;
 }

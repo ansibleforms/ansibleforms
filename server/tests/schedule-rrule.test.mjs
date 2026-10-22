@@ -3,11 +3,24 @@
 // changes, with EXRULE, UNTIL and a start date years ago.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { validateRrule, nextRuns, nextRun, zoneOf, defaultRrule, normalizeRrule } from "../src/lib/scheduleRrule.js";
+import { validateRrule, nextRuns, nextRun, zoneOf, defaultRrule, normalizeRrule, walkRuns } from "../src/lib/scheduleRrule.js";
 
 // before every run of the cases below, so the whole rule is walked
 const LONG_AGO = new Date("2020-01-01T00:00:00Z");
 const runs = (rrule, count = 10, after = LONG_AGO) => nextRuns(rrule, { after, count }).map((d) => d.toISOString());
+
+// what a walk costs, in ms : the fastest of three in this process (the time the runs cost, not
+// the thread's start or the pauses of a busy machine) ; a walk that is really slow is slow each
+// time, and one past the thread's second fails the call itself (nextRuns throws, validateRrule
+// refuses saying so)
+const fastest = (walk) =>
+  Math.min(
+    ...[0, 1, 2].map(() => {
+      const started = performance.now();
+      walk();
+      return performance.now() - started;
+    }),
+  );
 
 describe("a refused rrule is refused, with the reason", () => {
   // [rrule, the reason it gives]
@@ -166,9 +179,10 @@ describe("its runs, in its own time zone", () => {
 
   test("a minutely rule from years ago is walked from now, at once", () => {
     const now = new Date();
-    const started = Date.now();
-    const next = nextRuns("DTSTART;TZID=America/New_York:20051231T000030 RRULE:FREQ=MINUTELY;INTERVAL=15", { after: now, count: 10 });
-    assert.ok(Date.now() - started < 1000, "fast");
+    const rrule = "DTSTART;TZID=America/New_York:20051231T000030 RRULE:FREQ=MINUTELY;INTERVAL=15";
+    const next = nextRuns(rrule, { after: now, count: 10 });
+    const took = fastest(() => walkRuns(rrule, { after: now, count: 10 }));
+    assert.ok(took < 250, `fast (${took} ms)`);
     assert.equal(next.length, 10);
     assert.ok(next[0] > now && next[0] - now <= 15 * 60000, "the first run is within one interval");
     for (let i = 1; i < next.length; i++) {
@@ -183,9 +197,9 @@ describe("its runs, in its own time zone", () => {
     const hours = Array.from({ length: 24 }, (_, i) => i).join(",");
     const rrule = `DTSTART;TZID=Europe/Brussels:20100101T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=${hours};BYMINUTE=${minutes}`;
     const after = new Date("2026-11-10T09:17:23Z");
-    const started = Date.now();
     const next = nextRuns(rrule, { after, count: 10 }).map((d) => d.toISOString());
-    assert.ok(Date.now() - started < 500, `fast (${Date.now() - started} ms)`);
+    const took = fastest(() => walkRuns(rrule, { after, count: 10 }));
+    assert.ok(took < 250, `fast (${took} ms)`);
     assert.deepEqual(next.slice(0, 3), ["2026-11-10T09:21:00.000Z", "2026-11-10T09:28:00.000Z", "2026-11-10T09:35:00.000Z"]);
   });
 
@@ -217,16 +231,40 @@ describe("a rule whose times or days never meet is refused at once", () => {
   ];
   for (const rrule of rules) {
     test(rrule, { timeout: 10000 }, () => {
-      const started = Date.now();
+      // refused as one that never fires (one whose walk took over the thread's second would be
+      // refused saying that instead)
       const errors = validateRrule(rrule);
       assert.ok(errors.length, "refused");
       assert.match(errors[0], /never fires/);
       // its runs : none
       assert.deepEqual(nextRuns(rrule, { after: new Date("2026-10-22T10:00:00Z"), count: 3 }), []);
       assert.equal(nextRun(rrule), null);
-      assert.ok(Date.now() - started < 1000, `at once (${Date.now() - started} ms)`);
+      const took = fastest(() => walkRuns(rrule, { fromStart: true }));
+      assert.ok(took < 250, `at once (${took} ms)`);
     });
   }
+
+  test("seen without walking it : asked again and again, a rule that keeps no day costs nothing", () => {
+    // rrule.js walked such a rule to the year 9999 at each call (50 to 900 ms each)
+    const rrule = "DTSTART;TZID=Europe/Brussels:20260101T090000 RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH=2;BYMONTHDAY=30";
+    const started = performance.now();
+    for (let i = 0; i < 50; i++) assert.deepEqual(walkRuns(rrule, { after: new Date("2026-10-22T07:00:00Z"), count: 10 }), []);
+    const took = performance.now() - started;
+    assert.ok(took < 1000, `50 calls at once (${took} ms)`);
+  });
+
+  test("an EXRULE that takes out every run is walked to the end in time, and the rule refused", { timeout: 10000 }, () => {
+    // every minute taken out of a rule firing every ten hours, its day parts kept out of rrule.js
+    // (it took 17 to 24 s, then timed out at each try for ever)
+    const rrule =
+      "DTSTART;TZID=Pacific/Chatham:20190323T142800 RRULE:INTERVAL=10;BYSETPOS=315;FREQ=DAILY;WKST=SU;BYWEEKNO=25;BYHOUR=0,5,14,17;BYMINUTE=25,51,52,58;UNTIL=20320929T220245 RRULE:FREQ=HOURLY;BYMINUTE=32,44,46,55;BYDAY=TU,FR,SA;INTERVAL=10 EXRULE:INTERVAL=1;FREQ=MINUTELY";
+    const started = performance.now();
+    assert.deepEqual(walkRuns(rrule, { fromStart: true }), []);
+    assert.deepEqual(walkRuns(rrule, { after: new Date("2026-10-22T07:00:00Z"), count: 10 }), []);
+    const took = performance.now() - started;
+    assert.ok(took < 3000, `in time (${took} ms)`);
+    assert.match(validateRrule(rrule)[0], /never fires/);
+  });
 
   test("the next rule is served after one was given up", () => {
     assert.equal(nextRun("DTSTART:20300101T000000Z RRULE:FREQ=DAILY;INTERVAL=1", new Date("2030-01-01T12:00:00Z")).toISOString(), "2030-01-02T00:00:00.000Z");

@@ -1,5 +1,6 @@
 // The runs of a rrule are worked out in a thread of their own (lib/scheduleRrule.js) : a call
-// that takes too long gives the rule up a while - never refused for it, walked again after - a
+// that takes too long gives the rule up a while - a check refuses it, saying so, it is walked
+// again after - a
 // thread that stops is replaced at once, and a call awaited (nextRunsAsync) leaves the process
 // free meanwhile.
 import { test, describe, afterEach } from "vitest";
@@ -9,19 +10,21 @@ import { validateRrule, validateRruleAsync, nextRuns, nextRunsAsync, nextRun, li
 const DEFAULTS = { ...limits };
 afterEach(() => Object.assign(limits, DEFAULTS));
 
-// a rule walked for a while : every minute of the working week since 2016, as a weekly rule (each
-// test its own, by the week start, which does not change its runs)
+// a rule walked for a while (a hundred milliseconds or so) : every minute, its EXRULE taking out
+// every minute from October to February, so its next run after AFTER is the 1st of March, some
+// 180000 minutes looked at first (each test its own, by the week start, which does not change
+// its runs)
 const busy = (wkst) =>
-  `DTSTART;TZID=UTC:20160104T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;WKST=${wkst};BYDAY=MO,TU,WE,TH,FR;BYHOUR=${[...Array(24).keys()].join(",")};BYMINUTE=${[...Array(60).keys()].join(",")}`;
+  `DTSTART;TZID=UTC:20160104T000000 RRULE:FREQ=MINUTELY;INTERVAL=1;WKST=${wkst} EXRULE:FREQ=MINUTELY;INTERVAL=1;BYMONTH=10,11,12,1,2`;
 // a rule of its own for each test : the given up ones are remembered by their text
 const daily = (hour) => `DTSTART;TZID=UTC:20200101T${String(hour).padStart(2, "0")}0000 RRULE:FREQ=DAILY;INTERVAL=1`;
 const AFTER = new Date("2026-10-24T10:00:00Z");
 
 describe("a call that takes too long", () => {
-  test("is no reason to refuse the rule", async () => {
+  test("refuses the rule when it is checked, saying so", async () => {
     limits.walkMs = 0;
-    assert.deepEqual(validateRrule(daily(1)), []);
-    assert.deepEqual(await validateRruleAsync(busy("MO")), []);
+    assert.match(validateRrule(daily(1))[0], /could not be worked out in 0 second: simplify it/);
+    assert.match((await validateRruleAsync(busy("MO")))[0], /could not be worked out/);
     assert.equal(nextRun(daily(2)), null);
   });
 
@@ -65,7 +68,7 @@ describe("a thread that stops", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     await rruleThreads().async.terminate();
     await assert.rejects(pending, (e) => e.code !== TIMEOUT && /thread stopped/.test(e.message));
-    assert.equal((await nextRunsAsync(busy("TH"), { after: AFTER }))[0].toISOString(), "2026-10-26T00:00:00.000Z");
+    assert.equal((await nextRunsAsync(busy("TH"), { after: AFTER }))[0].toISOString(), "2027-03-01T00:00:00.000Z");
   });
 });
 
