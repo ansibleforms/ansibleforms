@@ -578,6 +578,23 @@ describe("a file that renames its credential", () => {
   });
 });
 
+describe("a new file naming an object a linked file still names", () => {
+  test("the linked file keeps it, the new one sorting first is refused as the name of another, never a database duplicate", async () => {
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.writeFile("creds", "credentials", "a-dup.yaml", gitCredential("git", { description: "the copy" }));
+    fx.writeFile("creds", "credentials", "git.yaml", gitCredential("git", { description: "changed" }));
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.deepEqual(summary.refused.map((r) => r.file), ["credentials/a-dup.yaml"]);
+    assert.deepEqual(summary.refused[0].reasons, ["the name 'git' is the name of another credential: creds/credentials/git.yaml"]);
+    assert.equal(summary.updated, 1);
+    const row = fx.rowNamed("credentials", "git");
+    assert.equal(row.repo_file, "credentials/git.yaml");
+    assert.equal(row.description, "changed");
+  });
+});
+
 describe("a pull goes on past what fails", () => {
   test("a credential its file removed that cannot be removed : said, the other files still applied", async () => {
     fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));

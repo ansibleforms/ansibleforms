@@ -525,10 +525,20 @@ export async function syncRepository(desc, name, opts = {}) {
     kept.add(f.file);
     taken.set(nameKey(row.name), `${f.file} (refused, kept as it was)`);
   }
-  // step 3 : the names, in file order : the first file to name an object has it ; a file that has
+  // step 3 : the names. A linked file that still names its own object keeps that name first : a
+  // new file sorting before it and naming the same object is the one refused - never the linked
+  // file, and never a raw duplicate from the database when the new object is inserted
+  const reserved = new Set();
+  for (const f of files) {
+    const row = f.object && own.get(f.file);
+    if (!row || nameKey(row.name) !== nameKey(f.object.name) || taken.has(nameKey(row.name))) continue;
+    taken.set(nameKey(row.name), `${name}/${f.file}`);
+    reserved.add(f.file);
+  }
+  // then the others, in file order : the first file to name an object has it ; a file that has
   // no object yet and names one of the app takes it over
   for (const f of files) {
-    if (!f.object) continue;
+    if (!f.object || reserved.has(f.file)) continue;
     const key = nameKey(f.object.name);
     if (!taken.has(key) && adoptable.has(key)) {
       if (own.has(f.file)) taken.set(key, `a ${desc.noun} of this app`);
