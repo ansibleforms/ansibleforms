@@ -227,8 +227,9 @@ class Runner extends CrudModel {
     // The first runner of a type is its default : forms of that type that name no runner need
     // one, and nobody should have to remember the tick. Not for the seed, which declares the
     // flag itself - setting it here would flip it back on every start.
-    // ... never one waiting for approval : it becomes the default when it is approved
-    if (!data.is_default && !opts.fromSeed && !data.pending && !(await this.findDefault(data.type))) {
+    // ... never one waiting for approval : it becomes the default when it is approved ; nor one a
+    // repository's file makes, which says itself whether it is the default (lib/repoObjects)
+    if (!data.is_default && !opts.fromSeed && !opts.fromRepo && !data.pending && !(await this.findDefault(data.type))) {
       data.is_default = 1;
     }
     await this.assertDefaultAllowed(data, data.type, opts);

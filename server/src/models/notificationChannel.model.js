@@ -282,8 +282,9 @@ class NotificationChannel extends CrudModel {
   // opts carries { fromSeed:true } for the declarative config seed only
   static async create(data, opts = {}) {
     await this.normalise(data, null, opts);
-    // the first mail channel is the active one : mail needs one, nobody should have to tick it
-    if (data.type === 'mail' && !data.is_active && !(await this.findActive({ enabledOnly: false }))) data.is_active = 1;
+    // the first mail channel is the active one : mail needs one, nobody should have to tick it ;
+    // one a repository's file makes says itself whether it is (lib/repoObjects)
+    if (!opts.fromRepo && data.type === 'mail' && !data.is_active && !(await this.findActive({ enabledOnly: false }))) data.is_active = 1;
     const id = await super.create(this.modelName, data, opts);
     if (data.is_active && id) await this.clearOtherActive(id);
     return id;

@@ -15,6 +15,7 @@ export default seedType({
   noun: "syslog server",
   // turned off is what a file says : on is the default
   keepFalse: ["enabled"],
-  // syslog_servers.description has no default in the table
-  defaults: { description: "" },
+  // syslog_servers.description has no default in the table ; its message format, none given, is
+  // the one its model gives a new server
+  defaults: { description: "", type: "BSD" },
 });

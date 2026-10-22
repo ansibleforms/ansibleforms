@@ -49,8 +49,9 @@ class Label extends CrudModel {
   // opts carries { fromSeed:true } for the declarative config seed only
   static async create(data, opts = {}) {
     this.normalise(data);
-    // after the others, unless a place is given
-    if (data.position === undefined || data.position === null || data.position === '') {
+    // after the others, unless a place is given - or a repository's file makes it : its place is
+    // the one its file says, else its column's (lib/repoObjects)
+    if (!opts.fromRepo && (data.position === undefined || data.position === null || data.position === '')) {
       const res = await mysql.do('SELECT COALESCE(MAX(position), 0) + 1 AS next FROM AnsibleForms.`labels`');
       data.position = res?.[0]?.next || 1;
     }

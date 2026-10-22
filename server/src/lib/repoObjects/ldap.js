@@ -14,7 +14,7 @@ import { seedType } from "./seedType.js";
 // the directories are written as a save from the app writes them : the declared fields only,
 // converted (Ldap.declared)
 const LdapModel = {
-  create: (d) => Ldap.create({ ...Ldap.declared(d), managed: 0 }),
+  create: (d, opts) => Ldap.create({ ...Ldap.declared(d), managed: 0 }, opts),
   update: (d, id) => Ldap.updateById(id, Ldap.declared(d)),
   delete: (id) => Ldap.deleteById(id),
 };

@@ -151,6 +151,15 @@ beforeEach(() => {
     credentials: CREDENTIALS,
     ldap: [{ ...MAIN }],
   });
+  // the columns' defaults, as information_schema gives them (MariaDB quotes a text)
+  fx.state.columns.syslog_servers = [
+    { name: "protocol", value: "'udp4'", nullable: "NO" },
+    { name: "level", value: "'info'", nullable: "NO" },
+    { name: "type", value: "NULL", nullable: "YES" },
+    { name: "receives", value: "'both'", nullable: "NO" },
+  ];
+  fx.state.columns.ldap = [{ name: "position", value: "1", nullable: "NO" }];
+  fx.state.columns.labels = [{ name: "position", value: "0", nullable: "NO" }, { name: "color", value: "'grey'", nullable: "NO" }];
   CrudModel.flushAllLocal();
 });
 
@@ -195,6 +204,17 @@ describe.each(TYPES)("$key", (type) => {
     CrudModel.flushAllLocal();
     assert.equal(await RepoObjects.appUpdated(type.key, before, row.id), true);
     assert.deepEqual(fx.readObject(repo, type.folder, "a.yaml"), { ...type.file, [type.edit[0]]: type.edit[1] });
+  });
+
+  test("a pull of the file it made changes nothing : what the file leaves out is not the model's own choice", async () => {
+    const file = { ...type.file };
+    delete file.position;
+    fx.writeFile(repo, type.folder, "a.yaml", file);
+    assert.equal((await RepoObjects.syncRepository(await desc(), repo)).created, 1);
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(await desc(), repo);
+    assert.equal(second.updated, 0, JSON.stringify(second));
+    assert.equal(second.unchanged, 1);
   });
 });
 
@@ -315,6 +335,32 @@ describe("an RTE that asked to join, rejected", () => {
   });
 });
 
+describe("a file leaves out what the model would choose for a new object of the app", () => {
+  test("a second SSO provider of a type, its file without enable : not used for sign-in, the one in use stays", async () => {
+    fx.state.tables.oauth2_providers.push({ id: 61, name: "current", provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable: 1, managed: 0 });
+    process.env.SSO_SECRET = "s";
+    fx.writeFile(repoOf("sso"), "sso", "new.yaml", { name: "new", provider: "oidc", issuer: "https://idp2", client_id: "id2", client_secret: "${SSO_SECRET}" });
+    const desc = await RepoObjects.descriptorOf("sso");
+    await RepoObjects.syncRepository(desc, repoOf("sso"));
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(desc, repoOf("sso"));
+    assert.equal(second.updated, 0, JSON.stringify(second));
+    assert.equal(Number(fx.rowNamed("oauth2_providers", "new").enable || 0), 0);
+    assert.equal(Number(fx.rowNamed("oauth2_providers", "current").enable), 1, "the provider people sign in with stays the one");
+  });
+
+  test("the first runner of a type, its file without is_default : not the default, the next pull changes nothing", async () => {
+    fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
+    process.env.RTE_TOKEN_A = "t";
+    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}" });
+    const desc = await RepoObjects.descriptorOf("runners");
+    await RepoObjects.syncRepository(desc, "run-repo");
+    assert.equal(Number(fx.rowNamed("runners", "a").is_default || 0), 0);
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(desc, "run-repo")).updated, 0);
+  });
+});
+
 describe("a change in the app that changes other objects of the type too", () => {
   test("a runner made the default : the former default's file says so too", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
@@ -358,6 +404,6 @@ describe("a change in the app that changes other objects of the type too", () =>
     const r = await asAdmin(controller.update, { body: { provider: "oidc", enable: 1 }, params: { id: "62" } });
     assert.ok(r.status < 300, JSON.stringify(r.data));
     assert.equal(fx.readObject(repoOf("sso"), "sso", "two.yaml").enable, true);
-    assert.equal(fx.readObject(repoOf("sso"), "sso", "one.yaml").enable, false, "one is turned off");
+    assert.equal(fx.readObject(repoOf("sso"), "sso", "one.yaml").enable, undefined, "one is turned off : no longer used for sign-in");
   });
 });

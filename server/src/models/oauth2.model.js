@@ -112,8 +112,9 @@ class OAuth2 extends CrudModel {
         // the tenant : its credential's (checked there), else its own
         if (!data.credential) this.assertEntraTenant(data.provider, data.tenant_id);
         // a new provider is the one its type signs in with when its type has none yet ; another is
-        // chosen with Use for sign-in (enable : 1)
-        if (data.enable === undefined && !opts.fromSeed) {
+        // chosen with Use for sign-in (enable : 1). One a repository's file makes says itself
+        // whether it is (lib/repoObjects)
+        if (data.enable === undefined && !opts.fromSeed && !opts.fromRepo) {
             const active = await mysql.do('SELECT id FROM AnsibleForms.`oauth2_providers` WHERE enable = 1 AND provider = ?', [data.provider]);
             data.enable = active.length ? 0 : 1;
         }

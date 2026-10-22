@@ -246,10 +246,12 @@ Ldap.updateById = async function (id, record) {
 };
 
 /**
- * Adds a directory, last in the lookup order unless it says its own.
+ * Adds a directory, last in the lookup order unless it says its own (one a repository's file
+ * makes : its place is the one its file says, else its column's).
  *
  * Args:
  *   record (object): the fields, converted (new Ldap).
+ *   opts (object): { fromRepo (true : a repository's file makes it, lib/repoObjects) }.
  *
  * Returns:
  *   number: its id.
@@ -258,7 +260,7 @@ Ldap.updateById = async function (id, record) {
  *   Errors.BadRequestError: its name is not valid or taken, its credential is not an ldap one, or
  *     it has no servers.
  */
-Ldap.create = async function (record) {
+Ldap.create = async function (record, opts = {}) {
   delete record.testuser;
   delete record.testpassword;
   delete record.id;
@@ -269,7 +271,7 @@ Ldap.create = async function (record) {
   if (!String(record.server || "").trim() && !(await Ldap.connectionOf(record.credential))) {
     throw new Errors.BadRequestError("An LDAP directory needs an ldap credential with its servers (host)");
   }
-  if (!record.position) {
+  if (!record.position && !opts.fromRepo) {
     const last = await mysql.do("SELECT COALESCE(MAX(position), 0) AS p FROM AnsibleForms.`ldap`");
     record.position = (last[0]?.p || 0) + 1;
   }
