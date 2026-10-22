@@ -118,15 +118,17 @@ const schedules = {
    *
    * Returns:
    *   object: { errors, absent, object (the schedule, null when refused), raw (the name a refused
-   *     one declares), ignored }.
+   *     one declares, whatever it is refused for), ignored }.
    */
   parse(text, forms) {
     const parsed = parseScheduleFile(text);
+    // a refused one's name kept, whatever it is refused for : no schedule of the app is written
+    // beside it under that name (lib/repoObjects/engine.js declaredName)
     if (parsed.schedule && forms && !forms.has(parsed.schedule.form)) {
-      // its name kept : no schedule of the app is written beside it under that name
       return { errors: [`the form '${parsed.schedule.form}' (unified_job_template.name) does not exist`], absent: false, object: null, raw: { name: parsed.schedule.name } };
     }
-    return { errors: parsed.errors, absent: parsed.absent, object: parsed.schedule, ignored: parsed.schedule?.ignored || [] };
+    if (!parsed.schedule) return { errors: parsed.errors, absent: parsed.absent, object: null, ignored: [], ...(parsed.name ? { raw: { name: parsed.name } } : {}) };
+    return { errors: parsed.errors, absent: parsed.absent, object: parsed.schedule, ignored: parsed.schedule.ignored || [] };
   },
 
   store: {

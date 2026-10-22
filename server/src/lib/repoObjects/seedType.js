@@ -137,6 +137,9 @@ export function seedType(spec) {
     secrets,
     references,
     keyOrder: fields.keys,
+    // the field a file names its object by (a disclaimer version's number) : the name a refused
+    // file declares (lib/repoObjects/engine.js declaredName)
+    nameField: spec.nameColumn || "name",
     listFile: spec.listFile,
     listKey: spec.listKey,
     // an object as the seed (or a file) declares it, checked (lib/repoObjects/fields.js), then what

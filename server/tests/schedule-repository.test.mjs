@@ -368,6 +368,26 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     await ScheduleRepo.activate("ops", { pull: false });
     assert.equal(rows.find((r) => r.id === 1).repo_file, "schedules/every-five-2.yaml");
   });
+
+  test("a file refused for its rrule declares its name : the app's schedule of that name stays in the app, never a second file", async () => {
+    rows.push({ id: 1, name: "Every five", form: "Report", cron: "*/5 * * * *", rrule: null, enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 0 });
+    nextId = 10;
+    // its DTSTART without a time zone : refused
+    writeFile("ops", "every-five.yaml", scheduleYaml("Every five", { rrule: "DTSTART:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1" }));
+    const preview = await ScheduleRepo.preview("ops");
+    assert.deepEqual(preview.clashes, ["Every five"]);
+    assert.deepEqual(preview.written, []);
+    const report = await ScheduleRepo.activate("ops", { pull: false });
+    assert.deepEqual(report.written, []);
+    assert.deepEqual(report.kept.map((k) => k.name), ["Every five"]);
+    assert.match(report.kept[0].reason, /^ops\/schedules\/every-five\.yaml has its name but is not read in/);
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, "ops", "schedules")), ["every-five.yaml"]);
+    // the file fixed in git : the next pull takes the app's schedule over
+    writeFile("ops", "every-five.yaml", scheduleYaml("Every five"));
+    const summary = await ScheduleRepo.syncRepository("ops");
+    assert.deepEqual(summary.matched, ["Every five"]);
+    assert.equal(rows.find((r) => r.id === 1).repo_file, "schedules/every-five.yaml");
+  });
 });
 
 describe("no longer the schedules repository, its schedules stay in the app", () => {

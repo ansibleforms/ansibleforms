@@ -353,7 +353,8 @@ export function scheduleNodeOf(doc) {
  *
  * Returns:
  *   object: { errors (string[]), absent (boolean), schedule: { name, description, rrule,
- *     enabled, form, extraData, launchOptions, ignored } } ; schedule is null when refused.
+ *     enabled, form, extraData, launchOptions, ignored }, name (the name a refused one declares,
+ *     null when it gives none) } ; schedule is null when refused.
  */
 export function parseScheduleFile(text) {
   const doc = YAML.parseDocument(String(text ?? ""), { prettyErrors: false });
@@ -395,7 +396,8 @@ export function parseScheduleFile(text) {
   const description = obj.description === null || obj.description === undefined ? "" : String(obj.description);
   const { options, errors: promptErrors, ignored } = launchOptionsOf(obj);
   errors.push(...promptErrors);
-  if (errors.length) return { errors, absent: false, schedule: null };
+  // refused, its name still said : no other schedule is written beside it under that name
+  if (errors.length) return { errors, absent: false, schedule: null, name: name || null };
   return { errors: [], absent: false, schedule: { name, description, rrule, enabled, form, extraData, launchOptions: options, ignored } };
 }
 

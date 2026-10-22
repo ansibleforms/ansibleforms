@@ -58,17 +58,19 @@ export const nameKey = (name) => String(name || "").trim().toLowerCase();
 
 /**
  * The name a file (or an entry of a list file) declares, read or not : its object's, else the one
- * its text gives (a file refused, or waiting for what it names).
+ * its text gives (a file refused, or waiting for what it names) - under the field the type names
+ * its objects by (descriptor.nameField : a disclaimer version's is its number), every type alike.
  *
  * Args:
+ *   desc (object): the type's descriptor.
  *   f (object): the file as read ({ object, raw }).
  *
  * Returns:
  *   string|null: the name, null when it gives none.
  */
-const declaredName = (f) => {
+const declaredName = (desc, f) => {
   const raw = f?.raw && typeof f.raw === "object" && !Array.isArray(f.raw) ? f.raw : null;
-  const n = f?.object?.name ?? raw?.name;
+  const n = f?.object?.name ?? raw?.[desc.nameField || "name"];
   return n === undefined || n === null || String(n).trim() === "" ? null : String(n);
 };
 
@@ -621,7 +623,7 @@ export async function syncRepository(desc, name, opts = {}) {
     if (!f.object) {
       // the name a refused or waiting file declares : no object of the app is written beside it
       // under that name (activateFolder) - its file follows once it is read in
-      if (!f.skipped && !f.absent && declaredName(f)) summary.unread.push({ name: declaredName(f), file: f.file });
+      if (!f.skipped && !f.absent && declaredName(desc, f)) summary.unread.push({ name: declaredName(desc, f), file: f.file });
       if (f.skipped) {
         summary.skipped.push({ file: f.file, ...f.skipped });
       } else if (f.waiting) {
@@ -1138,9 +1140,9 @@ export async function preview(desc, name) {
         else if (parsed.object) {
           files++;
           fileNames.add(nameKey(parsed.object.name));
-        } else if (declaredName(parsed)) {
+        } else if (declaredName(desc, parsed)) {
           // a file refused declaring a name : the app's object of that name is not written beside it
-          fileNames.add(nameKey(declaredName(parsed)));
+          fileNames.add(nameKey(declaredName(desc, parsed)));
         }
       } catch {
         // an unreadable file is refused by the sync, said then

@@ -852,4 +852,18 @@ describe("the disclaimer versions", () => {
     assert.deepEqual(done.updated, []);
     assert.equal(acceptances[1], 3);
   });
+
+  test("a refused file declares its version : the app's version of that number stays in the app, never a second file", async () => {
+    fx.state.tables.disclaimer_versions.push({ version: 1, title: "Terms", text: "Be nice", checkbox_label: "I agree", repository: null, repo_file: null });
+    fx.writeFile("news", "disclaimer", "1.yaml", file({ title: ["not", "a", "text"] }));
+    const preview = await RepoObjects.preview(await desc("disclaimer"), "news");
+    assert.deepEqual(preview.clashes, ["1"]);
+    assert.deepEqual(preview.written, []);
+    const report = await RepoObjects.activate(await desc("disclaimer"), "news", { pull: false });
+    assert.equal(report.refused.length, 1);
+    assert.deepEqual(report.written, []);
+    assert.match(report.kept[0].reason, /^news\/disclaimer\/1\.yaml has its name but is not read in/);
+    assert.deepEqual(fx.listFiles("news", "disclaimer"), ["1.yaml"]);
+    assert.equal(fx.state.tables.disclaimer_versions[0].repository, null);
+  });
 });
