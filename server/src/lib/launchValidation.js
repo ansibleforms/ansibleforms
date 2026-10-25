@@ -166,36 +166,43 @@ function stepShown(when, parent, evalSandbox) {
 }
 
 /**
- * Validate a wizard launch : every step the browser would submit is resolved against its
- * subform with the engine, and the extravars and credentials are rebuilt from the results.
+ * Resolve a wizard step by step, as the browser walks it : every step is resolved against
+ * its subform with the engine, and the extravars and credentials are built from the results.
  *
- * The browser sends `rawFormData` as `{ __wizard__: true, drafts: { step: values }, skipped:
- * { step: true } }`, the shape a stored wizard already has. A step is left out when it is
- * optional and skipped, or when its `when` is false ; every other step must be complete. A
- * step reads the others through `$(__parent__.<step>.<field>)` : the steps already checked
- * give their resolved values (defaults filled in), the others their draft. Password fields are not in the drafts ;
- * their value is read back from the extravars at the field's model path. File fields are
- * not supported in a wizard.
+ * `drafts` holds each step's values (`{ step: values }`), `skipped` the optional steps the
+ * user skipped (`{ step: true }`). A step is left out when it is optional and skipped, or
+ * when its `when` is false ; every other step must be complete. A step reads the others
+ * through `$(__parent__.<step>.<field>)` : the steps already resolved give their resolved
+ * values (defaults filled in), the others their draft. A step that is not complete is still
+ * followed by the next ones, so every step's errors are reported at once. File fields are not
+ * supported in a wizard.
+ *
+ * Password fields : with passwordFrom 'extravars' (the browser, whose drafts never hold one)
+ * their value is read back from `extravars` at the field's model path ; with 'drafts' (MCP
+ * and the chat) it is the step's own value.
  *
  * Args:
  *   formConfig (object): the form's configuration (its constants).
  *   formObj (object): the wizard form, its subforms inlined.
- *   user (object): the launching user.
- *   rawFormData (object): the step drafts, as above.
- *   extravars (object): the extravars the client built.
+ *   user (object): the user.
+ *   drafts (object): the steps' values, by step name.
+ *   skipped (object): the skipped optional steps.
+ *   extravars (object): the extravars the client built (passwordFrom 'extravars').
  *   services (object): the engine's services (createFormServices).
+ *   passwordFrom (string): 'extravars' or 'drafts'.
  *   allRows (boolean): resolve every list row.
  *   verifyUntouched (boolean): check the rows the editor did not touch.
  *
  * Returns:
- *   Promise<object>: as validateLaunch : { ok, errors, payload } or { ok: false, reason }.
+ *   Promise<object>: { complete, missing, invalid, waiting, validationErrors, rowErrors,
+ *   fields, warnings, steps, values, passwordsVisible, maskFields, payload } - the names of
+ *   the fields and errors as `<step>.<field>`, `steps` each step's state ({ name, subform,
+ *   shown, skipped, complete }), `values` the shown steps' resolved values by step (defaults
+ *   filled in, a choice its whole option), `maskFields` the shown steps' fields under the
+ *   model they write (for maskPasswords), `payload` ({ extravars, credentials }) only when
+ *   complete.
  */
-export async function validateWizardLaunch({ formConfig, formObj, user, rawFormData, extravars, services, allRows = false, verifyUntouched = false }) {
-  if (!rawFormData || rawFormData.__wizard__ !== true || !rawFormData.drafts || typeof rawFormData.drafts !== 'object') {
-    return { ok: false, reason: 'a wizard launch must send its step drafts ({ __wizard__: true, drafts })' };
-  }
-  const drafts = rawFormData.drafts;
-  const skipped = (rawFormData.skipped && typeof rawFormData.skipped === 'object') ? rawFormData.skipped : {};
+export async function resolveWizard({ formConfig, formObj, user, drafts = {}, skipped = {}, extravars, services, passwordFrom = 'extravars', allRows = false, verifyUntouched = false }) {
   const subforms = formObj.subforms || [];
   const vars = formObj.vars || {};
   const steps = formObj.wizard.filter((raw) => raw && !raw.summary).map((raw) => ({
@@ -220,21 +227,31 @@ export async function validateWizardLaunch({ formConfig, formObj, user, rawFormD
   const rowErrors = {};
   const warnings = [];
   const passwordsVisible = [];
+  const fields = [];
+  const maskFields = [];
+  const states = [];
+  const values = {};
   let complete = true;
   for (const step of steps) {
+    const state = { name: step.name, subform: step.subformName, shown: false, skipped: false, complete: false };
+    states.push(state);
     if (!step.sub || !Array.isArray(step.sub.fields)) continue;
-    if (step.optional && skipped[step.name]) continue;
+    if (step.optional && skipped[step.name]) {
+      state.skipped = true;
+      continue;
+    }
     if (!stepShown(step.when, parent, services.evalSandbox)) continue;
+    state.shown = true;
 
     // the step's own values : the draft, without what the client may not choose
-    const values = { ...parent[step.name] };
+    const own = { ...parent[step.name] };
     for (const f of step.sub.fields) {
       if (!f?.name) continue;
-      if (f.type === 'constant' || f.type === 'file') delete values[f.name];
-      if (f.type === 'password') {
-        delete values[f.name];
+      if (f.type === 'constant' || f.type === 'file') delete own[f.name];
+      if (f.type === 'password' && passwordFrom !== 'drafts') {
+        delete own[f.name];
         const v = readModelPath(extravars || {}, [].concat(stepModel(f, step.prefix))[0]);
-        if (v !== undefined) values[f.name] = v;
+        if (v !== undefined) own[f.name] = v;
       }
     }
     const { [step.name]: _self, ...others } = parent; // eslint-disable-line no-unused-vars
@@ -243,10 +260,10 @@ export async function validateWizardLaunch({ formConfig, formObj, user, rawFormD
       constants: formConfig?.constants || {},
       vars,
       user,
-      values,
+      values: own,
       services: typeof services.forSubform === 'function' ? services.forSubform(step.subformName) : services,
       subforms,
-      parent: { ...others, [step.name]: values },
+      parent: { ...others, [step.name]: own },
       allRows,
       verifyUntouched,
     });
@@ -255,9 +272,21 @@ export async function validateWizardLaunch({ formConfig, formObj, user, rawFormD
     // the later steps read this one's resolved values (its defaults filled in), not its draft
     const { __parent__, __user__, ...resolved } = res._values || {}; // eslint-disable-line no-unused-vars
     parent[step.name] = resolved;
+    values[step.name] = resolved;
+    const at = (n) => `${step.name}.${n}`;
+    const names = new Set(res._fields.map((f) => f.name));
+    for (const f of res.fields || []) {
+      fields.push({
+        ...f,
+        name: at(f.name),
+        step: step.name,
+        ...(Array.isArray(f.waitingFor) ? { waitingFor: f.waitingFor.map((n) => (names.has(n) ? at(n) : n)) } : {}),
+      });
+    }
+    const wrapped = res._fields.map((f) => ({ ...f, model: stepModel(f, step.prefix) }));
+    maskFields.push(...wrapped);
     if (!res.complete) {
       complete = false;
-      const at = (n) => `${step.name}.${n}`;
       errors.missing.push(...(res.missing || []).map(at));
       errors.invalid.push(...(res.invalid || []).map(at));
       errors.waiting.push(...(res.waiting || []).map(at));
@@ -265,7 +294,7 @@ export async function validateWizardLaunch({ formConfig, formObj, user, rawFormD
       for (const [n, rows] of Object.entries(res.rowErrors || {})) rowErrors[at(n)] = rows;
       continue;
     }
-    const wrapped = res._fields.map((f) => ({ ...f, model: stepModel(f, step.prefix) }));
+    state.complete = true;
     const output = buildFormOutput(wrapped, res._values, {
       isVisible: (f) => !!res._visibility[f.name],
       subforms,
@@ -273,12 +302,44 @@ export async function validateWizardLaunch({ formConfig, formObj, user, rawFormD
     merged = deepMerge(merged, output);
     for (const f of res._fields) if (f.asCredential === true) credentials[f.name] = res._values[f.name];
   }
-  if (Object.keys(rowErrors).length) errors.rowErrors = rowErrors;
-  if (!complete) return { ok: false, errors, warnings, passwordsVisible };
+  const out = { complete, ...errors, rowErrors, fields, warnings, steps: states, values, passwordsVisible, maskFields };
+  if (complete) out.payload = JSON.parse(JSON.stringify({ extravars: merged, credentials }));
+  return out;
+}
 
-  const payload = JSON.parse(JSON.stringify({ extravars: merged, credentials }));
+/**
+ * Validate a wizard launch from the browser : resolveWizard over the step drafts it sends.
+ *
+ * The browser sends `rawFormData` as `{ __wizard__: true, drafts: { step: values }, skipped:
+ * { step: true } }`, the shape a stored wizard already has. Password fields are not in the
+ * drafts ; their value is read back from the extravars at the field's model path.
+ *
+ * Args:
+ *   formConfig (object): the form's configuration (its constants).
+ *   formObj (object): the wizard form, its subforms inlined.
+ *   user (object): the launching user.
+ *   rawFormData (object): the step drafts, as above.
+ *   extravars (object): the extravars the client built.
+ *   services (object): the engine's services (createFormServices).
+ *   allRows (boolean): resolve every list row.
+ *   verifyUntouched (boolean): check the rows the editor did not touch.
+ *
+ * Returns:
+ *   Promise<object>: as validateLaunch : { ok, errors, payload } or { ok: false, reason }.
+ */
+export async function validateWizardLaunch({ formConfig, formObj, user, rawFormData, extravars, services, allRows = false, verifyUntouched = false }) {
+  if (!rawFormData || rawFormData.__wizard__ !== true || !rawFormData.drafts || typeof rawFormData.drafts !== 'object') {
+    return { ok: false, reason: 'a wizard launch must send its step drafts ({ __wizard__: true, drafts })' };
+  }
+  const skipped = (rawFormData.skipped && typeof rawFormData.skipped === 'object') ? rawFormData.skipped : {};
+  const res = await resolveWizard({ formConfig, formObj, user, drafts: rawFormData.drafts, skipped, extravars, services, allRows, verifyUntouched });
+  const errors = { missing: res.missing, invalid: res.invalid, waiting: res.waiting, validationErrors: res.validationErrors };
+  if (Object.keys(res.rowErrors).length) errors.rowErrors = res.rowErrors;
+  if (!res.complete) return { ok: false, errors, warnings: res.warnings, passwordsVisible: res.passwordsVisible };
+
+  const payload = res.payload;
   if (extravars?.__verbose__) payload.extravars.__verbose__ = true;
-  return { ok: true, errors, warnings, payload, uploadKeys: [], passwordsVisible };
+  return { ok: true, errors, warnings: res.warnings, payload, uploadKeys: [], passwordsVisible: res.passwordsVisible };
 }
 
 /**
@@ -376,4 +437,4 @@ export function describeRowErrors(rowErrors, prefix = '') {
   return out;
 }
 
-export default { validateLaunch, describeRowErrors, verifyUploads, compareExtravars, describeLaunchErrors };
+export default { validateLaunch, resolveWizard, describeRowErrors, verifyUploads, compareExtravars, describeLaunchErrors };

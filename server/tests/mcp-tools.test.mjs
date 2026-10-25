@@ -66,6 +66,29 @@ const call = async (client, name, args = {}) => {
   return { isError: !!r.isError, text: r.content[0].text, data: r.isError ? null : JSON.parse(r.content[0].text) };
 };
 
+// a wizard : the second step reads the first as __parent__, the third is optional
+const wizardForm = {
+  name: "W", type: "ansible", playbook: "w.yml", roles: ["default"], fields: [],
+  wizard: [
+    { subform: "basics", defaultModel: "vm" },
+    { name: "disk", subform: "disks", defaultModel: "vm", when: "$(__parent__.basics.large) === true" },
+    { name: "extra", subform: "extras", optional: true },
+  ],
+  subforms: [
+    { name: "basics", type: "subform", fields: [
+      { name: "name", type: "text", required: true },
+      { name: "large", type: "checkbox", default: false },
+      { name: "secret", type: "password", required: true },
+    ] },
+    { name: "disks", type: "subform", fields: [{ name: "size", type: "number", required: true, maxValue: 100 }] },
+    { name: "extras", type: "subform", fields: [{ name: "note", type: "text", required: true }] },
+  ],
+};
+const withWizard = () => {
+  const load = deps.Form.load.getMockImplementation();
+  deps.Form.load.mockImplementation(async (roles, name) => (name === "W" ? { constants: {}, forms: [structuredClone(wizardForm)], errors: [], warnings: [] } : load(roles, name)));
+};
+
 describe("MCP tools", () => {
   test("exactly the six tools, and no expression or eval tool", async () => {
     const client = await connect();
@@ -143,20 +166,60 @@ describe("MCP tools", () => {
     expect(deps.Job.launch.mock.calls[0][0].extravars.__verbose__).toBe(true);
   });
 
-  test("resolving a wizard form without a step points at the steps", async () => {
-    deps.Form.load.mockResolvedValueOnce({ forms: [{ name: "W", fields: [], wizard: [{ subform: "step1" }] }] });
+  test("get_form lists a wizard's steps with their fields, and says it is supported", async () => {
+    withWizard();
     const client = await connect();
-    const r = await call(client, "resolve_field", { form: "W" });
-    expect(r.isError).toBe(true);
-    expect(r.text).toContain("step1");
+    const r = await call(client, "get_form", { name: "W" });
+    expect(r.data.supported).toBe(true);
+    expect(r.data.steps.map((s) => [s.name, s.optional])).toEqual([["basics", false], ["disk", false], ["extra", true]]);
+    expect(r.data.steps[0].fields.map((f) => f.name)).toEqual(["name", "large", "secret"]);
   });
 
-  test("a wizard form is refused", async () => {
-    deps.Form.load.mockResolvedValueOnce({ forms: [{ ...volumeForm, wizard: [{ subform: "step1" }] }] });
+  test("a wizard resolves step by step, its fields and errors named <step>.<field>", async () => {
+    withWizard();
     const client = await connect();
-    const r = await call(client, "launch_job", { form: "Create volume", values: {} });
+    const r = await call(client, "resolve_field", { form: "W", values: { basics: { large: true }, disk: { size: 500 } } });
+    expect(r.data.complete).toBe(false);
+    expect(r.data.missing).toEqual(expect.arrayContaining(["basics.name", "basics.secret", "extra.note"]));
+    expect(Object.keys(r.data.validationErrors)).toEqual(["disk.size"]);
+    expect(r.data.fields.map((f) => f.name)).toContain("disk.size");
+    expect(r.data.payloadHash).toBeUndefined();
+    // the disk step is hidden for a small VM ; the extra step skipped
+    const small = await call(client, "resolve_field", { form: "W", values: { basics: { name: "web", secret: "s3" } }, skipped: { extra: true } });
+    expect(small.data.complete).toBe(true);
+    expect(small.data.steps.map((s) => [s.name, s.shown, s.skipped])).toEqual([["basics", true, false], ["disk", false, false], ["extra", false, true]]);
+    expect(small.data.modeledExtravars).toEqual({ vm: { name: "web", large: false, secret: "********" } });
+    expect(small.data.payloadHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  test("a wizard launches the steps' output merged, and keeps its drafts without the password", async () => {
+    withWizard();
+    const client = await connect();
+    const values = { basics: { name: "web", large: true, secret: "s3" }, disk: { size: 50 } };
+    const resolved = await call(client, "resolve_field", { form: "W", values, skipped: { extra: true } });
+    const r = await call(client, "launch_job", { form: "W", values, skipped: { extra: true }, expectedPayloadHash: resolved.data.payloadHash });
+    expect(r.isError).toBe(false);
+    const launched = deps.Job.launch.mock.calls[0][0];
+    expect(launched.extravars).toEqual({ vm: { name: "web", large: true, secret: "s3", size: 50 } });
+    expect(launched.rawFormData).toEqual({ __wizard__: true, drafts: { basics: { name: "web", large: true }, disk: { size: 50 } }, skipped: { extra: true } });
+    expect(launched.validated).toBe(true);
+  });
+
+  test("a wizard's values are given per step ; an incomplete wizard is not launched", async () => {
+    withWizard();
+    const client = await connect();
+    const flat = await call(client, "resolve_field", { form: "W", values: { name: "web" } });
+    expect(flat.isError).toBe(true);
+    expect(flat.text).toContain("basics");
+    const r = await call(client, "launch_job", { form: "W", values: { basics: { name: "web" } } });
     expect(r.isError).toBe(true);
-    expect(r.text).toContain("wizard");
+    expect(r.text).toContain("basics.secret");
+    // only an optional step can be skipped
+    const skip = await call(client, "resolve_field", { form: "W", values: { basics: { name: "web", secret: "s3" } }, skipped: { basics: true } });
+    expect(skip.isError).toBe(true);
+    expect(skip.text).toContain("not an optional step");
+    expect(skip.text).toContain("extra");
+    expect(deps.Job.launch).not.toHaveBeenCalled();
   });
 
   test("get_job reads the masked job, as the user, without credentials", async () => {
@@ -669,6 +732,60 @@ describe("MCP stored jobs", () => {
     const h = createHandlers({ user: storer, deps });
     await expect(h.launchJob({ form: "Create volume", storedJob: { id: 1 } })).rejects.toMatchObject({ code: "invalid_request" });
     expect(deps.Job.launch).not.toHaveBeenCalled();
+  });
+
+  describe("of a wizard form", () => {
+    beforeEach(() => {
+      withWizard();
+      // stored by the browser : the step drafts, no password, the optional step skipped ; a step
+      // and a field the form no longer has
+      rows.set(6, {
+        id: 6, name: "vm", form_name: "W", username: "local/bob", created_at: "2026-10-01T00:00:00.000Z", expires_at: null,
+        form_data: JSON.stringify({ __wizard__: true, drafts: { basics: { name: "web", large: false, old: 1 }, gone: { x: 1 } }, skipped: { extra: true } }),
+      });
+    });
+
+    test("resolve_field and launch_job start from its drafts, the password given ; what is gone is said", async () => {
+      const client = await connect(storer);
+      const r = await call(client, "resolve_field", { form: "W", storedJob: { id: 6 }, values: { basics: { secret: "s3" } } });
+      expect(r.data.complete).toBe(true);
+      expect(r.data.warnings.join(" ")).toMatch(/left out: gone, basics.old|left out: basics.old, gone/);
+      expect(r.data.steps.map((s) => [s.name, s.shown, s.skipped])).toEqual([["basics", true, false], ["disk", false, false], ["extra", false, true]]);
+      expect(r.data.modeledExtravars).toEqual({ vm: { name: "web", large: false, secret: "********" } });
+      expect(r.text).not.toContain("s3");
+      const launched = await call(client, "launch_job", { form: "W", storedJob: { name: "vm" }, values: { basics: { secret: "s3" } }, expectedPayloadHash: r.data.payloadHash });
+      expect(launched.isError).toBe(false);
+      const arg = deps.Job.launch.mock.calls[0][0];
+      expect(arg.extravars).toEqual({ vm: { name: "web", large: false, secret: "s3" } });
+      expect(arg.rawFormData).toEqual({ __wizard__: true, drafts: { basics: { name: "web", large: false } }, skipped: { extra: true } });
+    });
+
+    test("a skipped step given values is walked again ; `skipped` overrides the stored skips", async () => {
+      const client = await connect(storer);
+      const r = await call(client, "resolve_field", { form: "W", storedJob: { id: 6 }, values: { basics: { secret: "s3" }, extra: { note: "n" } } });
+      expect(r.data.complete).toBe(true);
+      expect(r.data.steps.find((s) => s.name === "extra")).toMatchObject({ shown: true, skipped: false, complete: true });
+      expect(r.data.modeledExtravars).toEqual({ vm: { name: "web", large: false, secret: "********" }, note: "n" });
+      const unskipped = await call(client, "resolve_field", { form: "W", storedJob: { id: 6 }, values: { basics: { secret: "s3" } }, skipped: { extra: false } });
+      expect(unskipped.data.complete).toBe(false);
+      expect(unskipped.data.missing).toEqual(["extra.note"]);
+    });
+
+    test("get_stored_job shows the drafts filtered by their steps ; store_job keeps them as the browser does", async () => {
+      const client = await connect(storer);
+      expect((await call(client, "get_stored_job", { id: 6 })).data.values).toEqual({ __wizard__: true, drafts: { basics: { name: "web", large: false } }, skipped: { extra: true } });
+      const r = await call(client, "store_job", { form: "W", name: "db", values: { basics: { name: "db", secret: "pw", bogus: 1 } }, skipped: { extra: true } });
+      expect(r.isError).toBe(false);
+      expect(JSON.parse(deps.StoredJobs.create.mock.calls[0][0].form_data)).toEqual({ __wizard__: true, drafts: { basics: { name: "db" } }, skipped: { extra: true } });
+      expect(r.data.stored).toEqual(["basics.name"]);
+      expect(r.data.leftOut).toEqual({ passwords: ["basics.secret"], unknown: ["basics.bogus"], other: [] });
+    });
+
+    test("a stored job without step drafts is refused, and says to store it again", async () => {
+      rows.set(7, { id: 7, name: "flat", form_name: "W", username: "local/bob", form_data: JSON.stringify({ name: "web" }) });
+      const h = createHandlers({ user: storer, deps });
+      await expect(h.resolveField({ form: "W", storedJob: { id: 7 } })).rejects.toMatchObject({ code: "invalid_request" });
+    });
   });
 
   test("a settings user reads everyone's, but starts only from their own ; by name it is their own", async () => {

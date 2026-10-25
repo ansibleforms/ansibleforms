@@ -92,14 +92,14 @@ export function createChatService({
           if (preview?.payloadHash !== plan.payloadHash) throw new ChatError('plan_stale', 'The job changed since the summary was made - ask again', 409);
           launched = await handlers.relaunchJob({ id: plan.sourceJobId, values: plan.values, expectedPayloadHash: plan.payloadHash });
         } else {
-          const res = await handlers.resolveField({ form: plan.form, values: plan.values });
+          const res = await handlers.resolveField({ form: plan.form, values: plan.values, skipped: plan.skipped });
           if (!res.complete || res.payloadHash !== plan.payloadHash) {
             throw new ChatError('plan_stale', 'The form resolves differently now than when the summary was made - ask again', 409);
           }
           if (plan.formFingerprint && res.formFingerprint !== plan.formFingerprint) {
             throw new ChatError('plan_stale', 'The form was changed since the summary was made - ask again', 409);
           }
-          launched = await handlers.launchJob({ form: plan.form, values: plan.values, expectedPayloadHash: plan.payloadHash });
+          launched = await handlers.launchJob({ form: plan.form, values: plan.values, skipped: plan.skipped, expectedPayloadHash: plan.payloadHash });
         }
       } catch (err) {
         if (err instanceof ChatError) throw err;

@@ -1,7 +1,7 @@
 'use strict';
 import { describeError } from '../mcp/tools.js';
 import { describeRowErrors } from '../lib/launchValidation.js';
-import { describeForm, score, chatForms } from './forms.js';
+import { describeForm, fieldsBySlot, score, chatForms } from './forms.js';
 import { mask, operatorText, typedByOperator, checkOperatorSlots } from './policy.js';
 import { createPlan } from './plans.js';
 
@@ -143,7 +143,22 @@ function prepareValues(info, answers) {
     if (info.listSlots.includes(k) && typeof value === 'string') value = /^(all|__all__)$/i.test(value) ? '__all__' : [value];
     values[k] = value;
   }
-  return { values };
+  if (!info.steps) return { values, flat: values };
+  // a wizard : the answers per step, and an optional step nobody answered for skipped
+  const steps = {};
+  const skipped = {};
+  for (const step of info.steps) {
+    const given = Object.fromEntries(Object.entries(values)
+      .filter(([k]) => step.slots.includes(k)).map(([k, v]) => [k.slice(step.name.length + 1), v]));
+    if (Object.keys(given).length) steps[step.name] = given;
+    else if (step.optional) skipped[step.name] = true;
+  }
+  return { values: steps, skipped, flat: values };
+}
+
+/** the slot a list row error is about : its field, `<step>.<field>` in a wizard */
+function rowSlot(info, line) {
+  return info.slots.find((slot) => line.startsWith(`${slot}[`) || line.startsWith(`${slot}.`)) || line.split(/[[.]/)[0];
 }
 
 function summaryOf(info, fields, values) {
@@ -167,11 +182,14 @@ async function resolve(args, ctx, planOnly) {
   const text = operatorText(ctx.session.operatorMessages);
   const denied = checkOperatorSlots(info.operatorSlots, answers, text, ctx.session.selections);
   if (denied) return { payload: { status: 'error', error: denied } };
-  const { values, errors } = prepareValues(info, answers);
+  const { values, skipped, flat, errors } = prepareValues(info, answers);
   if (errors) return { payload: { status: 'needs_input', form: info.form, validation_errors: errors } };
 
-  const res = await ctx.handlers.resolveField({ form: info.form, values });
-  const defs = Object.fromEntries((def.fields || []).map((f) => [f.name, f]));
+  const res = await ctx.handlers.resolveField({ form: info.form, values, ...(skipped ? { skipped } : {}) });
+  const defs = fieldsBySlot(def);
+  // a wizard's optional step left out : said, so the model can offer it
+  const skippedSteps = Object.keys(skipped || {});
+  const stepNote = skippedSteps.length ? `Optional steps skipped because nothing was answered for them: ${skippedSteps.join(', ')}.` : '';
   const pending = new Set([...(res.missing || []), ...(res.waiting || [])]);
   const byName = Object.fromEntries((res.fields || []).map((f) => [f.name, f]));
 
@@ -195,8 +213,8 @@ async function resolve(args, ctx, planOnly) {
   const validationErrors = [
     ...Object.entries(res.validationErrors || {}).flatMap(([slot, errs]) => errs.map((e) => ({ slot, code: e.type, message: e.description || e.type }))),
     ...(res.invalid || []).filter((n) => !(n in (res.validationErrors || {})) && !(n in (res.rowErrors || {})))
-      .map((n) => ({ slot: n, code: 'invalid_choice', message: `'${brief(values[n])}' is not one of the available choices` })),
-    ...describeRowErrors(res.rowErrors).map((line) => ({ slot: line.split(/[[.]/)[0], code: 'row_error', message: line })),
+      .map((n) => ({ slot: n, code: 'invalid_choice', message: `'${brief(flat[n])}' is not one of the available choices` })),
+    ...describeRowErrors(res.rowErrors).map((line) => ({ slot: rowSlot(info, line), code: 'row_error', message: line })),
     ...(res.fields || []).filter((f) => f.status === 'error' && f.error).map((f) => ({ slot: f.name, code: 'field_error', message: f.error })),
   ];
 
@@ -208,7 +226,8 @@ async function resolve(args, ctx, planOnly) {
       ...(res.warnings?.length ? { warnings: res.warnings.slice(0, 5) } : {}),
     };
     const list = Object.entries(choices).map(([slot, options]) => ({ slot, label: byName[slot]?.label || defs[slot]?.label || slot, options }));
-    if (planOnly) payload.note = 'The form is not complete yet ; ask for the missing fields.';
+    const notes = [planOnly ? 'The form is not complete yet ; ask for the missing fields.' : '', stepNote].filter(Boolean);
+    if (notes.length) payload.note = notes.join(' ');
     return { payload, choices: list };
   }
 
@@ -218,10 +237,10 @@ async function resolve(args, ctx, planOnly) {
   // what the card shows as a table : every field with a value, a switch only when it is on
   const chosen = other.filter((o) => (o.switch ? o.value === true : !isEmpty(o.value)))
     .slice(0, MAX_CARD_FIELDS).map((o) => ({ label: o.prompt, value: o.switch ? true : o.value }));
-  const summary = summaryOf(info, res.fields, values);
+  const summary = summaryOf(info, res.fields, flat);
   const plan = createPlan({
     username: ctx.user.username, userType: ctx.user.type, sessionId: ctx.session.id,
-    form: info.form, values, payloadHash: res.payloadHash, formFingerprint: res.formFingerprint,
+    form: info.form, values, ...(skipped ? { skipped } : {}), payloadHash: res.payloadHash, formFingerprint: res.formFingerprint,
     summary, label,
   });
   const extravars = mask(res.modeledExtravars || {});
@@ -230,6 +249,7 @@ async function resolve(args, ctx, planOnly) {
       status: 'planned', form: info.form, plan_id: plan.planId, summary,
       expires_at: new Date(plan.expiresAt).toISOString(),
       ...(optionalSwitches.length ? { optional_switches: optionalSwitches } : {}),
+      ...(stepNote ? { note: stepNote } : {}),
     },
     proposal: {
       planId: plan.planId, label, form: info.form, summary, fields: chosen, extravars,
@@ -253,12 +273,12 @@ async function relaunch(args, ctx) {
   if (refused) return { payload: refused };
   const denied = checkOperatorSlots(info.operatorSlots, values, text, ctx.session.selections);
   if (denied) return { payload: { status: 'error', error: denied } };
-  const { values: prepared, errors } = prepareValues(info, values);
+  const { values: prepared, flat, errors } = prepareValues(info, values);
   if (errors) return { payload: { status: 'needs_input', form: info.form, validation_errors: errors } };
 
   const preview = await ctx.handlers.relaunchJob({ id, values: prepared, preview: true });
   if (!preview?.payloadHash) return { payload: error('bad_response', 'The relaunch preview did not return a payload') };
-  const changed = Object.keys(prepared);
+  const changed = Object.keys(flat);
   const summary = `Relaunch job ${id} (${info.form})${changed.length ? `, changing ${changed.join(', ')}` : ''}`;
   const plan = createPlan({
     username: ctx.user.username, userType: ctx.user.type, sessionId: ctx.session.id,

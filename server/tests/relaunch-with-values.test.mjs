@@ -176,6 +176,51 @@ describe("a relaunch without changes", () => {
   });
 });
 
+describe("a wizard job relaunched", () => {
+  const wizardForm = {
+    name: "Create host", fields: [],
+    wizard: [{ subform: "basics", defaultModel: "vm" }, { name: "extra", subform: "extras", optional: true }],
+    subforms: [
+      { name: "basics", type: "subform", fields: [
+        { name: "host", type: "text", required: true, regex: { expression: "^prod-", description: "Must start with prod-" } },
+        { name: "size", type: "number", default: 10 },
+      ] },
+      { name: "extras", type: "subform", fields: [{ name: "note", type: "text", required: true }] },
+    ],
+  };
+  const wizardJob = () => ({
+    ...storedJob(),
+    extravars: JSON.stringify({ vm: { host: "prod-1", size: 10 } }),
+    raw_form_data: JSON.stringify({ __form__: "Create host", __wizard__: true, drafts: { basics: { host: "prod-1", size: 10 } }, skipped: { extra: true } }),
+  });
+  beforeEach(() => {
+    Form.load.mockResolvedValue({ constants: {}, forms: [structuredClone(wizardForm)] });
+    Job.findById = vi.fn(async () => wizardJob());
+  });
+
+  test("with changes per step, through the engine ; the changed drafts are stored with the new job", async () => {
+    const r = await Job.relaunchWithValues({ user, id: 42, values: { basics: { size: 20 } } });
+    expect(r).toMatchObject({ id: 43, payloadHash: expect.stringMatching(/^sha256:/) });
+    const arg = Job.launch.mock.calls[0][0];
+    expect(arg.extravars).toEqual({ vm: { host: "prod-1", size: 20 } });
+    expect(arg.rawFormData).toEqual({ __wizard__: true, drafts: { basics: { host: "prod-1", size: 20 } }, skipped: { extra: true } });
+  });
+
+  test("a skipped step given a change is walked again ; a change that breaks a rule is refused", async () => {
+    const p = await Job.relaunchWithValues({ user, id: 42, values: { extra: { note: "n" } }, preview: true });
+    expect(p.extravars).toEqual({ vm: { host: "prod-1", size: 10 }, note: "n" });
+    expect(Job.launch).not.toHaveBeenCalled();
+    await expect(Job.relaunchWithValues({ user, id: 42, values: { basics: { host: "dev-1" } } })).rejects.toMatchObject({ code: "form_incomplete" });
+  });
+
+  test("changes not given per step, or a job without its step drafts, are refused and say why", async () => {
+    await expect(Job.relaunchWithValues({ user, id: 42, values: { size: 20 } })).rejects.toMatchObject({ code: "invalid_request", details: { steps: ["basics", "extra"] } });
+    Job.findById = vi.fn(async () => ({ ...wizardJob(), raw_form_data: JSON.stringify({ __form__: "Create host", host: "prod-1" }) }));
+    await expect(Job.relaunchWithValues({ user, id: 42, values: { basics: { size: 20 } } })).rejects.toMatchObject({ code: "unsupported" });
+    expect(Job.launch).not.toHaveBeenCalled();
+  });
+});
+
 describe("raw form data is stored without passwords", () => {
   test("in list rows too, nested and in their __output__", () => {
     const subforms = [
