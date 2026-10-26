@@ -7,7 +7,7 @@
 #   docker pull node:26-trixie-slim
 #   docker inspect --format='{{index .RepoDigests 0}}' node:26-trixie-slim
 #
-FROM node:26-trixie-slim@sha256:0d1e33586362bb9e608c4e751e7a9e7edb55c9ac11461ed5666af696cc461dd4 AS nodebase
+FROM node:26-trixie-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS nodebase
 
 # ytt renders forms when USE_YTT=1 ; a static binary, checked against the release checksums
 ARG YTT_VERSION=0.55.3
@@ -33,7 +33,7 @@ RUN apt-get update \
 # intermediate build to compile the client application with vite
 # can run in parallel with base stage
 
-FROM node:26-trixie@sha256:1b84b89ada025e3b14543cbb837ffaa1c1b5273b841c5b94dd1a8f9c1d8cf7fe AS tmp_builder
+FROM node:26-trixie@sha256:a98e6fda54fdbb22d4238054cca9a2a113bcd1191c09193a535aae22f400aa8e AS tmp_builder
 
 # Build arguments for git SHA, build time and version. VERSION is empty for a local build,
 # which leaves server/package.json as the version shown ; CI passes the release or
