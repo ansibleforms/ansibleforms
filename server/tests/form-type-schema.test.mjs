@@ -49,3 +49,10 @@ describe("a form's type", () => {
     refused(form({ type: "multistep", steps: [{ type: "template", name: "build", template: "x" }] }));
   });
 });
+
+describe("a form in the chat", () => {
+  test("a wizard form can be offered in the chat, as a form with fields can", () => {
+    ok(form({ type: "ansible", playbook: "x.yml", enableForChat: true }));
+    ok({ name: "w", roles: ["admin"], type: "ansible", playbook: "x.yml", wizard: [{ subform: "basics" }], enableForChat: true });
+  });
+});

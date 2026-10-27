@@ -513,8 +513,7 @@ const choicesOf = (kind) => ({ credentials: credentialNames.value, inventories: 
 const flagSettings = computed(() =>
   [
     { key: 'showHelp', label: 'designer.showHelpByDefault', show: true },
-    // a wizard's fields live in its steps : not offered in the chat
-    { key: 'enableForChat', label: 'designer.formChat', show: allows('enableForChat') && !hasWizard.value },
+    { key: 'enableForChat', label: 'designer.formChat', show: allows('enableForChat') },
     { key: 'allowRelaunch', label: 'designer.formAllowRelaunch', show: allows('allowRelaunch') },
     { key: 'keepExtravars', label: 'designer.formKeepExtravars', show: allows('keepExtravars') },
     { key: 'check', label: 'designer.formCheck', show: allows('check') },
