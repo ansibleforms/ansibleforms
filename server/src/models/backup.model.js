@@ -123,7 +123,10 @@ async function getDirStats(dirPath) {
       }
     }
   } catch (e) {
-    logger.warning(`getDirSize: failed to read ${dirPath}: ${e.message || e}`);
+    // a backup taken before forms/ was included has no such folder : a valid restore point,
+    // which describeBackup reports as formsDirExists false. Warned about, it filled the log
+    // on every list of the backups (#1192)
+    if (e.code !== 'ENOENT') logger.warning(`getDirSize: failed to read ${dirPath}: ${e.message || e}`);
   }
   return { fileCount, totalSize };
 }
