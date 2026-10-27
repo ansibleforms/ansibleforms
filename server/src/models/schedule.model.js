@@ -202,14 +202,19 @@ class Schedule extends CrudModel {
   static async queue(id) {
     // set to queued
     logger.info(`Queuing schedule ${id}`);
-    // One statement, so the next queue number is read and written atomically - the same
-    // shape as Ds.queue. Reading every row, computing max+1 and writing it back let a
-    // cron tick and a manual queue interleave and hand two schedules the same queue_id,
-    // which is the ordering the processor depends on (ORDER BY queue_id LIMIT 1).
+    // One statement, so the next queue number is read and written atomically. Reading every
+    // row, computing max+1 and writing it back let a cron tick and a manual queue interleave
+    // and hand two schedules the same queue_id, which is the ordering the processor depends
+    // on (ORDER BY queue_id LIMIT 1).
     //
     // The derived table is required: MySQL refuses a subquery reading the same table an
     // UPDATE targets unless it is wrapped one level deeper.
-    await mysql.do(
+    //
+    // Its subquery takes shared locks on every row, then the UPDATE wants its own row : two
+    // schedules queued in the same instant (cron ticks of the same minute) deadlock, and
+    // InnoDB rolls one back. Run again, or that occurrence of the schedule was lost (#1214).
+    // Safe to run twice : it only sets the state and a fresh queue number.
+    await mysql.doRetryingDeadlock(
       "UPDATE AnsibleForms.`schedule` SET state='queued', queue_id=(SELECT n FROM (SELECT COALESCE(MAX(queue_id),0)+1 AS n FROM AnsibleForms.`schedule`) t) WHERE id=?",
       [id]);
     logger.info(`Queued schedule ${id}`);

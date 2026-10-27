@@ -3,6 +3,8 @@
 // All queries go through a single shared mysql2 connection pool (no more
 // per-request createConnection/end cycles). Public API:
 //   mysql.do(query, vars)  - run a query on a pool connection
+//   mysql.doRetryingDeadlock(query, vars) - the same, run again when InnoDB picks it as a
+//                            deadlock victim
 //   mysql.end()            - close the pool (graceful shutdown)
 //
 // NOTE: multipleStatements is left enabled because schema bootstrap may run
@@ -110,6 +112,37 @@ MySql.do = async function (query, vars, silent = false) {
 MySql.tryDo = async function (query, vars) {
   const [result] = await pool.query(query, vars);
   return result;
+};
+
+/**
+ * MySql.do for a statement InnoDB may pick as a deadlock victim : it is run again, a little
+ * later each time, as MySQL advises. A victim is rolled back as a whole, so only a statement
+ * that is safe to run twice belongs here. A retry is a warning ; only the last failure is an
+ * error, as mysql.do logs it.
+ *
+ * Args:
+ *   query (string): the statement.
+ *   vars (Array): its parameters.
+ *   attempts (number): how often it is run at most (default 5).
+ *
+ * Returns:
+ *   Promise<object>: the result, as mysql.do gives it.
+ */
+MySql.doRetryingDeadlock = async function (query, vars, attempts = 5) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const [result] = await pool.query(query, vars);
+      return result;
+    } catch (err) {
+      if (err?.code !== 'ER_LOCK_DEADLOCK' || attempt >= attempts) {
+        logger.error('[ansibleforms] Query error: ' + err);
+        throw err;
+      }
+      logger.warning(`[ansibleforms] Deadlock, running the statement again (${attempt}/${attempts - 1})`);
+      // with some jitter, so the statements that collided do not collide again
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt + Math.floor(Math.random() * 50)));
+    }
+  }
 };
 
 /**

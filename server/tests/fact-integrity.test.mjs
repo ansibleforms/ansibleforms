@@ -183,9 +183,11 @@ describe("queue numbers are allocated atomically", () => {
 
   test("the schedule allocates and writes in one statement", () => {
     const marker = "static async queue(id)";
-    const fn = src.slice(src.indexOf(marker), src.indexOf(marker) + 1200);
+    // up to the next method : the queue function alone, however long its comments grow
+    const fn = src.slice(src.indexOf(marker), src.indexOf("\n  static ", src.indexOf(marker) + marker.length));
     assert.ok(fn.includes("queue_id"), "the slice must be the queue function");
-    const stmts = [...fn.matchAll(/mysql\.do\(|super\.update\(|super\.findAll\(/g)];
+    // doRetryingDeadlock runs the same one statement again when InnoDB picks it as a deadlock victim (#1214)
+    const stmts = [...fn.matchAll(/mysql\.do\(|mysql\.doRetryingDeadlock\(|super\.update\(|super\.findAll\(/g)];
     assert.equal(stmts.length, 1, `schedule still makes ${stmts.length} calls to allocate a queue slot`);
     assert.match(fn, /COALESCE\(MAX\(queue_id\),0\)\+1/, "the next number must be computed in SQL");
   });
