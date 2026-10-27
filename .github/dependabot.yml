@@ -69,6 +69,10 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    # boto3 pins its own botocore release : bumped apart, each pull request fails to install
+    groups:
+      boto:
+        patterns: ['boto3', 'botocore']
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
