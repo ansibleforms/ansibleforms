@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.1](https://github.com/ansibleforms/ansibleforms/compare/7.4.0...7.4.1) (2026-10-27)
+
+
+### Fixed
+
+* a wizard form can be offered in the chat ([#1259](https://github.com/ansibleforms/ansibleforms/issues/1259)) ([bd5dc33](https://github.com/ansibleforms/ansibleforms/commit/bd5dc33fdf972cca943b7170884df236ae9aba9f))
+
 ## [7.4.0](https://github.com/ansibleforms/ansibleforms/compare/7.3.0...7.4.0) (2026-10-27)
 
 
