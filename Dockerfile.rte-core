@@ -15,7 +15,7 @@ ARG BASE_IMAGE=ghcr.io/ansibleforms/ansibleforms-rte-base:7
 # uv brings the python : debian trixie packages 3.13 only, and ansible-core 2.21 runs on 3.14.
 # A standalone CPython build (python-build-standalone), pinned like the rest ; Dependabot moves
 # the uv pin, PYTHON_VERSION moves by hand.
-FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 FROM ${BASE_IMAGE}
 
