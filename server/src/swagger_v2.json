@@ -5522,13 +5522,10 @@
             "description": "Valid (data null)"
           },
           "400": {
-            "description": "Empty body"
+            "description": "An empty body, or an invalid configuration (the validation message in details)"
           },
           "403": {
             "description": "No access (missing role option)"
-          },
-          "500": {
-            "description": "Invalid configuration (the error in the message)"
           }
         }
       }
