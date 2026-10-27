@@ -37,7 +37,7 @@
     "roboto-fontface": "^0.10.0",
     "showdown": "^2.1.0",
     "vue": "^3.5.44",
-    "vue-i18n": "^11.4.14",
+    "vue-i18n": "^11.4.16",
     "vue-json-pretty": "^2.6.0",
     "vue-showdown": "^4.2.0",
     "vue-sonner": "^2.0.9",
