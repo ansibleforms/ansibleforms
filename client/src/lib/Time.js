@@ -211,7 +211,10 @@ const Time = {
     return new Date(w.year(), w.month(), w.date(), w.hour(), w.minute(), w.second(), w.millisecond());
   },
   /**
-   * The moment a wall clock stands for in a zone : the reverse of toWallClock.
+   * The moment a wall clock stands for in a zone : the reverse of toWallClock. The hour the
+   * clocks go back comes twice and is read as the first (02:30 CEST, not CET); a wall clock in
+   * the spring gap is read on the offset before it. dayjs.tz would guess both from the offset
+   * of today, so the same wall clock gave another moment in summer than in winter.
    *
    * Args:
    *   wall (Date): the wall clock, in the Date's local fields.
@@ -226,7 +229,19 @@ const Time = {
     const text =
       `${wall.getFullYear()}-${p(wall.getMonth() + 1)}-${p(wall.getDate())}` +
       `T${p(wall.getHours())}:${p(wall.getMinutes())}:${p(wall.getSeconds())}`;
-    return dayjs.tz(text, zone).add(wall.getMilliseconds(), 'ms').toISOString();
+    const local = dayjs.utc(text).valueOf() + wall.getMilliseconds();
+    // the offsets of the zone half a day either side : every wall clock is on one of the two
+    const before = dayjs(local - 12 * 3600000)
+      .tz(zone)
+      .utcOffset();
+    const after = dayjs(local + 12 * 3600000)
+      .tz(zone)
+      .utcOffset();
+    const moments = [...new Set([before, after])]
+      .map((offset) => local - offset * 60000)
+      .filter((ts) => Time.toWallClock(ts, zone).getTime() === wall.getTime())
+      .sort((a, b) => a - b);
+    return new Date(moments.length ? moments[0] : local - before * 60000).toISOString();
   },
   /**
    * A moment on the clock of a zone, as the date and time picker writes it (2026-10-15 11:00).
