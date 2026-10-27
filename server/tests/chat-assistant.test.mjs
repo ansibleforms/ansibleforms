@@ -3,7 +3,7 @@
 // payload once and only from the operator's click, a claimed launch that never happened is
 // replaced, and the limits hold. The chat service and the MCP handlers are the real ones ;
 // the models are fakes and the model is scripted.
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 
 process.env.DB_HOST ||= "127.0.0.1";
 process.env.DB_PORT ||= "3306";
@@ -42,6 +42,23 @@ const FORMS = {
     name: "Delete everything", type: "ansible", playbook: "rm.yml", roles: ["default"],
     fields: [{ name: "target", type: "text", required: true }],
   },
+};
+
+// a wizard, offered in the chat only by the test that uses it
+const WIZARD = {
+  name: "Build a VM", type: "ansible", playbook: "vm.yml", roles: ["default"], enableForChat: true,
+  description: "Build a virtual machine", fields: [],
+  wizard: [
+    { subform: "basics", defaultModel: "vm" },
+    { name: "extra", subform: "extras", optional: true },
+  ],
+  subforms: [
+    { name: "basics", type: "subform", fields: [
+      { name: "vm_name", type: "text", required: true, label: "VM name" },
+      { name: "cpus", type: "number", default: 2, label: "CPUs" },
+    ] },
+    { name: "extras", type: "subform", fields: [{ name: "note", type: "text", required: true, label: "Note" }] },
+  ],
 };
 
 let deps, model, ticket;
@@ -289,6 +306,31 @@ describe("a summary launches exactly its payload, once, from the click", () => {
     const { out } = await planned(chat);
     expect(out.proposals[0].label).toBe("Launch");
     expect(deps.Job.launch).not.toHaveBeenCalled();
+  });
+});
+
+describe("a wizard form", () => {
+  beforeEach(() => { FORMS["Build a VM"] = WIZARD; });
+  afterEach(() => { delete FORMS["Build a VM"]; });
+
+  test("its slots are <step>.<field> ; an optional step nobody answered is skipped ; the click launches the merged steps", async () => {
+    const chat = service([
+      call("resolve", { form: "Build a VM", answers: {} }),
+      call("resolve", { form: "Build a VM", answers: { "basics.vm_name": "web01" } }),
+      say("Click Launch."),
+    ]);
+    const { sessionId } = await chat.openSession(user);
+    const out = await chat.message(user, { sessionId, message: "build vm web01" });
+    const tools = model.histories.at(-1).filter((m) => m.role === "tool").map((m) => JSON.parse(m.text));
+    expect(tools[0].status).toBe("needs_input");
+    expect(tools[0].missing_fields.map((f) => f.slot)).toEqual(["basics.vm_name"]);
+    expect(tools[0].note).toMatch(/extra/);
+    expect(out.proposals).toHaveLength(1);
+    expect(out.proposals[0].extravars).toEqual({ vm: { vm_name: "web01", cpus: 2 } });
+    await chat.approve(user, { sessionId, planId: out.proposals[0].planId });
+    const launched = deps.Job.launch.mock.calls[0][0];
+    expect(launched.extravars).toEqual({ vm: { vm_name: "web01", cpus: 2 } });
+    expect(launched.rawFormData).toEqual({ __wizard__: true, drafts: { basics: { vm_name: "web01" } }, skipped: { extra: true } });
   });
 });
 

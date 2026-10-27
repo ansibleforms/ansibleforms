@@ -5,7 +5,7 @@ import { scanDependencies } from '../lib/formEngine/placeholders.js';
 import { buildLaunchPayload, filterRawFormData, maskPasswords } from '../lib/formEngine/output.js';
 import { sha256 } from '../lib/formEngine/node/hash.js';
 import { createFormServices } from '../lib/formServices.js';
-import { describeRowErrors } from '../lib/launchValidation.js';
+import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
 import yaml from 'yaml';
 
@@ -60,6 +60,17 @@ function parseJson(s, fallback) {
 
 // the internal keys resolveForm hands back for the launch - never sent to a caller, they
 // hold the raw values including passwords
+/** whether a form is a wizard : its fields live in its steps */
+function isWizard(formObj) {
+  return Array.isArray(formObj?.wizard) && formObj.wizard.length > 0;
+}
+
+/** a wizard's steps (the summary left out), named as the browser and the drafts name them */
+function wizardSteps(formObj) {
+  return (formObj.wizard || []).filter((s) => s && !s.summary && s.subform)
+    .map((s) => ({ name: s.name || s.subform, subform: s.subform, optional: s.optional === true, when: s.when || '' }));
+}
+
 function publicResolution(res) {
   const { _values, _visibility, _fields, ...rest } = res; // eslint-disable-line no-unused-vars
   return rest;
@@ -289,11 +300,15 @@ export function createHandlers({ user, deps, policy = {} }) {
    * The values to resolve or launch with : a stored job's (Load on the form), with the values
    * given laid over them. A stored value for a field the form no longer has is left out and said.
    *
+   * A wizard's stored job holds its step drafts (`{ __wizard__: true, drafts, skipped }`) : the
+   * given values are laid over each step's draft, a step given values for is no longer skipped,
+   * and `skipped` given as true or false overrides the stored skips.
+   *
    * Returns:
-   *   Promise<object>: { values, warnings }.
+   *   Promise<object>: { values, skipped, warnings } - `skipped` for a wizard only.
    */
-  async function overStored(form, values, storedJob) {
-    if (!storedJob) return { values: values || {}, warnings: [] };
+  async function overStored(form, values, storedJob, skipped, loaded) {
+    if (!storedJob) return { values: values || {}, skipped, warnings: [] };
     const row = await visibleStored({ id: storedJob.id, form, name: storedJob.name });
     // a start from your own only : a settings user reads and deletes everyone's, but launches
     // nobody else's values
@@ -304,15 +319,63 @@ export function createHandlers({ user, deps, policy = {} }) {
       throw new ToolError(`Stored job ${row.id} holds values of form '${row.form_name}', not of '${form}'`, 'invalid_request');
     }
     const data = storedValues(row);
-    if (data.__wizard__ === true) throw new ToolError('This stored job is of a wizard form ; wizard forms cannot be launched through MCP yet', 'unsupported');
-    const { formObj } = await loadForm(form);
+    const { formObj } = loaded || await loadForm(form);
+    const warnings = [];
+    if (storedSummary(row).expired) warnings.push(`Stored job '${row.name}' has expired`);
+    if (isWizard(formObj)) {
+      const over = wizardOverStored(formObj, row, data, values, skipped);
+      if (over.stale.length) warnings.push(`Stored job '${row.name}' has values for steps or fields the form no longer has, left out: ${over.stale.join(', ')}`);
+      return { values: over.drafts, skipped: over.skipped, warnings };
+    }
+    if (data.__wizard__ === true) {
+      throw new ToolError(`Stored job ${row.id} holds the step drafts of a wizard, and '${form}' is no longer one ; store it again from the form`, 'invalid_request');
+    }
     const known = new Set(normalizeFields(formObj.fields).map((f) => f.name));
     const stale = Object.keys(data).filter((k) => !known.has(k));
     const kept = Object.fromEntries(Object.entries(data).filter(([k]) => known.has(k)));
-    const warnings = [];
     if (stale.length) warnings.push(`Stored job '${row.name}' has values for fields the form no longer has, left out: ${stale.join(', ')}`);
-    if (storedSummary(row).expired) warnings.push(`Stored job '${row.name}' has expired`);
     return { values: { ...kept, ...(values || {}) }, warnings };
+  }
+
+  /**
+   * A wizard's stored drafts with the given values over them, per step (overStored).
+   *
+   * Returns:
+   *   object: { drafts, skipped, stale } - `stale` the stored steps and fields (`<step>.<field>`)
+   *   the form no longer has.
+   */
+  function wizardOverStored(formObj, row, data, values, skipped) {
+    const plain = (o) => o && typeof o === 'object' && !Array.isArray(o);
+    if (data.__wizard__ !== true || !plain(data.drafts)) {
+      throw new ToolError(`Stored job ${row.id} holds no step drafts of wizard '${formObj.name}' ; store it again from the form`, 'invalid_request');
+    }
+    const given = wizardInput(formObj, values, skipped);
+    const steps = wizardSteps(formObj);
+    const subforms = formObj.subforms || [];
+    const drafts = {};
+    const stale = [];
+    for (const [name, draft] of Object.entries(data.drafts)) {
+      const step = steps.find((s) => s.name === name);
+      const sub = step && subforms.find((s) => s?.name === step.subform);
+      if (!sub || !plain(draft)) {
+        stale.push(name);
+        continue;
+      }
+      const known = new Set(normalizeFields(sub.fields || []).map((f) => f.name));
+      for (const k of Object.keys(draft)) if (!known.has(k)) stale.push(`${name}.${k}`);
+      drafts[name] = Object.fromEntries(Object.entries(draft).filter(([k]) => known.has(k)));
+    }
+    for (const [name, v] of Object.entries(given.drafts)) drafts[name] = { ...(drafts[name] || {}), ...v };
+    // the stored skips, except for a step given values for ; then the given skips over them
+    const skips = {};
+    for (const step of steps) {
+      if (step.optional && data.skipped?.[step.name] === true && !given.drafts[step.name]) skips[step.name] = true;
+    }
+    for (const [name, v] of Object.entries(plain(skipped) ? skipped : {})) {
+      if (v === true) skips[name] = true;
+      else if (v === false) delete skips[name];
+    }
+    return { drafts, skipped: skips, stale };
   }
 
   /** The cron service runs it from now on (the schedule routes do the same). */
@@ -326,17 +389,14 @@ export function createHandlers({ user, deps, policy = {} }) {
     return createFormServices({ user, formConfig, formObj, subformName, deps: { Expression, Query, resolveFormQuery } });
   }
 
-  async function resolveFor({ form, values, field, subform, parent, maxOptions }) {
-    const { formConfig, formObj } = await loadForm(form);
+  async function resolveFor({ form, values, field, subform, parent, maxOptions }, loaded) {
+    const { formConfig, formObj } = loaded || await loadForm(form);
     let target = formObj;
     let parentData;
     // a wizard keeps its fields in its steps : resolving the empty root would report a
     // "complete" form that is nothing of the sort
-    if (!subform && Array.isArray(formObj.wizard) && formObj.wizard.length > 0) {
-      throw new ToolError(`'${formObj.name}' is a wizard form ; its fields live in its steps `
-        + `(${formObj.wizard.map((s) => s?.subform).filter(Boolean).join(', ')}). Resolve a step with \`subform\`. `
-        + 'Wizard forms cannot be launched through MCP yet.', 'unsupported',
-        { steps: formObj.wizard.map((s) => s?.subform).filter(Boolean) });
+    if (!subform && isWizard(formObj)) {
+      throw new ToolError(`'${formObj.name}' is a wizard form ; its fields live in its steps`, 'invalid_request');
     }
     if (subform) {
       target = (formObj.subforms || []).find((s) => s?.name === subform);
@@ -380,6 +440,181 @@ export function createHandlers({ user, deps, policy = {} }) {
   }
 
   /**
+   * A wizard's values as its step drafts : `{ <step>: { field: value } }`, and the optional
+   * steps skipped as `{ <step>: true }` - the shape the browser sends and a wizard job stores.
+   */
+  function wizardInput(formObj, values, skipped) {
+    const plain = (o) => o && typeof o === 'object' && !Array.isArray(o);
+    const names = wizardSteps(formObj).map((s) => s.name);
+    if (values != null && !plain(values)) throw new ToolError('The values of a wizard form are an object of its steps', 'invalid_request');
+    const unknown = Object.keys(values || {}).filter((k) => !names.includes(k));
+    if (unknown.length) {
+      throw new ToolError(`'${formObj.name}' is a wizard form ; its values are given per step (${names.join(', ')}), not: ${unknown.join(', ')}`,
+        'invalid_request', { steps: names });
+    }
+    const drafts = {};
+    for (const [step, v] of Object.entries(values || {})) {
+      if (!plain(v)) throw new ToolError(`The values of step '${step}' are an object of its fields`, 'invalid_request');
+      drafts[step] = v;
+    }
+    // only an optional step can be skipped : a silent ignore would leave the agent guessing
+    // why the step is still reported as missing
+    const optional = wizardSteps(formObj).filter((s) => s.optional).map((s) => s.name);
+    const skips = {};
+    for (const [step, v] of Object.entries(plain(skipped) ? skipped : {})) {
+      if (v !== true) continue;
+      if (!optional.includes(step)) {
+        throw new ToolError(`'${step}' is not an optional step of '${formObj.name}'${optional.length ? ` ; the optional steps are: ${optional.join(', ')}` : ''}`,
+          'invalid_request', { steps: names, optional });
+      }
+      skips[step] = true;
+    }
+    return { drafts, skipped: skips };
+  }
+
+  /** A wizard resolved step by step, as the browser walks it (lib/launchValidation.js). */
+  async function resolveWizardFor({ form, values, skipped }, loaded) {
+    const { formConfig, formObj } = loaded || await loadForm(form);
+    const input = wizardInput(formObj, values, skipped);
+    const res = await resolveWizard({
+      formConfig, formObj, user, drafts: input.drafts, skipped: input.skipped,
+      services: servicesFor(formConfig, formObj),
+      // an agent gives a step's passwords with its values ; a browser in the extravars
+      passwordFrom: 'drafts',
+      allRows: true,
+    });
+    return { res, formConfig, formObj, ...input };
+  }
+
+  /** launchPayload for a wizard : its payload is the steps' output merged. */
+  function wizardPayload(res, formObj) {
+    const { extravars, credentials } = res.payload;
+    return {
+      extravars,
+      credentials,
+      preview: maskPasswords(extravars, res.maskFields, formObj.subforms || []),
+      payloadHash: sha256({ form: formObj.name, extravars, credentials }),
+    };
+  }
+
+  /**
+   * What a wizard job keeps of its drafts : each filtered by its step's subform (no passwords),
+   * the skips of its optional steps only.
+   */
+  function wizardRawFormData(formObj, drafts, skipped) {
+    const kept = {};
+    const skips = {};
+    for (const step of wizardSteps(formObj)) {
+      const sub = (formObj.subforms || []).find((s) => s?.name === step.subform);
+      const draft = drafts?.[step.name];
+      if (sub && draft && typeof draft === 'object' && !Array.isArray(draft)) kept[step.name] = filterRawFormData(sub.fields || [], draft, formObj.subforms || []);
+      if (step.optional && skipped?.[step.name] === true) skips[step.name] = true;
+    }
+    return { __wizard__: true, drafts: kept, skipped: skips };
+  }
+
+  /**
+   * What store_job keeps of a form's values : the given fields as the form reads them, filtered
+   * as the Store dialog filters them (no password, nothing the form does not have).
+   *
+   * Returns:
+   *   Promise<object>: { kept, stored, passwords, unknown, other } - `kept` the form_data,
+   *   `stored` the names kept, the rest the names left out and why.
+   */
+  async function plainToStore(loaded, values) {
+    const { formObj } = loaded;
+    const fields = normalizeFields(formObj.fields);
+    const { res } = await resolveFor({ form: formObj.name, values: values || {} }, loaded);
+    const given = Object.fromEntries(Object.keys(values || {}).filter((k) => k in res._values).map((k) => [k, res._values[k]]));
+    const kept = filterRawFormData(res._fields || fields, given, formObj.subforms || []);
+    const types = Object.fromEntries(fields.map((f) => [f.name, f.type]));
+    const leftOut = Object.keys(values || {}).filter((k) => !(k in kept));
+    const passwords = leftOut.filter((k) => types[k] === 'password');
+    const unknown = leftOut.filter((k) => !(k in types));
+    const other = leftOut.filter((k) => !passwords.includes(k) && !unknown.includes(k));
+    return { kept, stored: Object.keys(kept), passwords, unknown, other };
+  }
+
+  /**
+   * plainToStore for a wizard : its step drafts (`{ __wizard__: true, drafts, skipped }`, as the
+   * browser stores a wizard), each step's given fields as the step reads them when it is shown,
+   * as given when it is not. The names are `<step>.<field>`.
+   */
+  async function wizardToStore(loaded, values, skipped) {
+    const { formObj } = loaded;
+    const subforms = formObj.subforms || [];
+    const { res, drafts, skipped: skips } = await resolveWizardFor({ form: formObj.name, values, skipped }, loaded);
+    const kept = {};
+    const passwords = [];
+    const unknown = [];
+    const other = [];
+    for (const step of wizardSteps(formObj)) {
+      const given = drafts[step.name];
+      const sub = subforms.find((s) => s?.name === step.subform);
+      if (!given || !sub) continue;
+      const fields = normalizeFields(sub.fields || []);
+      const types = Object.fromEntries(fields.map((f) => [f.name, f.type]));
+      const resolved = res.values[step.name];
+      const source = resolved ? Object.fromEntries(Object.keys(given).filter((k) => k in resolved).map((k) => [k, resolved[k]])) : given;
+      const stepKept = filterRawFormData(fields, source, subforms);
+      if (Object.keys(stepKept).length) kept[step.name] = stepKept;
+      for (const k of Object.keys(given)) {
+        if (k in stepKept) continue;
+        const at = `${step.name}.${k}`;
+        if (types[k] === 'password') passwords.push(at);
+        else if (!(k in types)) unknown.push(at);
+        else other.push(at);
+      }
+    }
+    return {
+      kept: { __wizard__: true, drafts: kept, skipped: skips },
+      stored: Object.entries(kept).flatMap(([step, v]) => Object.keys(v).map((k) => `${step}.${k}`)),
+      passwords, unknown, other,
+    };
+  }
+
+  /**
+   * resolve_field for a wizard : every step resolved in order, the fields and errors named
+   * `<step>.<field>`, and the launch payload once every shown step is complete.
+   */
+  async function resolveWizardField({ form, values: given, skipped: givenSkips, field, storedJob }, loaded) {
+    const { values, skipped, warnings } = await overStored(form, given, storedJob, givenSkips, loaded);
+    const { res, formObj } = await resolveWizardFor({ form, values, skipped }, loaded);
+    // the resolved values hold the passwords : never sent
+    const { payload, values: _values, maskFields, passwordsVisible, ...rest } = res; // eslint-disable-line no-unused-vars
+    const out = { form: formObj.name, ...rest, fields: field ? rest.fields.filter((f) => f.name === field) : rest.fields };
+    if (warnings.length) out.warnings = [...(out.warnings || []), ...warnings];
+    out.formFingerprint = sha256(formObj);
+    if (res.complete && !field) {
+      const built = wizardPayload(res, formObj);
+      out.modeledExtravars = built.preview;
+      out.modeledPayload = built.preview;
+      out.credentials = built.credentials;
+      out.payloadHash = built.payloadHash;
+    }
+    return out;
+  }
+
+  /** form_incomplete, with what is missing and failing */
+  function incomplete(res) {
+    const parts = [];
+    const notAnOption = res.fields.filter((f) => f.notInOptions && res.invalid.includes(f.name)).map((f) => f.name);
+    const failing = Object.entries(res.validationErrors)
+      .map(([name, errs]) => `${name} (${errs.map((e) => e.description ? `${e.type}: ${e.description}` : e.type).join(', ')})`);
+    if (res.missing.length) parts.push(`missing input for: ${res.missing.join(', ')}`);
+    if (notAnOption.length) parts.push(`not one of the options: ${notAnOption.join(', ')}`);
+    if (failing.length) parts.push(`validation failed: ${failing.join(' ; ')}`);
+    const rows = describeRowErrors(res.rowErrors);
+    if (rows.length) parts.push(`list rows failing: ${rows.join(', ')}`);
+    if (res.waiting.length) parts.push(`not resolvable yet: ${res.waiting.join(', ')}`);
+    return new ToolError(`The form is not complete - ${parts.join(' ; ')}. Call resolve_field to see what is needed.`,
+      'form_incomplete', {
+        missing: res.missing, invalid: res.invalid, waiting: res.waiting, validationErrors: res.validationErrors,
+        rowErrors: res.rowErrors,
+      });
+  }
+
+  /**
    * A form resolved, validated and turned into its launch payload, as launch_job submits it and
    * plan_job plans it : refused while incomplete, with a file field, or when the payload differs
    * from the confirmed one.
@@ -387,9 +622,10 @@ export function createHandlers({ user, deps, policy = {} }) {
    * Returns:
    *   Promise<object>: { formObj, extravars, credentials, payloadHash, rawFormData, warnings }.
    */
-  async function readyToLaunch({ form, values: given, storedJob, verbose, expectedPayloadHash }) {
-    const { formConfig, formObj } = await loadForm(form);
-    const { values, warnings: storedWarnings } = await overStored(form, given, storedJob);
+  async function readyToLaunch({ form, values: given, skipped: givenSkips, storedJob, verbose, expectedPayloadHash }) {
+    const loaded = await loadForm(form);
+    const { formConfig, formObj } = loaded;
+    const { values, skipped, warnings: storedWarnings } = await overStored(form, given, storedJob, givenSkips, loaded);
     // a stored job can change between what was shown and the launch : the confirmed payload is
     // the one launched, or none
     if (storedJob && !expectedPayloadHash) {
@@ -399,12 +635,10 @@ export function createHandlers({ user, deps, policy = {} }) {
     if (formObj.type === 'subform') {
       throw new ToolError(`'${formObj.name}' is a subform and cannot be launched on its own`, 'unsupported');
     }
-    if (Array.isArray(formObj.wizard) && formObj.wizard.length > 0) {
-      throw new ToolError(`'${formObj.name}' is a wizard form ; wizard forms cannot be launched through MCP yet`, 'unsupported');
-    }
     if (verbose && !user?.options?.allowVerboseMode) {
       throw new ToolError('You do not have permission to run jobs in verbose mode', 'access_denied');
     }
+    if (isWizard(formObj)) return readyWizard({ loaded, values, skipped, storedWarnings, verbose, expectedPayloadHash });
     const res = await resolveForm({
       form: formObj,
       constants: formConfig.constants || {},
@@ -414,23 +648,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       services: servicesFor(formConfig, formObj),
       allRows: true,
     });
-    if (!res.complete) {
-      const parts = [];
-      const notAnOption = res.fields.filter((f) => f.notInOptions && res.invalid.includes(f.name)).map((f) => f.name);
-      const failing = Object.entries(res.validationErrors)
-        .map(([name, errs]) => `${name} (${errs.map((e) => e.description ? `${e.type}: ${e.description}` : e.type).join(', ')})`);
-      if (res.missing.length) parts.push(`missing input for: ${res.missing.join(', ')}`);
-      if (notAnOption.length) parts.push(`not one of the options: ${notAnOption.join(', ')}`);
-      if (failing.length) parts.push(`validation failed: ${failing.join(' ; ')}`);
-      const rows = describeRowErrors(res.rowErrors);
-      if (rows.length) parts.push(`list rows failing: ${rows.join(', ')}`);
-      if (res.waiting.length) parts.push(`not resolvable yet: ${res.waiting.join(', ')}`);
-      throw new ToolError(`The form is not complete - ${parts.join(' ; ')}. Call resolve_field to see what is needed.`,
-        'form_incomplete', {
-          missing: res.missing, invalid: res.invalid, waiting: res.waiting, validationErrors: res.validationErrors,
-          rowErrors: res.rowErrors,
-        });
-    }
+    if (!res.complete) throw incomplete(res);
     const files = res._fields.filter((f) => f.type === 'file' && res._visibility[f.name]
       && res._values[f.name] !== undefined && res._values[f.name] !== null && res._values[f.name] !== '');
     if (files.length) {
@@ -446,6 +664,21 @@ export function createHandlers({ user, deps, policy = {} }) {
     }
     if (verbose) extravars.__verbose__ = true;
     return { formObj, extravars, credentials, payloadHash, rawFormData: filterRawFormData(res._fields, res._values), warnings: [...(res.warnings || []), ...storedWarnings] };
+  }
+
+  /** readyToLaunch for a wizard : its steps resolved in order, their output merged. */
+  async function readyWizard({ loaded, values, skipped, storedWarnings, verbose, expectedPayloadHash }) {
+    const { formObj } = loaded;
+    const { res, drafts, skipped: skips } = await resolveWizardFor({ form: formObj.name, values, skipped }, loaded);
+    if (!res.complete) throw incomplete(res);
+    // a file field is never in a wizard's drafts : resolveWizard drops it
+    const { extravars, credentials, payloadHash } = wizardPayload(res, formObj);
+    if (expectedPayloadHash && expectedPayloadHash !== payloadHash) {
+      throw new ToolError('The payload differs from the one that was resolved - resolve the form again and have it confirmed.',
+        'payload_mismatch', { expectedPayloadHash, payloadHash });
+    }
+    if (verbose) extravars.__verbose__ = true;
+    return { formObj, extravars, credentials, payloadHash, rawFormData: wizardRawFormData(formObj, drafts, skips), warnings: [...(res.warnings || []), ...storedWarnings] };
   }
 
   return {
@@ -467,13 +700,22 @@ export function createHandlers({ user, deps, policy = {} }) {
       const fields = normalizeFields(formObj.fields);
       const known = [...Object.keys(formConfig.constants || {}), ...Object.keys(formObj.vars || {}), '__user__'];
       const graph = scanDependencies(fields, known);
-      const wizard = Array.isArray(formObj.wizard) && formObj.wizard.length > 0;
+      // a wizard's fields are its steps' : each step's subform fields, as the step shows them
+      const steps = isWizard(formObj) ? wizardSteps(formObj).map((step) => {
+        const sub = (formObj.subforms || []).find((s) => s?.name === step.subform);
+        const stepFields = normalizeFields(sub?.fields || []);
+        const stepGraph = scanDependencies(stepFields, [...known, '__parent__']);
+        return {
+          name: step.name, subform: step.subform, optional: step.optional, ...(step.when ? { when: step.when } : {}),
+          fields: stepFields.map((f) => ({ ...f, dynamic: isDynamicField(f), dependsOn: stepGraph.dependsOn[f.name] || [] })),
+        };
+      }) : undefined;
       return {
         ...formObj,
         fields: fields.map((f) => ({ ...f, dynamic: isDynamicField(f), dependsOn: graph.dependsOn[f.name] || [] })),
+        ...(steps ? { steps } : {}),
         constants: formConfig.constants || {},
-        supported: !wizard,
-        ...(wizard ? { unsupportedReason: 'wizard forms cannot be launched through MCP yet' } : {}),
+        supported: true,
         errors: formConfig.errors || [],
         warnings: [...(formConfig.warnings || []), ...graph.warnings],
       };
@@ -484,8 +726,10 @@ export function createHandlers({ user, deps, policy = {} }) {
       if (args.subform && args.storedJob) {
         throw new ToolError('A stored job holds the values of a whole form: resolve it without `subform`', 'invalid_request');
       }
+      const loaded = await loadForm(args.form);
+      if (!args.subform && isWizard(loaded.formObj)) return resolveWizardField(args, loaded);
       const fromStored = await overStored(args.form, args.values, args.storedJob);
-      const { res, formObj } = await resolveFor({ ...args, values: fromStored.values });
+      const { res, formObj } = await resolveFor({ ...args, values: fromStored.values }, loaded);
       const out = publicResolution(res);
       if (fromStored.warnings.length) out.warnings = [...(out.warnings || []), ...fromStored.warnings];
       // the exact launch payload, only where it is one : a whole root form, resolved
@@ -501,9 +745,9 @@ export function createHandlers({ user, deps, policy = {} }) {
       return out;
     },
 
-    async launchJob({ form, values, storedJob, verbose, expectedPayloadHash }) {
+    async launchJob({ form, values, skipped, storedJob, verbose, expectedPayloadHash }) {
       refuseWhenReadOnly();
-      const ready = await readyToLaunch({ form, values, storedJob, verbose, expectedPayloadHash });
+      const ready = await readyToLaunch({ form, values, skipped, storedJob, verbose, expectedPayloadHash });
       const job = await Job.launch({
         form: ready.formObj.name,
         user,
@@ -517,12 +761,12 @@ export function createHandlers({ user, deps, policy = {} }) {
       return { id: job?.id, form: ready.formObj.name, payloadHash: ready.payloadHash, warnings: ready.warnings };
     },
 
-    async planJob({ form, values, storedJob, run_at: runAt, name, verbose, expectedPayloadHash }) {
+    async planJob({ form, values, skipped, storedJob, run_at: runAt, name, verbose, expectedPayloadHash }) {
       refuseWhenReadOnly('jobs cannot be planned through it');
       if (!mayPlan) throw new ToolError('You do not have permission to plan jobs (the allowPlannedJobs role option)', 'access_denied');
       const when = momentOf(runAt);
       if (!String(name ?? '').trim()) throw new ToolError('A planned job needs a name', 'invalid_request');
-      const ready = await readyToLaunch({ form, values, storedJob, verbose, expectedPayloadHash });
+      const ready = await readyToLaunch({ form, values, skipped, storedJob, verbose, expectedPayloadHash });
       // Run later on the form : a one-time run as this user, checked again when it fires
       const id = await stored(String(name).trim(), () => Schedule.plan(user, {
         name: String(name).trim(),
@@ -615,33 +859,28 @@ export function createHandlers({ user, deps, policy = {} }) {
       let values = storedValues(row);
       try {
         const { formObj } = await loadForm(row.form_name);
-        values = filterRawFormData(normalizeFields(formObj.fields), values, formObj.subforms || []);
+        // a wizard's are its step drafts, each filtered by its step's subform
+        values = isWizard(formObj)
+          ? (values.__wizard__ === true ? wizardRawFormData(formObj, values.drafts, values.skipped) : {})
+          : filterRawFormData(normalizeFields(formObj.fields), values, formObj.subforms || []);
       } catch {
         values = Object.fromEntries(Object.entries(values).filter(([, v]) => v === null || typeof v !== 'object'));
       }
       return { ...storedSummary(row), values: parseJson(await Job.maskExtravars(row.form_name, JSON.stringify(values)), {}) };
     },
 
-    async storeJob({ form, name, values, description, expires_at: expiresAt }) {
+    async storeJob({ form, name, values, skipped, description, expires_at: expiresAt }) {
       refuseWhenReadOnly('jobs cannot be stored through it');
       if (!mayStore) throw new ToolError('You do not have permission to use stored jobs (the allowStoredJobs role option)', 'access_denied');
       if (!String(name ?? '').trim()) throw new ToolError('A stored job needs a name', 'invalid_request');
-      const { formObj } = await loadForm(form);
-      if (Array.isArray(formObj.wizard) && formObj.wizard.length > 0) {
-        throw new ToolError(`'${formObj.name}' is a wizard form ; its values cannot be stored through MCP yet`, 'unsupported');
-      }
-      const fields = normalizeFields(formObj.fields);
+      const loaded = await loadForm(form);
+      const { formObj } = loaded;
       // the values as the form reads them (a choice as its whole option record, so Load in the
       // browser finds it) ; then kept as the Store dialog keeps them : no password (in a list row
       // neither), nothing the form does not have, only what was given
-      const { res } = await resolveFor({ form: formObj.name, values: values || {} });
-      const given = Object.fromEntries(Object.keys(values || {}).filter((k) => k in res._values).map((k) => [k, res._values[k]]));
-      const kept = filterRawFormData(res._fields || fields, given, formObj.subforms || []);
-      const types = Object.fromEntries(fields.map((f) => [f.name, f.type]));
-      const leftOut = Object.keys(values || {}).filter((k) => !(k in kept));
-      const passwords = leftOut.filter((k) => types[k] === 'password');
-      const unknown = leftOut.filter((k) => !(k in types));
-      const other = leftOut.filter((k) => !passwords.includes(k) && !unknown.includes(k));
+      const { kept, stored: storedNames, passwords, unknown, other } = isWizard(formObj)
+        ? await wizardToStore(loaded, values, skipped)
+        : await plainToStore(loaded, values);
       const expires = expiresAt ? momentOf(expiresAt, 'expires_at') : null;
       const storedName = String(name).trim();
       let id;
@@ -666,7 +905,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       if (other.length) warnings.push(`Not stored (constants and reserved fields): ${other.join(', ')}`);
       return {
         id, name: storedName, form: formObj.name, expiresAt: expires ? expires.toISOString() : null,
-        stored: Object.keys(kept), leftOut: { passwords, unknown, other }, warnings,
+        stored: storedNames, leftOut: { passwords, unknown, other }, warnings,
       };
     },
 
@@ -723,14 +962,20 @@ export function createHandlers({ user, deps, policy = {} }) {
 }
 
 const valuesSchema = z.record(z.string(), z.any())
-  .describe('Raw field values keyed by field name. A choice field takes the selected option record, a partial record or its valueColumn value (an array of those when multiple).');
+  .describe('Raw field values keyed by field name. A choice field takes the selected option record, a partial record or its valueColumn value (an array of those when multiple). '
+    + 'For a wizard form (get_form lists its `steps`), the values per step: { <step>: { <field>: value } }.');
+
+// the optional steps of a wizard skipped, as Skip does in the browser
+const skippedSchema = z.record(z.string(), z.boolean()).optional()
+  .describe('Wizard forms only: the optional steps to skip, { <step>: true }. A step not skipped must be complete.');
 
 // a stored job to start from (#1070) : what Load does on the form
 const storedJobSchema = z.object({
   id: z.number().int().positive().optional().describe('Stored job id, from list_stored_jobs'),
   name: z.string().optional().describe('Or its name: one of your own stored jobs of this form'),
-}).optional().describe('Start from the values of one of your own stored jobs ; `values` are laid over them. Password fields '
-  + 'are not stored: supply them in `values`. launch_job and plan_job then need the expectedPayloadHash resolve_field returned.');
+}).optional().describe('Start from the values of one of your own stored jobs ; `values` are laid over them (per step for a wizard, '
+  + 'and a step given values for is no longer skipped). Password fields are not stored: supply them in `values`. '
+  + 'launch_job and plan_job then need the expectedPayloadHash resolve_field returned.');
 
 /**
  * Wrap a handler : the result as JSON text and as structured content, a refusal as a tool
@@ -790,7 +1035,8 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
     title: 'Get form',
     description: 'The full definition of one form: its fields (type, label, required, regex, default, '
       + 'dependencies, and per field `dynamic` and `dependsOn`), subforms, constants and varsFiles data. '
-      + 'Use it to understand the form ; use resolve_field to evaluate it.',
+      + 'A wizard form has no fields of its own: `steps` lists its steps in order (name, optional, when) '
+      + 'with their fields. Use it to understand the form ; use resolve_field to evaluate it.',
     inputSchema: { name: z.string().describe('Form name, as returned by list_forms') },
     annotations: { readOnlyHint: true },
   }, wrap((a) => handlers.getForm(a)));
@@ -807,10 +1053,13 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       + 'record, a partial record or its valueColumn value - it is replaced by the full option. When '
       + 'complete, the answer holds `modeledExtravars` (passwords masked) and `credentials` exactly as '
       + 'launch_job will submit them, and a `payloadHash` to pass to launch_job. Pass `field` to resolve '
-      + 'only that field and what it depends on. Call it again after every answer.',
+      + 'only that field and what it depends on. Call it again after every answer. A wizard form is resolved '
+      + 'step by step as the browser walks it - a step reads the earlier ones as __parent__ - and its fields '
+      + 'and errors are named `<step>.<field>` ; `steps` says per step whether it is shown, skipped and complete.',
     inputSchema: {
       form: z.string().describe('Form name'),
       values: valuesSchema.optional(),
+      skipped: skippedSchema,
       storedJob: storedJobSchema,
       field: z.string().optional().describe('Resolve only this field (and its dependencies)'),
       subform: z.string().optional().describe('Resolve a subform of the form (a list row or wizard step)'),
@@ -831,6 +1080,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
     inputSchema: {
       form: z.string().describe('Form name'),
       values: valuesSchema.optional(),
+      skipped: skippedSchema,
       storedJob: storedJobSchema,
       verbose: z.boolean().optional().describe('Verbose ansible output (needs the allowVerboseMode role option)'),
       expectedPayloadHash: z.string().optional().describe('The payloadHash resolve_field returned for the approved values ; the launch is refused when the payload differs'),
@@ -848,10 +1098,10 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       + 'first: that returns `modeledExtravars` (passwords masked), `credentials` and a `payloadHash` '
       + 'without launching - confirm them with the user, then call again with `expectedPayloadHash`. '
       + 'Refused while fields are missing, invalid or fail validation (code `form_incomplete`), for a '
-      + 'wizard form or a shown password field (`unsupported`), with changes for a job that stored no form values, such as one a schedule launched (`no_form_data`), or when the payload changed (`payload_mismatch`).',
+      + 'shown password field (`unsupported`), with changes for a job that stored no form values, such as one a schedule launched (`no_form_data`), or when the payload changed (`payload_mismatch`).',
     inputSchema: {
       id: z.number().int().positive().describe('Id of the job to relaunch'),
-      values: valuesSchema.optional().describe('Only the fields to change, as raw values ; the rest is taken from the job'),
+      values: valuesSchema.optional().describe('Only the fields to change, as raw values (per step for a wizard: { <step>: { <field>: value } }) ; the rest is taken from the job'),
       verbose: z.boolean().optional().describe('Verbose ansible output (needs the allowVerboseMode role option)'),
       preview: z.boolean().optional().describe('Resolve and build the payload only, do not launch'),
       expectedPayloadHash: z.string().optional().describe('The payloadHash of the confirmed preview ; the relaunch is refused when the payload differs'),
@@ -871,6 +1121,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
     inputSchema: {
       form: z.string().describe('Form name'),
       values: valuesSchema.optional(),
+      skipped: skippedSchema,
       storedJob: storedJobSchema,
       run_at: z.string().describe('When to run it: ISO 8601 with its offset or Z'),
       name: z.string().min(1).max(255).describe('A name for the planned run, as listed under Jobs > Scheduled ; names are unique'),
@@ -949,11 +1200,13 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       title: 'Store job',
       description: 'Save values of a form under a name, as the Store dialog does, to launch from later (yours or '
         + 'the user\'s in the browser, with Load). Password fields are not stored ; the answer says which '
-        + 'fields were left out. `expires_at` (optional) is ISO 8601 with its offset or Z.',
+        + 'fields were left out. A wizard form stores its values per step, with the optional steps skipped. '
+        + '`expires_at` (optional) is ISO 8601 with its offset or Z.',
       inputSchema: {
         form: z.string().describe('Form name'),
         name: z.string().min(1).max(255).describe('A name, unique among your stored jobs of this form'),
         values: valuesSchema,
+        skipped: skippedSchema,
         description: z.string().optional().describe('What these values are for'),
         expires_at: z.string().optional().describe('When it expires: ISO 8601 with its offset or Z ; none, it does not'),
       },

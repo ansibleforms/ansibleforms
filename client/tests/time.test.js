@@ -188,6 +188,19 @@ describe('Time.momentOf', () => {
     expect(Time.momentOf(wall, 'Europe/Madrid', second)).toBe(second);
   });
 
+  test('reads the hour that comes twice the same in summer as in winter', () => {
+    for (const now of ['2026-07-01T12:00:00Z', '2026-12-01T12:00:00Z']) {
+      vi.useFakeTimers({ now: new Date(now), toFake: ['Date'] });
+      try {
+        expect(Time.fromWallClock(new Date(2026, 9, 25, 2, 30), 'Europe/Madrid')).toBe('2026-10-25T00:30:00.000Z');
+        expect(Time.fromWallClock(new Date(2026, 9, 25, 2, 30), 'UTC')).toBe('2026-10-25T02:30:00.000Z');
+        expect(Time.fromWallClock(new Date(2026, 6, 1, 9, 0), 'America/New_York')).toBe('2026-07-01T13:00:00.000Z');
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  });
+
   test('keeps the milliseconds', () => {
     const iso = '2026-10-15T09:00:00.123Z';
     expect(Time.momentOf(Time.toWallClock(iso, 'Europe/Madrid'), 'Europe/Madrid', iso)).toBe(iso);

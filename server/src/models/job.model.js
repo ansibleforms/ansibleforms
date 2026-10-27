@@ -1755,6 +1755,38 @@ function codedError(ErrorClass, message, code, details = {}) {
 }
 
 /**
+ * A wizard job's stored step drafts with the changes laid over them, for a relaunch : the
+ * changes are given per step, as the browser's drafts are, and a step changed is walked again
+ * even when the job skipped it.
+ *
+ * Args:
+ *   formObj (object): the wizard form.
+ *   stored (object): the job's raw form data ({ __wizard__: true, drafts, skipped }).
+ *   values (object): the changes, { <step>: { <field>: value } }.
+ *
+ * Returns:
+ *   object: the raw form data to validate.
+ */
+function wizardRelaunchData(formObj, stored, values) {
+  const plain = (o) => o && typeof o === "object" && !Array.isArray(o);
+  const steps = formObj.wizard.filter((s) => s && !s.summary && s.subform).map((s) => s.name || s.subform);
+  if (values != null && !plain(values)) {
+    throw codedError(Errors.BadRequestError, `'${formObj.name}' is a wizard form ; its changes are given per step (${steps.join(", ")})`, 'invalid_request');
+  }
+  const drafts = { ...(plain(stored.drafts) ? stored.drafts : {}) };
+  const skipped = { ...(plain(stored.skipped) ? stored.skipped : {}) };
+  for (const [name, v] of Object.entries(values || {})) {
+    if (!steps.includes(name)) {
+      throw codedError(Errors.BadRequestError, `'${formObj.name}' is a wizard form ; its changes are given per step (${steps.join(", ")}), not: ${name}`, 'invalid_request', { steps });
+    }
+    if (!plain(v)) throw codedError(Errors.BadRequestError, `The changes of step '${name}' are an object of its fields`, 'invalid_request');
+    drafts[name] = { ...(plain(drafts[name]) ? drafts[name] : {}), ...v };
+    delete skipped[name];
+  }
+  return { __wizard__: true, drafts, skipped };
+}
+
+/**
  * Relaunch a job with some fields changed : the stored raw form data, with `values` laid
  * over it, goes through the form engine again - resolved, validated, the extravars built
  * by the server - as a NEW launch by `user` (ansibleforms_user is the caller, not the
@@ -1762,10 +1794,11 @@ function codedError(ErrorClass, message, code, details = {}) {
  *
  * Passwords are never stored and never reused, so a form with a password field anywhere -
  * its subforms included - cannot be relaunched this way : the data lost the password. The uploads of file fields are reused (verified
- * again). A wizard form is relaunched without changes only : under launch validation
- * 'enforce' it is checked step by step from the step drafts the job stored, and a wizard job
- * that did not store them (launched before 7) is refused. Neither can a job from before raw
- * form data was stored be relaunched with changes.
+ * again). A wizard form goes through the engine step by step from the step drafts the job
+ * stored, the changes given per step (`{ <step>: { <field>: value } }`) laid over them, a step
+ * changed no longer skipped ; a wizard job that did not store its drafts (launched before 7)
+ * is refused. Neither can a job from before raw form data was stored be relaunched with
+ * changes.
  *
  * @param {object} args
  * @param {boolean} [args.preview]  resolve and build only : { form, extravars (passwords
@@ -1801,7 +1834,7 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
     }
     if (preview) {
       // masked with the form just loaded - by definition - and then by key name
-      const byDefinition = maskPasswords(storedExtravars, formObj.fields || [], formObj.subforms || []);
+      const byDefinition = maskPasswords(storedExtravars, maskableFields(formObj), formObj.subforms || []);
       const masked = safeParse(Helpers.logSafe(JSON.stringify(byDefinition)), {}, `masked extravars id=${id}`);
       return { form: job.form, replayed: true, extravars: masked, credentials, payloadHash, warnings: [] };
     }
@@ -1811,10 +1844,11 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
 
   // otherwise through the form engine : resolved, validated, the extravars built here
   const stored = job.raw_form_data ? safeParse(job.raw_form_data, null, `job.raw_form_data id=${id}`) : null;
-  // a wizard is checked from its stored step drafts : as it ran, not with changes, and only
-  // when the job stored them (a wizard job launched before 7 stored its merged output)
-  if (Array.isArray(formObj.wizard) && formObj.wizard.length > 0 && (changed || stored?.__wizard__ !== true)) {
-    throw codedError(Errors.BadRequestError, `'${job.form}' is a wizard form ; ${changed ? 'it cannot be relaunched with changes' : 'this job did not store its step drafts, so it cannot be checked under launch validation \'enforce\''}`, 'unsupported');
+  // a wizard is checked from its stored step drafts, and only when the job stored them (a
+  // wizard job launched before 7 stored its merged output)
+  const wizard = Array.isArray(formObj.wizard) && formObj.wizard.length > 0;
+  if (wizard && stored && stored.__wizard__ !== true) {
+    throw codedError(Errors.BadRequestError, `'${job.form}' is a wizard form ; this job did not store its step drafts, so it cannot be ${changed ? 'relaunched with changes' : 'checked under launch validation \'enforce\''}`, 'unsupported');
   }
   if (!stored) {
     const why = launchedBySchedule(job)
@@ -1834,7 +1868,7 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
     const upload = readModelPath(storedExtravars, [].concat(f.model || f.name)[0]);
     if (upload && typeof upload === 'object') files[f.name] = upload;
   }
-  const rawFormData = { ...raw, ...(values || {}) };
+  const rawFormData = wizard ? wizardRelaunchData(formObj, raw, values) : { ...raw, ...(values || {}) };
   const result = await validateLaunch({
     // no extravars : a password is never taken from the stored data here
     formConfig, formObj, user, rawFormData, extravars: {}, files,
@@ -1865,7 +1899,7 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
   if (preview) {
     return {
       form: job.form,
-      extravars: maskPasswords(extravars, formObj.fields || [], formObj.subforms || []),
+      extravars: maskPasswords(extravars, maskableFields(formObj), formObj.subforms || []),
       credentials,
       payloadHash,
       warnings: result.warnings,

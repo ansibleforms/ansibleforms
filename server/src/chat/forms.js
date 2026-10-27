@@ -35,7 +35,11 @@ function help(field) {
   return [field.help, field.placeholder, regex].filter(Boolean).map((s) => String(s).trim()).join(' ');
 }
 
-/** the chat's view of one form : slots, targets, list slots, switches, help */
+/**
+ * The chat's view of one form : slots, targets, list slots, switches, help. A wizard's slots
+ * are its steps' fields, named `<step>.<field>` as MCP resolves them ; `steps` maps each
+ * step to its slots and says whether it is optional.
+ */
 export function describeForm(form) {
   const slots = [];
   const operatorSlots = [];
@@ -43,22 +47,38 @@ export function describeForm(form) {
   const switchSlots = [];
   const slotHelp = {};
   const summaryFields = [];
-  for (const field of form?.fields || []) {
-    if (!answerable(field)) continue;
-    slots.push(field.name);
-    if (operatorChoice(field)) operatorSlots.push(field.name);
-    if (field.multiple) listSlots.push(field.name);
-    if (field.type === 'checkbox') switchSlots.push(field.name);
+  const add = (field, slot) => {
+    if (!answerable(field)) return false;
+    slots.push(slot);
+    if (operatorChoice(field)) operatorSlots.push(slot);
+    if (field.multiple) listSlots.push(slot);
+    if (field.type === 'checkbox') switchSlots.push(slot);
     const h = help(field);
-    if (h) slotHelp[field.name] = h;
+    if (h) slotHelp[slot] = h;
     if (summaryFields.length < SUMMARY_FIELDS && field.required && !field.multiple && !field.dependencies) {
-      summaryFields.push({ name: field.name, label: field.label || field.name });
+      summaryFields.push({ name: slot, label: field.label || field.name });
     }
-  }
+    return true;
+  };
+  const steps = Array.isArray(form?.steps) ? form.steps.map((step) => ({
+    name: step.name,
+    optional: step.optional === true,
+    slots: (step.fields || []).filter((f) => add(f, `${step.name}.${f.name}`)).map((f) => `${step.name}.${f.name}`),
+  })) : null;
+  if (!steps) for (const field of form?.fields || []) add(field, field.name);
   return {
     form: form?.name,
     slots, operatorSlots, listSlots, switchSlots, slotHelp, summaryFields,
+    ...(steps ? { steps } : {}),
   };
+}
+
+/** a form's field definitions by slot name : a wizard's as `<step>.<field>` */
+export function fieldsBySlot(form) {
+  if (Array.isArray(form?.steps)) {
+    return Object.fromEntries(form.steps.flatMap((step) => (step.fields || []).map((f) => [`${step.name}.${f.name}`, f])));
+  }
+  return Object.fromEntries((form?.fields || []).map((f) => [f.name, f]));
 }
 
 /** share of the best phrase's words that appear in the query */
@@ -78,4 +98,4 @@ export async function chatForms(handlers) {
   return (forms || []).filter((f) => f.enableForChat === true);
 }
 
-export default { describeForm, score, chatForms };
+export default { describeForm, fieldsBySlot, score, chatForms };
