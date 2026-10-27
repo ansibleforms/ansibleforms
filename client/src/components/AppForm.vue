@@ -870,6 +870,12 @@ function resetField(fieldname) {
   bumpFieldGeneration(fieldname);
   setFieldStatus(fieldname, undefined);
   form.value[fieldname] = defaults.value[fieldname];
+  // A plain field (no query, no expression) waits on nothing, and the loop only restores the
+  // fields it evaluates : left pending, it was reported as never produced once the form
+  // settled (#1261 - a field whose dependencies: block names an enum filled by an expression)
+  if (isInitializing.value && !fieldOptions.value[fieldname]?.isDynamic && isPrefillPending(fieldname)) {
+    applyPrefill(fieldname);
+  }
 }
 
 // reset number field => input type number seems to evaluate to empty string instead of undefined

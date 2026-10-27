@@ -149,3 +149,63 @@ describe('a field settled on its default stops spinning', () => {
     lists.forEach((l) => expect(l).toContain("'default'"));
   });
 });
+
+//----------------------------------------------------------------
+// a plain field reset while the form is restored (#1261)
+//----------------------------------------------------------------
+
+/**
+ * The restore state after resetField ran on a field during initialisation, with the real
+ * isPrefillPending, applyPrefill and resetField of AppForm.
+ *
+ * Args:
+ *   isDynamic (boolean): whether the field has a query or an expression.
+ *
+ * Returns:
+ *   object: { applied, value, status } of the field 'node_count'.
+ */
+function afterReset(isDynamic) {
+  const ref = (value) => ({ value });
+  const state = {
+    isInitializing: ref(true),
+    prefillValues: ref({ node_count: 3 }),
+    prefillApplied: ref({ node_count: true }),
+    prefillFlagged: ref({}),
+    prefillApplyCount: ref({}),
+    protectedFields: ref({}),
+    progressCounter: ref(0),
+    fieldOptions: ref({ node_count: { isDynamic } }),
+    form: ref({ node_count: 3 }),
+    defaults: ref({}),
+    status: {},
+  };
+  const fns = new Function(
+    ...Object.keys(state).filter((k) => k !== 'status'),
+    'status',
+    `const toRaw = (v) => v;
+    const t = (k) => k;
+    const MAX_PREFILL_APPLIES = 5;
+    const flagPrefill = (name, reason) => { prefillFlagged.value[name] = reason; };
+    const prefillMatchesOptions = () => true;
+    const setFieldStatus = (name, s) => { status[name] = s; };
+    const bumpFieldGeneration = () => {};
+    // initiateDefaults hands the restored value back as the default while initialising
+    const initiateDefaults = (name) => { defaults.value[name] = prefillValues.value[name]; };
+    ${cut('function isPrefillPending', '// give up on restoring')}
+    ${cut('function applyPrefill(', '//------')}
+    ${cut('function resetField', '// reset number field')}
+    return { resetField };`,
+  )(...Object.keys(state).filter((k) => k !== 'status').map((k) => state[k]), state.status);
+  fns.resetField('node_count');
+  return { applied: !!state.prefillApplied.value.node_count, value: state.form.value.node_count, status: state.status.node_count };
+}
+
+describe('a plain field reset while the form is restored', () => {
+  it('is restored again at once : the loop never would, and it was reported as never produced', () => {
+    expect(afterReset(false)).toEqual({ applied: true, value: 3, status: 'fixed' });
+  });
+
+  it('a field with a query or an expression is still left to the loop', () => {
+    expect(afterReset(true)).toEqual({ applied: false, value: 3, status: undefined });
+  });
+});
