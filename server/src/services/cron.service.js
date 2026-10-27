@@ -665,28 +665,49 @@ class CronService {
   }
 
   /**
-   * Stop all cron jobs
+   * Stop all cron jobs. None starts again ; a run already going is waited for, at most
+   * `waitMs`, so a stop does not close the database pool under it (the minute's stopped-node
+   * sweep logged "Pool is closed" three times when a SIGTERM came on the minute).
+   *
+   * Args:
+   *   waitMs (number): the most to wait for the runs already going (default 5000, inside the
+   *     8 seconds lib/shutdown.js gives the whole stop).
+   *
+   * Returns:
+   *   Promise<void>: once no run is going, or the wait is over.
    */
-  stopAll() {
+  async stopAll(waitMs = 5000) {
     logger.info('Stopping all cron jobs...');
-    
+    const busy = [];
+
     this.jobs.repositories.forEach((task, name) => {
       task.stop();
+      if (task.isBusy()) busy.push(task);
       logger.debug(`Stopped repository cron job: ${name}`);
     });
     this.jobs.repositories.clear();
 
     this.jobs.schedules.forEach((task, id) => {
       task.stop();
+      if (task.isBusy()) busy.push(task);
       logger.debug(`Stopped schedule cron job: ${id}`);
     });
     this.jobs.schedules.clear();
 
     this.jobs.system.forEach((task, name) => {
       task.stop();
+      if (task.isBusy()) busy.push(task);
       logger.debug(`Stopped system task: ${name}`);
     });
     this.jobs.system.clear();
+
+    // the runs already going : polled, as croner tells only whether a job is busy
+    const until = Date.now() + waitMs;
+    while (busy.some((task) => task.isBusy()) && Date.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const left = busy.filter((task) => task.isBusy()).length;
+    if (left) logger.warning(`Stopped the scheduler with ${left} task(s) still running`);
 
     logger.info('All cron jobs stopped');
   }
