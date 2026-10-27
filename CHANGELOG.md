@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.2](https://github.com/ansibleforms/ansibleforms/compare/7.4.1...7.4.2) (2026-10-27)
+
+
+### Fixed
+
+* a stop waits for a scheduled task already running before it closes the database ([#1265](https://github.com/ansibleforms/ansibleforms/issues/1265)) ([19d1366](https://github.com/ansibleforms/ansibleforms/commit/19d1366110a567fdb81fc0841ae5c861962a5755))
+* editing a row or relaunching no longer warns that a field with dependencies could not be pre-filled ([#1266](https://github.com/ansibleforms/ansibleforms/issues/1266)) ([217552c](https://github.com/ansibleforms/ansibleforms/commit/217552c323889f07512c937447eabc3b72c2e97a))
+* listing the backups no longer warns about every backup without a forms folder ([#1268](https://github.com/ansibleforms/ansibleforms/issues/1268)) ([5d8fcb9](https://github.com/ansibleforms/ansibleforms/commit/5d8fcb977f380ed5f8069fd8905c7dc3e21e8503))
+* schedules that fire in the same minute are all queued instead of one losing to a deadlock ([#1267](https://github.com/ansibleforms/ansibleforms/issues/1267)) ([4c7edfa](https://github.com/ansibleforms/ansibleforms/commit/4c7edfaca22c8faa761f62c323d6e4db1f19d87d))
+* the designer's check answers an invalid configuration with 400, as a save does ([#1263](https://github.com/ansibleforms/ansibleforms/issues/1263)) ([ac9faaf](https://github.com/ansibleforms/ansibleforms/commit/ac9faafa024aab559ed0214a5f67cc79cc20c4b2))
+
 ## [7.4.1](https://github.com/ansibleforms/ansibleforms/compare/7.4.0...7.4.1) (2026-10-27)
 
 
