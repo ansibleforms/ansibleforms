@@ -18,11 +18,6 @@
       }
     },
     {
-      "$comment": "a wizard form cannot be offered in the chat : its fields live in its steps",
-      "if": { "required": ["wizard"] },
-      "then": { "properties": { "enableForChat": { "not": {} } } }
-    },
-    {
       "$comment": "subform forms must declare 'fields' and never 'wizard'",
       "if": {
         "properties": { "type": { "const": "subform" } }
@@ -646,7 +641,7 @@
     },
     "enableForChat": {
       "type": "boolean",
-      "description": "Offer this form in the chat assistant (ENABLE_CHAT). Not for wizard forms."
+      "description": "Offer this form in the chat assistant (ENABLE_CHAT)."
     },
     "varsFiles": {
       "type": "array",
