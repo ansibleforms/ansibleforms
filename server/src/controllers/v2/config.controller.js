@@ -499,10 +499,13 @@ const validate = function(req,res){
     if(formsConfig) {
       res.json(RestResult.single(null));
     }else{
-      res.status(500).json(RestResult.error(i18n.t(req, 'config.failedValidateForms')))
+      res.status(400).json(RestResult.error(i18n.t(req, 'config.failedValidateForms')))
     }
   }catch(err){
-    res.status(500).json(RestResult.error(i18n.t(req, 'config.failedValidateForms'), helpers.getError(err)))
+    // what parse and validate refuse is the user's mistake, as on a save (Form.save) : a 400
+    // with its message, where a 500 read as a broken server
+    const status = err instanceof Errors.ApiError && err.status ? err.status : 400
+    res.status(status).json(RestResult.error(i18n.t(req, 'config.failedValidateForms'), helpers.getError(err)))
   }
 }
 
