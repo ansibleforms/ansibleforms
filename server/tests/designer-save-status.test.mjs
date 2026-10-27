@@ -1,6 +1,7 @@
 // A designer save the user got wrong answers as the user's mistake, with its message : an
 // invalid form 400, a forbidden change 403, a duplicate form name 409. It used to answer 500
 // for all of them, which read as a broken server. Only a real failure stays a 500.
+// The designer's check (POST /api/v2/config/check) answers an invalid configuration the same.
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import yaml from "yaml";
 
@@ -102,5 +103,34 @@ describe("the save endpoint answers the refusal's status", () => {
     const res = await call(payload([form("Deploy")]));
     expect(res.statusCode).toBe(500);
     expect(res.body.details).toBe("disk full");
+  });
+});
+
+describe("the check endpoint answers an invalid configuration as the save does", () => {
+  const call = async (body) => {
+    vi.resetModules();
+    vi.doUnmock("../src/models/form.model.js");
+    const controller = (await import("../src/controllers/v2/config.controller.js")).default;
+    const res = { statusCode: 200, body: null };
+    res.status = (c) => { res.statusCode = c; return res; };
+    res.json = (b) => { res.body = b; return res; };
+    await controller.validate({ body, headers: {} }, res);
+    return res;
+  };
+
+  test("a valid configuration passes", async () => {
+    const res = await call(payload([form("Deploy")]));
+    expect(res.statusCode).toBe(200);
+  });
+
+  test("a form failing validation is a bad request (400), with the validation message", async () => {
+    const res = await call(payload([form("Deploy", { playbook: undefined })]));
+    expect(res.statusCode).toBe(400);
+    expect(res.body.details).toMatch(/playbook/);
+  });
+
+  test("text that is not yaml is a bad request (400)", async () => {
+    const res = await call({ forms: "roles: [unclosed" });
+    expect(res.statusCode).toBe(400);
   });
 });
