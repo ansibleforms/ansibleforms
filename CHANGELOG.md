@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.0](https://github.com/ansibleforms/ansibleforms/compare/7.3.0...7.4.0) (2026-10-27)
+
+
+### Added
+
+* a backup has its own page, and backups can be downloaded ([#1205](https://github.com/ansibleforms/ansibleforms/issues/1205)) ([7ad8f93](https://github.com/ansibleforms/ansibleforms/commit/7ad8f9337f9dd2becfc914b5226228cdffdd4e8d))
+* refresh buttons turn their arrows and say refreshing while they reload ([#1204](https://github.com/ansibleforms/ansibleforms/issues/1204)) ([f0304d7](https://github.com/ansibleforms/ansibleforms/commit/f0304d74b5f0e6fd0025d199ff12c64ef24616b0))
+* the default badge is dark grey, in the shape of the other row badges ([#1206](https://github.com/ansibleforms/ansibleforms/issues/1206)) ([e102186](https://github.com/ansibleforms/ansibleforms/commit/e1021865aaee4b9fce274720d74d3f1e92c60e26))
+* wizard forms in the chat and through MCP ([#1238](https://github.com/ansibleforms/ansibleforms/issues/1238)) ([a415c22](https://github.com/ansibleforms/ansibleforms/commit/a415c227ea7b4d959626cf54f5ca7891b390e599))
+
+
+### Fixed
+
+* a date picked in the hour the clocks go back is the same moment in summer and in winter ([#1241](https://github.com/ansibleforms/ansibleforms/issues/1241)) ([82c0283](https://github.com/ansibleforms/ansibleforms/commit/82c02830c8b59ecc7171fc34ac49e1028536c43f))
+* a designer save keeps a form that fails validation in its file instead of dropping it ([#1211](https://github.com/ansibleforms/ansibleforms/issues/1211)) ([024914e](https://github.com/ansibleforms/ansibleforms/commit/024914e6dd8bc8bbe3b0402d6c17fc7b5b53fb1a))
+* a designer save refused for a duplicate name or an invalid form answers 409 or 400, not 500 ([#1210](https://github.com/ansibleforms/ansibleforms/issues/1210)) ([e8ea64f](https://github.com/ansibleforms/ansibleforms/commit/e8ea64f485ced8fe1733784a331e58f8ff472e34))
+* a log level of warn logs warnings and errors instead of nothing ([#1199](https://github.com/ansibleforms/ansibleforms/issues/1199)) ([f41175b](https://github.com/ansibleforms/ansibleforms/commit/f41175b9a16f83421236c062f6d6f57f80998009))
+* a manual pull waits for unpushed changes, as the scheduled pull does ([#1212](https://github.com/ansibleforms/ansibleforms/issues/1212)) ([331534a](https://github.com/ansibleforms/ansibleforms/commit/331534a231eac926b1db32b8ead13ddd360ffdef))
+* a role's secret store limit also applies to fnCredentials ([#1194](https://github.com/ansibleforms/ansibleforms/issues/1194)) ([b8147dd](https://github.com/ansibleforms/ansibleforms/commit/b8147dd28b4ac9e811f240a1bc266bec463df6ab))
+* a socket RTE's running jobs survive a connection drop for RTE_QUEUE_MINUTES ([#1198](https://github.com/ansibleforms/ansibleforms/issues/1198)) ([3bcaef1](https://github.com/ansibleforms/ansibleforms/commit/3bcaef1acb5f0f90fc19459196f34991841636c9))
+* an RTE that cannot reach the app says why at the default log level ([#1197](https://github.com/ansibleforms/ansibleforms/issues/1197)) ([93685d6](https://github.com/ansibleforms/ansibleforms/commit/93685d6110966d5410594da467bbbd6621c3763a))
+* deletes, rejects and list actions confirm in the app's own modal, not the browser's ([#1202](https://github.com/ansibleforms/ansibleforms/issues/1202)) ([13dde7d](https://github.com/ansibleforms/ansibleforms/commit/13dde7defbdecc63430f0d012b81ed092fe12554))
+* test connection on an RTE runner shows its release and Ansible version ([#1200](https://github.com/ansibleforms/ansibleforms/issues/1200)) ([215ad0b](https://github.com/ansibleforms/ansibleforms/commit/215ad0b0df5a0d01b6d8b23d264edb7367383b72))
+* the disclaimer's ask again says users accept at their next action, in the app's own modal ([#1201](https://github.com/ansibleforms/ansibleforms/issues/1201)) ([9304945](https://github.com/ansibleforms/ansibleforms/commit/9304945913334aae595c63606ef6c10ee6ebb111))
+* the jobs list has select all, a count and clear selection, as the other tables ([#1203](https://github.com/ansibleforms/ansibleforms/issues/1203)) ([0516c16](https://github.com/ansibleforms/ansibleforms/commit/0516c16f5540fa87c078fe9df47d58002ea889f1))
+* turning the config seed off releases the rows it managed ([#1196](https://github.com/ansibleforms/ansibleforms/issues/1196)) ([d9b1960](https://github.com/ansibleforms/ansibleforms/commit/d9b196065e2c77096ffdbfeef26ab1b6e1fbfc82))
+
 ## [7.3.0](https://github.com/ansibleforms/ansibleforms/compare/7.2.0...7.3.0) (2026-10-18)
 
 
