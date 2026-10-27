@@ -134,7 +134,10 @@ only, so a stray `feat:` cannot make a 6.6.0.
 | GitHub App `ansibleforms-release` (contents and pull requests: read and write) | installed on this repository, on `ansibleforms/website` (the release rebuilds the site), on `ansibleforms/helm-charts` (the release moves the chart's default image), on `ansibleforms/installer` (the release releases the installer) and on `ansibleforms/docker` (the release tags its setup) | release.yml |
 | `RELEASE_APP_CLIENT_ID` | repository variable: the App's client ID | release.yml |
 | `RELEASE_APP_PRIVATE_KEY` | repository secret | release.yml |
+| `RELEASE_APP_PRIVATE_KEY` (again) | Dependabot secret: a Dependabot run sees no Actions secrets | dependabot-automerge.yml |
 | ruleset on `main` and `release/*` | pull request required, squash only, required checks, no force push | everything |
 
 The App token is needed because a pull request opened with the default `GITHUB_TOKEN`
 starts no workflows, so the release pull request would never get its required checks.
+For the same reason dependabot-automerge.yml turns on auto-merge with it: a merge made with
+`GITHUB_TOKEN` would start neither CI on main nor release-please.

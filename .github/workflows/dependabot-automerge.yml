@@ -1,0 +1,45 @@
+name: Dependabot auto-merge
+
+# A Dependabot minor or patch bump of an npm package turns on auto-merge (squash), so it
+# merges itself once every required check of the main ruleset is green. Majors never get
+# here : dependabot.yml ignores them, they are done by hand.
+#
+# Only npm : the client, server, database and browser jobs that test it are required checks.
+# A pip or docker bump is only tested by "Build image", which runs on docker changes alone
+# and so cannot be required - those stay a manual merge (boto3 once broke the RTE full image).
+#
+# Auto-merge is turned on with the token of the ansibleforms-release App, not GITHUB_TOKEN : a
+# merge made with GITHUB_TOKEN starts no workflow, so CI on main and release-please would not
+# run after it. A Dependabot run only sees Dependabot secrets, so RELEASE_APP_PRIVATE_KEY is
+# also under Settings > Secrets and variables > Dependabot.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main, 'release/**']
+
+permissions:
+  contents: read
+
+jobs:
+  automerge:
+    name: Auto-merge
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - uses: dependabot/fetch-metadata@v3
+        id: meta
+
+      - uses: actions/create-github-app-token@v3
+        id: app
+        if: steps.meta.outputs.package-ecosystem == 'npm_and_yarn' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Turn on auto-merge
+        if: steps.app.outcome == 'success'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
