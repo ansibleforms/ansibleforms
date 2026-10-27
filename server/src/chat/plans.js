@@ -44,6 +44,8 @@ export function createPlan(p, now = Date.now()) {
     sessionId: p.sessionId,
     form: p.form,
     values: p.values || {},
+    // a wizard's optional steps skipped
+    skipped: p.skipped || {},
     payloadHash: p.payloadHash,
     formFingerprint: p.formFingerprint || '',
     summary: p.summary || p.form,

@@ -3312,7 +3312,8 @@
 
           The assistant fills the form in with the user, through the same form engine as the
           browser, and never launches it: the user clicks Launch on the exact payload
-          the chat showed. Not for wizard forms.
+          the chat showed. A wizard form is filled in step by step, as the browser walks it;
+          an optional step the user gives no answer for is skipped.
         examples:
           - name: A form the chat may offer
             code: |

@@ -16,7 +16,7 @@ const { guardLaunch, launchValidationMode, filterRawFormDataOf } = await import(
 const Form = (await import("../src/models/form.model.js")).default;
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const logger = (await import("./__mocks__/logger.js")).default;
-const { validateLaunch, verifyUploads, compareExtravars, describeLaunchErrors, describeRowErrors } = await import("../src/lib/launchValidation.js");
+const { validateLaunch, resolveWizard, verifyUploads, compareExtravars, describeLaunchErrors, describeRowErrors } = await import("../src/lib/launchValidation.js");
 const { evalSandbox } = await import("../src/lib/formEngine/node/sandbox.js");
 
 const user = { username: "bob", roles: ["default"], options: {} };
@@ -243,6 +243,23 @@ describe("wizard forms", () => {
     appConfig.launchValidation = "log";
     await guardLaunch({ ...args(wizardRaw({ basics: { name: "prod-web", large: false } }), { vm: { name: "other", large: false } }), formObj: wizardForm });
     expect(warned.join("\n")).toMatch(/differ.*vm/);
+  });
+});
+
+describe("resolveWizard", () => {
+  test("a step's password from its own values, every step's errors at once, named <step>.<field>", async () => {
+    const r = await resolveWizard({ formConfig, formObj: wizardForm, user, services, passwordFrom: "drafts",
+      drafts: { basics: { name: "test-web", secret: "s" }, disk: { size: 500 } } });
+    expect(r.complete).toBe(false);
+    expect(Object.keys(r.validationErrors).sort()).toEqual(["basics.name", "disk.size"]);
+    expect(r.missing).toContain("extra.note");
+    expect(r.fields.find((f) => f.name === "basics.secret").step).toBe("basics");
+    expect(r.payload).toBeUndefined();
+    const ok = await resolveWizard({ formConfig, formObj: wizardForm, user, services, passwordFrom: "drafts",
+      drafts: { basics: { name: "prod-web", secret: "s" }, disk: { size: 50 } }, skipped: { extra: true } });
+    expect(ok.complete).toBe(true);
+    expect(ok.steps.map((s) => s.complete || s.skipped)).toEqual([true, true, true]);
+    expect(ok.payload.extravars).toEqual({ vm: { name: "prod-web", large: true, secret: "s", size: 50 } });
   });
 });
 
