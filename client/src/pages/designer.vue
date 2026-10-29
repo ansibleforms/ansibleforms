@@ -46,6 +46,7 @@ import {
 import { formPath } from '@/lib/formsPath';
 import { skippedPulls } from '@/lib/pullResults';
 import { EVERYONE_ROLES } from '@/composables/useRoleSupport';
+import { mayOpen } from '@/lib/routePermission';
 
 dayjs.extend(relativeTime);
 
@@ -193,6 +194,12 @@ function canDesignFiles(kind) {
 // a new inventory is a new repository : the repositories' New dialog (Settings > Repositories),
 // used for inventories - ticked, and its usage not to change here
 const inventoryRepoDialog = ref(null);
+// a new inventory needs the inventories' role option AND the repositories (the connections
+// settings, the route's own option) : without them the dialog's lists answer 403, so it is
+// neither mounted nor offered ; the existing inventories stay open to edit
+const canCreateInventories = computed(
+  () => canDesignFiles('inventories') && mayOpen('/settings/repositories', store.profile?.options),
+);
 const inventoryRepoSettings = computed(() => {
   const repositories = getSettings(t).repositories;
   return {
@@ -3708,7 +3715,7 @@ const toolbarActions = computed(() => {
       {
         key: 'newFile',
         run: () => f.newFile(),
-        disabled: f.busy || readOnly,
+        disabled: f.busy || readOnly || (inventories && !canCreateInventories.value),
         title: inventories ? t('designer.files.newInventory') : workflows ? t('designer.files.newWorkflow') : undefined,
       },
       {
@@ -5187,11 +5194,13 @@ onBeforeUnmount(() => {
                     :editorStyle="editorStyle('100%')"
                     @init="onEditorInit"
                     @reveal="showView('yaml')"
+                    :canCreateInventories="canCreateInventories"
                     @newInventory="newInventory"
                   />
-                  <!-- a new inventory : the repositories' New dialog, used for inventories -->
+                  <!-- a new inventory : the repositories' New dialog, used for inventories (only for a user
+                       who may create a repository) -->
                   <AppAdminMulti
-                    v-if="currentTab === 'Inventories'"
+                    v-if="currentTab === 'Inventories' && canCreateInventories"
                     ref="inventoryRepoDialog"
                     :apiVersion="2"
                     :settings="inventoryRepoSettings"
