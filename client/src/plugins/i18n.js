@@ -43,6 +43,14 @@ const i18n = createI18n({
 /**
  * Set the default language from server config (called after app/config fetch).
  * Only applies if the user has not explicitly chosen a language (no cookie).
+ *
+ * The language of a page is therefore, in this order : the af_language cookie (picked in the
+ * header or on the profile page), the instance's default (DEFAULT_LANGUAGE, else Settings, read
+ * by State.applyAppConfig on every page, the sign-in page too), then English.
+ *
+ * Args:
+ *   defaultLang (string): the instance's default language code ; an unknown or empty one
+ *     changes nothing.
  */
 export function applyDefaultLanguage(defaultLang) {
   if (!Helpers.getCookie('af_language') && defaultLang && Object.keys(messages).includes(defaultLang)) {

@@ -4,8 +4,12 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { toast } from 'vue-sonner';
 import State from '@/lib/State';
+import { useI18n } from 'vue-i18n';
 
 const store = useAppStore();
+// the language of this browser (the af_language cookie), else the instance's default, read below
+// with the app's config : the database is not there yet, so nobody is signed in
+const { t } = useI18n();
 
 defineEmits(['recheckSchema']);
 
@@ -28,7 +32,7 @@ const isSchemaReady = computed(() => {
 
 async function create() {
   loading.value = true;
-  toast.info('Creating schema and tables...');
+  toast.info(t('schema.creating'));
   try {
     const createResult = await axios.post(`/api/v2/schema`, {});
     toast.success(createResult.data.message);
@@ -67,6 +71,9 @@ function startCountdown() {
 onBeforeUnmount(stopCountdown);
 
 onMounted(async () => {
+  // the instance's default language (DEFAULT_LANGUAGE) and name : the server answers without its
+  // database, from its environment
+  State.loadAppConfig();
   try {
     const result = await State.checkDatabase();
     if (result) {
@@ -85,8 +92,8 @@ onMounted(async () => {
       <div v-if="!loading" class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
           <div v-if="isSchemaReady" class="alert alert-success">
-            <h5>Database is ready!</h5>
-            <p class="mb-0">Redirecting to home in {{ countdown }} seconds...</p>
+            <h5>{{ t('schema.ready') }}</h5>
+            <p class="mb-0">{{ t('schema.redirecting', { n: countdown }, countdown) }}</p>
           </div>
           <div class="alert alert-danger" v-if="error != ''" v-text="error"></div>
           <div class="alert alert-success" v-if="success" v-html="success"></div>
@@ -94,46 +101,39 @@ onMounted(async () => {
           <div v-if="error != 'Schema creation is disabled'">
             <form action="" class="card p-4 mb-3" v-if="failed && !success">
               <div class="mb-3">
-                If this is the first time setup and you don't have your own schema and tables.<br /><br />
-                Would you like me to try and create the schema and tables ?<br />
-                I would create the following : <br /><br />
+                <p>{{ t('schema.firstSetup') }}</p>
+                <p>{{ t('schema.willCreate') }}</p>
                 <table class="table table-bordered">
                   <tbody>
                     <tr>
-                      <th>Databaseschema</th>
+                      <th>{{ t('schema.databaseSchema') }}</th>
                       <td>AnsibleForms</td>
                     </tr>
                     <tr>
-                      <th>Tables</th>
-                      <td>All required tables</td>
+                      <th>{{ t('schema.tables') }}</th>
+                      <td>{{ t('schema.allTables') }}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <div class="mb-3">
                 <button type="button" class="btn btn-success" @click="create()">
-                  <span class="me-2"><font-awesome-icon icon="magic" /></span><span>Create</span>
+                  <span class="me-2"><font-awesome-icon icon="magic" /></span><span>{{ t('common.create') }}</span>
                 </button>
               </div>
             </form>
             <form action="" class="card p-4 mb-3" v-if="failed && success">
-              <div>
-                It appears that you have an unuseable schema. Part of the database is present, and part is missing.<br />
-                Please contact your database or application administrator to either restore from a backup, or create the
-                missing tables or remove the database so I can create it for you. When using K8s, it's best that you
-                don't create a default database. For now there is nothing I can do for you, until the schema and tables
-                are in a consistent state.
-              </div>
+              <div>{{ t('schema.partial') }}</div>
             </form>
           </div>
           <div v-else class="card p-4 mb-3">
             <div>
-              Schema creation is disabled by your administrator.<br />
-              Please contact your database or application administrator to create the schema and tables.
+              {{ t('schema.disabled') }}<br />
+              {{ t('schema.contactAdmin') }}
             </div>
           </div>
           <div v-if="error == 'FATAL ERROR'" class="card p-4 mb-3">
-            <div>Something went wrong. Most likely the database is simply not reachable.</div>
+            <div>{{ t('schema.unreachable') }}</div>
           </div>
         </div>
       </div>

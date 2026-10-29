@@ -14,6 +14,7 @@
 
 import { computed } from 'vue';
 import { useAppStore } from '@/stores/app';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
   currentTheme: {
@@ -27,6 +28,8 @@ const props = defineProps({
 // light theme's logo, so it must not stand in for the dark and color themes' own logos (the
 // color theme's has white lettering for its colored header)
 const store = useAppStore();
+// the toggler's label, read out by a screen reader
+const { t } = useI18n();
 const customLogo = computed(() => (store.logoIsDefault ? null : store.customLogo));
 // the theme the logo is for : a colour hovered shows the colour theme's for that moment
 const logoTheme = computed(() => store.themePreview || props.currentTheme);
@@ -50,7 +53,7 @@ const logoTheme = computed(() => store.themePreview || props.currentTheme);
         data-bs-target="#navbarCollapse"
         aria-controls="navbarCollapse"
         aria-expanded="false"
-        aria-label="Toggle navigation"
+        :aria-label="t('common.toggleNavigation')"
       >
         <span class="navbar-toggler-icon"></span>
       </button>

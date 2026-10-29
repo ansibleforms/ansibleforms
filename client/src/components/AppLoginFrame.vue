@@ -21,10 +21,12 @@
 import { ref } from 'vue';
 import { useAppStore } from '@/stores/app';
 import Theme from '@/lib/Theme';
+import { useI18n } from 'vue-i18n';
 
 // INIT
 
 const store = useAppStore();
+const { t } = useI18n();
 
 // PROPS
 
@@ -57,7 +59,7 @@ const currentTheme = ref(Theme.load());
           <span v-if="store.appName" class="login-app-name">{{ store.appName }}</span>
           <AppLabels />
         </div>
-        <h5 class="card-title login-title">Please sign in</h5>
+        <h5 class="card-title login-title">{{ t('login.pleaseSignIn') }}</h5>
         <slot></slot>
       </div>
     </div>

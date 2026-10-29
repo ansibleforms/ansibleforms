@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { withoutComments } from './vueSource.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
@@ -144,20 +145,7 @@ describe('keys built by concatenation are covered too', () => {
 // once" under the Run later picker).
 describe('the form page panels carry no hard-coded English', () => {
   const src = readFileSync(path.join(root, 'src/pages/form.vue'), 'utf8');
-  // only the template is rendered text; comments are not shown to the user, so each one is cut
-  // out from its opening to its closing mark (an unclosed one, to the end)
-  const withoutComments = (text) => {
-    let out = '';
-    let at = 0;
-    for (;;) {
-      const open = text.indexOf('<!--', at);
-      if (open < 0) return out + text.slice(at);
-      out += text.slice(at, open);
-      const close = text.indexOf('-->', open + 4);
-      if (close < 0) return out;
-      at = close + 3;
-    }
-  };
+  // only the template is rendered text; comments are not shown to the user
   const template = withoutComments(src.slice(src.indexOf('<template>'), src.lastIndexOf('</template>')));
   // the panels, from the schedule off-canvas to the end of the store off-canvas
   const start = template.indexOf(':show="showScheduleOffcanvas"');

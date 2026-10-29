@@ -28,8 +28,11 @@
 
 import { useTemplateRef, computed, toRaw } from 'vue';
 import Helpers from '@/lib/Helpers';
+import { useI18n } from 'vue-i18n';
 
 // INIT
+
+const { t } = useI18n();
 
 const emit = defineEmits(['update:modelValue', 'update:preview', 'isSelected', 'focusset', 'reset']);
 const queryfilterRef = useTemplateRef('queryfilterRef');
@@ -532,8 +535,8 @@ onMounted(() => {
         />
       </div>
     </div>
-    <p v-if="values.length == 0" class="pl-3">No data</p>
-    <p v-if="values.length > 0 && filtered.length == 0" class="ps-3">Filter returns no results</p>
+    <p v-if="values.length == 0" class="pl-3">{{ t('common.noData') }}</p>
+    <p v-if="values.length > 0 && filtered.length == 0" class="ps-3">{{ t('common.noFilterMatch') }}</p>
     <div class="table-container">
       <table class="table table-hover mb-0">
         <thead v-if="labels.length > 1">
@@ -559,7 +562,7 @@ onMounted(() => {
               />
               <font-awesome-icon v-show="!checkAll" @click="disabled ? null : multicheck()" :icon="['far', 'square']" />
             </th>
-            <th>Name</th>
+            <th>{{ t('common.name') }}</th>
           </tr>
         </thead>
         <tbody>

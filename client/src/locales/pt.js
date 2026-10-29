@@ -772,6 +772,16 @@ export default {
       'Esta página ainda executa uma build mais antiga do que a do servidor. Recarregue a página para obter a nova versão.',
   },
   common: {
+    help: 'Ajuda',
+    name: 'Nome',
+    orDivider: 'ou',
+    noFilterMatch: 'Nenhuma linha corresponde ao filtro',
+    toggleNavigation: 'Mostrar ou ocultar a navegação',
+    toggleDropdown: 'Mostrar ou ocultar o menu',
+    switchTheme: 'Mudar o tema',
+    pagination: 'Paginação',
+    goToPage: 'Ir para a página {n}',
+    searchPlaceholder: 'Pesquisar...',
     edit: 'Editar',
     open: 'Abrir',
     abort: 'Interromper',
@@ -882,6 +892,13 @@ export default {
       'O pedido era demasiado grande para o servidor (HTTP 431). Se inicia sessão com início de sessão único e pertence a muitos grupos, peça a um administrador que defina um filtro de grupos no fornecedor.',
   },
   login: {
+    pleaseSignIn: 'Inicie sessão',
+    signingIn: 'A iniciar sessão…',
+    withMicrosoft: 'Iniciar sessão com a Microsoft',
+    withOidc: 'Iniciar sessão com OpenID Connect',
+    ssoFailed: 'O início de sessão com o fornecedor de identidade falhou',
+    settingsFailed: 'Não foi possível ler as definições de início de sessão',
+    formInvalid: 'Introduza um nome de utilizador e uma palavra-passe',
     title: 'Iniciar sessão',
     username: 'Nome de utilizador',
     password: 'Palavra-passe',
@@ -2288,6 +2305,8 @@ export default {
     hasWarnings: 'Esta configuração tem',
   },
   designer: {
+    overlayIconPlaceholder: 'p. ex. check, bolt',
+    overlayTextPlaceholder: 'p. ex. NOVO',
     pasteNotAllowed: 'O navegador não permitiu ler a área de transferência. Use Ctrl+V no editor.',
     lockReleasedBy:
       'O seu bloqueio do designer foi libertado por {name}. As alterações não guardadas já não podem ser guardadas.',
@@ -3143,5 +3162,36 @@ export default {
     clearHint: 'Esvazia a vista, não o registo: só se mostram as linhas escritas a partir de agora',
     cleared: 'Limpo: as novas linhas aparecem aqui à medida que são escritas.',
     download: 'Transferir',
+  },
+  changePassword: {
+    title: 'Altere a sua palavra-passe',
+    defaultPassword: 'Iniciou sessão com a palavra-passe predefinida, que é pública. Escolha outra para continuar.',
+    currentRequired: 'Introduza a sua palavra-passe atual',
+    newRequired: 'Introduza uma nova palavra-passe',
+    invalid: 'Preencha todos os campos, com a mesma nova palavra-passe duas vezes',
+  },
+  schema: {
+    ready: 'A base de dados está pronta!',
+    redirecting:
+      'A redirecionar para o início dentro de {n} segundo... | A redirecionar para o início dentro de {n} segundos...',
+    creating: 'A criar o esquema e as tabelas...',
+    firstSetup:
+      'Se esta é uma primeira instalação e ainda não tem o seu próprio esquema nem tabelas, o AnsibleForms pode criá-los.',
+    willCreate: 'Será criado o seguinte:',
+    databaseSchema: 'Esquema da base de dados',
+    tables: 'Tabelas',
+    allTables: 'Todas as tabelas necessárias',
+    partial:
+      'O seu esquema parece inutilizável: uma parte da base de dados existe e outra falta. Contacte o administrador da base de dados ou da aplicação para restaurar uma cópia de segurança, criar as tabelas em falta ou remover a base de dados para que o AnsibleForms a possa criar. Com Kubernetes, é melhor não criar uma base de dados predefinida. Enquanto o esquema e as tabelas não estiverem num estado coerente, o AnsibleForms não pode continuar.',
+    disabled: 'A criação do esquema foi desativada pelo seu administrador.',
+    contactAdmin: 'Contacte o administrador da base de dados ou da aplicação para criar o esquema e as tabelas.',
+    unreachable: 'Algo correu mal. O mais provável é que a base de dados simplesmente não esteja acessível.',
+  },
+  apiDocs: {
+    title: 'Documentação da API',
+    welcome: 'Bem-vindo ao portal de documentação da API do AnsibleForms.',
+    version: 'A API REST é a {version} (a API v1 foi removida na 7.0.0).',
+    endpoint: 'Endpoint da documentação da API:',
+    hint: 'Clique na ligação acima ou introduza-a no navegador para abrir a interface interativa Swagger UI.',
   },
 };

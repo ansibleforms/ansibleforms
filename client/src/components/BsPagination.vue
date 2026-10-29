@@ -241,7 +241,7 @@ watch(
 <template>
   <!-- the page size, then the page boxes : the size outside the list, so Previous is its first
        box and gets the rounded left corners, as Next the right ones -->
-  <nav ref="navEl" aria-label="Pagination" class="af-pager-nav">
+  <nav ref="navEl" :aria-label="t('common.pagination')" class="af-pager-nav">
     <select class="form-select af-page-size" v-model="pageSize" :aria-label="t('common.pageSize')" @change="pickSize">
       <option v-for="size in SIZES" :key="size" :value="size">{{ size }}</option>
     </select>
@@ -253,7 +253,7 @@ watch(
         >
       </li>
       <li role="button" class="page-item" :class="{ active: 1 == page }">
-        <a class="page-link" v-if="showFirstPage" @click="setPage(1)" aria-label="Goto page 1">1</a>
+        <a class="page-link" v-if="showFirstPage" @click="setPage(1)" :aria-label="t('common.goToPage', { n: 1 })">1</a>
       </li>
       <li class="page-item" v-if="showFirstEllipsis">
         <span class="page-link">&hellip;</span>
@@ -265,7 +265,9 @@ watch(
         v-for="pageNumber in displayedPages"
         :key="pageNumber"
       >
-        <a class="page-link" @click="setPage(pageNumber)" :aria-label="'Goto page ' + pageNumber">{{ pageNumber }}</a>
+        <a class="page-link" @click="setPage(pageNumber)" :aria-label="t('common.goToPage', { n: pageNumber })">{{
+          pageNumber
+        }}</a>
       </li>
       <li class="page-item" v-if="showLastEllipsis">
         <span class="page-link">&hellip;</span>
@@ -275,7 +277,7 @@ watch(
           class="page-link"
           v-if="showLastPage"
           @click="setPage(pages.length)"
-          :aria-label="'Goto page ' + pages.length"
+          :aria-label="t('common.goToPage', { n: pages.length })"
           >{{ pages.length }}</a
         >
       </li>

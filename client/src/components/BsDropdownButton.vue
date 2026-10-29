@@ -24,11 +24,13 @@
 
 import { computed } from 'vue';
 import { useAppStore } from '@/stores/app';
+import { useI18n } from 'vue-i18n';
 
 // INIT
 
 const emit = defineEmits(['click', 'action']);
 const store = useAppStore();
+const { t } = useI18n();
 
 // PROPS
 
@@ -114,7 +116,7 @@ function handleActionClick(actionKey) {
       aria-expanded="false"
       style="flex: 0 0 auto"
     >
-      <span class="visually-hidden">Toggle Dropdown</span>
+      <span class="visually-hidden">{{ t('common.toggleDropdown') }}</span>
     </button>
 
     <!-- Dropdown menu -->

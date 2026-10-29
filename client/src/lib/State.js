@@ -6,7 +6,7 @@ import Profile from '@/lib/Profile';
 import Navigate from '@/lib/Navigate';
 import Time from '@/lib/Time';
 import { ssoSettled } from '@/lib/ssoReturn';
-import i18n from '@/plugins/i18n';
+import i18n, { applyDefaultLanguage } from '@/plugins/i18n';
 
 // the approvals count being read (refreshApprovals), shared while it is in flight
 let approvalsInFlight = null;
@@ -108,6 +108,11 @@ var State = {
     if (!Time.hasOwnPreference()) store.timezone = data.timezone || 'UTC';
     // the date format for everyone : only while this browser has not chosen its own
     if (!Time.hasOwnDateFormat()) store.dateFormat = data.dateFormat || 'YYYY-MM-DD';
+    // the language for everyone (DEFAULT_LANGUAGE, Settings) : only while this browser has not
+    // chosen its own (the af_language cookie). Here, so the pages shown before anyone signs in
+    // (the login, the change of a default password, the database setup) read it too, not only
+    // the pages with the header
+    applyDefaultLanguage(data.defaultLanguage);
     store.appConfigLoaded = true;
     document.title = data.appName || 'AnsibleForms';
   },

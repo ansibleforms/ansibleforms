@@ -12,11 +12,15 @@ import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { rememberedSso, rememberSso } from '@/lib/loginSso';
+import { useI18n } from 'vue-i18n';
 
 // plugins
 
 const route = useRoute();
 const router = useRouter();
+// the language of this browser (the af_language cookie), else the instance's default : nobody is
+// signed in yet, so no profile says otherwise (plugins/i18n.js, State.applyAppConfig)
+const { t } = useI18n();
 
 // vuelidate
 const rules = {
@@ -92,7 +96,7 @@ async function tokenLogin(token, type = 'azuread') {
     const result = await axios.post(`/api/v2/auth/${loginProvider}/login`, { token });
     processLogin(result.data);
   } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err, 'Identity Provider Login failed'));
+    toast.error(Helpers.parseAxiosResponseError(err, t('login.ssoFailed')));
   }
 }
 async function getSettings(token) {
@@ -127,7 +131,7 @@ async function getSettings(token) {
         getGroupsAndLogin(token, `${oidcIssuer.value}/protocol/openid-connect/userinfo`, 'oidc');
     }
   } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err, 'Failed to get settings'));
+    toast.error(Helpers.parseAxiosResponseError(err, t('login.settingsFailed')));
   } finally {
     settingsRead.value = true;
   }
@@ -187,10 +191,10 @@ async function login() {
       processLogin(result.data);
     } catch (err) {
       TokenStorage.clear();
-      toast.error(Helpers.parseAxiosResponseError(err, 'Login failed'));
+      toast.error(Helpers.parseAxiosResponseError(err, t('login.failed')));
     }
   } else {
-    toast.error('Form is not valid');
+    toast.error(t('login.formInvalid'));
     $v.value.user.$touch();
   }
 }
@@ -225,8 +229,8 @@ onMounted(() => {
     <BsInput
       v-model="user.username"
       @keyup_enter="login()"
-      label="Username"
-      placeholder="Username"
+      :label="t('login.username')"
+      :placeholder="t('login.username')"
       icon="user"
       :hasError="$v.user.username.$invalid && $v.user.username.$dirty"
       :errors="$v.user.username.$errors"
@@ -235,8 +239,8 @@ onMounted(() => {
       v-model="user.password"
       @keyup_enter="login()"
       type="password"
-      label="Password"
-      placeholder="Password"
+      :label="t('login.password')"
+      :placeholder="t('login.password')"
       icon="lock"
       :hasError="$v.user.password.$invalid && $v.user.password.$dirty"
       :errors="$v.user.password.$errors"
@@ -245,20 +249,22 @@ onMounted(() => {
          Signing in… -->
     <button class="btn btn-primary w-100 py-2 login-submit" @click="login()">
       <template v-if="ssoPending || loading">
-        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Signing in…
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{{ t('login.signingIn') }}
       </template>
-      <template v-else>Sign in</template>
+      <template v-else>{{ t('login.submit') }}</template>
     </button>
     <!-- single sign-on : under a divider, its providers in a centred row of equal buttons -->
     <template v-if="entraIdEnabled || oidcEnabled">
-      <div class="login-divider"><span>or</span></div>
+      <div class="login-divider">
+        <span>{{ t('common.orDivider') }}</span>
+      </div>
       <div class="login-sso">
         <button
           v-if="entraIdEnabled"
           type="button"
           class="login-sso-btn"
-          title="Sign in with Microsoft"
-          aria-label="Sign in with Microsoft"
+          :title="t('login.withMicrosoft')"
+          :aria-label="t('login.withMicrosoft')"
           @click="authEntraId()"
         >
           <!-- the Microsoft logo, as Microsoft's sign-in buttons carry it (its branding
@@ -274,8 +280,8 @@ onMounted(() => {
           v-if="oidcEnabled"
           type="button"
           class="login-sso-btn"
-          title="Sign in with OpenID Connect"
-          aria-label="Sign in with OpenID Connect"
+          :title="t('login.withOidc')"
+          :aria-label="t('login.withOidc')"
           @click="authOidc()"
         >
           <!-- the OpenID mark in its colours : the orange I, the grey swoosh and arrow -->

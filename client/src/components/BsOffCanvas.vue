@@ -98,7 +98,7 @@ function backdropClick(e) {
           <h5 class="modal-title" id="offcanvasLabel">
             <span v-if="icon" class="me-2"><FaIcon :icon="icon" /></span>{{ title }}
           </h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="close"></button>
+          <button type="button" class="btn-close" :aria-label="t('common.close')" @click="close"></button>
         </div>
         <!-- above the content, out of its scroll : the scrollbar starts under it -->
         <div v-if="$slots.top" class="af-modal-top">

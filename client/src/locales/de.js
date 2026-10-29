@@ -773,6 +773,16 @@ export default {
       'Diese Seite läuft noch mit einem älteren Build als der Server. Laden Sie die Seite neu, um die neue Version zu erhalten.',
   },
   common: {
+    help: 'Hilfe',
+    name: 'Name',
+    orDivider: 'oder',
+    noFilterMatch: 'Keine Zeile entspricht dem Filter',
+    toggleNavigation: 'Navigation ein-/ausblenden',
+    toggleDropdown: 'Menü ein-/ausblenden',
+    switchTheme: 'Design wechseln',
+    pagination: 'Seitennavigation',
+    goToPage: 'Gehe zu Seite {n}',
+    searchPlaceholder: 'Suchen...',
     edit: 'Bearbeiten',
     open: 'Öffnen',
     abort: 'Abbrechen',
@@ -883,6 +893,13 @@ export default {
       'Die Anfrage war für den Server zu groß (HTTP 431). Wenn Sie sich per Single Sign-on anmelden und vielen Gruppen angehören, bitten Sie einen Administrator, beim Anbieter einen Gruppenfilter festzulegen.',
   },
   login: {
+    pleaseSignIn: 'Bitte melden Sie sich an',
+    signingIn: 'Anmeldung läuft…',
+    withMicrosoft: 'Mit Microsoft anmelden',
+    withOidc: 'Mit OpenID Connect anmelden',
+    ssoFailed: 'Die Anmeldung beim Identitätsanbieter ist fehlgeschlagen',
+    settingsFailed: 'Die Anmeldeeinstellungen konnten nicht gelesen werden',
+    formInvalid: 'Geben Sie einen Benutzernamen und ein Passwort ein',
     title: 'Anmeldung',
     username: 'Benutzername',
     password: 'Passwort',
@@ -2301,6 +2318,8 @@ export default {
     hasWarnings: 'Diese Konfiguration hat',
   },
   designer: {
+    overlayIconPlaceholder: 'z. B. check, bolt',
+    overlayTextPlaceholder: 'z. B. NEU',
     pasteNotAllowed:
       'Der Browser hat das Lesen der Zwischenablage nicht erlaubt. Verwenden Sie stattdessen Strg+V im Editor.',
     lockReleasedBy:
@@ -3163,5 +3182,37 @@ export default {
     clearHint: 'Leert die Ansicht, nicht das Log: nur die ab jetzt geschriebenen Zeilen werden angezeigt',
     cleared: 'Geleert: neue Zeilen erscheinen hier, sobald sie geschrieben werden.',
     download: 'Herunterladen',
+  },
+  changePassword: {
+    title: 'Ändern Sie Ihr Passwort',
+    defaultPassword:
+      'Sie haben sich mit dem Standardpasswort angemeldet, das öffentlich bekannt ist. Wählen Sie ein anderes, um fortzufahren.',
+    currentRequired: 'Geben Sie Ihr aktuelles Passwort ein',
+    newRequired: 'Geben Sie ein neues Passwort ein',
+    invalid: 'Füllen Sie alle Felder aus, mit zweimal demselben neuen Passwort',
+  },
+  schema: {
+    ready: 'Die Datenbank ist bereit!',
+    redirecting: 'Weiterleitung zur Startseite in {n} Sekunde... | Weiterleitung zur Startseite in {n} Sekunden...',
+    creating: 'Schema und Tabellen werden erstellt...',
+    firstSetup:
+      'Wenn dies eine Ersteinrichtung ist und Sie noch kein eigenes Schema und keine Tabellen haben, kann AnsibleForms sie erstellen.',
+    willCreate: 'Es wird Folgendes erstellt:',
+    databaseSchema: 'Datenbankschema',
+    tables: 'Tabellen',
+    allTables: 'Alle benötigten Tabellen',
+    partial:
+      'Ihr Schema scheint unbrauchbar zu sein: Ein Teil der Datenbank ist vorhanden, ein Teil fehlt. Wenden Sie sich an Ihren Datenbank- oder Anwendungsadministrator, um aus einer Sicherung wiederherzustellen, die fehlenden Tabellen zu erstellen oder die Datenbank zu entfernen, damit AnsibleForms sie erstellen kann. Unter Kubernetes legen Sie am besten keine Standarddatenbank an. Solange Schema und Tabellen nicht in einem konsistenten Zustand sind, kann AnsibleForms nicht fortfahren.',
+    disabled: 'Die Schemaerstellung wurde von Ihrem Administrator deaktiviert.',
+    contactAdmin:
+      'Wenden Sie sich an Ihren Datenbank- oder Anwendungsadministrator, um das Schema und die Tabellen zu erstellen.',
+    unreachable: 'Etwas ist schiefgelaufen. Höchstwahrscheinlich ist die Datenbank einfach nicht erreichbar.',
+  },
+  apiDocs: {
+    title: 'API-Dokumentation',
+    welcome: 'Willkommen im Portal der AnsibleForms-API-Dokumentation.',
+    version: 'Die REST-API ist {version} (API v1 wurde in 7.0.0 entfernt).',
+    endpoint: 'Endpunkt der API-Dokumentation:',
+    hint: 'Klicken Sie auf den Link oben oder geben Sie ihn im Browser ein, um die interaktive Swagger UI zu öffnen.',
   },
 };

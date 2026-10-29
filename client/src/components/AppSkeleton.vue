@@ -266,7 +266,9 @@ const inline = computed(() => ['inline', 'badge'].includes(props.shape));
       <div class="af-sk af-sk-login-field"></div>
       <div class="af-sk af-sk-login-button"></div>
       <template v-if="count > 0">
-        <div class="af-sk-divider"><span>or</span></div>
+        <div class="af-sk-divider">
+          <span>{{ t('common.orDivider') }}</span>
+        </div>
         <div class="af-sk-sso">
           <div v-for="i in count" :key="i" class="af-sk af-sk-sso-button"></div>
         </div>
@@ -274,7 +276,9 @@ const inline = computed(() => ['inline', 'badge'].includes(props.shape));
     </div>
     <!-- the single sign-on part of the sign-in card : the divider, then the providers' buttons -->
     <div v-else-if="shape === 'sso'">
-      <div class="af-sk-divider"><span>or</span></div>
+      <div class="af-sk-divider">
+        <span>{{ t('common.orDivider') }}</span>
+      </div>
       <div class="af-sk-sso">
         <div v-for="i in count" :key="i" class="af-sk af-sk-sso-button"></div>
       </div>
