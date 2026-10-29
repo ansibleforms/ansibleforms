@@ -48,7 +48,9 @@ const RepoObjects = {
    * refused, nothing changed. Its app-to-git steps (appCreated, appUpdated ...) run under the same
    * claim. A type without a repository, or one not cloned, saves at once. A type whose repository
    * has a file that seems to give its key but cannot be read is refused the same way, nothing
-   * changed (engine.js assertTypeReadable) : its write would give it twice once that file is fixed.
+   * changed (engine.js assertTypeReadable) : its write would give it twice once that file is fixed ;
+   * so is an edit or a delete of an object (before) of such a type (assertLinkedReadable), which the
+   * next pull would undo.
    *
    * Args:
    *   keys (string|string[]): the type(s) the save writes.
@@ -76,9 +78,11 @@ const RepoObjects = {
     }
     // in one order, so two saves never wait for each other's claim
     const repositories = [...names].filter((n) => Engine.cloned(n)).sort();
-    // under the claims : each type's files readable, else refused before anything is saved
-    const checked = () => {
+    // under the claims : each type's files readable - the edited or deleted object's too (before)
+    // - else refused before anything is saved
+    const checked = async () => {
       for (const { desc, active } of types) if (Engine.cloned(active)) Engine.assertTypeReadable(desc, active);
+      await Engine.assertLinkedReadable(before);
       return change();
     };
     const run = (i) => (i < repositories.length ? Engine.withWriteClaim(repositories[i], () => run(i + 1)) : checked());

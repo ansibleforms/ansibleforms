@@ -402,6 +402,30 @@ describe("what a file not read held stays as it is", () => {
     assert.equal(fx.exists("ops", "credentials.yaml"), false);
   });
 
+  test("an edit or a delete of an object while a file of its type cannot be read : refused before anything is saved", async () => {
+    write("ops", "x.yaml", { controller_credentials: [git("a")] });
+    write("ops", "r.yaml", { controller_runners: [] });
+    await sync(credentials);
+    const before = { ...fx.rowNamed("credentials", "a") };
+    write("ops", "x.yaml", "controller_credentials:\n  - name: a\n    user: [broken\n");
+    let saved = false;
+    const save = () =>
+      RepoObjects.holding(
+        [],
+        async () => {
+          saved = true;
+        },
+        before,
+      );
+    await assert.rejects(save(), (e) => e.status === 409 && /x\.yaml/.test(e.message));
+    assert.equal(saved, false);
+    // a file of another type broken : this one's edit goes on
+    write("ops", "x.yaml", { controller_credentials: [git("a")] });
+    write("ops", "r.yaml", "controller_runners:\n  - name: [r\n");
+    await save();
+    assert.equal(saved, true);
+  });
+
   test("a refused entry with no name : the objects of its file whose entries are gone are kept", async () => {
     write("ops", "x.yaml", { controller_credentials: [git("a"), git("b")] });
     write("ops", "y.yaml", { controller_credentials: [git("c")] });

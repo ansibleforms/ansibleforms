@@ -315,6 +315,34 @@ export function assertTypeReadable(desc, name, scan = scanOf(name)) {
 }
 
 /**
+ * Refuses an edit or a delete of an object of a repository while a file of its type there cannot
+ * be read (assertTypeReadable) : saved in the app, the next pull would read that file again and
+ * undo it (an edit lost, a deleted object back). The object's type is the one whose objects have
+ * it (its id and its name, linked to that repository) ; only the types a file that cannot be read
+ * seems to give are looked at.
+ *
+ * Args:
+ *   before (object|null): the object as it was (its id, name, repository and file).
+ *
+ * Raises:
+ *   Errors.ConflictError: a file of its type in its repository cannot be read, named.
+ */
+export async function assertLinkedReadable(before) {
+  const repository = before?.repository;
+  if (!repository || !before.repo_file || !cloned(repository)) return;
+  const scan = scanOf(repository);
+  if (!scan.unreadable.length) return;
+  for (const key of APPLY_ORDER) {
+    if (!scan.hinted(key).length) continue;
+    const desc = await descriptorOf(key);
+    if (desc.single) continue;
+    const rows = (await desc.store.rows().catch(() => [])) || [];
+    const its = rows.some((r) => String(r.id) === String(before.id) && nameKey(r.name) === nameKey(before.name) && r.repository === repository);
+    if (its) assertTypeReadable(desc, repository, scan);
+  }
+}
+
+/**
  * Writes a file of a repository, its folders made as needed ; removed when its text is empty.
  *
  * Args:
@@ -2686,6 +2714,7 @@ export default {
   fileOf,
   targetFileOf,
   assertTypeReadable,
+  assertLinkedReadable,
   filesNow,
   writeEntries,
   entryFileOf,
