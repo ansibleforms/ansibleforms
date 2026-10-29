@@ -298,7 +298,9 @@ export function targetFileOf(desc, name, scan = scanOf(name)) {
  * Refuses a write of a type's objects to a repository while a file of it whose lines seem to give
  * the type's key cannot be read (not valid YAML) : what it holds is not known - a new entry or map
  * written elsewhere would give the type twice once that file is fixed (a name two entries give, a
- * map two files give), refused on every pull after.
+ * map two files give), refused on every pull after. A type the app has one of is refused the same
+ * way while a file gives its key without its shape (misfitsOf : a list under its key) : its map
+ * written to another file, the two would give it once that one is fixed.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -309,7 +311,10 @@ export function targetFileOf(desc, name, scan = scanOf(name)) {
  *   Errors.ConflictError: such a file, named with why it cannot be read.
  */
 export function assertTypeReadable(desc, name, scan = scanOf(name)) {
-  const unread = scan.hinted(desc.key);
+  const unread = [
+    ...scan.hinted(desc.key).map((u) => ({ file: u.file, errors: u.errors })),
+    ...(desc.single ? misfitsOf(desc, scan).map((file) => ({ file, errors: [misfitReason(desc)] })) : []),
+  ];
   if (!unread.length) return;
   const files = unread.map((u) => `${u.file} (${u.errors.join("; ")})`).join(", ");
   throw new Errors.ConflictError(`Repository '${name}' cannot be written for ${holdingOf(desc)}: ${files} seems to give ${fileKey(desc)}: but cannot be read - fix it in git and pull, then save again`);

@@ -525,6 +525,27 @@ describe("a type the app has one of", () => {
     assert.deepEqual((await sync(name, "look")).refused, []);
   });
 
+  test("its key in a file without its shape (a list) : an app edit refused before anything is saved, never a second file", async () => {
+    const name = await RepoObjects.descriptorOf("name");
+    write("look", "branding.yaml", "controller_name:\n  app_name: Git name\n");
+    assert.equal((await sync(name, "look")).updated, 1);
+    write("look", "branding.yaml", "controller_name:\n  - Git name\n");
+    CrudModel.flushAllLocal();
+    let saved = false;
+    await assert.rejects(
+      RepoObjects.holding("name", async () => {
+        saved = true;
+      }),
+      (e) => e.status === 409 && /branding\.yaml \('controller_name' must be a dictionary/.test(e.message),
+    );
+    assert.equal(saved, false);
+    const before = await RepoObjects.snapshot("name");
+    fx.state.tables.settings[0].app_name = "App edit";
+    CrudModel.flushAllLocal();
+    await assert.rejects(RepoObjects.appUpdated("name", before), (e) => e.status === 409);
+    assert.deepEqual(fs.readdirSync(path.join(fx.ROOT, "look")), ["branding.yaml"]);
+  });
+
   test("its image named relative to its file, inside the repository ; an edit writes into that file only", async () => {
     const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("logo")]);
     write("look", "assets/img/logo.png", PNG);

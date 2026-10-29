@@ -6644,7 +6644,8 @@
       `type`, as every form has) is never a type's file, whatever keys it has, and a key with a text, a number or a
       yes or no under it (a vars file's `name: web`) is no type's either, nor is one whose value has not the type's
       shape (a list of names under `controller_labels:`, a list under the key of a map): that file is never read nor
-      written to, refused in the pull output, and the objects linked to it are kept. Only the usages the repository holds are
+      written to, refused in the pull output, and the objects linked to it are kept; for a type the app has one of,
+      an edit or a turn-on of it is refused meanwhile, as for a file that cannot be read. Only the usages the repository holds are
       read: a key of another type is left alone, its pull output says so once as a hint (`Not read, the repository
       is not used for them: controller_labels: (team/look.yaml) - turn the usage on to read them`).
 
