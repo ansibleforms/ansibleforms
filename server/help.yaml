@@ -1820,6 +1820,8 @@
       - manageAllJobs: The user can abort, delete and relaunch the jobs of every user, not only their own, without the admin role (delete and relaunch also need allowJobDeletion and allowJobRelaunch). Default: admins. (Added in 7.3.0)
       - allowScheduledJobs: The user can create and manage scheduled jobs (recurring cron or one-time). Default for admins only. Grant it only to roles you would trust as admins: every user with this option sees and can change all schedules, not only their own, and a schedule they create runs with admin rights, for any form. (Added in 6.1.5)
       - allowStoredJobs: The user can store and load job data for later use. (Added in 6.1.5)
+      - allowStoredJobsShare: The user can share a stored job, so other users can load it from the form (they need allowStoredJobsViewAll). The stored job stays theirs: only they (and the admins) can change or delete it. Default: admins. (Added in 7.5.0)
+      - allowStoredJobsViewAll: The user sees the stored jobs other users shared, in the Load list of a form they may open, and can load them. Default: admins. (Added in 7.5.0)
       - allowPlannedJobs: The user can plan a one-time run of a form they may run ("Run later"). The job runs as that user, not as admin, and they cannot see or change other schedules. (Added in 6.1.5)
       - allowChat: The user can use the chat assistant (when it is enabled). Default true. (Added in 6.5.0)
       - allowMcp: The user can use the MCP server from an AI agent (when it is enabled). Defaults to the role's allowChat. (Added in 7.0.0)
@@ -2041,6 +2043,8 @@
           - manageAllJobs: The user can abort, delete and relaunch the jobs of every user, not only their own, without the admin role (delete and relaunch also need allowJobDeletion and allowJobRelaunch). Default: admins. (Added in 7.3.0)
           - allowScheduledJobs: The user can create and manage scheduled jobs (recurring cron or one-time). Default for admins only. Grant it only to roles you would trust as admins: every user with this option sees and can change all schedules, not only their own, and a schedule they create runs with admin rights, for any form. (Added in 6.1.5)
           - allowStoredJobs: The user can store and load job data for later use. (Added in 6.1.5)
+          - allowStoredJobsShare: The user can share a stored job, so other users can load it from the form (they need allowStoredJobsViewAll). The stored job stays theirs: only they (and the admins) can change or delete it. Default: admins. (Added in 7.5.0)
+          - allowStoredJobsViewAll: The user sees the stored jobs other users shared, in the Load list of a form they may open, and can load them. Default: admins. (Added in 7.5.0)
           - allowPlannedJobs: The user can plan a one-time run of a form they may run ("Run later"). The job runs as that user, not as admin, and they cannot see or change other schedules. (Added in 6.1.5)
           - allowChat: The user can use the chat assistant (when it is enabled). Default true. (Added in 6.5.0)
           - allowMcp: The user can use the MCP server from an AI agent (when it is enabled). Defaults to the role's allowChat. (Added in 7.0.0)
@@ -3259,6 +3263,21 @@
             code: |
               - name: Production Deployment
                 allowRelaunch: false
+      - name: allowStoredJobSharing
+        type: boolean
+        with_types: ansible, awx, aap, ascender, semaphore, rundeck, jenkins, multistep, workflow, subform
+        short: Allow sharing stored jobs
+        group: workflow
+        version: 7.5.0
+        default: true
+        description: |
+          By default, a user with the `allowStoredJobsShare` role option can share a stored job of this form, and a user with the `allowStoredJobsViewAll` role option sees the stored jobs others shared in the form's Load list.  
+          Set this to `false` to keep the stored jobs of this form private, whatever the role options say. Stored jobs shared earlier are then no longer shown to other users.
+        examples:
+          - name: Keep the stored jobs of a form private
+            code: |
+              - name: Production Deployment
+                allowStoredJobSharing: false
       - name: launchValidation
         type: string
         with_types: ansible, awx, aap, ascender, semaphore, rundeck, jenkins, multistep, workflow

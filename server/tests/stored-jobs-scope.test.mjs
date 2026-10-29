@@ -34,6 +34,15 @@ vi.mock("../src/models/crud.model.js", () => ({
   },
 }));
 
+// the forms a user may open : Demo and Other share, Locked turns sharing off, Hidden is no one's
+vi.mock("../src/models/form.model.js", () => ({
+  default: {
+    load: vi.fn(async (_roles, name) => ({
+      forms: name === "Hidden" ? [] : [{ name, ...(name === "Locked" ? { allowStoredJobSharing: false } : {}) }],
+    })),
+  },
+}));
+
 const CrudModel = (await import("../src/models/crud.model.js")).default;
 const controller = (await import("../src/controllers/v2/stored-jobs.controller.js")).default;
 
@@ -150,5 +159,76 @@ describe("the body of a create or update only reaches the writable columns", () 
     const res = await call("update", alice, { params: { id: "1" }, body: { id: 5 } });
     assert.equal(res.statusCode, 200);
     assert.equal(CrudModel.update.mock.calls.length, 0);
+  });
+});
+
+// #1269 : a stored job shared with other users. The owner stays its owner ; another user sees it
+// with allowStoredJobsViewAll, for a form they may open that does not turn sharing off.
+describe("a shared stored job", () => {
+  const viewer = user("carol", { allowStoredJobsViewAll: true });
+  const sharer = user("alice", { allowStoredJobsShare: true });
+
+  beforeEach(() => {
+    rows = [
+      { id: 1, name: "a1", form_name: "Demo", username: "local/alice", visibility: "shared", form_data: '{"key":"alice-shared"}' },
+      { id: 2, name: "a2", form_name: "Demo", username: "local/alice", visibility: "private", form_data: '{"key":"alice-private"}' },
+      { id: 3, name: "c1", form_name: "Demo", username: "local/carol", visibility: "private", form_data: "{}" },
+      { id: 4, name: "l1", form_name: "Locked", username: "local/alice", visibility: "shared", form_data: "{}" },
+      { id: 5, name: "h1", form_name: "Hidden", username: "local/alice", visibility: "shared", form_data: "{}" },
+    ];
+  });
+
+  test("the Load list gives the caller's own and the shared ones, with allowStoredJobsViewAll", async () => {
+    const res = await call("find", viewer, { query: { form_name: "Demo" } });
+    assert.deepEqual(res.body.records.map(r => r.id), [1, 3]);
+    assert.ok(!JSON.stringify(res.body).includes("alice-private"));
+  });
+
+  test("without allowStoredJobsViewAll the Load list stays the caller's own", async () => {
+    const res = await call("find", user("carol"), { query: { form_name: "Demo" } });
+    assert.deepEqual(res.body.records.map(r => r.id), [3]);
+  });
+
+  test("a form that turns sharing off, or one the caller may not open, shows no shared one", async () => {
+    assert.deepEqual((await call("find", viewer, { query: { form_name: "Locked" } })).body.records, []);
+    assert.deepEqual((await call("find", viewer, { query: { form_name: "Hidden" } })).body.records, []);
+  });
+
+  test("the stored jobs page stays the caller's own", async () => {
+    const res = await call("find", viewer);
+    assert.deepEqual(res.body.records.map(r => r.id), [3]);
+  });
+
+  test("a shared one is read by id, a private one or one of a locked form is not", async () => {
+    assert.equal((await call("findById", viewer, { params: { id: "1" } })).statusCode, 200);
+    assert.equal((await call("findById", viewer, { params: { id: "2" } })).statusCode, 403);
+    assert.equal((await call("findById", viewer, { params: { id: "4" } })).statusCode, 403);
+  });
+
+  test("a shared one is not the viewer's to change or delete", async () => {
+    assert.equal((await call("update", viewer, { params: { id: "1" }, body: { name: "x" } })).statusCode, 403);
+    assert.equal((await call("delete", viewer, { params: { id: "1" } })).statusCode, 403);
+    assert.equal(CrudModel.update.mock.calls.length + CrudModel.delete.mock.calls.length, 0);
+  });
+
+  test("sharing needs allowStoredJobsShare", async () => {
+    const body = { name: "n", form_name: "Demo", form_data: "{}", visibility: "shared" };
+    assert.equal((await call("create", alice, { body })).statusCode, 403);
+    assert.equal((await call("update", alice, { params: { id: "2" }, body: { visibility: "shared" } })).statusCode, 403);
+    assert.equal(CrudModel.create.mock.calls.length + CrudModel.update.mock.calls.length, 0);
+    const res = await call("create", sharer, { body });
+    assert.equal(res.statusCode, 201);
+    assert.equal(CrudModel.create.mock.calls[0][1].visibility, "shared");
+    assert.equal(CrudModel.create.mock.calls[0][1].username, "local/alice");
+  });
+
+  test("a form that turns sharing off refuses a shared one", async () => {
+    const res = await call("create", sharer, { body: { name: "n", form_name: "Locked", form_data: "{}", visibility: "shared" } });
+    assert.equal(res.statusCode, 403);
+  });
+
+  test("a visibility other than private or shared is a 400 ; private needs no option", async () => {
+    assert.equal((await call("update", alice, { params: { id: "1" }, body: { visibility: "public" } })).statusCode, 400);
+    assert.equal((await call("update", alice, { params: { id: "1" }, body: { visibility: "private" } })).statusCode, 200);
   });
 });

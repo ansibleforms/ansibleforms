@@ -25,18 +25,22 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { formPath } from '@/lib/formsPath';
 import { recordButtons } from '@/lib/recordButtons';
+import { useAppStore } from '@/stores/app';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const authenticated = ref(false);
 const loaded = ref(false);
+const store = useAppStore();
+// the Shared switch : the allowStoredJobsShare role option
+const canShare = computed(() => !!store.profile?.options?.allowStoredJobsShare);
 
 // ─── the stored job ───────────────────────────────────────────────────────────
 const storedId = computed(() => String(route.params.id || ''));
 const stored = ref(null); // as saved
 const edit = ref(null); // as edited
-const EDITED = ['name', 'description', 'never_expires', 'expires_at', 'values'];
+const EDITED = ['name', 'description', 'shared', 'never_expires', 'expires_at', 'values'];
 
 /**
  * The form's values as YAML, for the editor : the stored JSON read back.
@@ -69,6 +73,7 @@ function editable(record) {
   return {
     name: record.name ?? '',
     description: record.description ?? '',
+    shared: record.visibility === 'shared',
     never_expires: !record.expires_at,
     expires_at: record.expires_at ?? '',
     values: toYaml(record.form_data),
@@ -159,6 +164,7 @@ const tabFields = computed(() => ({
     ['description', t('settings.fields.description')],
     ['form', t('settings.fields.form'), t('settings.storedJobs.formHelp'), stored.value?.form_name],
     ['owner', t('settings.storedJobs.owner'), stored.value?.username],
+    ['shared', t('form.shareStoredJob'), t('form.shareStoredJobHelp')],
     [
       'createdAt',
       t('settings.fields.createdAt'),
@@ -208,6 +214,7 @@ async function save() {
   const data = {
     name: e.name.trim(),
     description: e.description.trim(),
+    visibility: e.shared ? 'shared' : 'private',
     expires_at: e.never_expires ? null : e.expires_at || null,
     form_data: JSON.stringify(YAML.parse(e.values || '{}') || {}),
   };
@@ -360,6 +367,21 @@ onMounted(async () => {
                 :disabled="true"
                 :label="t('settings.storedJobs.owner')"
               />
+              <!-- shared with the users who see shared stored jobs : with allowStoredJobsShare, or
+                   already shared (then it can be made private again) -->
+              <div v-if="canShare || stored.visibility === 'shared'" v-show="fieldShown('shared')" class="mb-3">
+                <div class="form-check form-switch">
+                  <input
+                    id="af-stored-shared"
+                    v-model="edit.shared"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                  />
+                  <label class="form-check-label" for="af-stored-shared">{{ t('form.shareStoredJob') }}</label>
+                </div>
+                <div class="form-text">{{ t('form.shareStoredJobHelp') }}</div>
+              </div>
               <div v-show="fieldShown('createdAt')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.fields.createdAt') }}</div>
                 <span>{{ stored.created_at ? Helpers.formatServerDate(stored.created_at) : '–' }}</span>

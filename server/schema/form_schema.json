@@ -634,6 +634,7 @@
     "repository": {"type": "string"},
     "showHelp": {"type": "boolean"},
     "allowRelaunch": {"type": "boolean"},
+    "allowStoredJobSharing": {"type": "boolean"},
     "launchValidation": {
       "type": "string",
       "enum": ["off", "log", "enforce"],

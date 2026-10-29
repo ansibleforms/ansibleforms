@@ -65,6 +65,8 @@ export const roleOptionGroups = [
       'allowScheduledJobs',
       'allowPlannedJobs',
       'allowStoredJobs',
+      'allowStoredJobsShare',
+      'allowStoredJobsViewAll',
     ],
   },
   {
@@ -111,6 +113,9 @@ export const roleOptionNeeds = {
   allowVarsFileDesign: 'showDesigner',
   // extended tokens add Never expires to the tokens (lib/tokenLifetime.js)
   extendedTokenExpiration: 'allowApiTokens',
+  // sharing a stored job, and loading the ones others shared, are part of the stored jobs
+  allowStoredJobsShare: 'allowStoredJobs',
+  allowStoredJobsViewAll: 'allowStoredJobs',
 };
 
 /**
@@ -160,6 +165,8 @@ export const roleOptionKeys = [
   'allowScheduledJobs',
   'allowPlannedJobs',
   'allowStoredJobs',
+  'allowStoredJobsShare',
+  'allowStoredJobsViewAll',
   'allowLogin',
   'allowChat',
   'allowMcp',
@@ -204,6 +211,8 @@ const adminByDefaultOptions = [
   'allowJobRelaunch',
   'showAllJobLogs',
   'allowScheduledJobs',
+  'allowStoredJobsShare',
+  'allowStoredJobsViewAll',
 ];
 
 // Effective value of every option for a role that does not spell it out.

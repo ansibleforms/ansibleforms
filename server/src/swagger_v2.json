@@ -6608,7 +6608,7 @@
           "storedjob"
         ],
         "summary": "List stored jobs, filter by form, or get one by name",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). By name or form_name only the caller's own are searched; the full list shows everyone's to a user with the settings permission, otherwise only the caller's own.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). By name only the caller's own are searched; by form_name the caller's own and, with the allowStoredJobsViewAll role option, the ones other users shared (visibility shared) of a form the caller may open that does not set allowStoredJobSharing: false. The full list shows everyone's to a user with the settings permission, otherwise only the caller's own.",
         "parameters": [
           {
             "name": "name",
@@ -6626,7 +6626,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Only the caller's stored jobs of this form"
+            "description": "Only the stored jobs of this form: the caller's own, and the ones shared with them"
           }
         ],
         "responses": {
@@ -6648,7 +6648,7 @@
           "storedjob"
         ],
         "summary": "Create a stored job",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). The owner is the calling user.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). The owner is the calling user. A shared one (visibility shared) needs the allowStoredJobsShare role option and a form that does not set allowStoredJobSharing: false.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6664,10 +6664,10 @@
             "description": "Stored job created; data is { id }"
           },
           "400": {
-            "description": "Missing required field or a value too long"
+            "description": "Missing required field, a value too long, or a visibility other than private or shared"
           },
           "403": {
-            "description": "No allowStoredJobs"
+            "description": "No allowStoredJobs, or sharing without allowStoredJobsShare or on a form that does not allow it"
           },
           "409": {
             "description": "The caller already has a stored job with this name for this form"
@@ -6686,7 +6686,7 @@
           "storedjob"
         ],
         "summary": "Get a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs, and the ones shared with them (see the list by form_name).",
         "parameters": [
           {
             "name": "id",
@@ -6719,7 +6719,7 @@
           "storedjob"
         ],
         "summary": "Update a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs. A body without writable fields changes nothing.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it.",
         "parameters": [
           {
             "name": "id",
@@ -7368,6 +7368,11 @@
             "type": "string",
             "format": "date-time",
             "description": "When the stored job expires (optional)"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["private", "shared"],
+            "description": "private (default): only the owner. shared: also the users with the allowStoredJobsViewAll role option, who can load it but not change it"
           }
         },
         "description": "Only these fields are written; id, username (always the caller) and created_at are ignored. name, form_name and form_data are required on create."

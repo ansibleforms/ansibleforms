@@ -645,7 +645,7 @@ const SCHEMA_MANIFEST = {
     patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
                               'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
                               'runner_leases', 'runner_join_tokens', 'job_events'],
-                     columns: ['job_events.result', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
+                     columns: ['job_events.result', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
                                'repositories.use_for_workflows', 'repositories.use_for_inventories',
@@ -1205,6 +1205,8 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addTable("job_events", jobEvents.toString()), messages, success, failed);
   // a host's whole result, as its details show it (a click on its line of the output)
   await checkPromise(addColumn("job_events", "result", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  // a stored job private to its owner or shared with other users (lib/storedJobScope.js)
+  await checkPromise(addColumn("stored_jobs", "visibility", "varchar(10)", false, "'private'"), messages, success, failed);
 }
 
 /**

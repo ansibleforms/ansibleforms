@@ -1926,6 +1926,9 @@
         "allowRelaunch": {
           "type": "boolean"
         },
+        "allowStoredJobSharing": {
+          "type": "boolean"
+        },
         "launchValidation": {
           "type": "string",
           "enum": [
@@ -6410,6 +6413,9 @@
             "type": "boolean"
           },
           "allowRelaunch": {
+            "type": "boolean"
+          },
+          "allowStoredJobSharing": {
             "type": "boolean"
           },
           "launchValidation": {

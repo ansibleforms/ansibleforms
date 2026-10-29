@@ -8,6 +8,7 @@ import { createFormServices } from '../lib/formServices.js';
 import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
 import yaml from 'yaml';
+import { ownerOf as storedJobOwner, seesShared } from '../lib/storedJobScope.js';
 
 /**
  * The MCP tools. Deliberately technical : they expose the form flow a browser goes through
@@ -240,11 +241,18 @@ export function createHandlers({ user, deps, policy = {} }) {
   }
 
   // ─── stored jobs (#1070) : as the stored jobs routes scope them ───────────────────────────────
-  // allowStoredJobs : the user's own ; a settings user (showSettings) everyone's
+  // allowStoredJobs : the user's own, and the ones shared with them (#1269, lib/storedJobScope.js) ;
+  // a settings user (showSettings) everyone's
   const mayStore = !!user?.options?.allowStoredJobs;
   const seesAllStored = !!user?.options?.showSettings;
   // the owner of a stored job, as the routes write it
-  const me = `${user?.type || 'local'}/${user?.username}`;
+  const me = storedJobOwner(user);
+
+  /** Whether another user's stored job is shared with this user : its form as they may open it. */
+  async function sharedWithMe(row) {
+    if (row.visibility !== 'shared') return false;
+    return seesShared(user, row, (await Form.load(roles, row.form_name))?.forms?.[0]);
+  }
 
   /**
    * A stored job this user may see : by its id, or by its form and name among their own ; else
@@ -266,7 +274,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     } else {
       throw new ToolError('Name a stored job by its id, or by its form and name', 'invalid_request');
     }
-    if (!row || (!seesAllStored && row.username !== me)) throw notFound;
+    if (!row || (!seesAllStored && row.username !== me && !(await sharedWithMe(row)))) throw notFound;
     const names = await offeredFormNames();
     if (names && !names.has(row.form_name)) throw notFound;
     return row;
@@ -280,7 +288,8 @@ export function createHandlers({ user, deps, policy = {} }) {
       name: row.name,
       description: row.description || '',
       form: row.form_name,
-      ...(seesAllStored ? { owner: row.username } : {}),
+      ...(seesAllStored || row.username !== me ? { owner: row.username } : {}),
+      shared: row.visibility === 'shared',
       createdAt: row.created_at ?? null,
       expiresAt: expires ? expires.toISOString() : null,
       expired: !!expires && expires.getTime() < Date.now(),
@@ -310,10 +319,10 @@ export function createHandlers({ user, deps, policy = {} }) {
   async function overStored(form, values, storedJob, skipped, loaded) {
     if (!storedJob) return { values: values || {}, skipped, warnings: [] };
     const row = await visibleStored({ id: storedJob.id, form, name: storedJob.name });
-    // a start from your own only : a settings user reads and deletes everyone's, but launches
-    // nobody else's values
-    if (row.username !== me) {
-      throw new ToolError(`Stored job ${row.id} is ${row.username}'s ; you can only start from your own`, 'access_denied');
+    // a start from your own, or one shared with you : a settings user reads and deletes
+    // everyone's, but launches nobody else's private values
+    if (row.username !== me && !(await sharedWithMe(row))) {
+      throw new ToolError(`Stored job ${row.id} is ${row.username}'s ; you can only start from your own or a shared one`, 'access_denied');
     }
     if (row.form_name !== form) {
       throw new ToolError(`Stored job ${row.id} holds values of form '${row.form_name}', not of '${form}'`, 'invalid_request');
@@ -842,12 +851,16 @@ export function createHandlers({ user, deps, policy = {} }) {
       const rows = (await StoredJobs.findAll()) || [];
       // what can be started from : a stored job of a form this user may launch (one stored from a
       // subform's tab holds a subform's values)
-      const launchable = new Set(((await Form.load(roles))?.forms || []).filter((f) => offered(f) && f.type !== 'subform').map((f) => f.name));
+      const forms = (await Form.load(roles))?.forms || [];
+      const launchable = new Set(forms.filter((f) => offered(f) && f.type !== 'subform').map((f) => f.name));
+      // another user's shared one : of a form this user may open (storedJobScope.seesShared)
+      const formsByName = new Map(forms.map((f) => [f.name, f]));
+      const shared = (r) => r.username !== me && seesShared(user, r, formsByName.get(r.form_name));
       const storedJobs = rows
-        .filter((r) => seesAllStored || r.username === me)
+        .filter((r) => seesAllStored || r.username === me || shared(r))
         .filter((r) => !names || names.has(r.form_name))
         .filter((r) => !form || r.form_name === form)
-        .map((r) => ({ ...storedSummary(r), usable: launchable.has(r.form_name) && r.username === me }));
+        .map((r) => ({ ...storedSummary(r), usable: launchable.has(r.form_name) && (r.username === me || shared(r)) }));
       return { storedJobs, scope: seesAllStored ? 'all' : 'mine' };
     },
 
@@ -912,6 +925,10 @@ export function createHandlers({ user, deps, policy = {} }) {
     async deleteStoredJob({ id }) {
       refuseWhenReadOnly('stored jobs cannot be deleted through it');
       const row = await visibleStored({ id });
+      // one shared with this user is seen, not theirs to delete
+      if (!seesAllStored && row.username !== me) {
+        throw new ToolError(`Stored job ${row.id} is ${row.username}'s ; you can only delete your own`, 'access_denied');
+      }
       await StoredJobs.delete(row.id);
       return { id: row.id, name: row.name, deleted: true };
     },
@@ -973,7 +990,7 @@ const skippedSchema = z.record(z.string(), z.boolean()).optional()
 const storedJobSchema = z.object({
   id: z.number().int().positive().optional().describe('Stored job id, from list_stored_jobs'),
   name: z.string().optional().describe('Or its name: one of your own stored jobs of this form'),
-}).optional().describe('Start from the values of one of your own stored jobs ; `values` are laid over them (per step for a wizard, '
+}).optional().describe('Start from the values of one of your own stored jobs, or one shared with you ; `values` are laid over them (per step for a wizard, '
   + 'and a step given values for is no longer skipped). Password fields are not stored: supply them in `values`. '
   + 'launch_job and plan_job then need the expectedPayloadHash resolve_field returned.');
 
@@ -1176,9 +1193,10 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
   if (options.allowStoredJobs) {
     server.registerTool('list_stored_jobs', {
       title: 'List stored jobs',
-      description: 'The stored jobs you may see (values saved under a name with Store on a form): your own, or '
-        + 'everyone\'s for a settings user. Name, description, form, created and expiry ; not the values - '
-        + 'get_stored_job has them. One marked `usable` (your own, of a form you may launch) can be passed as '
+      description: 'The stored jobs you may see (values saved under a name with Store on a form): your own and the ones '
+        + 'other users shared with you, or everyone\'s for a settings user. Name, description, form, owner when not '
+        + 'yours, created and expiry ; not the values - get_stored_job has them. One marked `usable` (your own or a '
+        + 'shared one, of a form you may launch) can be passed as '
         + '`storedJob` to resolve_field, launch_job or plan_job to start from it.',
       inputSchema: { form: z.string().optional().describe('Only the stored jobs of this form') },
       annotations: { readOnlyHint: true },
@@ -1215,7 +1233,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
 
     if (!policy.readOnly) server.registerTool('delete_stored_job', {
       title: 'Delete stored job',
-      description: 'Delete a stored job you may see.',
+      description: 'Delete one of your own stored jobs (a settings user: anyone\'s).',
       inputSchema: { id: z.number().int().positive().describe('Stored job id') },
       annotations: { readOnlyHint: false, destructiveHint: true },
     }, wrap((a) => handlers.deleteStoredJob(a)));
