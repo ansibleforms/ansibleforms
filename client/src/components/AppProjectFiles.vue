@@ -14,6 +14,9 @@
 /*         (inventory.yaml, group_vars/, host_vars/)              */
 /*      readOnly: Boolean - the designer lock is not ours, or a   */
 /*         playbook without the role's allowPlaybookDesign        */
+/*      canCreateInventories: Boolean - a new inventory (a new    */
+/*         repository) may be made : off without the              */
+/*         connections settings                                   */
 /*      theme: String - the editor's theme                        */
 /*      editorStyle: String|Object - the editor's size            */
 /*      view: String - 'yaml' (the text) or 'visual' (a           */
@@ -50,6 +53,8 @@ const props = defineProps({
   // the tab shown : 'yaml' (the text) or 'visual' (a vars file's variables)
   view: { type: String, default: 'yaml' },
   readOnly: { type: Boolean, default: false },
+  // a new inventory is a new repository : off for a user without the connections settings
+  canCreateInventories: { type: Boolean, default: true },
   theme: { type: String, default: null },
   editorStyle: { type: [String, Object], default: 'width: 100%;height: 75vh;font-size:1rem' },
   // the designer's forms ({ name, text }) : a vars file's Preview says which load it
@@ -307,6 +312,8 @@ async function push() {
 function startCreate(kind, folder = '') {
   if (props.readOnly) return;
   if (kind === 'inventory') {
+    // a new repository : not for a user who may not create one
+    if (!props.canCreateInventories) return;
     // a new inventory is a new repository : the designer opens the repositories' New dialog,
     // used for inventories (newInventory), then seeds it (seedInventory)
     emit('newInventory');
@@ -704,7 +711,7 @@ defineExpose({
             <span role="button" class="tree-add-btn" @click="toggleSearch()" :title="t('designer.search')"
               ><FaIcon icon="magnifying-glass"
             /></span>
-            <template v-if="!readOnly && isInventories">
+            <template v-if="!readOnly && isInventories && canCreateInventories">
               <span
                 role="button"
                 class="tree-add-btn"
@@ -713,7 +720,8 @@ defineExpose({
                 ><FaIcon icon="sitemap"
               /></span>
             </template>
-            <template v-else-if="!readOnly">
+            <!-- the inventories hold no loose folder nor file, with or without a new inventory -->
+            <template v-else-if="!readOnly && !isInventories">
               <span role="button" class="tree-add-btn" @click="startCreate('folder')" :title="t('designer.newFolder')"
                 ><FaIcon icon="folder"
               /></span>

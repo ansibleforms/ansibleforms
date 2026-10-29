@@ -436,6 +436,9 @@ async function loadList(type, isFlat = false, version = undefined, query = '') {
     }
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err, 'Failed to load data'));
+    // an empty list, never undefined : every caller spreads or filters it, so a list the user
+    // may not read (a 403) threw "is not iterable" on top of the message above
+    return [];
   }
 }
 // set while a record is being read into `item`, so the dependency watchers above do
