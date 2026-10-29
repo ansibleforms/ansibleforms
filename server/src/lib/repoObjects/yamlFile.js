@@ -616,7 +616,7 @@ function keepAliases(doc, anchors) {
   const changed = new Set();
   for (const [name, { json }] of anchors) {
     const node = now.get(name);
-    let same = false;
+    let same;
     try {
       same = !!node && JSON.stringify(node.toJS(doc)) === json;
     } catch {
