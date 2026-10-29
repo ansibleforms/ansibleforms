@@ -282,6 +282,27 @@ export function targetFileOf(desc, name, scan = scanOf(name)) {
 }
 
 /**
+ * Refuses a write of a type's objects to a repository while a file of it whose lines seem to give
+ * the type's key cannot be read (not valid YAML) : what it holds is not known - a new entry or map
+ * written elsewhere would give the type twice once that file is fixed (a name two entries give, a
+ * map two files give), refused on every pull after.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *   scan (object): the repository's files (scanOf) ; read when not given.
+ *
+ * Raises:
+ *   Errors.ConflictError: such a file, named with why it cannot be read.
+ */
+export function assertTypeReadable(desc, name, scan = scanOf(name)) {
+  const unread = scan.hinted(desc.key);
+  if (!unread.length) return;
+  const files = unread.map((u) => `${u.file} (${u.errors.join("; ")})`).join(", ");
+  throw new Errors.ConflictError(`Repository '${name}' cannot be written for ${holdingOf(desc)}: ${files} seems to give ${desc.key}: but cannot be read - fix it in git and pull, then save again`);
+}
+
+/**
  * Writes a file of a repository, its folders made as needed ; removed when its text is empty.
  *
  * Args:
@@ -1784,6 +1805,8 @@ async function activateList(desc, name, report, opts = {}) {
     const file = targetFileOf(desc, name);
     report.file = file;
     try {
+      // a file of the type that cannot be read : each kept in the app, not written beside it
+      assertTypeReadable(desc, name);
       writeEntries(desc, name, file, written.map((c) => desc.entryOf(c)));
       for (const c of written) {
         await desc.linkCandidate(c, name, file);
@@ -2042,7 +2065,9 @@ export async function appCreated(desc, id) {
   return withWriteClaim(repository, async () => {
     // an entry of the repository declaring its name, read in or not (refused, waiting, not pulled
     // yet) : kept in the app, never written beside it - two entries of that name would both be
-    // refused on every pull ; it follows that entry once it is read in
+    // refused on every pull ; it follows that entry once it is read in - nor while a file that may
+    // declare it cannot be read
+    assertTypeReadable(desc, repository);
     const now = await filesNow(desc, repository);
     if (now.names.has(nameKey(row.name))) {
       logger.warning(`Kept ${desc.noun} '${row.name}' in the app, not written to ${repository}: an entry of the repository has its name - it follows that entry once it is read in`);
@@ -2409,6 +2434,8 @@ async function appUpdatedSingle(desc, before) {
   if (canonicalJson(after) === canonicalJson(before)) return false;
   return withWriteClaim(repository, async () => {
     const scan = scanOf(repository);
+    // a file seeming to give it that cannot be read : never a second file giving it beside that one
+    assertTypeReadable(desc, repository, scan);
     const { file, value } = singleOf(desc, scan);
     const declared = value && typeof value === "object" && !Array.isArray(value) ? value : null;
     // the files its map no longer names : those the type says (only the images the map named and
@@ -2599,6 +2626,7 @@ export default {
   scanOf,
   fileOf,
   targetFileOf,
+  assertTypeReadable,
   writeEntries,
   entryFileOf,
   editEntry,

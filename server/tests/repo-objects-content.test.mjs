@@ -267,6 +267,26 @@ describe("what a file not read held stays as it is", () => {
     assert.equal(fx.rowNamed("credentials", "a").password, "enc:DBONLY");
   });
 
+  test("a file of the type that cannot be read : a new object of the app refused before it is saved, an activation keeps the app's", async () => {
+    write("ops", "x.yaml", "credentials:\n  - name: a\n    user: [broken\n");
+    let saved = false;
+    await assert.rejects(
+      RepoObjects.holding("credentials", async () => {
+        saved = true;
+      }),
+      (e) => e.status === 409 && /x\.yaml/.test(e.message),
+    );
+    assert.equal(saved, false);
+    fx.state.tables.credentials.push({ id: 40, name: "app-cred", credential_type: "git", user: "bot", password: "enc:x", repository: null, repo_file: null });
+    CrudModel.flushAllLocal();
+    await assert.rejects(RepoObjects.appCreated("credentials", 40), (e) => e.status === 409);
+    assert.equal(fx.exists("ops", "credentials.yaml"), false);
+    const report = await RepoObjects.activate(credentials, "ops");
+    assert.deepEqual(report.written, []);
+    assert.equal(report.kept.find((k) => k.name === "app-cred")?.code, "notWritten");
+    assert.equal(fx.exists("ops", "credentials.yaml"), false);
+  });
+
   test("a refused entry with no name : the objects of its file whose entries are gone are kept", async () => {
     write("ops", "x.yaml", { credentials: [git("a"), git("b")] });
     write("ops", "y.yaml", { credentials: [git("c")] });
@@ -301,6 +321,31 @@ describe("a type the app has one of", () => {
     assert.equal((await sync(name, "look")).updated, 1);
     assert.equal(fx.state.tables.settings[0].app_name, "B");
     assert.deepEqual(await RepoObjects.singleSource("name"), { repository: "look", repo_file: "b/branding.yaml" });
+  });
+
+  test("its file cannot be read : an app edit refused before anything is saved, never a second file giving it", async () => {
+    const name = await RepoObjects.descriptorOf("name");
+    write("look", "branding.yaml", "# site\nname:\n  app_name: Git name\n");
+    assert.equal((await sync(name, "look")).updated, 1);
+    write("look", "branding.yaml", "# site\nname:\n  app_name: [Git name\n");
+    CrudModel.flushAllLocal();
+    let saved = false;
+    await assert.rejects(
+      RepoObjects.holding("name", async () => {
+        saved = true;
+      }),
+      (e) => e.status === 409 && /branding\.yaml .* seems to give name: but cannot be read/.test(e.message),
+    );
+    assert.equal(saved, false, "the save never ran");
+    // the write itself refused too, when it is reached
+    const before = await RepoObjects.snapshot("name");
+    fx.state.tables.settings[0].app_name = "App edit";
+    CrudModel.flushAllLocal();
+    await assert.rejects(RepoObjects.appUpdated("name", before), (e) => e.status === 409);
+    assert.deepEqual(fs.readdirSync(path.join(fx.ROOT, "look")), ["branding.yaml"]);
+    // the typo fixed : read, nothing refused
+    write("look", "branding.yaml", "# site\nname:\n  app_name: Git name 2\n");
+    assert.deepEqual((await sync(name, "look")).refused, []);
   });
 
   test("its image named relative to its file, inside the repository ; an edit writes into that file only", async () => {

@@ -6778,7 +6778,10 @@
       file's other entries kept), a new object is written as a new entry (the first file holding the type's key,
       else `credentials.yaml` or `runners.yaml`), deleting one removes its entry; all wait for the repository's Push.
       A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)
-      with nothing changed, never saved in the app without its file.
+      with nothing changed, never saved in the app without its file. So is a new object, or an edit of a type the
+      app has one of, while a file of the repository that seems to give the type's key cannot be read (not valid
+      YAML): written beside it, the type would be given twice once that file is fixed. Fix the file in git, pull,
+      then save again; turning the usage on keeps the app's objects in the app meanwhile, said in its report.
       The credential's and the runner's page show **Repository: <name>** and the file of its entry for a linked
       object.
 

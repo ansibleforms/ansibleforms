@@ -46,7 +46,9 @@ const RepoObjects = {
    * repositories, or the one the object is linked to (before) - taken before the save : a pull, a
    * push or another write on them is waited for a while (engine.js CLAIM_WAIT), then the save is
    * refused, nothing changed. Its app-to-git steps (appCreated, appUpdated ...) run under the same
-   * claim. A type without a repository, or one not cloned, saves at once.
+   * claim. A type without a repository, or one not cloned, saves at once. A type whose repository
+   * has a file that seems to give its key but cannot be read is refused the same way, nothing
+   * changed (engine.js assertTypeReadable) : its write would give it twice once that file is fixed.
    *
    * Args:
    *   keys (string|string[]): the type(s) the save writes.
@@ -57,21 +59,29 @@ const RepoObjects = {
    *   Promise<any>: what the change returns.
    *
    * Raises:
-   *   Errors.ConflictError: a repository still busy once the wait is over (nothing saved).
+   *   Errors.ConflictError: a repository still busy once the wait is over, or a file of a type the
+   *     save writes that cannot be read (nothing saved).
    */
   async holding(keys, change, before = null) {
     const names = new Set();
+    const types = [];
     if (before?.repository) names.add(before.repository);
     for (const key of [].concat(keys)) {
       // its repository not readable (the database down) : the save says the rest
-      const active = await descriptorOf(key)
-        .then((desc) => Engine.activeRepository(desc))
-        .catch((e) => logger.error(`The ${key} repository could not be read before a save: ${e.message || e}`));
-      if (active) names.add(active);
+      const desc = await descriptorOf(key).catch((e) => logger.error(`The ${key} type could not be read before a save: ${e.message || e}`));
+      const active = desc && (await Engine.activeRepository(desc).catch((e) => logger.error(`The ${key} repository could not be read before a save: ${e.message || e}`)));
+      if (!active) continue;
+      names.add(active);
+      types.push({ desc, active });
     }
     // in one order, so two saves never wait for each other's claim
     const repositories = [...names].filter((n) => Engine.cloned(n)).sort();
-    const run = (i) => (i < repositories.length ? Engine.withWriteClaim(repositories[i], () => run(i + 1)) : change());
+    // under the claims : each type's files readable, else refused before anything is saved
+    const checked = () => {
+      for (const { desc, active } of types) if (Engine.cloned(active)) Engine.assertTypeReadable(desc, active);
+      return change();
+    };
+    const run = (i) => (i < repositories.length ? Engine.withWriteClaim(repositories[i], () => run(i + 1)) : checked());
     return run(0);
   },
 
