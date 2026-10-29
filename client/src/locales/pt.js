@@ -383,6 +383,9 @@ export default {
       allowVerboseMode: 'Executar tarefas em modo detalhado.',
       allowScheduledJobs: 'Criar e gerir agendamentos na página Agendamentos, recorrentes ou pontuais.',
       allowStoredJobs: 'Guardar os dados de um formulário e voltar a carregá-los mais tarde.',
+      allowStoredJobsShare:
+        'Partilhar uma tarefa guardada com outros utilizadores, que a carregam a partir do formulário ; continua a ser sua.',
+      allowStoredJobsViewAll: 'Ver e carregar as tarefas guardadas que outros utilizadores partilharam.',
       allowPlannedJobs:
         'Executar a tarefa de um formulário uma vez, mais tarde, à hora que escolher (Executar mais tarde).',
       showAllJobLogs: 'Ver as tarefas de todos os utilizadores, não só as suas.',
@@ -1618,6 +1621,8 @@ export default {
         'Valores de formulário guardados para voltar a executar: abra um no seu formulário, preenchido, a partir daqui ou do botão Carregar do formulário.',
       viewDetails: 'Ver detalhes da tarefa guardada',
       userTypeName: 'Utilizador (tipo/nome)',
+      visibility: 'Visibilidade',
+      private: 'Privada',
       openInForm: 'Abrir no formulário',
       tabValues: 'Valores',
       valuesNotMap: 'Os valores têm de ser um mapa de nomes de campo e valores.',
@@ -2175,6 +2180,8 @@ export default {
       roleOptionAllowMcp: 'Permitir MCP',
       roleOptionAllowFileUploads: 'Permitir carregar ficheiros',
       roleOptionAllowStoredJobs: 'Permitir tarefas guardadas',
+      roleOptionAllowStoredJobsShare: 'Partilhar tarefas guardadas',
+      roleOptionAllowStoredJobsViewAll: 'Ver tarefas guardadas partilhadas',
       roleOptionAllowPlannedJobs: 'Permitir Executar mais tarde',
       roleOptionAllowApiTokens: 'Permitir tokens de API',
       roleOptionExtendedTokenExpiration: 'Permitir tokens de API alargados',
@@ -2996,6 +3003,10 @@ export default {
     editField: 'Editar {name}',
     edit: 'Editar',
     storedJobLoaded: '"{name}" carregado no formulário',
+    shareStoredJob: 'Partilhar com outros utilizadores',
+    shareStoredJobHelp:
+      'Os utilizadores que podem ver tarefas guardadas partilhadas podem carregá-la a partir deste formulário. Só você a pode alterar ou eliminar.',
+    storedJobShared: 'Partilhada',
     storedJobLoadFailed: 'Não foi possível carregar a tarefa guardada',
     showHelp: 'Mostrar ajuda',
     hideHelp: 'Ocultar ajuda',

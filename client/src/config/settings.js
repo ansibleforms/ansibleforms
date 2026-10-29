@@ -1669,6 +1669,14 @@ export default function getSettings(t) {
           columnLabel: t('settings.storedJobs.owner'),
         },
         {
+          // private or shared : set with Store on the form, or on its page
+          key: 'visibility',
+          noInput: true,
+          icon: 'share-nodes',
+          label: t('settings.storedJobs.visibility'),
+          render: (v) => escapeHtml(v === 'shared' ? t('form.storedJobShared') : t('settings.storedJobs.private')),
+        },
+        {
           // the form's values, as YAML : a map of field names and values
           key: 'form_data',
           step: 'values',

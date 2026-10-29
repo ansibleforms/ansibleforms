@@ -383,6 +383,9 @@ export default {
       allowVerboseMode: 'Ejecutar jobs en modo verbose.',
       allowScheduledJobs: 'Crear y gestionar programaciones en la página Programaciones, recurrentes o puntuales.',
       allowStoredJobs: 'Guardar los datos de un formulario y volver a cargarlos después.',
+      allowStoredJobsShare:
+        'Compartir un trabajo almacenado con otros usuarios, que lo cargan desde el formulario ; sigue siendo tuyo.',
+      allowStoredJobsViewAll: 'Ver y cargar los trabajos almacenados que otros usuarios compartieron.',
       allowPlannedJobs:
         'Ejecutar el trabajo de un formulario una vez, más tarde, a la hora que elijas (Ejecutar más tarde).',
       showAllJobLogs: 'Ver los jobs de todos los usuarios, no solo los tuyos.',
@@ -1777,6 +1780,8 @@ export default {
         'Valores de formulario guardados para volver a ejecutarlos: abre uno en su formulario, ya rellenado, desde aquí o con el botón Cargar del formulario.',
       viewDetails: 'Ver detalles del trabajo almacenado',
       userTypeName: 'Usuario (tipo/nombre)',
+      visibility: 'Visibilidad',
+      private: 'Privado',
       openInForm: 'Abrir en el formulario',
       tabValues: 'Valores',
       valuesNotMap: 'Los valores deben ser un mapa de nombres de campo y valores.',
@@ -2177,6 +2182,8 @@ export default {
       roleOptionAllowMcp: 'Permitir MCP',
       roleOptionAllowFileUploads: 'Permitir subir archivos',
       roleOptionAllowStoredJobs: 'Permitir jobs almacenados',
+      roleOptionAllowStoredJobsShare: 'Compartir trabajos almacenados',
+      roleOptionAllowStoredJobsViewAll: 'Ver trabajos almacenados compartidos',
       roleOptionAllowPlannedJobs: 'Permitir Ejecutar más tarde',
       roleOptionAllowApiTokens: 'Permitir tokens de API',
       roleOptionExtendedTokenExpiration: 'Permitir tokens de API extendidos',
@@ -2998,6 +3005,10 @@ export default {
     editField: 'Editar {name}',
     edit: 'Editar',
     storedJobLoaded: '"{name}" cargado en el formulario',
+    shareStoredJob: 'Compartir con otros usuarios',
+    shareStoredJobHelp:
+      'Los usuarios que pueden ver trabajos almacenados compartidos pueden cargarlo desde este formulario. Solo tú puedes cambiarlo o eliminarlo.',
+    storedJobShared: 'Compartido',
     storedJobLoadFailed: 'No se pudo cargar el job guardado',
     showHelp: 'Mostrar ayuda',
     hideHelp: 'Ocultar ayuda',

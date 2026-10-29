@@ -54,6 +54,9 @@ function applyOptionDefaults(options, isAdmin) {
   if (options.manageAllJobs === undefined) options.manageAllJobs = isAdmin;
   if (options.allowScheduledJobs === undefined) options.allowScheduledJobs = isAdmin;
   if (options.allowStoredJobs === undefined) options.allowStoredJobs = true;
+  // sharing a stored job, and loading the ones others shared (lib/storedJobScope.js) : the admins'
+  if (options.allowStoredJobsShare === undefined) options.allowStoredJobsShare = isAdmin;
+  if (options.allowStoredJobsViewAll === undefined) options.allowStoredJobsViewAll = isAdmin;
   // a form's file fields, uploaded to the server : on unless a role turns it off
   if (options.allowFileUploads === undefined) options.allowFileUploads = true;
   // deleting jobs (their own ; every job for an admin) : on unless a role turns it off

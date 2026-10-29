@@ -353,7 +353,9 @@ const crudConfigs = {
       { name: 'username', required: true },
       { name: 'form_data', required: true },
       { name: 'created_at', isDatetime: true },
-      { name: 'expires_at', isDatetime: true }
+      { name: 'expires_at', isDatetime: true },
+      // private or shared (lib/storedJobScope.js)
+      { name: 'visibility' }
     ],
     allowCache: false
   }

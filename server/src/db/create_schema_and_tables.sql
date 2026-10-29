@@ -524,6 +524,7 @@ CREATE TABLE `stored_jobs` (
   `form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `expires_at` DATETIME DEFAULT NULL,
+  `visibility` VARCHAR(10) NOT NULL DEFAULT 'private',
   UNIQUE KEY `uk_user_form_name` (`username`, `form_name`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

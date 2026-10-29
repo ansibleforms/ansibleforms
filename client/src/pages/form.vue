@@ -558,6 +558,7 @@ const storeForm = ref({
   name: '',
   description: '',
   expires_at: null,
+  shared: false,
 });
 const storeSubmitting = ref(false);
 
@@ -574,14 +575,28 @@ const loadSubmitting = ref(false);
 //     title: string,          // displayed in the off-canvas header
 //     getData: () => object,  // payload to serialise on Save
 //     onLoad: (parsed) => void // applies a loaded record
+//     sharing: boolean,       // the form lets its stored jobs be shared (allowStoredJobSharing)
 //   }
 const storeCtx = ref(null);
+
+// the Store dialog's Share switch : the allowStoredJobsShare role option, on a form that does not
+// turn sharing off
+const canShareStored = computed(
+  () =>
+    !!store.profile?.options?.allowStoredJobsShare &&
+    (storeCtx.value
+      ? storeCtx.value.sharing
+      : !!currentForm.value && currentForm.value.allowStoredJobSharing !== false),
+);
+// the caller, as the owner of a stored job is written : another user's in the Load list is shared
+const storedJobOwner = computed(() => `${store.profile?.type || 'local'}/${store.profile?.username}`);
 
 function buildMainStoreCtx() {
   return {
     scope: 'form',
     formName: currentForm.value.name,
     title: currentForm.value.name,
+    sharing: currentForm.value?.allowStoredJobSharing !== false,
     getData: () => {
       // Wizard forms persist per-step drafts (without password values)
       // instead of merged extravars. That makes load-from-store
@@ -1443,6 +1458,7 @@ function openStoreOffcanvas() {
     name: '',
     description: '',
     expires_at: null,
+    shared: false,
   };
 
   showStoreOffcanvas.value = true;
@@ -1470,6 +1486,7 @@ async function createStoredJob() {
       form_name: ctx.formName,
       form_data: JSON.stringify(ctx.getData()),
       expires_at: storeForm.value.expires_at || null,
+      visibility: canShareStored.value && storeForm.value.shared ? 'shared' : 'private',
     };
 
     await axios.post('/api/v2/stored-jobs', storedJobData);
@@ -1539,6 +1556,7 @@ function handleSubformAction(entry, { action, value }) {
     scope: 'subform',
     formName: entry.subform.name,
     title: entry.subform.description || entry.subform.name,
+    sharing: entry.subform.allowStoredJobSharing !== false,
     getData: () => value,
     onLoad: (parsed) => {
       entry.snapshot = parsed;
@@ -2605,6 +2623,22 @@ onBeforeUnmount(() => {
           :disabled="storeSubmitting"
         />
       </div>
+
+      <!-- shared : the users with allowStoredJobsViewAll can load it too ; it stays yours -->
+      <div v-if="canShareStored" class="mb-3">
+        <div class="form-check form-switch">
+          <input
+            id="af-store-shared"
+            v-model="storeForm.shared"
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            :disabled="storeSubmitting"
+          />
+          <label class="form-check-label" for="af-store-shared">{{ t('form.shareStoredJob') }}</label>
+        </div>
+        <div class="form-text">{{ t('form.shareStoredJobHelp') }}</div>
+      </div>
     </template>
     <template #actions>
       <button class="btn btn-primary" @click="createStoredJob" :disabled="storeSubmitting">
@@ -2643,7 +2677,17 @@ onBeforeUnmount(() => {
         >
           <div class="d-flex w-100 justify-content-between align-items-start">
             <div>
-              <h6 class="mb-1">{{ job.name }}</h6>
+              <h6 class="mb-1">
+                {{ job.name }}
+                <!-- another user's, shared with the caller : whose it is -->
+                <span v-if="job.username !== storedJobOwner" class="badge text-bg-secondary ms-1 fw-normal">
+                  <FaIcon icon="user" class="me-1" />{{ job.username }}
+                </span>
+                <!-- the caller's own, shared with others -->
+                <span v-else-if="job.visibility === 'shared'" class="badge text-bg-info ms-1 fw-normal">
+                  <FaIcon icon="share-nodes" class="me-1" />{{ t('form.storedJobShared') }}
+                </span>
+              </h6>
               <p v-if="job.description" class="mb-1 small text-muted">{{ job.description }}</p>
               <small class="text-muted">
                 {{ t('form.created') }}: {{ Time.format(job.created_at) }}
