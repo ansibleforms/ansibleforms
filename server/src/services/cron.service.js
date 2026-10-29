@@ -385,6 +385,21 @@ class CronService {
   }
 
   /**
+   * Add or update the task of a schedule as it is stored : every timing it has, its rrule too, so
+   * a schedule of a schedules repository is timed by its rrule wherever it is registered from (the
+   * schedule routes, the MCP tools, the resync).
+   *
+   * Args:
+   *   row (object): the schedule's row ({ id, name, cron, one_time_run, run_at, rrule }).
+   *
+   * Returns:
+   *   Promise<void>|undefined: what addSchedule returns (settled once a rrule's task is registered).
+   */
+  addScheduleRow(row) {
+    return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.run_at, row.rrule);
+  }
+
+  /**
    * Remove a schedule cron job
    */
   removeSchedule(id) {
@@ -453,7 +468,7 @@ class CronService {
       const registering = [];
       for (const [id, r] of wanted) {
         if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.run_at, r.rrule)) {
-          registering.push(this.addSchedule(r.id, r.name, r.cron, r.one_time_run, r.run_at, r.rrule));
+          registering.push(this.addScheduleRow(r));
         }
       }
       await Promise.all(registering);

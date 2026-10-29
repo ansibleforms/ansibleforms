@@ -401,10 +401,10 @@ export function createHandlers({ user, deps, policy = {} }) {
     return { drafts, skipped: skips, stale };
   }
 
-  /** The cron service runs it from now on (the schedule routes do the same). */
+  /** The cron service runs it from now on, by its rrule when it has one (as the schedule routes do). */
   async function registered(id) {
     const row = await Schedule.findById(id);
-    cron?.addSchedule?.(row.id, row.name, row.cron, row.one_time_run, row.run_at);
+    cron?.addScheduleRow?.(row);
     return row;
   }
 

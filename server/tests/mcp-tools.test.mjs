@@ -488,7 +488,14 @@ describe("MCP schedules", () => {
       // the model's own next run, for a row read alone (the scheduler's zone : not the point here)
       withNextRun: vi.fn((row) => ({ ...row, next_run: row.cron ? "2031-01-01T22:00:00.000Z" : row.run_at && new Date(row.run_at) > new Date() ? row.run_at : null })),
     };
-    deps.cron = { addSchedule: vi.fn(), removeSchedule: vi.fn() };
+    // the cron service's own addScheduleRow : every timing of the row, its rrule too
+    deps.cron = {
+      addSchedule: vi.fn(),
+      removeSchedule: vi.fn(),
+      addScheduleRow(row) {
+        return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.run_at, row.rrule);
+      },
+    };
     deps.appTimezone = vi.fn(async () => "Europe/Madrid");
     deps.Job.maskExtravars = vi.fn(async (_form, text) => text.replace(/"password":"[^"]*"/, '"password":"**NOLOG**"'));
   });
@@ -519,7 +526,7 @@ describe("MCP schedules", () => {
     // the raw values for the launch validation when it fires : never the password
     expect(data.raw_form_data).toMatchObject({ cluster: "c1", name: "v1" });
     expect(data.raw_form_data.secret).toBeUndefined();
-    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "tonight", undefined, true, later.toISOString());
+    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "tonight", undefined, true, later.toISOString(), undefined);
     expect(r.data).toMatchObject({ runAt: later.toISOString(), timezone: "Europe/Madrid" });
     expect(r.data.runAtLocal).toMatch(/ Europe\/Madrid$/);
     expect(r.data.payloadHash).toMatch(/^sha256:[0-9a-f]{64}$/);
@@ -561,6 +568,20 @@ describe("MCP schedules", () => {
     // a blank cron is none : with no run_at either, refused rather than a schedule that never runs
     expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "blank", cron: "   " } })).structuredContent.code).toBe("invalid_request");
     await expect(createHandlers({ user: planner, deps }).createSchedule({ form: "Create volume", name: "x", cron: "0 1 * * *" })).rejects.toMatchObject({ code: "access_denied" });
+  });
+
+  test("create_schedule while a schedules repository is used : registered by the rrule it was given", async () => {
+    // the model writes it to the repository, its cron turned into a rrule
+    const rrule = "DTSTART;TZID=Europe/Madrid:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;BYHOUR=22;BYMINUTE=0";
+    const create = deps.Schedule.create;
+    deps.Schedule.create = vi.fn(async (data) => {
+      const id = await create(data);
+      rows.get(id).rrule = rrule;
+      return id;
+    });
+    const client = await connect(manager);
+    const r = await call(client, "create_schedule", { form: "Create volume", name: "weekdays", cron: "0 22 * * 1-5" });
+    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "weekdays", "0 22 * * 1-5", false, undefined, rrule);
   });
 
   test("a planner lists, reads and cancels their own runs only ; a manager sees all", async () => {

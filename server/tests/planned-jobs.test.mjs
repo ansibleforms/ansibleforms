@@ -52,7 +52,7 @@ vi.mock("../src/models/db.model.js", () => ({
 }));
 
 vi.mock("../src/services/cron.service.js", () => ({
-  default: { removeSchedule: () => {}, addSchedule: () => {} },
+  default: { removeSchedule: () => {}, addSchedule: () => {}, addScheduleRow: () => {} },
 }));
 
 // the forms each role may run : 'Demo Form' for 'users', 'Admin Form' for admins only

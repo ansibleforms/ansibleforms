@@ -44,7 +44,7 @@ const scheduleController = {
       const created = await Schedule.findById(insertId);
       // Add to cron service
       logger.info(`Adding schedule '${created.name}' (ID: ${created.id}) to cron service`);
-      cronService.addSchedule(created.id, created.name, created.cron, created.one_time_run, created.run_at, created.rrule);
+      cronService.addScheduleRow(created);
       return res.status(201).json(RestResult.single(i18n.t(req, 'resources.scheduleAdded'), created));
     } catch (err) {
       Errors.ReturnError(res, err);
@@ -67,7 +67,7 @@ const scheduleController = {
       const updated = await Schedule.findById(req.params.id);
       // Update cron service with complete record
       logger.info(`Updating schedule '${updated.name}' (ID: ${updated.id}) in cron service`);
-      cronService.addSchedule(updated.id, updated.name, updated.cron, updated.one_time_run, updated.run_at, updated.rrule);
+      cronService.addScheduleRow(updated);
       return res.json(RestResult.single(updated));
     } catch (err) {
       Errors.ReturnError(res, err);
