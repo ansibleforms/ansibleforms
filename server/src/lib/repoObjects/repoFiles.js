@@ -48,6 +48,12 @@ const FORM_LINE = /^["']?type["']?[ \t]*:/m;
 // a file written as one flow map ({ credentials: [...] }) : parsed too
 const FLOW_START = /^(?:\s*(?:#[^\n]*)?\n)*\s*(?:---\s*\n\s*)?\{/;
 
+// a document marker line (--- or ...) : a text with one may hold several documents
+const DOC_MARKER = /^(?:---|\.\.\.)(?:[ \t]|\r?$)/m;
+
+// the byte order mark some editors write at a text's start
+const BOM = /^\uFEFF/;
+
 // ===========================================================================
 // ONE FILE
 // ===========================================================================
@@ -67,10 +73,49 @@ function hintedKeys(text) {
 }
 
 /**
+ * A text with the indent of its top level taken off its lines : a top-level map may be written
+ * indented (  credentials:), its keys then read at the start of their lines as any other's. The
+ * top level's indent is the one of its first line that is not blank, a comment or a document
+ * marker or directive.
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   string: the text, its lines starting with that indent without it ; the text as it is when its
+ *     top level is not indented.
+ */
+function dedented(text) {
+  const first = text.split(/\r?\n/).find((line) => line.trim() && !/^\s*#/.test(line) && !/^(?:---|\.\.\.|%)/.test(line));
+  const indent = first ? first.match(/^[ \t]*/)[0] : "";
+  if (!indent) return text;
+  return text
+    .split("\n")
+    .map((line) => (line.startsWith(indent) ? line.slice(indent.length) : line))
+    .join("\n");
+}
+
+/**
+ * Whether a text holds more than one YAML document (parsed only when it has a document marker).
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   boolean: true when it holds several documents.
+ */
+function severalDocuments(text) {
+  if (!DOC_MARKER.test(text)) return false;
+  return YAML.parseAllDocuments(text, { prettyErrors: false }).length > 1;
+}
+
+/**
  * What a YAML text holds of the types : the type keys it gives at its top level with a list or a
  * map under them (or nothing yet), and their values. A form (a map with a `type` key, as every form
- * has), a list (a playbook) or any other value holds none. A text that cannot be read (not valid YAML, keys given twice, too many aliases) holds none
- * either, the keys its lines seem to give said (hints).
+ * has), a list (a playbook) or any other value holds none. A text that cannot be read (not valid
+ * YAML, keys given twice, too many aliases, several documents) holds none either, the keys its
+ * lines seem to give said (hints). A byte order mark at its start is left out, and its top-level
+ * map may be indented.
  *
  * Args:
  *   text (string): the text.
@@ -82,10 +127,19 @@ function hintedKeys(text) {
  */
 export function contentOf(text) {
   const none = { keys: [], data: {}, errors: [], hints: [] };
-  const source = String(text ?? "");
+  // its byte order mark left out : the first line's key read as any other
+  const source = String(text ?? "").replace(BOM, "");
+  // its lines as they are at its top level, even when that is indented
+  const lines = dedented(source);
+  const hints = hintedKeys(lines);
+  // several documents : never one type's file, whatever their lines say (a type line of a later
+  // document makes no form of it) - said unreadable when its lines give a type's key, so that what
+  // it held is kept, never taken for gone
+  if (hints.length && severalDocuments(source)) {
+    return { ...none, errors: ["not valid YAML: it holds several documents (--- lines) ; a type's file holds one"], hints };
+  }
   // a form (its type at its top level) : none, never parsed here
-  if (FORM_LINE.test(source)) return none;
-  const hints = hintedKeys(source);
+  if (FORM_LINE.test(lines)) return none;
   if (!hints.length && !FLOW_START.test(source)) return none;
   const doc = YAML.parseDocument(source, { prettyErrors: false });
   if (doc.errors.length) return { ...none, errors: [`not valid YAML: ${doc.errors[0].message}`], hints };

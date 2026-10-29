@@ -35,7 +35,7 @@ vi.mock("../src/lib/liveEvents.js", () => ({ publish: () => {}, onLive: () => {}
 const fx = await import("./fixtures/repoObjects.mjs");
 const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
-const { contentOf, scanRepository } = await import("../src/lib/repoObjects/repoFiles.js");
+const { contentOf, scanRepository, holdsTypeKeys } = await import("../src/lib/repoObjects/repoFiles.js");
 const keys = await import("../src/lib/configKeys.js");
 const credentials = await RepoObjects.descriptorOf("credentials");
 const runners = await RepoObjects.descriptorOf("runners");
@@ -211,6 +211,29 @@ describe("what a file not read held stays as it is", () => {
     assert.equal((await sync(credentials)).deleted, 0);
   });
 
+  test("a byte order mark, an indented top level : read as any file ; several documents : unreadable, never none", async () => {
+    write("ops", "x.yaml", "credentials:\n  - name: a\n    credential_type: git\n    user: bot\n");
+    assert.equal((await sync(credentials)).created, 1);
+    // a byte order mark before its first key : the same file, nothing deleted
+    write("ops", "x.yaml", "﻿credentials:\n  - name: a\n    credential_type: git\n    user: bot\n");
+    assert.deepEqual(contentOf(fx.textOf("ops", "x.yaml")).keys, ["credentials"]);
+    let summary = await sync(credentials);
+    assert.equal(summary.deleted, 0);
+    assert.equal(fx.rowNamed("credentials", "a").repo_file, "x.yaml");
+    assert.equal(holdsTypeKeys(path.join(fx.ROOT, "ops", "x.yaml")), true, "never a designer's file");
+    // its top-level map indented : read
+    assert.deepEqual(contentOf("  credentials:\n    - name: a\n").data, { credentials: [{ name: "a" }] });
+    // several documents, a later one with a type line : unreadable, what it held kept
+    write("ops", "x.yaml", "credentials:\n  - name: a\n    credential_type: git\n    user: bot\n---\ntype: x\n");
+    summary = await sync(credentials);
+    assert.equal(summary.deleted, 0);
+    assert.deepEqual(summary.refused.map((r) => r.file), ["x.yaml"]);
+    assert.match(summary.refused[0].reasons[0], /several documents/);
+    assert.deepEqual(contentOf("credentials:\n  - name: a\n---\nfoo: 1\n").hints, ["credentials"]);
+    // one document, a leading marker : read
+    assert.deepEqual(contentOf("---\ncredentials:\n  - name: a\n...\n").keys, ["credentials"]);
+  });
+
   test("a refused entry with no name : the objects of its file whose entries are gone are kept", async () => {
     write("ops", "x.yaml", { credentials: [git("a"), git("b")] });
     write("ops", "y.yaml", { credentials: [git("c")] });
@@ -281,6 +304,12 @@ describe("the roles, the categories and the constants, by their key", () => {
     const sources = await keys.keySources();
     assert.deepEqual(sources.map((s) => [s.key, s.file, s.exists]), [["roles", "team/access.yml", true], ["constants", "team/access.yml", true]]);
     assert.deepEqual(await keys.repositoryKeyProblems("access"), []);
+  });
+
+  test("a file giving them with a byte order mark : read", async () => {
+    write("access", "roles.yaml", "﻿roles:\n  - name: admin\n    groups:\n      - local/admins\n");
+    assert.deepEqual(await keys.repositoryKeyProblems("access"), []);
+    assert.deepEqual((await keys.keySources()).map((s) => [s.key, s.file, s.exists])[0], ["roles", "roles.yaml", true]);
   });
 
   test("two files giving them : neither read, both named", async () => {
