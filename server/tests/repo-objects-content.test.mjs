@@ -192,6 +192,13 @@ describe("an object is its name within its type", () => {
     for (const n of ["a2", "b2", "c2"]) assert.ok(!Object.values(ids).includes(fx.rowNamed("credentials", n).id), n);
   });
 
+  test("an object of the app an entry of its name takes over : said replaced by that entry", async () => {
+    fx.state.tables.credentials.push({ id: 30, name: "mine", credential_type: "git", user: "app", repository: null, repo_file: null });
+    write("ops", "x.yaml", { credentials: [git("mine")] });
+    const summary = await sync(credentials);
+    assert.match(RepoObjects.summaryText(credentials, summary), /\nReplaced by the entry of the same name: mine/);
+  });
+
   test("an entry moved to another file : its object follows, nothing else changes", async () => {
     write("ops", "x.yaml", { credentials: [git("a"), git("b")] });
     await sync(credentials);

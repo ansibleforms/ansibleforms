@@ -1083,7 +1083,7 @@ export function summaryText(desc, summary) {
   const lines = [
     `${titleOf(desc)}: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ${summary.unchanged} unchanged, ${summary.refused.length} refused${waiting.length ? `, ${waiting.length} waiting` : ""}`,
   ];
-  if (summary.matched.length) lines.push(`Replaced by the file of the same name: ${summary.matched.join(", ")}`);
+  if (summary.matched.length) lines.push(`Replaced by the entry of the same name: ${summary.matched.join(", ")}`);
   lines.push(...detailLines(summary));
   return "\n" + lines.join("\n");
 }
