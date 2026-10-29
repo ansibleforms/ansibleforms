@@ -118,6 +118,15 @@ describe("a type's list in a file", () => {
   });
 });
 
+describe("a file shared with other keys written in flow style", () => {
+  test("an entry edited : the other keys' flow lists and maps kept as they were written", () => {
+    const text = "controller_credentials:\n  - name: a\n    user: bot\nowners: [ops@x]\nother: {a: 1,b: [x,y]}\nq: \"[ a ]\"\n";
+    assert.equal(updateListEntry(text, "controller_credentials", "a", { user: "bot2" }), text.replace("user: bot\n", "user: bot2\n"));
+    const added = appendListEntries(text, "controller_credentials", [{ name: "b" }]);
+    assert.ok(added.includes("owners: [ops@x]\nother: {a: 1,b: [x,y]}\n"), added);
+  });
+});
+
 describe("entries added to a list", () => {
   test("one whose name is there already : left as it is, its name said to the caller", () => {
     const skipped = [];

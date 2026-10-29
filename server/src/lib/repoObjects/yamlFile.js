@@ -93,7 +93,40 @@ export function setKey(doc, map, key, value, keyOrder = []) {
 function comparedLine(line) {
   const text = line.replace(/\s+$/, "");
   const at = commentAt(text);
-  return at < 0 ? text : `${text.slice(0, at).replace(/[ \t]+$/, "")} ${text.slice(at)}`;
+  return at < 0 ? flowUnpadded(text) : `${flowUnpadded(text.slice(0, at).replace(/[ \t]+$/, ""))} ${text.slice(at)}`;
+}
+
+/**
+ * A line's flow collections without their spacing, outside its quoted values : the writer pads
+ * them ([ops@x] written [ ops@x ], [a,b] written [ a, b ]), a line changed only there is untouched.
+ *
+ * Args:
+ *   text (string): the line, without its inline comment.
+ *
+ * Returns:
+ *   string: the line, no space after [ { or a comma, none before ] }.
+ */
+function flowUnpadded(text) {
+  if (!/[[{]/.test(text)) return text;
+  let out = "";
+  let quote = null;
+  let last = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      out += c;
+      if (quote === '"' && c === "\\") out += text[++i] ?? "";
+      else if (quote === "'" && c === "'" && text[i + 1] === "'") out += text[++i];
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if ((c === '"' || c === "'") && (last === "" || /[:\-[{,]/.test(last))) quote = c;
+    // a space after an opening bracket or a comma, or before a closing one : left out
+    if (/[ \t]/.test(c) && (/[[{,]/.test(last) && /[[{,]/.test(out.slice(-1)) || /^[ \t]*[\]}]/.test(text.slice(i)))) continue;
+    out += c;
+    if (!/[ \t]/.test(c)) last = c;
+  }
+  return out;
 }
 
 /**
