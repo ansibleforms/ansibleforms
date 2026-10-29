@@ -23,7 +23,7 @@ import Errors from "./errors.js";
 import mysql from "../models/db.model.js";
 import Repo from "../models/repo.model.js";
 import _ from "lodash";
-import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js";
+import { updateMapFile, newMapFile, editedText, parseDocument, keptAsParsed, writtenText } from "./repoObjects/yamlFile.js";
 import { scanRepository } from "./repoObjects/repoFiles.js";
 import { fileKeyOf, typeKeyOf } from "./repoObjects/types.js";
 
@@ -197,7 +197,7 @@ const keyOf = (pair) => (YAML.isScalar(pair.key) ? pair.key.value : pair.key);
  *   Error: not valid YAML, or not a map.
  */
 function mapDocument(text) {
-  const doc = YAML.parseDocument(String(text ?? ""));
+  const doc = parseDocument(text);
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
   if (doc.contents === null || doc.contents === undefined) doc.contents = doc.createNode({});
   if (!YAML.isMap(doc.contents)) throw new Error("not a YAML dictionary");
@@ -221,6 +221,9 @@ function mapDocument(text) {
  *     a key's file).
  *   from (YAML.Document): the document that gives it (mapDocument).
  *   fromKey (string): the key as `from` writes it ; the same when not given.
+ *   written (boolean): true (a key saved into a file) : its lists and maps written in block style
+ *     ("- " items, one key a line), whatever style `from` gives them ; false (the configuration
+ *     shown) : as `from` writes them.
  *
  * Returns:
  *   string: the text, as it is when `from` has no such key.
@@ -228,7 +231,7 @@ function mapDocument(text) {
  * Raises:
  *   Error: the text is not valid YAML, or not a map.
  */
-function withKeyOf(text, key, from, fromKey = key) {
+function withKeyOf(text, key, from, fromKey = key, written = true) {
   const pair = from.contents.items.find((p) => keyOf(p) === fromKey);
   if (!pair) return text;
   const original = String(text ?? "");
@@ -251,7 +254,9 @@ function withKeyOf(text, key, from, fromKey = key) {
       if (YAML.isScalar(newKey)) newKey.value = key;
       doc.contents.items.push(doc.createPair(newKey, value));
     }
-    return original.trim() ? editedText(doc, original) : doc.toString({ lineWidth: 0 });
+    // shown : its flow lists and maps as `from` writes them ; saved : in block style (editedText)
+    if (!written) keptAsParsed(doc, value);
+    return original.trim() ? editedText(doc, original) : writtenText(doc);
   };
   const readsAsWanted = (out) => {
     const doc = YAML.parseDocument(out);
@@ -408,7 +413,8 @@ export function composeConfig(baseText, sources, render) {
       if (!from && closed) from = { doc: mapDocument(YAML.stringify({ [s.key]: closed })), key: s.key };
       if (!from) continue;
     }
-    text = withKeyOf(text, s.key, from.doc, from.key);
+    // the key as its file writes it : the configuration shown, never written from here
+    text = withKeyOf(text, s.key, from.doc, from.key, false);
   }
   return text;
 }

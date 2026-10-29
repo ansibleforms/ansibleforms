@@ -515,10 +515,10 @@ describe("a config.yaml of before giving several keys, one of them not read", ()
   const base = "roles:\n  - name: base-role\ncategories:\n  - name: Base\n";
 
   test("its roles broken : the roles last read, never the broken ones the categories' read of the same file kept", async () => {
-    let file = "roles:\n  - name: admin\n    groups: [local/admins]\ncategories:\n  - name: Ops\n";
+    let file = "roles:\n  - name: admin\n    groups:\n      - local/admins\ncategories:\n  - name: Ops\n";
     const src = sources("legacy-roles");
     assert.deepEqual(YAML.parse(keys.composeConfig(base, src, () => file)).roles, [{ name: "admin", groups: ["local/admins"] }]);
-    file = "roles:\n  admin:\n    groups: [local/admins]\ncategories:\n  - name: Ops\n";
+    file = "roles:\n  admin:\n    groups:\n      - local/admins\ncategories:\n  - name: Ops\n";
     for (let i = 0; i < 3; i++) {
       const doc = YAML.parse(keys.composeConfig(base, src, () => file));
       assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }], `read ${i + 1}`);
@@ -643,5 +643,40 @@ describe("a key file not there to read : gone from its repository, or its reposi
     assert.deepEqual(doc.categories, [{ name: "Ops" }]);
     assert.deepEqual(doc.constants, { env: "prod" });
     assert.deepEqual((await keys.repositoryKeyProblems("gone-design")).map((p) => p.key), ["categories", "constants"]);
+  });
+});
+
+describe("the roles, categories and constants the app writes : block style, never flow", () => {
+  const FLOW_ROLES = "controller_roles: [{name: admin, groups: [local/admins], users: [root]}]\nnotes: [kept]\n";
+
+  test("roles saved from their values (Settings > Roles) : their groups and users in block style, the file's other flow keys as written", async () => {
+    writeRaw("access", "roles.yaml", FLOW_ROLES);
+    fx.cloneEmpty("design");
+    const sources = await keys.keySources();
+    await keys.writeConfigKeys({ roles: [{ name: "admin", groups: ["local/admins", "corp/ops"], users: ["root"] }] }, sources, { claim: false });
+    assert.equal(
+      read(path.join(fx.ROOT, "access", "roles.yaml")),
+      "controller_roles:\n  - name: admin\n    groups:\n      - local/admins\n      - corp/ops\n    users:\n      - root\nnotes: [kept]\n",
+    );
+    // a new key file, a dictionary with a list : the same
+    await keys.writeConfigKeys({ categories: [{ name: "Ops", icon: "bars" }], constants: { hosts: ["a", "b"], db: { port: 1 } } }, sources, { claim: false });
+    assert.equal(read(path.join(fx.ROOT, "design", "constants.yaml")), "controller_constants:\n  hosts:\n    - a\n    - b\n  db:\n    port: 1\n");
+  });
+
+  test("shown as the file writes them ; saved from the editor's text in flow style, written in block style", async () => {
+    writeRaw("access", "roles.yaml", FLOW_ROLES);
+    fx.cloneEmpty("design");
+    const sources = await keys.keySources();
+    const shown = keys.composeConfig(read(BASE), sources, read);
+    assert.match(shown, /^roles: \[ ?\{ ?name: admin, groups: \[ ?local\/admins ?\], users: \[ ?root ?\] ?\} ?\]\n/m);
+    const text = shown.replace(/users: \[ ?root ?\]/, "users: [root, bob]");
+    await keys.writeConfigKeys(YAML.parse(text), sources, { claim: false, text, served: YAML.parse(shown) });
+    assert.equal(
+      read(path.join(fx.ROOT, "access", "roles.yaml")),
+      "controller_roles:\n  - name: admin\n    groups:\n      - local/admins\n    users:\n      - root\n      - bob\nnotes: [kept]\n",
+    );
+    // the base saved from a text : a key it writes in block style too
+    const base = keys.mergeIntoBase("# ours\nextra: 1\n", { extra: { hosts: ["a"] } }, { extra: 1 }, { text: "extra: {hosts: [a]}\n" });
+    assert.equal(base, "# ours\nextra:\n  hosts:\n    - a\n");
   });
 });

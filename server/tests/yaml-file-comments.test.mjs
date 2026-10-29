@@ -179,3 +179,62 @@ describe("a large file", () => {
     assert.equal(updateListEntry(text, "repositories", "r5", { branch: "dev" }, ["name", "branch"]), rendered);
   });
 });
+
+describe("the lists and maps the app writes : block style, never flow", () => {
+  // a file of the user's own, its lists and maps in flow style
+  const FLOW = "controller_credentials: [{name: a, owners: [ops, dev]}]\nlabels: [web, db]   # ours\nextra: {a: 1, b: [x, y]}\n";
+
+  test("a new entry : written in block style, the list it joins too ; the entries and keys it leaves as written", () => {
+    const out = appendListEntries(FLOW, "controller_credentials", [{ name: "b", owners: ["ops"], tags: { env: "prod" } }]);
+    assert.equal(
+      out,
+      "controller_credentials:\n  - {name: a, owners: [ops, dev]}\n  - name: b\n    owners:\n      - ops\n    tags:\n      env: prod\nlabels: [web, db]   # ours\nextra: {a: 1, b: [x, y]}\n",
+    );
+  });
+
+  test("a value the app edits that the file writes as a flow list : the new value in block style", () => {
+    const text = "controller_roles:\n  - name: admin\n    groups: [local/admins]\n    users: [root]   # who\n";
+    const out = updateListEntry(text, "controller_roles", "admin", { groups: ["local/admins", "local/ops"] });
+    assert.equal(out, "controller_roles:\n  - name: admin\n    groups:\n      - local/admins\n      - local/ops\n    users: [root]   # who\n");
+    // a list emptied : [], the only way YAML writes an empty one
+    assert.match(updateListEntry(text, "controller_roles", "admin", { users: [] }), /\n {4}users: \[\] {3}# who\n$/);
+  });
+
+  test("an entry written as one flow map : edited, it is written in block style, its lists too", () => {
+    const text = "controller_roles:\n  - {name: admin, groups: [local/admins], users: [root]}\n  - {name: ops, groups: [local/ops]}\n";
+    const out = updateListEntry(text, "controller_roles", "admin", { groups: ["local/admins", "corp/admins"], users: ["root", "bob"] });
+    assert.equal(
+      out,
+      "controller_roles:\n  - name: admin\n    groups:\n      - local/admins\n      - corp/admins\n    users:\n      - root\n      - bob\n  - {name: ops, groups: [local/ops]}\n",
+    );
+  });
+
+  test("a type's single map holding a list : the map and the list in block style, a flow map in it left as written", () => {
+    const text = "controller_links: {show_designer: true, header_links: [], style: {x: 1}}\n";
+    const out = editMapEntry(text, "controller_links", (doc, map) => applyEdits(doc, map, { header_links: [{ id: "docs", label: "Docs", url: "https://d", newTab: true }] }));
+    assert.equal(out, "controller_links:\n  show_designer: true\n  header_links:\n    - id: docs\n      label: Docs\n      url: https://d\n      newTab: true\n  style: {x: 1}\n");
+    // a map file (a whole type's file) : the same
+    assert.equal(updateMapFile("a: 1\nb: [x]\nc: [y]\n", { b: ["x", "z"] }), "a: 1\nb:\n  - x\n  - z\nc: [y]\n");
+  });
+
+  test("several objects written at once (a usage turned on) : each in block style, new file or not", () => {
+    const entries = [
+      { name: "a", owners: ["ops"], extra: { k: [1, 2] } },
+      { name: "b", owners: ["dev", "qa"] },
+    ];
+    const block = "controller_credentials:\n  - name: a\n    owners:\n      - ops\n    extra:\n      k:\n        - 1\n        - 2\n  - name: b\n    owners:\n      - dev\n      - qa\n";
+    assert.equal(appendListEntries("", "controller_credentials", entries), block);
+    assert.equal(appendListEntries("controller_credentials: []\n", "controller_credentials", entries), block);
+    assert.equal(appendListEntries("# ours\nnotes: [kept]\n", "controller_credentials", entries), `# ours\nnotes: [kept]\n${block}`);
+  });
+
+  test("a file written padded ([ a ]) : a flow node kept on a rewritten line padded as the file pads them", () => {
+    const text = "controller_roles:\n  - { name: admin, groups: [ local/admins ], users: [ root ] }\n";
+    assert.equal(updateListEntry(text, "controller_roles", "admin", { groups: ["x"] }), "controller_roles:\n  - name: admin\n    groups:\n      - x\n    users: [ root ]\n");
+  });
+
+  test("flow style still read, and a file saved with nothing changed byte for byte", () => {
+    assert.deepEqual(parseMapFile(FLOW).object, { controller_credentials: [{ name: "a", owners: ["ops", "dev"] }], labels: ["web", "db"], extra: { a: 1, b: ["x", "y"] } });
+    assert.equal(updateListEntry(FLOW, "controller_credentials", "a", { owners: ["ops", "dev"] }), FLOW);
+  });
+});

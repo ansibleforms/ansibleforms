@@ -3,8 +3,10 @@
 // a file (a list of objects under each, or one map), an entry of a list or a type's map written
 // back with only the fields the app changed - the keys it does not know, the other entries and
 // keys of the file, their comments and their order kept as the file has them, a new key put at
-// its place in the type's key order. Pure, no database : the schedules (lib/scheduleFiles.js) and
-// every other object type write through these.
+// its place in the type's key order. Every list and map the app writes is in block style ("- "
+// items, one key a line), never flow ([a, b], {a: 1}) ; a flow one of the file the edit leaves as
+// it is stays as written. Pure, no database : the schedules (lib/scheduleFiles.js), the roles,
+// categories and constants (lib/configKeys.js) and every other object type write through these.
 import fs from "fs";
 import path from "path";
 import YAML from "yaml";
@@ -15,6 +17,132 @@ import YAML from "yaml";
 
 // an object's file : yaml
 export const YAML_FILE = /\.(yaml|yml)$/i;
+
+// the flow collections ([a, b], {a: 1}) of the documents parsed by parseDocument, each with its
+// value as it was parsed (as JSON) : one still holding that value is the file's own, written as the
+// file has it ; any other the app wrote, written in block style (blockWhereWritten)
+const PARSED_FLOW = new WeakMap();
+
+// the documents parsed by parseDocument whose flow collections are written padded ([ a, b ]) or
+// not ([a, b]) : a flow collection kept on a line the edit rewrites is written as the file writes
+// them
+const FLOW_PADDING = new WeakMap();
+
+// ===========================================================================
+// THE FILE : PARSED
+// ===========================================================================
+
+/**
+ * A collection's value, as JSON : what tells a flow collection the app changed from one it left as
+ * it was.
+ *
+ * Args:
+ *   doc (YAML.Document): the document, its aliases resolved in.
+ *   node (YAMLMap|YAMLSeq): the collection.
+ *
+ * Returns:
+ *   string|null: its value as JSON ; null when it cannot be resolved (too many aliases).
+ */
+function valueJson(doc, node) {
+  try {
+    return JSON.stringify(node.toJS(doc));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A file's text parsed as the app edits it : each of its flow collections remembered with its
+ * value, so that the text written (editedText) keeps the ones the edit leaves as they are and writes
+ * every other list and map in block style.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   options (object): the YAML parser's options.
+ *
+ * Returns:
+ *   YAML.Document: the document.
+ */
+export function parseDocument(text, options = undefined) {
+  const source = String(text ?? "");
+  const doc = YAML.parseDocument(source, options);
+  if (!doc.errors.length) {
+    YAML.visit(doc, {
+      Collection(_, node) {
+        if (!node.flow) return;
+        PARSED_FLOW.set(node, valueJson(doc, node));
+        // the first one holding something tells how the file pads them
+        if (!FLOW_PADDING.has(doc) && node.items.length && node.range) FLOW_PADDING.set(doc, /^[[{][ \t]/.test(source.slice(node.range[0])));
+      },
+    });
+  }
+  return doc;
+}
+
+/**
+ * A node put into a document as another text writes it (a key the configuration shows as its file
+ * has it) : its flow collections taken as parsed (parseDocument), kept as they are written.
+ *
+ * Args:
+ *   doc (YAML.Document): the document it is in now.
+ *   node (YAML.Node): the node.
+ *
+ * Returns:
+ *   YAML.Node: the same node.
+ */
+export function keptAsParsed(doc, node) {
+  if (YAML.isNode(node)) {
+    YAML.visit(node, {
+      Collection(_, n) {
+        if (n.flow) PARSED_FLOW.set(n, valueJson(doc, n));
+      },
+    });
+  }
+  return node;
+}
+
+/**
+ * The lists and maps the app writes, in block style ("- " items, one key a line), never as flow
+ * ([a, b], {a: 1}) : a flow collection of the file the edit left as it was (its value the one
+ * parsed, parseDocument) is kept as the file has it ; one the edit changed, one holding a node the
+ * app wrote, and one the app made, are written in block style (an empty one is [] or {}, the only
+ * way YAML writes it, on its key's line).
+ *
+ * Args:
+ *   doc (YAML.Document): the document, edited.
+ *
+ * Returns:
+ *   YAML.Document: the same document.
+ */
+function blockWhereWritten(doc) {
+  YAML.visit(doc, {
+    Collection(_, node) {
+      // an empty one : [] or {} whatever its style, on its key's line (its comment after it)
+      if (!node.items.length) {
+        node.flow = true;
+        return;
+      }
+      if (!node.flow) return;
+      if (PARSED_FLOW.has(node) && PARSED_FLOW.get(node) === valueJson(doc, node)) return;
+      node.flow = false;
+    },
+  });
+  return doc;
+}
+
+/**
+ * The text of a document the app wrote : its lists and maps in block style (blockWhereWritten), no
+ * line folded, a flow collection of the file it keeps padded as the file pads them.
+ *
+ * Args:
+ *   doc (YAML.Document): the document.
+ *
+ * Returns:
+ *   string: its text.
+ */
+export function writtenText(doc) {
+  return blockWhereWritten(doc).toString({ lineWidth: 0, flowCollectionPadding: FLOW_PADDING.get(doc) ?? true });
+}
 
 // ===========================================================================
 // THE FILE : WRITTEN
@@ -297,9 +425,9 @@ function commonLines(ka, kb) {
 }
 
 /**
- * A document edited in place, as its file's new text : the writer's text, every line the edit
- * did not change kept as the file had it (keepUntouchedLines), its byte order mark and its CRLF
- * line ends kept.
+ * A document edited in place, as its file's new text : the writer's text (writtenText : what the
+ * edit wrote in block style), every line the edit did not change kept as the file had it
+ * (keepUntouchedLines), its byte order mark and its CRLF line ends kept.
  *
  * Args:
  *   doc (YAML.Document): the document, edited.
@@ -313,7 +441,7 @@ export function editedText(doc, original) {
   const text = String(original ?? "");
   const bom = text.startsWith("\uFEFF") ? "\uFEFF" : "";
   const crlf = /\r\n/.test(text);
-  const lines = keepUntouchedLines(text.slice(bom.length).replace(/\r\n/g, "\n"), doc.toString({ lineWidth: 0 }));
+  const lines = keepUntouchedLines(text.slice(bom.length).replace(/\r\n/g, "\n"), writtenText(doc));
   return bom + (crlf ? lines.replace(/\n/g, "\r\n") : lines);
 }
 
@@ -349,7 +477,7 @@ export function same(a, b) {
  *   Error: the file is not valid YAML, or not a map.
  */
 export function updateMapFile(text, edits, keyOrder = []) {
-  const doc = YAML.parseDocument(String(text ?? ""));
+  const doc = parseDocument(text);
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
   if (!YAML.isMap(doc.contents)) throw new Error("the file is not a YAML dictionary");
   const map = doc.contents;
@@ -508,7 +636,7 @@ export function staysIn(root, abs) {
  *   Error: not valid YAML, or not a map.
  */
 function mapDocument(text) {
-  const doc = YAML.parseDocument(String(text ?? ""));
+  const doc = parseDocument(text);
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
   if (doc.contents === null || doc.contents === undefined || (YAML.isScalar(doc.contents) && (doc.contents.value === null || doc.contents.value === undefined))) {
     doc.contents = doc.createNode({});
@@ -731,7 +859,7 @@ export function appendListEntries(text, key, entries, keyOrder = [], nameField =
     if (!entryOf(seq, entry[nameField], nameField, doc)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
     else skipped.push(entry[nameField]);
   }
-  return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
+  return String(text ?? "").trim() ? editedText(doc, text) : writtenText(doc);
 }
 
 /**
@@ -795,7 +923,7 @@ export function editMapEntry(text, key, mutate) {
   if (!YAML.isMap(map)) throw new Error(`'${key}' must be a dictionary`);
   if (!map.items.length) map.flow = false;
   mutate(doc, map);
-  return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
+  return String(text ?? "").trim() ? editedText(doc, text) : writtenText(doc);
 }
 
 /**

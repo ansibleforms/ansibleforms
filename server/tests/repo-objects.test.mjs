@@ -1120,3 +1120,18 @@ describe("the pull summary an activation reports", () => {
     assert.deepEqual(report.credentials.activated.matched, ["git"]);
   });
 });
+
+describe("a usage turned on over a file written in flow style", () => {
+  test("the app's objects written in block style, the list they join too ; the file's other flow keys and entries as written", async () => {
+    fx.writeFile("creds", ".", "credentials.yaml", 'controller_credentials: [{name: git, credential_type: git, user: bot, password: "${GIT_PW}"}]\nnotes: [kept]\n');
+    fx.state.tables.credentials.push({ id: 8, name: "smb", credential_type: "git", user: "u", password: "enc:pw" });
+    fx.state.tables.credentials.push({ id: 9, name: "web", credential_type: "git", user: "w", password: "enc:pw" });
+    const report = await RepoObjects.activate(credentials, "creds", { pull: false });
+    assert.deepEqual(report.written.sort(), ["smb", "web"]);
+    const text = fx.textOf("creds", "credentials.yaml");
+    assert.match(text, /^controller_credentials:\n {2}- \{name: git, credential_type: git, user: bot, password: "\$\{GIT_PW\}"\}\n {2}- name: smb\n/);
+    assert.match(text, /\n {2}- name: web\n {4}user: w\n {4}credential_type: git\n/);
+    assert.match(text, /\nnotes: \[kept\]\n$/);
+    assert.doesNotMatch(text.split("\n").slice(2, -2).join("\n"), /[[{]/);
+  });
+});
