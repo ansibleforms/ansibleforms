@@ -1698,14 +1698,20 @@ export async function usageReportText(report) {
  *
  * Returns:
  *   Promise<object>: the type's report : { error (what happened), turnedOff (whether the flag is
- *     off again) }.
+ *     off again : what its own pull linked before the wait unlinked again, kept in the app) }.
  */
 async function undoActivation(desc, name, e) {
   const why = `Repository '${name}' is busy (a pull or a push is running)`;
   try {
     await mysql.do("UPDATE AnsibleForms.`repositories` SET ? WHERE name = ?", [{ [desc.flag]: 0 }, name]);
     logger.warning(`${why}: the usage for ${holdingOf(desc)} is turned off again, nothing was handed over (${e.message || e})`);
-    return { error: `${why}: the usage was not turned on, nothing was read in nor written - save it again in a moment`, turnedOff: true };
+    // what the activation's own pull read in before the wait (its flag was on) : unlinked again,
+    // kept in the app - never linked to a repository that does not hold the type ; what that pull
+    // read is no activation's to say any more
+    synced.delete(syncedKey(desc, name));
+    const unlinked = desc.file ? 0 : await unlinkRepository(desc, name);
+    const what = unlinked ? `nothing was handed over (the ${unlinked} ${desc.noun}(s) its pull read in stay in the app, no longer linked to it)` : "nothing was read in nor written";
+    return { error: `${why}: the usage was not turned on, ${what} - save it again in a moment`, turnedOff: true };
   } catch (e2) {
     logger.error(`${why}, and its usage for ${holdingOf(desc)} could not be turned off again: ${e2.message || e2}`);
     return { error: `${why}: the usage is saved but nothing was handed over - turn it off, save, and turn it on again (${e2.message || e2})`, turnedOff: false };

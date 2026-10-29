@@ -944,6 +944,34 @@ describe("turning the usage on while the repository is busy", () => {
     assert.equal(fx.rowNamed("credentials", "app-cred").repository, "other");
   });
 
+  test("its own pull read the files in before the wait : what it linked is unlinked again, kept in the app", async () => {
+    fx.rowNamed("repositories", "creds").use_for_credentials = 0;
+    fx.cloneEmpty("other");
+    fx.writeFile("other", "credentials", "git.yaml", gitCredential("git"));
+    fx.rowNamed("repositories", "other").use_for_credentials = 1;
+    // the pull reads its object files in, as the model's pull does, then a push holds the claim
+    const pull = fx.repository.pull;
+    fx.repository.pull = async (name) => {
+      await RepoObjects.afterGit(name, fx.rowNamed("repositories", name));
+      fx.state.busy[name] = Infinity;
+    };
+    const wait = { ...Engine.CLAIM_WAIT };
+    Object.assign(Engine.CLAIM_WAIT, { totalMs: 30, everyMs: 10 });
+    let report;
+    try {
+      report = await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 });
+    } finally {
+      fx.repository.pull = pull;
+      Object.assign(Engine.CLAIM_WAIT, wait);
+      fx.state.busy = {};
+    }
+    assert.equal(report.credentials.turnedOff, true);
+    assert.match(report.credentials.error, /the usage was not turned on, nothing was handed over \(the 1 credential\(s\) its pull read in stay in the app, no longer linked to it\)/);
+    assert.equal(fx.rowNamed("repositories", "other").use_for_credentials, 0);
+    assert.ok(fx.rowNamed("credentials", "git"), "kept in the app");
+    assert.equal(fx.rowNamed("credentials", "git").repository ?? null, null);
+  });
+
   test("the flag that cannot be turned off again is said as it is", async () => {
     fx.rowNamed("repositories", "creds").use_for_credentials = 0;
     fx.cloneEmpty("other");
