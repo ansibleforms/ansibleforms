@@ -230,6 +230,17 @@ describe("an entry written back where the file uses anchors and aliases", () => 
     assert.equal(fx.rowNamed("credentials", "a"), undefined);
     assert.equal(fx.rowNamed("credentials", "b").user, "bot");
   });
+
+  test("an entry whose name is an alias : an app edit written into it, never a second entry", async () => {
+    write("ops", "creds.yaml", "x_names:\n  n: &n gitcred\ncredentials:\n  - name: *n\n    credential_type: git\n    user: bot\n");
+    await sync(credentials);
+    const before = { ...fx.rowNamed("credentials", "gitcred") };
+    fx.rowNamed("credentials", "gitcred").user = "bot2";
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appUpdated("credentials", before, before.id), true);
+    assert.match(fx.textOf("ops", "creds.yaml"), /- name: \*n\n {4}credential_type: git\n {4}user: bot2\n$/);
+    assert.deepEqual((await sync(credentials)).refused, []);
+  });
 });
 
 // ─── a file not read ───────────────────────────────────────────────────────────

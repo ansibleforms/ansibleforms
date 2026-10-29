@@ -140,6 +140,15 @@ describe("an entry another one takes a value from by an alias", () => {
     assert.equal(updateListEntry(TEXT, "credentials", "a", { description: "x" }), TEXT.replace("user: &u bot\n", "user: &u bot\n    description: x\n"));
   });
 
+  test("an entry whose name is an alias : found by the name it stands for, never added again", () => {
+    const text = "x_names:\n  n: &n gitcred\ncredentials:\n  - name: *n\n    user: bot\n";
+    assert.equal(updateListEntry(text, "credentials", "gitcred", { user: "bot2" }), text.replace("user: bot", "user: bot2"));
+    const skipped = [];
+    assert.equal(appendListEntries(text, "credentials", [{ name: "GitCred" }], [], "name", skipped), text);
+    assert.deepEqual(skipped, ["GitCred"]);
+    assert.equal(removeListEntry(text, "credentials", "gitcred").text, "x_names:\n  n: &n gitcred\n");
+  });
+
   test("a whole entry anchored and merged into another : removed, the other keeps what it took", () => {
     const text = "credentials:\n  - &base\n    name: a\n    user: bot\n  - <<: *base\n    name: b\n";
     const out = removeListEntry(text, "credentials", "a").text;

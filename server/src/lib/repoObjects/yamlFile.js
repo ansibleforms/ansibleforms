@@ -512,19 +512,25 @@ function listOf(doc, key) {
 
 /**
  * The entry of a name in a list : its map, or none ; names compared as the tables compare them
- * (case does not count).
+ * (case does not count), a name given by an alias (name: *n) compared by the value it stands for.
  *
  * Args:
  *   seq (YAMLSeq): the list.
  *   name (string): the entry's name.
  *   nameField (string): the field an entry is named by (a disclaimer version's : version).
+ *   doc (YAML.Document): the document, its aliases resolved in.
  *
  * Returns:
  *   YAMLMap|undefined: the entry.
  */
-function entryOf(seq, name, nameField = "name") {
+function entryOf(seq, name, nameField = "name", doc = null) {
   const key = String(name ?? "").trim().toLowerCase();
-  return seq.items.find((item) => YAML.isMap(item) && String(item.get(nameField) ?? "").trim().toLowerCase() === key);
+  const nameOf = (item) => {
+    let node = item.get(nameField, true);
+    if (YAML.isAlias(node)) node = doc ? node.resolve(doc) : undefined;
+    return YAML.isScalar(node) ? node.value : node;
+  };
+  return seq.items.find((item) => YAML.isMap(item) && String(nameOf(item) ?? "").trim().toLowerCase() === key);
 }
 
 /**
@@ -627,7 +633,7 @@ export function hasListEntry(text, key, name, nameField = "name") {
   try {
     const doc = mapDocument(text);
     const seq = doc.contents.get(key, true);
-    return YAML.isSeq(seq) && !!entryOf(seq, name, nameField);
+    return YAML.isSeq(seq) && !!entryOf(seq, name, nameField, doc);
   } catch {
     return false;
   }
@@ -654,7 +660,7 @@ export function hasListEntry(text, key, name, nameField = "name") {
 export function editListEntry(text, key, name, mutate, opts = {}) {
   const doc = mapDocument(text);
   const seq = listOf(doc, key);
-  const entry = entryOf(seq, name, opts.nameField);
+  const entry = entryOf(seq, name, opts.nameField, doc);
   if (entry) {
     // what another entry takes from it by an alias : kept as it was
     const anchors = anchorsIn(doc, entry);
@@ -689,7 +695,7 @@ export function appendListEntries(text, key, entries, keyOrder = [], nameField =
   const doc = mapDocument(text);
   const seq = listOf(doc, key);
   for (const entry of entries) {
-    if (!entryOf(seq, entry[nameField], nameField)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
+    if (!entryOf(seq, entry[nameField], nameField, doc)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
     else skipped.push(entry[nameField]);
   }
   return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
@@ -717,7 +723,7 @@ export function removeListEntry(text, key, name, nameField = "name") {
     return { text, empty: false };
   }
   const seq = doc.contents.get(key, true);
-  const entry = YAML.isSeq(seq) ? entryOf(seq, name, nameField) : null;
+  const entry = YAML.isSeq(seq) ? entryOf(seq, name, nameField, doc) : null;
   if (!entry) return { text, empty: false };
   // what another entry takes from it by an alias : a copy of it left there
   const anchors = anchorsIn(doc, entry);
