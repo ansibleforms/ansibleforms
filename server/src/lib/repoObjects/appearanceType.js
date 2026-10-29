@@ -6,7 +6,7 @@
 // names), the website icon (icon:, the same), the name (name:) and the header's links (links: the
 // links and the Designer's). One way for all, written once : a
 // file applied as the pages save (the settings row's fields through lib/appearance.js, the
-// environment settings through lib/envSave.js, the images through lib/brandImages.js), the images
+// environment settings through lib/repoObjects/envFields.js, the images through lib/brandImages.js), the images
 // read and written as binary and checked as an upload is. The config seed's sections of the same
 // names are read the same way, its images relative to the seed file.
 //
@@ -15,21 +15,12 @@
 import fs from "fs";
 import path from "path";
 import Settings, { validHeaderLinks } from "../../models/settings.model.js";
-import appConfig from "../../../config/app.config.js";
 import { saveSettingsFields } from "../appearance.js";
-import { saveEnvValues } from "../envSave.js";
-import EnvSettings from "../envSettings.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
+import { envFieldSet } from "./envFields.js";
 import { same, fileBeside } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
-
-// the environment settings among the appearance fields, by field : their variable, and how the app
-// reads them now
-const ENV = {
-  default_language: { name: "DEFAULT_LANGUAGE", read: () => process.env.DEFAULT_LANGUAGE || null, write: (v) => v ?? "" },
-  show_designer: { name: "SHOW_DESIGNER", read: () => !!appConfig.showDesigner, write: (v) => (v ? "1" : "0") },
-};
 
 /**
  * A field's value as two are compared : a list as its JSON (an empty one as none), a yes or no as
@@ -131,6 +122,8 @@ export function appearanceType(spec) {
   // the config seed's hold on this type's fields
   const hold = seedHold((f) => fields.includes(f));
   const { seededOf } = hold;
+  // its environment settings, read and saved as their page does
+  const env = envFieldSet(envFields);
 
   /**
    * The fields a declaration changes : those whose value is not the app's - the ones the config
@@ -183,9 +176,8 @@ export function appearanceType(spec) {
       }
       // a variable set in the real environment is not the app's to save : none here, never written
       // to the repository (_envSet : not applied from it, said)
-      const managed = envFields.length ? await EnvSettings.readManaged() : null;
-      const envSet = envFields.filter((field) => EnvSettings.isOverridden(ENV[field].name, managed));
-      for (const field of envFields) out[field] = envSet.includes(field) ? null : ENV[field].read();
+      const { values, envSet } = await env.read();
+      Object.assign(out, values);
       Object.defineProperty(out, "_envSet", { value: envSet });
       for (const kind of images) out[kind] = await BRAND_IMAGES[kind].get();
       // the fields the config seed manages : the seed's, never the repository's
@@ -217,17 +209,12 @@ export function appearanceType(spec) {
       // the settings row's fields, as the pages save them
       const row = Object.fromEntries(changed.filter((k) => rowFields.includes(k)).map((k) => [k, declared[k]]));
       // the environment settings, as their pages save them
-      const env = Object.fromEntries(changed.filter((k) => envFields.includes(k)).map((k) => [ENV[k].name, ENV[k].write(declared[k])]));
-      const notes = [];
-      const who = { user: opts.fromSeed ? "config seed" : "repository" };
+      const updates = env.updates(changed, declared);
       // the environment settings checked before anything is saved : a file refused whole, never
       // applied by halves
-      if (Object.keys(env).length) await saveEnvValues(env, who, { ...opts, dryRun: true });
+      await env.check(updates, opts);
       if (Object.keys(row).length) await saveSettingsFields(row, opts);
-      if (Object.keys(env).length) {
-        const { restartRequired } = await saveEnvValues(env, who, opts);
-        if (restartRequired.length) notes.push(`Saved ; applied at the next restart: ${restartRequired.join(", ")}`);
-      }
+      const notes = await env.save(updates, opts);
       // the images : the one named, or the bundled one
       for (const kind of images) if (changed.includes(kind)) await BRAND_IMAGES[kind].set(declared[kind], opts);
       return notes;
@@ -236,7 +223,7 @@ export function appearanceType(spec) {
     // applied, said
     notesOf: (declared, current) => {
       const envSet = Object.keys(declared).filter((k) => (current?._envSet || []).includes(k));
-      return [...hold.notesOf(declared, current), ...(envSet.length ? [`Set in the environment, not applied: ${envSet.map((k) => ENV[k].name).join(", ")}`] : [])];
+      return [...hold.notesOf(declared, current), ...(envSet.length ? [`Set in the environment, not applied: ${envSet.map(env.nameOf).join(", ")}`] : [])];
     },
   });
 }
