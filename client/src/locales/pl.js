@@ -769,6 +769,16 @@ export default {
       'Ta strona nadal działa na starszej kompilacji niż serwer. Przeładuj stronę, aby uzyskać nową wersję.',
   },
   common: {
+    help: 'Pomoc',
+    name: 'Nazwa',
+    orDivider: 'lub',
+    noFilterMatch: 'Żaden wiersz nie pasuje do filtra',
+    toggleNavigation: 'Pokaż lub ukryj nawigację',
+    toggleDropdown: 'Pokaż lub ukryj menu',
+    switchTheme: 'Zmień motyw',
+    pagination: 'Stronicowanie',
+    goToPage: 'Przejdź do strony {n}',
+    searchPlaceholder: 'Szukaj...',
     edit: 'Edytuj',
     open: 'Otwórz',
     abort: 'Przerwij',
@@ -879,6 +889,13 @@ export default {
       'Żądanie było zbyt duże dla serwera (HTTP 431). Jeśli logujesz się przez logowanie jednokrotne i należysz do wielu grup, poproś administratora o ustawienie filtru grup u dostawcy.',
   },
   login: {
+    pleaseSignIn: 'Zaloguj się',
+    signingIn: 'Logowanie…',
+    withMicrosoft: 'Zaloguj się przez Microsoft',
+    withOidc: 'Zaloguj się przez OpenID Connect',
+    ssoFailed: 'Logowanie przez dostawcę tożsamości nie powiodło się',
+    settingsFailed: 'Nie udało się odczytać ustawień logowania',
+    formInvalid: 'Wpisz nazwę użytkownika i hasło',
     title: 'Logowanie',
     username: 'Nazwa użytkownika',
     password: 'Hasło',
@@ -2272,6 +2289,8 @@ export default {
     hasWarnings: 'Ta konfiguracja zawiera',
   },
   designer: {
+    overlayIconPlaceholder: 'np. check, bolt',
+    overlayTextPlaceholder: 'np. NOWE',
     pasteNotAllowed: 'Przeglądarka nie zezwoliła na odczyt schowka. Zamiast tego użyj Ctrl+V w edytorze.',
     lockReleasedBy:
       'Twoja blokada projektanta została zwolniona przez {name}. Niezapisanych zmian nie można już zapisać.',
@@ -3129,5 +3148,36 @@ export default {
     clearHint: 'Czyści widok, nie log: widoczne są tylko wiersze zapisane od teraz',
     cleared: 'Wyczyszczono: nowe wiersze pojawiają się tutaj w miarę zapisywania.',
     download: 'Pobierz',
+  },
+  changePassword: {
+    title: 'Zmień hasło',
+    defaultPassword: 'Zalogowano się domyślnym hasłem, które jest publiczne. Wybierz inne, aby kontynuować.',
+    currentRequired: 'Wpisz obecne hasło',
+    newRequired: 'Wpisz nowe hasło',
+    invalid: 'Wypełnij wszystkie pola, wpisując dwa razy to samo nowe hasło',
+  },
+  schema: {
+    ready: 'Baza danych jest gotowa!',
+    redirecting:
+      'Przekierowanie na stronę główną za {n} sekundę... | Przekierowanie na stronę główną za {n} sekundy... | Przekierowanie na stronę główną za {n} sekund...',
+    creating: 'Tworzenie schematu i tabel...',
+    firstSetup:
+      'Jeśli to pierwsza instalacja i nie masz jeszcze własnego schematu ani tabel, AnsibleForms może je utworzyć.',
+    willCreate: 'Zostanie utworzone:',
+    databaseSchema: 'Schemat bazy danych',
+    tables: 'Tabele',
+    allTables: 'Wszystkie wymagane tabele',
+    partial:
+      'Wygląda na to, że schemat jest nieużywalny: część bazy danych istnieje, a części brakuje. Skontaktuj się z administratorem bazy danych lub aplikacji, aby przywrócić kopię zapasową, utworzyć brakujące tabele lub usunąć bazę danych, tak aby AnsibleForms mógł ją utworzyć. W Kubernetes najlepiej nie tworzyć domyślnej bazy danych. Dopóki schemat i tabele nie będą spójne, AnsibleForms nie może kontynuować.',
+    disabled: 'Tworzenie schematu zostało wyłączone przez administratora.',
+    contactAdmin: 'Skontaktuj się z administratorem bazy danych lub aplikacji, aby utworzyć schemat i tabele.',
+    unreachable: 'Coś poszło nie tak. Najprawdopodobniej baza danych jest po prostu nieosiągalna.',
+  },
+  apiDocs: {
+    title: 'Dokumentacja API',
+    welcome: 'Witamy w portalu dokumentacji API AnsibleForms.',
+    version: 'REST API to {version} (API v1 usunięto w wersji 7.0.0).',
+    endpoint: 'Endpoint dokumentacji API:',
+    hint: 'Kliknij powyższy link lub wpisz go w przeglądarce, aby otworzyć interaktywny Swagger UI.',
   },
 };

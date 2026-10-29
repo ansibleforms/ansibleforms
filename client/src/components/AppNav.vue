@@ -16,7 +16,6 @@ import Helpers from '@/lib/Helpers';
 import State from '@/lib/State';
 import Profile from '@/lib/Profile';
 import { languages, fallbackLanguage } from '@/config/languages';
-import { applyDefaultLanguage } from '@/plugins/i18n';
 
 // INIT
 const store = useAppStore();
@@ -40,12 +39,9 @@ import { followJobNotifications } from '@/lib/jobNotifications';
 onMounted(async () => {
   try {
     const res = await axios.get('/api/v2/app/config');
-    // the switches, the name, the label, the announcement (State.applyAppConfig)
+    // the switches, the name, the label, the announcement and the default language
+    // (State.applyAppConfig)
     State.applyAppConfig(res.data || {});
-    // Apply server default language if user hasn't chosen one
-    if (res.data?.defaultLanguage) {
-      applyDefaultLanguage(res.data.defaultLanguage);
-    }
     if (res.data?.defaultTheme) {
       Theme.applyServerDefault(res.data.defaultTheme, res.data.defaultThemeColor);
       currentTheme.value = store.theme;
@@ -497,7 +493,7 @@ const buildMismatch = computed(() => {
 
       <!-- help menu -->
       <BsNavItem :dropdown="true">
-        <BsNavMenu icon="circle-question" title="Help" buttonClass="af-icon-btn">
+        <BsNavMenu icon="circle-question" :title="t('common.help')" buttonClass="af-icon-btn">
           <li v-for="m in helpMenu" :key="m.title">
             <a
               v-if="m.href"

@@ -12,6 +12,7 @@
 /******************************************************************/
 
 import Theme from '@/lib/Theme';
+import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/stores/app';
 import { onBeforeUnmount } from 'vue';
 
@@ -27,6 +28,7 @@ const currentTheme = defineModel();
 const themes = Theme.themes();
 defineEmits(['themeChanged']);
 const store = useAppStore();
+const { t } = useI18n();
 const wrapperRef = ref(null);
 
 // PROPS
@@ -112,7 +114,7 @@ const themeIcon = computed(() => {
 </script>
 <template>
   <span ref="wrapperRef" style="display: contents">
-    <BsNavMenu :icon="themeIcon" title="Toggle switcher" :buttonClass="buttonClass">
+    <BsNavMenu :icon="themeIcon" :title="t('common.switchTheme')" :buttonClass="buttonClass">
       <li v-for="t in themes" :key="t.value">
         <button
           v-if="t.value === 'color'"

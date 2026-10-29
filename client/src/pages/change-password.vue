@@ -8,8 +8,12 @@ import { useVuelidate } from '@vuelidate/core';
 import Navigate from '@/lib/Navigate';
 import Helpers from '@/lib/Helpers';
 import { required, helpers, sameAs } from '@vuelidate/validators';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
+// the user's language : the af_language cookie, else the instance's default (State.applyAppConfig)
+// - this page can come before any other, right after a sign-in with the default password
+const { t } = useI18n();
 
 const item = ref({
   // the server requires the current password before it will set a new one : a stolen
@@ -22,7 +26,9 @@ const item = ref({
 const fields = [
   {
     key: 'password',
-    label: 'Password',
+    // the translation key of its label, translated in the template (the language can still
+    // change once the instance's default is read)
+    labelI18n: 'profilePage.newPassword',
     type: 'password',
     sortable: false,
     required: true,
@@ -40,14 +46,14 @@ async function updateItem() {
     try {
       await axios.put(`/api/v2/profile`, item.value);
       // a new password ends every session of the user, this one too : sign in again with it
-      toast.success('Password is changed, sign in with your new password');
+      toast.success(t('profilePage.changedSignIn'));
       TokenStorage.clear();
       router.push({ name: '/login' });
     } catch (err) {
-      toast.error(Helpers.parseAxiosResponseError(err, 'Failed to change the password'));
+      toast.error(Helpers.parseAxiosResponseError(err, t('profilePage.changeFailed')));
     }
   } else {
-    toast.warning('Invalid form data');
+    toast.warning(t('changePassword.invalid'));
     $v.value.item.$touch();
   }
 }
@@ -57,7 +63,8 @@ function getRules() {
   fields.forEach((field) => {
     var rule = {};
     if (field.required) {
-      rule.required = helpers.withMessage(`${field.label} is required`, required);
+      // a function, so the message is translated when it shows, in the language of that moment
+      rule.required = helpers.withMessage(() => t('changePassword.newRequired'), required);
     }
     // regex validation
     if (field.regex && field.regex.expression) {
@@ -68,7 +75,7 @@ function getRules() {
         regexObj = new RegExp(field.regex.expression);
       } catch (e) {
         console.error(
-          `Field '${field.key || field.label}': invalid regex '${field.regex.expression}' (${e.message}); the rule is ignored.`,
+          `Field '${field.key}': invalid regex '${field.regex.expression}' (${e.message}); the rule is ignored.`,
         );
       }
       var description = field.regex.description;
@@ -81,7 +88,10 @@ function getRules() {
     ruleObj.item[field.key] = rule;
     if (field.type == 'password') {
       rule = {};
-      rule.password_comfirmation = sameAs(computed(() => item.value.password));
+      rule.password_comfirmation = helpers.withMessage(
+        () => t('profilePage.mismatch'),
+        sameAs(computed(() => item.value.password)),
+      );
       ruleObj.item['password2'] = rule;
     }
   });
@@ -92,7 +102,7 @@ const rules = getRules();
 // added outside getRules() : that loop appends a 'Confirm' box for every password-typed
 // field, and the current password must not get one
 rules.item.currentPassword = {
-  required: helpers.withMessage('Current password is required', required),
+  required: helpers.withMessage(() => t('changePassword.currentRequired'), required),
 };
 
 const $v = useVuelidate(rules, { item });
@@ -104,11 +114,16 @@ const $v = useVuelidate(rules, { item });
     <div class="card form-change-password w-100 m-auto">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h5 class="card-title mb-0">Please Change Password</h5>
-          <button v-if="!mustChange" class="btn-close" aria-label="Close" @click="Navigate.toHome(router)"></button>
+          <h5 class="card-title mb-0">{{ t('changePassword.title') }}</h5>
+          <button
+            v-if="!mustChange"
+            class="btn-close"
+            :aria-label="t('common.close')"
+            @click="Navigate.toHome(router)"
+          ></button>
         </div>
         <div v-if="mustChange" class="alert alert-warning py-2" role="alert">
-          You signed in with the default password, which is public. Choose another one to continue.
+          {{ t('changePassword.defaultPassword') }}
         </div>
         <BsInput
           :isHorizontal="true"
@@ -117,7 +132,7 @@ const $v = useVuelidate(rules, { item });
           v-model="$v.item['currentPassword'].$model"
           :isFloating="true"
           :required="true"
-          label="Current password"
+          :label="t('profilePage.currentPassword')"
           :hasError="$v.item['currentPassword'].$invalid && $v.item['currentPassword'].$dirty"
           :errors="$v.item['currentPassword'].$errors"
         />
@@ -132,7 +147,7 @@ const $v = useVuelidate(rules, { item });
             v-model="$v.item[field.key].$model"
             :isFloating="true"
             :required="field.required"
-            :label="field.label"
+            :label="t(field.labelI18n)"
             :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
             :errors="$v.item[field.key].$errors"
             :valueKey="field.valueKey"
@@ -150,14 +165,14 @@ const $v = useVuelidate(rules, { item });
             v-model="$v.item['password2'].$model"
             :isFloating="true"
             :required="true"
-            label="Confirm"
+            :label="t('profilePage.confirmPassword')"
             :hasError="$v.item['password2'].$invalid && $v.item['password2'].$dirty"
             :errors="$v.item['password2'].$errors"
           />
           <!-- password confirmation -->
         </template>
         <button class="btn btn-primary w-100 py-2" @click="updateItem()" :disabled="$v.$invalid">
-          Change Password
+          {{ t('profilePage.change') }}
         </button>
       </div>
     </div>

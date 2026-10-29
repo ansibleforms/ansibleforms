@@ -4223,7 +4223,7 @@ onBeforeUnmount(() => {
               v-model="iconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              placeholder="search..."
+              :placeholder="t('common.searchPlaceholder')"
             />
             <div class="icon-grid mt-2">
               <div
@@ -4291,7 +4291,7 @@ onBeforeUnmount(() => {
                   v-model="iconForm.overlayIcon"
                   :label="t('designer.overlayIcon')"
                   icon="layer-group"
-                  placeholder="e.g. check, bolt"
+                  :placeholder="t('designer.overlayIconPlaceholder')"
                 />
               </div>
               <div class="col-6">
@@ -4322,7 +4322,7 @@ onBeforeUnmount(() => {
                   v-model="iconForm.overlayIconText"
                   :label="t('designer.overlayText')"
                   icon="font"
-                  placeholder="e.g. NEW"
+                  :placeholder="t('designer.overlayTextPlaceholder')"
                 />
               </div>
               <div class="col-4">
@@ -4387,7 +4387,7 @@ onBeforeUnmount(() => {
             v-model="catIconSearch"
             :label="t('designer.searchIcons')"
             icon="magnifying-glass"
-            placeholder="search..."
+            :placeholder="t('common.searchPlaceholder')"
             class="mb-2"
           />
           <div class="icon-grid">
@@ -4547,7 +4547,7 @@ onBeforeUnmount(() => {
               v-model="editCatIconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              placeholder="search..."
+              :placeholder="t('common.searchPlaceholder')"
               class="mb-2"
             />
             <div class="icon-grid">

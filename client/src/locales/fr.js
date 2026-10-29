@@ -774,6 +774,16 @@ export default {
       'Cette page utilise encore une build plus ancienne que le serveur. Rechargez la page pour obtenir la nouvelle version.',
   },
   common: {
+    help: 'Aide',
+    name: 'Nom',
+    orDivider: 'ou',
+    noFilterMatch: 'Aucune ligne ne correspond au filtre',
+    toggleNavigation: 'Afficher ou masquer la navigation',
+    toggleDropdown: 'Afficher ou masquer le menu',
+    switchTheme: 'Changer de thème',
+    pagination: 'Pagination',
+    goToPage: 'Aller à la page {n}',
+    searchPlaceholder: 'Rechercher...',
     edit: 'Modifier',
     open: 'Ouvrir',
     abort: 'Arrêter',
@@ -884,6 +894,13 @@ export default {
       'La requête était trop volumineuse pour le serveur (HTTP 431). Si vous vous connectez par authentification unique et appartenez à de nombreux groupes, demandez à un administrateur de définir un filtre de groupes sur le fournisseur.',
   },
   login: {
+    pleaseSignIn: 'Veuillez vous connecter',
+    signingIn: 'Connexion en cours…',
+    withMicrosoft: 'Se connecter avec Microsoft',
+    withOidc: 'Se connecter avec OpenID Connect',
+    ssoFailed: "La connexion auprès du fournisseur d'identité a échoué",
+    settingsFailed: 'Impossible de lire les paramètres de connexion',
+    formInvalid: "Saisissez un nom d'utilisateur et un mot de passe",
     title: 'Connexion',
     username: "Nom d'utilisateur",
     password: 'Mot de passe',
@@ -2299,6 +2316,8 @@ export default {
     hasWarnings: 'Cette configuration contient',
   },
   designer: {
+    overlayIconPlaceholder: 'p. ex. check, bolt',
+    overlayTextPlaceholder: 'p. ex. NOUVEAU',
     pasteNotAllowed:
       "Le navigateur n'a pas autorisé la lecture du presse-papiers. Utilisez plutôt Ctrl+V dans l'éditeur.",
     lockReleasedBy:
@@ -3154,5 +3173,37 @@ export default {
     clearHint: "Vide l'affichage, pas le journal : seules les lignes écrites à partir de maintenant s'affichent",
     cleared: "Effacé : les nouvelles lignes s'affichent ici à mesure qu'elles sont écrites.",
     download: 'Telecharger',
+  },
+  changePassword: {
+    title: 'Changez votre mot de passe',
+    defaultPassword:
+      'Vous vous êtes connecté avec le mot de passe par défaut, qui est public. Choisissez-en un autre pour continuer.',
+    currentRequired: 'Saisissez votre mot de passe actuel',
+    newRequired: 'Saisissez un nouveau mot de passe',
+    invalid: 'Remplissez tous les champs, avec deux fois le même nouveau mot de passe',
+  },
+  schema: {
+    ready: 'La base de données est prête !',
+    redirecting: "Redirection vers l'accueil dans {n} seconde... | Redirection vers l'accueil dans {n} secondes...",
+    creating: 'Création du schéma et des tables...',
+    firstSetup:
+      "S'il s'agit d'une première installation et que vous n'avez pas encore votre propre schéma ni vos tables, AnsibleForms peut les créer.",
+    willCreate: 'Les éléments suivants seront créés :',
+    databaseSchema: 'Schéma de base de données',
+    tables: 'Tables',
+    allTables: 'Toutes les tables nécessaires',
+    partial:
+      "Votre schéma semble inutilisable : une partie de la base de données est présente, une autre manque. Contactez votre administrateur de base de données ou de l'application pour restaurer une sauvegarde, créer les tables manquantes ou supprimer la base de données afin qu'AnsibleForms puisse la créer. Sous Kubernetes, mieux vaut ne pas créer de base de données par défaut. Tant que le schéma et les tables ne sont pas cohérents, AnsibleForms ne peut pas continuer.",
+    disabled: 'La création du schéma est désactivée par votre administrateur.',
+    contactAdmin:
+      "Contactez votre administrateur de base de données ou de l'application pour créer le schéma et les tables.",
+    unreachable: "Une erreur s'est produite. La base de données n'est très probablement pas joignable.",
+  },
+  apiDocs: {
+    title: "Documentation de l'API",
+    welcome: "Bienvenue sur le portail de documentation de l'API AnsibleForms.",
+    version: "L'API REST est en {version} (l'API v1 a été supprimée en 7.0.0).",
+    endpoint: "Point d'accès de la documentation de l'API :",
+    hint: "Cliquez sur le lien ci-dessus ou saisissez-le dans votre navigateur pour ouvrir l'interface interactive Swagger UI.",
   },
 };

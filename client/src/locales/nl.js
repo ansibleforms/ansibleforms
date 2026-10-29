@@ -771,6 +771,16 @@ export default {
       'Deze pagina draait nog een oudere build dan de server. Herlaad de pagina om de nieuwe versie te krijgen.',
   },
   common: {
+    help: 'Help',
+    name: 'Naam',
+    orDivider: 'of',
+    noFilterMatch: 'Geen enkele rij voldoet aan het filter',
+    toggleNavigation: 'Navigatie tonen of verbergen',
+    toggleDropdown: 'Menu tonen of verbergen',
+    switchTheme: 'Thema wisselen',
+    pagination: 'Paginering',
+    goToPage: 'Ga naar pagina {n}',
+    searchPlaceholder: 'Zoeken...',
     edit: 'Bewerken',
     open: 'Openen',
     abort: 'Afbreken',
@@ -881,6 +891,13 @@ export default {
       'Het verzoek was te groot voor de server (HTTP 431). Als u zich aanmeldt met single sign-on en lid bent van veel groepen, vraag dan een beheerder om een groepsfilter in te stellen bij de provider.',
   },
   login: {
+    pleaseSignIn: 'Meld u aan',
+    signingIn: 'Bezig met aanmelden…',
+    withMicrosoft: 'Aanmelden met Microsoft',
+    withOidc: 'Aanmelden met OpenID Connect',
+    ssoFailed: 'Aanmelden bij de identiteitsprovider is mislukt',
+    settingsFailed: 'De aanmeldinstellingen konden niet worden gelezen',
+    formInvalid: 'Vul een gebruikersnaam en een wachtwoord in',
     title: 'Inloggen',
     username: 'Gebruikersnaam',
     password: 'Wachtwoord',
@@ -2281,6 +2298,8 @@ export default {
     hasWarnings: 'Deze configuratie heeft',
   },
   designer: {
+    overlayIconPlaceholder: 'bv. check, bolt',
+    overlayTextPlaceholder: 'bv. NIEUW',
     pasteNotAllowed:
       'De browser stond het lezen van het klembord niet toe. Gebruik in plaats daarvan Ctrl+V in de editor.',
     lockReleasedBy:
@@ -3138,5 +3157,36 @@ export default {
     clearHint: 'Wist de weergave, niet het log: alleen de regels die vanaf nu worden geschreven, worden getoond',
     cleared: 'Gewist: nieuwe regels verschijnen hier zodra ze worden geschreven.',
     download: 'Downloaden',
+  },
+  changePassword: {
+    title: 'Wijzig uw wachtwoord',
+    defaultPassword: 'U bent aangemeld met het standaardwachtwoord, dat openbaar is. Kies een ander om verder te gaan.',
+    currentRequired: 'Vul uw huidige wachtwoord in',
+    newRequired: 'Vul een nieuw wachtwoord in',
+    invalid: 'Vul alle velden in, met twee keer hetzelfde nieuwe wachtwoord',
+  },
+  schema: {
+    ready: 'De database is klaar!',
+    redirecting:
+      'Doorsturen naar de startpagina over {n} seconde... | Doorsturen naar de startpagina over {n} seconden...',
+    creating: 'Schema en tabellen worden aangemaakt...',
+    firstSetup:
+      'Als dit een eerste installatie is en u nog geen eigen schema en tabellen hebt, kan AnsibleForms ze aanmaken.',
+    willCreate: 'Het volgende wordt aangemaakt:',
+    databaseSchema: 'Databaseschema',
+    tables: 'Tabellen',
+    allTables: 'Alle vereiste tabellen',
+    partial:
+      'Uw schema lijkt onbruikbaar: een deel van de database is aanwezig en een deel ontbreekt. Neem contact op met uw database- of applicatiebeheerder om een back-up terug te zetten, de ontbrekende tabellen aan te maken of de database te verwijderen zodat AnsibleForms hem kan aanmaken. Onder Kubernetes maakt u best geen standaarddatabase aan. Zolang schema en tabellen niet in een consistente staat zijn, kan AnsibleForms niet verder.',
+    disabled: 'Het aanmaken van het schema is uitgeschakeld door uw beheerder.',
+    contactAdmin: 'Neem contact op met uw database- of applicatiebeheerder om het schema en de tabellen aan te maken.',
+    unreachable: 'Er is iets misgegaan. Waarschijnlijk is de database gewoon niet bereikbaar.',
+  },
+  apiDocs: {
+    title: 'API-documentatie',
+    welcome: 'Welkom op het portaal van de AnsibleForms API-documentatie.',
+    version: 'De REST API is {version} (API v1 is verwijderd in 7.0.0).',
+    endpoint: 'Endpoint van de API-documentatie:',
+    hint: 'Klik op de link hierboven of voer hem in uw browser in om de interactieve Swagger UI te openen.',
   },
 };
