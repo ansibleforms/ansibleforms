@@ -161,8 +161,15 @@ function fitPrimaryNav() {
   const tightWidth = widthAs('tight');
   widthAs(navFit.value);
   const box = bar.getBoundingClientRect();
-  const brand = bar.querySelector('.af-env-label') || bar.querySelector('.af-brand');
+  // where the left side ends : after the labels beside the logo (AppLabels) when there are any,
+  // else after the logo. The labels are measured whole : they give way (narrower, their names
+  // cut short) only when even the links' icons alone leave them too little room, so what they
+  // show at this moment must not decide how the links sit
+  const labels = bar.querySelector('.af-labels');
+  const brand = labels || bar.querySelector('.af-brand');
+  if (labels) labels.style.flexShrink = '0';
   const leftEnd = brand ? brand.getBoundingClientRect().right : box.left;
+  if (labels) labels.style.flexShrink = '';
   // where the buttons start when nothing pushes them : the bar's end less its padding and them
   const rightStart = box.right - (parseFloat(getComputedStyle(bar).paddingRight) || 0) - utility.offsetWidth;
   const middle = box.left + box.width / 2;
