@@ -72,6 +72,9 @@ export default seedType({
   skip: ["ask_again"],
   notCompared: ["ask_again"],
   canonical,
+  // a file whose number changes : refused, never the old version's text rewritten as a correction
+  // (its acceptances kept for words nobody accepted)
+  renameRefused: "a version keeps its number: add a new file",
   // one version in force
   oneOnly: [{ field: "enabled", label: "the one in force" }],
   order: "version",

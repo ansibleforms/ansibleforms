@@ -884,4 +884,25 @@ describe("the disclaimer versions", () => {
     assert.deepEqual(fx.listFiles("news", "disclaimer"), ["1.yaml"]);
     assert.equal(fx.state.tables.disclaimer_versions[0].repository, null);
   });
+
+  test("a file whose number changes is refused : never the old version's text rewritten, a new file makes the new one", async () => {
+    fx.writeFile("news", "disclaimer", "terms.yaml", file());
+    await RepoObjects.syncRepository(await desc("disclaimer"), "news");
+    acceptances[1] = 5;
+    // the admin publishes new terms in the same file, the next number and a new text
+    fx.writeFile("news", "disclaimer", "terms.yaml", file({ version: 2, text: "New terms" }));
+    const summary = await RepoObjects.syncRepository(await desc("disclaimer"), "news");
+    assert.equal(summary.updated, 0, JSON.stringify(summary));
+    assert.match(summary.refused[0].reasons[0], /it renames '1' to '2', but a version keeps its number: add a new file/);
+    assert.deepEqual(fx.state.tables.disclaimer_versions.map((r) => [r.version, r.text]), [[1, "Be nice"]]);
+    assert.equal(acceptances[1], 5);
+    // the same pull again : still refused, nothing changed
+    assert.equal((await RepoObjects.syncRepository(await desc("disclaimer"), "news")).updated, 0);
+    // as a new file : made
+    fx.writeFile("news", "disclaimer", "terms.yaml", file({ enabled: false }));
+    fx.writeFile("news", "disclaimer", "terms-2.yaml", file({ version: 2, text: "New terms" }));
+    const made = await RepoObjects.syncRepository(await desc("disclaimer"), "news");
+    assert.equal(made.created, 1, JSON.stringify(made));
+    assert.deepEqual(made.refused, []);
+  });
 });

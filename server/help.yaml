@@ -6874,7 +6874,8 @@
       `title`, `text`, `checkbox_label` and `enabled` (the version in force, the disclaimer on; one at most). A
       changed title, text or label arriving from git is a **correction** of that version, as the app's save makes
       one; with `ask_again: true` in the file, everyone who accepted it is asked again (a key of the file only:
-      never written back, and nothing happens while the text does not change). Who accepted what is never in git.
+      never written back, and nothing happens while the text does not change). A version keeps its number: a file
+      whose `version` changes is refused, a new version is a new file. Who accepted what is never in git.
       The seed's `disclaimer:` section takes the same items.
       ```yaml
       version: 2
