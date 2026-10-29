@@ -63,8 +63,10 @@ const MINUTE = 60000;
 const HOUR = 3600000;
 const DAY = 86400000;
 
-// once enough runs are found, the window after them is looked at this far still : a time a DST
-// change skips, moved forward, may come after a run found later
+// the furthest a DST change moves a time it skips : once enough runs are found, the window after
+// them is looked at this far still (a skipped time, moved forward, may come after a run found
+// later), and the runs after a moment are looked for from this long before its wall clock time (a
+// skipped time before it, moved forward, may come after it)
 const SHIFT_MS = 3 * HOUR;
 
 // the time the runs of one call may take in their thread, the time its start may take, how long a
@@ -1028,7 +1030,10 @@ export function walkRuns(value, { after = new Date(), count = 1, fromStart = fal
   // the runs a rule gives a window at most : one that has more ends the window at its last
   const limit = count + WINDOW_EXTRA;
   let until = end;
-  let from = reference;
+  // from a little before the moment asked : a time its zone's clock skipped just before it, moved
+  // forward, may be after it (02:30 run at 03:30, asked after 03:15) ; the runs not after it are
+  // left out below
+  let from = fromStart ? reference : reference - SHIFT_MS;
   let window = FIRST_WINDOW_MS;
   while (takes.length && from < until) {
     let to = Math.min(from + window, until);

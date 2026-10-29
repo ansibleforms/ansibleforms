@@ -3297,6 +3297,55 @@
     9969033600000,
     10002297600000
    ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:20260101T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=2;BYMINUTE=30 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=3;BYMINUTE=15",
+   "after": 1806196500000,
+   "count": 3,
+   "runs": [
+    1806197400000,
+    1806280200000,
+    1806282900000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Dublin:20270326T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=1;BYMINUTE=30",
+   "after": 1806195600000,
+   "count": 2,
+   "runs": [
+    1806197400000,
+    1806280200000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:20270326T000000 RRULE:FREQ=MINUTELY;INTERVAL=7",
+   "after": 1806195600000,
+   "count": 3,
+   "runs": [
+    1806195780000,
+    1806195960000,
+    1806196200000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Europe/Brussels:20270326T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SU,SA;BYHOUR=0,2;BYMINUTE=30",
+   "after": 1806196200000,
+   "count": 3,
+   "runs": [
+    1806197400000,
+    1806705000000,
+    1806712200000
+   ]
+  },
+  {
+   "rrule": "DTSTART;TZID=Pacific/Chatham:20270924T000000 RRULE:FREQ=HOURLY;INTERVAL=3",
+   "after": 1821880800000,
+   "count": 3,
+   "runs": [
+    1821881700000,
+    1821888900000,
+    1821899700000
+   ]
   }
  ]
 }

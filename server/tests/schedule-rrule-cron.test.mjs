@@ -219,6 +219,23 @@ describe("a rrule schedule is registered at its next run", () => {
     assert.equal(second.pattern.getTime(), minute + 1000);
   });
 
+  test("a time the spring gap skips, moved past a later run of the day, still runs in the chain", async () => {
+    // 02:30 and 03:15 in Brussels : the night of 2027-03-28 skips 02:30, run at 03:30 (01:30 UTC),
+    // after the 03:15 (01:15 UTC) that registered it
+    const rrule =
+      "DTSTART;TZID=Europe/Brussels:20260101T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=2;BYMINUTE=30 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=3;BYMINUTE=15";
+    await cronService.addRruleSchedule(7, "Twice a night", rrule, new Date("2027-03-27T20:00:00Z"));
+    const fired = [];
+    for (let i = 0; i < 4; i++) {
+      const [task] = live();
+      fired.push(task.pattern.toISOString());
+      row.state = "idle";
+      await task.fn();
+    }
+    assert.equal(queued, 4);
+    assert.deepEqual(fired, ["2027-03-28T01:15:00.000Z", "2027-03-28T01:30:00.000Z", "2027-03-29T00:30:00.000Z", "2027-03-29T01:15:00.000Z"]);
+  });
+
   test("a schedule removed while its next run is worked out is not registered", async () => {
     const pending = cronService.addSchedule(7, "Nightly", null, 0, null, RRULE);
     cronService.removeSchedule(7);
