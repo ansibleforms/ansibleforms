@@ -572,6 +572,24 @@ describe("the rules of the usages", () => {
     );
     assert.equal(await RepoObjects.usageReportText({}), "");
   });
+
+  test("the lines its pull said already are not said again after it : each refusal and note once", async () => {
+    fx.writeFile("other", "credentials", "rte.yaml", rteCredential);
+    fx.writeFile("other", "credentials", "bad.yaml", { name: "bad", credential_type: "git", password: "plain" });
+    // the pull of the usage just turned on reads the files in (afterGit), its lines in its output
+    const pulled = await Engine.syncText(credentials, "other");
+    assert.match(pulled, /\nRefused credentials\/bad\.yaml: /);
+    const report = {};
+    await RepoObjects.afterUsageChange({}, "other", { use_for_credentials: 1 }, { report, pull: false });
+    const output = pulled + (await RepoObjects.usageReportText(report));
+    assert.equal(output.match(/Refused credentials\/bad\.yaml/g).length, 1, output);
+    assert.match(output, /\nNow holds the credentials: /);
+    // no pull before it (its lines never said) : the activation says them
+    fx.writeFile("other", "credentials", "bad.yaml", { name: "bad", credential_type: "git", password: "plainer" });
+    const again = {};
+    await RepoObjects.afterUsageChange({ use_for_credentials: 0 }, "other", { use_for_credentials: 1 }, { report: again, pull: false });
+    assert.match(await RepoObjects.usageReportText(again), /\nRefused credentials\/bad\.yaml: /);
+  });
 });
 
 describe("an edit or a delete read before a pull that renamed its file", () => {

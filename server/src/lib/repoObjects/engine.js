@@ -874,6 +874,22 @@ function detailLines(summary) {
   return lines;
 }
 
+/**
+ * What an activation says besides its counts (detailLines), without the lines the pull before it
+ * said already in the same pull output (report.saidByPull : that pull's own read of the same
+ * files, taken by the activation) : each refusal, note or waiting file said once.
+ *
+ * Args:
+ *   report (object): activate's report.
+ *
+ * Returns:
+ *   string[]: the lines.
+ */
+function activationDetailLines(report) {
+  const said = new Set(report.saidByPull || []);
+  return detailLines(report).filter((line) => !said.has(line));
+}
+
 // what the last pull (or clone) of a repository read in of each type it holds, by type and
 // repository : an activation that follows it says what that pull took (git winning on a name), its
 // own read finding nothing left to take. Taken by the activation, dropped when the type is let go.
@@ -1427,7 +1443,8 @@ async function pullFor(desc, name, why) {
  *
  * Returns:
  *   Promise<object>: { repository, pull, created, matched: [name], written: [name],
- *     withoutSecret: [name], kept: [{ name, reason }], refused, waiting, ...what the type adds }.
+ *     withoutSecret: [name], kept: [{ name, reason }], refused, waiting, saidByPull (the lines the
+ *     pull before it said already : activationDetailLines), ...what the type adds }.
  *
  * Raises:
  *   Errors.ConflictError: the repository still busy once the wait is over : nothing read in nor
@@ -1479,7 +1496,7 @@ function newReport(name) {
 async function activatedText(desc, name, opts = {}) {
   try {
     const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name), opts));
-    return ["", `Now holds ${activationText(desc, report)}`, ...detailLines(report)].join("\n");
+    return ["", `Now holds ${activationText(desc, report)}`, ...activationDetailLines(report)].join("\n");
   } catch (e) {
     logger.error(`Repository '${name}' could not take ${holdingOf(desc)}: ${e.message || e}`);
     return `\n${titleOf(desc)} could not follow the usage: ${e.message || e}`;
@@ -1505,6 +1522,8 @@ async function activateFolder(desc, name, report, opts = {}) {
   // pull before it read in is said with it - that read found nothing left to take
   const summary = await syncRepository(desc, name, { reset: opts.reset });
   const pulled = takeSynced(desc, name) || newSummary();
+  // what that pull said in its output already : not said again after it (activationDetailLines)
+  report.saidByPull = detailLines(pulled);
   const both = (field) => [...new Set([...(pulled[field] || []), ...(summary[field] || [])])];
   report.created = pulled.created + summary.created;
   report.deleted = pulled.deleted + summary.deleted;
@@ -1676,7 +1695,7 @@ export async function usageReportText(report) {
     const desc = await descriptorOf(key);
     if (r.error) out += `\n${titleOf(desc)} could not follow the usage: ${r.error}`;
     else if (r.activated?.notCloned || r.activated?.pull === "not cloned") out += `\nNot cloned: ${holdingOf(desc)} will be taken once it is`;
-    else if (r.activated) out += ["", `Now holds ${activationText(desc, r.activated)}`, ...detailLines(r.activated)].join("\n");
+    else if (r.activated) out += ["", `Now holds ${activationText(desc, r.activated)}`, ...activationDetailLines(r.activated)].join("\n");
     else if (r.deactivated) {
       out += `\nNo longer holds ${holdingOf(desc)}: ${r.deactivated.unlinked} unlinked, kept in the app`;
       // its latest files not read in first (still busy) : the objects stay as the last pull left them
@@ -2110,8 +2129,10 @@ async function previewSingle(desc, name) {
  *   Promise<object>: the report.
  */
 async function activateSingle(desc, name, report) {
-  // what the pull before it read in : its file applied then, said by the read below as well
-  takeSynced(desc, name);
+  // what the pull before it read in : its file applied then, said by the read below as well - its
+  // lines in that pull's output already, not said again after it (activationDetailLines)
+  const pulled = takeSynced(desc, name);
+  report.saidByPull = pulled ? detailLines(pulled) : [];
   const current = await desc.current();
   report.kept = desc.kept(current);
   if (desc.heldBySeed(current)) {
