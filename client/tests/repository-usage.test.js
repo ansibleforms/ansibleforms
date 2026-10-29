@@ -28,6 +28,7 @@ vi.mock('vue-sonner', () => ({
 import axios from 'axios';
 import getSettings from '../src/config/settings.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
+import { htmlToText } from '../src/lib/dataTable.js';
 import {
   USAGE_CATEGORIES,
   USAGE_TYPES,
@@ -365,12 +366,20 @@ describe("the repositories list's Usage column", () => {
     const html = field.render(null, { use_for_runners: 1, use_for_forms: 1, use_for_config: 0 });
     expect(html).toBe(
       '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.forms</span>' +
+        '<span class="visually-hidden">, </span>' +
         '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.runners</span>',
     );
     expect(usageBadges((k) => (k.endsWith('forms') ? '<b>' : k), { use_for_forms: 1 })).toContain('&lt;b&gt;');
     expect(usageBadges(t, {})).toBe('');
     const css = read('styles/bootstrap-override.scss');
     expect(css).toMatch(/\.af-required-badge,\s*\.af-usage-badge \{/);
+  });
+
+  it('its plain text (CSV export, column filter, tooltip) keeps the names apart', () => {
+    const tt = (k) => k.split('.').pop();
+    const html = usageBadges(tt, { use_for_forms: 1, use_for_playbooks: 1, use_for_workflows: 1 });
+    expect(htmlToText(html)).toBe('forms, playbooks, workflows');
+    expect(htmlToText(usageBadges(tt, { use_for_forms: 1 }))).toBe('forms');
   });
 
   it('sorts by the types, a repository used for nothing last', () => {
@@ -615,6 +624,7 @@ describe('the header links : their own type, after Branding', () => {
     const tt = (key) => key;
     expect(usageBadges(tt, { use_for_notifications: 1, use_for_links: 1 })).toBe(
       '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
+        '<span class="visually-hidden">, </span>' +
         '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
     );
   });
@@ -648,6 +658,7 @@ describe('the MCP settings : one mcp.yaml, in Connections', () => {
     const tt = (key) => key;
     expect(usageBadges(tt, { use_for_general: 1, use_for_mcp: 1 })).toBe(
       '<span class="badge af-usage-badge me-1">sidebar.ansibleForms</span>' +
+        '<span class="visually-hidden">, </span>' +
         '<span class="badge af-usage-badge me-1">sidebar.mcp</span>',
     );
     expect(usageLabel(tt, 'general')).toBe('sidebar.ansibleForms');
