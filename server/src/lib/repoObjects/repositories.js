@@ -1,15 +1,15 @@
 'use strict';
-// The Repositories type of the repository-backed objects (lib/repoObjects/engine.js, its list mode)
-// : the other repositories in a repository's repositories.yaml, a `repositories:` list of items in
-// the config seed's format (its repositories section : name, uri, branch, description, credential
+// The Repositories type of the repository-backed objects (lib/repoObjects/engine.js) : the other
+// repositories, the entries of the repositories: lists of a repository's files, in the config
+// seed's format (its repositories section : name, uri, branch, description, credential
 // by name, the use_for_* flags, the pull schedule ...), one repository at most holding it. A
 // repository made from the file is cloned as one made in the app is, and takes the objects of its
 // usages as if they were ticked (git wins, no question : the file is the decision).
 //
 // Its guard rails :
-//   the holder    the repository holding the file is never made, changed nor deleted by it : an
-//                 entry of its name is not imported (said), and it is never written to the file
-//   no chains     a file never sets use_for_repositories on another repository : refused (said),
+//   the holder    the repository holding the entries is never made, changed nor deleted by them : an
+//                 entry of its name is not imported (said), and it is never written to its files
+//   no chains     an entry never sets use_for_repositories on another repository : refused (said),
 //                 its other fields applied
 //   usages taken  a usage another repository holds already (one repository per type) : refused
 //                 for that repository (said), its other usages applied
@@ -17,7 +17,8 @@
 //                 credentials are read before the repositories, every other type after them
 //   delete        an entry gone deletes its repository as the app's delete does (its objects
 //                 unlinked, its working copy removed) - never the holder, never one with changes
-//                 not pushed yet (refused, kept, said)
+//                 not pushed yet (refused, kept, said) ; no file giving repositories: at all
+//                 unlinks them instead, kept in the app
 //   the seed      a repository the config seed manages stays the seed's
 //   secrets       a credential by name only : a password, or a user and token in its uri, refused
 //   use_for_config  deprecated : applied as use_for_roles, use_for_categories and use_for_constants,
@@ -39,8 +40,8 @@ const RepositoryModel = {
 export default seedType({
   key: "repositories",
   section: "repositories",
-  listFile: "repositories.yaml",
-  listKey: "repositories",
+  // no file giving repositories: at all : they stay in the app, unlinked - never each one deleted
+  noKeyUnlinks: true,
   model: "repositories",
   Model: RepositoryModel,
   title: "Repositories",
@@ -54,7 +55,7 @@ export default seedType({
     ...(o.password !== undefined || o.user !== undefined ? ["user and password are refused: give the repository's credential by name"] : []),
     ...(uriCarriesSecret(o.uri) ? ["uri must not carry a user or a token: give the repository's credential by name"] : []),
   ],
-  // the holder itself : never its own file's
+  // the holder itself : never its own entries'
   notImported: (o, holder) => (holder && o.name === holder ? "the repository holding this file" : null),
   // the holder : by its flag, or by its name before the flag is saved (the question asked first) ;
   // one whose uri carries a user or a token : its secret never goes to git
@@ -70,7 +71,7 @@ export default seedType({
     }
     if (flagOn(out.use_for_repositories)) {
       delete out.use_for_repositories;
-      notes.push("use_for_repositories refused: a repository of repositories.yaml cannot hold repositories itself");
+      notes.push("use_for_repositories refused: a repository listed under repositories: cannot hold repositories itself");
     }
     for (const flag of ONE_ONLY_FLAGS) {
       if (!flagOn(out[flag])) continue;

@@ -76,11 +76,11 @@ describe("a column's default, as the type of the column says", () => {
  */
 async function takenOut(key, repo, folder, file, field, table) {
   const desc = await RepoObjects.descriptorOf(key);
-  fx.writeFile(repo, folder, `${file.name}.yaml`, { ...file, [field]: true });
+  fx.writeEntry(repo, `${folder}/${file.name}.yaml`, key, { ...file, [field]: true });
   const first = await RepoObjects.syncRepository(desc, repo);
   assert.equal(first.created, 1, JSON.stringify(first.refused));
   assert.equal(Number(fx.rowNamed(table, file.name)[field]), 1, `${field} on`);
-  fx.writeFile(repo, folder, `${file.name}.yaml`, file);
+  fx.writeEntry(repo, `${folder}/${file.name}.yaml`, key, file);
   CrudModel.flushAllLocal();
   const summary = await RepoObjects.syncRepository(desc, repo);
   assert.equal(summary.updated, 1);
@@ -111,12 +111,12 @@ describe.each([
 describe("the default runner moved in git", () => {
   test("taken off one file, put on another : the new one is the default, the old one not, and it stays so", async () => {
     const desc = await RepoObjects.descriptorOf("runners");
-    fx.writeFile("run-repo", "runners", "a.yaml", runnerFile("a", { is_default: true }));
-    fx.writeFile("run-repo", "runners", "b.yaml", runnerFile("b"));
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", runnerFile("a", { is_default: true }));
+    fx.writeEntry("run-repo", "runners/b.yaml", "runners", runnerFile("b"));
     await RepoObjects.syncRepository(desc, "run-repo");
     assert.equal(Number(fx.rowNamed("runners", "a").is_default), 1);
-    fx.writeFile("run-repo", "runners", "a.yaml", runnerFile("a"));
-    fx.writeFile("run-repo", "runners", "b.yaml", runnerFile("b", { is_default: true }));
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", runnerFile("a"));
+    fx.writeEntry("run-repo", "runners/b.yaml", "runners", runnerFile("b", { is_default: true }));
     CrudModel.flushAllLocal();
     await RepoObjects.syncRepository(desc, "run-repo");
     assert.equal(Number(fx.rowNamed("runners", "a").is_default), 0);

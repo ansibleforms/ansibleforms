@@ -1,10 +1,10 @@
 'use strict';
-// The appearance types of the repository-backed objects (lib/repoObjects/engine.js, its
-// single-file mode) : what Settings > Appearance's pages save, one file of a repository per page,
-// each holding what its page saves and nothing else - the defaults (defaults.yaml : the theme, its
-// colour, the forms view, the time zone, the date format, the language), the logo (logo.yaml, the
-// image a file beside it), the website icon (icon.yaml, the same), the name (name.yaml) and the
-// header's links (links.yaml : the links and the Designer's). One way for all, written once : a
+// The appearance types of the repository-backed objects (lib/repoObjects/engine.js, its single
+// mode) : what Settings > Appearance's pages save, one key of a repository's files per page, each
+// holding what its page saves and nothing else - the defaults (defaults: the theme, its colour, the
+// forms view, the time zone, the date format, the language), the logo (logo:, the image a file it
+// names), the website icon (icon:, the same), the name (name:) and the header's links (links: the
+// links and the Designer's). One way for all, written once : a
 // file applied as the pages save (the settings row's fields through lib/appearance.js, the
 // environment settings through lib/envSave.js, the images through lib/brandImages.js), the images
 // read and written as binary and checked as an upload is. The config seed's sections of the same
@@ -21,7 +21,7 @@ import { saveEnvValues } from "../envSave.js";
 import EnvSettings from "../envSettings.js";
 import { BRAND_IMAGES, imageDataUrl, imageFile } from "../brandImages.js";
 import { seedHold } from "./seedHold.js";
-import { same, parseMapFile, fileBeside } from "./yamlFile.js";
+import { same, fileBeside } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
 
 // the environment settings among the appearance fields, by field : their variable, and how the app
@@ -44,20 +44,22 @@ const ENV = {
 const comparable = (v) => (Array.isArray(v) ? (v.length ? JSON.stringify(v) : "") : typeof v === "boolean" ? v : v === null || v === undefined ? "" : String(v));
 
 /**
- * An image file a file names, read as binary : inside the folder it is named from.
+ * An image file a file names, read as binary : relative to the file naming it, inside its
+ * repository (or beside the seed file).
  *
  * Args:
- *   dir (string): the folder (the repository's root, the seed file's folder).
- *   name (string): its path, relative to it.
+ *   dir (string): the folder of the file naming it.
+ *   name (string): its path, relative to that folder.
+ *   root (string|null): the repository it must be in ; none : beside the file (the seed's).
  *
  * Returns:
  *   Buffer: its bytes.
  *
  * Raises:
- *   Error: a path that leads outside the folder (a link too), or a file that cannot be read.
+ *   Error: a path that leads outside the root (a link too), or a file that cannot be read.
  */
-function readImage(dir, name) {
-  const abs = fileBeside(dir, name);
+function readImage(dir, name, root = null) {
+  const abs = fileBeside(dir, name, root);
   try {
     return fs.readFileSync(abs);
   } catch (e) {
@@ -113,7 +115,7 @@ function imageEdits(images, seeded, declared, after, before) {
  *
  * Args:
  *   spec (object):
- *     key, file, title, noun (string): as lib/repoObjects/singleType.js reads them.
+ *     key, title, noun (string): as lib/repoObjects/singleType.js reads them.
  *     section (object): the schema of its file (lib/seed-schema.js).
  *     rowFields (string[]): its fields of the settings row (app_name, header_links ...).
  *     envFields (string[]): its environment settings, by field (default_language, show_designer).
@@ -165,7 +167,6 @@ export function appearanceType(spec) {
 
   return singleType({
     key: spec.key,
-    file: spec.file,
     section: spec.section,
     title: spec.title,
     noun: spec.noun,
@@ -199,13 +200,13 @@ export function appearanceType(spec) {
     // an app edit : only the images it changed written, each as <kind>.<extension> beside the YAML,
     // the YAML naming it so where it named another file (images/logo.png) ; an image left as it
     // is keeps its file and its name, wherever the file names it
-    editFiles: (text, after, before) => imageEdits(images, seededOf(after), parseMapFile(text).object || {}, after, before),
+    editFiles: (declared, after, before) => imageEdits(images, seededOf(after), declared || {}, after, before),
     // the images it names read and checked ; its links as the model keeps them
-    fromFile: async (declared, { dir } = {}) => {
+    fromFile: async (declared, { dir, root } = {}) => {
       const out = { ...declared };
       for (const kind of images) {
         if (declared[kind] === undefined) continue;
-        out[kind] = declared[kind] ? imageDataUrl(kind, readImage(dir, declared[kind])) : null;
+        out[kind] = declared[kind] ? imageDataUrl(kind, readImage(dir, declared[kind], root)) : null;
       }
       if (declared.header_links !== undefined) out.header_links = validHeaderLinks(declared.header_links);
       return out;

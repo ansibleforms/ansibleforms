@@ -1,26 +1,25 @@
 'use strict';
-// The descriptor of an object type kept in ONE file of its repository instead of a folder : the
-// chat assistant's settings (chat-assistant.yaml), the System > General settings (general.yaml), the
-// logo (logo.yaml and its image). The app has one such object ; the file holds it, in
-// the config seed's format, checked, its secrets ${ENV} references only (lib/repoObjects/fields.js).
-// The engine's single-file mode (lib/repoObjects/engine.js) reads it in, writes the app's values to
-// it when the repository is made the type's, and writes an app edit into it, field by field.
+// The descriptor of an object type the app has ONE object of : the chat assistant's settings
+// (chat_assistant:), the System > General settings (general:), the logo (logo: and its image). A
+// file of its repository holds it as one map under its key, in the config seed's format, checked,
+// its secrets ${ENV} references only (lib/repoObjects/fields.js) ; one file at most gives it. The
+// engine's single mode (lib/repoObjects/engine.js) reads it in, writes the app's values when the
+// repository is made the type's, and writes an app edit into it, field by field.
 //
-// A type says what is its own : its file and schema, how the app's object is read (current), how a
-// file's object is applied (apply : the same rules as the app's own save), and, for a type with
-// files beside its YAML (the logo's image), how they are read and written.
+// A type says what is its own : its schema, how the app's object is read (current), how a file's
+// object is applied (apply : the same rules as the app's own save), and, for a type with files
+// beside its YAML (the logo's image), how they are read and written.
 import { differs } from "../seedCompare.js";
 import { fieldSet } from "./fields.js";
 import { typeOf } from "./types.js";
 
 /**
- * The descriptor of a single-file object type.
+ * The descriptor of an object type the app has one of.
  *
  * Args:
  *   spec (object):
- *     key (string): the type (chat).
- *     file (string): its file at the root of its repository (chat-assistant.yaml).
- *     section (string|object): the schema of its file (lib/seed-schema.js).
+ *     key (string): the type (chat_assistant), its key in a file.
+ *     section (string|object): the schema of its map (lib/seed-schema.js).
  *     title, noun (string): how the pull output names it.
  *     secrets, skip, keepFalse, canonical : as lib/repoObjects/fields.js reads them.
  *     references (object[]): what it names : [{ field, type }] ; it waits when one is missing.
@@ -33,17 +32,18 @@ import { typeOf } from "./types.js";
  *     kept (function): (current) => [{ name, code, reason }] - the parts that stay in the app (the
  *       appearance fields the config seed manages), said before the type is turned on.
  *     heldBySeed (function): (current) => whether the config seed manages the whole object (the
- *       chat assistant's settings) : it stays with the seed, as a seed-managed object of a folder
+ *       chat assistant's settings) : it stays with the seed, as a seed-managed object of a list
  *       type does - never written to the repository's file, its file never applied (said).
  *     notesOf (function): (declared, current) => lines for the pull output about a file, whether it
  *       changes anything or not (the fields of it the config seed keeps).
- *     fromFile (function): async (object, { dir, fromSeed }) => the object as the app reads it, the files
- *       beside the YAML read (the logo's image) ; as it is when not given.
+ *     fromFile (function): async (object, { dir, root, fromSeed }) => the object as the app reads
+ *       it, the files its YAML names read, relative to its file's folder (dir) and inside root (the
+ *       repository ; the seed file's folder) - the logo's image ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
  *       object writes (the logo's image), its YAML naming them.
- *     editFiles (function): (text, after, before) => { base, names, extraFiles, gone } - an app
- *       edit's files beside the YAML, from the file as it is : the files written (those the edit
- *       changed, own when the YAML names them), the ones it no longer names (removed), and the
+ *     editFiles (function): (declared, after, before) => { base, names, extraFiles, gone } - an app
+ *       edit's files beside the YAML, from its map as the file has it : the files written (those
+ *       the edit changed, own when the YAML names them), the ones it no longer names (removed), and the
  *       fields of the YAML compared as the file names them (base, over the object before the edit)
  *       and as the edit names them (names, over the object after it) ; extraFiles(after), all of
  *       them, when not given.
@@ -57,7 +57,7 @@ import { typeOf } from "./types.js";
  *       settings' are known by their names).
  *
  * Returns:
- *   object: the descriptor (lib/repoObjects/engine.js, its single-file mode).
+ *   object: the descriptor (lib/repoObjects/engine.js, its single mode).
  */
 export function singleType(spec) {
   // its fields : the seed's schema, or the type's own (a flat map : the settings)
@@ -69,7 +69,8 @@ export function singleType(spec) {
     key: spec.key,
     flag: typeOf(spec.key).flag,
     model: spec.key,
-    file: spec.file,
+    // one map under its key, in one file at most
+    single: true,
     title: spec.title,
     noun: spec.noun,
     secrets: spec.secrets || [],
@@ -83,8 +84,9 @@ export function singleType(spec) {
      *
      * Args:
      *   raw (object): the object.
-     *   opts (object): { dir (the folder its file is in), resolved (the seed's own : its
-     *     references resolved already), fromSeed (the config seed's declaration) }.
+     *   opts (object): { dir (the folder its file is in), root (the folder what it names must be
+     *     in : the repository, the seed file's folder ; dir when not given), resolved (the seed's own
+     *     : its references resolved already), fromSeed (the config seed's declaration) }.
      *
      * Returns:
      *   Promise<object>: { errors, object (as the app reads it, null when refused) }.
@@ -107,50 +109,48 @@ export function singleType(spec) {
     notesOf: spec.notesOf || (() => []),
 
     /**
-     * The app's object as its file : its YAML (its secrets left out) and the files beside it.
+     * The app's object as its map : its fields (its secrets left out) and the files beside it.
      *
      * Args:
      *   current (object): the app's object.
      *
      * Returns:
-     *   object: { text, withoutSecret, extraFiles: [{ name, buffer }] }.
+     *   object: { object (the map), withoutSecret, extraFiles: [{ name, buffer }] }.
      */
     fileOf(current) {
       const { object, withoutSecret } = fields.toFile(toYaml(current));
-      return { text: fields.newText(object), withoutSecret, extraFiles: spec.extraFiles ? spec.extraFiles(current) : [] };
+      return { object, withoutSecret, extraFiles: spec.extraFiles ? spec.extraFiles(current) : [] };
     },
 
     /**
-     * An app edit written into its file : only the fields it changed, and the files beside it
+     * An app edit as the edits of its map : only the fields it changed, and the files beside it
      * that changed.
      *
      * Args:
-     *   text (string): the file's text.
+     *   declared (object): its map as the file has it now.
      *   after (object): the app's object as saved.
      *   before (object): the app's object before the edit.
      *
      * Returns:
-     *   object: { text, extraFiles: [{ name, buffer }], gone (string[] : the files beside it no
-     *     longer named, when the type says them ; undefined : those the object named before) }.
+     *   object: { edits ({ field: value }, undefined removing it), keyOrder, extraFiles: [{ name,
+     *     buffer }], gone (string[] : the files beside it no longer named, when the type says them ;
+     *     undefined : none) }.
      */
-    fileEdits(text, after, before) {
-      // the files beside it as the file names them now (the logo's image) : only the ones
-      // the edit changed written, and its YAML naming them where it names another file
-      const files = spec.editFiles ? spec.editFiles(text, after, before || {}) : null;
-      if (files) {
-        return {
-          text: fields.editText(text, { ...toYaml(after), ...files.names }, { ...toYaml(before || {}), ...files.base }),
-          extraFiles: files.extraFiles,
-          gone: files.gone,
-        };
-      }
+    fileEdits(declared, after, before) {
+      // the files beside it as the file names them now (the logo's image) : only the ones the edit
+      // changed written, and its YAML naming them where it names another file
+      const files = spec.editFiles ? spec.editFiles(declared || {}, after, before || {}) : null;
+      const next = files ? { ...toYaml(after), ...files.names } : toYaml(after);
+      const prev = files ? { ...toYaml(before || {}), ...files.base } : toYaml(before || {});
       return {
-        text: fields.editText(text, toYaml(after), toYaml(before || {})),
-        extraFiles: spec.extraFiles ? spec.extraFiles(after) : [],
+        edits: fields.editsOf(next, prev),
+        keyOrder: fields.keyOrderOf(next, prev),
+        extraFiles: files ? files.extraFiles : spec.extraFiles ? spec.extraFiles(after) : [],
+        gone: files ? files.gone : undefined,
       };
     },
 
-    // a type of one file has no rows to link : its repository holds it, its flag says so
+    // a type the app has one of has no rows to link : its repository holds it, its flag says so
     store: { unlink: async () => 0, rename: async () => 0, countLinked: async () => 0 },
   };
 }

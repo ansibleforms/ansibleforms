@@ -45,7 +45,7 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), i18n.t(req, 'resources.logoInvalidImage')));
     }
     try {
-      // the Logo repository's logo.yaml, before : its logo written beside it after
+      // the Logo repository's logo: map, before : its logo written into it after
       await RepoObjects.holding('logo', async () => {
         const before = await RepoObjects.snapshot('logo');
         await BRAND_IMAGES.logo.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);

@@ -1,25 +1,22 @@
-// A schedule of a schedules repository (use_for_schedules) : one YAML file under its `schedules`
-// folder, in one of three shapes - the export form (its template, inventory and credentials as
-// natural keys { name, type, organization }, its credentials under related, its own natural_key),
-// the module form (the template and inventory as names, credentials as a list of names,
-// organization beside them) or a controller_schedules list of one - read into what AnsibleForms
-// runs, refused where it is not a valid schedule, and written back with everything the file says
-// kept ; its rrule is checked by lib/scheduleRrule.js. Pure : models/scheduleRepo.model.js reads
-// the files and writes the database.
+// A schedule of a schedules repository (use_for_schedules) : an entry of a schedules: list in any
+// YAML file of the repository (lib/repoObjects/repoFiles.js), in one of two shapes - the export
+// form (its template, inventory and credentials as natural keys { name, type, organization }, its
+// credentials under related, its own natural_key) or the module form (the template and inventory
+// as names, credentials as a list of names, organization beside them) - read into what
+// AnsibleForms runs, refused where it is not a valid schedule, and written back with everything
+// its entry says kept ; its rrule is checked by lib/scheduleRrule.js. Pure :
+// models/scheduleRepo.model.js and the engine (lib/repoObjects/engine.js) read the files and write
+// the database.
 import YAML from "yaml";
 import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
-import { setKey as setMapKey, same, fileNameFor as objectFileName, YAML_FILE, editedText } from "./repoObjects/yamlFile.js";
+import { setKey as setMapKey, same, editListEntry } from "./repoObjects/yamlFile.js";
 
 // ===========================================================================
 // CONSTANTS
 // ===========================================================================
 
-// the folder of a schedules repository the schedules are in, one per file ; nothing else in the
-// repository is read as a schedule
-export const SCHEDULES_FOLDER = "schedules";
-
-// a schedule's file : yaml, as every object file
-export const SCHEDULE_FILE = YAML_FILE;
+// the key of the lists the schedules are entries of, in a repository's files
+export const SCHEDULES_KEY = "schedules";
 
 // the keys of a schedule in the export's order (its own fields, its prompts, then
 // unified_job_template, enabled and rrule, then related and natural_key) : a new file is written in it, a key added to a file goes to its
@@ -48,11 +45,6 @@ export const KEY_ORDER = [
   "related",
   "natural_key",
 ];
-
-// the lists a file may hold its one schedule in : an export's { schedules: [...] }, or
-// { controller_schedules: [...] }
-export const WRAPPER_KEYS = ["schedules", "controller_schedules"];
-
 
 // the prompts AnsibleForms has none for : checked, kept in the file, not used
 export const UNMAPPED_KEYS = ["forks", "timeout", "job_slice_count", "labels"];
@@ -312,60 +304,22 @@ export function launchOptionsOf(obj) {
 }
 
 /**
- * The map of a parsed file that is its schedule : the file itself, or the one item of the list
- * an export ({ schedules: [...] }) or a controller_configuration file ({ controller_schedules:
- * [...] }) holds it in.
+ * Reads a schedule entry : what AnsibleForms runs, and why it is refused when it is not a valid
+ * schedule - no name, a name longer than the schedule table keeps, no rrule or a refused one, no
+ * unified_job_template name, extra_data that are no dictionary, a prompt of the wrong type. Whether
+ * its form exists is the caller's to check (it knows the forms). An entry with `state: absent`
+ * (the module's) holds no schedule.
  *
  * Args:
- *   doc (YAML.Document): the parsed file.
- *
- * Returns:
- *   object: { node (YAMLMap), wrapper (the list's key, or null) }.
- *
- * Raises:
- *   Error: the file is no map, or its list holds more or less than one schedule.
- */
-export function scheduleNodeOf(doc) {
-  const top = doc.contents;
-  if (!YAML.isMap(top)) throw new Error("the file is not a schedule (a YAML dictionary)");
-  if (!top.has("name")) {
-    const wrapper = WRAPPER_KEYS.find((key) => top.has(key));
-    if (wrapper) {
-      const list = top.get(wrapper, true);
-      if (!YAML.isSeq(list) || list.items.length !== 1 || !YAML.isMap(list.items[0])) {
-        throw new Error(`'${wrapper}' must hold exactly one schedule: one schedule per file`);
-      }
-      return { node: list.items[0], wrapper };
-    }
-  }
-  return { node: top, wrapper: null };
-}
-
-/**
- * Reads a schedule file : what AnsibleForms runs, and why it is refused when it is not a valid
- * schedule - no name, a name longer than the schedule table keeps, no
- * rrule or a refused one, no unified_job_template name, extra_data that are no dictionary, a
- * prompt of the wrong type. Whether its form exists is the caller's to check (it knows the forms).
- * A file with `state: absent` (the module's) holds no schedule.
- *
- * Args:
- *   text (string): the file's text.
+ *   obj (object): the entry, as its file gives it.
  *
  * Returns:
  *   object: { errors (string[]), absent (boolean), schedule: { name, description, rrule,
  *     enabled, form, extraData, launchOptions, ignored }, name (the name a refused one declares,
  *     null when it gives none) } ; schedule is null when refused.
  */
-export function parseScheduleFile(text) {
-  const doc = YAML.parseDocument(String(text ?? ""), { prettyErrors: false });
-  if (doc.errors.length) return { errors: [`not valid YAML: ${doc.errors[0].message}`], absent: false, schedule: null };
-  let node;
-  try {
-    ({ node } = scheduleNodeOf(doc));
-  } catch (e) {
-    return { errors: [e.message], absent: false, schedule: null };
-  }
-  const obj = node.toJS(doc) || {};
+export function parseSchedule(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return { errors: ["a schedule must be a dictionary"], absent: false, schedule: null };
   if (obj.state === "absent") return { errors: [], absent: true, schedule: null };
   const errors = [];
   // name : required, the schedule table's name
@@ -420,27 +374,19 @@ function setKey(doc, map, key, value) {
 }
 
 /**
- * The fields the app edits written into a schedule's file : the rest of it - the prompts, the
- * keys AnsibleForms does not use, the wrapper list, the comments, the order - kept as the file
- * has them. unified_job_template keeps its shape (a name, or a natural key whose name changes),
- * and the export's natural_key follows the name and the form.
+ * The fields the app edits written into a schedule's entry, its map changed in place : the rest of
+ * it - the prompts, the keys AnsibleForms does not use, the comments, the order - kept as the
+ * file has them. unified_job_template keeps its shape (a name, or a natural key whose name
+ * changes), and the export's natural_key follows the name and the form.
  *
  * Args:
- *   text (string): the file's text.
+ *   doc (YAML.Document): the file's document.
+ *   node (YAMLMap): the schedule's entry.
  *   edits (object): any of { name, description, rrule, enabled, form, extraData, launchOptions
  *     (the launch options : only the prompts whose value changes rewritten, those no longer
  *     given removed) }.
- *
- * Returns:
- *   string: the file's new text.
- *
- * Raises:
- *   Error: the file is not a schedule.
  */
-export function updateScheduleFile(text, edits) {
-  const doc = YAML.parseDocument(String(text ?? ""));
-  if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
-  const { node } = scheduleNodeOf(doc);
+export function updateScheduleEntry(doc, node, edits) {
   const current = node.toJS(doc) || {};
   if (edits.name !== undefined && edits.name !== current.name) setKey(doc, node, "name", edits.name);
   if (edits.description !== undefined && edits.description !== (current.description ?? "")) setKey(doc, node, "description", edits.description);
@@ -480,11 +426,52 @@ export function updateScheduleFile(text, edits) {
     const nujt = natural.get("unified_job_template", true);
     if (edits.form !== undefined && YAML.isMap(nujt) && nujt.get("name") !== edits.form) setKey(doc, nujt, "name", edits.form);
   }
-  return editedText(doc, text);
 }
 
 /**
- * A new schedule file, in the export form of one schedule : its keys in the export's order, its
+ * The fields the app edits written into a schedule's entry of a file (updateScheduleEntry), found
+ * by its name in the file's schedules: list ; the rest of the file kept.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   name (string): the schedule's name (before the edit).
+ *   edits (object): updateScheduleEntry's.
+ *   whole (object|null): the entry whole (newScheduleEntry), added when the file has none of
+ *     that name ; none : the text left as it is.
+ *
+ * Returns:
+ *   string: the file's new text.
+ *
+ * Raises:
+ *   Error: the file is not a map of valid YAML, or its schedules: no list.
+ */
+export function updateScheduleText(text, name, edits, whole = null) {
+  return editListEntry(text, SCHEDULES_KEY, name, (doc, node) => updateScheduleEntry(doc, node, edits), { whole, keyOrder: KEY_ORDER });
+}
+
+/**
+ * A schedule's entry of a file's text, by its name, as plain values : what is read back after an
+ * edit.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   name (string): the schedule's name.
+ *
+ * Returns:
+ *   object|null: the entry ; null when the file has none of that name (or cannot be read).
+ */
+export function scheduleEntryOf(text, name) {
+  try {
+    const list = YAML.parse(String(text ?? ""))?.[SCHEDULES_KEY];
+    const key = String(name ?? "").trim().toLowerCase();
+    return (Array.isArray(list) ? list : []).find((e) => e && typeof e === "object" && nameOf(e.name).trim().toLowerCase() === key) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A new schedule entry, in the export form of one schedule : its keys in the export's order, its
  * template as a natural key, and its own natural key (what an import finds it by). No
  * AnsibleForms field in it.
  *
@@ -493,9 +480,9 @@ export function updateScheduleFile(text, edits) {
  *     launch options, written as the prompts that give them : promptsOf) }.
  *
  * Returns:
- *   string: the file's text.
+ *   object: the entry, its keys in the export's order.
  */
-export function newScheduleFile({ name, description = "", rrule, enabled = true, form, extraData = {}, launchOptions = {} }) {
+export function newScheduleEntry({ name, description = "", rrule, enabled = true, form, extraData = {}, launchOptions = {} }) {
   const ujt = { name: form, type: "job_template" };
   const obj = {
     name,
@@ -508,21 +495,5 @@ export function newScheduleFile({ name, description = "", rrule, enabled = true,
     natural_key: { name, type: "schedule", unified_job_template: { ...ujt } },
   };
   const rank = (k) => (KEY_ORDER.includes(k) ? KEY_ORDER.indexOf(k) : KEY_ORDER.length);
-  return YAML.stringify(Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b))), { lineWidth: 0 });
-}
-
-/**
- * The file name a new schedule gets in the schedules folder : its name in lower case, letters
- * and digits apart by dashes, a number added when a file has it already (the shared namer of the
- * object files, lib/repoObjects/yamlFile.js).
- *
- * Args:
- *   name (string): the schedule's name.
- *   taken (function): (fileName) => true when a file has that name.
- *
- * Returns:
- *   string: the file name (nightly-log-rotation.yaml).
- */
-export function fileNameFor(name, taken = () => false) {
-  return objectFileName(name, taken, "schedule");
+  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b)));
 }

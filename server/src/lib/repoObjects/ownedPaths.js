@@ -1,17 +1,21 @@
 'use strict';
-// The paths of a repository its usage types own (lib/repoObjects/types.js) : the roles', the
-// categories' and the constants' files (lib/configKeys.js, config.yaml included), and each object
-// type's folder (credentials/, runners/ ...), its list file (repositories.yaml) or its single file
-// (general.yaml, logo.yaml) with the files beside it that file names (the logo's, the icon's image) ;
-// and the file the whole base configuration may be served from, roles included, when no repository
-// holds those keys (a forms repository's config.yaml, Repository.getConfigCandidates).
-// The app reads them as configuration, objects and secrets : the designer's file explorers
-// (models/projectFiles.model.js) never list, read, write nor delete them, even in a repository used
-// for workflows, inventories, playbooks or vars files as well - writing roles.yaml there made a
-// designer an admin ; nor does its forms save (models/form.model.js) write a form file onto one, in
-// a repository serving its forms from its root, nor its forms load read one as forms. A path is checked against every repository whose
-// working tree it is in, as the disk resolves it : a local folder holding the repositories' root, or
-// a form file named '../other/roles.yaml', reaches another repository's files.
+// The files of a repository its usage types own (lib/repoObjects/types.js), by their content
+// (lib/repoObjects/repoFiles.js) : each YAML file giving at its top level the key of a type the
+// repository holds (credentials:, defaults:, roles: ... - one that cannot be read, its lines seeming
+// to give one, too), the files those name (the logo's, the icon's image, relative to the file
+// naming it), the config.yaml of before at its root while it holds the roles, the categories or
+// the constants (still read, deprecated), and each of these keys' own file at its root (roles.yaml :
+// read for it when no other file gives it, there or not) ; and the file the whole base configuration may be served
+// from, roles included, when no repository holds those keys (a forms repository's config.yaml,
+// Repository.getConfigCandidates). The app reads them as configuration, objects and secrets : the
+// designer's file explorers (models/projectFiles.model.js) never list, read, write nor delete them,
+// even in a repository used for workflows, inventories, playbooks or vars files as well - writing
+// roles: there made a designer an admin ; nor does its forms save (models/form.model.js) write a
+// form file onto one, in a repository serving its forms from its root, nor its forms load read one
+// as forms. A file a designer writes whose content would give such a key is refused the same way
+// (assertContentNotOwned). A path is checked against every repository whose working tree it is in,
+// as the disk resolves it : a local folder holding the repositories' root, or a form file named
+// '../other/roles.yaml', reaches another repository's files.
 import fs from "fs";
 import path from "path";
 import mysql from "../../models/db.model.js";
@@ -19,10 +23,13 @@ import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
 import logger from "../logger.js";
 import Errors from "../errors.js";
-import { USAGE_TYPES } from "./types.js";
-import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
+import { USAGE_TYPES, typeOf } from "./types.js";
 import { CONFIG_KEYS, LEGACY_FILE } from "../configKeys.js";
-import { parseMapFile } from "./yamlFile.js";
+import { scanRepository, contentOf, holdsTypeKeys } from "./repoFiles.js";
+
+// the types whose map names files of the repository, and the fields that name them : the logo's
+// and the icon's image
+const NAMING = { logo: ["logo"], icon: ["icon"] };
 
 /**
  * A path relative to a folder, with forward slashes ; null when it is not inside it.
@@ -67,7 +74,21 @@ export function realPathOf(abs) {
 }
 
 /**
- * What a repository's usage types own in it, by path relative to its working tree.
+ * The type keys a repository holds (its use_for_* flags), each with its label.
+ *
+ * Args:
+ *   row (object): the repository's row.
+ *
+ * Returns:
+ *   Map<string, string>: label by type key.
+ */
+function heldKeys(row) {
+  return new Map(USAGE_TYPES.filter((t) => (t.objects || t.config) && Number(row[t.flag] ?? 0)).map((t) => [t.key, t.label]));
+}
+
+/**
+ * What a repository's usage types own in it, by path relative to its working tree : by the files'
+ * content.
  *
  * Args:
  *   row (object): the repository's row (its name and its use_for_* flags).
@@ -75,48 +96,43 @@ export function realPathOf(abs) {
  *     (Repository.getConfigCandidates : [{ repo, path }]).
  *
  * Returns:
- *   Promise<object[]>: [{ rel, folder (a whole folder), label (the type's, as the server names it) }].
+ *   object[]: [{ rel, label (the type's, as the server names it) }].
  */
-async function ownedOf(row, configFiles = []) {
+function ownedOf(row, configFiles = []) {
   const dir = Repo.folderOf(row.name);
   const out = [];
   // the base configuration, roles included, served from this repository's file (no repository holds
   // the roles, the categories nor the constants : the 7.3 layout)
   for (const c of configFiles) {
     const rel = c.repo === row.name ? relativeTo(dir, path.resolve(c.path)) : null;
-    if (rel) out.push({ rel, folder: false, label: "configuration" });
+    if (rel) out.push({ rel, label: "configuration" });
   }
-  for (const type of USAGE_TYPES) {
-    if (!Number(row[type.flag] ?? 0)) continue;
-    // the roles, the categories, the constants : their own file, and config.yaml they may be read from
-    const key = CONFIG_KEYS.find((k) => k.key === type.key);
-    if (key) {
-      out.push({ rel: key.file, folder: false, label: type.label }, { rel: LEGACY_FILE, folder: false, label: type.label });
-      continue;
-    }
-    if (!type.objects || !BUILT_OBJECT_TYPES.includes(type.key)) continue;
-    const desc = await descriptorOf(type.key);
-    if (desc.file) {
-      out.push({ rel: desc.file, folder: false, label: type.label });
-      // the files its YAML names beside it
-      const besides = desc.besides || [];
-      if (besides.length) {
-        let named = {};
-        try {
-          named = parseMapFile(fs.readFileSync(path.join(dir, desc.file), "utf8")).object || {};
-        } catch {
-          // no file yet : nothing named
-        }
-        for (const field of besides) {
-          const rel = typeof named[field] === "string" ? relativeTo(dir, path.resolve(dir, named[field])) : null;
-          if (rel) out.push({ rel, folder: false, label: type.label });
-        }
+  const held = heldKeys(row);
+  if (!held.size) return out;
+  // config.yaml of before : still read for the roles, the categories and the constants ; and each
+  // key's own file at the root (roles.yaml), read for it when no other file gives it, there or not
+  const legacy = [...held.keys()].find((k) => typeOf(k)?.config);
+  if (legacy) out.push({ rel: LEGACY_FILE, label: held.get(legacy) });
+  for (const k of CONFIG_KEYS) if (held.has(k.key)) out.push({ rel: k.file, label: held.get(k.key) });
+  const scan = scanRepository(dir);
+  for (const f of scan.files) {
+    const keys = f.keys.filter((k) => held.has(k));
+    if (!keys.length) continue;
+    out.push({ rel: f.file, label: held.get(keys[0]) });
+    // the files its maps name, relative to it
+    for (const key of keys) {
+      const value = f.data[key];
+      for (const field of NAMING[key] || []) {
+        const named = value && typeof value === "object" && !Array.isArray(value) ? value[field] : null;
+        const rel = typeof named === "string" && named ? relativeTo(dir, path.resolve(dir, path.dirname(f.file), named)) : null;
+        if (rel) out.push({ rel, label: held.get(key) });
       }
-    } else if (desc.listFile) {
-      out.push({ rel: desc.listFile, folder: false, label: type.label });
-    } else if (desc.folder) {
-      out.push({ rel: desc.folder, folder: true, label: type.label });
     }
+  }
+  // a file that cannot be read, its lines seeming to give a key it holds : still the type's
+  for (const u of scan.unreadable) {
+    const key = u.hints.find((k) => held.has(k));
+    if (key) out.push({ rel: u.file, label: held.get(key) });
   }
   return out;
 }
@@ -141,8 +157,9 @@ async function ownersTest() {
   const trees = [];
   for (const row of rows || []) {
     if (!Repo.isValidName(row.name)) continue;
-    const owned = await ownedOf(row, configFiles);
-    if (!owned.length) continue;
+    const owned = ownedOf(row, configFiles);
+    const held = heldKeys(row);
+    if (!owned.length && !held.size) continue;
     const dir = Repo.folderOf(row.name);
     let realDir = dir;
     try {
@@ -150,11 +167,15 @@ async function ownersTest() {
     } catch {
       // not cloned yet : as written
     }
-    trees.push({ repository: row.name, dir, realDir, owned });
+    trees.push({ repository: row.name, dir, realDir, owned, held });
   }
-  if (!trees.length) return () => null;
-  const match = (tree, rel) => tree.owned.find((o) => rel !== null && (rel === o.rel || (o.folder && rel.startsWith(`${o.rel}/`))))?.label || null;
-  return (abs) => {
+  if (!trees.length) {
+    const none = () => null;
+    none.treesOf = () => [];
+    return none;
+  }
+  const match = (tree, rel) => tree.owned.find((o) => rel !== null && rel === o.rel)?.label || null;
+  const test = (abs) => {
     const real = realPathOf(abs);
     for (const tree of trees) {
       // as written ; else a link to one of them, or a new file made through a linked folder
@@ -163,6 +184,12 @@ async function ownersTest() {
     }
     return null;
   };
+  // the repositories a path is in, each with the type keys it holds (assertContentNotOwned)
+  test.treesOf = (abs) => {
+    const real = realPathOf(abs);
+    return trees.filter((tree) => relativeTo(tree.dir, path.resolve(abs)) !== null || relativeTo(tree.realDir, real) !== null);
+  };
+  return test;
 }
 
 /**
@@ -175,6 +202,20 @@ async function ownersTest() {
 export async function ownerTest() {
   const test = await ownersTest();
   return (abs) => test(abs)?.label || null;
+}
+
+/**
+ * What the forms loader leaves out, as a test made once for many paths : a file a usage type owns
+ * (ownerTest), and any file giving a type's key at its top level, whatever repository it is in and
+ * whatever usages that repository holds (lib/repoObjects/repoFiles.js holdsTypeKeys) - a form never
+ * gives one (a form is a map with a type), so such a file is never read as forms.
+ *
+ * Returns:
+ *   Promise<function>: (absolute path) => truthy when it is left out.
+ */
+export async function formsSkipTest() {
+  const owned = await ownerTest();
+  return (abs) => owned(abs) || holdsTypeKeys(abs);
 }
 
 /**
@@ -220,4 +261,30 @@ export async function assertNotOwned(repository, abs, name) {
   if (owner) throw new Errors.AccessDeniedError(`'${name}' holds the ${owner.label} of repository '${owner.repository}': it is not read nor written in the designer`);
 }
 
-export default { realPathOf, ownerTest, findOwner, ownerOf, assertNotOwned };
+/**
+ * Refuses a file a designer writes whose content gives at its top level the key of a type a
+ * repository it lands in holds (credentials:, roles: ... : lib/repoObjects/repoFiles.js) : written,
+ * it would be that type's, read in by the next pull - a designer never writes the app's objects,
+ * its roles nor its secrets. A form (a map with a type) never gives one ; a text that cannot be read
+ * is refused when its lines seem to give one.
+ *
+ * Args:
+ *   abs (string): the path written.
+ *   content (string): its text.
+ *   name (string): the path as the request names it.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: its content gives such a key, which one said.
+ */
+export async function assertContentNotOwned(abs, content, name) {
+  if (!/\.(yaml|yml)$/i.test(String(abs))) return;
+  const found = contentOf(content);
+  const keys = found.errors.length ? found.hints : found.keys;
+  if (!keys.length) return;
+  for (const tree of (await ownersTest()).treesOf(abs)) {
+    const key = keys.find((k) => tree.held.has(k));
+    if (key) throw new Errors.AccessDeniedError(`'${name}' gives ${key}:, the ${tree.held.get(key)} of repository '${tree.repository}': it is not written in the designer`);
+  }
+}
+
+export default { realPathOf, ownerTest, formsSkipTest, findOwner, ownerOf, assertNotOwned, assertContentNotOwned };

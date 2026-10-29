@@ -46,7 +46,7 @@ describe("the settings, as a part of them reads them", () => {
     const { body } = await find({ showConnectionsSettings: true });
     expect(body.seed_managed_fields).toBe('["app_name"]');
     expect(body.source_mcp).toEqual({ repository: "conn", repo_file: "mcp.yaml" });
-    expect(body.source_chat_assistant).toEqual({ repository: "conn", repo_file: "chat-assistant.yaml" });
+    expect(body.source_chat_assistant).toEqual({ repository: "conn", repo_file: "chat_assistant.yaml" });
     for (const k of ["source_defaults", "source_logo", "source_icon", "source_name", "source_links", "source_general", "app_name"]) expect(body).not.toHaveProperty(k);
   });
 

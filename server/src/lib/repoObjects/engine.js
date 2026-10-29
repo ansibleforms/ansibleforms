@@ -1,28 +1,40 @@
 'use strict';
 // The engine of the repository-backed objects : the schedules, the credentials, the runners ...
 // (lib/repoObjects/types.js, the object types), each kept in a repository used for it, one
-// object per YAML file in the type's folder. One repository at most per type.
+// repository at most per type.
 //
-// Every type is a descriptor (lib/repoObjects/<type>.js : its folder, its table, how a file
-// reads, what it names, its secret fields) ; what they share is here, written once :
+// Where a repository keeps them is its files' content (lib/repoObjects/repoFiles.js) : any YAML
+// file, any name, any folder, at any depth, whose top-level key is a type's key holds that type -
+// a list of objects (credentials: [...]), or one map for a type the app has one of (defaults:).
+// A file may hold several types, a type may be spread over many files. An object is its name
+// within its type, never its file : each object row keeps the file its entry is in now
+// (repository, repo_file), moving an entry to another file only changes that.
+//
+// Every type is a descriptor (lib/repoObjects/<type>.js : its table, how an entry reads, what it
+// names, its secret fields) ; what they share is here, written once :
 //   git to app   after each pull (or clone, reset), at the worker's start and when a
-//                repository is made one, its files are read into the table (syncRepository) :
-//                new files make objects, changed ones change them, a removed file removes its
-//                object - unless something uses it, said and refused. A file that is not valid
-//                is refused alone, said in the pull output and the server log, the others still
-//                sync. One that names an object that is not there yet WAITS, said in the pull
-//                output, and is read again when the type it names is next pulled.
+//                repository is made one, its entries are read into the table (syncRepository),
+//                the repository read once and each type handed its entries : a new name makes an
+//                object, a changed entry changes it, a name gone removes its object - unless
+//                something uses it, said and refused. An entry that is not valid is refused alone,
+//                said in the pull output and the server log, the others still sync. One that names
+//                an object that is not there yet WAITS, said in the pull output, and is read again
+//                when the type it names is next pulled. Two entries of a name are both refused,
+//                naming both places. A name changed in its file, the only one gone from that file
+//                and the only one new in it, is a rename : the object keeps its secrets, its id and
+//                what uses it.
 //   app to git   an object of a repository edited, created or deleted in the app writes or
-//                removes its file in the repository's working tree, under its write claim ;
-//                only the changed fields are written, and the change goes to git with the
-//                repository's Push.
-//   activation   made the type's repository, it is pulled and its files read in - a file named
+//                removes its entry in the repository's working tree, under its write claim ; only
+//                the changed fields are written (the file's comments, its other keys and entries
+//                kept), and the change goes to git with the repository's Push. A new object goes to
+//                the first file holding its type's key, else to <key>.yaml at the root.
+//   activation   made the type's repository, it is pulled and its entries read in - an entry named
 //                as an object of the app takes that object over, git's version wins - and the
 //                app's other objects are written to it ; what cannot go stays in the app
 //                (preview first, changing nothing : the question asked before it is saved).
 //   deactivation no longer used for it, or deleted : pulled once more, read in, and its objects
 //                unlinked - they stay in the app as they are, the files in git untouched.
-//   secrets      never plain in git : a file gives them as ${ENV} references (resolved as the
+//   secrets      never plain in git : an entry gives them as ${ENV} references (resolved as the
 //                config seed resolves them), a plain one is refused ; an app object is written
 //                without its secrets, which stay in the database (lib/repoObjects/secrets.js).
 //
@@ -36,7 +48,8 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
-import { filesIn, fileIn, fileBeside, fileNameFor, parseMapFile, parseListFile, appendListEntries, updateListEntry, removeListEntry } from "./yamlFile.js";
+import { fileBeside, fileInRepository, appendListEntries, editListEntry, removeListEntry, editMapEntry, applyEdits, hasListEntry, sortedByOrder } from "./yamlFile.js";
+import { scanRepository } from "./repoFiles.js";
 import { given } from "./secrets.js";
 import { canonicalJson } from "../seedCompare.js";
 import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
@@ -58,20 +71,21 @@ import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 export const nameKey = (name) => String(name || "").trim().toLowerCase();
 
 /**
- * The name a file (or an entry of a list file) declares, read or not : its object's, else the one
- * its text gives (a file refused, or waiting for what it names) - under the field the type names
- * its objects by (descriptor.nameField : a disclaimer version's is its number), every type alike.
+ * The name an entry declares, read or not : its object's, else the one its text gives (an entry
+ * refused, or waiting for what it names) - under the field the type names its objects by
+ * (descriptor.nameField : a disclaimer version's is its number), every type alike.
  *
  * Args:
  *   desc (object): the type's descriptor.
- *   f (object): the file as read ({ object, raw }).
+ *   f (object): the entry as read ({ object, raw, entry }).
  *
  * Returns:
  *   string|null: the name, null when it gives none.
  */
 const declaredName = (desc, f) => {
-  const raw = f?.raw && typeof f.raw === "object" && !Array.isArray(f.raw) ? f.raw : null;
-  const n = f?.object?.name ?? raw?.[desc.nameField || "name"];
+  const asMap = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+  const field = desc.nameField || "name";
+  const n = f?.object?.name ?? asMap(f?.raw)?.[field] ?? asMap(f?.entry)?.[field];
   return n === undefined || n === null || String(n).trim() === "" ? null : String(n);
 };
 
@@ -87,9 +101,9 @@ const declaredName = (desc, f) => {
 const titleOf = (desc) => desc.title || desc.key;
 
 /**
- * How the log and the pull output name what a type holds, one way per mode : a type kept in one
- * file by its label, as a name (General, Defaults, MCP, Chat assistant, Links), a folder or a list
- * type by its objects (the credentials). The sentences built on it never make a verb agree with
+ * How the log and the pull output name what a type holds, one way per mode : a type the app has
+ * one of by its label, as a name (General, Defaults, MCP, Chat assistant, Links), a list type by
+ * its objects (the credentials). The sentences built on it never make a verb agree with
  * it, so they read the same for both.
  *
  * Args:
@@ -98,7 +112,7 @@ const titleOf = (desc) => desc.title || desc.key;
  * Returns:
  *   string: what the type holds, as a sentence names it (General, the credentials).
  */
-const holdingOf = (desc) => (desc.file ? titleOf(desc) : `the ${titleOf(desc).toLowerCase()}`);
+const holdingOf = (desc) => (desc.single ? titleOf(desc) : `the ${titleOf(desc).toLowerCase()}`);
 
 /**
  * Whether a repository's working tree is there.
@@ -186,82 +200,208 @@ export function asHolding(repository, run) {
   return held.run(new Set([...(held.getStore() || []), repository]), run);
 }
 
+// ===========================================================================
+// THE FILES OF A REPOSITORY
+// ===========================================================================
+
 /**
- * The absolute path of an object's file, checked to be right in its type's folder.
+ * A repository's files as the types read them (lib/repoObjects/repoFiles.js) : read once, then
+ * handed to each type.
  *
  * Args:
- *   desc (object): the type's descriptor.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   object: the scan (scanRepository's) ; an empty one when it is not cloned.
+ */
+export const scanOf = (name) => scanRepository(Repo.folderOf(name));
+
+/**
+ * A repository's files read whole (scanOf) : a folder of it that cannot be read (no access, a file
+ * where a folder was) is never taken for an empty one - its sync would delete every object its
+ * files hold.
+ *
+ * Args:
+ *   scan (object): the scan.
+ *
+ * Returns:
+ *   object: the same scan.
+ *
+ * Raises:
+ *   Error: a folder of it cannot be read, named with why.
+ */
+function wholeScan(scan) {
+  if (scan.blocked?.length) throw new Error(scan.blocked.map((b) => `the folder ${b.file} cannot be read: ${b.reason}`).join("; "));
+  return scan;
+}
+
+/**
+ * The absolute path of a file of a repository an object is linked to, checked to be a YAML file
+ * inside it that stays in it once its links are followed.
+ *
+ * Args:
  *   repository (string): the repository.
- *   repoFile (string): the file, relative to the repository (credentials/git.yaml).
+ *   repoFile (string): the file, relative to the repository (credentials.yaml, team/app.yml).
  *
  * Returns:
  *   string: the path.
  *
  * Raises:
- *   Error: a file outside the folder.
+ *   Error: a file outside the repository, a hidden one, or no YAML file.
  */
-export function fileOf(desc, repository, repoFile) {
+export function fileOf(repository, repoFile) {
   try {
-    return fileIn(Repo.folderOf(repository), desc.folder, repoFile);
+    return fileInRepository(Repo.folderOf(repository), repoFile);
   } catch {
-    throw new Error(`'${repoFile}' is not a ${desc.noun} file of repository '${repository}'`);
+    throw new Error(`'${repoFile}' is not a YAML file of repository '${repository}'`);
   }
 }
 
 /**
- * The list file of a type kept as a list in one file (repositories.yaml), at the repository's
- * root : checked to stay in the repository once its links are followed.
+ * The file a new object of a type is written to : the first file (by path) that holds the type's
+ * key already, with the shape the type keeps there (a list, or a map for a type the app has one
+ * of) - else <key>.yaml at the repository's root, made ; a file of that name that is there and does
+ * not hold the key (a form, a playbook) is never written to : <key>-2.yaml, <key>-3.yaml ... then.
  *
  * Args:
  *   desc (object): the type's descriptor.
- *   repository (string): the repository.
+ *   name (string): the repository.
+ *   scan (object): the repository's files (scanOf) ; read when not given.
  *
  * Returns:
- *   string: its absolute path.
- *
- * Raises:
- *   Error: a link that leads outside the repository.
+ *   string: the file, relative to the repository.
  */
-export const listFileOf = (desc, repository) => fileIn(Repo.folderOf(repository), ".", desc.listFile, /./);
-
-/**
- * Adds a new object's entry to its type's list file (the list mode : repositories.yaml).
- *
- * Args:
- *   desc (object): the type's descriptor.
- *   repository (string): the repository.
- *   entry (object): the entry.
- *
- * Returns:
- *   string: the list file, relative to the repository (repositories.yaml).
- */
-export function writeListEntry(desc, repository, entry) {
-  const abs = listFileOf(desc, repository);
-  const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
-  fs.writeFileSync(abs, appendListEntries(text, desc.listKey, [entry], desc.keyOrder), "utf8");
-  return desc.listFile;
+export function targetFileOf(desc, name, scan = scanOf(name)) {
+  const fits = (v) => v === null || v === undefined || (desc.single ? typeof v === "object" && !Array.isArray(v) : Array.isArray(v));
+  const holding = scan.holding(desc.key).find((f) => fits(f.value));
+  if (holding) return holding.file;
+  const dir = Repo.folderOf(name);
+  let file = `${desc.key}.yaml`;
+  for (let n = 2; fs.existsSync(path.join(dir, file)); n++) file = `${desc.key}-${n}.yaml`;
+  return file;
 }
 
 /**
- * Writes a new object's file in its type's folder, named after it.
+ * Writes a file of a repository, its folders made as needed ; removed when its text is empty.
+ *
+ * Args:
+ *   repository (string): the repository.
+ *   repoFile (string): the file, relative to the repository.
+ *   text (string): its text ; '' removes it.
+ */
+function writeRepoFile(repository, repoFile, text) {
+  const abs = fileOf(repository, repoFile);
+  if (text === "") {
+    fs.rmSync(abs, { force: true });
+    return;
+  }
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, text, "utf8");
+}
+
+/**
+ * A file of a repository's text, '' when it is not there.
+ *
+ * Args:
+ *   repository (string): the repository.
+ *   repoFile (string): the file, relative to the repository.
+ *
+ * Returns:
+ *   string: its text.
+ */
+function readRepoFile(repository, repoFile) {
+  const abs = fileOf(repository, repoFile);
+  return fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+}
+
+/**
+ * Adds entries of a type to a file of a repository, at the end of its key's list (the key made at
+ * the file's end when it has none, the file made when it is not there).
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   repoFile (string): the file, relative to the repository.
+ *   entries (object[]): the entries.
+ */
+export function writeEntries(desc, repository, repoFile, entries) {
+  const text = readRepoFile(repository, repoFile);
+  const next = appendListEntries(text, desc.key, entries, desc.keyOrder || [], desc.nameField || "name");
+  if (next !== text) writeRepoFile(repository, repoFile, next);
+}
+
+/**
+ * The file an object's entry is in now : the file it is linked to while that file still holds an
+ * entry of its name under its type's key, else the first file of the repository that does (a pull
+ * moved it meanwhile).
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   repository (string): the repository.
  *   name (string): the object's name.
- *   text (string): the file's text.
+ *   hint (string|null): the file it is linked to.
  *
  * Returns:
- *   string: the file, relative to the repository (credentials/git.yaml).
+ *   string|null: the file, relative to the repository ; null when no file holds it.
  */
-export function writeNewFile(desc, repository, name, text) {
-  const folder = path.join(Repo.folderOf(repository), desc.folder);
-  const file = fileNameFor(name, (f) => fs.existsSync(path.join(folder, f)), desc.noun);
-  // its folder a link that leads outside the repository : refused before anything is made
-  const abs = fileOf(desc, repository, `${desc.folder}/${file}`);
-  fs.mkdirSync(folder, { recursive: true });
-  fs.writeFileSync(abs, text, "utf8");
-  return `${desc.folder}/${file}`;
+export function entryFileOf(desc, repository, name, hint = null) {
+  const field = desc.nameField || "name";
+  try {
+    if (hint && hasListEntry(readRepoFile(repository, hint), desc.key, name, field)) return hint;
+  } catch {
+    // its file outside the repository : looked for among the others
+  }
+  const found = scanOf(repository)
+    .holding(desc.key)
+    .find((f) => Array.isArray(f.value) && f.value.some((e) => e && typeof e === "object" && nameKey(e[field]) === nameKey(name)));
+  return found?.file || null;
+}
+
+/**
+ * Edits an object's entry where it is now (entryFileOf) : mutate changes its map, the rest of the
+ * file kept ; an entry no file holds any more written whole into the file it is linked to.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   name (string): the object's name before the edit.
+ *   hint (string): the file it is linked to.
+ *   mutate (function): (doc, map) => changes the entry.
+ *   whole (object|null): the entry whole, written when no file holds it ; none : nothing written.
+ *
+ * Returns:
+ *   string|null: the file written, relative to the repository ; null when nothing changed.
+ */
+export function editEntry(desc, repository, name, hint, mutate, whole = null) {
+  const file = entryFileOf(desc, repository, name, hint) || hint;
+  const text = readRepoFile(repository, file);
+  const next = editListEntry(text, desc.key, name, mutate, { nameField: desc.nameField || "name", whole, keyOrder: desc.keyOrder || [] });
+  if (next === text) return null;
+  writeRepoFile(repository, file, next);
+  return file;
+}
+
+/**
+ * Removes an object's entry where it is now (entryFileOf) : its type's key goes when its list is
+ * left empty, the file when it holds nothing more.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   repository (string): the repository.
+ *   name (string): the object's name.
+ *   hint (string|null): the file it is linked to.
+ *
+ * Returns:
+ *   string|null: the file it was removed from ; null when no file holds it.
+ */
+export function removeEntry(desc, repository, name, hint = null) {
+  const file = entryFileOf(desc, repository, name, hint);
+  if (!file) return null;
+  const text = readRepoFile(repository, file);
+  const out = removeListEntry(text, desc.key, name, desc.nameField || "name");
+  if (out.text === text && !out.empty) return null;
+  writeRepoFile(repository, file, out.empty ? "" : out.text);
+  return file;
 }
 
 // ===========================================================================
@@ -337,42 +477,71 @@ async function namesOf(key) {
 }
 
 /**
- * Reads a type's files of a repository, each checked on its own (descriptor.parse), then what each
- * names : one that names an object not there yet waits.
+ * Where an entry is, as the pull output and the log say it : its file and its name
+ * (credentials.yaml#git), or its place in its list when it gives no name (credentials.yaml#3).
+ *
+ * Args:
+ *   file (string): the file, relative to the repository.
+ *   name (string|null): the name it declares.
+ *   index (number): its place in its list, from 0.
+ *
+ * Returns:
+ *   string: the place.
+ */
+const placeOf = (file, name, index) => `${file}#${name ?? index + 1}`;
+
+/**
+ * A type's entries in a repository's files (the scan of a pull), each checked on its own
+ * (descriptor.parseEntry), then what each names : one that names an object not there yet waits.
+ * What keeps the objects linked to a file whatever its entries say is said too : a file that cannot
+ * be read (its lines seeming to give the type's key : refused, said), a link that leads outside
+ * the repository, a file whose key holds no list.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
  *   ctx (any): the descriptor's context (descriptor.context), for its parse.
+ *   scan (object): the repository's files (scanOf).
  *
  * Returns:
- *   Promise<object[]>: { file, errors, waiting, absent, object, raw, ignored } each.
+ *   Promise<object>: { entries: [{ place, repoFile, index, entry, errors, waiting, absent, object,
+ *     raw, ignored, skipped }], held (Set : the files whose objects are kept as they are), refused
+ *     ([{ file, reasons }] : the files refused whole), any (whether a file may give the key at all :
+ *     one that does, read or not, or a link never read) }.
  */
-async function readFiles(desc, name, ctx) {
-  const repoDir = Repo.folderOf(name);
-  // a type kept as a list in one file : its entries, each as a file of its own would be ; a file
-  // that is a link leading outside the repository, or a folder, refused (said, never read)
-  const links = [];
-  const files = desc.listFile ? readListFile(desc, name) : filesIn(repoDir, desc.folder, undefined, links).map((file) => {
-    let text;
-    try {
-      text = fs.readFileSync(path.join(repoDir, file), "utf8");
-    } catch (e) {
-      return { file, errors: [`cannot be read: ${e.code || e.message}`], object: null, absent: false };
+async function readEntries(desc, name, ctx, scan) {
+  const entries = [];
+  const refused = [];
+  // the files whose linked objects stay as they are, whatever the entries : not read, or not a list
+  const held = new Set([...scan.unreadable.map((u) => u.file), ...scan.refused.map((r) => r.file)]);
+  for (const u of scan.hinted(desc.key)) refused.push({ file: u.file, reasons: u.errors });
+  const holding = scan.holding(desc.key);
+  for (const { file, value } of holding) {
+    // the key with nothing after it : no entry
+    if (value === null || value === undefined) continue;
+    if (!Array.isArray(value)) {
+      held.add(file);
+      refused.push({ file, reasons: [`'${desc.key}' must be a list of ${desc.noun} entries`] });
+      continue;
     }
-    // a file its reading throws on (an alias bomb) : refused alone, the others still read
-    try {
-      return { file, ...desc.parse(text, ctx) };
-    } catch (e) {
-      return { file, errors: [`cannot be read: ${e.message || e}`], object: null, absent: false };
-    }
-  });
-  if (files === null) return null;
-  for (const l of links) files.push({ file: l.file, errors: [l.reason], object: null, absent: false });
-  files.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
-  // a file the type does not import (an announcement already ended : descriptor.notImported) : not
-  // refused, said on a line of its own ; its object, if the app has it, goes
-  for (const f of files) {
+    value.forEach((item, index) => {
+      const named = item && typeof item === "object" && !Array.isArray(item) ? item[desc.nameField || "name"] : undefined;
+      const place = placeOf(file, named === undefined || named === null || String(named).trim() === "" ? null : String(named), index);
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        entries.push({ place, repoFile: file, index, entry: item, errors: ["an entry must be a dictionary"], object: null, absent: false });
+        return;
+      }
+      // an entry its reading throws on : refused alone, the others still read
+      try {
+        entries.push({ place, repoFile: file, index, entry: item, ...desc.parseEntry(item, ctx) });
+      } catch (e) {
+        entries.push({ place, repoFile: file, index, entry: item, errors: [`cannot be read: ${e.message || e}`], object: null, absent: false });
+      }
+    });
+  }
+  // an entry the type does not import (an announcement already ended : descriptor.notImported) :
+  // not refused, said on a line of its own ; its object, if the app has it, goes
+  for (const f of entries) {
     const reason = f.object && desc.notImported ? desc.notImported(f.object, name) : null;
     if (reason) {
       f.skipped = { name: f.object.name, reason };
@@ -381,7 +550,7 @@ async function readFiles(desc, name, ctx) {
   }
   // the references : by name, to an object of the type named, that must be there
   const cache = new Map();
-  for (const f of files) {
+  for (const f of entries) {
     if (!f.object) continue;
     const waiting = await waitingOf(desc, f.object, cache);
     if (waiting.length) {
@@ -390,48 +559,10 @@ async function readFiles(desc, name, ctx) {
       f.object = null;
     }
   }
-  return files;
+  // whether a file may give the key : one that does, read or not, or a link never read
+  return { entries, held, refused, any: holding.length > 0 || refused.length > 0 || scan.refused.length > 0 };
 }
 
-/**
- * The entries of a type kept as a list in one file (desc.listFile : repositories.yaml, its
- * desc.listKey list), each read and checked on its own as a file of its own would be : its "file"
- * the list file and its name (repositories.yaml#forms). A file that cannot be read as a list is one
- * refusal of the whole (whole : nothing of it changes the app).
- *
- * Args:
- *   desc (object): the type's descriptor.
- *   name (string): the repository.
- *
- * Returns:
- *   object[]|null: { file, repoFile, errors, absent, object, raw } each ; null when the repository
- *     has no such file (the app keeps its objects).
- */
-function readListFile(desc, name) {
-  const abs = listFileOf(desc, name);
-  if (!fs.existsSync(abs)) return null;
-  const { errors, items } = parseListFile(fs.readFileSync(abs, "utf8"), desc.listKey);
-  if (errors.length) return [{ file: desc.listFile, errors, object: null, absent: false, whole: true }];
-  return items.map((raw, i) => {
-    const label = raw && typeof raw === "object" && raw.name !== undefined ? String(raw.name) : `#${i + 1}`;
-    const file = `${desc.listFile}#${label}`;
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { file, repoFile: desc.listFile, errors: ["an entry must be a dictionary"], object: null, absent: false };
-    return { file, repoFile: desc.listFile, ...desc.check(raw), raw, absent: false };
-  });
-}
-
-/**
- * Where an object of the app is linked to, as its type's files are known : its file, or its entry
- * of a list file (repositories.yaml#forms).
- *
- * Args:
- *   desc (object): the type's descriptor.
- *   row (object): the object.
- *
- * Returns:
- *   string: its file's key.
- */
-const linkKeyOf = (desc, row) => (desc.listFile ? `${desc.listFile}#${row.name}` : row.repo_file);
 
 /**
  * What an object names that is not there yet (its references, by name) : it waits for them.
@@ -457,20 +588,27 @@ async function waitingOf(desc, object, cache = new Map()) {
 }
 
 /**
- * What an object of a repository declares in its own file as the working copy has it now (an entry
- * of a list file, or its file), read or not : its raw keys, before any check.
+ * What an object of a repository declares in its own entry as the working copy has it now, read or
+ * not : its raw keys, before any check - the entry of its name in the file it is linked to, else in
+ * any file of its repository.
  *
  * Args:
  *   desc (object): the object's type's descriptor.
  *   row (object): the object (its repository, repo_file and name).
  *
  * Returns:
- *   object|null: the keys its file gives ; null when its file is gone or cannot be read.
+ *   object|null: the keys its entry gives ; null when no file holds it.
  */
 function declaredOf(desc, row) {
   try {
-    if (desc.listFile) return (readListFile(desc, row.repository) || []).find((f) => f.file === linkKeyOf(desc, row))?.raw || null;
-    return desc.parse(fs.readFileSync(fileOf(desc, row.repository, row.repo_file), "utf8")).raw || null;
+    const field = desc.nameField || "name";
+    const holding = scanOf(row.repository).holding(desc.key);
+    const ordered = [...holding.filter((f) => f.file === row.repo_file), ...holding.filter((f) => f.file !== row.repo_file)];
+    for (const f of ordered) {
+      const entry = (Array.isArray(f.value) ? f.value : []).find((e) => e && typeof e === "object" && nameKey(e[field]) === nameKey(row.name));
+      if (entry) return entry;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -478,11 +616,11 @@ function declaredOf(desc, row) {
 
 /**
  * Whether every object that uses an object by its name follows its rename : each one is an object
- * of a repository, of a type that names this one (descriptor.references), whose own file - as the
+ * of a repository, of a type that names this one (descriptor.references), whose own entry - as the
  * working copy has it now : the same commit - names it by its new name. The rename is then taken,
- * and each user follows when its file is read in : at once in the same repository (the types read
+ * and each user follows when its entry is read in : at once in the same repository (the types read
  * in their order), else when the types that name it are read again (retryDependents). One that is
- * no repository object, a single-file type's, or a file that still names the old name : not.
+ * no repository object, a type the app has one of, or an entry that still names the old name : not.
  *
  * Args:
  *   desc (object): the renamed object's type's descriptor.
@@ -497,7 +635,7 @@ async function followsRename(desc, row, to, users) {
   let following = 0;
   for (const key of dependentsOf([desc.key])) {
     const other = await descriptorOf(key);
-    if (other.file) continue;
+    if (other.single) continue;
     const fields = (other.references || []).filter((r) => r.type === desc.key).map((r) => r.field);
     for (const user of (await other.store.rows()) || []) {
       for (const field of fields) {
@@ -512,244 +650,284 @@ async function followsRename(desc, row, to, users) {
 }
 
 /**
- * Reads a type's files of a repository into its table : a new file makes an object, a changed one
- * changes it, a removed one (or one saying state: absent) removes it - unless something uses it
- * (descriptor.usersOf) or it can never be deleted (descriptor.undeletable), then it is kept and
- * the refusal said. A file renamed (its object's name given by a new file) moves its object to it.
- * A refused file - not valid, a name another object has - changes nothing : an object it made before stays as it was, a new one is
- * not made. A file that names an object not there yet waits, the same way. Where the file gives
- * no secret, the database's stays ; a field it no longer declares takes the value a new object gets
- * (descriptor.store.removed).
+ * Reads a type's entries of a repository into its table, an object found by its name within its
+ * type, never by its file : a new name makes an object, a changed entry changes it, an entry moved
+ * to another file links its object to that file, a name gone (or an entry saying state: absent)
+ * removes its object - unless something uses it (descriptor.usersOf) or it can never be deleted
+ * (descriptor.undeletable), then it is kept and the refusal said.
+ *
+ * Renames : a name changed in git is a delete and a new object, except when, in one pull, exactly
+ * one object of the type linked to a file is gone from it and exactly one new name of the type
+ * appeared in that same file : that is its rename - the object keeps its secrets kept in the
+ * database, its state, its id and what uses it (a rename refused while something uses it, unless
+ * each user follows it in the same commit : followsRename ; never for a type whose objects keep
+ * their name : descriptor.renameRefused).
+ *
+ * A refused entry - not valid, a name two entries give, a name another object has - changes
+ * nothing : an object of its name stays as it was, a new one is not made ; an entry that names an
+ * object not there yet waits, the same way. The objects linked to a file that cannot be read (or a
+ * link leading outside the repository, or a key that holds no list) stay as they are, as do those
+ * of a file whose refused entries may be them (an entry refused without a name, or with a name no
+ * object has). Where an entry gives no secret, the database's stays ; a field it no longer declares
+ * takes the value a new object gets (descriptor.store.removed).
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *   opts (object): { context (the descriptor's context, read when not given), reset (true : the
- *     working tree was just cloned where there was none - a reset, or a tree that was gone : a
- *     file the app wrote may never have been pushed - an object whose file is not there is
- *     unlinked and kept in the app, never deleted) }.
+ *   opts (object): { context (the descriptor's context, read when not given), scan (the
+ *     repository's files, read once by the pull for every type : scanOf ; read when not given),
+ *     reset (true : the working tree was just cloned where there was none - a reset, or a tree that
+ *     was gone : an entry the app wrote may never have been pushed - an object whose name no entry
+ *     gives is unlinked and kept in the app, never deleted) }.
  *
  * Returns:
  *   Promise<object>: { created, updated, deleted, unchanged (counts), matched: [name], refused:
  *     [{ file, reasons }], waiting: [{ file, reasons }], ignored: [{ file, keys }], secretsKept:
- *     [name], skipped: [{ file, name, reason }] (files the type does not import : descriptor.notImported),
- *     notes, unread, unlinked: [name] (the objects a reset unlinked, their files not in the
- *     repository as cloned again) }.
+ *     [name], skipped: [{ file, name, reason }] (entries the type does not import :
+ *     descriptor.notImported), notes, unread, unlinked: [name] (the objects a reset unlinked, their
+ *     entries not in the repository as cloned again) } ; each file an entry's place
+ *     (credentials.yaml#git).
  */
 export async function syncRepository(desc, name, opts = {}) {
-  // a type kept in one file : its own mode
-  if (desc.file) return syncSingle(desc, name);
+  // a type the app has one of : its own mode
+  if (desc.single) return syncSingle(desc, name, opts);
   const summary = newSummary();
   const ctx = opts.context !== undefined ? opts.context : await desc.context?.();
-  // step 1 : the files, read and checked on their own, and what they name
-  const files = await readFiles(desc, name, ctx);
-  // a type kept as a list in one file, the repository without that file : the app keeps its objects,
-  // unlinked - left linked, the next entry the app writes would make a file of that one entry, and
-  // the pull after its Push would delete every other one
-  if (files === null) {
+  const scan = wholeScan(opts.scan || scanOf(name));
+  // step 1 : the entries, read and checked on their own, and what they name
+  const { entries, held, refused, any } = await readEntries(desc, name, ctx, scan);
+  summary.refused.push(...refused);
+  // no file of the repository gives the type's key at all, for a type whose objects are never
+  // deleted for that (the repositories : each would lose its working copy) : kept in the app, unlinked
+  if (!any && desc.noKeyUnlinks) {
     const unlinked = await desc.store.unlink(name);
     if (unlinked) CrudModel.changed(desc.model);
-    summary.notes.push(`No ${desc.listFile} in the repository: the app keeps ${holdingOf(desc)} as it has them${unlinked ? `, ${unlinked} no longer linked to it` : ""}`);
+    summary.notes.push(`No file of the repository gives ${desc.key}: - the app keeps ${holdingOf(desc)} as it has them${unlinked ? `, ${unlinked} no longer linked to it` : ""}`);
     return summary;
   }
-  // step 2 : the objects there are : this repository's by file, the names of the others
+  // step 2 : the objects there are : this repository's by name, the names of the others
   const rows = await desc.store.rows();
   const own = new Map();
   const taken = new Map(); // name key -> where it is taken
-  // the app's own objects : a file of that name takes it over, git's version wins
+  // the app's own objects : an entry of that name takes it over, git's version wins
   const adoptable = new Map();
   for (const row of rows || []) {
     const kind = desc.store.classify(row, name);
-    if (kind === "own") own.set(linkKeyOf(desc, row), row);
+    if (kind === "own") own.set(nameKey(row.name), row);
     else if (kind === "adoptable") adoptable.set(nameKey(row.name), row);
     else taken.set(nameKey(row.name), kind);
   }
-  // a refused or waiting file that is still there keeps its object, and that object its name ; a
-  // list file refused whole keeps them all
-  const kept = new Set(files.some((f) => f.whole) ? own.keys() : []);
-  for (const f of files) {
-    if (!f.object && !f.absent && !f.skipped && own.has(f.file)) {
-      kept.add(f.file);
-      taken.set(nameKey(own.get(f.file).name), `${f.file} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
+  // step 3 : a name two entries give (in one file or two) : each refused, naming the others - the
+  // object of that name, if any, stays as it was
+  const byName = new Map();
+  for (const f of entries) {
+    const n = !f.absent ? declaredName(desc, f) : null;
+    if (n !== null) byName.set(nameKey(n), [...(byName.get(nameKey(n)) || []), f]);
+  }
+  for (const list of byName.values()) {
+    if (list.length < 2) continue;
+    for (const f of list) {
+      const others = list.filter((o) => o !== f).map((o) => `${o.repoFile} (entry ${o.index + 1})`);
+      f.errors = [`the name '${declaredName(desc, f)}' is given twice: here (${f.repoFile}, entry ${f.index + 1}) and in ${others.join(", ")} - one entry per ${desc.noun}`];
+      f.object = null;
+      f.waiting = undefined;
+      f.duplicate = true;
     }
   }
-  // a file that gives its object a new name where its type never renames one (descriptor.renameRefused :
-  // a disclaimer version keeps its number), or while something uses it by its name (a credential a
-  // runner names) : refused, the object kept as it was - renamed, what uses it would name nothing
-  for (const f of desc.usersOf || desc.renameRefused ? files : []) {
-    const row = f.object && own.get(f.file);
-    if (!row || nameKey(row.name) === nameKey(f.object.name)) continue;
-    if (desc.renameRefused) f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${desc.renameRefused}`];
-    else {
-      const users = await desc.usersOf(row);
+  // step 4 : each entry read in finds its object by its name
+  const matched = new Set();
+  for (const f of entries) {
+    const row = f.object && own.get(nameKey(f.object.name));
+    if (!row || matched.has(row.id)) continue;
+    f.row = row;
+    matched.add(row.id);
+  }
+  // step 5 : the objects kept as they are : their file not read (whole), their entry refused or
+  // waiting, or their file holding a refused entry that may be them (no name, or a name no object
+  // of the repository has : a rename that is refused)
+  const kept = new Set();
+  const keep = (row, why) => {
+    kept.add(row.id);
+    taken.set(nameKey(row.name), why);
+  };
+  const unmatchedRefused = new Set();
+  for (const f of entries) {
+    if (f.object || f.absent || f.skipped) continue;
+    const n = declaredName(desc, f);
+    const row = n !== null ? own.get(nameKey(n)) : null;
+    if (row && !matched.has(row.id)) keep(row, `${f.place} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
+    else if (!row) unmatchedRefused.add(f.repoFile);
+  }
+  for (const row of own.values()) {
+    if (matched.has(row.id) || kept.has(row.id)) continue;
+    if (held.has(row.repo_file)) keep(row, `${row.repo_file} (not read, kept as it was)`);
+    else if (unmatchedRefused.has(row.repo_file)) keep(row, `${row.repo_file} (an entry of it refused, kept as it was)`);
+  }
+  // step 6 : a rename in a file : the one object of the type gone from a file, the one new name in
+  // that same file
+  const goneIn = new Map();
+  for (const row of own.values()) {
+    if (matched.has(row.id) || kept.has(row.id)) continue;
+    goneIn.set(row.repo_file, [...(goneIn.get(row.repo_file) || []), row]);
+  }
+  const newIn = new Map();
+  for (const f of entries) {
+    if (!f.object || f.row) continue;
+    const key = nameKey(f.object.name);
+    if (own.has(key) || adoptable.has(key) || taken.has(key)) continue;
+    newIn.set(f.repoFile, [...(newIn.get(f.repoFile) || []), f]);
+  }
+  for (const [file, gone] of goneIn) {
+    const fresh = newIn.get(file) || [];
+    if (gone.length !== 1 || fresh.length !== 1) continue;
+    const [row] = gone;
+    const [f] = fresh;
+    // a type whose objects keep their name (a disclaimer version its number) : refused, kept
+    if (desc.renameRefused) {
+      f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${desc.renameRefused}`];
+    } else {
+      const users = desc.usersOf ? await desc.usersOf(row) : [];
       // nothing uses it, or every user follows it in the same commit (followsRename) : taken
-      if (!users.length || (await followsRename(desc, row, f.object.name, users))) continue;
+      if (!users.length || (await followsRename(desc, row, f.object.name, users))) {
+        f.row = row;
+        f.renamed = row.name;
+        matched.add(row.id);
+        logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${row.name}' is renamed '${f.object.name}' in ${name}/${file}`);
+        continue;
+      }
       f.errors = [
-        `it renames '${row.name}' to '${f.object.name}', but ${users.join(", ")} still uses '${row.name}': kept as it was until nothing uses it - name '${f.object.name}' in the files of what uses it in the same commit, or change what uses it in the app first`,
+        `it renames '${row.name}' to '${f.object.name}', but ${users.join(", ")} still uses '${row.name}': kept as it was until nothing uses it - name '${f.object.name}' in the entries of what uses it in the same commit, or change what uses it in the app first`,
       ];
     }
     f.object = null;
-    kept.add(f.file);
-    taken.set(nameKey(row.name), `${f.file} (refused, kept as it was)`);
+    keep(row, `${f.place} (refused, kept as it was)`);
   }
-  // step 3 : the names. A linked file that still names its own object keeps that name first : a
-  // new file sorting before it and naming the same object is the one refused - never the linked
-  // file, and never a raw duplicate from the database when the new object is inserted
-  const reserved = new Set();
-  for (const f of files) {
-    const row = f.object && own.get(f.file);
-    if (!row || nameKey(row.name) !== nameKey(f.object.name) || taken.has(nameKey(row.name))) continue;
-    taken.set(nameKey(row.name), `${name}/${f.file}`);
-    reserved.add(f.file);
-  }
-  // then the others, in file order : the first file to name an object has it ; a file that has
-  // no object yet and names one of the app takes it over
-  for (const f of files) {
-    if (!f.object || reserved.has(f.file)) continue;
+  // step 7 : the new names : one another object has is refused ; one of the app's own objects is
+  // taken over by its entry
+  for (const f of entries) {
+    if (!f.object || f.row) continue;
     const key = nameKey(f.object.name);
     if (!taken.has(key) && adoptable.has(key)) {
-      if (own.has(f.file)) taken.set(key, `a ${desc.noun} of this app`);
-      else {
-        f.adopt = adoptable.get(key);
-        adoptable.delete(key);
-      }
+      f.adopt = adoptable.get(key);
+      adoptable.delete(key);
+      continue;
     }
     if (taken.has(key)) {
       f.errors = [`the name '${f.object.name}' is the name of another ${desc.noun}: ${taken.get(key)}`];
       f.object = null;
-      if (own.has(f.file)) kept.add(f.file);
       continue;
     }
-    taken.set(key, `${name}/${f.file}`);
+    taken.set(key, `${name}/${f.place}`);
   }
-  // step 4 : a file renamed in git (its old file gone, a new one giving the same name) : the
-  // object follows it to its new file, and is changed as a changed file - never removed and made
-  // again, which would lose its secrets kept in the database, its state, and refuse it for good
-  // while something uses it
-  const gone = new Map();
+  // step 8 : a flag one object at most has (the default runner of a type, the active mail channel
+  // ...) that several entries give : each write would take it off the others, the next pull giving
+  // it back, for ever - applied from none of them, each object keeping what it has, said
+  oneOnlyClashes(desc, entries, summary, name);
+  // step 9 : the objects whose entry is gone (or absent) go first - not one something uses - then
+  // the changed, then the new
   let relinked = 0;
-  for (const [file, row] of own) {
-    if (!files.some((f) => f.file === file)) gone.set(nameKey(row.name), file);
-  }
-  for (const f of files) {
-    if (!f.object || own.has(f.file) || f.adopt) continue;
-    const from = gone.get(nameKey(f.object.name));
-    if (from === undefined) continue;
-    gone.delete(nameKey(f.object.name));
-    const row = own.get(from);
-    try {
-      await desc.store.link(row.id, name, f.repoFile ?? f.file);
-    } catch (e) {
-      // not moved : the new file refused, the object kept on its old one, the others go on
-      f.errors = [`not saved: ${e.message || e}`];
-      f.object = null;
-      kept.add(from);
-      continue;
-    }
-    relinked++;
-    own.delete(from);
-    own.set(f.file, { ...row, repo_file: f.repoFile ?? f.file });
-    logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${row.name}' follows its file, renamed in git: ${name}/${from} is now ${name}/${f.file}`);
-  }
-  // step 4b : a flag one object at most has (the default runner of a type, the active mail
-  // channel ...) that several files give : each write would take it off the others, the next pull
-  // giving it back, for ever - applied from none of them, each object keeping what it has, said
-  oneOnlyClashes(desc, files, own, summary, name);
-  // step 5 : the objects whose file is gone (or absent) go first - not one something uses -
-  // then the changed, then the new
-  const present = new Set([...files.filter((f) => f.object).map((f) => f.file), ...kept]);
-  for (const [file, row] of own) {
-    if (present.has(file)) continue;
+  for (const row of own.values()) {
+    if (matched.has(row.id) || kept.has(row.id)) continue;
+    const where = `${row.repo_file}#${row.name}`;
     // one that can never be deleted (the main LDAP directory) : kept, said
     const never = desc.undeletable ? await desc.undeletable(row) : null;
     if (never) {
-      summary.refused.push({ file, reasons: [`its file is gone, but ${never}: kept, and still linked to it`] });
-      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${never}`);
+      summary.refused.push({ file: where, reasons: [`its entry is gone, but ${never}: kept, and still linked to it`] });
+      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${row.repo_file}: its entry is gone, but ${never}`);
       continue;
     }
     const users = desc.usersOf ? await desc.usersOf(row) : [];
     if (users.length) {
-      summary.refused.push({ file, reasons: [`its file is gone, but ${users.join(", ")} still uses '${row.name}': kept until nothing uses it`] });
-      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${file}: its file is gone, but ${users.join(", ")} still uses it`);
+      summary.refused.push({ file: where, reasons: [`its entry is gone, but ${users.join(", ")} still uses '${row.name}': kept until nothing uses it`] });
+      logger.warning(`Kept ${desc.noun} '${row.name}' of ${name}/${row.repo_file}: its entry is gone, but ${users.join(", ")} still uses it`);
       continue;
     }
+    // what its repository says of it still : an entry saying state: absent, or one not imported
+    const said = entries.find((f) => (f.absent || f.skipped) && nameKey(declaredName(desc, f) ?? f.skipped?.name) === nameKey(row.name));
     try {
-      // cloned again (a reset, a tree that was gone) : a file not in the repository may never have
-      // been pushed (written by the app) -
-      // its object stays in the app, unlinked, never deleted with the secrets it keeps
-      if (opts.reset && !files.some((f) => f.file === file)) {
+      // cloned again (a reset, a tree that was gone) : an entry not in the repository may never
+      // have been pushed (written by the app) - its object stays in the app, unlinked, never
+      // deleted with the secrets it keeps
+      if (opts.reset && !said) {
         await desc.store.link(row.id, null, null);
         relinked++;
         summary.unlinked.push(row.name);
-        summary.notes.push(`${file}: not in the repository as cloned again (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
-        logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its file ${name}/${file} is not in the repository as cloned again`);
+        summary.notes.push(`${where}: not in the repository as cloned again (never pushed?): '${row.name}' kept in the app, no longer linked to it`);
+        logger.notice(`Kept ${desc.noun} '${row.name}' in the app, unlinked: its entry in ${name}/${row.repo_file} is not in the repository as cloned again`);
         continue;
       }
       await desc.store.remove(row);
     } catch (e) {
       // not removed (its model refused, the database busy) : kept, said, the others go on
-      summary.refused.push({ file, reasons: [`its file is gone, but '${row.name}' could not be removed: ${e.message || e}`] });
-      logger.warning(`Could not remove ${desc.noun} '${row.name}' of ${name}/${file}: ${e.message || e}`);
+      summary.refused.push({ file: where, reasons: [`its entry is gone, but '${row.name}' could not be removed: ${e.message || e}`] });
+      logger.warning(`Could not remove ${desc.noun} '${row.name}' of ${name}/${row.repo_file}: ${e.message || e}`);
       continue;
     }
-    const skipped = files.find((f) => f.file === file && f.skipped);
-    logger.notice(`Removed ${desc.noun} '${row.name}': ${skipped ? `its file ${name}/${file} says it is ${skipped.skipped.reason}` : `its file ${name}/${file} is gone`}`);
+    logger.notice(`Removed ${desc.noun} '${row.name}': ${said?.skipped ? `its entry in ${name}/${said.repoFile} says it is ${said.skipped.reason}` : `its entry in ${name}/${row.repo_file} is gone`}`);
     summary.deleted++;
   }
-  for (const f of files) {
+  for (const f of entries) {
     if (!f.object) {
-      // the name a refused or waiting file declares : no object of the app is written beside it
-      // under that name (activateFolder) - its file follows once it is read in
-      if (!f.skipped && !f.absent && declaredName(desc, f)) summary.unread.push({ name: declaredName(desc, f), file: f.file });
+      // the name a refused or waiting entry declares : no object of the app is written beside it
+      // under that name (activateList) - it follows that entry once it is read in
+      if (!f.skipped && !f.absent && declaredName(desc, f)) summary.unread.push({ name: declaredName(desc, f), file: f.place });
       if (f.skipped) {
-        summary.skipped.push({ file: f.file, ...f.skipped });
+        summary.skipped.push({ file: f.place, ...f.skipped });
       } else if (f.waiting) {
-        summary.waiting.push({ file: f.file, reasons: f.waiting });
-        logger.warning(`Waiting ${desc.noun} file ${name}/${f.file}: ${f.waiting.join("; ")}`);
+        summary.waiting.push({ file: f.place, reasons: f.waiting });
+        logger.warning(`Waiting ${desc.noun} entry ${name}/${f.place}: ${f.waiting.join("; ")}`);
       } else if (f.errors?.length) {
-        summary.refused.push({ file: f.file, reasons: f.errors });
-        logger.warning(`Refused ${desc.noun} file ${name}/${f.file}: ${f.errors.join("; ")}`);
+        summary.refused.push({ file: f.place, reasons: f.errors });
+        logger.warning(`Refused ${desc.noun} entry ${name}/${f.place}: ${f.errors.join("; ")}`);
       }
       continue;
     }
-    if (f.ignored?.length) summary.ignored.push({ file: f.file, keys: f.ignored });
-    // what the file may not set taken out, each said (a usage another repository holds)
+    if (f.ignored?.length) summary.ignored.push({ file: f.place, keys: f.ignored });
+    // what the entry may not set taken out, each said (a usage another repository holds)
     if (desc.adjust) {
       const adjusted = await desc.adjust(f.object, name);
       f.object = adjusted.object;
-      summary.notes.push(...adjusted.notes.map((n) => `${f.file}: ${n}`));
+      summary.notes.push(...adjusted.notes.map((n) => `${f.place}: ${n}`));
     }
-    const row = own.get(f.file);
-    // a secret the file does not give : the database's stays, said in the pull output
+    const row = f.row;
+    // a secret the entry does not give : the database's stays, said in the pull output
     const before = f.adopt || row;
     if (before && (desc.secrets || []).some((s) => !given(f.raw?.[s]) && given(before[s]))) summary.secretsKept.push(f.object.name);
     try {
-      // a field the file no longer declares : out of the app too (the value a new object gets)
+      // a field the entry no longer declares : out of the app too (the value a new object gets)
       const removed = before && desc.store.removed ? await desc.store.removed(before, f.object) : {};
       if (Object.keys(removed).length) f.object = { ...f.object, ...removed };
       if (f.adopt) {
         // git's version replaces the app's definition ; what runs it stays
-        await desc.store.adopt(f.adopt, f.object, name, f.repoFile ?? f.file);
+        await desc.store.adopt(f.adopt, f.object, name, f.repoFile);
         summary.matched.push(f.object.name);
-        logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' of the app now follows ${name}/${f.file}: git's version replaced it`);
-      } else if (row) {
-        if (!Object.keys(removed).length && !desc.store.changed(row, f.object)) {
+        logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' of the app now follows ${name}/${f.place}: git's version replaced it`);
+        continue;
+      }
+      if (row) {
+        // moved to another file : linked to it, nothing else
+        if (row.repo_file !== f.repoFile) {
+          await desc.store.link(row.id, name, f.repoFile);
+          relinked++;
+          logger.notice(`${desc.noun.charAt(0).toUpperCase()}${desc.noun.slice(1)} '${f.object.name}' follows its entry, moved in git: ${name}/${row.repo_file} is now ${name}/${f.repoFile}`);
+        }
+        if (!Object.keys(removed).length && !f.renamed && !desc.store.changed(row, f.object)) {
           summary.unchanged++;
           continue;
         }
         await desc.store.update(row, f.object);
         summary.updated++;
       } else {
-        await desc.store.insert(f.object, name, f.repoFile ?? f.file);
+        await desc.store.insert(f.object, name, f.repoFile);
         summary.created++;
       }
     } catch (e) {
-      // two files swapping their names in one pull, a value the model refuses, or an object made
-      // meanwhile : said, the others go on ; its name not read in, as a refused file's (an
-      // activation keeps the app's object of that name, never a second file beside it)
-      summary.unread.push({ name: f.object.name, file: f.file });
-      summary.refused.push({ file: f.file, reasons: [`not saved: ${e.message || e}`] });
-      logger.warning(`Could not save the ${desc.noun} of ${name}/${f.file}: ${e.message || e}`);
+      // two entries swapping their names in one pull, a value the model refuses, or an object made
+      // meanwhile : said, the others go on ; its name not read in, as a refused entry's (an
+      // activation keeps the app's object of that name, never a second entry beside it)
+      summary.unread.push({ name: f.object.name, file: f.place });
+      summary.refused.push({ file: f.place, reasons: [`not saved: ${e.message || e}`] });
+      logger.warning(`Could not save the ${desc.noun} of ${name}/${f.place}: ${e.message || e}`);
     }
   }
   if (summary.created || summary.updated || summary.deleted || summary.matched.length || relinked) CrudModel.changed(desc.model);
@@ -760,8 +938,73 @@ export async function syncRepository(desc, name, opts = {}) {
 }
 
 /**
+ * The flags one object at most has (descriptor.oneOnly : the default runner of a type, the active
+ * mail channel, the provider of a type used for sign-in, the disclaimer version in force) that
+ * several entries of a pull give, as the config seed refuses them (lib/seed-schema.js
+ * assertSingletonFlags) : applied from none of them, each object keeping the value it has (a new
+ * one without it), the one holding it now keeping it even when its entry takes it off in the same
+ * pull (never none left with it), the rest of each entry applied - the pull changes nothing of that
+ * flag until one entry only gives it, and the next pull is the same. Said in the pull output, with
+ * the one that keeps it.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   entries (object[]): the entries read (readEntries), their objects changed in place ; each with
+ *     its object (row) or the app's it takes over (adopt).
+ *   summary (object): the sync's summary, its notes added to.
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   void
+ */
+function oneOnlyClashes(desc, entries, summary, name) {
+  const on = (v) => v === true || (v !== false && v !== null && v !== undefined && !!Number(v));
+  for (const rule of desc.oneOnly || []) {
+    const groups = new Map();
+    for (const f of entries) {
+      if (!f.object || !on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) continue;
+      const scope = rule.by ? String(f.object[rule.by] ?? "") : "";
+      groups.set(scope, [...(groups.get(scope) || []), f]);
+    }
+    for (const [scope, list] of groups) {
+      if (list.length < 2) continue;
+      for (const f of list) {
+        const before = f.adopt || f.row;
+        f.object = { ...f.object, [rule.field]: before ? on(before[rule.field]) : false };
+      }
+      // the one holding it now whose entry takes it off in the same pull : it keeps it too - the
+      // flag changes not at all until one entry only gives it, never left on none of them
+      const keeps = entries.filter((f) => {
+        if (!f.object || list.includes(f) || on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) return false;
+        if (rule.by && String(f.object[rule.by] ?? "") !== scope) return false;
+        const before = f.adopt || f.row;
+        return !!before && on(before[rule.field]);
+      });
+      for (const f of keeps) f.object = { ...f.object, [rule.field]: true };
+      const what = `${rule.label}${rule.by ? ` (${rule.by} ${scope})` : ""}`;
+      const kept = keeps.length ? `${keeps.map((f) => f.place).join(", ")} keeps it until then` : `the ${desc.noun} holding it now, if any, keeps it until then`;
+      const line = `${rule.field} not applied: ${list.map((f) => f.place).join(", ")} each say it, one ${desc.noun} at most is ${what} - say it in one entry only (${kept})`;
+      summary.notes.push(line);
+      logger.warning(`${titleOf(desc)} of repository '${name}': ${line}`);
+    }
+  }
+}
+
+/**
+ * An empty sync summary.
+ *
+ * Returns:
+ *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
+ *     secretsKept, notes, unread (the names refused or waiting entries declare : [{ name, file }]),
+ *     unlinked (the objects a reset unlinked : [name]) }.
+ */
+function newSummary() {
+  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [], unlinked: [] };
+}
+
+/**
  * What a sync did, as lines for the repository's pull output : the counts, each refused or waiting
- * file with why, the fields a file gives that the app keeps but does not use, and the objects
+ * entry with why, the fields an entry gives that the app keeps but does not use, and the objects
  * whose secrets stay the database's.
  *
  * Args:
@@ -771,71 +1014,6 @@ export async function syncRepository(desc, name, opts = {}) {
  * Returns:
  *   string: the lines, starting with a newline.
  */
-/**
- * An empty sync summary.
- *
- * Returns:
- *   object: { created, updated, deleted, unchanged, matched, refused, waiting, ignored,
- *     secretsKept, notes, unread (the names refused or waiting files declare : [{ name, file }]),
- *     unlinked (the objects a reset unlinked : [name]) }.
- */
-/**
- * The flags one object at most has (descriptor.oneOnly : the default runner of a type, the active
- * mail channel, the provider of a type used for sign-in, the disclaimer version in force) that
- * several files of a pull give, as the config seed refuses them (lib/seed-schema.js
- * assertSingletonFlags) : applied from none of them, each object keeping the value it has (a new
- * one without it), the one holding it now keeping it even when its file takes it off in the same
- * pull (never none left with it), the rest of each file applied - the pull changes nothing of that
- * flag until one file only gives it, and the next pull is the same. Said in the pull output, with
- * the one that keeps it.
- *
- * Args:
- *   desc (object): the type's descriptor.
- *   files (object[]): the files read (readFiles), their objects changed in place.
- *   own (Map): the repository's objects, by file.
- *   summary (object): the sync's summary, its notes added to.
- *   name (string): the repository.
- *
- * Returns:
- *   void
- */
-function oneOnlyClashes(desc, files, own, summary, name) {
-  const on = (v) => v === true || (v !== false && v !== null && v !== undefined && !!Number(v));
-  for (const rule of desc.oneOnly || []) {
-    const groups = new Map();
-    for (const f of files) {
-      if (!f.object || !on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) continue;
-      const scope = rule.by ? String(f.object[rule.by] ?? "") : "";
-      groups.set(scope, [...(groups.get(scope) || []), f]);
-    }
-    for (const [scope, list] of groups) {
-      if (list.length < 2) continue;
-      for (const f of list) {
-        const before = f.adopt || own.get(f.file);
-        f.object = { ...f.object, [rule.field]: before ? on(before[rule.field]) : false };
-      }
-      // the one holding it now whose file takes it off in the same pull : it keeps it too - the
-      // flag changes not at all until one file only gives it, never left on none of them
-      const keeps = files.filter((f) => {
-        if (!f.object || list.includes(f) || on(f.object[rule.field]) || (rule.when && !rule.when(f.object))) return false;
-        if (rule.by && String(f.object[rule.by] ?? "") !== scope) return false;
-        const before = f.adopt || own.get(f.file);
-        return !!before && on(before[rule.field]);
-      });
-      for (const f of keeps) f.object = { ...f.object, [rule.field]: true };
-      const what = `${rule.label}${rule.by ? ` (${rule.by} ${scope})` : ""}`;
-      const kept = keeps.length ? `${keeps.map((f) => f.file).join(", ")} keeps it until then` : `the ${desc.noun} holding it now, if any, keeps it until then`;
-      const line = `${rule.field} not applied: ${list.map((f) => f.file).join(", ")} each say it, one ${desc.noun} at most is ${what} - say it in one file only (${kept})`;
-      summary.notes.push(line);
-      logger.warning(`${titleOf(desc)} of repository '${name}': ${line}`);
-    }
-  }
-}
-
-function newSummary() {
-  return { created: 0, updated: 0, deleted: 0, unchanged: 0, matched: [], refused: [], waiting: [], ignored: [], secretsKept: [], skipped: [], notes: [], unread: [], unlinked: [] };
-}
-
 export function summaryText(desc, summary) {
   const waiting = summary.waiting || [];
   const lines = [
@@ -924,26 +1102,21 @@ function headOf(dir) {
 }
 
 /**
- * What a repository's working tree holds of a type now, as one text : its commit and each of the
- * type's files with its size and time. Two reads of the tree give the same stamp only when no
+ * What a repository's working tree holds now, as one text : its commit and each of its YAML files
+ * with its size and time (the scan's stamp). Two reads of the tree give the same stamp only when no
  * pull (of any node : the volume is shared) changed it between them.
  *
  * Args:
- *   desc (object): the type's descriptor.
  *   name (string): the repository.
+ *   scan (object): its files as read (scanOf) ; read when not given.
  *
  * Returns:
  *   string|null: the stamp, null when the tree cannot be read (never the same as another).
  */
-function treeStamp(desc, name) {
+function treeStamp(name, scan = null) {
   try {
     const dir = Repo.folderOf(name);
-    const files = desc.file ? [desc.file] : desc.listFile ? [desc.listFile] : filesIn(dir, desc.folder);
-    const parts = files.map((file) => {
-      const st = fs.statSync(path.join(dir, file), { throwIfNoEntry: false });
-      return st ? `${file}:${st.size}:${st.mtimeMs}` : `${file}:-`;
-    });
-    return [headOf(dir), ...parts].join("\n");
+    return [headOf(dir), (scan || scanOf(name)).stamp].join("\n");
   } catch {
     return null;
   }
@@ -977,7 +1150,7 @@ function takeSynced(desc, name) {
   const kept = synced.get(syncedKey(desc, name)) || null;
   synced.delete(syncedKey(desc, name));
   if (!kept) return null;
-  const now = treeStamp(desc, name);
+  const now = treeStamp(name);
   return now !== null && now === kept.stamp ? kept.summary : null;
 }
 
@@ -988,7 +1161,7 @@ function takeSynced(desc, name) {
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *   opts (object): syncRepository's ({ reset }).
+ *   opts (object): syncRepository's ({ reset, scan }).
  *
  * Returns:
  *   Promise<string>: the lines.
@@ -996,7 +1169,7 @@ function takeSynced(desc, name) {
 export async function syncText(desc, name, opts = {}) {
   try {
     const summary = await syncRepository(desc, name, opts);
-    synced.set(syncedKey(desc, name), { summary, stamp: treeStamp(desc, name) });
+    synced.set(syncedKey(desc, name), { summary, stamp: treeStamp(name) });
     return summaryText(desc, summary);
   } catch (e) {
     logger.error(`Could not synchronize ${holdingOf(desc)} of repository '${name}': ${e.message || e}`);
@@ -1104,7 +1277,7 @@ export function trackClone(name, done) {
 
 /**
  * Waits for the background clones running (CLONE_WAIT at most), then the types given are read :
- * the repositories a repositories.yaml made are there for them. A clone still running is said,
+ * the repositories its repositories: entries made are there for them. A clone still running is said,
  * and the types read again in their repositories once it is done.
  *
  * Args:
@@ -1136,9 +1309,10 @@ async function afterClones(keys) {
 /**
  * Syncs every object type of a repository after git changed its working tree (a pull, a clone,
  * a reset), in APPLY_ORDER, then reads again the types that name them in other repositories :
- * what it did, for its pull output. Its first clone takes the app's objects of each type
- * instead (activation : a repository not cloned when its usage was turned on takes them once it
- * is). A failure is said there too, never thrown : the git operation itself worked.
+ * what it did, for its pull output. The repository's files are read once, each type handed its
+ * entries ; a link of it leading outside is said once. Its first clone takes the app's objects of
+ * each type instead (activation : a repository not cloned when its usage was turned on takes them
+ * once it is). A failure is said there too, never thrown : the git operation itself worked.
  *
  * Args:
  *   name (string): the repository.
@@ -1150,13 +1324,21 @@ async function afterClones(keys) {
  *   Promise<string>: the lines for the pull output.
  */
 export async function afterGit(name, repo, opts = {}) {
-  const keys = objectTypesOf(await usagesNow(name, repo));
+  const now = await usagesNow(name, repo);
+  const keys = objectTypesOf(now);
   let out = "";
+  if (!keys.length) return out;
+  // the repository's files, read once for every type it holds
+  let scan = scanOf(name);
+  for (const r of scan.refused) out += `\nRefused ${r.file}: ${r.reason}`;
+  out += notHeldHint(scan, now);
   for (const [i, key] of keys.entries()) {
     const desc = await descriptorOf(key);
-    out += opts.activate ? await activatedText(desc, name, { reset: opts.reset }) : await syncText(desc, name, { reset: opts.reset });
-    // the repositories its repositories.yaml just made : cloned before the types read after them
-    // (a schedule naming a form of one of them)
+    out += opts.activate ? await activatedText(desc, name, { reset: opts.reset }) : await syncText(desc, name, { reset: opts.reset, scan });
+    // an activation writes the app's objects to the files : read again for the next types
+    if (opts.activate) scan = scanOf(name);
+    // the repositories its repositories: entries just made : cloned before the types read after
+    // them (a schedule naming a form of one of them)
     if (key === "repositories" && i < keys.length - 1) out += await afterClones(keys.slice(i + 1));
   }
   try {
@@ -1165,6 +1347,30 @@ export async function afterGit(name, repo, opts = {}) {
     logger.error(`The objects that name those of repository '${name}' could not be read again: ${e.message || e}`);
   }
   return out;
+}
+
+/**
+ * The keys of types a repository does not hold that its files give, said once in its pull output
+ * as a hint : they are not read (a file may hold anything else, a form, a vars file).
+ *
+ * Args:
+ *   scan (object): the repository's files (scanOf).
+ *   repo (object): its row (its use_for_* flags).
+ *
+ * Returns:
+ *   string: the line, starting with a newline ; '' when every key its files give is one it holds.
+ */
+function notHeldHint(scan, repo) {
+  const notHeld = new Map();
+  for (const f of scan.files) {
+    for (const key of f.keys) {
+      if (flagOn(repo?.[typeOf(key)?.flag])) continue;
+      notHeld.set(key, [...(notHeld.get(key) || []), f.file]);
+    }
+  }
+  if (!notHeld.size) return "";
+  const what = [...notHeld].map(([key, files]) => `${key}: (${files.join(", ")})`).join(", ");
+  return `\nNot read, the repository is not used for them: ${what} - turn the usage on to read them`;
 }
 
 /**
@@ -1252,11 +1458,11 @@ async function candidates(desc, name = null, stay = new Map()) {
 
 /**
  * The app's objects an activation leaves in the app whatever they are, by name, with why :
- *   - a name a file of the repository declares that is not read in (refused, waiting) : a second
- *     file of its name would be refused on every pull ; the object follows that file once it is
+ *   - a name an entry of the repository declares that is not read in (refused, waiting) : a second
+ *     entry of its name would refuse both on every pull ; the object follows that entry once it is
  *     read in
- *   - an object the fresh clone just read unlinked (its file not in the repository as cloned
- *     again : deleted in git, or never pushed) : written back, a file deleted in git would come
+ *   - an object the fresh clone just read unlinked (its entry not in the repository as cloned
+ *     again : deleted in git, or never pushed) : written back, an entry deleted in git would come
  *     back with the next Push ; only what was never in the repository moves
  *
  * Args:
@@ -1270,9 +1476,9 @@ async function candidates(desc, name = null, stay = new Map()) {
 function stayReasons(name, summaries) {
   const stay = new Map();
   for (const s of summaries) {
-    for (const u of s.unread || []) stay.set(nameKey(u.name), `${name}/${u.file} has its name but is not read in (refused or waiting): it follows that file once it is`);
+    for (const u of s.unread || []) stay.set(nameKey(u.name), `${name}/${u.file} has its name but is not read in (refused or waiting): it follows that entry once it is`);
     for (const n of s.unlinked || []) {
-      stay.set(nameKey(n), `its file is not in the repository as cloned again (deleted in git, or never pushed): kept in the app, not written back`);
+      stay.set(nameKey(n), `its entry is not in the repository as cloned again (deleted in git, or never pushed): kept in the app, not written back`);
     }
   }
   return stay;
@@ -1306,70 +1512,63 @@ async function takenNames(desc) {
 const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptExtra(c) : {}), reason: c.reason, ...(c.code ? { code: c.code } : {}) });
 
 /**
- * A type's files in a repository's working copy as they are now, each parsed, changing nothing :
+ * A type's entries in a repository's working copy as they are now, each parsed, changing nothing :
  * how many give an object, how many the type does not import, the names they declare - read in or
- * not (a refused or waiting file's too : an object of the app of that name is never written beside
- * it) - and the files refused for what they are (a link leading outside, a list file that cannot be
- * read).
+ * not (a refused or waiting entry's too : an object of the app of that name is never written beside
+ * it) - the files refused for what they are (a link leading outside, a file that cannot be read
+ * seeming to give the key, a key that holds no list), and the file a new object would go to.
  *
  * Args:
- *   desc (object): the type's descriptor (a folder or a list type).
+ *   desc (object): the type's descriptor (a list type).
  *   name (string|null): the repository ; nothing read when it is not cloned.
  *
  * Returns:
- *   Promise<object>: { files, skipped (counts), names (Set of nameKey), refused: [{ file, reasons }] }.
+ *   Promise<object>: { files (the entries giving an object), skipped (counts), names (Set of
+ *     nameKey), refused: [{ file, reasons }], file (where a new object goes ; null when not cloned) }.
  */
 async function filesNow(desc, name) {
-  const fileNames = new Set();
+  const names = new Set();
   let files = 0;
   let skipped = 0;
   const refused = [];
-  if (cloned(name)) {
-    const ctx = await desc.previewContext?.();
-    // a list file's entries, or each file of the folder ; a list file that cannot be read (a link
-    // that leads outside the repository), or a folder (no access, not a folder), is said refused,
-    // as its sync refuses it
-    let parsedFiles = [];
-    const links = [];
-    try {
-      parsedFiles = desc.listFile
-        ? readListFile(desc, name) || []
-        : filesIn(Repo.folderOf(name), desc.folder, undefined, links).map((file) => {
-            try {
-              return desc.parse(fs.readFileSync(path.join(Repo.folderOf(name), file), "utf8"), ctx);
-            } catch {
-              return {};
-            }
-          });
-    } catch (e) {
-      refused.push({ file: desc.listFile || desc.folder, reasons: [e.message || String(e)] });
+  if (!cloned(name)) return { files, skipped, names, refused, file: null };
+  const ctx = await desc.previewContext?.();
+  const scan = scanOf(name);
+  refused.push(...scan.refused.map((r) => ({ file: r.file, reasons: [r.reason] })));
+  refused.push(...scan.blocked.map((b) => ({ file: b.file, reasons: [`the folder cannot be read: ${b.reason}`] })));
+  for (const u of scan.hinted(desc.key)) refused.push({ file: u.file, reasons: u.errors });
+  for (const { file, value } of scan.holding(desc.key)) {
+    if (value === null || value === undefined) continue;
+    if (!Array.isArray(value)) {
+      refused.push({ file, reasons: [`'${desc.key}' must be a list of ${desc.noun} entries`] });
+      continue;
     }
-    // a file that is a link leading outside, or a folder : refused, as its sync refuses it
-    refused.push(...links.map((l) => ({ file: l.file, reasons: [l.reason] })));
-    for (const parsed of parsedFiles) {
+    for (const item of value) {
+      let parsed = { entry: item };
       try {
-        // one the type does not import (an announcement already ended) : counted apart
-        if (parsed.object && desc.notImported?.(parsed.object, name)) skipped++;
-        else if (parsed.object) {
-          files++;
-          fileNames.add(nameKey(parsed.object.name));
-        } else if (declaredName(desc, parsed)) {
-          // a file refused declaring a name : the app's object of that name is not written beside it
-          fileNames.add(nameKey(declaredName(desc, parsed)));
-        }
+        if (item && typeof item === "object" && !Array.isArray(item)) parsed = { entry: item, ...desc.parseEntry(item, ctx) };
       } catch {
-        // an unreadable file is refused by the sync, said then
+        // an entry that cannot be read is refused by the sync, said then
+      }
+      // one the type does not import (an announcement already ended) : counted apart
+      if (parsed.object && desc.notImported?.(parsed.object, name)) skipped++;
+      else if (parsed.object) {
+        files++;
+        names.add(nameKey(parsed.object.name));
+      } else if (!parsed.absent && declaredName(desc, parsed)) {
+        // an entry refused declaring a name : the app's object of that name is not written beside it
+        names.add(nameKey(declaredName(desc, parsed)));
       }
     }
   }
-  return { files, skipped, names: fileNames, refused };
+  return { files, skipped, names, refused, file: targetFileOf(desc, name, scan) };
 }
 
 /**
  * What making a repository a type's repository would do, changing nothing : the app's objects it
- * would take (written as files, those whose secret stays in the database said), those that stay
- * in the app and why, the files whose name an app's object has (git's version would win), and
- * what it holds now.
+ * would take (written as entries of the file it says, those whose secret stays in the database
+ * said), those that stay in the app and why, the entries whose name an app's object has (git's
+ * version would win), and what it holds now.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -1378,13 +1577,14 @@ async function filesNow(desc, name) {
  *
  * Returns:
  *   Promise<object>: { repository, active, written: [name], withoutSecret: [name], kept: [{ name,
- *     reason }], clashes: [name], files, linked, ...what the type adds (descriptor.previewExtra) }.
+ *     reason }], clashes: [name], files (the entries there are), file (the file the app's objects
+ *     go to), linked, ...what the type adds (descriptor.previewExtra) }.
  */
 export async function preview(desc, name) {
-  if (desc.file) return previewSingle(desc, name);
+  if (desc.single) return previewSingle(desc, name);
   const list = await candidates(desc, name);
-  // the files there are now, by name (a pull before the activation may bring more)
-  const { files, skipped, names: fileNames, refused } = await filesNow(desc, name);
+  // the entries there are now, by name (a pull before the activation may bring more)
+  const { files, skipped, names: fileNames, refused, file } = await filesNow(desc, name);
   const clashes = list.filter((c) => fileNames.has(nameKey(c.row.name))).map((c) => c.row.name);
   const clash = new Set(clashes);
   const written = list.filter((c) => !c.reason && !clash.has(c.row.name));
@@ -1397,6 +1597,7 @@ export async function preview(desc, name) {
     clashes,
     files,
     skipped,
+    file: file || `${desc.key}.yaml`,
     ...(refused.length ? { refused } : {}),
     linked: name ? await desc.store.countLinked(name) : 0,
     ...(desc.previewExtra ? await desc.previewExtra(name, list) : {}),
@@ -1433,9 +1634,10 @@ async function pullFor(desc, name, why) {
 
 /**
  * Makes a repository a type's repository, once its flag is saved : pulls it (clones it when it is
- * not yet), reads its files in (a file named as an app's object takes it over, git wins), then
- * writes every other object of the app to it as a new file - without its secrets, which stay in
- * the database - for its Push. What cannot go stays in the app.
+ * not yet), reads its entries in (an entry named as an app's object takes it over, git wins), then
+ * writes every other object of the app to it as a new entry of the first file holding the type's
+ * key (else <key>.yaml) - without its secrets, which stay in the database - for its Push. What
+ * cannot go stays in the app.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -1465,7 +1667,7 @@ export async function activate(desc, name, { pull = true } = {}) {
   // the reads and the writes under the repository's write claim : no pull, push nor app write on
   // it meanwhile ; one busy is waited for a while, then the activation fails, said (its report's
   // error), never dropped
-  return withWriteClaim(name, () => (desc.file ? activateSingle(desc, name, report) : activateFolder(desc, name, report)));
+  return withWriteClaim(name, () => (desc.single ? activateSingle(desc, name, report) : activateList(desc, name, report)));
 }
 
 /**
@@ -1489,14 +1691,14 @@ function newReport(name) {
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *   opts (object): activateFolder's ({ reset }).
+ *   opts (object): activateList's ({ reset }).
  *
  * Returns:
  *   Promise<string>: the lines.
  */
 async function activatedText(desc, name, opts = {}) {
   try {
-    const report = await asHolding(name, () => (desc.file ? activateSingle : activateFolder)(desc, name, newReport(name), opts));
+    const report = await asHolding(name, () => (desc.single ? activateSingle : activateList)(desc, name, newReport(name), opts));
     return ["", `Now holds ${activationText(desc, report)}`, ...activationDetailLines(report)].join("\n");
   } catch (e) {
     logger.error(`Repository '${name}' could not take ${holdingOf(desc)}: ${e.message || e}`);
@@ -1505,21 +1707,21 @@ async function activatedText(desc, name, opts = {}) {
 }
 
 /**
- * Makes a repository a folder or a list type's (pulled already, its write claim held) : its files
- * read in, git winning on a name, then the app's other objects written to it.
+ * Makes a repository a list type's (pulled already, its write claim held) : its entries read in,
+ * git winning on a name, then the app's other objects written to it.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
  *   report (object): the report so far (activate's), filled in.
  *   opts (object): { reset (true : cloned where there was no working tree - an object of it whose
- *     file is not there is unlinked, never deleted : syncRepository's) }.
+ *     entry is not there is unlinked, never deleted : syncRepository's) }.
  *
  * Returns:
  *   Promise<object>: the report.
  */
-async function activateFolder(desc, name, report, opts = {}) {
-  // step 2 : its files read in (again : the pull may not have run), git wins on a name ; what the
+async function activateList(desc, name, report, opts = {}) {
+  // step 2 : its entries read in (again : the pull may not have run), git wins on a name ; what the
   // pull before it read in is said with it - that read found nothing left to take
   const summary = await syncRepository(desc, name, { reset: opts.reset });
   const pulled = takeSynced(desc, name) || newSummary();
@@ -1535,41 +1737,28 @@ async function activateFolder(desc, name, report, opts = {}) {
   report.waiting = summary.waiting;
   report.skipped = summary.skipped;
   report.ignored = summary.ignored;
-  // step 3 : the app's other objects, each a new file - none beside a file of its name not read in,
-  // none the fresh clone unlinked (the pull before it, or the read above)
+  // step 3 : the app's other objects, each a new entry of the first file holding the type's key
+  // (else <key>.yaml) - none beside an entry of its name not read in, none the fresh clone unlinked
+  // (the pull before it, or the read above) ; written at once
   const list = await candidates(desc, name, stayReasons(name, [pulled, summary]));
-  // written in one step (a list file at once, else a file each), its returns ending that step only
-  await (async () => {
-    // a type kept as a list in one file : every candidate an entry of it, added at its end
-    if (desc.listFile) {
-      for (const c of list.filter((x) => x.reason)) report.kept.push(keptOf(desc, c));
-      const written = list.filter((x) => !x.reason);
-      if (!written.length) return;
-      const abs = listFileOf(desc, name);
-      const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
-      fs.writeFileSync(abs, appendListEntries(text, desc.listKey, written.map((c) => c.object), desc.keyOrder), "utf8");
+  for (const c of list.filter((x) => x.reason)) report.kept.push(keptOf(desc, c));
+  const written = list.filter((x) => !x.reason);
+  if (written.length) {
+    const file = targetFileOf(desc, name);
+    report.file = file;
+    try {
+      writeEntries(desc, name, file, written.map((c) => desc.entryOf(c)));
       for (const c of written) {
-        await desc.linkCandidate(c, name, desc.listFile);
-        report.written.push(c.row.name);
-        if (c.withoutSecret) report.withoutSecret.push(c.row.name);
-      }
-      return;
-    }
-    for (const c of list) {
-      if (c.reason) {
-        report.kept.push(keptOf(desc, c));
-        continue;
-      }
-      try {
-        const file = writeNewFile(desc, name, c.row.name, desc.newFileText(c));
         await desc.linkCandidate(c, name, file);
         report.written.push(c.row.name);
         if (c.withoutSecret) report.withoutSecret.push(c.row.name);
-      } catch (e) {
+      }
+    } catch (e) {
+      for (const c of written.filter((x) => !report.written.includes(x.row.name))) {
         report.kept.push({ ...keptOf(desc, c), reason: `not written: ${e.message || e}`, code: "notWritten", error: e.message || String(e) });
       }
     }
-  })();
+  }
   if (desc.reportExtra) Object.assign(report, await desc.reportExtra(name));
   if (report.written.length || report.matched.length) CrudModel.changed(desc.model);
   logger.notice(`Repository '${name}' now holds ${activationText(desc, report)}`);
@@ -1635,8 +1824,8 @@ export async function deactivate(desc, name, { pull = true } = {}) {
   } else {
     report.pull = "not cloned";
   }
-  // a type kept in one file has nothing to unlink but itself : the app keeps its values
-  report.unlinked = desc.file ? 1 : await unlinkRepository(desc, name);
+  // a type the app has one of has nothing to unlink but itself : the app keeps its values
+  report.unlinked = desc.single ? 1 : await unlinkRepository(desc, name);
   return report;
 }
 
@@ -1659,22 +1848,23 @@ export async function renameRepository(from, to) {
 }
 
 /**
- * What an activation did, as the log and the pull output say it after "now holds" : a type kept in
- * one file, written to it or read from it ; another, how many objects were read, replaced, written
- * and kept in the app (and why).
+ * What an activation did, as the log and the pull output say it after "now holds" : a type the app
+ * has one of, written to its file or read from it ; another, how many objects were read, replaced,
+ * written (to which file) and kept in the app (and why).
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   report (object): what activate answered.
  *
  * Returns:
- *   string: the text (General (written to general.yaml, waiting for Push)).
+ *   string: the text (General (written to general.yaml, waiting for Push) ; the credentials: 2 read
+ *     from its files ...).
  */
 function activationText(desc, report) {
-  if (desc.file) return `${holdingOf(desc)} (${report.written.length ? `written to ${desc.file}, waiting for Push` : `read from ${desc.file}`})`;
+  if (desc.single) return `${holdingOf(desc)} (${report.written.length ? `written to ${report.file}, waiting for Push` : report.file ? `read from ${report.file}` : "no file gives it"})`;
   const kept = report.kept || [];
   const withoutSecret = report.withoutSecret || [];
-  return `${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by a file of the same name, ${report.deleted ? `${report.deleted} removed (their files gone), ` : ""}${report.written.length} written to it (waiting for Push${withoutSecret.length ? `, ${withoutSecret.length} without their secrets, kept in the database` : ""}), ${kept.length} kept in the app${kept.length ? ` (${kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`;
+  return `${holdingOf(desc)}: ${report.created} read from its files, ${report.matched.length} replaced by an entry of the same name, ${report.deleted ? `${report.deleted} removed (their entries gone), ` : ""}${report.written.length} written to ${report.file || "it"} (waiting for Push${withoutSecret.length ? `, ${withoutSecret.length} without their secrets, kept in the database` : ""}), ${kept.length} kept in the app${kept.length ? ` (${kept.map((k) => `${k.name}: ${k.reason}`).join("; ")})` : ""}`;
 }
 
 /**
@@ -1730,7 +1920,7 @@ async function undoActivation(desc, name, e) {
     // kept in the app - never linked to a repository that does not hold the type ; what that pull
     // read is no activation's to say any more
     synced.delete(syncedKey(desc, name));
-    const unlinked = desc.file ? 0 : await unlinkRepository(desc, name);
+    const unlinked = desc.single ? 0 : await unlinkRepository(desc, name);
     const what = unlinked ? `nothing was handed over (the ${unlinked} ${desc.noun}(s) its pull read in stay in the app, no longer linked to it)` : "nothing was read in nor written";
     return { error: `${why}: the usage was not turned on, ${what} - save it again in a moment`, turnedOff: true };
   } catch (e2) {
@@ -1792,17 +1982,18 @@ export async function afterUsageChange(before, name, now, opts = {}) {
 // ===========================================================================
 
 /**
- * A new object made in the app : written to its type's repository as a new file and linked to it,
- * for its Push - without its secrets, which stay in the database. Nothing when the type has no
- * repository (or it is not cloned), or the object stays in the app (descriptor.candidateOf).
+ * A new object made in the app : written to its type's repository as a new entry - at the end of
+ * the first file holding the type's key, else of <key>.yaml at its root - and linked to it, for its
+ * Push ; without its secrets, which stay in the database. Nothing when the type has no repository
+ * (or it is not cloned), or the object stays in the app (descriptor.candidateOf).
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   id (number): the new object.
  *
  * Returns:
- *   Promise<object|null>: { repository, file, withoutSecret }, null when it stays in the app (a
- *     file of the repository declares its name : it follows that file once it is read in).
+ *   Promise<object|null>: { repository, file, withoutSecret }, null when it stays in the app (an
+ *     entry of the repository declares its name : it follows that entry once it is read in).
  */
 export async function appCreated(desc, id) {
   const repository = await activeRepository(desc);
@@ -1812,15 +2003,16 @@ export async function appCreated(desc, id) {
   const c = await desc.candidateOf(row, null, await takenNames(desc));
   if (c.reason) return null;
   return withWriteClaim(repository, async () => {
-    // a file of the repository declaring its name, read in or not (refused, waiting, not pulled
-    // yet) : kept in the app, never written beside it - a second file of that name would be refused
-    // on every pull, and the first one too once it is fixed ; it follows that file once it is read in
-    const declared = (await filesNow(desc, repository)).names;
-    if (declared.has(nameKey(row.name))) {
-      logger.warning(`Kept ${desc.noun} '${row.name}' in the app, not written to ${repository}: a file of the repository has its name - it follows that file once it is read in`);
+    // an entry of the repository declaring its name, read in or not (refused, waiting, not pulled
+    // yet) : kept in the app, never written beside it - two entries of that name would both be
+    // refused on every pull ; it follows that entry once it is read in
+    const now = await filesNow(desc, repository);
+    if (now.names.has(nameKey(row.name))) {
+      logger.warning(`Kept ${desc.noun} '${row.name}' in the app, not written to ${repository}: an entry of the repository has its name - it follows that entry once it is read in`);
       return null;
     }
-    const file = desc.listFile ? writeListEntry(desc, repository, c.object) : writeNewFile(desc, repository, row.name, desc.newFileText(c));
+    const file = now.file;
+    writeEntries(desc, repository, file, [desc.entryOf(c)]);
     await desc.linkCandidate(c, repository, file);
     CrudModel.changed(desc.model);
     logger.info(`Wrote ${desc.noun} '${row.name}' to ${repository}/${file}${c.withoutSecret ? ", without its secret (kept in the database)" : ""}`);
@@ -1830,9 +2022,10 @@ export async function appCreated(desc, id) {
 
 /**
  * An object of a repository edited in the app : only the fields the edit changed written into its
- * file (descriptor.fileEdits : the object before and after it), the rest of it - the keys the app does not use, its ${ENV}
- * references, its comments - kept ; a file gone meanwhile written again, whole. Its secrets are
- * never written.
+ * entry, where it is now (descriptor.entryEdits : the object before and after it), the rest of it -
+ * the keys the app does not use, its ${ENV} references, its comments, the file's other keys and
+ * entries - kept ; an entry no file holds any more written again, whole, in the file it is linked
+ * to. Its secrets are never written.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -1843,157 +2036,131 @@ export async function appCreated(desc, id) {
  *   Promise<boolean>: whether its file was written.
  */
 export async function appUpdated(desc, before, id) {
-  // a type kept in one file : its own mode, before being the app's object before the edit
-  if (desc.file) return appUpdatedSingle(desc, before);
+  // a type the app has one of : its own mode, before being the app's object before the edit
+  if (desc.single) return appUpdatedSingle(desc, before);
   if (!before?.repository || !before.repo_file) return false;
   const row = await desc.store.byId(id);
   if (!row) return false;
   // where it is linked now, read after the save (under the claim) : a pull that held the claim
-  // before it may have moved its file or unlinked it - its old file is never written back
+  // before it may have moved its entry or unlinked it - its old file is never written back
   const at = "repo_file" in row ? row : before;
   if (!at.repository || !at.repo_file) return false;
-  // a type kept as a list in one file : its entry edited, field by field (added when it is gone)
-  if (desc.listFile) {
-    return withWriteClaim(at.repository, async () => {
-      const abs = listFileOf(desc, at.repository);
-      const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
-      const whole = (await desc.candidateOf({ ...row, repository: null })).object;
-      const next = updateListEntry(text, desc.listKey, before.name, desc.entryEdits(row, before), desc.keyOrder, whole);
-      if (next === text) return false;
-      fs.writeFileSync(abs, next, "utf8");
-      logger.info(`Saved ${desc.noun} '${row.name}' into ${at.repository}/${desc.listFile}`);
-      return true;
-    });
-  }
   return withWriteClaim(at.repository, async () => {
-    const abs = fileOf(desc, at.repository, at.repo_file);
-    const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-    const next = text === null ? desc.newFileText(await desc.candidateOf({ ...row, repository: null })) : desc.fileEdits(text, row, before);
-    if (next === text) return false;
-    fs.writeFileSync(abs, next, "utf8");
-    logger.info(`Saved ${desc.noun} '${row.name}' into ${at.repository}/${at.repo_file}`);
+    const edits = desc.entryEdits(row, before);
+    const whole = desc.entryOf(await desc.candidateOf({ ...row, repository: null }));
+    const file = editEntry(desc, at.repository, before.name, at.repo_file, (doc, map) => applyEdits(doc, map, edits, desc.keyOrder || []), whole);
+    if (!file) return false;
+    // found in another file than the one it was linked to : linked to it
+    if (file !== at.repo_file) await desc.store.link(row.id, at.repository, file);
+    logger.info(`Saved ${desc.noun} '${row.name}' into ${at.repository}/${file}`);
     return true;
   });
 }
 
 /**
- * An object of a repository deleted in the app : its file goes too, for the repository's Push.
+ * An object of a repository deleted in the app : its entry goes too, where it is now (its type's
+ * key with it when its list is left empty, the file when it holds nothing more), for the
+ * repository's Push.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   before (object): the object as it was (its repository and file).
  *
  * Returns:
- *   Promise<boolean>: whether a file was removed.
+ *   Promise<boolean>: whether an entry was removed.
  */
 export async function appDeleted(desc, before) {
   if (!before?.repository || !before.repo_file) return false;
   return withWriteClaim(before.repository, async () => {
-    // a type kept as a list in one file : its entry removed, the others kept
-    if (desc.listFile) {
-      const abs = listFileOf(desc, before.repository);
-      if (fs.existsSync(abs)) fs.writeFileSync(abs, removeListEntry(fs.readFileSync(abs, "utf8"), desc.listKey, before.name), "utf8");
-      logger.info(`Removed ${desc.noun} '${before.name}' from ${before.repository}/${desc.listFile}`);
-      return true;
-    }
     // its file now : a pull that held the claim before the delete may have moved it
-    const file = fileNaming(desc, before.repository, before);
+    const file = removeEntry(desc, before.repository, before.name, before.repo_file);
     if (!file) return false;
-    fs.rmSync(fileOf(desc, before.repository, file), { force: true });
-    logger.info(`Deleted the file ${before.repository}/${file} of ${desc.noun} '${before.name}'`);
+    logger.info(`Removed ${desc.noun} '${before.name}' from ${before.repository}/${file}`);
     return true;
   });
 }
 
+// ===========================================================================
+// THE TYPES THE APP HAS ONE OF
+// ===========================================================================
+// The chat assistant's settings, the System > General settings, the Appearance pages' : the app has
+// one object of each, its repository one map of it under its key in one of its files (chat_assistant:,
+// general:, defaults: ...), and the files that map names (the logo's, the icon's image), relative
+// to its file. The same rules as the list types : a pull applies it (git wins), turning the type on
+// writes the app's values when no file gives it (to <key>.yaml, made) and applies it when one does,
+// an app edit writes only the changed fields, the secrets are ${ENV} references only, turning it
+// off reads it once more and the app keeps its values. Two files giving it are refused, naming both
+// ; no file giving it changes nothing in the app.
+
 /**
- * The file of an object read before a pull that may have moved it (renamed in git) : the file it
- * was linked to while that file still names it - or names nothing that can be read - else the file
- * of its folder that names it now.
+ * Where a type the app has one of is in a repository's files : the file that gives its key, and
+ * what keeps it from being read (two files giving it, a file seeming to give it that cannot be
+ * read, a key that holds no map).
  *
  * Args:
  *   desc (object): the type's descriptor.
- *   repository (string): the repository.
- *   before (object): the object as it was read (its name and repo_file).
+ *   scan (object): the repository's files (scanOf).
  *
  * Returns:
- *   string|null: the file, relative to the repository ; null when no file names it.
+ *   object: { file (the file giving it, the first of several ; null for none), value (its map ; {}
+ *     for a key with nothing after it), refused ([{ file, reasons }] : why it is not read) }.
  */
-function fileNaming(desc, repository, before) {
-  const dir = Repo.folderOf(repository);
-  const nameIn = (file) => {
-    try {
-      const parsed = desc.parse(fs.readFileSync(path.join(dir, file), "utf8"));
-      return (parsed.object || parsed.raw)?.name;
-    } catch {
-      return undefined;
-    }
-  };
-  if (fs.existsSync(fileOf(desc, repository, before.repo_file))) {
-    const named = nameIn(before.repo_file);
-    if (named === undefined || nameKey(named) === nameKey(before.name)) return before.repo_file;
+function singleOf(desc, scan) {
+  const holding = scan.holding(desc.key);
+  const refused = scan.hinted(desc.key).map((u) => ({ file: u.file, reasons: u.errors }));
+  if (holding.length > 1) {
+    const files = holding.map((f) => f.file);
+    refused.push({ file: files.join(", "), reasons: [`${desc.key}: is given by ${files.length} files (${files.join(", ")}): one file at most gives it`] });
   }
-  return filesIn(dir, desc.folder).find((file) => nameKey(nameIn(file)) === nameKey(before.name)) || null;
+  const first = holding[0] || null;
+  let value = first ? first.value : null;
+  if (first && (value === null || value === undefined)) value = {};
+  if (first && (typeof value !== "object" || Array.isArray(value))) refused.push({ file: first.file, reasons: [`'${desc.key}' must be a dictionary`] });
+  return { file: first?.file || null, value, refused };
 }
 
-// ===========================================================================
-// THE TYPES KEPT IN ONE FILE
-// ===========================================================================
-// The chat assistant's settings, the System > General settings, the Appearance pages' : the app has one
-// object of each, its repository one file of it (desc.file, at its root : chat-assistant.yaml), and the
-// files the YAML names beside it (the logo's, the icon's image). The same rules as the folder types :
-// a pull applies the file (git wins), turning the type on writes the app's values to it when it
-// has none (and applies it when it has one), an app edit writes only the changed fields, the
-// secrets are ${ENV} references only, turning it off reads it once more and the app keeps its
-// values. A file removed changes nothing in the app.
-
 /**
- * The file of a single-file type in a repository.
+ * Writes a type the app has one of into a file of its repository, and the files its map names : a
+ * file whose content is the same is left as it is, a file it no longer names removed. A file it
+ * names is written where its map names it (own) ; any other file already there with other bytes is
+ * not the type's (a README's image, a logo of something else) : refused before anything is
+ * written, never overwritten.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
- *
- * Returns:
- *   string: its absolute path.
- *
- * Raises:
- *   Error: a link that leads outside the repository.
- */
-const singleFileOf = (desc, name) => fileIn(Repo.folderOf(name), ".", desc.file, /./);
-
-/**
- * Writes a single-file type's YAML and the files beside it : a file whose content is the same is
- * left as it is, a file beside it the object no longer names removed. A file beside it is written
- * where the YAML names it (own) ; any other file already there with other bytes is not the type's
- * (a README's image, a logo of something else) : refused before anything is written, never
- * overwritten.
- *
- * Args:
- *   desc (object): the type's descriptor.
- *   name (string): the repository.
- *   out (object): { text (null : the YAML left as it is), extraFiles: [{ name, buffer, own }] }.
- *   gone (string[]): the files beside it the YAML named before and no longer does.
+ *   file (string): the file, relative to the repository (made when it is not there, its key added
+ *     when it has none).
+ *   out (object): { object (its whole map : written when the file does not give it) | edits (the
+ *     fields to change in it) and keyOrder ; none : the map left as it is, extraFiles: [{ name,
+ *     buffer, own }] (relative to the file) }.
+ *   gone (string[]): the files its map named before and no longer does (relative to the file).
  *
  * Returns:
  *   boolean: whether anything was written.
  *
  * Raises:
- *   Error: a file beside it to write that is there already, with other bytes, and not the type's ;
+ *   Error: a file it names to write that is there already, with other bytes, and not the type's ;
  *     or a path outside the repository.
  */
-function writeSingle(desc, name, out, gone = []) {
-  const dir = path.dirname(singleFileOf(desc, name));
-  const extras = (out.extraFiles || []).map((extra) => ({ ...extra, abs: fileBeside(dir, extra.name) }));
+function writeSingle(desc, name, file, out, gone = []) {
+  const repoDir = Repo.folderOf(name);
+  const abs = fileOf(name, file);
+  const dir = path.dirname(abs);
+  const extras = (out.extraFiles || []).map((extra) => ({ ...extra, abs: fileBeside(dir, extra.name, repoDir) }));
   // step 1 : nothing written when one of them would overwrite a file that is not the type's
   for (const extra of extras) {
     if (extra.own || !fs.existsSync(extra.abs) || Buffer.compare(fs.readFileSync(extra.abs), extra.buffer) === 0) continue;
-    throw new Error(`'${extra.name}' is in repository '${name}' already and is not the one ${desc.file} names: rename or remove it, or name the image in ${desc.file}`);
+    throw new Error(`'${extra.name}' is in repository '${name}' already and is not the one ${file} names: rename or remove it, or name the image under ${desc.key}: in ${file}`);
   }
-  // step 2 : the YAML, then the files beside it
+  // step 2 : the YAML, then the files it names
   let written = false;
-  const abs = singleFileOf(desc, name);
-  if (out.text !== null && out.text !== undefined && (!fs.existsSync(abs) || fs.readFileSync(abs, "utf8") !== out.text)) {
-    fs.writeFileSync(abs, out.text, "utf8");
+  const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  let next = text;
+  if (out.object) next = editMapEntry(text, desc.key, (doc, map) => applyEdits(doc, map, sortedByOrder(out.object, desc.keyOrder || []), desc.keyOrder || []));
+  else if (out.edits && Object.keys(out.edits).length) next = editMapEntry(text, desc.key, (doc, map) => applyEdits(doc, map, out.edits, out.keyOrder || desc.keyOrder || []));
+  if (next !== text) {
+    writeRepoFile(name, file, next);
     written = true;
   }
   const kept = new Set();
@@ -2006,48 +2173,57 @@ function writeSingle(desc, name, out, gone = []) {
   }
   // step 3 : the files it named before
   for (const old of gone) {
-    const file = fileBeside(dir, old);
-    if (kept.has(file) || !fs.existsSync(file)) continue;
-    fs.rmSync(file, { force: true });
+    const named = fileBeside(dir, old, repoDir);
+    if (kept.has(named) || !fs.existsSync(named)) continue;
+    fs.rmSync(named, { force: true });
     written = true;
   }
   return written;
 }
 
 /**
- * Reads a single-file type's file into the app : checked, what it names there, then applied as
- * the app's own save applies it - only when it changes something. No file : nothing changes.
+ * Reads a type the app has one of into the app : checked, what it names there, then applied as the
+ * app's own save applies it - only when it changes something. No file giving it : nothing changes ;
+ * two files giving it : refused, nothing applied.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string): the repository.
+ *   opts (object): { scan (the repository's files, read once by the pull : scanOf ; read when not
+ *     given) }.
  *
  * Returns:
  *   Promise<object>: the summary, as syncRepository's ; its notes what the apply said.
  */
-async function syncSingle(desc, name) {
+async function syncSingle(desc, name, opts = {}) {
   const summary = newSummary();
-  const abs = singleFileOf(desc, name);
-  if (!fs.existsSync(abs)) {
-    summary.notes.push(`No ${desc.file} in the repository: the app keeps ${holdingOf(desc)} as it is`);
+  const { file, value, refused } = singleOf(desc, wholeScan(opts.scan || scanOf(name)));
+  if (refused.length) {
+    summary.refused.push(...refused);
+    for (const r of refused) logger.warning(`Refused ${desc.noun} of ${name}/${r.file}: ${r.reasons.join("; ")}`);
     return summary;
   }
-  const { errors, object: raw } = parseMapFile(fs.readFileSync(abs, "utf8"));
-  const checked = errors.length ? { errors } : await desc.check(raw, { dir: path.dirname(abs) });
+  if (!file) {
+    summary.notes.push(`No file of the repository gives ${desc.key}: - the app keeps ${holdingOf(desc)} as it is`);
+    return summary;
+  }
+  const raw = value;
+  const abs = fileOf(name, file);
+  const checked = await desc.check(raw, { dir: path.dirname(abs), root: Repo.folderOf(name) });
   if (checked.errors.length) {
-    summary.refused.push({ file: desc.file, reasons: checked.errors });
-    logger.warning(`Refused ${desc.noun} file ${name}/${desc.file}: ${checked.errors.join("; ")}`);
+    summary.refused.push({ file, reasons: checked.errors });
+    logger.warning(`Refused ${desc.noun} of ${name}/${file}: ${checked.errors.join("; ")}`);
     return summary;
   }
   const waiting = await waitingOf(desc, checked.object);
   if (waiting.length) {
-    summary.waiting.push({ file: desc.file, reasons: waiting });
+    summary.waiting.push({ file, reasons: waiting });
     return summary;
   }
   const current = await desc.current();
   // the config seed's whole object (the chat assistant's settings) : not applied, said
   if (desc.heldBySeed(current)) {
-    summary.notes.push(`Kept by the config seed, not applied: ${desc.file}`);
+    summary.notes.push(`Kept by the config seed, not applied: ${desc.key}: of ${file}`);
     summary.unchanged = 1;
     return summary;
   }
@@ -2068,41 +2244,48 @@ async function syncSingle(desc, name) {
     keptSecrets(await desc.current());
     summary.updated = 1;
     CrudModel.changed(desc.model);
-    logger.notice(`Applied ${name}/${desc.file}: the app follows git for ${holdingOf(desc)} from now on`);
+    logger.notice(`Applied ${desc.key}: of ${name}/${file}: the app follows git for ${holdingOf(desc)} from now on`);
   } catch (e) {
-    summary.refused.push({ file: desc.file, reasons: [`not saved: ${e.message || e}`] });
-    logger.warning(`Could not apply ${name}/${desc.file}: ${e.message || e}`);
+    summary.refused.push({ file, reasons: [`not saved: ${e.message || e}`] });
+    logger.warning(`Could not apply ${desc.key}: of ${name}/${file}: ${e.message || e}`);
   }
   return summary;
 }
 
 /**
- * What making a repository a single-file type's would do, changing nothing : the app's values
- * written to it when it has no file (said when its secrets stay in the database), else the file
- * applied, git winning.
+ * What making a repository the repository of a type the app has one of would do, changing nothing :
+ * the app's values written to it when no file gives it (said when its secrets stay in the
+ * database), else its file applied, git winning.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   name (string|null): the repository.
  *
  * Returns:
- *   Promise<object>: as preview's.
+ *   Promise<object>: as preview's ; file the file giving it, or the one it would be written to.
  */
 async function previewSingle(desc, name) {
-  // its file a link that leads outside the repository : said refused, as its sync refuses it ;
-  // nothing written over it
-  let exists = false;
-  let refused = null;
-  try {
-    exists = cloned(name) && fs.existsSync(singleFileOf(desc, name));
-  } catch (e) {
-    refused = [{ file: desc.file, reasons: [e.message || String(e)] }];
+  // a file seeming to give it that cannot be read, two files giving it, a link leading outside :
+  // said refused, as its sync refuses it ; nothing written over it
+  let file = null;
+  let refused = [];
+  let target = `${desc.key}.yaml`;
+  if (cloned(name)) {
+    const scan = scanOf(name);
+    ({ file, refused } = singleOf(desc, scan));
+    refused = [
+      ...scan.refused.map((r) => ({ file: r.file, reasons: [r.reason] })),
+      ...scan.blocked.map((b) => ({ file: b.file, reasons: [`the folder cannot be read: ${b.reason}`] })),
+      ...refused,
+    ];
+    target = file || targetFileOf(desc, name, scan);
   }
+  const exists = !!file;
   const current = await desc.current();
   const { withoutSecret } = desc.fileOf(current);
   const active = (await activeRepository(desc)) || null;
-  // written when the repository has no file, unless the config seed holds the whole object
-  const writes = !exists && !refused && !desc.heldBySeed(current);
+  // written when no file gives it, unless the config seed holds the whole object
+  const writes = !exists && !refused.length && !desc.heldBySeed(current);
   return {
     repository: name || null,
     active,
@@ -2112,14 +2295,15 @@ async function previewSingle(desc, name) {
     kept: desc.kept(current),
     clashes: exists ? [desc.title] : [],
     files: exists ? 1 : 0,
-    ...(refused ? { refused } : {}),
+    file: target,
+    ...(refused.length ? { refused } : {}),
     linked: name && active === name ? 1 : 0,
   };
 }
 
 /**
- * Makes a repository a single-file type's (pulled already) : its file applied when it has one, git
- * winning, else the app's values written to it, for its Push.
+ * Makes a repository the repository of a type the app has one of (pulled already) : its file
+ * applied when one gives it, git winning, else the app's values written to it, for its Push.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -2138,18 +2322,23 @@ async function activateSingle(desc, name, report) {
   report.kept = desc.kept(current);
   if (desc.heldBySeed(current)) {
     // the config seed's whole object : it stays with the seed, nothing written nor applied
-    logger.notice(`Repository '${name}' now holds ${holdingOf(desc)}, kept by the config seed while it declares them: nothing written to ${desc.file}`);
+    logger.notice(`Repository '${name}' now holds ${holdingOf(desc)}, kept by the config seed while it declares them: nothing written to it`);
     return report;
   }
-  if (fs.existsSync(singleFileOf(desc, name))) {
-    const summary = await syncSingle(desc, name);
+  const scan = scanOf(name);
+  const there = singleOf(desc, scan);
+  if (there.file || there.refused.length) {
+    const summary = await syncSingle(desc, name, { scan });
+    report.file = there.file;
     report.refused = summary.refused;
     report.waiting = summary.waiting;
     report.notes = summary.notes;
     if (!summary.refused.length && !summary.waiting.length) report.matched = [desc.title];
   } else {
+    const file = targetFileOf(desc, name, scan);
     const out = desc.fileOf(await desc.current());
-    await withWriteClaim(name, async () => writeSingle(desc, name, out));
+    await withWriteClaim(name, async () => writeSingle(desc, name, file, out));
+    report.file = file;
     report.written = [desc.title];
     if (out.withoutSecret) report.withoutSecret = [desc.title];
   }
@@ -2158,9 +2347,9 @@ async function activateSingle(desc, name, report) {
 }
 
 /**
- * A single-file type edited in the app : only the fields the edit changed written into its file,
- * and the files beside it that changed ; the file written whole when it is gone. Nothing when
- * the type has no repository.
+ * A type the app has one of, edited in the app : only the fields the edit changed written into its
+ * map, and the files it names that changed ; written whole (to <key>.yaml, made) when no file gives
+ * it. Nothing when the type has no repository.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -2179,19 +2368,39 @@ async function appUpdatedSingle(desc, before) {
   if (desc.heldBySeed(after)) return false;
   // a save that left this type's object as it was (one endpoint saving several pages' fields : the
   // Defaults page's save is not the Name page's) : its file is not touched, not even written again
-  // when it is gone - a page's save writes its own file only
+  // when it is gone - a page's save writes its own key only
   if (canonicalJson(after) === canonicalJson(before)) return false;
   return withWriteClaim(repository, async () => {
-    const abs = singleFileOf(desc, repository);
-    const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);
-    // the files beside it the edit no longer names : those the type says (only the images the YAML
-    // named and the edit changed) ; none when the YAML is gone - a file it does not name is never
-    // the type's to remove
-    const gone = out.gone ?? [];
-    const written = writeSingle(desc, repository, out, gone);
-    if (written) logger.info(`Saved ${holdingOf(desc)} into ${repository}/${desc.file}`);
+    const scan = scanOf(repository);
+    const { file, value } = singleOf(desc, scan);
+    const declared = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    // the files its map no longer names : those the type says (only the images the map named and
+    // the edit changed) ; none when no file gives it - a file it does not name is never the type's
+    // to remove
+    const out = file && declared ? desc.fileEdits(declared, after, before) : desc.fileOf(after);
+    const target = file || targetFileOf(desc, repository, scan);
+    const written = writeSingle(desc, repository, target, out, out.gone ?? []);
+    if (written) logger.info(`Saved ${holdingOf(desc)} into ${repository}/${target}`);
     return written;
   });
+}
+
+/**
+ * Where a type the app has one of is kept : the repository holding it and the file that gives it
+ * (the first of several), else the file it would be written to.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   Promise<object|null>: { repository, repo_file }, null when no repository holds it.
+ */
+export async function singleSourceOf(desc) {
+  const repository = await activeRepository(desc);
+  if (!repository) return null;
+  if (!cloned(repository)) return { repository, repo_file: `${desc.key}.yaml` };
+  const scan = scanOf(repository);
+  return { repository, repo_file: singleOf(desc, scan).file || targetFileOf(desc, repository, scan) };
 }
 
 // ===========================================================================
@@ -2201,13 +2410,13 @@ async function appUpdatedSingle(desc, before) {
 /**
  * Applies what the config seed declares of a type (the Appearance pages', the announcements, the
  * disclaimer : sections the seed reads through the same descriptors as a repository) : checked
- * as a file is (its references resolved by the seed already), then a single-file type applied,
- * a folder type's objects made or changed by name - never one a repository holds. Nothing is linked
+ * as an entry is (its references resolved by the seed already), then a type the app has one of
+ * applied, a list type's objects made or changed by name - never one a repository holds. Nothing is linked
  * to a repository.
  *
  * Args:
  *   desc (object): the type's descriptor.
- *   declared (object|object[]): the section's object (a single-file type), or its items.
+ *   declared (object|object[]): the section's object (a type the app has one of), or its items.
  *   opts (object): { dir (the seed file's folder : what the section names beside it) }.
  *
  * Returns:
@@ -2219,7 +2428,7 @@ async function appUpdatedSingle(desc, before) {
  */
 export async function applyDeclared(desc, declared, opts = {}) {
   const out = { created: [], updated: [], unchanged: 0, kept: [] };
-  if (desc.file) {
+  if (desc.single) {
     const checked = await desc.check(declared, { resolved: true, fromSeed: true, dir: opts.dir });
     if (checked.errors.length) throw new Error(`${desc.title}: ${checked.errors.join("; ")}`);
     const current = await desc.current();
@@ -2350,8 +2559,14 @@ export default {
   cloned,
   withWriteClaim,
   asHolding,
+  scanOf,
   fileOf,
-  writeNewFile,
+  targetFileOf,
+  writeEntries,
+  entryFileOf,
+  editEntry,
+  removeEntry,
+  singleSourceOf,
   repositories,
   activeRepository,
   assertUsageAllowed,

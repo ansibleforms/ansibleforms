@@ -1,6 +1,6 @@
 'use strict';
-// The Runners type of the repository-backed objects (lib/repoObjects/engine.js) : one runner per
-// YAML file in a repository's `runners` folder, in the config seed's format (an item of its runners
+// The Runners type of the repository-backed objects (lib/repoObjects/engine.js) : the entries of the
+// runners: lists of a repository's files, in the config seed's format (an item of its runners
 // section) : its type, address, mode, the RTE settings, whether it is the default and enabled. It
 // names its credential by name : a runner whose credential is not there yet waits, and is read
 // again when the credentials are next pulled. Its own token or password, if any, is an ${ENV}

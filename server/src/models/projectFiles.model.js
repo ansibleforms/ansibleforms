@@ -10,9 +10,10 @@
 // a root per inventories repository, each an inventory of its own : its paths start with its name
 // (production/inventory.yaml), as a local inventory's start with its folder's.
 //
-// A repository's files its usage types own (roles.yaml, credentials/, general.yaml ... :
-// lib/repoObjects/ownedPaths.js) are never listed, read, written nor deleted here, in a repository
-// used for these files as well. A form file (Form.formsFileTest : a forms folder's, every yaml file
+// A repository's files its usage types own (each YAML file giving the key of a type the repository
+// holds : roles:, credentials:, general: ... ; the images those name : lib/repoObjects/ownedPaths.js)
+// are never listed, read, written nor deleted here, in a repository used for these files as well ;
+// nor is a file written whose content would give such a key. A form file (Form.formsFileTest : a forms folder's, every yaml file
 // of a forms repository serving its forms from its root) is never written nor deleted here : the
 // designer's forms write it, checked.
 import fs from "fs";
@@ -25,7 +26,7 @@ import Repository from "./repository.model.js";
 import Repo from "./repo.model.js";
 import { configRepoFromPath } from "../lib/forms-git.js";
 import { FILE_KINDS, MAX_FILE_BYTES, MAX_LISTED_FILES, safeRelativePath, isInside, isTextBuffer } from "../lib/projectFiles.js";
-import { ownerTest, assertNotOwned } from "../lib/repoObjects/ownedPaths.js";
+import { ownerTest, assertNotOwned, assertContentNotOwned } from "../lib/repoObjects/ownedPaths.js";
 import Form from "./form.model.js";
 
 const ProjectFiles = {};
@@ -341,7 +342,8 @@ async function withWriteClaim(repository, write) {
  *   BadRequestError: the path or the content is not valid.
  *   ConflictError: onlyNew and the file exists.
  *   AccessDeniedError: a usage type of its repository owns the file (lib/repoObjects/ownedPaths.js),
- *     or it is a form file (Form.formsFileTest).
+ *     its content would give a key of a type its repository holds (assertContentNotOwned), or it
+ *     is a form file (Form.formsFileTest).
  */
 ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   if (typeof content !== "string") throw new Errors.BadRequestError("The content must be text");
@@ -350,6 +352,7 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
   await assertNotOwned(repository, file.abs, name);
+  await assertContentNotOwned(file.abs, content, name);
   await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     if (fs.existsSync(file.abs)) {

@@ -1,10 +1,10 @@
 'use strict';
-// The Disclaimer type of the repository-backed objects (lib/repoObjects/engine.js) : one disclaimer
-// version per YAML file in a repository's `disclaimer` folder, in the config seed's format (an item
+// The Disclaimer type of the repository-backed objects (lib/repoObjects/engine.js) : the disclaimer
+// versions of the disclaimer: lists of a repository's files, in the config seed's format (an item
 // of its disclaimer section) : its number (version, what it is found by), title, text, checkbox
 // label, and whether it is the one in force (enabled : the disclaimer on, this version asked ; one
 // at most). A changed title, text or label arriving from git is a correction of that version, as
-// the app's save makes one ; with `ask_again: true` in its file, everyone who accepted it is asked
+// the app's save makes one ; with `ask_again: true` in its entry, everyone who accepted it is asked
 // again, as the app's "Ask everyone again" does. Who accepted what is the app's alone, never in git.
 import Disclaimer from "../../models/disclaimer.model.js";
 import { disclaimerItem } from "../seed-schema.js";
@@ -55,7 +55,6 @@ const DisclaimerModel = {
 
 export default seedType({
   key: "disclaimer",
-  folder: "disclaimer",
   section: disclaimerItem,
   model: "disclaimer",
   table: "AnsibleForms.`disclaimer_versions`",
@@ -72,9 +71,9 @@ export default seedType({
   skip: ["ask_again"],
   notCompared: ["ask_again"],
   canonical,
-  // a file whose number changes : refused, never the old version's text rewritten as a correction
+  // an entry whose number changes : refused, never the old version's text rewritten as a correction
   // (its acceptances kept for words nobody accepted)
-  renameRefused: "a version keeps its number: add a new file",
+  renameRefused: "a version keeps its number: add a new entry",
   // one version in force
   oneOnly: [{ field: "enabled", label: "the one in force" }],
   order: "version",

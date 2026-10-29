@@ -18,7 +18,7 @@ vi.mock("../src/models/db.model.js", () => ({ default: { do: async (sql, vars) =
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 
 const { default: schedules } = await import("../src/lib/repoObjects/schedules.js");
-const { parseScheduleFile, newScheduleFile, updateScheduleFile, promptsOf, PROMPTS } = await import("../src/lib/scheduleFiles.js");
+const { parseSchedule, newScheduleEntry, updateScheduleText, promptsOf, PROMPTS } = await import("../src/lib/scheduleFiles.js");
 
 // every launch option a prompt gives
 const ALL = {
@@ -51,12 +51,11 @@ function rowAfter(row, { sql, vars }) {
 describe("one table, both ways", () => {
   test("every prompt written is read back as the same launch option", () => {
     assert.equal(PROMPTS.length, 11);
-    const text = newScheduleFile({ ...BASE, launchOptions: ALL });
-    const file = YAML.parse(text);
-    assert.equal(file.limit, "webservers");
-    assert.equal(file.job_type, "check");
-    assert.deepEqual(file.credentials, ["vault-prod", "ssh-ops"]);
-    assert.deepEqual(parseScheduleFile(text).schedule.launchOptions, ALL);
+    const entry = newScheduleEntry({ ...BASE, launchOptions: ALL });
+    assert.equal(entry.limit, "webservers");
+    assert.equal(entry.job_type, "check");
+    assert.deepEqual(entry.credentials, ["vault-prod", "ssh-ops"]);
+    assert.deepEqual(parseSchedule(YAML.parse(YAML.stringify(entry))).schedule.launchOptions, ALL);
   });
 
   test("an option no prompt gives stays in the app only : a credential map under other names, an unknown one", () => {
@@ -72,23 +71,23 @@ describe("turning the Schedules usage on", () => {
     const row = { id: 3, name: "Nightly cleanup", description: "", form: "Nightly", cron: "30 2 * * *", rrule: null, enabled: 1, extra_vars: "", launch_options: JSON.stringify(options) };
     const c = schedules.candidateOf(row);
     assert.deepEqual(schedules.appOnlyOptions([c]), ["Nightly cleanup (__custom__)"]);
-    const text = schedules.newFileText(c);
-    assert.equal(YAML.parse(text).limit, "webservers");
+    const entry = schedules.entryOf(c);
+    assert.equal(entry.limit, "webservers");
     statements.length = 0;
-    await schedules.linkCandidate(c, "ops", "schedules/nightly-cleanup.yaml");
+    await schedules.linkCandidate(c, "ops", "schedules.yaml");
     const stored = rowAfter(row, statements[0]);
     assert.deepEqual(JSON.parse(stored.launch_options), options);
     // the pull : the file read, the row compared and left as it is
-    assert.equal(schedules.store.changed(stored, parseScheduleFile(text).schedule), false);
+    assert.equal(schedules.store.changed(stored, parseSchedule(YAML.parse(YAML.stringify(entry))).schedule), false);
   });
 });
 
 describe("an app edit of the launch options", () => {
   test("only the prompts that change rewritten, one no longer given removed, the rest byte for byte", () => {
-    const text = "name: Nightly        # ours\nlimit: webservers    # the web tier\njob_tags: deploy\nverbosity: 1\nteam_owner: platform # our key\nunified_job_template: Nightly\nrrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n";
-    const out = updateScheduleFile(text, { launchOptions: { __limit__: "dbservers", __verbosity__: 1 } });
-    assert.equal(out, text.replace("limit: webservers    # the web tier", "limit: dbservers    # the web tier").replace("job_tags: deploy\n", ""));
+    const text = "schedules:\n  - name: Nightly        # ours\n    limit: webservers    # the web tier\n    job_tags: deploy\n    verbosity: 1\n    team_owner: platform # our key\n    unified_job_template: Nightly\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n";
+    const out = updateScheduleText(text, "Nightly", { launchOptions: { __limit__: "dbservers", __verbosity__: 1 } });
+    assert.equal(out, text.replace("limit: webservers    # the web tier", "limit: dbservers    # the web tier").replace("    job_tags: deploy\n", ""));
     // the same options : nothing rewritten
-    assert.equal(updateScheduleFile(text, { launchOptions: { __limit__: "webservers", __tags__: "deploy", __verbosity__: 1 } }), text);
+    assert.equal(updateScheduleText(text, "Nightly", { launchOptions: { __limit__: "webservers", __tags__: "deploy", __verbosity__: 1 } }), text);
   });
 });

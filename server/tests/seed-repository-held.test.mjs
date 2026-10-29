@@ -37,7 +37,7 @@ beforeEach(() => {
 test("a credential a repository holds : not adopted by the seed, its next pull still applies", async () => {
   process.env.SEED_HELD_PW = "s3cret";
   fx.reset({ repositories: [{ id: 1, name: "creds", uri: "x", use_for_credentials: 1 }] });
-  fx.writeFile("creds", "credentials", "git.yaml", { name: "git", credential_type: "git", user: "bot", password: "${SEED_HELD_PW}", description: "from git" });
+  fx.writeEntry("creds", "credentials/git.yaml", "credentials", { name: "git", credential_type: "git", user: "bot", password: "${SEED_HELD_PW}", description: "from git" });
   await RepoObjects.syncRepository(await RepoObjects.descriptorOf("credentials"), "creds");
   CrudModel.flushAllLocal();
   const done = summary();
@@ -49,7 +49,7 @@ test("a credential a repository holds : not adopted by the seed, its next pull s
   assert.deepEqual([done.updated, done.adopted], [[], []]);
   assert.match(warnings.join("\n"), /The config seed declares the credential 'git', which repository 'creds' holds \(credentials\/git.yaml\): not applied/);
   // the repository's own change still reaches it
-  fx.writeFile("creds", "credentials", "git.yaml", { name: "git", credential_type: "git", user: "bot", password: "${SEED_HELD_PW}", description: "changed in git" });
+  fx.writeEntry("creds", "credentials/git.yaml", "credentials", { name: "git", credential_type: "git", user: "bot", password: "${SEED_HELD_PW}", description: "changed in git" });
   CrudModel.flushAllLocal();
   const pulled = await RepoObjects.syncRepository(await RepoObjects.descriptorOf("credentials"), "creds");
   assert.deepEqual(pulled.refused || [], []);

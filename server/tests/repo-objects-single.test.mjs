@@ -1,19 +1,19 @@
-// The last object types on the engine (lib/repoObjects) : the ones kept in ONE file of their
-// repository - the chat assistant (chat-assistant.yaml), the System > General settings (general.yaml), the
-// Appearance pages (defaults.yaml, logo.yaml, icon.yaml, name.yaml, links.yaml) - and the announcements and the disclaimer versions, one
-// file each. On the shared fixture :
-//   single-file mode  a pull applies the file (git wins), turning the type on writes the app's
-//                     values when there is no file, an edit in the app rewrites only what changed,
+// The last object types on the engine (lib/repoObjects) : the ones the app has ONE object of, a map
+// under its key in one file of their repository - the chat assistant (chat_assistant:), the System >
+// General settings (general:), the Appearance pages (defaults:, logo:, icon:, name:, links:) - and
+// the announcements and the disclaimer versions, lists of entries. On the shared fixture :
+//   single mode       a pull applies the map (git wins), turning the type on writes the app's
+//                     values when no file gives it, an edit in the app rewrites only what changed,
 //                     its secret an ${ENV} reference only, what it names waited for
 //   general           checked and applied as the settings page's Save : a variable another page or
 //                     the deployment owns refused, a secret only as ${ENV}, a restart said
-//   mcp               the MCP page's switches the same way (mcp.yaml), applied at once, never a
+//   mcp               the MCP page's switches the same way (mcp:), applied at once, never a
 //                     variable of the settings' ; the seed's mcp section holding them per variable
-//   appearance        one file per page, holding what that page saves and nothing else, a page's
-//                     save writing its own file only ; the logo's and the icon's images beside
-//                     their file, read and written as binary, checked as an upload
+//   appearance        one key per page, holding what that page saves and nothing else, a page's
+//                     save writing its own key only ; the logo's and the icon's images named
+//                     relative to their file, read and written as binary, checked as an upload
 //   announcements     named, their moments compared in UTC, one made in the app named on its way
-//   disclaimer        a changed text a correction, or everyone asked again when the file says so
+//   disclaimer        a changed text a correction, or everyone asked again when the entry says so
 //   the seed          the defaults, logo, icon and name sections read through the same descriptors,
 //                     the images relative to it
 import { test, describe, beforeEach, vi } from "vitest";
@@ -89,11 +89,33 @@ const desc = (key) => RepoObjects.descriptorOf(key);
 // a PNG as the sniffing reads it : its signature, then anything
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("rest of the image")]);
 const dataUrl = (buffer) => `data:image/png;base64,${buffer.toString("base64")}`;
+// the type each YAML file of these tests holds, by the name the tests give it : any name would do,
+// a file is read by its content (its top-level key)
+const KEY_OF = {
+  "chat-assistant.yaml": "chat_assistant",
+  "chat_assistant.yaml": "chat_assistant",
+  "general.yaml": "general",
+  "mcp.yaml": "mcp",
+  "defaults.yaml": "defaults",
+  "logo.yaml": "logo",
+  "icon.yaml": "icon",
+  "name.yaml": "name",
+  "links.yaml": "links",
+};
+// a type's map as text (provider: openai ...), written under its key, and read back so
+const wrapped = (key, text) => `${key}:\n${String(text).split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`;
+const unwrapped = (text) => text.split("\n").slice(1).map((l) => l.replace(/^ {2}/, "")).join("\n");
 const writeRaw = (repo, file, content) => {
-  fs.mkdirSync(path.join(fx.ROOT, repo), { recursive: true });
-  fs.writeFileSync(path.join(fx.ROOT, repo, file), content);
+  fs.mkdirSync(path.dirname(path.join(fx.ROOT, repo, file)), { recursive: true });
+  const key = KEY_OF[path.basename(file)];
+  // a text already under its key (logo:\n  logo: logo.png) written as it is
+  const under = typeof content === "string" && new RegExp(`^${key}:[ \\t]*(\\n|$)`, "m").test(content);
+  fs.writeFileSync(path.join(fx.ROOT, repo, file), typeof content === "string" && key && !under ? wrapped(key, content) : content);
 };
 const readRaw = (repo, file) => fs.readFileSync(path.join(fx.ROOT, repo, file));
+// a type's map of a file, and its text under its key
+const readMapOf = (repo, file) => fx.readMap(repo, file, KEY_OF[path.basename(file)]);
+const readFlat = (repo, file) => unwrapped(fx.textOf(repo, file));
 
 beforeEach(() => {
   process.env.CHAT_KEY = "sk-from-env";
@@ -117,7 +139,7 @@ beforeEach(() => {
 });
 
 // ─── the single-file mode ──────────────────────────────────────────────────────
-describe("a type kept in one file : the chat assistant", () => {
+describe("a type the app has one of : the chat assistant", () => {
   test("a pull applies its file, its ${ENV} key resolved ; an unchanged file changes nothing", async () => {
     writeRaw("cfg", "chat-assistant.yaml", "provider: openai\nmodel: gpt-5\napi_key: ${CHAT_KEY}\n");
     const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
@@ -169,12 +191,15 @@ describe("a type kept in one file : the chat assistant", () => {
     assert.deepEqual(p.withoutSecret, ["Chat assistant"]);
     const report = await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
     assert.deepEqual(report.written, ["Chat assistant"]);
-    assert.deepEqual(fx.readObject("cfg", ".", "chat-assistant.yaml"), { provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
+    // no file gives it : written to <key>.yaml at the root
+    assert.equal(report.file, "chat_assistant.yaml");
+    assert.equal(p.file, "chat_assistant.yaml");
+    assert.deepEqual(readMapOf("cfg", "chat_assistant.yaml"), { provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
     // edited in the app : only the model rewritten
     const before = await RepoObjects.snapshot("chat_assistant");
     fx.state.tables.chat_settings[0].model = "gpt-6";
     assert.equal(await RepoObjects.appUpdated("chat_assistant", before), true);
-    assert.equal(fx.readObject("cfg", ".", "chat-assistant.yaml").model, "gpt-6");
+    assert.equal(readMapOf("cfg", "chat_assistant.yaml").model, "gpt-6");
     // and a pull says its key stays the database's
     const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.deepEqual(summary.secretsKept, ["Chat assistant"]);
@@ -186,7 +211,7 @@ describe("a type kept in one file : the chat assistant", () => {
     assert.deepEqual(report.matched, ["Chat assistant"]);
     assert.deepEqual(report.written, []);
     assert.equal(fx.state.tables.chat_settings[0].model, "from-git");
-    assert.equal(fx.readText("cfg", ".", "chat-assistant.yaml"), "model: from-git\n");
+    assert.equal(readFlat("cfg", "chat-assistant.yaml"), "model: from-git\n");
   });
 
   test("its file a link that leads outside the repository : never read, never written through", async () => {
@@ -195,8 +220,10 @@ describe("a type kept in one file : the chat assistant", () => {
     fs.writeFileSync(target, "model: read-from-the-server\n");
     fx.cloneEmpty("cfg");
     fs.symlinkSync(target, path.join(fx.ROOT, "cfg", "chat-assistant.yaml"));
-    const out = await RepoObjects.syncText(await desc("chat_assistant"), "cfg");
-    assert.match(out, /not synchronized/);
+    await RepoObjects.syncText(await desc("chat_assistant"), "cfg");
+    const preview = await RepoObjects.preview(await desc("chat_assistant"), "cfg");
+    assert.deepEqual(preview.refused, [{ file: "chat-assistant.yaml", reasons: ["a link that leads outside the repository: never read"] }]);
+    assert.deepEqual(preview.written, []);
     assert.equal(fx.state.tables.chat_settings[0].model ?? "", "");
     // an edit in the app : the file outside left as it was
     const before = { ...(await RepoObjects.snapshot("chat_assistant")) };
@@ -219,12 +246,12 @@ describe("a type kept in one file : the chat assistant", () => {
     const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.deepEqual(summary.refused, []);
     assert.equal(fx.state.tables.chat_settings[0].model, "seeded");
-    assert.match(RepoObjects.summaryText(await desc("chat_assistant"), summary), /Kept by the config seed, not applied: chat-assistant.yaml/);
+    assert.match(RepoObjects.summaryText(await desc("chat_assistant"), summary), /Kept by the config seed, not applied: chat_assistant: of chat-assistant\.yaml/);
     // the app's own write (the seed's apply) never reaches the file
     const before = await RepoObjects.snapshot("chat_assistant");
     fx.state.tables.chat_settings[0].model = "seeded-2";
     assert.equal(await RepoObjects.appUpdated("chat_assistant", before), false);
-    assert.equal(fx.readText("cfg", ".", "chat-assistant.yaml"), "model: from-git\n");
+    assert.equal(readFlat("cfg", "chat-assistant.yaml"), "model: from-git\n");
   });
 
   test("turned off : read once more, the app keeps its values, the file stays", async () => {
@@ -279,7 +306,7 @@ describe("the System > General settings, by their environment names", () => {
     const before = await RepoObjects.snapshot("general");
     await saveEnvValues({ GIT_PULL_COMMAND: "git pull --ff-only", JOB_RETENTION_DAYS: "31" }, { user: "root" });
     await RepoObjects.appUpdated("general", before);
-    assert.equal(fx.readText("cfg", ".", "general.yaml"), "JOB_RETENTION_DAYS: 31\n");
+    assert.equal(readFlat("cfg", "general.yaml"), "JOB_RETENTION_DAYS: 31\n");
   });
 
   test("a save from the page rewrites the file, its secrets never", async () => {
@@ -289,7 +316,7 @@ describe("the System > General settings, by their environment names", () => {
     const before = await RepoObjects.snapshot("general");
     await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
     await RepoObjects.appUpdated("general", before);
-    assert.equal(fx.readText("cfg", ".", "general.yaml"), "# ops\nJOB_RETENTION_DAYS: 45\n");
+    assert.equal(readFlat("cfg", "general.yaml"), "# ops\nJOB_RETENTION_DAYS: 45\n");
   });
 
   test("each value in its variable's type, a new one below the leading comment ; both forms read", async () => {
@@ -303,7 +330,7 @@ describe("the System > General settings, by their environment names", () => {
     await saveEnvValues({ AUDIT_RETENTION_DAYS: "200", ACCESS_TOKEN_ISSUER: "1" }, { user: "root" });
     await RepoObjects.appUpdated("general", before);
     assert.equal(
-      fx.readText("cfg", ".", "general.yaml"),
+      readFlat("cfg", "general.yaml"),
       "# ops settings\n# kept by the platform team\nACCESS_TOKEN_ISSUER: \"1\"\nAUDIT_RETENTION_DAYS: 200\nJOB_RETENTION_DAYS: \"30\"\n",
     );
     CrudModel.flushAllLocal();
@@ -318,7 +345,7 @@ describe("the System > General settings, by their environment names", () => {
     const general = await desc("general");
     fx.cloneEmpty("cfg");
     await RepoObjects.activate(general, "cfg", { pull: false });
-    const text = fx.readText("cfg", ".", "general.yaml");
+    const text = readFlat("cfg", "general.yaml");
     assert.equal(text, "AUDIT_RETENTION_DAYS: 90\n");
     // the platform team changes the other setting in git : applied, not refused
     writeRaw("cfg", "general.yaml", text.replace("AUDIT_RETENTION_DAYS: 90", "AUDIT_RETENTION_DAYS: 120"));
@@ -335,7 +362,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     fx.cloneEmpty("cfg");
     const report = await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
     assert.deepEqual(report.written, ["MCP"]);
-    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false, MCP_READ_ONLY: false });
+    assert.deepEqual(readMapOf("cfg", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false, MCP_READ_ONLY: false });
     // a pull : saved as the page saves it, the server switched on without a restart
     const { default: appConfig } = await import("./__mocks__/app.config.js");
     writeRaw("cfg", "mcp.yaml", "ENABLE_MCP: 1\nMCP_READ_ONLY: 0\n");
@@ -351,7 +378,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     const before = await RepoObjects.snapshot("mcp");
     await saveEnvValues({ MCP_READ_ONLY: "1" }, { user: "root" });
     await RepoObjects.appUpdated("mcp", before);
-    assert.equal(fx.readObject("cfg", ".", "mcp.yaml").MCP_READ_ONLY, true);
+    assert.equal(readMapOf("cfg", "mcp.yaml").MCP_READ_ONLY, true);
     // turned off : the app keeps its values, the file stays
     assert.equal((await RepoObjects.deactivate(await desc("mcp"), "cfg")).unlinked, 1);
     assert.equal(appConfig.enableMcp, true);
@@ -407,7 +434,7 @@ describe("the MCP settings, in their mcp.yaml", () => {
     fx.cloneEmpty("cfg");
     assert.deepEqual((await RepoObjects.preview(await desc("mcp"), "cfg")).kept.map((k) => k.name), ["MCP_READ_ONLY"]);
     await RepoObjects.activate(await desc("mcp"), "cfg", { pull: false });
-    assert.deepEqual(fx.readObject("cfg", ".", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false });
+    assert.deepEqual(readMapOf("cfg", "mcp.yaml"), { ENABLE_MCP: false, MCP_CHAT_FORMS_ONLY: false });
     // a file declaring it : not applied, said ; the others applied
     writeRaw("cfg", "mcp.yaml", "MCP_READ_ONLY: 1\nMCP_CHAT_FORMS_ONLY: 1\n");
     const summary = await RepoObjects.syncRepository(await desc("mcp"), "cfg");
@@ -443,7 +470,7 @@ describe("each Appearance page in its own file, holding what that page saves and
     const { APPEARANCE_FIELDS, sectionOfField } = await import("../src/lib/seedManaged.js");
     for (const [key, fields] of Object.entries(PAGE_FIELDS)) {
       const d = await desc(key);
-      assert.equal(d.file, `${key}.yaml`);
+      assert.equal(d.single, true);
       assert.deepEqual([...d.keyOrder].sort(), [...fields].sort(), key);
       assert.deepEqual(Object.keys(APPEARANCE_SECTIONS[key].properties).sort(), [...fields].sort(), key);
       for (const field of fields) assert.equal(sectionOfField(field), key, field);
@@ -467,7 +494,7 @@ describe("each Appearance page in its own file, holding what that page saves and
     const { saveEnvValues } = await import("../src/lib/envSave.js");
     await saveEnvValues({ DEFAULT_LANGUAGE: "fr" }, { user: "root" });
     for (const key of ["defaults", "logo", "icon", "name"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
-    assert.deepEqual(fx.readObject("cfg", ".", "defaults.yaml"), {
+    assert.deepEqual(readMapOf("cfg", "defaults.yaml"), {
       default_theme: "dark",
       default_theme_color: "#198754",
       forms_view: "list",
@@ -475,9 +502,9 @@ describe("each Appearance page in its own file, holding what that page saves and
       default_date_format: "DD/MM/YYYY",
       default_language: "fr",
     });
-    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
-    assert.deepEqual(fx.readObject("cfg", ".", "icon.yaml"), { icon: "icon.png" });
-    assert.deepEqual(fx.readObject("cfg", ".", "name.yaml"), { app_name: "Mine" });
+    assert.deepEqual(readMapOf("cfg", "logo.yaml"), { logo: "logo.png" });
+    assert.deepEqual(readMapOf("cfg", "icon.yaml"), { icon: "icon.png" });
+    assert.deepEqual(readMapOf("cfg", "name.yaml"), { app_name: "Mine" });
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), PNG), 0);
     assert.equal(Buffer.compare(readRaw("cfg", "icon.png"), PNG), 0);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "branding.yaml")), false);
@@ -532,7 +559,7 @@ describe("a save from an Appearance page writes its own page's file only", () =>
     fs.rmSync(path.join(fx.ROOT, "cfg", "links.yaml"));
     const res = await put({ default_theme: "dark", default_theme_color: "#008cba", forms_view: "tiles", default_timezone: "UTC", default_date_format: "YYYY-MM-DD" });
     assert.equal(res.code, 200, JSON.stringify(res.body));
-    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_theme, "dark");
+    assert.equal(readMapOf("cfg", "defaults.yaml").default_theme, "dark");
     assert.equal(readRaw("cfg", "name.yaml").toString(), name);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "links.yaml")), false, "the Links page's file is not the Defaults page's to write");
   });
@@ -542,7 +569,7 @@ describe("a save from an Appearance page writes its own page's file only", () =>
     for (const key of ["defaults", "name"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
     fs.rmSync(path.join(fx.ROOT, "cfg", "defaults.yaml"));
     assert.equal((await put({ app_name: "Renamed" })).code, 200);
-    assert.deepEqual(fx.readObject("cfg", ".", "name.yaml"), { app_name: "Renamed" });
+    assert.deepEqual(readMapOf("cfg", "name.yaml"), { app_name: "Renamed" });
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "defaults.yaml")), false);
   });
 
@@ -553,7 +580,7 @@ describe("a save from an Appearance page writes its own page's file only", () =>
     const before = await RepoObjects.snapshots(["logo", "icon"]);
     fx.state.tables.settings[0].logo = dataUrl(PNG);
     await RepoObjects.appUpdatedAll(before);
-    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
+    assert.deepEqual(readMapOf("cfg", "logo.yaml"), { logo: "logo.png" });
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "icon.yaml")), false);
   });
 });
@@ -568,7 +595,7 @@ describe("the logo and the icon, their images beside their file", () => {
     writeRaw("cfg", "icon.yaml", "icon: icon.png\n");
     assert.match((await RepoObjects.syncRepository(await desc("icon"), "cfg")).refused[0].reasons[0], /larger than 256 KB/);
     writeRaw("cfg", "logo.yaml", "logo: ../elsewhere.png\n");
-    assert.match((await RepoObjects.syncRepository(await desc("logo"), "cfg")).refused[0].reasons[0], /not a file beside it/);
+    assert.match((await RepoObjects.syncRepository(await desc("logo"), "cfg")).refused[0].reasons[0], /not a file of the repository/);
   });
 
   test("an image linked to a file outside the repository is never read", async () => {
@@ -578,7 +605,7 @@ describe("the logo and the icon, their images beside their file", () => {
     fs.symlinkSync(path.join(outside, "secret.png"), path.join(fx.ROOT, "cfg", "logo.png"));
     writeRaw("cfg", "logo.yaml", "logo: logo.png\n");
     const summary = await RepoObjects.syncRepository(await desc("logo"), "cfg");
-    assert.match(summary.refused[0]?.reasons[0] || "", /not a file beside it/, JSON.stringify(summary));
+    assert.match(summary.refused[0]?.reasons[0] || "", /not a file of the repository/, JSON.stringify(summary));
     assert.equal(fx.state.tables.settings[0].logo, null);
   });
 
@@ -586,7 +613,7 @@ describe("the logo and the icon, their images beside their file", () => {
     fx.cloneEmpty("cfg");
     Object.assign(fx.state.tables.settings[0], { app_name: "Mine", logo: dataUrl(PNG) });
     await RepoObjects.activate(await desc("logo"), "cfg", { pull: false });
-    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
+    assert.deepEqual(readMapOf("cfg", "logo.yaml"), { logo: "logo.png" });
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), PNG), 0);
     // a new logo in the app : the image rewritten, the YAML as it was
     const before = await RepoObjects.snapshot("logo");
@@ -594,7 +621,7 @@ describe("the logo and the icon, their images beside their file", () => {
     fx.state.tables.settings[0].logo = dataUrl(other);
     await RepoObjects.appUpdated("logo", before);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), other), 0);
-    assert.equal(fx.readObject("cfg", ".", "logo.yaml").logo, "logo.png");
+    assert.equal(readMapOf("cfg", "logo.yaml").logo, "logo.png");
   });
 
   test("a new logo in the app while the file names it elsewhere : written where it names it, an unrelated logo.png untouched", async () => {
@@ -612,7 +639,7 @@ describe("the logo and the icon, their images beside their file", () => {
     fx.state.tables.settings[0].logo = dataUrl(other);
     assert.equal(await RepoObjects.appUpdated("logo", before), true);
     // the YAML still names its own file, which holds the new logo : a pull of it gives the new one
-    assert.equal(readRaw("cfg", "logo.yaml").toString(), "logo: images/logo.png # the team's layout\n");
+    assert.equal(readFlat("cfg", "logo.yaml"), "logo: images/logo.png # the team's layout\n");
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), other), 0);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0, "the README's logo untouched");
     // another type : beside it with its extension, the YAML naming it, the old file the logo's gone
@@ -620,7 +647,7 @@ describe("the logo and the icon, their images beside their file", () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
     fx.state.tables.settings[0].logo = `data:image/svg+xml;base64,${svg.toString("base64")}`;
     await RepoObjects.appUpdated("logo", before2);
-    assert.equal(fx.readObject("cfg", ".", "logo.yaml").logo, "images/logo.svg");
+    assert.equal(readMapOf("cfg", "logo.yaml").logo, "images/logo.svg");
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.svg"), svg), 0);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "images", "logo.png")), false);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
@@ -641,7 +668,7 @@ describe("the logo and the icon, their images beside their file", () => {
     fx.state.tables.settings[0].logo = dataUrl(Buffer.concat([PNG, Buffer.from("v3")]));
     assert.equal(await RepoObjects.appUpdated("logo", before), null);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
-    assert.equal(readRaw("cfg", "logo.yaml").toString(), "# no logo yet\n{}\n");
+    assert.equal(readFlat("cfg", "logo.yaml"), "# no logo yet\n{}\n");
   });
 
   test("a save that leaves the logo as it is writes nothing : no image beside the YAML, none removed", async () => {
@@ -654,7 +681,7 @@ describe("the logo and the icon, their images beside their file", () => {
     const before = await RepoObjects.snapshot("logo");
     fx.state.tables.settings[0].app_name = "Renamed";
     assert.equal(await RepoObjects.appUpdated("logo", before), false);
-    assert.equal(readRaw("cfg", "logo.yaml").toString(), "logo: images/logo.png\n");
+    assert.equal(readFlat("cfg", "logo.yaml"), "logo: images/logo.png\n");
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "logo.png")), false);
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), PNG), 0);
   });
@@ -708,7 +735,7 @@ describe("the default language, an environment setting in defaults.yaml", () => 
     try {
       fx.cloneEmpty("cfg");
       await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
-      assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_language, undefined, "the deployment's value is not the repository's");
+      assert.equal(readMapOf("cfg", "defaults.yaml").default_language, undefined, "the deployment's value is not the repository's");
       writeRaw("cfg", "defaults.yaml", "default_theme: dark\ndefault_language: de\n");
       const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
       assert.deepEqual(summary.refused, []);
@@ -751,9 +778,9 @@ describe("the log names a type kept in one file by its label", () => {
       await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
       await RepoObjects.appUpdated("general", before);
       assert.ok(lines.includes("Repository 'cfg' now holds MCP (written to mcp.yaml, waiting for Push)"), lines.join("\n"));
-      assert.ok(lines.includes("Applied cfg/general.yaml: the app follows git for General from now on"), lines.join("\n"));
+      assert.ok(lines.includes("Applied general: of cfg/general.yaml: the app follows git for General from now on"), lines.join("\n"));
       assert.ok(lines.includes("Saved General into cfg/general.yaml"), lines.join("\n"));
-      assert.deepEqual(none.notes, ["No chat-assistant.yaml in the repository: the app keeps Chat assistant as it is"]);
+      assert.deepEqual(none.notes, ["No file of the repository gives chat_assistant: - the app keeps Chat assistant as it is"]);
       assert.ok(!lines.some((l) => /holds the general|The \w+ follow /.test(l)), lines.join("\n"));
     } finally {
       for (const spy of spies) spy.mockRestore();
@@ -770,7 +797,7 @@ describe("the header's links, in their own links.yaml", () => {
     fx.state.tables.settings[0].header_links = JSON.stringify([LINK]);
     const report = await RepoObjects.activate(await desc("links"), "cfg", { pull: false });
     assert.deepEqual(report.written, ["Links"]);
-    const file = fx.readObject("cfg", ".", "links.yaml");
+    const file = readMapOf("cfg", "links.yaml");
     assert.equal(file.header_links[0].label, "Docs");
     assert.equal(file.show_designer, true);
     // the other Appearance pages' files hold no link
@@ -791,7 +818,7 @@ describe("the header's links, in their own links.yaml", () => {
     const before = await RepoObjects.snapshot("links");
     fx.state.tables.settings[0].header_links = JSON.stringify([LINK]);
     await RepoObjects.appUpdated("links", before);
-    assert.equal(fx.readObject("cfg", ".", "links.yaml").header_links[0].label, "Docs");
+    assert.equal(readMapOf("cfg", "links.yaml").header_links[0].label, "Docs");
     // turned off : the app keeps its links, the file stays
     assert.equal((await RepoObjects.deactivate(await desc("links"), "cfg")).unlinked, 1);
     assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "links.yaml")));
@@ -851,8 +878,8 @@ describe("the appearance fields the config seed declares are its own", () => {
     const p = await RepoObjects.preview(await desc("defaults"), "cfg");
     assert.deepEqual(p.kept, [{ name: "default_theme", code: "seed", reason: "managed by the config seed" }]);
     await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
-    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_theme, undefined);
-    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_timezone, "UTC");
+    assert.equal(readMapOf("cfg", "defaults.yaml").default_theme, undefined);
+    assert.equal(readMapOf("cfg", "defaults.yaml").default_timezone, "UTC");
     // a file declaring it : not applied, said ; the other fields applied
     writeRaw("cfg", "defaults.yaml", "default_theme: dark\ndefault_timezone: Europe/Brussels\n");
     const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
@@ -866,7 +893,7 @@ describe("the appearance fields the config seed declares are its own", () => {
 // ─── the announcements and the disclaimer ──────────────────────────────────────
 describe("the announcements", () => {
   test("named, their moments in UTC : made, then unchanged ; one of the app written with a name", async () => {
-    fx.writeFile("news", "announcements", "maintenance.yaml", { name: "Maintenance", message: "Down on Sunday", level: "warning", start_at: "2030-01-01T08:00:00Z" });
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", { name: "Maintenance", message: "Down on Sunday", level: "warning", start_at: "2030-01-01T08:00:00Z" });
     const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
     assert.equal(summary.created, 1, JSON.stringify(summary));
     const row = fx.rowNamed("announcements", "Maintenance");
@@ -883,7 +910,7 @@ describe("the announcements", () => {
 
 describe("the config seed and a repository naming the same announcement", () => {
   test("the repository's is kept, the seed's not applied, said : no tug of war between a start and a pull", async () => {
-    fx.writeFile("news", "announcements", "maintenance.yaml", { name: "Maintenance", message: "From git" });
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", { name: "Maintenance", message: "From git" });
     await RepoObjects.syncRepository(await desc("announcements"), "news");
     const done = await RepoObjects.applyDeclared(await desc("announcements"), [{ name: "Maintenance", message: "From the seed" }], {});
     assert.deepEqual(done.kept, ["Maintenance"]);
@@ -914,22 +941,22 @@ describe("an announcement already ended in git", () => {
   const ended = { name: "Maintenance", message: "Down on Sunday", end_at: "2020-01-01T10:00:00Z" };
 
   test("is not imported : no refusal, an information line, the sync goes on", async () => {
-    fx.writeFile("news", "announcements", "maintenance.yaml", ended);
-    fx.writeFile("news", "announcements", "later.yaml", { name: "Later", message: "Soon", end_at: "2099-01-01T10:00:00Z" });
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", ended);
+    fx.writeEntry("news", "announcements/later.yaml", "announcements", { name: "Later", message: "Soon", end_at: "2099-01-01T10:00:00Z" });
     const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
     assert.deepEqual(summary.refused, []);
     assert.equal(summary.created, 1, "a future end still imports");
     assert.equal(fx.rowNamed("announcements", "Maintenance"), undefined);
-    assert.match(RepoObjects.summaryText(await desc("announcements"), summary), /Not imported, already ended: Maintenance \(announcements\/maintenance.yaml\)/);
+    assert.match(RepoObjects.summaryText(await desc("announcements"), summary), /Not imported, already ended: Maintenance \(announcements\/maintenance.yaml#Maintenance\)/);
     // and the question before turning the usage on says how many are skipped
     assert.equal((await RepoObjects.preview(await desc("announcements"), "news")).skipped, 1);
   });
 
   test("a linked one whose file has since ended is removed from the app, its file left as it is", async () => {
-    fx.writeFile("news", "announcements", "maintenance.yaml", { ...ended, end_at: "2099-01-01T10:00:00Z" });
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", { ...ended, end_at: "2099-01-01T10:00:00Z" });
     await RepoObjects.syncRepository(await desc("announcements"), "news");
     assert.ok(fx.rowNamed("announcements", "Maintenance"));
-    fx.writeFile("news", "announcements", "maintenance.yaml", ended);
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", ended);
     const text = fx.readText("news", "announcements", "maintenance.yaml");
     const summary = await RepoObjects.syncRepository(await desc("announcements"), "news");
     assert.equal(summary.deleted, 1);
@@ -941,7 +968,7 @@ describe("an announcement already ended in git", () => {
   });
 
   test("the app's own clean-up of an ended linked announcement leaves git untouched", async () => {
-    fx.writeFile("news", "announcements", "maintenance.yaml", { ...ended, end_at: "2099-01-01T10:00:00Z" });
+    fx.writeEntry("news", "announcements/maintenance.yaml", "announcements", { ...ended, end_at: "2099-01-01T10:00:00Z" });
     await RepoObjects.syncRepository(await desc("announcements"), "news");
     const before = await RepoObjects.rowsOf("announcements");
     const text = fx.readText("news", "announcements", "maintenance.yaml");
@@ -960,7 +987,7 @@ describe("the disclaimer versions", () => {
   const file = (extra = {}) => ({ version: 1, title: "Terms", text: "Be nice", checkbox_label: "I agree", enabled: true, ...extra });
 
   test("a version from git is made and put in force ; acceptances never in the file", async () => {
-    fx.writeFile("news", "disclaimer", "1.yaml", file());
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", file());
     const summary = await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(summary.created, 1, JSON.stringify(summary));
     assert.equal(fx.state.tables.settings[0].disclaimer_version, 1);
@@ -969,14 +996,14 @@ describe("the disclaimer versions", () => {
   });
 
   test("a changed text is a correction ; with ask_again, everyone is asked again", async () => {
-    fx.writeFile("news", "disclaimer", "1.yaml", file());
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", file());
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     acceptances[1] = 5;
-    fx.writeFile("news", "disclaimer", "1.yaml", file({ text: "Be very nice" }));
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", file({ text: "Be very nice" }));
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(fx.state.tables.disclaimer_versions[0].text, "Be very nice");
     assert.equal(acceptances[1], 5, "a correction keeps who accepted it");
-    fx.writeFile("news", "disclaimer", "1.yaml", file({ text: "Be kind", ask_again: true }));
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", file({ text: "Be kind", ask_again: true }));
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(acceptances[1], 0, "everyone asked again");
     // ask_again with the text unchanged : nothing happens
@@ -986,8 +1013,8 @@ describe("the disclaimer versions", () => {
   });
 
   test("a text ending on a line break (a YAML block) with ask_again : asked again once, never on each pull", async () => {
-    const text = "version: 1\ntitle: Terms\ntext: |\n  Line one.\n  Line two.\ncheckbox_label: I agree\nenabled: true\nask_again: true\n";
-    fx.writeFile("news", "disclaimer", "1.yaml", text);
+    const text = "disclaimer:\n  - version: 1\n    title: Terms\n    text: |\n      Line one.\n      Line two.\n    checkbox_label: I agree\n    enabled: true\n    ask_again: true\n";
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", text);
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(fx.state.tables.disclaimer_versions[0].text, "Line one.\nLine two.");
     acceptances[1] = 3;
@@ -999,36 +1026,35 @@ describe("the disclaimer versions", () => {
     assert.equal(acceptances[1], 3);
   });
 
-  test("a refused file declares its version : the app's version of that number stays in the app, never a second file", async () => {
+  test("a refused entry declares its version : the app's version of that number stays in the app, never a second entry", async () => {
     fx.state.tables.disclaimer_versions.push({ version: 1, title: "Terms", text: "Be nice", checkbox_label: "I agree", repository: null, repo_file: null });
-    fx.writeFile("news", "disclaimer", "1.yaml", file({ title: ["not", "a", "text"] }));
+    fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", file({ title: ["not", "a", "text"] }));
     const preview = await RepoObjects.preview(await desc("disclaimer"), "news");
     assert.deepEqual(preview.clashes, ["1"]);
     assert.deepEqual(preview.written, []);
     const report = await RepoObjects.activate(await desc("disclaimer"), "news", { pull: false });
     assert.equal(report.refused.length, 1);
     assert.deepEqual(report.written, []);
-    assert.match(report.kept[0].reason, /^news\/disclaimer\/1\.yaml has its name but is not read in/);
+    assert.match(report.kept[0].reason, /^news\/disclaimer\/1\.yaml#1 has its name but is not read in/);
     assert.deepEqual(fx.listFiles("news", "disclaimer"), ["1.yaml"]);
     assert.equal(fx.state.tables.disclaimer_versions[0].repository, null);
   });
 
-  test("a file whose number changes is refused : never the old version's text rewritten, a new file makes the new one", async () => {
-    fx.writeFile("news", "disclaimer", "terms.yaml", file());
+  test("an entry whose number changes is refused : never the old version's text rewritten, a new entry makes the new one", async () => {
+    fx.writeEntry("news", "disclaimer/terms.yaml", "disclaimer", file());
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     acceptances[1] = 5;
     // the admin publishes new terms in the same file, the next number and a new text
-    fx.writeFile("news", "disclaimer", "terms.yaml", file({ version: 2, text: "New terms" }));
+    fx.writeEntry("news", "disclaimer/terms.yaml", "disclaimer", file({ version: 2, text: "New terms" }));
     const summary = await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(summary.updated, 0, JSON.stringify(summary));
-    assert.match(summary.refused[0].reasons[0], /it renames '1' to '2', but a version keeps its number: add a new file/);
+    assert.match(summary.refused[0].reasons[0], /it renames '1' to '2', but a version keeps its number: add a new entry/);
     assert.deepEqual(fx.state.tables.disclaimer_versions.map((r) => [r.version, r.text]), [[1, "Be nice"]]);
     assert.equal(acceptances[1], 5);
     // the same pull again : still refused, nothing changed
     assert.equal((await RepoObjects.syncRepository(await desc("disclaimer"), "news")).updated, 0);
-    // as a new file : made
-    fx.writeFile("news", "disclaimer", "terms.yaml", file({ enabled: false }));
-    fx.writeFile("news", "disclaimer", "terms-2.yaml", file({ version: 2, text: "New terms" }));
+    // as a new entry, in the same file : made
+    fx.writeEntry("news", "disclaimer/terms.yaml", "disclaimer", [file({ enabled: false }), file({ version: 2, text: "New terms" })]);
     const made = await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(made.created, 1, JSON.stringify(made));
     assert.deepEqual(made.refused, []);

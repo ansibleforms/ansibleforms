@@ -1,12 +1,13 @@
-// A schedule file of a schedules repository (lib/scheduleFiles.js) : one schedule in YAML, in the
-// export form (foreign keys as natural keys, credentials under related, its own natural_key), the
-// module form (names instead of natural keys) or a controller_schedules list of one. Read into what
-// AnsibleForms runs, refused where it is not a valid schedule, and written back with everything the
-// file says kept.
+// A schedule of a schedules repository (lib/scheduleFiles.js) : an entry of a schedules: list in any
+// YAML file of the repository, in the export form (foreign keys as natural keys, credentials under
+// related, its own natural_key) or the module form (names instead of natural keys). Read into what
+// AnsibleForms runs, refused where it is not a valid schedule, and written back with everything its
+// entry and its file say kept.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
 import YAML from "yaml";
-import { parseScheduleFile, updateScheduleFile, newScheduleFile, fileNameFor, launchOptionsOf } from "../src/lib/scheduleFiles.js";
+import { parseSchedule, updateScheduleText, newScheduleEntry, scheduleEntryOf, launchOptionsOf } from "../src/lib/scheduleFiles.js";
+import { appendListEntries } from "../src/lib/repoObjects/yamlFile.js";
 
 // one schedule in the export form : its template, inventory and execution environment as natural
 // keys, its credentials under related, and its own natural key
@@ -93,25 +94,14 @@ labels:
 timeout: 10
 `;
 
-// a controller_schedules list of one item
-const CONTROLLER = `---
-controller_schedules:
-  - name: ExampleOrg CasC_Objects_Cleanup
-    description: CasC_Ojbects_Cleanup
-    unified_job_template: ExampleOrg CasC_JobTemplates_AAP_Desired_State
-    rrule: DTSTART;TZID=Europe/Madrid:20220127T163000 RRULE:INTERVAL=1;FREQ=DAILY
-    job_tags: desired_state
-    enabled: false
-    extra_data:
-      ansible_python_interpreter: /usr/bin/python3
-      env: dev
-    organization: ExampleOrg
-...
-`;
+// a schedule's text as the only entry of a file's schedules: list, and a schedule of a text
+const asFile = (text) => `schedules:\n${text.trimEnd().split("\n").map((l, i) => (i === 0 ? `  - ${l}` : l ? `    ${l}` : l)).join("\n")}\n`;
+const parse = (text) => parseSchedule(YAML.parse(text));
+const entryIn = (text, i = 0) => YAML.parse(text).schedules[i];
 
 describe("reading a schedule file", () => {
   test("the export's object : its template's name is the form, its prompts are the job's reserved extra vars", () => {
-    const { errors, schedule } = parseScheduleFile(EXPORTED);
+    const { errors, schedule } = parse(EXPORTED);
     assert.deepEqual(errors, []);
     assert.equal(schedule.name, "Nightly log rotation");
     assert.equal(schedule.form, "Nightly Workflow");
@@ -130,7 +120,7 @@ describe("reading a schedule file", () => {
   });
 
   test("the module's options : names instead of natural keys, every prompt mapped or kept", () => {
-    const { errors, schedule } = parseScheduleFile(MODULE);
+    const { errors, schedule } = parse(MODULE);
     assert.deepEqual(errors, []);
     assert.equal(schedule.form, "Demo Job Template");
     assert.deepEqual(schedule.launchOptions, {
@@ -150,15 +140,12 @@ describe("reading a schedule file", () => {
     assert.deepEqual(schedule.ignored.sort(), ["forks", "job_slice_count", "labels", "timeout"]);
   });
 
-  test("a controller_schedules list of one, and an export's schedules list of one", () => {
-    const one = parseScheduleFile(CONTROLLER);
-    assert.deepEqual(one.errors, []);
-    assert.equal(one.schedule.name, "ExampleOrg CasC_Objects_Cleanup");
-    assert.equal(one.schedule.enabled, false);
-    // an export writes { schedules: [...] } around them
-    const exported = parseScheduleFile(YAML.stringify({ schedules: [YAML.parse(EXPORTED)] }));
-    assert.deepEqual(exported.errors, []);
-    assert.equal(exported.schedule.form, "Nightly Workflow");
+  test("several schedules in one file, beside other keys : each read from its entry", () => {
+    const text = `${asFile(EXPORTED)}${asFile(MODULE).replace("schedules:\n", "")}credentials:\n  - name: other\n`;
+    assert.equal(YAML.parse(text).schedules.length, 2);
+    assert.equal(parseSchedule(entryIn(text, 0)).schedule.form, "Nightly Workflow");
+    assert.equal(parseSchedule(entryIn(text, 1)).schedule.form, "Demo Job Template");
+    assert.equal(scheduleEntryOf(text, "SCHED2").name, "sched2", "found by its name, case aside");
   });
 
   test("job_type check is a check run", () => {
@@ -166,16 +153,16 @@ describe("reading a schedule file", () => {
   });
 
   test("state: absent holds no schedule", () => {
-    const parsed = parseScheduleFile("name: gone\nstate: absent\n");
+    const parsed = parseSchedule({ name: "gone", state: "absent" });
     assert.equal(parsed.absent, true);
     assert.equal(parsed.schedule, null);
   });
 });
 
-describe("a file that is not a valid schedule is refused, saying why", () => {
+describe("an entry that is not a valid schedule is refused, saying why", () => {
   const base = { name: "x", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1", unified_job_template: { name: "Form" } };
   const refused = (obj, reason) => {
-    const parsed = parseScheduleFile(typeof obj === "string" ? obj : YAML.stringify(obj));
+    const parsed = parseSchedule(obj);
     assert.equal(parsed.schedule, null, "refused");
     assert.ok(parsed.errors.some((e) => e.includes(reason)), `${parsed.errors.join(" | ")} says ${reason}`);
   };
@@ -191,15 +178,14 @@ describe("a file that is not a valid schedule is refused, saying why", () => {
   test("negative forks", () => refused({ ...base, forks: -1 }, "forks must be"));
   test("credentials that are no list", () => refused({ ...base, credentials: "one" }, "credentials must be a list"));
   test("enabled that is no yes or no", () => refused({ ...base, enabled: "sometimes" }, "enabled must be true or false"));
-  test("more than one schedule in a file", () => refused({ controller_schedules: [base, { ...base, name: "y" }] }, "one schedule per file"));
-  test("not YAML", () => refused("name: [unclosed", "not valid YAML"));
-  test("not a dictionary", () => refused("- a\n- b\n", "not a schedule"));
+  test("not a dictionary", () => refused(["a", "b"], "a schedule must be a dictionary"));
 });
 
-describe("writing a schedule file", () => {
+describe("writing a schedule entry", () => {
   test("nothing changed : the file stays byte for byte", () => {
-    const { schedule } = parseScheduleFile(EXPORTED);
-    const text = updateScheduleFile(EXPORTED, {
+    const { schedule } = parse(EXPORTED);
+    const file = asFile(EXPORTED);
+    const text = updateScheduleText(file, schedule.name, {
       name: schedule.name,
       description: schedule.description,
       rrule: schedule.rrule,
@@ -207,34 +193,35 @@ describe("writing a schedule file", () => {
       form: schedule.form,
       extraData: schedule.extraData,
     });
-    assert.equal(text, EXPORTED);
+    assert.equal(text, file);
   });
 
   test("a rrule written on several lines stays so while it does not change", () => {
-    const source = `name: Nightly
+    const source = asFile(`name: Nightly
 unified_job_template: Nightly Workflow
 rrule: |
   DTSTART;TZID=Europe/Brussels:20261020T020000
   RRULE:FREQ=DAILY;INTERVAL=1
-`;
+`);
     // the app sends it back on one line, as it keeps it, with the field it changed
-    const { schedule } = parseScheduleFile(source);
-    const text = updateScheduleFile(source, { name: "Nightly rotation", rrule: schedule.rrule });
-    assert.equal(text, source.replace("name: Nightly\n", "name: Nightly rotation\n"));
+    const { schedule } = parseSchedule(entryIn(source));
+    const text = updateScheduleText(source, "Nightly", { name: "Nightly rotation", rrule: schedule.rrule });
+    assert.equal(text, source.replace("  - name: Nightly\n", "  - name: Nightly rotation\n"));
     // changed, it is written
-    const changed = updateScheduleFile(source, { rrule: "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1" });
-    assert.equal(YAML.parse(changed).rrule, "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1");
+    const changed = updateScheduleText(source, "Nightly", { rrule: "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1" });
+    assert.equal(entryIn(changed).rrule, "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1");
   });
 
-  test("an edit changes those keys only : prompts, unknown keys, comments and the order are kept", () => {
+  test("an edit changes those keys only : prompts, unknown keys, comments, the order and the other entries are kept", () => {
+    const other = "  - name: Other\n    unified_job_template: Report\n    rrule: DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1\n";
     const source = `# kept by the platform team
-name: Nightly
+${asFile(`name: Nightly
 custom_note: keep me # an AnsibleForms-unknown key
 unified_job_template: Nightly Workflow
 forks: 5
 rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
-`;
-    const text = updateScheduleFile(source, {
+`)}${other}`;
+    const text = updateScheduleText(source, "Nightly", {
       name: "Nightly rotation",
       rrule: "DTSTART;TZID=Europe/Brussels:20261020T030000 RRULE:FREQ=DAILY;INTERVAL=1",
       enabled: false,
@@ -245,7 +232,8 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
     assert.ok(text.startsWith("# kept by the platform team\n"));
     assert.ok(text.includes("custom_note: keep me # an AnsibleForms-unknown key"));
     assert.ok(text.includes("forks: 5"));
-    const obj = YAML.parse(text);
+    assert.ok(text.endsWith(other), "the other entry byte for byte");
+    const obj = entryIn(text);
     assert.equal(obj.name, "Nightly rotation");
     // the module's shape is kept : the template stays a name
     assert.equal(obj.unified_job_template, "Other Form");
@@ -256,8 +244,8 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
   });
 
   test("the export's natural keys follow the name and the form", () => {
-    const text = updateScheduleFile(EXPORTED, { name: "Renamed", form: "Another Form" });
-    const obj = YAML.parse(text);
+    const text = updateScheduleText(asFile(EXPORTED), "Nightly log rotation", { name: "Renamed", form: "Another Form" });
+    const obj = entryIn(text);
     assert.equal(obj.unified_job_template.name, "Another Form");
     assert.equal(obj.unified_job_template.type, "workflow_job_template");
     assert.equal(obj.natural_key.name, "Renamed");
@@ -267,15 +255,14 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
     assert.equal(obj.limit, "webservers");
   });
 
-  test("a schedule in a controller_schedules list stays in it", () => {
-    const text = updateScheduleFile(CONTROLLER, { enabled: true });
-    const obj = YAML.parse(text);
-    assert.equal(obj.controller_schedules.length, 1);
-    assert.equal(obj.controller_schedules[0].enabled, true);
-    assert.equal(obj.controller_schedules[0].organization, "ExampleOrg");
+  test("an entry no file holds : added whole when given, the file left as it is otherwise", () => {
+    const file = asFile(EXPORTED);
+    assert.equal(updateScheduleText(file, "Missing", { enabled: false }), file);
+    const added = updateScheduleText(file, "Missing", {}, newScheduleEntry({ name: "Missing", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1", form: "Report" }));
+    assert.deepEqual(YAML.parse(added).schedules.map((e) => e.name), ["Nightly log rotation", "Missing"]);
   });
 
-  test("a new file : the export's form, nothing of AnsibleForms' own, read back the same (round trip)", () => {
+  test("a new entry : the export's form, nothing of AnsibleForms' own, read back the same (round trip)", () => {
     const values = {
       name: "Weekly report",
       description: "",
@@ -284,31 +271,19 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
       form: "Report",
       extraData: { to: "ops@example.com" },
     };
-    const text = newScheduleFile(values);
-    const obj = YAML.parse(text);
+    const text = appendListEntries("", "schedules", [newScheduleEntry(values)]);
+    const obj = entryIn(text);
     assert.deepEqual(Object.keys(obj), ["name", "description", "extra_data", "unified_job_template", "enabled", "rrule", "natural_key"]);
     assert.deepEqual(obj.unified_job_template, { name: "Report", type: "job_template" });
     assert.deepEqual(obj.natural_key, { name: "Weekly report", type: "schedule", unified_job_template: { name: "Report", type: "job_template" } });
     assert.ok(!/\b(user|cron|owner|repository)\b:/.test(text), "no AnsibleForms field");
     // the rrule on one line
     assert.ok(text.includes("rrule: DTSTART;TZID=Europe/Brussels:20261020T060000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO\n"));
-    const back = parseScheduleFile(text).schedule;
+    const back = parseSchedule(entryIn(text)).schedule;
     assert.equal(back.name, values.name);
     assert.equal(back.form, values.form);
     assert.deepEqual(back.extraData, values.extraData);
     // and saved again unchanged, byte for byte
-    assert.equal(updateScheduleFile(text, { name: back.name, form: back.form, rrule: back.rrule, enabled: true, extraData: back.extraData }), text);
-  });
-});
-
-describe("a new schedule's file name", () => {
-  test("its name in lower case, dashes between the words", () => {
-    assert.equal(fileNameFor("Nightly Log Rotation!"), "nightly-log-rotation.yaml");
-    assert.equal(fileNameFor("Café équipe"), "cafe-equipe.yaml");
-    assert.equal(fileNameFor("***"), "schedule.yaml");
-  });
-  test("a number added when the name is taken", () => {
-    const taken = new Set(["nightly.yaml", "nightly-2.yaml"]);
-    assert.equal(fileNameFor("Nightly", (f) => taken.has(f)), "nightly-3.yaml");
+    assert.equal(updateScheduleText(text, back.name, { name: back.name, form: back.form, rrule: back.rrule, enabled: true, extraData: back.extraData }), text);
   });
 });

@@ -81,7 +81,7 @@ const update = async function (req, res) {
       // a setting that cannot be sent as it is (extra headers) : say which, do not store it
       return res.status(400).json(RestResultv2.error(i18n.t(req, 'resources.failedUpdateChatSettings'), err.message));
     }
-    // the chat assistant repository's chat-assistant.yaml, before : its changed fields written into it after
+    // the chat assistant repository's chat_assistant: map, before : its changed fields written into it after
     // under its repository's write claim, taken first (RepoObjects.holding)
     await RepoObjects.holding('chat_assistant', async () => {
       const before = await RepoObjects.snapshot('chat_assistant');

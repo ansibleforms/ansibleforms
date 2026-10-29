@@ -1,6 +1,7 @@
 'use strict';
 // The repository-backed objects, as the rest of the app uses them : the engine
-// (lib/repoObjects/engine.js) by type key. A controller tells it what the app saved (appCreated,
+// (lib/repoObjects/engine.js) by type key, each type kept in the entries its key gives in a
+// repository's files (lib/repoObjects/repoFiles.js). A controller tells it what the app saved (appCreated,
 // appUpdated, appDeleted) ; the repository model tells it what git and the usage flags changed.
 // A save is wrapped in the write claim of the repository it writes to (holding), taken before the
 // database changes : a repository a pull or a push holds is waited for a while, then the save is
@@ -87,7 +88,7 @@ const RepoObjects = {
   appCreated: (key, id) => appStep(key, "a new object", (desc) => Engine.appCreated(desc, id)),
 
   /**
-   * An object of a type edited in the app : its file rewritten where its fields changed.
+   * An object of a type edited in the app : its entry rewritten where its fields changed.
    *
    * Args:
    *   key (string): the type.
@@ -100,20 +101,20 @@ const RepoObjects = {
   appUpdated: (key, before, id) => appStep(key, "an edit", (desc) => Engine.appUpdated(desc, before, id)),
 
   /**
-   * An object of a type deleted in the app : its file removed.
+   * An object of a type deleted in the app : its entry removed.
    *
    * Args:
    *   key (string): the type.
    *   before (object): the object as it was (its repository and file).
    *
    * Returns:
-   *   Promise<boolean|null>: whether a file was removed.
+   *   Promise<boolean|null>: whether an entry was removed.
    */
   appDeleted: (key, before) => appStep(key, "a delete", (desc) => Engine.appDeleted(desc, before)),
 
   /**
-   * A single-file type's object as the app holds it now (the chat's, the settings', the
-   * defaults'), before an edit : what appUpdated compares the saved one with. Null when the type
+   * The object of a type the app has one of as the app holds it now (the chat's, the settings',
+   * the defaults'), before an edit : what appUpdated compares the saved one with. Null when the type
    * has no repository (nothing to write then).
    *
    * Args:
@@ -125,7 +126,7 @@ const RepoObjects = {
   async snapshot(key) {
     try {
       const desc = await descriptorOf(key);
-      if (!desc.file || !(await Engine.activeRepository(desc))) return null;
+      if (!desc.single || !(await Engine.activeRepository(desc))) return null;
       return await desc.current();
     } catch (e) {
       logger.error(`The ${key} could not be read before an edit: ${e.message || e}`);
@@ -134,7 +135,7 @@ const RepoObjects = {
   },
 
   /**
-   * Several single-file types' objects before an edit (snapshot each).
+   * Several objects of types the app has one of, before an edit (snapshot each).
    *
    * Args:
    *   keys (string[]): the types.
@@ -149,7 +150,7 @@ const RepoObjects = {
   },
 
   /**
-   * Several single-file types edited in the app : each one's file written (appUpdated).
+   * Several types the app has one of, edited in the app : each one's map written (appUpdated).
    *
    * Args:
    *   befores (object): { <type>: its object before the edit } (snapshots).
@@ -164,10 +165,10 @@ const RepoObjects = {
   },
 
   /**
-   * Where a type kept in one file is (the defaults', the settings', the chat assistant's ...) :
-   * the repository holding it and its file, for the Repository line of its page - read with the
-   * settings (controllers/v2/settings.controller.js), so a page shows it without reading the
-   * repositories.
+   * Where a type the app has one of is (the defaults', the settings', the chat assistant's ...) :
+   * the repository holding it and the file giving its key (the one it would be written to when none
+   * does), for the Repository line of its page - read with the settings
+   * (controllers/v2/settings.controller.js), so a page shows it without reading the repositories.
    *
    * Args:
    *   key (string): the type (defaults).
@@ -179,9 +180,8 @@ const RepoObjects = {
   async singleSource(key) {
     try {
       const desc = await descriptorOf(key);
-      if (!desc.file) return null;
-      const repository = await Engine.activeRepository(desc);
-      return repository ? { repository, repo_file: desc.file } : null;
+      if (!desc.single) return null;
+      return await Engine.singleSourceOf(desc);
     } catch (e) {
       logger.error(`The repository of the ${key} could not be read: ${e.message || e}`);
       return null;
@@ -210,7 +210,7 @@ const RepoObjects = {
   /**
    * A change in the app that may touch several objects of a type (a label or an LDAP directory
    * moved : every place numbered again ; a disclaimer version enabled, added or deleted) : each
-   * new object written to the type's repository, each linked one's file rewritten where it
+   * new object written to the type's repository, each linked one's entry rewritten where it
    * changed, each linked one gone removed.
    *
    * Args:
@@ -230,7 +230,7 @@ const RepoObjects = {
       else if (old.repository) await RepoObjects.appUpdated(key, old, row.id);
     }
     // gone by itself (an announcement the app removes once it has ended : descriptor.notImported) : its
-    // file stays in git as it is, a pull skips it
+    // entry stays in git as it is, a pull skips it
     const desc = await descriptorOf(key);
     for (const old of before || []) {
       if (now.has(String(old.id)) || !old.repository) continue;

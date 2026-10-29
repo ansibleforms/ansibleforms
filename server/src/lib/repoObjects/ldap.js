@@ -1,10 +1,10 @@
 'use strict';
-// The LDAP type of the repository-backed objects (lib/repoObjects/engine.js) : one LDAP directory
-// per YAML file in a repository's `ldap` folder, in the config seed's format (its ldap section,
+// The LDAP type of the repository-backed objects (lib/repoObjects/engine.js) : the LDAP directories
+// of the ldap: lists of a repository's files, in the config seed's format (its ldap section,
 // with the directory's name, place and domains : lib/seed-schema.js ldapDirectoryItem). It names its
 // ldap credential by name : a directory whose credential is not there yet waits, and is read again
 // when the credentials are next pulled. Its bind password, if any, is an ${ENV} reference only.
-// The main directory keeps its rules : it is never deleted nor renamed, so its file removed is
+// The main directory keeps its rules : it is never deleted nor renamed, so its entry removed is
 // refused while it is linked. The directories keep their lookup order (position).
 import Ldap from "../../models/ldap.model.js";
 import { DEFAULT_NAME } from "../ldapDirectories.js";
@@ -21,7 +21,6 @@ const LdapModel = {
 
 export default seedType({
   key: "ldap",
-  folder: "ldap",
   section: ldapDirectoryItem,
   model: "ldap",
   Model: LdapModel,

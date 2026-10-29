@@ -1,14 +1,14 @@
 'use strict';
-// The schedules of the schedules repository (use_for_schedules) : one schedule per file in a
-// repository's `schedules` folder, as YAML (lib/scheduleFiles.js), timed by its iCal rrule
+// The schedules of the schedules repository (use_for_schedules) : the entries of the schedules:
+// lists of its YAML files, any name, any folder (lib/scheduleFiles.js), timed by its iCal rrule
 // (lib/scheduleRrule.js), run as the Schedule Service as every recurring schedule.
 //
 // The Schedules type of the repository-backed objects : the engine (lib/repoObjects/engine.js)
-// reads the files into the schedule table after each pull, takes the app's recurring schedules
+// reads the entries into the schedule table after each pull, takes the app's recurring schedules
 // when a repository is made the schedules repository and lets them go, unlinked, when it is no
 // longer one ; the type's descriptor (lib/repoObjects/schedules.js) says how a file reads and a row
 // is stored. What is the schedules' own stays here : a schedule made, edited or deleted in the app
-// is checked as a schedule (its form, its rrule, a cron written as a rrule) and saved into its file
+// is checked as a schedule (its form, its rrule, a cron written as a rrule) and saved into its entry
 // under the repository's write claim, the file put back when the database refuses it.
 //
 // The scheduler always runs from the database ; the repository is a source kept in step with it.
@@ -20,11 +20,11 @@ import mysql from "./db.model.js";
 import CrudModel from "./crud.model.js";
 import Repo from "./repo.model.js";
 import Errors from "../lib/errors.js";
-import { parseScheduleFile, updateScheduleFile, newScheduleFile, extraDataOf } from "../lib/scheduleFiles.js";
+import { parseSchedule, updateScheduleText, newScheduleEntry, scheduleEntryOf, extraDataOf } from "../lib/scheduleFiles.js";
 import { validateRruleAsync, normalizeRrule } from "../lib/scheduleRrule.js";
 import { cronToRrule } from "../lib/cronToRrule.js";
 import logConfig from "../../config/log.config.js";
-import Engine, { withWriteClaim, fileOf, writeNewFile, nameKey } from "../lib/repoObjects/engine.js";
+import Engine, { withWriteClaim, fileOf, targetFileOf, writeEntries, entryFileOf, removeEntry, nameKey } from "../lib/repoObjects/engine.js";
 import schedules, { extraVarsText, launchOptionsText, formNames, valuesOf } from "../lib/repoObjects/schedules.js";
 
 const MODEL = "schedule";
@@ -38,7 +38,7 @@ const ScheduleRepo = {
   repositories: () => Engine.repositories(schedules),
   // the schedules repository, if there is one (there is one at most)
   activeRepository: () => Engine.activeRepository(schedules),
-  // a repository's schedules folder read into the schedule table
+  // a repository's schedules: entries read into the schedule table
   syncRepository: (name, opts) => Engine.syncRepository(schedules, name, opts),
   // what a sync did, as lines for the pull output
   summaryText: (summary) => Engine.summaryText(schedules, summary),
@@ -50,7 +50,7 @@ const ScheduleRepo = {
   unlinkRepository: (name) => Engine.unlinkRepository(schedules, name),
   // what making a repository the schedules repository would do, changing nothing
   preview: (name) => Engine.preview(schedules, name),
-  // made the schedules repository : pulled, its files read in, the app's schedules written to it
+  // made the schedules repository : pulled, its entries read in, the app's schedules written to it
   activate: (name, opts) => Engine.activate(schedules, name, opts),
   // no longer one : pulled once more, read in, its schedules unlinked
   deactivate: (name, opts) => Engine.deactivate(schedules, name, opts),
@@ -138,8 +138,9 @@ function cronRrule(cron) {
 }
 
 /**
- * Makes a schedule in a schedules repository : a new YAML file in its schedules folder, the
- * export form of one schedule, named after the schedule, and its row ; pushed with the repository's Push.
+ * Makes a schedule in a schedules repository : a new entry, the export form of one schedule, at the
+ * end of the first file holding schedules: (else schedules.yaml, made), and its row ; pushed with
+ * the repository's Push.
  *
  * Args:
  *   repository (string): the repository.
@@ -169,9 +170,12 @@ ScheduleRepo.create = async function (repository, data) {
   };
   const { extraData } = await checkValues(values, null);
   return withWriteClaim(repository, async () => {
-    const text = newScheduleFile({ ...values, extraData });
-    const parsed = parseScheduleFile(text);
-    const file = writeNewFile(schedules, repository, values.name, text);
+    const entry = newScheduleEntry({ ...values, extraData });
+    const parsed = parseSchedule(structuredClone(entry));
+    const file = targetFileOf(schedules, repository);
+    const abs = fileOf(repository, file);
+    const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
+    writeEntries(schedules, repository, file, [entry]);
     try {
       const res = await mysql.do(
         "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, enabled, extra_vars, launch_options, repository, repo_file, one_time_run, state) VALUES (?,?,?,?,?,?,?,?,?,0,'idle')",
@@ -181,17 +185,19 @@ ScheduleRepo.create = async function (repository, data) {
       logger.info(`Created schedule '${values.name}' in ${repository}/${file}`);
       return res.insertId;
     } catch (e) {
-      // no file left behind for a schedule that was not made
-      fs.rmSync(fileOf(schedules, repository, file), { force: true });
+      // no entry left behind for a schedule that was not made
+      if (before === null) fs.rmSync(abs, { force: true });
+      else fs.writeFileSync(abs, before, "utf8");
       throw e;
     }
   });
 };
 
 /**
- * Saves the edit of a repository's schedule into its file - only the fields changed, the rest of
- * the file (its prompts, the keys AnsibleForms does not use, its comments) kept - and its row.
- * A file that is gone meanwhile is written again, whole.
+ * Saves the edit of a repository's schedule into its entry, where it is now - only the fields
+ * changed, the rest of the file (its prompts, the keys AnsibleForms does not use, its comments, the
+ * file's other keys and entries) kept - and its row. An entry gone meanwhile is written again,
+ * whole, in the file it is linked to.
  *
  * Args:
  *   row (object): the schedule as it is.
@@ -203,7 +209,7 @@ ScheduleRepo.create = async function (repository, data) {
  *   Promise<void>
  *
  * Raises:
- *   Errors.BadRequestError: a value refused, or a file that is not a valid schedule any more.
+ *   Errors.BadRequestError: a value refused, or an entry that is not a valid schedule any more.
  *   Errors.ConflictError: the name of another schedule.
  */
 ScheduleRepo.update = async function (row, data) {
@@ -221,7 +227,7 @@ ScheduleRepo.update = async function (row, data) {
   if (data.launch_options !== undefined) edits.launchOptions = data.launch_options ?? "";
   await withWriteClaim(row.repository, async () => {
     // the row read again under the claim : a pull that held it may have removed the schedule (its
-    // file gone from git) or moved it, and its file must not be written back for it
+    // entry gone from git) or moved it, and its entry must not be written back for it
     const fresh = (await mysql.do("SELECT * FROM AnsibleForms.`schedule` WHERE id = ?", [row.id]))?.[0];
     if (!fresh) throw new Errors.NotFoundError(`The schedule '${row.name}' is gone: a pull removed it meanwhile.`);
     if (fresh.repository !== row.repository || fresh.repo_file !== row.repo_file) {
@@ -229,29 +235,27 @@ ScheduleRepo.update = async function (row, data) {
     }
     // the options no prompt gives : the row's, or the edit's when it gives them
     const kept = { ...fresh, launch_options: edits.launchOptions ?? fresh.launch_options };
-    const abs = fileOf(schedules, fresh.repository, fresh.repo_file);
+    // its entry where it is now ; gone : written again, whole, in the file it is linked to
+    const file = entryFileOf(schedules, fresh.repository, fresh.name, fresh.repo_file) || fresh.repo_file;
+    const abs = fileOf(fresh.repository, file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
+    const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, rrule: fresh.rrule, enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
     let text;
-    if (before === null) {
-      const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, rrule: fresh.rrule, enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
-      text = newScheduleFile({ ...current, ...edits });
-    } else {
-      try {
-        text = updateScheduleFile(before, edits);
-      } catch (e) {
-        throw new Errors.BadRequestError(`The file ${fresh.repository}/${fresh.repo_file} is not a valid schedule: ${e.message}`);
-      }
+    try {
+      text = updateScheduleText(before ?? "", fresh.name, edits, newScheduleEntry({ ...current, ...edits }));
+    } catch (e) {
+      throw new Errors.BadRequestError(`The file ${fresh.repository}/${file} cannot hold the schedule: ${e.message}`);
     }
-    const parsed = parseScheduleFile(text);
+    const parsed = parseSchedule(scheduleEntryOf(text, edits.name ?? fresh.name));
     if (!parsed.schedule) {
-      throw new Errors.BadRequestError(`The file ${fresh.repository}/${fresh.repo_file} is not a valid schedule, fix it in git: ${parsed.errors.join("; ")}`);
+      throw new Errors.BadRequestError(`The schedule '${fresh.name}' of ${fresh.repository}/${file} is not a valid schedule, fix it in git: ${parsed.errors.join("; ")}`);
     }
     if (text !== before) fs.writeFileSync(abs, text, "utf8");
     const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, fresh.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same
@@ -260,12 +264,13 @@ ScheduleRepo.update = async function (row, data) {
       throw e;
     }
     CrudModel.changed(MODEL);
-    logger.info(`Saved schedule '${v.name}' into ${fresh.repository}/${fresh.repo_file}`);
+    logger.info(`Saved schedule '${v.name}' into ${fresh.repository}/${file}`);
   });
 };
 
 /**
- * Deletes a repository's schedule : its file, and its row ; pushed with the repository's Push.
+ * Deletes a repository's schedule : its entry (its file when it holds nothing more), and its row ;
+ * pushed with the repository's Push.
  *
  * Args:
  *   row (object): the schedule.
@@ -275,11 +280,10 @@ ScheduleRepo.update = async function (row, data) {
  */
 ScheduleRepo.delete = async function (row) {
   await withWriteClaim(row.repository, async () => {
-    const abs = fileOf(schedules, row.repository, row.repo_file);
-    fs.rmSync(abs, { force: true });
+    const file = removeEntry(schedules, row.repository, row.name, row.repo_file);
     await mysql.do("DELETE FROM AnsibleForms.`schedule` WHERE id = ?", [row.id]);
     CrudModel.changed(MODEL);
-    logger.info(`Deleted schedule '${row.name}' and its file ${row.repository}/${row.repo_file}`);
+    logger.info(`Deleted schedule '${row.name}' and its entry in ${row.repository}/${file || row.repo_file}`);
   });
 };
 

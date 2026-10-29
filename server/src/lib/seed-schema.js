@@ -183,7 +183,7 @@ export function foldAwxIntoRunners(doc) {
  * A repository's use_for_config (deprecated since 7.5.0, removed in 8) as the three flags it is
  * now : use_for_roles, use_for_categories and use_for_constants, each the item's own when it
  * declares it. The one rule for the config seed's repositories (foldConfigFlag) and a
- * repositories.yaml's entries (lib/repoObjects/repositories.js).
+ * repositories: entries of a repository (lib/repoObjects/repositories.js).
  *
  * Args:
  *   item (object): the repository as declared.
@@ -651,7 +651,7 @@ export const ldapDirectoryItem = {
   },
 };
 
-// The chat assistant's settings as a repository holds them (lib/repoObjects/chatAssistant.js, chat-assistant.yaml) :
+// The chat assistant's settings as a repository holds them (lib/repoObjects/chatAssistant.js, its chat_assistant: map) :
 // the chat section's fields, none required - a file declares what it owns, its api key left out
 // when the app's stays in the database
 export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);
@@ -664,7 +664,7 @@ export const chatFileItem = (({ required: _all, ...section }) => section)(chatSe
 const appearanceSection = (properties) => ({ type: "object", additionalProperties: false, properties });
 
 // Settings > Appearance > Defaults : the theme and its colour, the forms view, the time zone, the
-// date format, the language (defaults.yaml, the seed's defaults section)
+// date format, the language (a repository's defaults: map, the seed's defaults section)
 export const defaultsSection = appearanceSection({
   default_theme: { type: "string", enum: ["system", "light", "dark"] },
   default_theme_color: str,
@@ -675,12 +675,12 @@ export const defaultsSection = appearanceSection({
 });
 
 // Settings > Appearance > Logo and Icon : an image file's path, relative to the seed file (or the
-// repository's logo.yaml, icon.yaml), read as binary and checked as an upload is ; empty : the
+// repository's logo: and icon: maps), read as binary and checked as an upload is ; empty : the
 // bundled one
 export const logoSection = appearanceSection({ logo: str });
 export const iconSection = appearanceSection({ icon: str });
 
-// Settings > Appearance > Name : the app's name (name.yaml, the seed's name section)
+// Settings > Appearance > Name : the app's name (a repository's name: map, the seed's name section)
 export const nameSection = appearanceSection({ app_name: str });
 
 // The header's links (Settings > Appearance > Links) : its own links and whether the Designer's
@@ -697,7 +697,7 @@ export const linksSection = appearanceSection({
 export const APPEARANCE_SECTIONS = { defaults: defaultsSection, logo: logoSection, icon: iconSection, name: nameSection, links: linksSection };
 
 // The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
-// their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as an mcp.yaml holds them.
+// their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as a repository's mcp: map holds them.
 // What the seed declares is its own, variable by variable, as the Appearance pages' fields
 // (lib/seedManaged.js) ; each checked as the page's Save checks it when applied.
 export const mcpSection = {

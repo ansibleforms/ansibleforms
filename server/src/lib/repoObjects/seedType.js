@@ -1,13 +1,14 @@
 'use strict';
-// The descriptor of an object type whose files are in the config seed's format (lib/seed-schema.js)
-// - the credentials, the runners, and the types of the later versions : one item of the seed's
-// section per file, so a seed item and a repository file are interchangeable. Read and checked as
+// The descriptor of an object type whose entries are in the config seed's format (lib/seed-schema.js)
+// - the credentials, the runners, and the types of the later versions : each entry of its list in a
+// repository's files (credentials: [...]) one item of the seed's section, so a seed item and a
+// repository entry are interchangeable. Read and checked as
 // the seed checks its items, ${ENV} references resolved as the seed resolves them (the secret rule,
 // lib/repoObjects/secrets.js), compared with the row as the seed compares (lib/seedCompare.js), and
 // written through the type's model, as a save from the app.
 //
 // A type says only what is its own : its section, its model, its secret fields, what it names, the
-// fields its files leave out, and why an object of the app stays in the app.
+// fields its entries leave out, and why an object of the app stays in the app.
 import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import { differs } from "../seedCompare.js";
@@ -95,8 +96,9 @@ export const KEPT_REASONS = {
  *       version).
  *     notImported (function): (object) => why a file's object is not imported (an announcement already
  *       ended), or null : said in the pull output, never refused ; the app's object of it goes.
- *     listFile, listKey (string): its objects kept as a list in one file (repositories.yaml, its
- *       `repositories:` list) instead of a file each (the engine's list mode).
+ *     noKeyUnlinks (boolean): no file of the repository holding its key at all : its objects
+ *       unlinked and kept in the app, never deleted (the repositories : each one deleted would lose
+ *       its working copy) ; otherwise each one goes, as any entry gone.
  *     validate (function): (object) => what the type refuses of an object besides the schema (a
  *       secret in an address) : string[].
  *     adjust (function): async (object, repository) => { object, notes } - what a file's object
@@ -104,7 +106,7 @@ export const KEPT_REASONS = {
  *     notCompared (string[]): the fields a file gives that are no field of the object (a
  *       disclaimer's ask_again : how a changed text is applied) : never compared.
  *     renameRefused (string): why its objects never change their name (a disclaimer version keeps
- *       its number) : a linked file giving another name is refused with it, its object kept.
+ *       its number) : an entry renamed in its file is refused with it, its object kept.
  *     oneOnly (object[]): the yes or no fields one object at most has on (lib/repoObjects/engine.js
  *       oneOnlyClashes) : [{ field, label (what it makes the object : the default), by (the field
  *       each one is per : a runner's type), when ((object) => whether the rule is the object's) }].
@@ -133,22 +135,21 @@ export function seedType(spec) {
     key,
     flag: typeOf(key).flag,
     model,
-    folder: spec.folder || key,
     title: spec.title,
     noun: spec.noun,
     secrets,
     references,
     keyOrder: fields.keys,
-    // the field a file names its object by (a disclaimer version's number) : the name a refused
-    // file declares (lib/repoObjects/engine.js declaredName)
+    // the field an entry names its object by (a disclaimer version's number) : what it is found by,
+    // and the name a refused entry declares (lib/repoObjects/engine.js declaredName)
     nameField: spec.nameColumn || "name",
-    listFile: spec.listFile,
-    listKey: spec.listKey,
-    // an object as the seed (or a file) declares it, checked (lib/repoObjects/fields.js), then what
-    // the type refuses besides
+    noKeyUnlinks: !!spec.noKeyUnlinks,
+    // an object as the seed (or an entry) declares it, checked (lib/repoObjects/fields.js), then
+    // what the type refuses besides
     check: (raw, opts) => withRules(fields.check(raw, opts)),
-    parse: (text) => {
-      const parsed = fields.parse(text);
+    // an entry of a file : checked, state: absent holding no object
+    parseEntry: (raw) => {
+      const parsed = fields.read(raw);
       return parsed.object ? { ...parsed, ...withRules(parsed) } : parsed;
     },
     adjust: spec.adjust,
@@ -197,7 +198,7 @@ export function seedType(spec) {
     },
 
     /**
-     * An object of the app as a repository would take it : its file's fields (without its
+     * An object of the app as a repository would take it : its entry's fields (without its
      * secrets), or why it stays in the app. One without a name (an announcement made in the app)
      * is written with the one nameFor gives it, made unique among the names taken (a suffix : the
      * second "Planned maintenance" is "Planned maintenance (2)") - a pull finds each by its name.
@@ -218,16 +219,16 @@ export function seedType(spec) {
       return { row: named, named: named !== row, ...fields.toFile(named) };
     },
 
-    newFileText: (c) => fields.newText(c.object),
-    // linked to its file ; a name given for the file kept by the object too
+    // its new entry : its fields, in the seed's order
+    entryOf: (c) => c.object,
+    // linked to its file ; a name given for its entry kept by the object too
     linkCandidate: async (c, name, file) => {
       await links.link(c.row.id, name, file);
       if (c.named) await Model.update({ name: c.row.name }, c.row.id, FROM_REPO);
     },
 
-    // an app edit : only the fields it changed (lib/repoObjects/fields.js editText)
-    fileEdits: (text, row, before) => fields.editText(text, row, before),
-    // the same, as the edits of its entry in a list file (the list mode)
+    // an app edit : only the fields it changed, written into its entry (lib/repoObjects/fields.js
+    // editsOf)
     entryEdits: (row, before) => fields.editsOf(row, before),
 
     usersOf: spec.usersOf,

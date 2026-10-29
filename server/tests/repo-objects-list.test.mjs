@@ -1,6 +1,6 @@
-// The Repositories type (lib/repoObjects/repositories.js) : the other repositories in a
-// repository's repositories.yaml, the engine's list mode (one file, a list of entries found by
-// their name), on the shared fixture. Its guard rails : the holder never in its own file, no
+// The Repositories type (lib/repoObjects/repositories.js) : the other repositories, the entries of
+// the repositories: lists of a repository's files (repositories.yaml here), each found by its name,
+// on the shared fixture. Its guard rails : the holder never in its own file, no
 // chains, a usage another repository holds refused, a credential waited for, an entry gone deleting
 // its repository as the app does - never one with changes not pushed yet -, no secret in the file.
 import { test, describe, beforeEach, vi } from "vitest";
@@ -124,8 +124,8 @@ describe("a pull of repositories.yaml", () => {
     fs.writeFileSync(outside, YAML.stringify({ repositories: [entry("planted")] }));
     fs.mkdirSync(path.join(fx.ROOT, "hub"), { recursive: true });
     fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
-    const out = await RepoObjects.syncText(await desc(), "hub");
-    assert.match(out, /not synchronized/);
+    const out = await RepoObjects.afterGit("hub", fx.rowNamed("repositories", "hub"));
+    assert.match(out, /Refused repositories\.yaml: a link that leads outside the repository: never read/);
     assert.equal(fx.rowNamed("repositories", "planted"), undefined);
   });
 
@@ -147,7 +147,7 @@ describe("a pull of repositories.yaml", () => {
     assert.equal(row.use_for_credentials, undefined);
     assert.equal(row.use_for_forms, true);
     const text = RepoObjects.summaryText(await desc(), summary);
-    assert.match(text, /repositories.yaml#forms: use_for_repositories refused: a repository of repositories.yaml cannot hold repositories itself/);
+    assert.match(text, /repositories.yaml#forms: use_for_repositories refused: a repository listed under repositories: cannot hold repositories itself/);
     assert.match(text, /repositories.yaml#forms: use_for_credentials refused: repository 'creds' holds the credentials already/);
   });
 
@@ -197,16 +197,20 @@ describe("a pull of repositories.yaml", () => {
   test("no repositories.yaml, or one that is no list : nothing changes", async () => {
     writeList([entry("forms")]);
     await RepoObjects.syncRepository(await desc(), "hub");
-    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "repositories: nope\n");
+    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "repositories:\n  name: forms\n");
     const broken = await RepoObjects.syncRepository(await desc(), "hub");
     assert.equal(broken.deleted, 0);
     assert.match(broken.refused[0].reasons[0], /'repositories' must be a list/);
+    assert.equal(fx.rowNamed("repositories", "forms").repository, "hub", "kept, still linked");
+    // a text under the key : no list of repositories, none given (unlinked, never deleted)
+    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "repositories: nope\n");
+    assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).deleted, 0);
     fs.rmSync(path.join(fx.ROOT, "hub", "repositories.yaml"));
     assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).deleted, 0);
     assert.ok(fx.rowNamed("repositories", "forms"));
   });
 
-  test("no repositories.yaml : its repositories unlinked, so an entry the app writes next never deletes the others", async () => {
+  test("no file giving repositories: : its repositories unlinked, so an entry the app writes next never deletes the others", async () => {
     fx.state.tables.repositories.push(
       { id: 5, name: "forms-a", uri: "https://git/a.git", branch: "main", description: "" },
       { id: 6, name: "forms-b", uri: "https://git/b.git", branch: "main", description: "" },
@@ -219,7 +223,7 @@ describe("a pull of repositories.yaml", () => {
     fx.cloneEmpty("hub");
     CrudModel.flushAllLocal();
     const text = await RepoObjects.afterGit("hub", { name: "hub", use_for_repositories: 1 }, { reset: true });
-    assert.match(text, /No repositories\.yaml in the repository: the app keeps the repositories as it has them, 2 no longer linked to it/);
+    assert.match(text, /No file of the repository gives repositories: - the app keeps the repositories as it has them, 2 no longer linked to it/);
     assert.equal(fx.rowNamed("repositories", "forms-a").repository, null);
     // one made in the app, pushed, then pulled : the others stay
     fx.state.tables.repositories.push({ id: 9, name: "new-one", uri: "https://git/n.git", branch: "main", description: "" });
@@ -242,7 +246,7 @@ describe("the question asked before it is turned on", () => {
     try {
       fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
       const p = await RepoObjects.preview(await desc(), "hub");
-      assert.match(p.refused[0].reasons[0], /'repositories\.yaml' is not a file/);
+      assert.deepEqual(p.refused, [{ file: "repositories.yaml", reasons: ["a link that leads outside the repository: never read"] }]);
       fx.state.tables.settings = [{ id: 1 }];
       fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "links.yaml"));
       const links = await RepoObjects.preview(await RepoObjects.descriptorOf("links"), "hub");
@@ -279,7 +283,8 @@ describe("the app's repositories to repositories.yaml", () => {
     await RepoObjects.appUpdated("repositories", before, 5);
     assert.equal(readList()[0].branch, "dev");
     await RepoObjects.appDeleted("repositories", fx.rowNamed("repositories", "forms"));
-    assert.deepEqual(readList(), []);
+    // its last entry : the file it empties goes
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "hub", "repositories.yaml")), false);
   });
 
   test("a new repositories.yaml lists its entries one below the other, never on one line", async () => {
@@ -336,11 +341,13 @@ describe("the app's repositories to repositories.yaml", () => {
       "syslog",
     ]);
     assert.equal(types.USAGE_FLAGS.length, 27);
-    // the files follow the labels ; the seed's sections keep their names, one format for both
+    // a file holds each by its key ; the seed's sections keep their names, one format for both
     const chat = await RepoObjects.descriptorOf("chat_assistant");
     const notifications = await RepoObjects.descriptorOf("notifications");
-    assert.equal(chat.file, "chat-assistant.yaml");
-    assert.equal(notifications.folder, "notifications");
+    assert.equal(chat.key, "chat_assistant");
+    assert.equal(chat.single, true);
+    assert.equal(notifications.key, "notifications");
+    assert.equal(notifications.single, undefined);
     const { itemValidator, chatFileItem } = await import("../src/lib/seed-schema.js");
     assert.deepEqual(notifications.keyOrder, itemValidator("notification_channels").keys);
     assert.deepEqual(chat.keyOrder, itemValidator(chatFileItem).keys);
@@ -351,8 +358,7 @@ describe("a repository a pull of repositories.yaml makes, and what names its con
   // the hub holds the runners too ; c2, made by its repositories.yaml, holds the credentials : its
   // clone (in the background) reads the credential a runner of the hub names
   const runnerFile = () => {
-    fs.mkdirSync(path.join(fx.ROOT, "hub", "runners"), { recursive: true });
-    fs.writeFileSync(path.join(fx.ROOT, "hub", "runners", "r.yaml"), YAML.stringify({ name: "r", type: "rte", rte_mode: "outbound", credential: "c2-cred" }));
+    fx.writeEntry("hub", "runners/r.yaml", "runners", { name: "r", type: "rte", rte_mode: "outbound", credential: "c2-cred" });
   };
   const cloneTaking = (ms) => () =>
     new Promise((resolve) =>

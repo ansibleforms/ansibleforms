@@ -278,13 +278,13 @@ export const crypto = {
 // ===========================================================================
 
 /**
- * Writes an object's file in a repository's folder.
+ * Writes a file of a repository, in a folder of it.
  *
  * Args:
  *   name (string): the repository.
- *   folder (string): the type's folder (credentials).
+ *   folder (string): the folder, relative to the repository ('' or '.' for its root).
  *   file (string): the file name.
- *   content (object|string): the object (written as YAML) or the file's text.
+ *   content (object|string): the content (written as YAML) or the file's text.
  */
 export function writeFile(name, folder, file, content) {
   const dir = path.join(ROOT, name, folder);
@@ -299,6 +299,73 @@ export const fileExists = (name, folder, file) => fs.existsSync(path.join(ROOT, 
 export const removeFile = (name, folder, file) => fs.rmSync(path.join(ROOT, name, folder, file));
 export const cloneEmpty = (name) => fs.mkdirSync(path.join(ROOT, name), { recursive: true });
 export const listFiles = (name, folder) => fs.readdirSync(path.join(ROOT, name, folder)).sort();
+
+/**
+ * Writes a file of a repository holding entries of a type under its key (credentials: [...]) : the
+ * repository's files are read by their content, any name, any folder.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   file (string): the file, relative to the repository (credentials.yaml, team/creds.yml).
+ *   key (string): the type's key (credentials).
+ *   content (object|object[]|string): one entry, the entries, or the file's whole text.
+ */
+export function writeEntry(name, file, key, content) {
+  const abs = path.join(ROOT, name, file);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  const text = typeof content === "string" ? content : YAML.stringify({ [key]: Array.isArray(content) ? content : [content] });
+  fs.writeFileSync(abs, text);
+}
+
+/**
+ * Writes a file of a repository holding the map of a type the app has one of under its key
+ * (defaults: {...}).
+ *
+ * Args:
+ *   name (string): the repository.
+ *   file (string): the file, relative to the repository.
+ *   key (string): the type's key (defaults).
+ *   content (object|string): the map, or the file's whole text.
+ */
+export function writeMap(name, file, key, content) {
+  const abs = path.join(ROOT, name, file);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, typeof content === "string" ? content : YAML.stringify({ [key]: content }));
+}
+
+/**
+ * The entries of a type a file of a repository holds, or one of them by its name.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   file (string): the file, relative to the repository.
+ *   key (string): the type's key.
+ *   entry (string): the entry's name ; none : all of them.
+ *
+ * Returns:
+ *   object|object[]|undefined: the entry, or the list.
+ */
+export function readEntry(name, file, key, entry) {
+  const list = YAML.parse(fs.readFileSync(path.join(ROOT, name, file), "utf8"))?.[key] || [];
+  return entry === undefined ? list : list.find((e) => String(e?.name ?? e?.version) === String(entry));
+}
+
+/**
+ * The map of a type the app has one of a file of a repository holds.
+ *
+ * Args:
+ *   name (string): the repository.
+ *   file (string): the file, relative to the repository.
+ *   key (string): the type's key.
+ *
+ * Returns:
+ *   object|undefined: the map.
+ */
+export const readMap = (name, file, key) => YAML.parse(fs.readFileSync(path.join(ROOT, name, file), "utf8"))?.[key];
+
+// whether a file of a repository is there, and its text (path relative to the repository)
+export const exists = (name, file) => fs.existsSync(path.join(ROOT, name, file));
+export const textOf = (name, file) => fs.readFileSync(path.join(ROOT, name, file), "utf8");
 
 /**
  * A table's row by its name.

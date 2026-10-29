@@ -58,7 +58,7 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), i18n.t(req, 'resources.faviconInvalidImage')));
     }
     try {
-      // the Icon repository's icon.yaml, before : its icon written beside it after
+      // the Icon repository's icon: map, before : its icon written into it after
       await RepoObjects.holding('icon', async () => {
         const before = await RepoObjects.snapshot('icon');
         await BRAND_IMAGES.icon.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);

@@ -1249,9 +1249,9 @@ async function patchVersion7(messages, success, failed) {
   const databases = fs.readFileSync(`${__dirname}/../db/create_databases_table.sql`);
   await checkPromise(addTable("databases", databases.toString()), messages, success, failed);
   await checkPromise(addDatabasesForCredentials(), messages, success, failed);
-  // schedules kept in a git repository (use_for_schedules), one per file in its schedules
-  // folder, one YAML file each, timed by their iCal rrule (models/scheduleRepo.model.js).
-  // A schedule says where it comes from (repository, repo_file) ; its file's prompts are kept as
+  // schedules kept in a git repository (use_for_schedules), the entries of the schedules: lists of
+  // its YAML files, timed by their iCal rrule (models/scheduleRepo.model.js).
+  // A schedule says where it comes from (repository, repo_file) ; its entry's prompts are kept as
   // the reserved extra vars a job reads (launch_options) ; any schedule may have a description
   await checkPromise(addColumn("repositories", "use_for_schedules", "tinyint(4)", true, "0"), messages, success, failed);
   await checkPromise(addColumn("schedule", "description", "text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);

@@ -1,11 +1,15 @@
 // The object files written back by the app (lib/repoObjects/yamlFile.js) : every line an edit does
 // not change kept byte for byte - its inline comment as far from its value as it was, its trailing
-// spaces - and a changed line keeping its comment's spacing. The YAML writer alone re-spaced every
-// inline comment of the file.
+// spaces, the file's other keys and entries - and a changed line keeping its comment's spacing. The
+// YAML writer alone re-spaced every inline comment of the file.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { updateMapFile, updateListEntry, keepUntouchedLines, parseMapFile, parseListFile, appendListEntries, removeListEntry } from "../src/lib/repoObjects/yamlFile.js";
-import { updateScheduleFile } from "../src/lib/scheduleFiles.js";
+import YAML from "yaml";
+import { updateMapFile, editListEntry, editMapEntry, applyEdits, keepUntouchedLines, parseMapFile, appendListEntries, removeListEntry } from "../src/lib/repoObjects/yamlFile.js";
+import { updateScheduleText } from "../src/lib/scheduleFiles.js";
+
+// an entry of a type's list edited field by field, as the engine writes an app edit
+const updateListEntry = (text, key, name, edits, keyOrder = []) => editListEntry(text, key, name, (doc, map) => applyEdits(doc, map, edits, keyOrder));
 
 const ALIGNED = [
   "# the runner of the edge site",
@@ -43,10 +47,19 @@ describe("the other writers keep untouched lines too", () => {
     assert.equal(out, text.replace("branch: dev  # its branch", "branch: prod  # its branch"));
   });
 
-  test("a schedule file", () => {
-    const text = "name: Nightly          # the schedule\ndescription: old       # what it does\nrrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\nteam_owner: platform   # our own key\nunified_job_template: Nightly\n";
-    const out = updateScheduleFile(text, { description: "new" });
+  test("a schedule entry", () => {
+    const text = "schedules:\n  - name: Nightly          # the schedule\n    description: old       # what it does\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n    team_owner: platform   # our own key\n    unified_job_template: Nightly\n";
+    const out = updateScheduleText(text, "Nightly", { description: "new" });
     assert.equal(out, text.replace("description: old       # what it does", "description: new       # what it does"));
+  });
+
+  test("a type's map among other keys : only its changed field, the other keys as they were", () => {
+    const text = "# the platform's settings\n# shown beside the logo\nlabels:\n  - name: PROD\ndefaults:\n  # the house style\n  default_theme: dark     # always\n  forms_view: grid\nnotes: kept\n";
+    const out = editMapEntry(text, "defaults", (doc, map) => applyEdits(doc, map, { forms_view: "list" }));
+    assert.equal(out, text.replace("forms_view: grid", "forms_view: list"));
+    // a key the file does not give yet : made at its end
+    const made = editMapEntry("labels: []\n", "name", (doc, map) => applyEdits(doc, map, { app_name: "X" }));
+    assert.deepEqual(YAML.parse(made), { labels: [], name: { app_name: "X" } });
   });
 
   test("lines the writer did not change are the file's ; lines it changed are its own", () => {
@@ -80,16 +93,28 @@ describe("the file's own form kept, whatever it is", () => {
   });
 });
 
-describe("a list file", () => {
+describe("a type's list in a file", () => {
   test("an entry removed takes the comment right above it with it ; one apart from it stays", () => {
     const text = "# top\nrepositories:\n  # about a\n  - name: a\n    uri: x\n  # about b\n  - name: b\n    uri: y\n";
-    assert.equal(removeListEntry(text, "repositories", "a"), "# top\nrepositories:\n  # about b\n  - name: b\n    uri: y\n");
-    assert.equal(removeListEntry(text, "repositories", "b"), "# top\nrepositories:\n  # about a\n  - name: a\n    uri: x\n");
+    assert.deepEqual(removeListEntry(text, "repositories", "a"), { text: "# top\nrepositories:\n  # about b\n  - name: b\n    uri: y\n", empty: false });
+    assert.deepEqual(removeListEntry(text, "repositories", "b"), { text: "# top\nrepositories:\n  # about a\n  - name: a\n    uri: x\n", empty: false });
   });
 
-  test("its key with nothing after it is an empty list, read and added to", () => {
-    assert.deepEqual(parseListFile("repositories:\n", "repositories"), { errors: [], items: [] });
-    assert.deepEqual(parseListFile(appendListEntries("repositories:\n", "repositories", [{ name: "a" }]), "repositories").items, [{ name: "a" }]);
+  test("its last entry removed : its key goes, and the file when it holds nothing more", () => {
+    assert.deepEqual(removeListEntry("labels:\n  - name: a\ncredentials:\n  - name: c\n", "credentials", "c"), { text: "labels:\n  - name: a\n", empty: false });
+    assert.deepEqual(removeListEntry("credentials:\n  - name: c\n", "credentials", "C"), { text: "", empty: true });
+  });
+
+  test("its key with nothing after it is an empty list, added to ; a file without it gets it at its end", () => {
+    assert.deepEqual(YAML.parse(appendListEntries("repositories:\n", "repositories", [{ name: "a" }])).repositories, [{ name: "a" }]);
+    assert.equal(appendListEntries("# ours\nlabels: []\n", "credentials", [{ name: "a" }]), "# ours\nlabels: []\ncredentials:\n  - name: a\n");
+  });
+
+  test("an entry found by its type's name field, case aside : a disclaimer version by its number", () => {
+    const text = "disclaimer:\n  - version: 2\n    title: Old\n";
+    assert.equal(updateListEntry(text, "disclaimer", "2", { title: "New" }).includes("title: New"), false, "by name : none");
+    const out = editListEntry(text, "disclaimer", "2", (doc, map) => applyEdits(doc, map, { title: "New" }), { nameField: "version" });
+    assert.equal(out, "disclaimer:\n  - version: 2\n    title: New\n");
   });
 });
 

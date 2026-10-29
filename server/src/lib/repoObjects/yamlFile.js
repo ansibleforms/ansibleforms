@@ -1,9 +1,10 @@
 'use strict';
-// The YAML files of the repository-backed objects (lib/repoObjects/engine.js) : one object per
-// file, read as a map, and written back with only the fields the app changed - the keys it does
-// not know, their comments and their order kept as the file has them, a new key put at its place
-// in the type's key order. Pure, no database : the schedule files (lib/scheduleFiles.js) and every
-// other object type write through these.
+// The YAML files of the repository-backed objects (lib/repoObjects/engine.js) : the types' keys of
+// a file (a list of objects under each, or one map), an entry of a list or a type's map written
+// back with only the fields the app changed - the keys it does not know, the other entries and
+// keys of the file, their comments and their order kept as the file has them, a new key put at
+// its place in the type's key order. Pure, no database : the schedules (lib/scheduleFiles.js) and
+// every other object type write through these.
 import fs from "fs";
 import path from "path";
 import YAML from "yaml";
@@ -67,8 +68,8 @@ export function setKey(doc, map, key, value, keyOrder = []) {
     if (lastBefore >= 0) at = lastBefore + 1;
     else if (firstAfter >= 0) at = firstAfter;
   }
-  // first in the file : below its leading comment, which the writer gives the key it was above
-  if (at === 0 && map === doc.contents && YAML.isNode(map.items[0]?.key) && map.items[0].key.commentBefore) {
+  // first in its map : below the map's leading comment, which the writer gives the key it was above
+  if (at === 0 && YAML.isNode(map.items[0]?.key) && map.items[0].key.commentBefore) {
     pair.key = YAML.isNode(pair.key) ? pair.key : doc.createNode(pair.key);
     pair.key.commentBefore = map.items[0].key.commentBefore;
     pair.key.spaceBefore = map.items[0].key.spaceBefore;
@@ -366,130 +367,54 @@ export function parseMapFile(text) {
 }
 
 // ===========================================================================
-// THE FILES OF A FOLDER
+// THE PATHS OF A REPOSITORY
 // ===========================================================================
 
 /**
- * The file name a new object gets in its folder : its name in lower case, letters and digits
- * apart by dashes, a number added when a file has it already.
- *
- * Args:
- *   name (string): the object's name.
- *   taken (function): (fileName) => true when a file has that name.
- *   fallback (string): the name of an object whose name has no letter nor digit.
- *
- * Returns:
- *   string: the file name (nightly-log-rotation.yaml).
- */
-export function fileNameFor(name, taken = () => false, fallback = "object") {
-  const slug =
-    String(name || "")
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60)
-      .replace(/-+$/g, "") || fallback;
-  let file = `${slug}.yaml`;
-  for (let n = 2; taken(file); n++) file = `${slug}-${n}.yaml`;
-  return file;
-}
-
-/**
- * The object files of a folder of a repository : the yaml files right in it, sorted ; a link that
- * leads outside the repository (or nowhere), a folder (or a link to one) or anything else is left
- * out - each said in `refused` when given, as its pull and its preview refuse it.
- *
- * Args:
- *   repoDir (string): the repository's working tree.
- *   folder (string): the folder, relative to it (credentials).
- *   pattern (RegExp): the file names taken (YAML_FILE when not given).
- *   refused (object[]|null): filled with each entry of that name left out : { file, reason }.
- *
- * Returns:
- *   string[]: the files, relative to the repository (credentials/git.yaml) ; none when the folder
- *     is not there.
- *
- * Raises:
- *   Error: a folder that is there but cannot be read (no access, not a folder) : never taken for
- *     an empty one, whose sync would delete every object of the type.
- */
-export function filesIn(repoDir, folder, pattern = YAML_FILE, refused = null) {
-  const dir = path.join(repoDir, folder);
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch (e) {
-    // no folder : no files ; any other failure is no answer
-    if (e.code === "ENOENT") return [];
-    throw new Error(`the ${folder} folder cannot be read: ${e.code || e.message}`, { cause: e });
-  }
-  const files = [];
-  for (const entry of entries) {
-    if (!pattern.test(entry.name)) continue;
-    const abs = path.join(dir, entry.name);
-    const file = `${folder}/${entry.name}`;
-    let reason = null;
-    try {
-      // a link is followed only when it stays in the repository
-      const real = fs.realpathSync(abs);
-      if (!real.startsWith(fs.realpathSync(repoDir) + path.sep)) reason = "a link that leads outside the repository: never read";
-      else if (!fs.statSync(real).isFile()) reason = "not a file (a folder, or a link to one): never read";
-    } catch {
-      reason = "a link that leads nowhere, or not readable: never read";
-    }
-    if (reason) {
-      refused?.push({ file, reason });
-      continue;
-    }
-    files.push(file);
-  }
-  return files.sort();
-}
-
-/**
  * The absolute path of a file a file names beside it (a logo or icon image : logo.png,
- * images/logo.png), checked to be inside the folder it is named from, and to stay in it once its
- * links are followed (staysIn) : a link in a repository never reads nor writes the server's files.
+ * images/logo.png, ../images/logo.png), relative to the folder it is named from, checked to be
+ * inside a root - that folder itself (the seed file's folder), or the repository the file is in -
+ * and to stay in it once its links are followed (staysIn) : a link in a repository never reads nor
+ * writes the server's files.
  *
  * Args:
- *   dir (string): the folder (the repository's root, the seed file's folder).
+ *   dir (string): the folder it is named from (the folder of the file naming it).
  *   name (string): its path, relative to it.
+ *   root (string|null): the repository's working tree it must be in ; none : inside dir.
  *
  * Returns:
  *   string: the path.
  *
  * Raises:
- *   Error: a path that leads outside the folder, a link too.
+ *   Error: a path that leads outside the root, a link too.
  */
-export function fileBeside(dir, name) {
-  const base = path.resolve(dir || ".");
-  const abs = path.resolve(base, String(name));
-  if (!abs.startsWith(base + path.sep) || !staysIn(base, abs)) throw new Error(`'${name}' is not a file beside it`);
+export function fileBeside(dir, name, root = null) {
+  const base = path.resolve(root || dir || ".");
+  const abs = path.resolve(dir || ".", String(name));
+  if (!abs.startsWith(base + path.sep) || !staysIn(base, abs)) throw new Error(root ? `'${name}' is not a file of the repository` : `'${name}' is not a file beside it`);
   return abs;
 }
 
 /**
- * The absolute path of an object's file, checked to be right in its folder of the repository, and
- * to stay in the repository once its links are followed (staysIn).
+ * The absolute path of a YAML file of a repository, checked to be inside it and to stay in it once
+ * its links are followed (staysIn), and to be no hidden one (its .git folder).
  *
  * Args:
  *   repoDir (string): the repository's working tree.
- *   folder (string): the type's folder (credentials).
- *   repoFile (string): the file, relative to the repository (credentials/git.yaml).
- *   pattern (RegExp): the file names taken (YAML_FILE when not given).
+ *   repoFile (string): the file, relative to it (credentials.yaml, settings/app.yml).
  *
  * Returns:
  *   string: the path.
  *
  * Raises:
- *   Error: a file outside the folder.
+ *   Error: a file outside the repository, a hidden one, or no YAML file.
  */
-export function fileIn(repoDir, folder, repoFile, pattern = YAML_FILE) {
-  const abs = path.resolve(repoDir, String(repoFile || ""));
-  if (path.dirname(abs) !== path.join(repoDir, folder) || !pattern.test(abs) || !staysIn(repoDir, abs)) {
-    throw new Error(`'${repoFile}' is not a file of the ${folder} folder`);
+export function fileInRepository(repoDir, repoFile) {
+  const rel = String(repoFile || "");
+  const abs = path.resolve(repoDir, rel);
+  const parts = path.relative(repoDir, abs).split(path.sep);
+  if (!rel || !abs.startsWith(path.resolve(repoDir) + path.sep) || parts.some((p) => p.startsWith(".")) || !YAML_FILE.test(abs) || !staysIn(repoDir, abs)) {
+    throw new Error(`'${repoFile}' is not a YAML file of the repository`);
   }
   return abs;
 }
@@ -531,140 +456,230 @@ export function staysIn(root, abs) {
 }
 
 // ===========================================================================
-// A LIST IN ONE FILE
+// A TYPE'S KEY IN A FILE
 // ===========================================================================
-// A type whose objects are kept as a list in one file (the repositories, repositories.yaml : a
-// `repositories:` list of items, each found by its name) : an entry read, edited field by field,
-// added and removed, the rest of the file - the other entries, their comments - kept.
+// A file holds a type under its key : a list of objects, each found by its name (credentials:), or
+// one map (defaults:). An entry is read, edited field by field, added and removed, the key's map
+// edited, the rest of the file - the other keys and entries, their comments - kept.
 
 /**
- * The list of a list file, its document and its sequence.
+ * A file's document, its contents a map : an empty text (or one of comments only) an empty map.
  *
  * Args:
  *   text (string): the file's text ('' for a new one).
- *   key (string): its list's key (repositories).
  *
  * Returns:
- *   object: { doc (YAML.Document), seq (YAMLSeq) }.
+ *   YAML.Document: the document.
  *
  * Raises:
- *   Error: not valid YAML, not a map, or its key no list.
+ *   Error: not valid YAML, or not a map.
  */
-function listOf(text, key) {
-  const doc = YAML.parseDocument(String(text ?? "").trim() ? String(text) : `${key}: []\n`);
+function mapDocument(text) {
+  const doc = YAML.parseDocument(String(text ?? ""));
   if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
+  if (doc.contents === null || doc.contents === undefined || (YAML.isScalar(doc.contents) && (doc.contents.value === null || doc.contents.value === undefined))) {
+    doc.contents = doc.createNode({});
+  }
   if (!YAML.isMap(doc.contents)) throw new Error("the file is not a YAML dictionary");
-  // no list yet, or its key with nothing after it (repositories:) : an empty list
+  // an empty map ({}) : its keys written one below the other, never all on one line
+  if (!doc.contents.items.length) doc.contents.flow = false;
+  return doc;
+}
+
+/**
+ * The list of a type's key in a file, made when the file has none (or the key with nothing after
+ * it : credentials:).
+ *
+ * Args:
+ *   doc (YAML.Document): the file's document (mapDocument).
+ *   key (string): the type's key.
+ *
+ * Returns:
+ *   YAMLSeq: the list.
+ *
+ * Raises:
+ *   Error: the key holds no list.
+ */
+function listOf(doc, key) {
   const value = doc.contents.get(key, true);
   if (!doc.contents.has(key) || (YAML.isScalar(value) && (value.value === null || value.value === undefined))) doc.contents.set(key, doc.createNode([]));
   const seq = doc.contents.get(key, true);
   if (!YAML.isSeq(seq)) throw new Error(`'${key}' must be a list`);
   // an empty list ([]) : its entries written one below the other, never all on one line
   if (!seq.items.length) seq.flow = false;
-  return { doc, seq };
+  return seq;
 }
 
 /**
- * The entries of a list file, as plain objects.
- *
- * Args:
- *   text (string): the file's text.
- *   key (string): its list's key.
- *
- * Returns:
- *   object: { errors (string[]), items (object[], null when refused) }.
- */
-export function parseListFile(text, key) {
-  try {
-    const { doc, seq } = listOf(text, key);
-    return { errors: [], items: seq.items.map((item) => (YAML.isMap(item) ? item.toJS(doc) : item)) };
-  } catch (e) {
-    return { errors: [e.message], items: null };
-  }
-}
-
-/**
- * The entry of a name in a list : its map, or none.
+ * The entry of a name in a list : its map, or none ; names compared as the tables compare them
+ * (case does not count).
  *
  * Args:
  *   seq (YAMLSeq): the list.
  *   name (string): the entry's name.
+ *   nameField (string): the field an entry is named by (a disclaimer version's : version).
  *
  * Returns:
  *   YAMLMap|undefined: the entry.
  */
-const entryOf = (seq, name) => seq.items.find((item) => YAML.isMap(item) && String(item.get("name")) === String(name));
+function entryOf(seq, name, nameField = "name") {
+  const key = String(name ?? "").trim().toLowerCase();
+  return seq.items.find((item) => YAML.isMap(item) && String(item.get(nameField) ?? "").trim().toLowerCase() === key);
+}
 
 /**
- * Writes an app edit into an entry of a list file : each key of `edits` set (a new one at its
- * place in the key order), a key whose edit is undefined removed ; an entry not there added.
+ * Applies edits to a map : each key set (a new one at its place in the key order), a key whose edit
+ * is undefined removed.
+ *
+ * Args:
+ *   doc (YAML.Document): the document.
+ *   map (YAMLMap): the map.
+ *   edits (object): { key: value } ; undefined removes the key.
+ *   keyOrder (string[]): the order a new key is put in.
+ */
+export function applyEdits(doc, map, edits, keyOrder = []) {
+  if (!map.items.length) map.flow = false;
+  for (const [k, value] of Object.entries(edits)) {
+    if (value === undefined) map.delete(k);
+    else setKey(doc, map, k, value, keyOrder);
+  }
+}
+
+/**
+ * Whether a file holds an entry of a name under a type's key.
  *
  * Args:
  *   text (string): the file's text.
- *   key (string): its list's key.
- *   name (string): the entry's name (before the edit).
- *   edits (object): { key: value } ; undefined removes the key.
- *   keyOrder (string[]): the type's key order.
- *   whole (object): the entry whole, when it is not there yet.
+ *   key (string): the type's key.
+ *   name (string): the entry's name.
+ *   nameField (string): the field an entry is named by.
  *
  * Returns:
- *   string: the file's new text.
+ *   boolean: true when it does (false for a file that cannot be read).
  */
-export function updateListEntry(text, key, name, edits, keyOrder = [], whole = null) {
-  const { doc, seq } = listOf(text, key);
-  const entry = entryOf(seq, name);
-  if (!entry) {
-    if (whole) seq.items.push(doc.createNode(sortedByOrder(whole, keyOrder)));
-    return editedText(doc, text);
+export function hasListEntry(text, key, name, nameField = "name") {
+  try {
+    const doc = mapDocument(text);
+    const seq = doc.contents.get(key, true);
+    return YAML.isSeq(seq) && !!entryOf(seq, name, nameField);
+  } catch {
+    return false;
   }
-  for (const [k, value] of Object.entries(edits)) {
-    if (value === undefined) entry.delete(k);
-    else setKey(doc, entry, k, value, keyOrder);
-  }
+}
+
+/**
+ * Edits an entry of a type's list in a file : mutate changes its map in place ; an entry not there
+ * is added whole when `whole` is given.
+ *
+ * Args:
+ *   text (string): the file's text.
+ *   key (string): the type's key.
+ *   name (string): the entry's name (before the edit).
+ *   mutate (function): (doc, map) => changes the entry's map.
+ *   opts (object): { nameField (the field an entry is named by), whole (the entry, added at the
+ *     list's end when it is not there), keyOrder (its keys' order) }.
+ *
+ * Returns:
+ *   string: the file's new text (the same text when nothing changed).
+ *
+ * Raises:
+ *   Error: the file is not a map of valid YAML, or its key no list.
+ */
+export function editListEntry(text, key, name, mutate, opts = {}) {
+  const doc = mapDocument(text);
+  const seq = listOf(doc, key);
+  const entry = entryOf(seq, name, opts.nameField);
+  if (entry) mutate(doc, entry);
+  else if (opts.whole) seq.items.push(doc.createNode(sortedByOrder(opts.whole, opts.keyOrder || [])));
+  else return text;
   return editedText(doc, text);
 }
 
 /**
- * Adds entries to a list file, at its end ; one whose name is there already left as it is.
+ * Adds entries to a type's list in a file, at its end (the key made at the file's end when the
+ * file has none) ; one whose name is there already left as it is.
  *
  * Args:
  *   text (string): the file's text ('' for a new one).
- *   key (string): its list's key.
+ *   key (string): the type's key.
  *   entries (object[]): the entries.
  *   keyOrder (string[]): the type's key order.
+ *   nameField (string): the field an entry is named by.
  *
  * Returns:
  *   string: the file's new text.
+ *
+ * Raises:
+ *   Error: the file is not a map of valid YAML, or its key no list.
  */
-export function appendListEntries(text, key, entries, keyOrder = []) {
-  const { doc, seq } = listOf(text, key);
+export function appendListEntries(text, key, entries, keyOrder = [], nameField = "name") {
+  const doc = mapDocument(text);
+  const seq = listOf(doc, key);
   for (const entry of entries) {
-    if (!entryOf(seq, entry.name)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
+    if (!entryOf(seq, entry[nameField], nameField)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
   }
-  return editedText(doc, text);
+  return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
 }
 
 /**
- * Removes an entry of a list file, the comment right above it with it.
+ * Removes an entry of a type's list in a file, the comment right above it with it ; the key goes
+ * when its list is left empty.
  *
  * Args:
  *   text (string): the file's text.
- *   key (string): its list's key.
+ *   key (string): the type's key.
  *   name (string): the entry's name.
+ *   nameField (string): the field an entry is named by.
  *
  * Returns:
- *   string: the file's new text (the same when it is not there).
+ *   object: { text (the file's new text ; the same when the entry is not there), empty (true : the
+ *     file holds no key any more - it is removed) }.
  */
-export function removeListEntry(text, key, name) {
-  const { doc, seq } = listOf(text, key);
-  const entry = entryOf(seq, name);
-  if (!entry) return text;
+export function removeListEntry(text, key, name, nameField = "name") {
+  let doc;
+  try {
+    doc = mapDocument(text);
+  } catch {
+    return { text, empty: false };
+  }
+  const seq = doc.contents.get(key, true);
+  const entry = YAML.isSeq(seq) ? entryOf(seq, name, nameField) : null;
+  if (!entry) return { text, empty: false };
   const at = seq.items.indexOf(entry);
   // the comment right above the first entry is the list's to the writer : it goes with the entry
   // (one apart from it by an empty line is the list's own, and stays)
   if (at === 0 && seq.commentBefore && !entry.spaceBefore) seq.commentBefore = undefined;
   seq.items.splice(at, 1);
-  return editedText(doc, text);
+  // its last entry : the key goes too
+  if (!seq.items.length) doc.contents.delete(key);
+  if (!doc.contents.items.length) return { text: "", empty: true };
+  return { text: editedText(doc, text), empty: false };
+}
+
+/**
+ * Edits a type's map in a file (a type the app has one of : defaults:) : mutate changes it in place
+ * ; the key is made at the file's end when the file has none.
+ *
+ * Args:
+ *   text (string): the file's text ('' for a new one).
+ *   key (string): the type's key.
+ *   mutate (function): (doc, map) => changes the map.
+ *
+ * Returns:
+ *   string: the file's new text.
+ *
+ * Raises:
+ *   Error: the file is not a map of valid YAML, or its key holds no map.
+ */
+export function editMapEntry(text, key, mutate) {
+  const doc = mapDocument(text);
+  const value = doc.contents.get(key, true);
+  if (!doc.contents.has(key) || (YAML.isScalar(value) && (value.value === null || value.value === undefined))) doc.contents.set(key, doc.createNode({}));
+  const map = doc.contents.get(key, true);
+  if (!YAML.isMap(map)) throw new Error(`'${key}' must be a dictionary`);
+  if (!map.items.length) map.flow = false;
+  mutate(doc, map);
+  return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
 }
 
 /**
@@ -677,7 +692,7 @@ export function removeListEntry(text, key, name) {
  * Returns:
  *   object: a copy, its keys in that order.
  */
-function sortedByOrder(obj, keyOrder) {
+export function sortedByOrder(obj, keyOrder = []) {
   const rank = (k) => (keyOrder.includes(k) ? keyOrder.indexOf(k) : keyOrder.length);
   return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b)));
 }

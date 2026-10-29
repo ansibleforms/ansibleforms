@@ -1,10 +1,10 @@
 // The schedules of a schedules repository (models/scheduleRepo.model.js), both ways :
-//   git to app : a pull reads its schedules folder into the schedule table - new files make
-//                schedules, changed ones change them, removed ones remove them ; a refused file
+//   git to app : a pull reads its schedules: entries into the schedule table - new names make
+//                schedules, changed entries change them, removed ones remove them ; a refused entry
 //                (its rrule is refused, its form does not exist, its name is taken) is said and
 //                changes nothing, the others still sync.
 //   app to git : a schedule of a repository edited, made or deleted in the app writes or removes
-//                its file in the working tree, under the repository's write claim, for its Push.
+//                its entry in the working tree, under the repository's write claim, for its Push.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "fs";
@@ -131,7 +131,10 @@ const { default: ScheduleRepo } = await import("../src/models/scheduleRepo.model
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
 const RRULE = "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1";
-const scheduleYaml = (name, extra = {}) => YAML.stringify({ name, unified_job_template: { name: "Nightly", type: "job_template" }, rrule: RRULE, ...extra });
+// a file holding one schedule, as an entry of its schedules: list
+const scheduleYaml = (name, extra = {}) => YAML.stringify({ schedules: [{ name, unified_job_template: { name: "Nightly", type: "job_template" }, rrule: RRULE, ...extra }] });
+// the schedule a file's text holds (its first entry, or the one of a name)
+const entryOf = (text, name) => (YAML.parse(text).schedules || []).find((e) => name === undefined || e.name === name);
 function writeFile(repo, file, text) {
   const dir = path.join(ROOT, repo, "schedules");
   fs.mkdirSync(dir, { recursive: true });
@@ -160,15 +163,19 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 // ─── git to app ────────────────────────────────────────────────────────────────
-describe("a pull reads the schedules folder into the schedule table", () => {
+describe("a pull reads the schedules: entries into the schedule table", () => {
   test("new files make schedules, timed by their rrule, run as the Schedule Service (no owner)", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs", { extra_data: { days: 14 }, limit: "web" }));
     writeFile("ops", "b.yml", scheduleYaml("Clean tmp", { enabled: false }));
-    // nothing outside the schedules folder is read
-    fs.writeFileSync(path.join(ROOT, "ops", "other.yaml"), scheduleYaml("Not a schedule"));
+    // any file giving schedules:, whatever its name or folder ; a file that does not is none of theirs
+    fs.writeFileSync(path.join(ROOT, "ops", "other.yaml"), scheduleYaml("Elsewhere"));
+    fs.writeFileSync(path.join(ROOT, "ops", "playbook.yaml"), YAML.stringify([{ hosts: "all", tasks: [] }]));
+    fs.writeFileSync(path.join(ROOT, "ops", "vars.yaml"), YAML.stringify({ name: "Not a schedule", rrule: RRULE }));
     const summary = await ScheduleRepo.syncRepository("ops");
-    assert.equal(summary.created, 2);
-    const [a, b] = own("ops");
+    assert.equal(summary.created, 3);
+    assert.deepEqual(summary.refused, []);
+    assert.equal(rows.find((r) => r.name === "Elsewhere").repo_file, "other.yaml");
+    const [a, b] = own("ops").filter((r) => r.repo_file.startsWith("schedules/"));
     assert.equal(a.name, "Rotate logs");
     assert.equal(a.repo_file, "schedules/a.yaml");
     assert.equal(a.rrule, RRULE);
@@ -216,28 +223,28 @@ describe("a pull reads the schedules folder into the schedule table", () => {
   test("a bad file is refused alone, said with its name ; the others still sync", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
     writeFile("ops", "bad-rrule.yaml", scheduleYaml("Bad", { rrule: "DTSTART:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1" }));
-    writeFile("ops", "no-form.yaml", YAML.stringify({ name: "No form", unified_job_template: { name: "Missing" }, rrule: RRULE }));
+    writeFile("ops", "no-form.yaml", YAML.stringify({ schedules: [{ name: "No form", unified_job_template: { name: "Missing" }, rrule: RRULE }] }));
     writeFile("ops", "z.yaml", scheduleYaml("Last one"));
     const summary = await ScheduleRepo.syncRepository("ops");
     assert.equal(summary.created, 2);
-    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/bad-rrule.yaml", "schedules/no-form.yaml"]);
+    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/bad-rrule.yaml#Bad", "schedules/no-form.yaml#No form"]);
     assert.ok(summary.refused[0].reasons[0].includes("naive"));
     assert.ok(summary.refused[1].reasons[0].includes("the form 'Missing'"));
     const text = ScheduleRepo.summaryText(summary);
     assert.ok(text.includes("Schedules: 2 created"));
-    assert.ok(text.includes("Refused schedules/bad-rrule.yaml:"));
+    assert.ok(text.includes("Refused schedules/bad-rrule.yaml#Bad:"));
   });
 
-  test("the forms not readable (the configuration not valid) : every file refused, never imported unchecked ; its schedule kept as it was", async () => {
+  test("the forms not readable (the configuration not valid) : every entry refused, never imported unchecked ; its schedule kept as it was", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
     await ScheduleRepo.syncRepository("ops");
     forms = null;
     writeFile("ops", "a.yaml", scheduleYaml("Rotate all logs"));
-    writeFile("ops", "ghost.yaml", YAML.stringify({ name: "Ghost", unified_job_template: { name: "Does not exist" }, rrule: RRULE }));
+    writeFile("ops", "ghost.yaml", YAML.stringify({ schedules: [{ name: "Ghost", unified_job_template: { name: "Does not exist" }, rrule: RRULE }] }));
     const summary = await ScheduleRepo.syncRepository("ops");
     assert.equal(summary.created, 0);
     assert.equal(summary.deleted, 0);
-    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/a.yaml", "schedules/ghost.yaml"]);
+    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/a.yaml#Rotate all logs", "schedules/ghost.yaml#Ghost"]);
     assert.match(summary.refused[1].reasons[0], /the forms could not be read/);
     assert.deepEqual(own("ops").map((r) => r.name), ["Rotate logs"]);
     // a save of the app : refused too
@@ -246,21 +253,21 @@ describe("a pull reads the schedules folder into the schedule table", () => {
     forms = ["Nightly", "Report"];
     const after = await ScheduleRepo.syncRepository("ops");
     assert.equal(after.updated, 1);
-    assert.deepEqual(after.refused.map((r) => r.file), ["schedules/ghost.yaml"]);
+    assert.deepEqual(after.refused.map((r) => r.file), ["schedules/ghost.yaml#Ghost"]);
     assert.match(after.refused[0].reasons[0], /the form 'Does not exist'/);
   });
 
   test("a file that becomes bad keeps its schedule as it was", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
     await ScheduleRepo.syncRepository("ops");
-    writeFile("ops", "a.yaml", "name: [broken");
+    writeFile("ops", "a.yaml", "schedules:\n  - name: [broken");
     const summary = await ScheduleRepo.syncRepository("ops");
     assert.equal(summary.deleted, 0);
     assert.equal(summary.refused.length, 1);
     assert.equal(own("ops")[0].name, "Rotate logs");
   });
 
-  test("a duplicate name is refused : in the same repository, in another one, or a one-time job's", async () => {
+  test("a duplicate name is refused : two entries of it, both ; another repository's, or a one-time job's", async () => {
     rows.push({ id: 90, name: "App made", repository: null, repo_file: null, owner: '{"username":"bob"}', one_time_run: 1 });
     nextId = 100;
     writeFile("team", "x.yaml", scheduleYaml("Shared name"));
@@ -270,19 +277,20 @@ describe("a pull reads the schedules folder into the schedule table", () => {
     writeFile("ops", "c.yaml", scheduleYaml("Shared name"));
     writeFile("ops", "d.yaml", scheduleYaml("App made"));
     const summary = await ScheduleRepo.syncRepository("ops");
-    assert.equal(summary.created, 1);
-    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/b.yaml", "schedules/c.yaml", "schedules/d.yaml"]);
-    assert.ok(summary.refused[1].reasons[0].includes("repository 'team'"));
-    assert.ok(summary.refused[2].reasons[0].includes("a one-time job of this app"));
+    assert.equal(summary.created, 0);
+    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/a.yaml#Rotate logs", "schedules/b.yaml#rotate LOGS", "schedules/c.yaml#Shared name", "schedules/d.yaml#App made"]);
+    assert.match(summary.refused[0].reasons[0], /the name 'Rotate logs' is given twice: here \(schedules\/a\.yaml, entry 1\) and in schedules\/b\.yaml \(entry 1\)/);
+    assert.ok(summary.refused[2].reasons[0].includes("repository 'team'"));
+    assert.ok(summary.refused[3].reasons[0].includes("a one-time job of this app"));
   });
 
   test("the fields AnsibleForms does not use are said in the pull output", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs", { forks: 5, labels: ["x"] }));
     const summary = await ScheduleRepo.syncRepository("ops");
-    assert.ok(ScheduleRepo.summaryText(summary).includes("schedules/a.yaml: kept in the file, not used by AnsibleForms: forks, labels"));
+    assert.ok(ScheduleRepo.summaryText(summary).includes("schedules/a.yaml#Rotate logs: kept in the file, not used by AnsibleForms: forks, labels"));
   });
 
-  test("a file named as a recurring schedule of the app takes it over : git wins, its runs kept", async () => {
+  test("an entry named as a recurring schedule of the app takes it over : git wins, its runs kept", async () => {
     rows.push({ id: 40, name: "Rotate logs", form: "Report", cron: "0 3 * * *", repository: null, repo_file: null, owner: null, one_time_run: 0, state: "idle", last_run: "2026-10-19 03:00:00", status: "success" });
     nextId = 50;
     writeFile("ops", "a.yaml", scheduleYaml("rotate logs", { extra_data: { days: 3 } }));
@@ -353,7 +361,7 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     );
   });
 
-  test("activation : pulled, git wins on a clash, convertible crons written as files, the rest kept in the app", async () => {
+  test("activation : pulled, git wins on a clash, convertible crons written to the first file holding schedules:, the rest kept in the app", async () => {
     appRows();
     const report = await ScheduleRepo.activate("ops");
     assert.deepEqual(pulls, ["ops"]);
@@ -366,22 +374,23 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     const clash = rows.find((r) => r.id === 5);
     assert.equal(clash.repo_file, "schedules/clash.yaml");
     assert.equal(clash.last_run, "2026-10-19 04:00:00");
-    // the written ones : a file each, the row linked, on its rrule
+    // the written ones : entries after the one there, each row linked, on its rrule
     const five = rows.find((r) => r.id === 1);
     assert.equal(five.repository, "ops");
-    assert.equal(five.repo_file, "schedules/every-five.yaml");
+    assert.equal(five.repo_file, "schedules/clash.yaml");
     assert.equal(five.cron, null);
     assert.match(five.rrule, /RRULE:FREQ=MINUTELY;INTERVAL=5$/);
-    const file = YAML.parse(readFile("ops", "every-five.yaml"));
-    assert.equal(file.name, "Every five");
+    const text = readFile("ops", "clash.yaml");
+    assert.deepEqual(YAML.parse(text).schedules.map((e) => e.name), ["Clash", "Every five", "Weekdays"]);
+    const file = entryOf(text, "Every five");
     assert.equal(file.rrule, five.rrule);
     assert.deepEqual(file.extra_data, { a: 1 });
-    assert.equal(YAML.parse(readFile("ops", "weekdays.yaml")).enabled, false);
+    assert.equal(entryOf(text, "Weekdays").enabled, false);
     // the inconvertible cron and the planned job stay in the app, never written
     assert.equal(rows.find((r) => r.id === 3).repository, null);
     assert.equal(rows.find((r) => r.id === 3).cron, "0 0 1 * 1");
     assert.equal(rows.find((r) => r.id === 4).repository, null);
-    assert.deepEqual(fs.readdirSync(path.join(ROOT, "ops", "schedules")).sort(), ["clash.yaml", "every-five.yaml", "weekdays.yaml"]);
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, "ops", "schedules")).sort(), ["clash.yaml"]);
   });
 
   test("a pull that fails is said, the working copy used as it is", async () => {
@@ -392,14 +401,16 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     assert.deepEqual(report.written, ["Every five", "Weekdays"]);
   });
 
-  test("a file name taken gets a number", async () => {
-    appRows();
-    writeFile("ops", "every-five.yaml", "not: a schedule\n");
+  test("no file holding schedules: : written to schedules.yaml at the root, never over a file of that name that is not theirs", async () => {
+    rows.push({ id: 1, name: "Every five", form: "Report", cron: "*/5 * * * *", rrule: null, enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 0 });
+    fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, "ops", "schedules.yaml"), "not: a schedule\n");
     await ScheduleRepo.activate("ops", { pull: false });
-    assert.equal(rows.find((r) => r.id === 1).repo_file, "schedules/every-five-2.yaml");
+    assert.equal(rows.find((r) => r.id === 1).repo_file, "schedules-2.yaml");
+    assert.equal(fs.readFileSync(path.join(ROOT, "ops", "schedules.yaml"), "utf8"), "not: a schedule\n");
   });
 
-  test("a file refused for its rrule declares its name : the app's schedule of that name stays in the app, never a second file", async () => {
+  test("an entry refused for its rrule declares its name : the app's schedule of that name stays in the app, never a second entry", async () => {
     rows.push({ id: 1, name: "Every five", form: "Report", cron: "*/5 * * * *", rrule: null, enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 0 });
     nextId = 10;
     // its DTSTART without a time zone : refused
@@ -410,7 +421,7 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     const report = await ScheduleRepo.activate("ops", { pull: false });
     assert.deepEqual(report.written, []);
     assert.deepEqual(report.kept.map((k) => k.name), ["Every five"]);
-    assert.match(report.kept[0].reason, /^ops\/schedules\/every-five\.yaml has its name but is not read in/);
+    assert.match(report.kept[0].reason, /^ops\/schedules\/every-five\.yaml#Every five has its name but is not read in/);
     assert.deepEqual(fs.readdirSync(path.join(ROOT, "ops", "schedules")), ["every-five.yaml"]);
     // the file fixed in git : the next pull takes the app's schedule over
     writeFile("ops", "every-five.yaml", scheduleYaml("Every five"));
@@ -455,14 +466,14 @@ describe("no longer the schedules repository, its schedules stay in the app", ()
 });
 
 // ─── app to git ────────────────────────────────────────────────────────────────
-describe("an edit in the app goes to the file", () => {
-  test("a new schedule in a repository : a new file in the export's form, and its row", async () => {
+describe("an edit in the app goes to its entry", () => {
+  test("a new schedule in a repository : a new entry in the export's form, in schedules.yaml made, and its row", async () => {
     fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
     const id = await ScheduleRepo.create("ops", { name: "Weekly Report", form: "Report", rrule: RRULE, extra_vars: "to: ops\n" });
     const row = rows.find((r) => r.id === id);
-    assert.equal(row.repo_file, "schedules/weekly-report.yaml");
+    assert.equal(row.repo_file, "schedules.yaml");
     assert.equal(row.repository, "ops");
-    const obj = YAML.parse(readFile("ops", "weekly-report.yaml"));
+    const obj = entryOf(fs.readFileSync(path.join(ROOT, "ops", "schedules.yaml"), "utf8"), "Weekly Report");
     assert.equal(obj.name, "Weekly Report");
     assert.deepEqual(obj.unified_job_template, { name: "Report", type: "job_template" });
     assert.deepEqual(obj.extra_data, { to: "ops" });
@@ -489,16 +500,16 @@ describe("an edit in the app goes to the file", () => {
     await assert.rejects(ScheduleRepo.create("ops", { name: "x", form: "Nope", rrule: RRULE }), { name: "BadRequestError" });
     rows.push({ id: 50, name: "Taken", repository: null });
     await assert.rejects(ScheduleRepo.create("ops", { name: "taken", form: "Report", rrule: RRULE }), { name: "ConflictError" });
-    assert.deepEqual(fs.existsSync(path.join(ROOT, "ops", "schedules")) ? fs.readdirSync(path.join(ROOT, "ops", "schedules")) : [], []);
+    assert.equal(fs.existsSync(path.join(ROOT, "ops", "schedules.yaml")), false);
   });
 
-  test("an edit writes the changed fields into the file, keeping what AnsibleForms does not use", async () => {
+  test("an edit writes the changed fields into its entry, keeping what AnsibleForms does not use", async () => {
     writeFile("ops", "a.yaml", `# owned by ops\n${scheduleYaml("Rotate logs", { forks: 5, limit: "web", custom: { a: 1 } })}`);
     await ScheduleRepo.syncRepository("ops");
     await ScheduleRepo.update(rows[0], { name: "Rotate", enabled: 0, extra_vars: "days: 3", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1" });
     const text = readFile("ops", "a.yaml");
     assert.ok(text.startsWith("# owned by ops\n"));
-    const obj = YAML.parse(text);
+    const obj = entryOf(text);
     assert.equal(obj.name, "Rotate");
     assert.equal(obj.enabled, false);
     assert.deepEqual(obj.extra_data, { days: 3 });
@@ -547,7 +558,7 @@ describe("an edit in the app goes to the file", () => {
     assert.deepEqual(rows, []);
   });
 
-  test("a delete removes the file and the row", async () => {
+  test("a delete removes the entry, the file it empties, and the row", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
     await ScheduleRepo.syncRepository("ops");
     await ScheduleRepo.delete(rows[0]);

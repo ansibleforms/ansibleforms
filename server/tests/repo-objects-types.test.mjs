@@ -168,7 +168,7 @@ describe.each(TYPES)("$key", (type) => {
   const desc = () => RepoObjects.descriptorOf(type.key);
 
   test("a pull makes its object from its file, linked to it", async () => {
-    fx.writeFile(repo, type.folder, "a.yaml", type.file);
+    fx.writeEntry(repo, `${type.folder}/a.yaml`, type.key, type.file);
     const summary = await RepoObjects.syncRepository(await desc(), repo);
     assert.deepEqual(summary.refused, []);
     assert.equal(summary.created, 1);
@@ -178,13 +178,13 @@ describe.each(TYPES)("$key", (type) => {
     type.check(row);
   });
 
-  test("activation : the app's object written to its folder, without its secret ; deactivation unlinks it", async () => {
+  test("activation : the app's object written to <key>.yaml, without its secret ; deactivation unlinks it", async () => {
     fx.state.tables[type.table].push({ ...type.app });
     const report = await RepoObjects.activate(await desc(), repo);
     assert.ok(report.written.includes(type.app.name), JSON.stringify(report));
-    const files = fx.listFiles(repo, type.folder);
-    const file = files.map((f) => fx.readObject(repo, type.folder, f)).find((o) => o.name === type.app.name);
-    assert.ok(file, files.join(", "));
+    assert.equal(report.file, `${type.key}.yaml`);
+    const file = fx.readEntry(repo, `${type.key}.yaml`, type.key, type.app.name);
+    assert.ok(file, fx.textOf(repo, `${type.key}.yaml`));
     if (type.secret) {
       assert.equal(file[type.secret], undefined);
       assert.ok(report.withoutSecret.includes(type.app.name));
@@ -196,20 +196,20 @@ describe.each(TYPES)("$key", (type) => {
   });
 
   test("an edit in the app rewrites only the changed field", async () => {
-    fx.writeFile(repo, type.folder, "a.yaml", type.file);
+    fx.writeEntry(repo, `${type.folder}/a.yaml`, type.key, type.file);
     await RepoObjects.syncRepository(await desc(), repo);
     const row = fx.rowNamed(type.table, type.file.name);
     const before = { ...row };
     row[type.edit[0]] = type.edit[1];
     CrudModel.flushAllLocal();
     assert.equal(await RepoObjects.appUpdated(type.key, before, row.id), true);
-    assert.deepEqual(fx.readObject(repo, type.folder, "a.yaml"), { ...type.file, [type.edit[0]]: type.edit[1] });
+    assert.deepEqual(fx.readEntry(repo, `${type.folder}/a.yaml`, type.key)[0], { ...type.file, [type.edit[0]]: type.edit[1] });
   });
 
   test("a pull of the file it made changes nothing : what the file leaves out is not the model's own choice", async () => {
     const file = { ...type.file };
     delete file.position;
-    fx.writeFile(repo, type.folder, "a.yaml", file);
+    fx.writeEntry(repo, `${type.folder}/a.yaml`, type.key, file);
     assert.equal((await RepoObjects.syncRepository(await desc(), repo)).created, 1);
     CrudModel.flushAllLocal();
     const second = await RepoObjects.syncRepository(await desc(), repo);
@@ -223,10 +223,10 @@ describe.each(TYPES.filter((t) => t.secret))("$key : its secret", (type) => {
   const desc = () => RepoObjects.descriptorOf(type.key);
 
   test("a plain secret is refused, an ${ENV} one taken", async () => {
-    fx.writeFile(repo, type.folder, "plain.yaml", { ...type.file, [type.secret]: "plain-text" });
+    fx.writeEntry(repo, `${type.folder}/plain.yaml`, type.key, { ...type.file, [type.secret]: "plain-text" });
     const summary = await RepoObjects.syncRepository(await desc(), repo);
     assert.match(summary.refused[0].reasons[0], new RegExp(`${type.secret} must be an \\$\\{ENV\\} reference`));
-    fx.writeFile(repo, type.folder, "plain.yaml", { ...type.file, [type.secret]: "${HOOK_URL}" });
+    fx.writeEntry(repo, `${type.folder}/plain.yaml`, type.key, { ...type.file, [type.secret]: "${HOOK_URL}" });
     assert.equal((await RepoObjects.syncRepository(await desc(), repo)).refused.length, 0);
   });
 });
@@ -237,7 +237,7 @@ describe.each(TYPES.filter((t) => t.file.credential))("$key : its credential", (
 
   test("its credential not there yet : it waits", async () => {
     fx.state.tables.credentials = [];
-    fx.writeFile(repo, type.folder, "a.yaml", type.file);
+    fx.writeEntry(repo, `${type.folder}/a.yaml`, type.key, type.file);
     const summary = await RepoObjects.syncRepository(await desc(), repo);
     assert.equal(summary.created, 0);
     assert.match(summary.waiting[0].reasons[0], new RegExp(`waits for the credential '${type.file.credential}'`));
@@ -245,8 +245,8 @@ describe.each(TYPES.filter((t) => t.file.credential))("$key : its credential", (
 });
 
 describe("what the new types bring to the engine", () => {
-  test("the main LDAP directory is never deleted : its file removed is refused, it stays linked", async () => {
-    fx.writeFile(repoOf("ldap"), "ldap", "main.yaml", { name: "main", search_base: "dc=git" });
+  test("the main LDAP directory is never deleted : its entry removed is refused, it stays linked", async () => {
+    fx.writeEntry(repoOf("ldap"), "ldap/main.yaml", "ldap", { name: "main", search_base: "dc=git" });
     const first = await RepoObjects.syncRepository(await RepoObjects.descriptorOf("ldap"), repoOf("ldap"));
     assert.deepEqual(first.matched, ["main"], "a file named main takes the main directory over");
     assert.equal(fx.rowNamed("ldap", "main").search_base, "dc=git");
@@ -258,22 +258,23 @@ describe("what the new types bring to the engine", () => {
     assert.equal(fx.rowNamed("ldap", "main").repository, repoOf("ldap"));
   });
 
-  test("the labels keep their places : written in their order, a move rewrites the places in the files", async () => {
+  test("the labels keep their places : written in their order, a move rewrites the places in their entries", async () => {
     fx.state.tables.labels.push(
       { id: 41, name: "Second", color: "blue", enabled: 1, position: 2 },
       { id: 40, name: "First", color: "red", enabled: 1, position: 1 },
     );
     const report = await RepoObjects.activate(await RepoObjects.descriptorOf("labels"), repoOf("labels"));
     assert.deepEqual(report.written, ["First", "Second"]);
-    assert.equal(fx.readObject(repoOf("labels"), "labels", "first.yaml").position, 1);
+    // in their order in labels.yaml
+    assert.deepEqual(fx.readEntry(repoOf("labels"), "labels.yaml", "labels").map((l) => [l.name, l.position]), [["First", 1], ["Second", 2]]);
     // moved in the app : the places swap, both files follow
     const before = fx.state.tables.labels.map((r) => ({ ...r }));
     fx.rowNamed("labels", "First").position = 2;
     fx.rowNamed("labels", "Second").position = 1;
     CrudModel.flushAllLocal();
     await RepoObjects.appChangedRows("labels", before);
-    assert.equal(fx.readObject(repoOf("labels"), "labels", "first.yaml").position, 2);
-    assert.equal(fx.readObject(repoOf("labels"), "labels", "second.yaml").position, 1);
+    assert.equal(fx.readEntry(repoOf("labels"), "labels.yaml", "labels", "First").position, 2);
+    assert.equal(fx.readEntry(repoOf("labels"), "labels.yaml", "labels", "Second").position, 1);
     // and a pull of them changes nothing
     CrudModel.flushAllLocal();
     assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("labels"), repoOf("labels"))).unchanged, 2);
@@ -282,7 +283,7 @@ describe("what the new types bring to the engine", () => {
   test("a credential any of them names cannot lose its file", async () => {
     fx.state.tables.credentials = [];
     fx.state.tables.repositories.push({ id: 99, name: "creds", use_for_credentials: 1 });
-    fx.writeFile("creds", "credentials", "corp-bind.yaml", { name: "corp-bind", credential_type: "ldap", host: "ldap.corp" });
+    fx.writeEntry("creds", "credentials/corp-bind.yaml", "credentials", { name: "corp-bind", credential_type: "ldap", host: "ldap.corp" });
     const credentials = await RepoObjects.descriptorOf("credentials");
     await RepoObjects.syncRepository(credentials, "creds");
     fx.state.tables.ldap.push({ id: 5, name: "corp", credential: "corp-bind" });
@@ -297,7 +298,7 @@ describe("a value as the database gives it", () => {
     fx.state.tables.oauth2_providers.push({ id: 30, name: "google", provider: "oidc", issuer: "https://accounts.google.com", client_id: "id", client_secret: "enc:sec", enable: 1, extra: { prompt: "login" } });
     const desc = await RepoObjects.descriptorOf("sso");
     await RepoObjects.activate(desc, repoOf("sso"));
-    assert.equal(fx.readObject(repoOf("sso"), "sso", "google.yaml").extra, '{"prompt":"login"}');
+    assert.equal(fx.readEntry(repoOf("sso"), "sso.yaml", "sso", "google").extra, '{"prompt":"login"}');
     CrudModel.flushAllLocal();
     const summary = await RepoObjects.syncRepository(desc, repoOf("sso"));
     assert.deepEqual(summary.refused, []);
@@ -310,7 +311,7 @@ describe("a yes or no whose default is on", () => {
     fx.state.tables.notification_channels.push({ id: 30, name: "hook", type: "webhook", url: "https://hook.example.com", method: "POST", verify_tls: 0, enabled: 1, description: "" });
     const desc = await RepoObjects.descriptorOf("notifications");
     await RepoObjects.activate(desc, repoOf("notifications"));
-    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "hook.yaml").verify_tls, false);
+    assert.equal(fx.readEntry(repoOf("notifications"), "notifications.yaml", "notifications", "hook").verify_tls, false);
     // the same file pulled into an app without the channel (another instance, a database rebuilt)
     fx.state.tables.notification_channels = [];
     CrudModel.flushAllLocal();
@@ -323,7 +324,7 @@ describe("an RTE that asked to join, rejected", () => {
   test("its credential a credentials repository holds : its file goes too, the next pull does not make it again", async () => {
     fx.state.tables.repositories.push({ id: 91, name: "creds", use_for_credentials: 1 });
     fx.state.tables.credentials.push({ id: 9, name: "edge-rte", credential_type: "rte", password: "enc:t", description: "", managed: 0, repository: "creds", repo_file: "credentials/edge-rte.yaml" });
-    fx.writeFile("creds", "credentials", "edge-rte.yaml", { name: "edge-rte", credential_type: "rte" });
+    fx.writeEntry("creds", "credentials/edge-rte.yaml", "credentials", { name: "edge-rte", credential_type: "rte" });
     fx.state.tables.runners.push({ id: 55, name: "edge", type: "rte", credential: "edge-rte", pending: 1 });
     const { default: Runner } = await import("../src/models/runner.model.js");
     await Runner.reject(55);
@@ -339,7 +340,7 @@ describe("a file leaves out what the model would choose for a new object of the 
   test("a second SSO provider of a type, its file without enable : not used for sign-in, the one in use stays", async () => {
     fx.state.tables.oauth2_providers.push({ id: 61, name: "current", provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable: 1, managed: 0 });
     process.env.SSO_SECRET = "s";
-    fx.writeFile(repoOf("sso"), "sso", "new.yaml", { name: "new", provider: "oidc", issuer: "https://idp2", client_id: "id2", client_secret: "${SSO_SECRET}" });
+    fx.writeEntry(repoOf("sso"), "sso/new.yaml", "sso", { name: "new", provider: "oidc", issuer: "https://idp2", client_id: "id2", client_secret: "${SSO_SECRET}" });
     const desc = await RepoObjects.descriptorOf("sso");
     await RepoObjects.syncRepository(desc, repoOf("sso"));
     CrudModel.flushAllLocal();
@@ -352,7 +353,7 @@ describe("a file leaves out what the model would choose for a new object of the 
   test("the first runner of a type, its file without is_default : not the default, the next pull changes nothing", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     process.env.RTE_TOKEN_A = "t";
-    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}" });
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}" });
     const desc = await RepoObjects.descriptorOf("runners");
     await RepoObjects.syncRepository(desc, "run-repo");
     assert.equal(Number(fx.rowNamed("runners", "a").is_default || 0), 0);
@@ -365,7 +366,7 @@ describe("a runner's file with an address its model keeps otherwise : the next p
   test("its address with a slash at its end", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     process.env.RTE_TOKEN_A = "t";
-    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000/", token: "${RTE_TOKEN_A}" });
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", { name: "a", type: "rte", uri: "https://a:8000/", token: "${RTE_TOKEN_A}" });
     const desc = await RepoObjects.descriptorOf("runners");
     await RepoObjects.syncRepository(desc, "run-repo");
     assert.equal(fx.rowNamed("runners", "a").uri, "https://a:8000");
@@ -376,7 +377,7 @@ describe("a runner's file with an address its model keeps otherwise : the next p
   test("its own address beside a credential that gives one : the credential's, said", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     fx.state.tables.credentials.push({ id: 8, name: "rte-login", credential_type: "rte", url: "https://cred:8000", password: "enc:t" });
-    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", rte_mode: "inbound", uri: "https://own:8000", credential: "rte-login" });
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", { name: "a", type: "rte", rte_mode: "inbound", uri: "https://own:8000", credential: "rte-login" });
     const desc = await RepoObjects.descriptorOf("runners");
     const first = await RepoObjects.syncRepository(desc, "run-repo");
     assert.equal(first.created, 1, JSON.stringify(first));
@@ -393,16 +394,16 @@ describe("a change in the app that changes other objects of the type too", () =>
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     const runner = (name, isDefault) => ({ name, type: "rte", uri: `https://${name}:8000`, token: "enc:t", is_default: isDefault, enabled: 1, description: "", repository: "run-repo", repo_file: `runners/${name}.yaml` });
     fx.state.tables.runners.push({ id: 51, ...runner("a", 1) }, { id: 52, ...runner("b", 0) });
-    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", is_default: true, enabled: true });
-    fx.writeFile("run-repo", "runners", "b.yaml", { name: "b", type: "rte", uri: "https://b:8000", enabled: true });
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", { name: "a", type: "rte", uri: "https://a:8000", is_default: true, enabled: true });
+    fx.writeEntry("run-repo", "runners/b.yaml", "runners", { name: "b", type: "rte", uri: "https://b:8000", enabled: true });
     const { default: controller } = await import("../src/controllers/v2/runner.controller.js");
     fx.state.calls.length = 0;
     const r = await asAdmin(controller.update, { body: { is_default: 1 }, params: { id: "52" } });
     assert.ok(r.status < 300, JSON.stringify(r.data));
     // the repository's claim taken once, before the save, both files written under it
     assert.deepEqual(fx.state.calls.filter((c) => /run-repo/.test(c)), ["claim:run-repo", "release:run-repo"]);
-    assert.equal(fx.readObject("run-repo", "runners", "b.yaml").is_default, true);
-    assert.equal(fx.readObject("run-repo", "runners", "a.yaml").is_default, undefined, "a is no longer the default");
+    assert.equal(fx.readEntry("run-repo", "runners/b.yaml", "runners")[0].is_default, true);
+    assert.equal(fx.readEntry("run-repo", "runners/a.yaml", "runners")[0].is_default, undefined, "a is no longer the default");
     // and the next pull changes nothing : the user's choice stays
     CrudModel.flushAllLocal();
     assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("runners"), "run-repo")).updated, 0);
@@ -412,13 +413,13 @@ describe("a change in the app that changes other objects of the type too", () =>
   test("a mail channel made the active one : the former active one's file says so too", async () => {
     const channel = (id, name, active) => ({ id, name, type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: 1, is_active: active, description: "", repository: repoOf("notifications"), repo_file: `notifications/${name}.yaml` });
     fx.state.tables.notification_channels.push(channel(71, "a", 1), channel(72, "b", 0));
-    fx.writeFile(repoOf("notifications"), "notifications", "a.yaml", { name: "a", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true, is_active: true });
-    fx.writeFile(repoOf("notifications"), "notifications", "b.yaml", { name: "b", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true });
+    fx.writeEntry(repoOf("notifications"), "notifications/a.yaml", "notifications", { name: "a", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true, is_active: true });
+    fx.writeEntry(repoOf("notifications"), "notifications/b.yaml", "notifications", { name: "b", type: "mail", credential: "smtp-login", from_address: "af@example.com", enabled: true });
     const { default: controller } = await import("../src/controllers/v2/notificationChannel.controller.js");
     const r = await asAdmin(controller.update, { body: { is_active: 1 }, params: { id: "72" } });
     assert.ok(r.status < 300, JSON.stringify(r.data));
-    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "b.yaml").is_active, true);
-    assert.equal(fx.readObject(repoOf("notifications"), "notifications", "a.yaml").is_active, undefined, "a is no longer the active one");
+    assert.equal(fx.readEntry(repoOf("notifications"), "notifications/b.yaml", "notifications")[0].is_active, true);
+    assert.equal(fx.readEntry(repoOf("notifications"), "notifications/a.yaml", "notifications")[0].is_active, undefined, "a is no longer the active one");
     // and the next pull changes nothing : the user's choice stays
     CrudModel.flushAllLocal();
     assert.equal((await RepoObjects.syncRepository(await RepoObjects.descriptorOf("notifications"), repoOf("notifications"))).updated, 0);
@@ -428,13 +429,13 @@ describe("a change in the app that changes other objects of the type too", () =>
   test("an SSO provider enabled : the other provider of its type turned off in its file too", async () => {
     const provider = (id, name, enable) => ({ id, name, provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable, managed: 0, repository: repoOf("sso"), repo_file: `sso/${name}.yaml` });
     fx.state.tables.oauth2_providers.push(provider(61, "one", 1), provider(62, "two", 0));
-    fx.writeFile(repoOf("sso"), "sso", "one.yaml", { name: "one", provider: "oidc", issuer: "https://idp", client_id: "id", enable: true });
-    fx.writeFile(repoOf("sso"), "sso", "two.yaml", { name: "two", provider: "oidc", issuer: "https://idp", client_id: "id", enable: false });
+    fx.writeEntry(repoOf("sso"), "sso/one.yaml", "sso", { name: "one", provider: "oidc", issuer: "https://idp", client_id: "id", enable: true });
+    fx.writeEntry(repoOf("sso"), "sso/two.yaml", "sso", { name: "two", provider: "oidc", issuer: "https://idp", client_id: "id", enable: false });
     const { default: controller } = await import("../src/controllers/v2/oauth2.controller.js");
     const r = await asAdmin(controller.update, { body: { provider: "oidc", enable: 1 }, params: { id: "62" } });
     assert.ok(r.status < 300, JSON.stringify(r.data));
-    assert.equal(fx.readObject(repoOf("sso"), "sso", "two.yaml").enable, true);
-    assert.equal(fx.readObject(repoOf("sso"), "sso", "one.yaml").enable, undefined, "one is turned off : no longer used for sign-in");
+    assert.equal(fx.readEntry(repoOf("sso"), "sso/two.yaml", "sso")[0].enable, true);
+    assert.equal(fx.readEntry(repoOf("sso"), "sso/one.yaml", "sso")[0].enable, undefined, "one is turned off : no longer used for sign-in");
   });
 });
 
@@ -491,12 +492,12 @@ describe("a flag one object at most has, that two files give", () => {
     const repo = repoOf(c.key);
     const linked = (row) => ({ ...row, repository: repo, repo_file: `${c.folder}/${row.name}.yaml` });
     fx.state.tables[c.table].push(linked(c.row(51, "a", 1)), linked(c.row(52, "b", 0)));
-    fx.writeFile(repo, c.folder, "a.yaml", c.file("a"));
+    fx.writeEntry(repo, `${c.folder}/a.yaml`, c.key, c.file("a"));
     // b's file edited in git to take the flag, a's left as it is
-    fx.writeFile(repo, c.folder, "b.yaml", c.file("b"));
+    fx.writeEntry(repo, `${c.folder}/b.yaml`, c.key, c.file("b"));
     const desc = await RepoObjects.descriptorOf(c.key);
     const first = await RepoObjects.syncRepository(desc, repo);
-    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/a.yaml, ${c.folder}/b.yaml each say it`));
+    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/a.yaml#a, ${c.folder}/b.yaml#b each say it`));
     assert.equal(Number(fx.rowNamed(c.table, "a")[c.field]), 1);
     assert.equal(Number(fx.rowNamed(c.table, "b")[c.field] || 0), 0);
     CrudModel.flushAllLocal();
@@ -509,15 +510,15 @@ describe("a flag one object at most has, that two files give", () => {
     const repo = repoOf(c.key);
     const linked = (row) => ({ ...row, repository: repo, repo_file: `${c.folder}/${row.name}.yaml` });
     fx.state.tables[c.table].push(linked(c.row(51, "a", 1)), linked(c.row(52, "b", 0)), linked(c.row(53, "c", 0)));
-    fx.writeFile(repo, c.folder, "a.yaml", { ...c.file("a"), [c.field]: false });
-    fx.writeFile(repo, c.folder, "b.yaml", c.file("b"));
-    fx.writeFile(repo, c.folder, "c.yaml", c.file("c"));
+    fx.writeEntry(repo, `${c.folder}/a.yaml`, c.key, { ...c.file("a"), [c.field]: false });
+    fx.writeEntry(repo, `${c.folder}/b.yaml`, c.key, c.file("b"));
+    fx.writeEntry(repo, `${c.folder}/c.yaml`, c.key, c.file("c"));
     const desc = await RepoObjects.descriptorOf(c.key);
     const first = await RepoObjects.syncRepository(desc, repo);
-    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/b.yaml, ${c.folder}/c.yaml each say it.*\\(${c.folder}/a.yaml keeps it until then\\)`));
+    assert.match(first.notes.join("\n"), new RegExp(`${c.field} not applied: ${c.folder}/b.yaml#b, ${c.folder}/c.yaml#c each say it.*\\(${c.folder}/a.yaml#a keeps it until then\\)`));
     assert.deepEqual(["a", "b", "c"].map((n) => Number(fx.rowNamed(c.table, n)[c.field] || 0)), [1, 0, 0]);
     // c's file fixed : b alone says it, a's file takes it off, both applied
-    fx.writeFile(repo, c.folder, "c.yaml", { ...c.file("c"), [c.field]: false });
+    fx.writeEntry(repo, `${c.folder}/c.yaml`, c.key, { ...c.file("c"), [c.field]: false });
     CrudModel.flushAllLocal();
     const second = await RepoObjects.syncRepository(desc, repo);
     assert.deepEqual(second.notes, []);
@@ -527,7 +528,7 @@ describe("a flag one object at most has, that two files give", () => {
   test("two new runner files of a type, both the default : neither made the default, both made", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     process.env.RTE_TOKEN_A = "t";
-    for (const name of ["a", "b"]) fx.writeFile("run-repo", "runners", `${name}.yaml`, { name, type: "rte", uri: `https://${name}:8000`, token: "${RTE_TOKEN_A}", is_default: true });
+    for (const name of ["a", "b"]) fx.writeEntry("run-repo", `runners/${name}.yaml`, "runners", { name, type: "rte", uri: `https://${name}:8000`, token: "${RTE_TOKEN_A}", is_default: true });
     const desc = await RepoObjects.descriptorOf("runners");
     assert.equal((await RepoObjects.syncRepository(desc, "run-repo")).created, 2);
     assert.equal(Number(fx.rowNamed("runners", "a").is_default || 0) + Number(fx.rowNamed("runners", "b").is_default || 0), 0);
@@ -538,8 +539,8 @@ describe("a flag one object at most has, that two files give", () => {
   test("two runner files, the default of different types : both applied", async () => {
     fx.state.tables.repositories.push({ id: 90, name: "run-repo", use_for_runners: 1 });
     process.env.RTE_TOKEN_A = "t";
-    fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}", is_default: true });
-    fx.writeFile("run-repo", "runners", "b.yaml", { name: "b", type: "semaphore", uri: "https://b", token: "${RTE_TOKEN_A}", is_default: true });
+    fx.writeEntry("run-repo", "runners/a.yaml", "runners", { name: "a", type: "rte", uri: "https://a:8000", token: "${RTE_TOKEN_A}", is_default: true });
+    fx.writeEntry("run-repo", "runners/b.yaml", "runners", { name: "b", type: "semaphore", uri: "https://b", token: "${RTE_TOKEN_A}", is_default: true });
     const summary = await RepoObjects.syncRepository(await RepoObjects.descriptorOf("runners"), "run-repo");
     assert.deepEqual(summary.notes, []);
     assert.equal(Number(fx.rowNamed("runners", "a").is_default), 1);

@@ -244,11 +244,11 @@ class Repository extends CrudModel {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
     // the branch it pulls and pushes is required, as its name ; the seed's own, and a
-    // repositories.yaml's entry (in the seed's format), may leave it out (the remote's default)
+    // repositories: entry (in the seed's format), may leave it out (the remote's default)
     if (!opts.fromSeed && !opts.fromRepo && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
-    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories.yaml)
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories: entry)
     normalizeUsageFlags(data);
     // one repository at most per object type (the schedules, the credentials ...), and no usage of
     // a later version
@@ -262,7 +262,7 @@ class Repository extends CrudModel {
     // repositories page showed a repository stuck blank with the reason nowhere the user
     // could reach. Record it where they are already looking.
     // the activation below takes the app's objects and says what it did : the clone only reads.
-    // Tracked until it is done : a pull whose repositories.yaml made it waits for it (a while)
+    // Tracked until it is done : a pull whose repositories: entries made it waits for it (a while)
     // before reading what names its content (lib/repoObjects/engine.js afterClones)
     const done = Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
@@ -303,12 +303,12 @@ class Repository extends CrudModel {
     if (data.name !== undefined && data.name !== name && !Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
-    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories.yaml)
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories: entry)
     normalizeUsageFlags(data);
     // one repository at most per object type : turned on here while another one has it, refused ;
     // a usage of a later version too
     await (await repoObjects()).assertUsageAllowed(data, name, repo);
-    // one a repositories.yaml holds : its uri goes to git, so it never carries a user or a token
+    // one a repositories: entry holds : its uri goes to git, so it never carries a user or a token
     if (repo.repository && !opts.fromRepo && uriCarriesSecret(data.uri)) {
       throw new Errors.BadRequestError(`Repository '${name}' is kept in ${repo.repository}/${repo.repo_file}: its uri must not carry a user or a token, give it a credential instead`);
     }
@@ -317,7 +317,7 @@ class Repository extends CrudModel {
     // schedule (Scheduled pull off) or its credential. Removed with the others, an empty
     // value left the old one in place, so a repository could never stop being pulled on
     // a schedule nor drop its credential.
-    // A repository's repositories.yaml (opts.fromRepo) clears whatever its entry no longer declares,
+    // A repository's repositories: entry (opts.fromRepo) clears whatever its entry no longer declares,
     // each to the value it gives (a description emptied, a column back to null).
     const cleared = Object.fromEntries(
       Object.keys(data)
@@ -935,7 +935,7 @@ class Repository extends CrudModel {
       // its credential : what the pull signs in with, and the password masked in the output
       if (pullRepo) pullRepo = await Repository.withCredential(pullRepo).catch(() => pullRepo)
       output = await Repo.pull(name, Repository.gitAuth(pullRepo), pullRepo?.uri)
-      // its schedules folder read into the schedule table, still under the claim : what changed
+      // its schedules: entries read into the schedule table, still under the claim : what changed
       // is said under git's output
       if (objectTypesOf(pullRepo).length) {
         output += await (await repoObjects()).afterGit(name, pullRepo)

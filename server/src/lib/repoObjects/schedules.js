@@ -1,6 +1,6 @@
 'use strict';
-// The Schedules type of the repository-backed objects (lib/repoObjects/engine.js) : one schedule per
-// YAML file in a repository's `schedules` folder, read by lib/scheduleFiles.js (its own format, the
+// The Schedules type of the repository-backed objects (lib/repoObjects/engine.js) : the entries of
+// the schedules: lists of a repository's files, read by lib/scheduleFiles.js (its own format, the
 // export form of one schedule), timed by its iCal rrule (lib/scheduleRrule.js), run as the Schedule
 // Service as every recurring schedule. What is the schedules' own is here : how a file reads (its
 // form must exist), how a row is stored, which app schedules a repository takes (the recurring
@@ -11,7 +11,7 @@ import YAML from "yaml";
 import logger from "../logger.js";
 import mysql from "../../models/db.model.js";
 import Form from "../../models/form.model.js";
-import { SCHEDULES_FOLDER, parseScheduleFile, newScheduleFile, extraDataOf, promptsOf } from "../scheduleFiles.js";
+import { KEY_ORDER, parseSchedule, newScheduleEntry, extraDataOf, promptsOf } from "../scheduleFiles.js";
 import { validateRrule, normalizeRrule } from "../scheduleRrule.js";
 import { cronToRrule } from "../cronToRrule.js";
 import logConfig from "../../../config/log.config.js";
@@ -53,7 +53,8 @@ export function launchOptionsText(options) {
 /**
  * The names of the forms there are, to check the form a schedule runs ; null when they cannot be
  * read (the configuration not valid, a key file broken) : fail closed, a schedule is then never
- * taken unchecked - a file is refused (kept as it was, read again by the next pull : schedules.parse),
+ * taken unchecked - an entry is refused (kept as it was, read again by the next pull :
+ * schedules.parseEntry),
  * a save of the app refused (models/scheduleRepo.model.js checkValues).
  *
  * Returns:
@@ -70,7 +71,7 @@ export async function formNames() {
 }
 
 /**
- * A schedule of a file as the schedule table keeps it : its launch options the file's, and those
+ * A schedule of an entry as the schedule table keeps it : its launch options the entry's, and those
  * of its row no prompt of a file can give, kept in the app only (promptsOf).
  *
  * Args:
@@ -102,7 +103,8 @@ const schedules = {
   key: "schedules",
   flag: "use_for_schedules",
   model: "schedule",
-  folder: SCHEDULES_FOLDER,
+  nameField: "name",
+  keyOrder: KEY_ORDER,
   title: "Schedules",
   noun: "schedule",
   references: [],
@@ -112,11 +114,11 @@ const schedules = {
   context: () => formNames(),
 
   /**
-   * Reads a schedule file ; its form must exist. The forms not readable (null, formNames) : refused,
-   * never taken unchecked - a schedule of it the app has is kept as it was.
+   * Reads a schedule entry ; its form must exist. The forms not readable (null, formNames) :
+   * refused, never taken unchecked - a schedule of it the app has is kept as it was.
    *
    * Args:
-   *   text (string): the file's text.
+   *   raw (object): the entry, as its file gives it.
    *   forms (Set<string>|null|undefined): the forms there are ; null : they could not be read (the
    *     file refused) ; undefined : not checked (a preview counting the files).
    *
@@ -124,8 +126,8 @@ const schedules = {
    *   object: { errors, absent, object (the schedule, null when refused), raw (the name a refused
    *     one declares, whatever it is refused for), ignored }.
    */
-  parse(text, forms) {
-    const parsed = parseScheduleFile(text);
+  parseEntry(raw, forms) {
+    const parsed = parseSchedule(raw);
     // a refused one's name kept, whatever it is refused for : no schedule of the app is written
     // beside it under that name (lib/repoObjects/engine.js declaredName)
     if (parsed.schedule && forms === null) {
@@ -202,7 +204,7 @@ const schedules = {
   },
 
   /**
-   * The launch options of the schedules a repository would take that no prompt of a file gives :
+   * The launch options of the schedules a repository would take that no prompt of an entry gives :
    * kept in the app only, said before the usage is turned on.
    *
    * Args:
@@ -222,9 +224,9 @@ const schedules = {
   // a cron that stays in the app is said with its cron
   keptExtra: (c) => ({ cron: c.row.cron }),
 
-  // a new file in the export form of one schedule
-  newFileText: ({ row, rrule }) =>
-    newScheduleFile({
+  // a new entry in the export form of one schedule
+  entryOf: ({ row, rrule }) =>
+    newScheduleEntry({
       name: row.name,
       description: row.description || "",
       rrule,
@@ -235,9 +237,9 @@ const schedules = {
     }),
 
   /**
-   * Links an app's schedule to the file just written for it, the row stored as a pull reads that
-   * file (its extra vars as YAML text, its rrule as written, no cron) : the next pull finds it
-   * unchanged.
+   * Links an app's schedule to the file its entry was just written to, the row stored as a pull
+   * reads that entry (its extra vars as YAML text, its rrule as written, no cron) : the next pull
+   * finds it unchanged.
    *
    * Args:
    *   c (object): the candidate ({ row, rrule }).
@@ -248,7 +250,7 @@ const schedules = {
    *   Promise: the update.
    */
   linkCandidate: (c, name, file) => {
-    const v = valuesOf(parseScheduleFile(schedules.newFileText(c)).schedule, c.row);
+    const v = valuesOf(parseSchedule(structuredClone(schedules.entryOf(c))).schedule, c.row);
     return mysql.do(
       "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, cron=NULL, repository=?, repo_file=? WHERE id=?",
       [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],

@@ -141,7 +141,7 @@ function assertRepositoryAdminFields(req, existing) {
 /**
  * A request's use_for_config (deprecated since 7.5.0, removed in 8) as the three flags it is now,
  * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
- * repositories.yaml take it (foldConfigItem) : before anything reads the request's flags, so the
+ * repositories: entry take it (foldConfigItem) : before anything reads the request's flags, so the
  * admin rule and the one-repository rule apply to them. Said in the server log once the save is
  * applied (configUsageApplied), never for a save refused. Then every flag as the table stores it
  * (normalizeUsageFlags).
@@ -198,7 +198,7 @@ const create = async function(req, res) {
     await guardRepositoryCredential(req, null);
     const insertId = await RepoObjects.holding('repositories', async () => {
       const id = await Repository.create(req.body);
-      // the repositories repository, when there is one : written to its repositories.yaml
+      // the repositories repository, when there is one : written to its repositories: entries
       await RepoObjects.appCreated('repositories', id);
       return id;
     });
@@ -255,7 +255,7 @@ const update = async function(req, res) {
     const report = {};
     await RepoObjects.holding([], async () => {
       await Repository.update(req.body, req.params.name, { dropPassword, report });
-      // one of the repositories repository : its entry of repositories.yaml rewritten where it changed
+      // one of the repositories repository : its repositories: entry rewritten where it changed
       if (existing.repository) await RepoObjects.appUpdated('repositories', existing, existing.id);
     }, existing);
     if (folded) configUsageApplied(req.params.name);
@@ -293,7 +293,7 @@ const deleteRepository = async function(req, res) {
     const before = await Repository.findByName(req.params.name).catch(() => null);
     await RepoObjects.holding([], async () => {
       await Repository.delete(req.params.name, { report });
-      // one of the repositories repository : its entry removed from repositories.yaml
+      // one of the repositories repository : its repositories: entry removed
       if (before?.repository) await RepoObjects.appDeleted('repositories', before);
     }, before);
     // Remove from cron service

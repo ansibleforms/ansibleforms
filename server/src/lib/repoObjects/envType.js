@@ -1,8 +1,8 @@
 'use strict';
-// The environment types of the repository-backed objects (lib/repoObjects/engine.js, its
-// single-file mode) : what a page that saves environment variables saves, in one file of a
-// repository, keyed by the variables' names - System > General's (general.yaml) and Connections >
-// MCP's (mcp.yaml). One way for both, written once : the variables a page owns (lib/envSave.js
+// The environment types of the repository-backed objects (lib/repoObjects/engine.js, its single
+// mode) : what a page that saves environment variables saves, under its key in a repository's
+// file, keyed by the variables' names - System > General's (general:) and Connections > MCP's
+// (mcp:). One way for both, written once : the variables a page owns (lib/envSave.js
 // ownsVariable : never one variable for two pages, never a refused one, nor one set in the real
 // environment), a secret one (its name ends in _PASSWORD, _SECRET, _TOKEN or _SECRET_PREVIOUS)
 // an ${ENV} reference only, as the page masks it. A pull applies the file as the page's Save does
@@ -46,7 +46,7 @@ export function typedValue(value, type) {
  *
  * Args:
  *   spec (object):
- *     key, file, title, noun (string): as lib/repoObjects/singleType.js reads them ; key is also
+ *     key, title, noun (string): as lib/repoObjects/singleType.js reads them ; key is also
  *       the page's owner in lib/envSave.js ENV_OWNERS.
  *     page (string): the page, as a refusal names it (Settings > System > General).
  *     all (boolean): its file holds every variable the page owns, the saved value or the
@@ -118,7 +118,6 @@ export function envType(spec) {
 
   return singleType({
     key: spec.key,
-    file: spec.file,
     title: spec.title,
     noun: spec.noun,
     fields: mapFieldSet({ isSecret }),

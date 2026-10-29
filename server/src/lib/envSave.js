@@ -51,7 +51,7 @@ export const ENV_OWNERS = {
 };
 
 // The variables a repository's file never sets, whatever page owns them : the page saves them (an
-// admin's choice, typed in the app), a general.yaml would hand them to whoever may push to the
+// admin's choice, typed in the app), a repository's general: map would hand them to whoever may push to the
 // repository. Each says why, as the pull output refuses it ; the app never writes them to the file.
 export const REPOSITORY_REFUSED = [
   // a command line the server runs (git, the database dump and restore)

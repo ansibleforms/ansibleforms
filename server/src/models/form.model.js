@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { findOwner, ownerTest, realPathOf } from "../lib/repoObjects/ownedPaths.js";
+import { findOwner, formsSkipTest, realPathOf } from "../lib/repoObjects/ownedPaths.js";
 import { isInside } from "../lib/projectFiles.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
@@ -298,8 +298,9 @@ async function getSaveTargets() {
  *   kept. Before, one unreadable subfolder threw out of the whole walk and the
  *   complete forms folder looked empty.
  *
- * - a file or a folder skip says to skip (one a usage type of a repository owns :
- *   lib/repoObjects/ownedPaths.js ownerTest) is neither listed nor walked.
+ * - a file or a folder skip says to skip (one a usage type of a repository owns, or a
+ *   file giving a type's key : lib/repoObjects/ownedPaths.js formsSkipTest) is neither
+ *   listed nor walked.
  *
  * Args:
  *   root (string): The forms folder to walk.
@@ -379,7 +380,7 @@ function walkYamlFiles(root, onWarn = (m) => logger.warning(m), skip = null) {
 
 // recursively list the yaml files of a forms folder, relative to it ; used to
 // remove forms that were deleted in the designer (same walk as the loader, the files a
-// usage type owns left out the same way : skip, ownerTest's)
+// usage type owns left out the same way : skip, formsSkipTest's)
 function listYamlFiles(dir, skip = null) {
   return walkYamlFiles(dir, undefined, skip)
 }
@@ -806,10 +807,11 @@ export function duplicateNotice(name, used, skipped) {
 
 /**
  * Every form of the folders, each with where it is, in the order they are read (the folders in
- * turn, the files of each sorted). A file or a folder a usage type of a repository owns (roles.yaml,
- * general.yaml, credentials/, labels/ ... : lib/repoObjects/ownedPaths.js, as the designer's file
- * explorers skip them) is never read as forms : a repository holding objects that serves its forms
- * from its root would give each of them as a form that does not validate.
+ * turn, the files of each sorted). A file a usage type of a repository owns, or any file giving a
+ * type's key at its top level (credentials:, roles:, defaults: ... : lib/repoObjects/ownedPaths.js
+ * formsSkipTest), is never read as forms : a form is a map with a type, and a repository holding
+ * objects that serves its forms from its root would give each of them as a form that does not
+ * validate.
  *
  * Args:
  *   formsdirs (object[]): the folders (formsFolders).
@@ -821,8 +823,8 @@ export function duplicateNotice(name, used, skipped) {
  */
 async function collectForms(formsdirs, warn, error) {
   const out = []
-  // what the usage types own, tested once for every folder
-  const owned = await ownerTest()
+  // what the usage types own and the files giving a type's key, tested once for every folder
+  const owned = await formsSkipTest()
   // when several forms repos exist, tag each form with the repo it came from so a save writes it
   // back there even if another repo has a same-named file
   const tagRepository = formsdirs.filter((d) => d.name).length > 1
@@ -1960,9 +1962,10 @@ Form.save = async function(data, options = {}){
     const into = [...(g.dir ? [g.dir] : []), ...(g.dir?.staging ? formsDirs.filter((d) => d.name) : [])]
     for (const d of into) {
       const target = path.join(d.path, g.source)
-      // a file a usage type of a repository owns (roles.yaml, config.yaml, general.yaml,
-      // credentials/ ... : lib/repoObjects/ownedPaths.js), in whichever repository the file
-      // really lands (links followed) : never written as a forms file
+      // a file a usage type of a repository owns (a file giving roles:, credentials:, general:
+      // ... of a repository holding them, config.yaml : lib/repoObjects/ownedPaths.js), in
+      // whichever repository the file really lands (links followed) : never written as a forms
+      // file
       const owner = await findOwner(target)
       if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner.label} of repository '${owner.repository}': save the form to another file`)
       // the playbooks or the vars files of a repository serving its forms from its root, or a file
@@ -2023,8 +2026,9 @@ Form.save = async function(data, options = {}){
     // the copies the loader skipped (a form name another forms folder defines first) : never in
     // the payload, so a file holding one with other forms would lose it when written again ; kept
     const skipped = await skippedCopies(formsDirs)
-    // what the usage types own : never a candidate for removal, as the loader never reads it
-    const owned = await ownerTest()
+    // what the usage types own, and the files giving a type's key : never a candidate for removal,
+    // as the loader never reads them
+    const owned = await formsSkipTest()
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)

@@ -1,6 +1,6 @@
 'use strict';
-// The Secret stores type of the repository-backed objects (lib/repoObjects/engine.js) : one secret
-// store per YAML file in a repository's `secret-stores` folder, in the config seed's format (an item
+// The Secret stores type of the repository-backed objects (lib/repoObjects/engine.js) : the secret
+// stores of the secret_stores: lists of a repository's files, in the config seed's format (an item
 // of its secret_stores section). It names the credential it logs in with (a Vault's token) by
 // name : a store whose credential is not there yet waits, and is read again when the credentials
 // are next pulled. Its own token and client key, if any, are ${ENV} references only.
@@ -9,7 +9,6 @@ import { seedType } from "./seedType.js";
 
 export default seedType({
   key: "secret_stores",
-  folder: "secret-stores",
   section: "secret_stores",
   model: "secretstore",
   Model: SecretStore,

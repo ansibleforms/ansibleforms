@@ -1,15 +1,15 @@
 'use strict';
 // The fields of a repository-backed object's file, in the config seed's format : what every
-// seed-format type does the same way, the types kept in a folder (lib/repoObjects/seedType.js) and
-// the types kept in one file (lib/repoObjects/singleType.js) alike -
+// seed-format type does the same way, the list types (lib/repoObjects/seedType.js) and the types the
+// app has one of (lib/repoObjects/singleType.js) alike -
 //   check     a file's object checked : its secrets ${ENV} references only (resolved as the seed
 //             resolves them), then the seed's schema of the item
 //   toFile    an object of the app as its file gives it : the seed's fields that are set, its
 //             secrets left out
-//   editText  an app edit written into the file : only the fields it changed
+//   editsOf   an app edit as the edits of its entry : only the fields it changed
 //   removedOf the fields a file no longer declares, given back the value a new object gets
 import { itemValidator } from "../seed-schema.js";
-import { parseMapFile, newMapFile, updateMapFile, same } from "./yamlFile.js";
+import { same } from "./yamlFile.js";
 import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
 
 /**
@@ -25,7 +25,7 @@ import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
  *       ISO text, ...), the file's and the app's alike ; none : as it is.
  *
  * Returns:
- *   object: { keys, booleans, strings, check, parse, toFile, newText, editText, editsOf, removedOf }.
+ *   object: { keys, booleans, strings, check, read, toFile, editsOf, removedOf, keyOrderOf }.
  */
 export function fieldSet(spec) {
   const { secrets = [], skip = [], keepFalse = [], canonical = (o) => o } = spec;
@@ -82,41 +82,18 @@ export function fieldSet(spec) {
   }
 
   /**
-   * Reads a file : one item, checked (check). A file saying state: absent holds no object.
+   * Reads an entry of a file : one item, checked (check). An entry saying state: absent holds no
+   * object.
    *
    * Args:
-   *   text (string): the file's text.
+   *   raw (object): the entry, as the file gives it.
    *
    * Returns:
    *   object: { errors, absent, object, raw (as the file gives it) }.
    */
-  function parse(text) {
-    const { errors, object: raw } = parseMapFile(text);
-    if (errors.length) return { errors, absent: false, object: null };
-    if (raw.state === "absent") return { errors: [], absent: true, object: null };
+  function read(raw) {
+    if (raw?.state === "absent") return { errors: [], absent: true, object: null, raw };
     return { ...check(raw), absent: false, raw };
-  }
-
-  /**
-   * An app edit written into a file : each field the edit changed (the object before and after it,
-   * as a file gives them) written, a field emptied removed ; the others - the file's ${ENV}
-   * references, the fields it does not declare - left as they are, the secrets never written.
-   *
-   * Args:
-   *   text (string): the file's text.
-   *   after (object): the object as saved.
-   *   before (object): the object before the edit.
-   *
-   * Returns:
-   *   string: the file's new text (the same text when nothing changed).
-   */
-  function editText(text, after, before) {
-    const edits = editsOf(after, before);
-    const next = toFile(after).object;
-    if (!Object.keys(edits).length) return text;
-    // a file that is not a map any more : written again, whole
-    if (!parseMapFile(text).object) return newText(next);
-    return updateMapFile(text, edits, fileKeys);
   }
 
   /**
@@ -169,10 +146,7 @@ export function fieldSet(spec) {
     return out;
   }
 
-  // a new file : the seed's fields in the seed's order
-  const newText = (obj) => newMapFile(obj, fileKeys);
-
-  return { keys: fileKeys, booleans, strings, check, parse, toFile, newText, editText, editsOf, removedOf };
+  return { keys: fileKeys, booleans, strings, check, read, toFile, editsOf, removedOf, keyOrderOf: () => fileKeys };
 }
 
 /**
@@ -185,12 +159,11 @@ export function fieldSet(spec) {
  *   spec (object): { isSecret ((name) => whether its value is a secret) }.
  *
  * Returns:
- *   object: { keys, check, parse, toFile, newText, editText }, as fieldSet's.
+ *   object: { keys, check, read, toFile, editsOf, keyOrderOf }, as fieldSet's.
  */
 export function mapFieldSet(spec) {
   const isSecret = spec.isSecret || (() => false);
   const sorted = (obj) => Object.keys(obj).sort();
-  const newText = (obj) => newMapFile(obj, sorted(obj));
 
   function toFile(map) {
     const obj = {};
@@ -208,13 +181,11 @@ export function mapFieldSet(spec) {
     return { errors: [], object };
   }
 
-  function parse(text) {
-    const { errors, object: raw } = parseMapFile(text);
-    if (errors.length) return { errors, absent: false, object: null };
+  function read(raw) {
     return { ...check(raw), absent: false, raw };
   }
 
-  function editText(text, after, before) {
+  function editsOf(after, before) {
     const next = toFile(after).object;
     const prev = toFile(before || {}).object;
     const edits = {};
@@ -222,10 +193,11 @@ export function mapFieldSet(spec) {
       if (isSecret(k) || same(next[k], prev[k])) continue;
       edits[k] = next[k];
     }
-    if (!Object.keys(edits).length) return text;
-    if (!parseMapFile(text).object) return newText(next);
-    return updateMapFile(text, edits, sorted({ ...prev, ...next }));
+    return edits;
   }
 
-  return { keys: [], check, parse, toFile, newText, editText };
+  // a new name at its place among the names, sorted
+  const keyOrderOf = (after, before) => sorted({ ...toFile(before || {}).object, ...toFile(after).object });
+
+  return { keys: [], check, read, toFile, editsOf, keyOrderOf };
 }
