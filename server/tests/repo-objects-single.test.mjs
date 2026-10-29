@@ -306,6 +306,24 @@ describe("the System > General settings, by their environment names", () => {
     CrudModel.flushAllLocal();
     assert.equal((await RepoObjects.syncRepository(await desc("general"), "cfg")).unchanged, 1);
   });
+
+  test("a variable the real environment sets is never written : the next pull still applies the file", async () => {
+    // saved on the page earlier, then the deployment set it in docker-compose : the environment wins
+    fs.writeFileSync(MANAGED, "JOB_RETENTION_DAYS='30'\nAUDIT_RETENTION_DAYS='90'\n");
+    process.env.JOB_RETENTION_DAYS = "60";
+    process.env.AUDIT_RETENTION_DAYS = "90";
+    const general = await desc("general");
+    fx.cloneEmpty("cfg");
+    await RepoObjects.activate(general, "cfg", { pull: false });
+    const text = fx.readText("cfg", ".", "general.yaml");
+    assert.equal(text, "AUDIT_RETENTION_DAYS: 90\n");
+    // the platform team changes the other setting in git : applied, not refused
+    writeRaw("cfg", "general.yaml", text.replace("AUDIT_RETENTION_DAYS: 90", "AUDIT_RETENTION_DAYS: 120"));
+    const summary = await RepoObjects.syncRepository(general, "cfg");
+    assert.equal(summary.refused.length, 0, JSON.stringify(summary.refused));
+    assert.equal(summary.updated, 1);
+    assert.equal(process.env.AUDIT_RETENTION_DAYS, "120");
+  });
 });
 
 // ─── the MCP settings ──────────────────────────────────────────────────────────

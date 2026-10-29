@@ -134,7 +134,11 @@ export function envType(spec) {
           if (EnvSettings.isOverridden(name, managed)) continue;
           out[name] = managed.has(name) ? managed.get(name) : String(docs.get(name).default ?? "");
         }
-      } else for (const [name, value] of managed) if (owns(name, docs)) out[name] = value;
+      } else {
+        for (const [name, value] of managed) {
+          if (owns(name, docs) && !EnvSettings.isOverridden(name, managed)) out[name] = value;
+        }
+      }
       if (spec.seedHeld) out._seedManaged = await hold.managed();
       // each variable's documented type, for its file (typedValue)
       Object.defineProperty(out, "_types", { value: Object.fromEntries(Object.keys(out).map((name) => [name, docs.get(name)?.type])) });
