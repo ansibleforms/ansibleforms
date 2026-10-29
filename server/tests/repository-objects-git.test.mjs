@@ -6,7 +6,8 @@
 //   reset         cloned again by a reset : an object whose file is not in the remote is unlinked,
 //                 never deleted
 //   push          a Push into a missing working tree clones it as every clone into a missing tree :
-//                 its files read as cloned again, the app's other objects taken, before the commit
+//                 its files read as cloned again, the app's other objects taken, before the commit ;
+//                 into one already there, its files read in after it (its rebase brings git's edits)
 //   delete        its objects unlinked only once the delete holds the repository : a delete refused
 //                 (a pull running) leaves them linked
 import { test, describe, beforeEach, vi } from "vitest";
@@ -73,6 +74,8 @@ vi.mock("../src/lib/repoObjects/index.js", () => ({
   default: {
     afterGit: async (name, repo, opts) => {
       asked.push(["afterGit", name, opts]);
+      // when, among the queries : before the claim is released or after
+      queries.push({ sql: "afterGit" });
       return "";
     },
     afterUsageChange: async (before, name, now, opts) => {
@@ -127,7 +130,18 @@ describe("the push of a repository holding credentials", () => {
     assert.match(output, /^cloned\npushed$/);
   });
 
-  test("into a working tree already there : nothing read, only pushed", async () => {
+  test("into a working tree already there : pushed, then its files read in under the claim - the rebase may bring git's edits", async () => {
+    fs.mkdirSync(path.join(ROOT, "creds"));
+    assert.equal(await Repository.sync("creds", "admin"), "pushed");
+    // read as a pull reads them
+    assert.deepEqual(asked, [["afterGit", "creds", undefined]]);
+    // read while the push still holds the repository : its claim released after it
+    const release = queries.findIndex((q) => /set push_output = \?/.test(q.sql));
+    assert.ok(release > queries.findIndex((q) => q.sql === "afterGit"));
+  });
+
+  test("a repository holding no object type : nothing read", async () => {
+    row = { ...row, use_for_credentials: 0, use_for_forms: 1 };
     fs.mkdirSync(path.join(ROOT, "creds"));
     assert.equal(await Repository.sync("creds", "admin"), "pushed");
     assert.deepEqual(asked, []);

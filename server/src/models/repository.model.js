@@ -1240,6 +1240,10 @@ class Repository extends CrudModel {
       const objects = objectTypesOf(syncRepo).map((key) => typeOf(key).label)
       const what = !syncRepo.use_for_forms && objects.length ? objects.join(", ").replace(/^./, (c) => c.toUpperCase()) : "Forms"
       output = (cloned ? `${cloned}\n` : "") + await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
+      // its rebase on the remote brings git's edits and deletes of its object files : read in
+      // still under the claim, as a pull reads them - left unread, the next app edit would write a
+      // file deleted in git back, and the next Push resurrect it (a fresh clone was read already)
+      if (!cloned && objectTypesOf(syncRepo).length) output += await (await repoObjects()).afterGit(name, syncRepo)
       status = "success"
     } catch (e) {
       output = e.message
