@@ -25,6 +25,10 @@ vi.mock("croner", () => ({
       this.stopped = true;
     }
     resume() {}
+    // never running : a stop has nothing to wait for
+    isBusy() {
+      return false;
+    }
     nextRun() {
       return this.pattern instanceof Date ? this.pattern : null;
     }
@@ -35,23 +39,22 @@ vi.mock("croner", () => ({
 let row;
 let queued;
 let schedules;
-vi.mock("../src/models/db.model.js", () => ({
-  default: {
-    do: async (sql) => {
-      if (/^SELECT id FROM AnsibleForms.`schedule` WHERE id=\? AND COALESCE\(enabled,1\)=1/.test(sql)) {
-        return row.enabled && !["queued", "running"].includes(row.state) ? [{ id: row.id }] : [];
-      }
-      if (/^UPDATE AnsibleForms.`schedule` SET state='queued'/.test(sql)) {
-        queued++;
-        row.state = "queued";
-        return { affectedRows: 1 };
-      }
-      if (/FROM AnsibleForms.`schedule`/.test(sql)) return schedules;
-      return [];
-    },
-    tryDo: async () => [],
-  },
-}));
+vi.mock("../src/models/db.model.js", () => {
+  const run = async (sql) => {
+    if (/^SELECT id FROM AnsibleForms.`schedule` WHERE id=\? AND COALESCE\(enabled,1\)=1/.test(sql)) {
+      return row.enabled && !["queued", "running"].includes(row.state) ? [{ id: row.id }] : [];
+    }
+    if (/^UPDATE AnsibleForms.`schedule` SET state='queued'/.test(sql)) {
+      queued++;
+      row.state = "queued";
+      return { affectedRows: 1 };
+    }
+    if (/FROM AnsibleForms.`schedule`/.test(sql)) return schedules;
+    return [];
+  };
+  // the queueing runs its statement again on a deadlock (Schedule.queue)
+  return { default: { do: run, doRetryingDeadlock: run, tryDo: async () => [] } };
+});
 let held = true;
 vi.mock("../src/lib/workerLock.js", () => ({ confirmWorkerLock: async () => held }));
 
@@ -70,9 +73,9 @@ beforeEach(() => {
   schedules = [{ id: 7, name: "Nightly", one_time_run: 0, cron: null, run_at: null, rrule: RRULE }];
   cronService.active = true;
 });
-afterEach(() => {
+afterEach(async () => {
   Object.assign(limits, LIMITS);
-  cronService.stopAll();
+  await cronService.stopAll();
   cronService.active = false;
   cronService.signatures.schedules.clear();
 });
