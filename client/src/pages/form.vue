@@ -582,7 +582,11 @@ const storeCtx = ref(null);
 // the Store dialog's Share switch : the allowStoredJobsShare role option, on a form that does not
 // turn sharing off
 const canShareStored = computed(
-  () => !!store.profile?.options?.allowStoredJobsShare && (storeCtx.value || buildMainStoreCtx()).sharing,
+  () =>
+    !!store.profile?.options?.allowStoredJobsShare &&
+    (storeCtx.value
+      ? storeCtx.value.sharing
+      : !!currentForm.value && currentForm.value.allowStoredJobSharing !== false),
 );
 // the caller, as the owner of a stored job is written : another user's in the Load list is shared
 const storedJobOwner = computed(() => `${store.profile?.type || 'local'}/${store.profile?.username}`);
