@@ -396,8 +396,11 @@ describe("a change in the app that changes other objects of the type too", () =>
     fx.writeFile("run-repo", "runners", "a.yaml", { name: "a", type: "rte", uri: "https://a:8000", is_default: true, enabled: true });
     fx.writeFile("run-repo", "runners", "b.yaml", { name: "b", type: "rte", uri: "https://b:8000", enabled: true });
     const { default: controller } = await import("../src/controllers/v2/runner.controller.js");
+    fx.state.calls.length = 0;
     const r = await asAdmin(controller.update, { body: { is_default: 1 }, params: { id: "52" } });
     assert.ok(r.status < 300, JSON.stringify(r.data));
+    // the repository's claim taken once, before the save, both files written under it
+    assert.deepEqual(fx.state.calls.filter((c) => /run-repo/.test(c)), ["claim:run-repo", "release:run-repo"]);
     assert.equal(fx.readObject("run-repo", "runners", "b.yaml").is_default, true);
     assert.equal(fx.readObject("run-repo", "runners", "a.yaml").is_default, undefined, "a is no longer the default");
     // and the next pull changes nothing : the user's choice stays

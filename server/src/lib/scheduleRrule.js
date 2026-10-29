@@ -442,7 +442,16 @@ function momentOf(floating, zone) {
     },
     { zone },
   );
-  return dt.isValid ? dt.toJSDate() : null;
+  if (!dt.isValid) return null;
+  // luxon picks one of a time the clock shows twice from the zone's offset now, so the same rule
+  // gave the summer time's run in summer and the winter time's in winter : the earliest moment the
+  // clock shows it at, by the offsets a day either side of it
+  let first = dt.toMillis();
+  for (const near of [first - DAY, first + DAY]) {
+    const moment = floating - DateTime.fromMillis(near, { zone }).offset * 60000;
+    if (moment < first && floatingOf(new Date(moment), zone) === floating) first = moment;
+  }
+  return new Date(first);
 }
 
 /**

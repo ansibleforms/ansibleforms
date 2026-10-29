@@ -2,6 +2,7 @@
 // where it is not valid, with the reason, and its runs worked out in its own time zone, across DST
 // changes, with EXRULE, UNTIL and a start date years ago.
 import { test, describe } from "vitest";
+import { Settings } from "luxon";
 import assert from "node:assert/strict";
 import { validateRrule, nextRuns, nextRun, zoneOf, defaultRrule, normalizeRrule, walkRuns } from "../src/lib/scheduleRrule.js";
 
@@ -150,6 +151,24 @@ describe("its runs, in its own time zone", () => {
       "2026-10-25T00:00:00.000Z", // 02:00 CEST : the clock shows 02:00 twice, the first is run
       "2026-10-26T01:00:00.000Z", // 02:00 CET
     ]);
+  });
+
+  test("a time the clock shows twice is the first of the two, in summer as in winter", () => {
+    // luxon guesses from the zone's offset now : the same rule gave 01:00Z once summer time ended
+    const rule = "DTSTART;TZID=Europe/Brussels:20261024T020000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=3";
+    const saved = Settings.now;
+    try {
+      for (const now of ["2026-07-01T12:00:00Z", "2026-12-01T12:00:00Z"]) {
+        Settings.now = () => Date.parse(now);
+        assert.deepEqual(
+          walkRuns(rule, { after: LONG_AGO, count: 3 }).map((d) => d.toISOString()),
+          ["2026-10-24T00:00:00.000Z", "2026-10-25T00:00:00.000Z", "2026-10-26T01:00:00.000Z"],
+          `now ${now}`,
+        );
+      }
+    } finally {
+      Settings.now = saved;
+    }
   });
 
   test("the first Saturday of the month, by the local day", () => {
