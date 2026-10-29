@@ -688,7 +688,8 @@ async function followsRename(desc, row, to, users) {
  * object not there yet waits, the same way. The objects linked to a file that cannot be read (or a
  * link leading outside the repository, or a key that holds no list) stay as they are, as do those
  * of a file whose refused entries may be them (an entry refused without a name, or with a name no
- * object has). Where an entry gives no secret, the database's stays ; a field it no longer declares
+ * object has) ; while a file whose lines seem to give the type's key cannot be read, no object whose
+ * entry is gone is deleted (it may have moved into that file), each one kept said. Where an entry gives no secret, the database's stays ; a field it no longer declares
  * takes the value a new object gets (descriptor.store.removed).
  *
  * Args:
@@ -778,10 +779,21 @@ export async function syncRepository(desc, name, opts = {}) {
     if (row && !matched.has(row.id)) keep(row, `${f.place} (${f.waiting ? "waiting" : "refused"}, kept as it was)`);
     else if (!row) unmatchedRefused.add(f.repoFile);
   }
+  // a file that cannot be read whose lines seem to give the type's key : any object whose entry is
+  // gone may have moved into it - kept, said, until it can be read
+  const unread = scan.hinted(desc.key).map((u) => u.file);
+  const keptForUnread = [];
   for (const row of own.values()) {
     if (matched.has(row.id) || kept.has(row.id)) continue;
     if (held.has(row.repo_file)) keep(row, `${row.repo_file} (not read, kept as it was)`);
     else if (unmatchedRefused.has(row.repo_file)) keep(row, `${row.repo_file} (an entry of it refused, kept as it was)`);
+    else if (unread.length) {
+      keep(row, `${row.repo_file} (its entry gone, kept as it was while ${unread.join(", ")} cannot be read)`);
+      keptForUnread.push(row.name);
+    }
+  }
+  if (keptForUnread.length) {
+    summary.notes.push(`Kept, their entries gone while ${unread.join(", ")} cannot be read (they may be there): ${keptForUnread.join(", ")}`);
   }
   // step 6 : a rename in a file : the one object of the type gone from a file, the one new name in
   // that same file, what tells it apart besides its name unchanged (sameIdentity)

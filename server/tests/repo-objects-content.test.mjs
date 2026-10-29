@@ -248,6 +248,25 @@ describe("what a file not read held stays as it is", () => {
     assert.deepEqual(contentOf("---\ncredentials:\n  - name: a\n...\n").keys, ["credentials"]);
   });
 
+  test("an entry moved into a file that cannot be read : its object kept with its secret, said, until the file is read", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "a", credential_type: "git", user: "bot", password: "enc:DBONLY", repository: "ops", repo_file: "x.yaml" });
+    write("ops", "x.yaml", { credentials: [{ name: "a", credential_type: "git", user: "bot" }, git("b")] });
+    write("ops", "y.yaml", { credentials: [git("c")] });
+    await sync(credentials);
+    write("ops", "x.yaml", { credentials: [git("b")] });
+    write("ops", "y.yaml", "credentials:\n  - name: c\n    credential_type: git\n    user: bot\n  - name: a\n    credential_type: git\n    user: [bot\n");
+    let summary = await sync(credentials);
+    assert.equal(summary.deleted, 0);
+    assert.equal(fx.rowNamed("credentials", "a").password, "enc:DBONLY");
+    assert.match(RepoObjects.summaryText(credentials, summary), /Kept, their entries gone while y\.yaml cannot be read \(they may be there\): a/);
+    // the file fixed : read, the object follows its entry
+    write("ops", "y.yaml", { credentials: [git("c"), { name: "a", credential_type: "git", user: "bot" }] });
+    summary = await sync(credentials);
+    assert.equal(summary.deleted, 0);
+    assert.equal(fx.rowNamed("credentials", "a").repo_file, "y.yaml");
+    assert.equal(fx.rowNamed("credentials", "a").password, "enc:DBONLY");
+  });
+
   test("a refused entry with no name : the objects of its file whose entries are gone are kept", async () => {
     write("ops", "x.yaml", { credentials: [git("a"), git("b")] });
     write("ops", "y.yaml", { credentials: [git("c")] });

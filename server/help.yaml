@@ -6657,7 +6657,9 @@
       unless each user names the new one in the same commit; a disclaimer version never changes its number). One
       of those fields changed too is another object: the one gone is deleted and a new one made. An entry that is refused or waits keeps the object of its name as it was, and an entry refused
       without a name keeps the objects its file held whose entries are gone; the objects of a file that cannot be
-      read (not valid YAML) stay as they are, the file refused when its lines seem to give the type's key.
+      read (not valid YAML) stay as they are, the file refused when its lines seem to give the type's key, and
+      while such a file cannot be read no object whose entry is gone is deleted (it may have moved into it): each
+      one is kept, said in the pull output, until the file is read again.
 
       **The app writes back where the object is**: an edit rewrites only the fields it changed in that entry, the
       file's comments, its other keys and entries kept; a new object of the app goes at the end of the first file
