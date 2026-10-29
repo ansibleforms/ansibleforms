@@ -111,7 +111,7 @@ export const FILE_KEYS = CONTENT_KEYS.map(fileKeyOf);
 /**
  * Whether a value under a type's key has the type's shape : one map for a type the app has one of
  * (and the constants), else a list of maps (an entry each) ; nothing under the key (none yet) fits
- * either. Any other value (a vars file's list of names : controller_labels: [web, frontend]) is no
+ * either. Any other value (a vars file's list of names : controller_labels: with - web and - frontend) is no
  * type's.
  *
  * Args:

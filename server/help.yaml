@@ -6496,7 +6496,8 @@
           unified_job_template:
             name: Nightly Workflow          # the AnsibleForms form it runs
             type: workflow_job_template     # accepted, informational
-            organization: { name: Default } # accepted, ignored
+            organization:                   # accepted, ignored
+              name: Default
           extra_data:                       # the form's values (its extra vars)
             retention_days: 14
           limit: webservers                 # a prompt, see below
@@ -6674,7 +6675,9 @@
       holding `controller_credentials:`; one of that name there that gives no such key, a form or a playbook, is never written to: `credentials-2.yaml`
       then); a delete removes its entry, the key when its list is left empty, and the file when it holds nothing
       more. Turning a usage on writes the app's objects the same way. Images (the logo's, the icon's) are named
-      relative to the file naming them, inside the repository.
+      relative to the file naming them, inside the repository. Every list and map the app writes is in block style
+      (`- ` items, one key per line), a value you wrote as a flow list (`[a, b]`) too once the app changes it; the
+      flow lists and maps it does not change stay as you wrote them, and flow style is always read.
 
       **The designer** never lists, reads, writes nor deletes a file giving the key of a type its repository holds
       (nor the images such a file names), and refuses to write a file whose content would give the key of any type,
@@ -7007,7 +7010,11 @@
       controller_links:
         show_designer: true
         header_links:
-          - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
+          - id: docs
+            label: Docs
+            url: https://docs.example.com
+            icon: book
+            newTab: true
       ```
 
       As every seed section, the seed's `defaults:`, `logo:`, `icon:`, `name:` and `links:` lock what they declare,

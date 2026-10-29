@@ -5,7 +5,7 @@
 //
 // Where a repository keeps them is its files' content (lib/repoObjects/repoFiles.js) : any YAML
 // file, any name, any folder, at any depth, whose top-level key is a type's key holds that type -
-// a list of objects (credentials: [...]), or one map for a type the app has one of (defaults:).
+// a list of objects ("- " items under credentials:), or one map for a type the app has one of (defaults:).
 // A file may hold several types, a type may be spread over many files. An object is its name
 // within its type, never its file : each object row keeps the file its entry is in now
 // (repository, repo_file), moving an entry to another file only changes that.

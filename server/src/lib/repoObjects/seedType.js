@@ -1,7 +1,7 @@
 'use strict';
 // The descriptor of an object type whose entries are in the config seed's format (lib/seed-schema.js)
 // - the credentials, the runners, and the types of the later versions : each entry of its list in a
-// repository's files (credentials: [...]) one item of the seed's section, so a seed item and a
+// repository's files (a "- " item under credentials:) one item of the seed's section, so a seed item and a
 // repository entry are interchangeable. Read and checked as
 // the seed checks its items, ${ENV} references resolved as the seed resolves them (the secret rule,
 // lib/repoObjects/secrets.js), compared with the row as the seed compares (lib/seedCompare.js), and
