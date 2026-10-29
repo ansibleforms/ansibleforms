@@ -2,9 +2,11 @@
 // yes / no by value, text alphabetically with "file2" before "file10" ; and an empty cell is an en
 // dash (lib/tableCells.js).
 import { describe, it, expect } from 'vitest';
-import { isSortable, compareRows } from '@/lib/dataTable';
+import { createI18n } from 'vue-i18n';
+import { isSortable, compareRows, htmlToText } from '@/lib/dataTable';
 import { orEmpty, EMPTY_CELL } from '@/lib/tableCells';
-import { usageBadges, usageSortValue } from '@/lib/repositoryUsage';
+import getSettings from '@/config/settings';
+import de from '@/locales/de.js';
 
 const text = (row, col) => String(row[col.key] ?? '');
 const sorted = (rows, col, dir = 1) => [...rows].sort((a, b) => compareRows(a, b, col, dir, text));
@@ -33,20 +35,28 @@ describe('the order of a table', () => {
     ]);
   });
 
-  it('a sortValue that is a text sorts by that text, not by the cell (a repository used for nothing last)', () => {
+  it('a sortValue that is a text sorts by that text when the column asks (a repository used for nothing last)', () => {
     const t = (k) => k;
-    const col = {
-      key: 'usage',
-      label: 'Usage',
-      render: (v, row) => usageBadges(t, row),
-      sortValue: (row) => usageSortValue(t, row),
-    };
+    const col = { ...getSettings(t).repositories.fields.find((f) => f.key === 'usage') };
+    expect(col.sortByValue).toBe(true);
     // the cell's text, as the table reads it (BsDataTable cellText : the badges' text)
     const cell = (row) => col.render(undefined, row).replace(/<[^>]+>/g, '');
     const rows = [{ name: 'none' }, { name: 'forms', use_for_forms: 1 }, { name: 'creds', use_for_credentials: 1 }];
     const order = (dir) => [...rows].sort((a, b) => compareRows(a, b, col, dir, cell)).map((r) => r.name);
     expect(order(1)).toEqual(['creds', 'forms', 'none']);
     expect(order(-1)).toEqual(['none', 'forms', 'creds']);
+  });
+
+  it('any other text sortValue sorts by what the cell shows, in its language (a runner RTE Mode)', () => {
+    const i18n = createI18n({ legacy: false, locale: 'de', messages: { de } });
+    const col = getSettings(i18n.global.t).runners.fields.find((f) => f.key === 'rte_mode_column');
+    expect(col.sortByValue).toBeUndefined();
+    const rows = ['outbound', 'inbound', 'database'].map((m) => ({ type: 'rte', rte_mode: m }));
+    const cell = (row, c) => htmlToText(c.render(undefined, row));
+    const shown = (dir) => [...rows].sort((a, b) => compareRows(a, b, col, dir, cell)).map((r) => cell(r, col));
+    // the pills as shown, A to Z in German (Ausgehend, Datenbank, Eingehend), not by their raw value
+    expect(shown(1)).toEqual([...shown(1)].sort((a, b) => a.localeCompare(b)));
+    expect(shown(-1)).toEqual([...shown(1)].reverse());
   });
 });
 

@@ -1224,6 +1224,8 @@ export default function getSettings(t) {
           label: t('settings.repositories.usageColumn'),
           render: (v, row) => usageBadges(t, row),
           sortValue: (row) => usageSortValue(t, row),
+          // by that text, not the badges' : a repository used for nothing (no badge) sorts last
+          sortByValue: true,
           filterable: true,
         },
       ],
