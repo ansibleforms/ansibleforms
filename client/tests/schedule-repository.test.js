@@ -283,6 +283,10 @@ describe('a rrule is checked on its text', () => {
     ['DTSTART:20300308T050000Z RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=+1MO', 'BYDAY with numeric prefix'],
     ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1 rdate:20300401T000000Z', 'RDATE'],
     ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;FOO=1', "Unknown RRULE property 'FOO'"],
+    // a day there is not, a part given twice : as the server refuses them
+    ['DTSTART:20300230T050000Z RRULE:FREQ=DAILY;INTERVAL=1', 'invalid DTSTART'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20310230T000000', 'invalid UNTIL'],
+    ['DTSTART:20300308T050000Z RRULE:FREQ=FOO;INTERVAL=1;FREQ=DAILY', 'a part is given more than once: FREQ'],
   ])('refuses %s', (rrule, reason) => {
     expect(rruleProblem(rrule)).toContain(reason);
     expect(rruleValidationMessage(t, rrule)).toContain('settings.schedules.rruleInvalid');

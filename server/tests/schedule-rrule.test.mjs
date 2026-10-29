@@ -64,6 +64,13 @@ describe("a refused rrule is refused, with the reason", () => {
     ["DTSTART:20300308T050000Z RRULE:FREQ=MINUTELY;INTERVAL=1;count=100000000", "COUNT > 999 is unsupported"],
     ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;COUNT=0", "COUNT must be a positive integer"],
     ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;count=5;until=20310101T000000Z", "RRULE may not contain both COUNT and UNTIL"],
+    // a DTSTART or an UNTIL that is no day there is : said so, not that it never fires
+    ["DTSTART:20300230T050000Z RRULE:FREQ=DAILY;INTERVAL=1", "rrule parsing failed validation: invalid DTSTART: DTSTART:20300230T050000Z"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20310230T000000", "rrule parsing failed validation: invalid UNTIL: UNTIL=20310230T000000"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20311340T000000Z", "rrule parsing failed validation: invalid UNTIL: UNTIL=20311340T000000Z"],
+    // a part given twice, whichever rrule.js or dateutil would take
+    ["DTSTART:20300308T050000Z RRULE:FREQ=FOO;INTERVAL=1;FREQ=DAILY", "rrule parsing failed validation: a part is given more than once: FREQ"],
+    ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;BYWEEKDAY=MO;byday=TU", "rrule parsing failed validation: a part is given more than once: BYDAY"],
     // a rule that never fires
     ["DTSTART:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20300101T000000Z", "never fires in the 50 years after its DTSTART"],
   ];

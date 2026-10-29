@@ -9,7 +9,8 @@
 //     EXRULE takes runs out, EXDATE and RDATE are refused ; each rule needs an INTERVAL of 1 or
 //     more, no SECONDLY, no BYDAY with a number (5MO), not COUNT and UNTIL together, COUNT 999
 //     at most ; each BYxxx number in its range (BYHOUR 0 to 23, BYSETPOS 1 to 366 or -366 to
-//     -1, BYEASTER -80 to 250 ...), WKST a weekday
+//     -1, BYEASTER -80 to 250 ...), WKST a weekday, each part named once ; a DTSTART and an
+//     UNTIL a day and a time there are (not 20300230)
 //   a naive UNTIL is read in the DTSTART's zone, one ending in Z is the UTC moment it names
 //   a rule needs a run in the 50 years after its DTSTART : one that never fires is refused
 //   a COUNT rule's runs are counted from its DTSTART, up to 50 years after now
@@ -175,7 +176,8 @@ function readErrors(value) {
  * Why a rrule is refused : no DTSTART, a naive one (neither a TZID nor a Z), more than one, no RRULE,
  * an EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix (20MO), COUNT and UNTIL together, COUNT above 999, a BYxxx number out of its range,
- * a TZID that is no time zone, whatever does not parse, a rule with no run in the HORIZON_YEARS
+ * a TZID that is no time zone, a DTSTART or an UNTIL that is no day there is (20300230), a part
+ * given twice, whatever does not parse, a rule with no run in the HORIZON_YEARS
  * after its DTSTART, and a rule whose runs could not be worked out in limits.walkMs (said so).
  *
  * Args:
@@ -333,7 +335,8 @@ function partProblem(part) {
 
 /**
  * A rule's parts, its UNTIL in the wall clock of the DTSTART's zone : a naive UNTIL is read in
- * that zone, one ending in Z is the UTC moment it names.
+ * that zone, one ending in Z is the UTC moment it names. A part given twice and an UNTIL that is
+ * no day and time there are (20270230T000000) are refused.
  *
  * Args:
  *   text (string): the rule's parts (FREQ=DAILY;INTERVAL=1;UNTIL=...).
@@ -347,15 +350,25 @@ function partProblem(part) {
  *   Error: a part that does not parse.
  */
 function ruleOptions(text, zone, fail, label = `RRULE:${text}`) {
+  // a part given twice (FREQ=FOO;INTERVAL=1;FREQ=DAILY) : rrule.js would take one, dateutil the
+  // other ; BYDAY and BYWEEKDAY are the same part
+  const named = new Set();
+  for (const part of text.split(";").filter(Boolean)) {
+    const at = part.indexOf("=");
+    const key = (at < 0 ? part : part.slice(0, at)).toUpperCase().replace(/^BYWEEKDAY$/, "BYDAY");
+    if (named.has(key)) throw fail(`a part is given more than once: ${key}`);
+    named.add(key);
+  }
   let until = null;
   const parts = text
     .split(";")
     .filter((part) => {
       const m = part.match(/^UNTIL=(.*)$/i);
       if (!m) return true;
-      // an UNTIL is a date with a time (YYYYMMDDTHHMMSS, Z or not)
+      // an UNTIL is a date with a time (YYYYMMDDTHHMMSS, Z or not), a day and a time there are
       const stamp = m[1].match(/^(\d{8}T\d{6})(Z?)$/i);
       if (!stamp) throw fail(`UNTIL must be a date and a time (YYYYMMDDTHHMMSS): ${part}`);
+      if (Number.isNaN(floatingOfStamp(stamp[1]))) throw fail(`invalid UNTIL: ${part}`);
       until = stamp[2] ? floatingOf(new Date(floatingOfStamp(stamp[1])), zone) : floatingOfStamp(stamp[1]);
       return false;
     })

@@ -72,6 +72,26 @@ export function intlZone(tzid) {
 }
 
 /**
+ * Whether a YYYYMMDDTHHMMSS stamp is a day and a time there are : not the 30th of February, a
+ * 13th month or a 25th hour, as the server reads it.
+ *
+ * Args:
+ *   stamp (string): the stamp.
+ *
+ * Returns:
+ *   boolean: true when it is one.
+ */
+function realStamp(stamp) {
+  const m = String(stamp).match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return false;
+  const [y, mo, d, h, mi, s] = m.slice(1).map(Number);
+  const back = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return (
+    back.getUTCMonth() === mo - 1 && back.getUTCDate() === d && back.getUTCHours() === h && back.getUTCMinutes() === mi
+  );
+}
+
+/**
  * A number of a rule's part as the server reads it : an integer, a sign allowed ; NaN when it is
  * none (1.5, abc).
  *
@@ -87,7 +107,7 @@ function numberOf(text) {
 
 /**
  * Why one rule (RRULE or EXRULE) is refused once it is read, in the order the server finds it :
- * an UNTIL that is no date and time, a FREQ that does not exist, a part that is not a rule's, a
+ * a part given twice, an UNTIL that is no date and time (or no day there is), a FREQ that does not exist, a part that is not a rule's, a
  * weekday with a number that is not one, a BYxxx out of its range or a WKST that is no weekday, no FREQ, an INTERVAL under 1, SECONDLY, COUNT with UNTIL,
  * a COUNT under 1 or above 999, a weekday that is not one, BYDAY with a number.
  *
@@ -109,11 +129,19 @@ function ruleProblem(kind, text) {
       return { part, key: (at < 0 ? part : part.slice(0, at)).toUpperCase(), value: at < 0 ? '' : part.slice(at + 1) };
     });
   const values = Object.fromEntries(parts.map((p) => [p.key, p.value]));
-  // step 1 : an UNTIL is a date with a time
+  // step 0 : a part given twice (BYDAY and BYWEEKDAY are the same part)
+  const named = new Set();
+  for (const { key } of parts) {
+    const name = key === 'BYWEEKDAY' ? 'BYDAY' : key;
+    if (named.has(name)) return failed(`a part is given more than once: ${name}`);
+    named.add(name);
+  }
+  // step 1 : an UNTIL is a date with a time, a day and a time there are
   const until = parts.find((p) => p.key === 'UNTIL');
   if (until && !/^\d{8}T\d{6}Z?$/i.test(until.value)) {
     return failed(`UNTIL must be a date and a time (YYYYMMDDTHHMMSS): ${until.part}`);
   }
+  if (until && !realStamp(until.value.slice(0, 15))) return failed(`invalid UNTIL: ${until.part}`);
   // step 2 : a FREQ that does not exist
   if (values.FREQ !== undefined && !FREQS.includes(values.FREQ.toUpperCase()))
     return failed(`invalid 'FREQ': ${values.FREQ}`);
@@ -168,7 +196,8 @@ function ruleProblem(kind, text) {
  * EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix, COUNT with UNTIL, a COUNT under 1 or above 999, a part that is not a rule's, a
  * BYxxx number out of its range (BYSETPOS=0), a WKST that is no weekday, a TZID that is no time
- * zone (an IANA zone, or a fixed offset UTC+5 or GMT-3) - the server's reasons, in its order.
+ * zone (an IANA zone, or a fixed offset UTC+5 or GMT-3), a DTSTART or an UNTIL that is no day
+ * there is (20300230), a part given twice - the server's reasons, in its order.
  *
  * Args:
  *   value (string): the rrule.
@@ -214,6 +243,8 @@ export function rruleProblem(value, validZone = () => true) {
       if (!dt[1] && !dt[3]) return `A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`;
       if (dt[1] && !validZone(intlZone(dt[1])))
         return `A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`;
+      // a day and a time there are (not 20300230)
+      if (!realStamp(dt[2])) return `rrule parsing failed validation: invalid DTSTART: ${token}`;
       continue;
     }
     const rule = token.match(/^(RRULE|EXRULE):(.*)$/i);

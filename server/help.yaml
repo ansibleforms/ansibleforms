@@ -6515,7 +6515,8 @@
       naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL` or with one under 1, `SECONDLY`, `BYDAY` with a number
       (`5MO`), `COUNT` with `UNTIL`, `COUNT` above 999 (in any case, `count=5000` too), a `BYxxx` number out of its
       range (`BYHOUR` 0 to 23, `BYSETPOS` 1 to 366 or -366 to -1, `BYEASTER` -80 to 250 ...), a `WKST` that is no
-      weekday, and a rule that never fires: no run in the 50 years after its `DTSTART` (`FREQ=HOURLY;INTERVAL=2;BYHOUR=1`
+      weekday, a `DTSTART` or `UNTIL` that is no real day and time (`20300230`), a part given twice in a rule
+      (`FREQ=FOO;INTERVAL=1;FREQ=DAILY`, `BYDAY` and `BYWEEKDAY` being one part), and a rule that never fires: no run in the 50 years after its `DTSTART` (`FREQ=HOURLY;INTERVAL=2;BYHOUR=1`
       from midnight only meets even hours). A rule whose runs take longer than a second to work out is refused, saying so (one saved
       before is tried again a minute later). A time a DST change skips runs when the clock reaches it (02:30 runs at 03:30 the night
       the clock goes from 02:00 to 03:00), as a cron does; a time the clock shows twice runs once, at the first.
