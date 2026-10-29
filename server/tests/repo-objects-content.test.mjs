@@ -125,6 +125,13 @@ describe("several types in one file, a type over several files", () => {
     assert.deepEqual(fx.readEntry("ops", "team-b/creds.yaml", "credentials").map((e) => e.name), ["b1"]);
   });
 
+  test("a new entry whose name the file has already : refused, never written beside it", () => {
+    write("ops", "x.yaml", { credentials: [git("a")] });
+    const text = fx.textOf("ops", "x.yaml");
+    assert.throws(() => RepoObjects.writeEntries(credentials, "ops", "x.yaml", [git("A"), git("b")]), (e) => e.status === 409 && /'A'/.test(e.message));
+    assert.equal(fx.textOf("ops", "x.yaml"), text);
+  });
+
   test("a key of a type the repository does not hold : never read, said once as a hint", async () => {
     write("ops", "a.yaml", { credentials: [git("a")], labels: [{ name: "PROD" }], sso: [] });
     write("ops", "b.yaml", { labels: [{ name: "DEV" }] });

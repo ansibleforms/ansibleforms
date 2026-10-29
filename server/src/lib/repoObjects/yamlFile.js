@@ -597,7 +597,8 @@ export function editListEntry(text, key, name, mutate, opts = {}) {
 
 /**
  * Adds entries to a type's list in a file, at its end (the key made at the file's end when the
- * file has none) ; one whose name is there already left as it is.
+ * file has none) ; one whose name is there already left as it is, its name put in skipped for the
+ * caller to say.
  *
  * Args:
  *   text (string): the file's text ('' for a new one).
@@ -605,6 +606,8 @@ export function editListEntry(text, key, name, mutate, opts = {}) {
  *   entries (object[]): the entries.
  *   keyOrder (string[]): the type's key order.
  *   nameField (string): the field an entry is named by.
+ *   skipped (string[]): filled with the names of the entries not added (an entry of that name is
+ *     there already).
  *
  * Returns:
  *   string: the file's new text.
@@ -612,11 +615,12 @@ export function editListEntry(text, key, name, mutate, opts = {}) {
  * Raises:
  *   Error: the file is not a map of valid YAML, or its key no list.
  */
-export function appendListEntries(text, key, entries, keyOrder = [], nameField = "name") {
+export function appendListEntries(text, key, entries, keyOrder = [], nameField = "name", skipped = []) {
   const doc = mapDocument(text);
   const seq = listOf(doc, key);
   for (const entry of entries) {
     if (!entryOf(seq, entry[nameField], nameField)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
+    else skipped.push(entry[nameField]);
   }
   return String(text ?? "").trim() ? editedText(doc, text) : doc.toString({ lineWidth: 0 });
 }

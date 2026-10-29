@@ -24,7 +24,7 @@ import { parseSchedule, updateScheduleText, newScheduleEntry, scheduleEntryOf, e
 import { validateRruleAsync, normalizeRrule } from "../lib/scheduleRrule.js";
 import { cronToRrule } from "../lib/cronToRrule.js";
 import logConfig from "../../config/log.config.js";
-import Engine, { withWriteClaim, fileOf, targetFileOf, writeEntries, entryFileOf, removeEntry, nameKey } from "../lib/repoObjects/engine.js";
+import Engine, { withWriteClaim, fileOf, writeEntries, entryFileOf, removeEntry, nameKey, filesNow, assertTypeReadable } from "../lib/repoObjects/engine.js";
 import schedules, { extraVarsText, launchOptionsText, formNames, valuesOf } from "../lib/repoObjects/schedules.js";
 
 const MODEL = "schedule";
@@ -151,7 +151,8 @@ function cronRrule(cron) {
  *
  * Raises:
  *   Errors.BadRequestError: no schedules repository of that name, not cloned yet, or a value refused.
- *   Errors.ConflictError: the name of another schedule.
+ *   Errors.ConflictError: the name of another schedule, the name an entry of the repository declares
+ *     (refused or not read in yet), or a file of the repository giving schedules: that cannot be read.
  */
 ScheduleRepo.create = async function (repository, data) {
   const rows = await mysql.do("SELECT name, use_for_schedules FROM AnsibleForms.`repositories` WHERE name = ?", [repository]);
@@ -170,9 +171,16 @@ ScheduleRepo.create = async function (repository, data) {
   };
   const { extraData } = await checkValues(values, null);
   return withWriteClaim(repository, async () => {
+    // a file that may declare it cannot be read, or an entry of the repository declaring its name
+    // (refused, waiting, not pulled yet) : refused - never a second entry of that name beside it
+    assertTypeReadable(schedules, repository);
+    const now = await filesNow(schedules, repository);
+    if (now.names.has(nameKey(values.name))) {
+      throw new Errors.ConflictError(`An entry of repository '${repository}' is named '${values.name}' already (see its pull output): choose another name, or fix that entry in git.`);
+    }
     const entry = newScheduleEntry({ ...values, extraData });
     const parsed = parseSchedule(structuredClone(entry));
-    const file = targetFileOf(schedules, repository);
+    const file = now.file;
     const abs = fileOf(repository, file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     writeEntries(schedules, repository, file, [entry]);

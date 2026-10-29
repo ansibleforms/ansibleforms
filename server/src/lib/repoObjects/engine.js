@@ -337,17 +337,25 @@ function readRepoFile(repository, repoFile) {
 
 /**
  * Adds entries of a type to a file of a repository, at the end of its key's list (the key made at
- * the file's end when it has none, the file made when it is not there).
+ * the file's end when it has none, the file made when it is not there). An entry whose name the
+ * file has already is never written beside it : nothing is written then, refused.
  *
  * Args:
  *   desc (object): the type's descriptor.
  *   repository (string): the repository.
  *   repoFile (string): the file, relative to the repository.
  *   entries (object[]): the entries.
+ *
+ * Raises:
+ *   Errors.ConflictError: an entry whose name the file has already, named.
  */
 export function writeEntries(desc, repository, repoFile, entries) {
   const text = readRepoFile(repository, repoFile);
-  const next = appendListEntries(text, desc.key, entries, desc.keyOrder || [], desc.nameField || "name");
+  const skipped = [];
+  const next = appendListEntries(text, desc.key, entries, desc.keyOrder || [], desc.nameField || "name", skipped);
+  if (skipped.length) {
+    throw new Errors.ConflictError(`${repository}/${repoFile} has an entry named ${skipped.map((n) => `'${n}'`).join(", ")} already: not written beside it`);
+  }
   if (next !== text) writeRepoFile(repository, repoFile, next);
 }
 
@@ -1584,7 +1592,7 @@ const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptE
  *   Promise<object>: { files (the entries giving an object), skipped (counts), names (Set of
  *     nameKey), refused: [{ file, reasons }], file (where a new object goes ; null when not cloned) }.
  */
-async function filesNow(desc, name) {
+export async function filesNow(desc, name) {
   const names = new Set();
   let files = 0;
   let skipped = 0;
@@ -2627,6 +2635,7 @@ export default {
   fileOf,
   targetFileOf,
   assertTypeReadable,
+  filesNow,
   writeEntries,
   entryFileOf,
   editEntry,

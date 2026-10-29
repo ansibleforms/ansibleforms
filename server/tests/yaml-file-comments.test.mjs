@@ -118,6 +118,15 @@ describe("a type's list in a file", () => {
   });
 });
 
+describe("entries added to a list", () => {
+  test("one whose name is there already : left as it is, its name said to the caller", () => {
+    const skipped = [];
+    const out = appendListEntries("credentials:\n  - name: a\n", "credentials", [{ name: "A" }, { name: "b" }], [], "name", skipped);
+    assert.equal(out, "credentials:\n  - name: a\n  - name: b\n");
+    assert.deepEqual(skipped, ["A"]);
+  });
+});
+
 describe("a large file", () => {
   test("its lines compared in memory linear in its length", () => {
     let text = "repositories:\n";

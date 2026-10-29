@@ -503,6 +503,17 @@ describe("an edit in the app goes to its entry", () => {
     assert.equal(fs.existsSync(path.join(ROOT, "ops", "schedules.yaml")), false);
   });
 
+  test("a new schedule named as a refused entry of the repository : refused, nothing written nor made", async () => {
+    fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
+    // an entry whose form does not exist : refused by the pull, no row
+    const text = YAML.stringify({ schedules: [{ name: "Weekly Report", unified_job_template: { name: "Gone form", type: "job_template" }, rrule: RRULE }] });
+    fs.writeFileSync(path.join(ROOT, "ops", "schedules.yaml"), text);
+    assert.equal((await ScheduleRepo.syncRepository("ops")).refused.length, 1);
+    await assert.rejects(ScheduleRepo.create("ops", { name: "weekly report", form: "Report", rrule: RRULE }), (e) => e.name === "ConflictError" && /is named 'weekly report' already/.test(e.message));
+    assert.equal(rows.length, 0);
+    assert.equal(fs.readFileSync(path.join(ROOT, "ops", "schedules.yaml"), "utf8"), text);
+  });
+
   test("an edit writes the changed fields into its entry, keeping what AnsibleForms does not use", async () => {
     writeFile("ops", "a.yaml", `# owned by ops\n${scheduleYaml("Rotate logs", { forks: 5, limit: "web", custom: { a: 1 } })}`);
     await ScheduleRepo.syncRepository("ops");
