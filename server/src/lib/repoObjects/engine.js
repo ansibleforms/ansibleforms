@@ -686,7 +686,9 @@ export async function syncRepository(desc, name, opts = {}) {
       }
     } catch (e) {
       // two files swapping their names in one pull, a value the model refuses, or an object made
-      // meanwhile : said, the others go on
+      // meanwhile : said, the others go on ; its name not read in, as a refused file's (an
+      // activation keeps the app's object of that name, never a second file beside it)
+      summary.unread.push({ name: f.object.name, file: f.file });
       summary.refused.push({ file: f.file, reasons: [`not saved: ${e.message || e}`] });
       logger.warning(`Could not save the ${desc.noun} of ${name}/${f.file}: ${e.message || e}`);
     }
@@ -1229,24 +1231,20 @@ async function takenNames(desc) {
 const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptExtra(c) : {}), reason: c.reason, ...(c.code ? { code: c.code } : {}) });
 
 /**
- * What making a repository a type's repository would do, changing nothing : the app's objects it
- * would take (written as files, those whose secret stays in the database said), those that stay
- * in the app and why, the files whose name an app's object has (git's version would win), and
- * what it holds now.
+ * A type's files in a repository's working copy as they are now, each parsed, changing nothing :
+ * how many give an object, how many the type does not import, the names they declare - read in or
+ * not (a refused or waiting file's too : an object of the app of that name is never written beside
+ * it) - and the files refused for what they are (a link leading outside, a list file that cannot be
+ * read).
  *
  * Args:
- *   desc (object): the type's descriptor.
- *   name (string|null): the repository (its working copy read when it is cloned), null for one
- *     not made yet.
+ *   desc (object): the type's descriptor (a folder or a list type).
+ *   name (string|null): the repository ; nothing read when it is not cloned.
  *
  * Returns:
- *   Promise<object>: { repository, active, written: [name], withoutSecret: [name], kept: [{ name,
- *     reason }], clashes: [name], files, linked, ...what the type adds (descriptor.previewExtra) }.
+ *   Promise<object>: { files, skipped (counts), names (Set of nameKey), refused: [{ file, reasons }] }.
  */
-export async function preview(desc, name) {
-  if (desc.file) return previewSingle(desc, name);
-  const list = await candidates(desc, name);
-  // the files there are now, by name (a pull before the activation may bring more)
+async function filesNow(desc, name) {
   const fileNames = new Set();
   let files = 0;
   let skipped = 0;
@@ -1288,6 +1286,29 @@ export async function preview(desc, name) {
       }
     }
   }
+  return { files, skipped, names: fileNames, refused };
+}
+
+/**
+ * What making a repository a type's repository would do, changing nothing : the app's objects it
+ * would take (written as files, those whose secret stays in the database said), those that stay
+ * in the app and why, the files whose name an app's object has (git's version would win), and
+ * what it holds now.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   name (string|null): the repository (its working copy read when it is cloned), null for one
+ *     not made yet.
+ *
+ * Returns:
+ *   Promise<object>: { repository, active, written: [name], withoutSecret: [name], kept: [{ name,
+ *     reason }], clashes: [name], files, linked, ...what the type adds (descriptor.previewExtra) }.
+ */
+export async function preview(desc, name) {
+  if (desc.file) return previewSingle(desc, name);
+  const list = await candidates(desc, name);
+  // the files there are now, by name (a pull before the activation may bring more)
+  const { files, skipped, names: fileNames, refused } = await filesNow(desc, name);
   const clashes = list.filter((c) => fileNames.has(nameKey(c.row.name))).map((c) => c.row.name);
   const clash = new Set(clashes);
   const written = list.filter((c) => !c.reason && !clash.has(c.row.name));
@@ -1695,7 +1716,8 @@ export async function afterUsageChange(before, name, now, opts = {}) {
  *   id (number): the new object.
  *
  * Returns:
- *   Promise<object|null>: { repository, file, withoutSecret }, null when it stays in the app.
+ *   Promise<object|null>: { repository, file, withoutSecret }, null when it stays in the app (a
+ *     file of the repository declares its name : it follows that file once it is read in).
  */
 export async function appCreated(desc, id) {
   const repository = await activeRepository(desc);
@@ -1705,6 +1727,14 @@ export async function appCreated(desc, id) {
   const c = await desc.candidateOf(row, null, await takenNames(desc));
   if (c.reason) return null;
   return withWriteClaim(repository, async () => {
+    // a file of the repository declaring its name, read in or not (refused, waiting, not pulled
+    // yet) : kept in the app, never written beside it - a second file of that name would be refused
+    // on every pull, and the first one too once it is fixed ; it follows that file once it is read in
+    const declared = (await filesNow(desc, repository)).names;
+    if (declared.has(nameKey(row.name))) {
+      logger.warning(`Kept ${desc.noun} '${row.name}' in the app, not written to ${repository}: a file of the repository has its name - it follows that file once it is read in`);
+      return null;
+    }
     const file = desc.listFile ? writeListEntry(desc, repository, c.object) : writeNewFile(desc, repository, row.name, desc.newFileText(c));
     await desc.linkCandidate(c, repository, file);
     CrudModel.changed(desc.model);

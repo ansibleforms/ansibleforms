@@ -744,6 +744,33 @@ describe("turning the usage on beside a file of the same name it refuses", () =>
     assert.deepEqual(report.written, []);
     assert.deepEqual(fx.listFiles("ops", "runners"), ["rte1.yaml"]);
   });
+
+  test("a file of its name that cannot take it over (its model refuses the change) : kept in the app, never a second file", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "rte-cred", credential_type: "rte", password: "enc:x", repository: null, repo_file: null });
+    // the app's runner a Semaphore one, git's file of the same name an RTE
+    fx.state.tables.runners.push({ id: 50, name: "edge", type: "semaphore", uri: "https://semaphore", token: "enc:t", enabled: 1, is_default: 1, description: "", repository: null, repo_file: null });
+    fx.writeFile("ops", "runners", "edge.yaml", rteRunner("edge"));
+    const report = await RepoObjects.activate(runners, "ops", { pull: false });
+    assert.equal(report.refused.length, 1, JSON.stringify(report));
+    assert.deepEqual(report.written, []);
+    assert.match(report.kept.find((k) => k.name === "edge").reason, /^ops\/runners\/edge\.yaml has its name but is not read in/);
+    assert.deepEqual(fx.listFiles("ops", "runners"), ["edge.yaml"]);
+  });
+
+  test("an object made in the app with the name a refused file declares : kept in the app, said, never a second file", async () => {
+    fx.writeFile("creds", "credentials", "db.yaml", gitCredential("db", { password: "plain" }));
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).refused.length, 1);
+    fx.state.tables.credentials.push({ id: 60, name: "db", credential_type: "git", user: "u", password: "enc:p", repository: null, repo_file: null });
+    assert.equal(await RepoObjects.appCreated("credentials", 60), null);
+    assert.deepEqual(fx.listFiles("creds", "credentials"), ["db.yaml"]);
+    assert.equal(fx.rowNamed("credentials", "db").repository ?? null, null);
+    // git's file fixed : it takes the app's object over
+    fx.writeFile("creds", "credentials", "db.yaml", gitCredential("db"));
+    CrudModel.flushAllLocal();
+    const next = await RepoObjects.syncRepository(credentials, "creds");
+    assert.deepEqual(next.refused, []);
+    assert.deepEqual(next.matched, ["db"]);
+  });
 });
 
 describe("a usage turned off while a pull of the repository runs", () => {

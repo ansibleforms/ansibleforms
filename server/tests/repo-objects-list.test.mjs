@@ -174,6 +174,15 @@ describe("a pull of repositories.yaml", () => {
     assert.match(why, /repositories.yaml#pw: user and password are refused/);
   });
 
+  test("an entry waiting names a repository then made in the app : kept in the app, never linked to an entry it is not", async () => {
+    writeList([entry("forms", { credential: "missing" })]);
+    assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).waiting.length, 1);
+    fx.state.tables.repositories.push({ id: 6, name: "forms", uri: "https://git/other.git", branch: "main", description: "" });
+    assert.equal(await RepoObjects.appCreated("repositories", 6), null);
+    assert.equal(fx.rowNamed("repositories", "forms").repository ?? null, null);
+    assert.deepEqual(readList(), [entry("forms", { credential: "missing" })]);
+  });
+
   test("an entry gone : never a repository with changes not pushed yet, kept and said", async () => {
     writeList([entry("forms")]);
     await RepoObjects.syncRepository(await desc(), "hub");
