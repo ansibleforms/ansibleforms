@@ -692,6 +692,9 @@ function readFormsFile(formsPath,filename){
   }  
 }
 
+// whether a user's roles reach a form (an admin reaches every one) : the Forms page's filter, and
+// the designer's for a user without designAllForms (lib/designerForms.js)
+Form.checkFormRole = (form, userRoles) => checkFormRole(form, userRoles)
 function checkFormRole(form, userRoles) {
   if(!userRoles) {
     return true
@@ -709,6 +712,86 @@ function checkFormRole(form, userRoles) {
   return false
 }
 
+/**
+ * The forms folders with their repository name, in the order the loader reads them : the forms
+ * repositories' (each its forms subfolder, or its root), then the staging folder when it is there
+ * (new forms not yet pushed, no repository) ; or the local forms folder when no repository serves
+ * forms.
+ *
+ * Returns:
+ *   Promise<object[]>: [{ name (the repository, null for a local or the staging folder), path,
+ *     dedicated }].
+ */
+async function formsFolders() {
+  const repoFolders = await Repository.getFormsFolders()
+  const stagingPath = appConfig.formsStagingPath
+  return repoFolders.length > 0
+    ? [...repoFolders, ...(fs.existsSync(stagingPath) ? [{ name: null, path: stagingPath }] : [])]
+    : [{ name: null, path: appConfig.formsFolderPath }]
+}
+
+/**
+ * Every form of the folders, each with where it is, in the order they are read (the folders in
+ * turn, the files of each sorted) : what the loader goes through, and what the designer's checks
+ * of the forms it never received read (Form.unloaded, Form.duplicates).
+ *
+ * Args:
+ *   formsdirs (object[]): the folders (formsFolders).
+ *   warn (function): (message) => a warning (a folder that cannot be read).
+ *   error (function): (message) => an error (a file that cannot be read or parsed).
+ *
+ * Returns:
+ *   object[]: [{ form, repository (its repository, null for a local or the staging folder), dir
+ *     (its folder), file (the file, relative to the folder) }].
+ */
+function collectForms(formsdirs, warn, error) {
+  const out = []
+  // when several forms repos exist, tag each form with the repo it came from so a save writes it
+  // back there even if another repo has a same-named file
+  const tagRepository = formsdirs.filter((d) => d.name).length > 1
+  // Loop through each forms directory (with its repository name)
+  for (const formsdir of formsdirs) {
+    const formsdirpath = formsdir.path
+    var files;
+    try {
+      // walk directory recursively and collect relative paths for .yml/.yaml files ;
+      // walkYamlFiles skips an unreadable subfolder on its own (with a warning) and
+      // guards against symbolic link loops
+      if (fs.existsSync(formsdirpath)) {
+        files = walkYamlFiles(formsdirpath, warn);
+      } else {
+        warn(`Failed to load forms directory '${formsdirpath}'.`);
+        continue; // skip this directory
+      }
+    } catch (e) {
+      warn(`Failed to load forms directory '${formsdirpath}'.`, e);
+      continue; // skip this directory
+    }
+    if (!files?.length) continue
+    logger.debug(`Found ${files.length} form file(s) in '${formsdirpath}'`)
+    // sort for deterministic order
+    files.sort();
+    // read files
+    for (const item of files) {
+      // read the file and add to the forms array
+      logger.debug(`Loading forms from file ${item} in ${formsdirpath}`);
+      try{
+        const fileForms = getFormsFromFile(formsdirpath,item) // get the forms from the file, including subpaths
+        // tag with the originating repository so a save writes it back there
+        // (disambiguates same-named files across repos) ; only when needed
+        if (tagRepository && formsdir.name) {
+          for (const ff of fileForms) ff.repository = formsdir.name
+        }
+        for (const form of fileForms) out.push({ form, repository: formsdir.name, dir: formsdir, file: item })
+      }
+      catch (e) {
+        error(e.message);
+      }
+    }
+  }
+  return out
+}
+
 // load the forms config
 Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=false) {
   logger.debug(`Loading forms with userRoles=${userRoles}, formName=${formName}, loadFullConfig=${loadFullConfig}, baseOnly=${baseOnly}`)
@@ -718,15 +801,8 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   
   // Get the forms folders with their repository name - can be multiple from
   // repositories or a single default path. In repository mode the staging
-  // folder is added (new forms not yet pushed) with no repository.
-  const repoFolders = await Repository.getFormsFolders()
-  const stagingPath = appConfig.formsStagingPath
-  // when several forms repos exist, tag each form with the repo it came from so
-  // a save writes it back there even if another repo has a same-named file
-  const tagRepository = repoFolders.length > 1
-  const formsdirs = repoFolders.length > 0
-    ? [...repoFolders, ...(fs.existsSync(stagingPath) ? [{ name: null, path: stagingPath }] : [])]
-    : [{ name: null, path: appConfig.formsFolderPath }]
+  // folder is added (new forms not yet pushed) with no repository (formsFolders).
+  const formsdirs = await formsFolders()
 
   logger.debug(`Loading forms from ${formsdirs.length} folder(s): ${formsdirs.map(d => d.path).join(", ")}`)
 
@@ -779,49 +855,8 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   }
   var unvalidatedForms = [];
 
-  // read extra form files from all forms directories
-  // Loop through each forms directory (with its repository name)
-  for(const formsdir of formsdirs){
-    const formsdirpath = formsdir.path
-    var files;
-    try {
-      // walk directory recursively and collect relative paths for .yml/.yaml files ;
-      // walkYamlFiles skips an unreadable subfolder on its own (with a warning) and
-      // guards against symbolic link loops
-      if (fs.existsSync(formsdirpath)) {
-        files = walkYamlFiles(formsdirpath, warn);
-      } else {
-        warn(`Failed to load forms directory '${formsdirpath}'.`);
-        continue; // skip this directory
-      }
-    } catch (e) {
-      warn(`Failed to load forms directory '${formsdirpath}'.`, e);
-      continue; // skip this directory
-    }
-
-    if (files && files.length) {
-      logger.debug(`Found ${files.length} form file(s) in '${formsdirpath}'`)
-      // sort for deterministic order
-      files.sort();
-      // read files
-      for (const item of files) {
-        // read the file and add to the forms array
-        logger.debug(`Loading forms from file ${item} in ${formsdirpath}`);
-        try{
-          const fileForms = getFormsFromFile(formsdirpath,item) // get the forms from the file, including subpaths
-          // tag with the originating repository so a save writes it back there
-          // (disambiguates same-named files across repos) ; only when needed
-          if (tagRepository && formsdir.name) {
-            for (const ff of fileForms) ff.repository = formsdir.name
-          }
-          unvalidatedForms = unvalidatedForms.concat(fileForms);
-        }
-        catch (e) {
-          error(e.message);
-        }
-      };
-    }
-  }
+  // read extra form files from all forms directories, in the order they are read (collectForms)
+  unvalidatedForms = unvalidatedForms.concat(collectForms(formsdirs, warn, error).map((e) => e.form));
   
   // Process all collected forms
   for (const f of unvalidatedForms) {
@@ -844,7 +879,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         continue
       }
       if(existingFormNames.includes(f.name)){
-        warn(`skipping duplicate form ${f.name}`)
+        warn(Form.duplicateWarning(f.name))
         continue
       }
       // The name is claimed BEFORE the role check, so a name resolves to exactly one
@@ -871,7 +906,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         form = getFormInfo(f,formName,loadFullConfig); // retreive only the necessary form info
       } catch (e) {
         // convert e to proper string
-        error(`Failed to validate form '${f.name}'.\r\n${e.message}`);
+        error(Form.validationError(f.name, e.message));
       }  
       if(form){
         // Load varsFiles if this is a single form request and varsFiles is defined
@@ -940,12 +975,22 @@ function collectSubformNames(fields, unvalidated, collected, visited){
 // definitions referenced by its list fields (recursively). Missing subforms
 // produce an error entry but do not throw, so the form itself can still be
 // rendered (the client will show a placeholder).
-function collectSubformsForForm(parentForm, unvalidated, errors){
+/**
+ * The subforms a form uses, by name : its list and yaml fields' (recursively) and its wizard steps'.
+ *
+ * Args:
+ *   parentForm (object): the form.
+ *   unvalidated (object[]): every form, as read.
+ *
+ * Returns:
+ *   Set<string>: the subforms' names.
+ */
+function subformNamesOf(parentForm, unvalidated){
   const names = new Set()
   const visited = new Set()
-  collectSubformNames(parentForm.fields, unvalidated, names, visited)
+  collectSubformNames(parentForm?.fields, unvalidated, names, visited)
   // wizard steps reference subforms by name too
-  if(Array.isArray(parentForm.wizard)){
+  if(Array.isArray(parentForm?.wizard)){
     for(const step of parentForm.wizard){
       if(step?.subform && !visited.has(step.subform)){
         visited.add(step.subform)
@@ -957,6 +1002,13 @@ function collectSubformsForForm(parentForm, unvalidated, errors){
       }
     }
   }
+  return names
+}
+// the subforms a form uses : the designer's for a user without designAllForms (lib/designerForms.js)
+Form.subformNamesOf = subformNamesOf
+
+function collectSubformsForForm(parentForm, unvalidated, errors){
+  const names = subformNamesOf(parentForm, unvalidated)
   const result = []
   for(const name of names){
     const raw = unvalidated.find(f => f.name === name && f.type === "subform")
@@ -971,6 +1023,158 @@ function collectSubformsForForm(parentForm, unvalidated, errors){
     }
   }
   return result
+}
+
+// ===========================================================================
+// WHAT A DESIGNER WITHOUT designAllForms IS NOT TOLD
+// ===========================================================================
+// The designer of a user whose role option designAllForms is off shows only the forms of their
+// roles (lib/designerForms.js). These read what the loader leaves out or says of a form (a form
+// that does not load, a name defined twice), so that nothing of a form hidden from them is named.
+
+/**
+ * A path as the disk resolves it, links followed : the deepest part of it that exists resolved
+ * (realpath), the rest added as written. A file not made yet is resolved through the folders it
+ * would be made in, so a link to a folder (sub -> .) cannot hide where it lands.
+ *
+ * Args:
+ *   abs (string): the path, absolute.
+ *
+ * Returns:
+ *   string: the path resolved ; as written when nothing of it resolves.
+ */
+function realPathOf(abs) {
+  let probe = path.resolve(abs)
+  const rest = []
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(probe), ...rest)
+    } catch {
+      const parent = path.dirname(probe)
+      if (parent === probe) return path.resolve(abs)
+      rest.unshift(path.basename(probe))
+      probe = parent
+    }
+  }
+}
+
+/**
+ * The warning the loader records for a form name defined twice : the later copy is skipped.
+ *
+ * Args:
+ *   name (string): the form.
+ *
+ * Returns:
+ *   string: the warning.
+ */
+Form.duplicateWarning = (name) => `skipping duplicate form ${name}`
+
+/**
+ * The form names defined more than once across the forms folders : the copy used (the first
+ * read, Form.load's) and each one skipped, with the roles of both, so that a designer without
+ * designAllForms is told only of copies they reach (lib/designerForms.js duplicateShown).
+ *
+ * Returns:
+ *   Promise<object[]>: [{ name, used: { roles }, skipped: { roles }, notice (the loader's warning,
+ *     Form.duplicateWarning) }].
+ */
+Form.duplicates = async function() {
+  const first = new Map()
+  const out = []
+  for (const e of collectForms(await formsFolders(), () => {}, () => {})) {
+    const name = e.form?.name
+    if (!name) continue
+    if (!first.has(name)) {
+      first.set(name, e)
+      continue
+    }
+    const used = first.get(name)
+    out.push({
+      name,
+      used: { roles: Array.isArray(used.form.roles) ? used.form.roles : [] },
+      skipped: { roles: Array.isArray(e.form.roles) ? e.form.roles : [] },
+      notice: Form.duplicateWarning(name),
+    })
+  }
+  return out
+}
+
+/**
+ * The forms the loader leaves out because they do not load (no name aside : failing validation),
+ * each the copy its name resolves to (a later copy of a name is a skipped one) : the designer never
+ * receives them, a save keeps them (formsToKeep). A designer without designAllForms is refused
+ * their names and their files when they are not theirs (lib/designerForms.js).
+ *
+ * Returns:
+ *   Promise<object[]>: [{ form (as read), source (its file in its folder), repository (its
+ *     repository, null for a local or the staging folder) }].
+ */
+Form.unloaded = async function() {
+  const first = new Map()
+  for (const e of collectForms(await formsFolders(), () => {}, () => {})) {
+    if (e.form?.name && !first.has(e.form.name)) first.set(e.form.name, e)
+  }
+  // validated as the loader validates them : a form that loads is answered from its cache
+  const loads = (form) => {
+    try {
+      validatedForm(form)
+      return true
+    } catch {
+      return false
+    }
+  }
+  return [...first.values()].filter((e) => !loads(e.form)).map((e) => ({ form: e.form, source: e.file, repository: e.repository }))
+}
+
+/**
+ * The error the loader records for a form failing validation : what a designer without
+ * designAllForms is not shown of a form hidden from them (lib/designerForms.js).
+ *
+ * Args:
+ *   name (string): the form.
+ *   message (string): why it fails ; '' for the start every such error has.
+ *
+ * Returns:
+ *   string: the error.
+ */
+Form.validationError = (name, message) => `Failed to validate form '${name}'.\r\n${message}`
+
+/**
+ * What a save says of a form name it cannot take, to a designer who is not told where it is.
+ *
+ * Args:
+ *   name (string): the name.
+ *
+ * Returns:
+ *   string: the message.
+ */
+Form.nameTaken = (name) => `The form name '${name}' is already taken`
+
+/**
+ * Which paths are form files, as the loader reads them (formsFolders) : anything in a folder that
+ * is the forms' own (a forms repository's forms folder, the staging folder, the local forms
+ * folder, those two whether they are read now or not), and every yaml file of a forms repository
+ * serving its forms from its root. The designer's other explorers (models/projectFiles.model.js)
+ * never write one : a form written there skips every check of Form.save (its name, its roles, its
+ * validation, the forms hidden from a designer).
+ *
+ * Returns:
+ *   Promise<function>: (absolute path) => whether it is a form file, by the path as written and
+ *     as the disk resolves it (links followed).
+ */
+Form.formsFileTest = async function() {
+  const inside = (root, p) => {
+    const rel = path.relative(root, p)
+    return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel)
+  }
+  // the forms repositories' folders, and the staging and the local forms folders whether they are
+  // read now or not (a file made there is a form once they are) ; a folder not configured holds none
+  const folders = [...(await Repository.getFormsFolders()), { name: null, path: appConfig.formsStagingPath }, { name: null, path: appConfig.formsFolderPath }]
+  const roots = folders.filter((d) => d.path).map((d) => ({ own: !d.name || !!d.dedicated, paths: [path.resolve(d.path), realPathOf(d.path)] }))
+  return (abs) => {
+    const candidates = [path.resolve(abs), realPathOf(abs)]
+    return roots.some((r) => candidates.some((p) => r.paths.some((root) => inside(root, p)) && (r.own || /\.(yaml|yml)$/i.test(p))))
+  }
 }
 
 // load the forms config

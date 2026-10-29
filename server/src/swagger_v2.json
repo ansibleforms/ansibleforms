@@ -666,7 +666,7 @@
       "get": {
         "tags": ["repository"],
         "summary": "List all repositories",
-        "description": "Returns a list of all configured git repositories with masked passwords.",
+        "description": "Returns a list of all configured git repositories with masked passwords. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the stored pull and push outputs leave out the lines naming files.",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {
@@ -765,7 +765,7 @@
       "get": {
         "tags": ["repository"],
         "summary": "Get repository by name",
-        "description": "Returns a single repository configuration with masked password.",
+        "description": "Returns a single repository configuration with masked password. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the stored pull and push outputs leave out the lines naming files.",
         "security": [ { "bearerAuth": [] } ],
         "parameters": [
           {
@@ -1063,7 +1063,7 @@
       "post": {
         "tags": ["expression"],
         "summary": "Evaluate a form field's server expression",
-        "description": "Evaluates the expression of a form field. Send formName and fieldName (plus subformName for a field in a subform): the expression text is taken from the form definition, loaded with the caller's roles, and only the placeholder values come from the request. A raw `expression` is accepted only from a user with settings or designer access.",
+        "description": "Evaluates the expression of a form field. Send formName and fieldName (plus subformName for a field in a subform): the expression text is taken from the form definition, loaded with the caller's roles, and only the placeholder values come from the request. A raw `expression` is accepted only from a user with settings access, or a designer who may edit the forms and sees every form, playbook and workflow (the role options designAllForms, designAllPlaybooks and designAllWorkflows on).",
         "security": [ { "bearerAuth": [] } ],
         "parameters": [
           { "name": "noLog", "in": "query", "required": false, "schema": { "type": "boolean" }, "description": "Suppress expression logging" }
@@ -1082,7 +1082,7 @@
                   "literals": { "type": "array", "items": { "type": "string" }, "description": "The keys of values that are spliced in as JSON (objects, arrays, records)" },
                   "expression": {
                     "type": "string",
-                    "description": "A raw JavaScript expression - settings or designer access only",
+                    "description": "A raw JavaScript expression - settings access, or a designer who sees every form, playbook and workflow, only",
                     "example": "fn.fnReadYamlFile('/path/to/file.yml')"
                   }
                 }
@@ -1102,7 +1102,7 @@
             }
           },
           "400": { "description": "Bad request - no expression provided" },
-          "403": { "description": "A raw expression without settings or designer access, or a form the caller may not use" },
+          "403": { "description": "A raw expression without settings access or a designer who sees every form, playbook and workflow, or a form the caller may not use" },
           "404": { "description": "The form, subform or field does not exist or has no server expression" },
           "500": { 
             "description": "Expression evaluation error",
@@ -4922,7 +4922,7 @@
           "repository"
         ],
         "summary": "Commit and push repository",
-        "description": "Commits the working tree of a forms, config, playbooks, workflows or inventories repository and pushes it to the remote (cloning it first when missing). Requires the settings or connections settings permission.",
+        "description": "Commits the working tree of a forms, config, playbooks, workflows or inventories repository and pushes it to the remote (cloning it first when missing). Requires the settings or connections settings permission. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
         "parameters": [
           {
             "name": "name",
@@ -4980,7 +4980,7 @@
           "designer"
         ],
         "summary": "Commit and push all forms repositories",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option.",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
         "responses": {
           "200": {
             "description": "RestResult with data { results: [{ name, status, output }] }"
@@ -5008,7 +5008,7 @@
           "designer"
         ],
         "summary": "Commit and push one forms repository",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option.",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
         "parameters": [
           {
             "name": "name",
@@ -5117,7 +5117,7 @@
           "designer"
         ],
         "summary": "List workflow names",
-        "description": "The designer's workflows by name, each with its file. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "description": "The designer's workflows by name, each with its file: what a workflow form may run. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllWorkflows (on by default, and always for admins), only the workflows of the files used by the forms the user can see in the designer, and of the files no form uses yet, are listed.",
         "responses": {
           "200": {
             "description": "RestResult list of { name, file }"
@@ -5139,7 +5139,7 @@
           "designer"
         ],
         "summary": "List designer files",
-        "description": "Lists the playbooks, vars files, inventories or workflows of the designer. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "description": "Lists the playbooks, vars files, inventories or workflows of the designer. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too.",
         "parameters": [
           {
             "name": "kind",
@@ -5181,7 +5181,7 @@
           "designer"
         ],
         "summary": "Read a designer file",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file answers 404.",
         "parameters": [
           {
             "name": "kind",
@@ -5219,7 +5219,7 @@
             "description": "No access (missing role option)"
           },
           "404": {
-            "description": "File not found"
+            "description": "File not found, or hidden from the user"
           }
         }
       },
@@ -5233,7 +5233,7 @@
           "designer"
         ],
         "summary": "Save a designer file",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock.",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file's name answers 409, as a file there already. A workflow file whose nodes run a playbook or a workflow hidden from the user answers 409, without naming it. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it.",
         "parameters": [
           {
             "name": "kind",
@@ -5269,7 +5269,10 @@
             "description": "Unknown kind, invalid path, content not text or too big"
           },
           "403": {
-            "description": "No access (missing role option)"
+            "description": "No access (missing role option), or a form file"
+          },
+          "409": {
+            "description": "The name is already taken (a hidden file), or a workflow running a playbook or a workflow hidden from the user"
           },
           "423": {
             "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
@@ -5286,7 +5289,7 @@
           "designer"
         ],
         "summary": "Create a designer file",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock.",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file's name answers 409, as a file there already. A workflow file whose nodes run a playbook or a workflow hidden from the user answers 409, without naming it. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it.",
         "parameters": [
           {
             "name": "kind",
@@ -5322,10 +5325,10 @@
             "description": "Unknown kind, invalid path, content not text or too big"
           },
           "403": {
-            "description": "No access (missing role option)"
+            "description": "No access (missing role option), or a form file"
           },
           "409": {
-            "description": "File exists already"
+            "description": "File exists already (a hidden file too), or a workflow running a playbook or a workflow hidden from the user"
           },
           "423": {
             "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
@@ -5342,7 +5345,7 @@
           "designer"
         ],
         "summary": "Delete a designer file",
-        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock.",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file answers 404. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it.",
         "parameters": [
           {
             "name": "kind",
@@ -5377,10 +5380,10 @@
             "description": "Unknown kind or invalid path"
           },
           "403": {
-            "description": "No access (missing role option)"
+            "description": "No access (missing role option), or a form file"
           },
           "404": {
-            "description": "File not found"
+            "description": "File not found, or hidden from the user"
           },
           "423": {
             "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
@@ -5419,7 +5422,7 @@
         ],
         "responses": {
           "200": {
-            "description": "RestResult with data { repository, output }"
+            "description": "RestResult with data { repository, output } ; without designAllForms, designAllPlaybooks or designAllWorkflows the output leaves out the lines naming files"
           },
           "400": {
             "description": "The files are in a local folder, no repository to push to"
@@ -5444,7 +5447,7 @@
           "config"
         ],
         "summary": "Save the forms configuration",
-        "description": "Writes the whole forms configuration. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not change the roles.",
+        "description": "Writes the whole forms configuration. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not change the roles. With the role option designAllForms off, the forms the user does not see are kept as they are (a file holding several forms keeps its hidden ones), a read-only subform must come back unchanged (403), a form named as a hidden one (one that does not load included), a subform a hidden form uses, or a form put in the file of a hidden form that does not load is refused with the name said to be taken (409), and every form saved (a subform aside) must keep one of the user's roles (400). Without designAllPlaybooks or designAllWorkflows, a form naming a playbook or a workflow hidden from the user is refused (409). Without any of the three, a form may not gain an expression or a query the server runs that it does not have already (403).",
         "requestBody": {
           "required": true,
           "content": {
@@ -5460,13 +5463,13 @@
             "description": "Saved (data null)"
           },
           "400": {
-            "description": "Empty body or invalid configuration"
+            "description": "Empty body, invalid configuration, or a form saved without one of the user's roles (designAllForms off)"
           },
           "403": {
-            "description": "No access, or a non-admin changed the roles"
+            "description": "No access, a non-admin changed the roles, a read-only subform changed, or a new or changed expression or query the server runs (designAllForms, designAllPlaybooks or designAllWorkflows off)"
           },
           "409": {
-            "description": "Duplicate form name"
+            "description": "Duplicate form name, a form name or file already taken, or a playbook or a workflow not available to the user (designAllForms, designAllPlaybooks or designAllWorkflows off)"
           },
           "423": {
             "description": "The designer is locked by another user"
@@ -5486,7 +5489,7 @@
           "config"
         ],
         "summary": "Get the full forms configuration",
-        "description": "Returns every form, unfiltered by role. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "description": "Returns every form, unfiltered by role, with the load's errors and warnings. With the role option designAllForms off (it is on by default, and always for admins) only the forms whose roles hold one of the user's roles are returned, with the subforms no hidden form uses; a subform a hidden form uses as well as one of theirs is added with readOnly: true, and the warnings and errors naming a hidden form are left out. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
         "responses": {
           "200": {
             "description": "RestResult with the full configuration"
@@ -5543,7 +5546,7 @@
           "config"
         ],
         "summary": "Restore a forms configuration backup",
-        "description": "Restores a configuration backup file (see /config/backups). Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not restore a backup with different roles.",
+        "description": "Restores a configuration backup file (see /config/backups). Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not restore a backup with different roles. Refused (403) for a user whose role option designAllForms is off: a backup replaces every form.",
         "parameters": [
           {
             "name": "backupName",
@@ -5572,7 +5575,7 @@
             "description": "Missing or invalid backup name"
           },
           "403": {
-            "description": "No access, or a non-admin restores different roles"
+            "description": "No access, designAllForms off, or a non-admin restores different roles"
           },
           "423": {
             "description": "The designer is locked by another user"
@@ -5616,7 +5619,7 @@
           "config"
         ],
         "summary": "Get the forms of the caller",
-        "description": "Returns the categories and the forms the caller's roles may open, without roles and constants. Any authenticated user.",
+        "description": "Returns the categories and the forms the caller's roles may open, without roles and constants. Any authenticated user. With the role option designAllForms off, the warning of a form name defined twice is left out unless the caller's roles reach both copies.",
         "responses": {
           "200": {
             "description": "RestResult with the filtered configuration"
@@ -5635,7 +5638,7 @@
           "config"
         ],
         "summary": "List forms with their roles and runners",
-        "description": "Every form with the roles that open it and where its jobs run. Requires any settings permission (settings, appearance or connections).",
+        "description": "Every form with the roles that open it and where its jobs run. Requires any settings permission (settings, appearance or connections). Without the settings permission itself and with the role option designAllForms off, only the forms the caller's designer shows are returned.",
         "responses": {
           "200": {
             "description": "RestResult list"
@@ -5657,7 +5660,7 @@
           "config"
         ],
         "summary": "List credentials used by forms",
-        "description": "The credentials each form names, for a credential's Used by tab. Requires the settings or connections settings permission.",
+        "description": "The credentials each form names, for a credential's Used by tab. Requires the settings or connections settings permission. Without the settings permission itself and with the role option designAllForms off, only the forms the caller's designer shows are returned.",
         "responses": {
           "200": {
             "description": "RestResult list"
@@ -5679,7 +5682,7 @@
           "config"
         ],
         "summary": "List credentials used by workflows",
-        "description": "The credentials each designer workflow names, for a credential's Used by tab. Requires the settings or connections settings permission.",
+        "description": "The credentials each designer workflow names, for a credential's Used by tab. Requires the settings or connections settings permission. Without the settings permission itself and with the role option designAllWorkflows off, only the workflow files the caller's designer shows are returned.",
         "responses": {
           "200": {
             "description": "RestResult list of { name, description, file, credentials: [{ name, where }] }"

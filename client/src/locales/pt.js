@@ -364,8 +364,14 @@ export default {
       showDesigner: 'Ver e utilizar o designer.',
       allowFormDesign:
         'Editar os formulários no designer: categorias, constantes e formulários (sem isso: só leitura).',
+      designAllForms:
+        'Mostrar e editar todos os formulários no designer; sem isto, apenas os formulários das funções do utilizador (os subformulários que usam, só de leitura). Limita apenas os formulários (os playbooks e os fluxos de trabalho têm as suas próprias opções); inventários, ficheiros de variáveis, categorias e constantes continuam visíveis para todos os designers.',
       allowPlaybookDesign: 'Editar os playbooks no designer (sem isso: só leitura).',
+      designAllPlaybooks:
+        'Mostrar e editar todos os playbooks no designer; sem isto, apenas os playbooks usados pelos formulários que o utilizador pode ver, e os que nenhum formulário usa ainda.',
       allowWorkflowDesign: 'Editar os fluxos de trabalho no designer (sem isso: só leitura).',
+      designAllWorkflows:
+        'Mostrar e editar todos os fluxos de trabalho no designer; sem isto, apenas os fluxos de trabalho usados pelos formulários que o utilizador pode ver, e os que nenhum formulário usa ainda.',
       allowInventoryDesign: 'Editar os inventários no designer (sem isso: só leitura).',
       allowVarsFileDesign: 'Editar os ficheiros de variáveis no designer (sem isso: só leitura).',
       showLogs: 'Ver o registo do servidor.',
@@ -2153,8 +2159,11 @@ export default {
       noConstants: 'Nenhuma constante configurada',
       roleOptionShowDesigner: 'Mostrar o Designer',
       roleOptionAllowFormDesign: 'Editar Formulários',
+      roleOptionDesignAllForms: 'Editar Todos os Formulários',
       roleOptionAllowPlaybookDesign: 'Editar Playbooks',
+      roleOptionDesignAllPlaybooks: 'Editar Todos os Playbooks',
       roleOptionAllowWorkflowDesign: 'Editar Fluxos de trabalho',
+      roleOptionDesignAllWorkflows: 'Editar Todos os Fluxos de trabalho',
       roleOptionAllowInventoryDesign: 'Editar Inventários',
       roleOptionAllowVarsFileDesign: 'Editar Ficheiros de variáveis',
       roleOptionShowLogs: 'Mostrar o Registo do servidor',
@@ -2756,6 +2765,8 @@ export default {
     selectBackupFirst: 'Selecione primeiro uma cópia de segurança',
     warnFormDuplicate: "O formulário '{name}' tem duplicados",
     warnUniqueFormName: 'Cada formulário tem de ter um nome único',
+    subformReadOnly:
+      'Só de leitura: um subformulário usado por um dos seus formulários, mas nenhuma das suas funções está nas suas funções.',
     warnEmptyFormName: 'Nome de formulário vazio',
     warnBadFormYaml: "O formulário '{name}' tem YAML inválido e não pode ser analisado",
     warnBadSource: "O formulário '{name}' tem uma propriedade 'source' inválida",

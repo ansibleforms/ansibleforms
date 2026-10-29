@@ -55,3 +55,38 @@ describe('saving the forms', () => {
     expect(src).not.toMatch(/restoreBackup\(\);\s*resetAction\(\);/);
   });
 });
+
+describe('a read-only subform (designAllForms off)', () => {
+  // the server keeps it as stored : a delete or a move in the designer would be said saved, and be
+  // back on the next load
+  const body = (name) => {
+    const start = src.indexOf(name);
+    return src.slice(start, src.indexOf('\n}\n', start));
+  };
+
+  it('is never deleted nor moved, by its row, its menu or a drag', () => {
+    expect(body('function deleteForm(')).toMatch(/refusedReadOnly\(readOnlyForm\(id\)\)/);
+    expect(body('function onDragStart(')).toMatch(/if \(readOnlyForm\(id\)\) \{\s*event\.preventDefault\(\);/);
+    expect(body('function ctxMoveToFile(')).toMatch(/refusedReadOnly\(readOnlyForm\(/);
+    expect(src).toContain(':draggable="!readOnlyForm(n.id)"');
+    expect(src).toMatch(/v-if="!readOnlyForm\(n\.id\)"\s+role="button"\s+class="tree-del-btn/);
+    expect(src).toMatch(/'ctx-item-disabled': readOnlyForm\(ctxMenu\.target\?\.id\) \}"\s+@click="ctxMoveToFile\(\)"/);
+    expect(src).toMatch(
+      /'ctx-item-disabled': readOnlyForm\(ctxMenu\.target\?\.id\) \}"\s+@click="ctxDeleteFormFromMenu\(\)"/,
+    );
+  });
+
+  it('keeps the file and the folder holding it : not renamed, moved nor deleted', () => {
+    for (const fn of ['function ctxRenameFile(', 'function confirmDeleteFile(', 'function ctxMoveFileToFolder(']) {
+      expect(body(fn)).toMatch(/refusedReadOnly\(fileHoldsReadOnly\(source\)\)/);
+    }
+    expect(body('function confirmDeleteFolder(')).toMatch(/refusedReadOnly\(folderHoldsReadOnly\(folder\)\)/);
+  });
+
+  it('says it is read only on the Visual tab as on the YAML tab', () => {
+    const notices = src.match(/<div v-if="formReadOnly" class="alert alert-secondary py-2 mb-2">/g) || [];
+    expect(notices.length).toBe(2);
+    const visual = src.slice(src.indexOf('editorView === \'visual\'" class="designer-visual">'));
+    expect(visual.indexOf('formReadOnly')).toBeLessThan(visual.indexOf('<AppFormVisualEditor'));
+  });
+});

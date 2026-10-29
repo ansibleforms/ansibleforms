@@ -364,8 +364,14 @@ export default {
       showDesigner: 'De designer zien en gebruiken.',
       allowFormDesign:
         'De formulieren in de designer bewerken: categorieën, constanten en formulieren (zonder: alleen lezen).',
+      designAllForms:
+        'Alle formulieren in de designer tonen en bewerken; zonder dit alleen de formulieren van de rollen van de gebruiker (de subformulieren die ze gebruiken alleen-lezen). Beperkt alleen de formulieren (playbooks en workflows hebben hun eigen opties); inventarissen, variabelenbestanden, categorieën en constanten blijven zichtbaar voor elke designer.',
       allowPlaybookDesign: 'De playbooks in de designer bewerken (zonder: alleen lezen).',
+      designAllPlaybooks:
+        'Alle playbooks in de designer tonen en bewerken; zonder dit alleen de playbooks die de formulieren gebruiken die de gebruiker kan zien, en de playbooks die nog geen formulier gebruikt.',
       allowWorkflowDesign: 'De workflows in de designer bewerken (zonder: alleen lezen).',
+      designAllWorkflows:
+        'Alle workflows in de designer tonen en bewerken; zonder dit alleen de workflows die de formulieren gebruiken die de gebruiker kan zien, en de workflows die nog geen formulier gebruikt.',
       allowInventoryDesign: 'De inventarissen in de designer bewerken (zonder: alleen lezen).',
       allowVarsFileDesign: 'De variabelenbestanden in de designer bewerken (zonder: alleen lezen).',
       showLogs: 'Het serverlog zien.',
@@ -2146,8 +2152,11 @@ export default {
       noConstants: 'Geen constanten geconfigureerd',
       roleOptionShowDesigner: 'Ontwerper tonen',
       roleOptionAllowFormDesign: 'Formulieren bewerken',
+      roleOptionDesignAllForms: 'Alle formulieren bewerken',
       roleOptionAllowPlaybookDesign: 'Playbooks bewerken',
+      roleOptionDesignAllPlaybooks: 'Alle playbooks bewerken',
       roleOptionAllowWorkflowDesign: 'Workflows bewerken',
+      roleOptionDesignAllWorkflows: 'Alle workflows bewerken',
       roleOptionAllowInventoryDesign: 'Inventarissen bewerken',
       roleOptionAllowVarsFileDesign: 'Variabelenbestanden bewerken',
       roleOptionShowLogs: 'Serverlog tonen',
@@ -2751,6 +2760,8 @@ export default {
     selectBackupFirst: 'Selecteer eerst een back-up',
     warnFormDuplicate: "Formulier '{name}' komt dubbel voor",
     warnUniqueFormName: 'Elk formulier moet een unieke naam hebben',
+    subformReadOnly:
+      'Alleen-lezen: een subformulier dat een van je formulieren gebruikt, maar geen van je rollen staat in zijn rollen.',
     warnEmptyFormName: 'Lege formuliernaam',
     warnBadFormYaml: "Formulier '{name}' bevat ongeldige YAML en kan niet worden gelezen",
     warnBadSource: "Formulier '{name}' heeft een ongeldige 'source'-eigenschap",

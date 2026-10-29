@@ -363,8 +363,14 @@ export default {
         'Wyświetlanie i zmiana wszystkich stron ustawień. Dziennik serwera i Kopie zapasowe mają własne przełączniki.',
       showDesigner: 'Wyświetlanie projektanta i korzystanie z niego.',
       allowFormDesign: 'Edytować formularze w designerze: kategorie, stałe i formularze (bez tego: tylko odczyt).',
+      designAllForms:
+        'Pokazywać i edytować wszystkie formularze w designerze; bez tego tylko formularze ról użytkownika (używane przez nie podformularze tylko do odczytu). Ogranicza tylko formularze (playbooki i przepływy pracy mają własne opcje); inwentarze, pliki zmiennych, kategorie i stałe pozostają widoczne dla każdego projektanta.',
       allowPlaybookDesign: 'Edytować playbooki w designerze (bez tego: tylko odczyt).',
+      designAllPlaybooks:
+        'Pokazywać i edytować wszystkie playbooki w designerze; bez tego tylko playbooki używane przez formularze widoczne dla użytkownika oraz te, których żaden formularz jeszcze nie używa.',
       allowWorkflowDesign: 'Edytować przepływy pracy w designerze (bez tego: tylko odczyt).',
+      designAllWorkflows:
+        'Pokazywać i edytować wszystkie przepływy pracy w designerze; bez tego tylko przepływy pracy używane przez formularze widoczne dla użytkownika oraz te, których żaden formularz jeszcze nie używa.',
       allowInventoryDesign: 'Edytować inwentarze w designerze (bez tego: tylko odczyt).',
       allowVarsFileDesign: 'Edytować pliki zmiennych w designerze (bez tego: tylko odczyt).',
       showLogs: 'Wyświetlanie dziennika serwera.',
@@ -2138,8 +2144,11 @@ export default {
       noConstants: 'Nie skonfigurowano stałych',
       roleOptionShowDesigner: 'Pokaż Projektanta',
       roleOptionAllowFormDesign: 'Edytować Formularze',
+      roleOptionDesignAllForms: 'Edytować Wszystkie Formularze',
       roleOptionAllowPlaybookDesign: 'Edytować Playbooki',
+      roleOptionDesignAllPlaybooks: 'Edytować Wszystkie Playbooki',
       roleOptionAllowWorkflowDesign: 'Edytować Przepływy pracy',
+      roleOptionDesignAllWorkflows: 'Edytować Wszystkie Przepływy pracy',
       roleOptionAllowInventoryDesign: 'Edytować Inwentarze',
       roleOptionAllowVarsFileDesign: 'Edytować Pliki zmiennych',
       roleOptionShowLogs: 'Pokaż Dziennik serwera',
@@ -2740,6 +2749,8 @@ export default {
     selectBackupFirst: 'Najpierw wybierz kopię zapasową',
     warnFormDuplicate: "Formularz '{name}' ma duplikaty",
     warnUniqueFormName: 'Każdy formularz musi mieć unikalną nazwę',
+    subformReadOnly:
+      'Tylko do odczytu: podformularz używany przez jeden z twoich formularzy, ale żadna z twoich ról nie jest w jego rolach.',
     warnEmptyFormName: 'Pusta nazwa formularza',
     warnBadFormYaml: "Formularz '{name}' ma nieprawidłowy YAML i nie można go przetworzyć",
     warnBadSource: "Formularz '{name}' ma nieprawidłową właściwość 'source'",

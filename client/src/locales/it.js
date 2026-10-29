@@ -364,8 +364,14 @@ export default {
         'Vedere e modificare tutte le pagine delle impostazioni. Il Log del server e i Backup hanno i propri interruttori.',
       showDesigner: 'Vedere e usare il designer.',
       allowFormDesign: 'Modificare i moduli nel designer: categorie, costanti e moduli (senza: sola lettura).',
+      designAllForms:
+        "Mostrare e modificare tutti i moduli nel designer; senza, solo i moduli dei ruoli dell'utente (i sottomoduli che usano in sola lettura). Limita solo i moduli (playbook e workflow hanno le proprie opzioni); inventari, file di variabili, categorie e costanti restano visibili a ogni designer.",
       allowPlaybookDesign: 'Modificare i playbook nel designer (senza: sola lettura).',
+      designAllPlaybooks:
+        "Mostrare e modificare tutti i playbook nel designer; senza, solo i playbook usati dai moduli che l'utente può vedere, e quelli che nessun modulo usa ancora.",
       allowWorkflowDesign: 'Modificare i workflow nel designer (senza: sola lettura).',
+      designAllWorkflows:
+        "Mostrare e modificare tutti i workflow nel designer; senza, solo i workflow usati dai moduli che l'utente può vedere, e quelli che nessun modulo usa ancora.",
       allowInventoryDesign: 'Modificare gli inventari nel designer (senza: sola lettura).',
       allowVarsFileDesign: 'Modificare i file di variabili nel designer (senza: sola lettura).',
       showLogs: 'Vedere il log del server.',
@@ -2143,8 +2149,11 @@ export default {
       noConstants: 'Nessuna costante configurata',
       roleOptionShowDesigner: 'Mostra il Designer',
       roleOptionAllowFormDesign: 'Modificare i Moduli',
+      roleOptionDesignAllForms: 'Modificare Tutti i Moduli',
       roleOptionAllowPlaybookDesign: 'Modificare i Playbook',
+      roleOptionDesignAllPlaybooks: 'Modificare Tutti i Playbook',
       roleOptionAllowWorkflowDesign: 'Modificare i Workflow',
+      roleOptionDesignAllWorkflows: 'Modificare Tutti i Workflow',
       roleOptionAllowInventoryDesign: 'Modificare gli Inventari',
       roleOptionAllowVarsFileDesign: 'Modificare i File di variabili',
       roleOptionShowLogs: 'Mostra il Log del server',
@@ -2747,6 +2756,8 @@ export default {
     selectBackupFirst: 'Seleziona prima un backup',
     warnFormDuplicate: "Il modulo '{name}' è duplicato",
     warnUniqueFormName: 'Ogni modulo deve avere un nome univoco',
+    subformReadOnly:
+      'Sola lettura: un sottomodulo usato da uno dei tuoi moduli, ma nessuno dei tuoi ruoli è nei suoi ruoli.',
     warnEmptyFormName: 'Nome del modulo vuoto',
     warnBadFormYaml: "Il modulo '{name}' contiene YAML non valido e non può essere letto",
     warnBadSource: "Il modulo '{name}' ha una proprietà 'source' non valida",

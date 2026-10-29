@@ -9,6 +9,10 @@
 // A kind has one root ; the inventories have the local folder (one folder per inventory) and
 // a root per inventories repository, each an inventory of its own : its paths start with its name
 // (production/inventory.yaml), as a local inventory's start with its folder's.
+//
+// A form file (Form.formsFileTest : a forms folder's, every yaml file of a forms repository serving
+// its forms from its root) is never written nor deleted here : the designer's forms write it,
+// checked.
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -19,6 +23,7 @@ import Repository from "./repository.model.js";
 import Repo from "./repo.model.js";
 import { configRepoFromPath } from "../lib/forms-git.js";
 import { FILE_KINDS, MAX_FILE_BYTES, MAX_LISTED_FILES, safeRelativePath, isInside, isTextBuffer } from "../lib/projectFiles.js";
+import Form from "./form.model.js";
 
 const ProjectFiles = {};
 
@@ -68,7 +73,23 @@ ProjectFiles.roots = async function (kind) {
  *   BadRequestError: the path names no root of the kind.
  */
 async function rootOf(kind, rel) {
-  const roots = await ProjectFiles.roots(kind);
+  return rootIn(await ProjectFiles.roots(kind), rel);
+}
+
+/**
+ * The root a path is in, among a kind's roots already read (rootOf's rule).
+ *
+ * Args:
+ *   roots (object[]): the kind's roots (ProjectFiles.roots).
+ *   rel (string): the path, as the explorer shows it.
+ *
+ * Returns:
+ *   object: { root, repository, prefix, inner }.
+ *
+ * Raises:
+ *   BadRequestError: the path names no root of the kind.
+ */
+function rootIn(roots, rel) {
   const parts = String(rel ?? "").replace(/^\/+/, "").split("/");
   const repo = roots.find((r) => r.prefix && r.prefix === parts[0]);
   if (repo) return { ...repo, inner: parts.slice(1).join("/") };
@@ -109,6 +130,70 @@ async function resolveIn(root, rel) {
     if (real !== realRoot && !isInside(realRoot, real)) throw new Errors.BadRequestError(`'${rel}' is not a valid file path`);
   }
   return { rel: safe, abs };
+}
+
+/**
+ * The absolute paths of files of a kind, as the explorer shows them : what the designer's
+ * visibility of the playbooks and the workflows compares (lib/designerForms.js).
+ *
+ * Args:
+ *   kind (string): the kind.
+ *   rels (string[]): the paths.
+ *
+ * Returns:
+ *   Promise<Map<string, string>>: each path's absolute one (a path naming no root left out).
+ */
+ProjectFiles.absolutes = async function (kind, rels) {
+  const roots = await ProjectFiles.roots(kind);
+  const out = new Map();
+  for (const rel of rels || []) {
+    try {
+      const { root, inner } = rootIn(roots, rel);
+      out.set(rel, path.resolve(root, String(inner).replace(/^\/+/, "")));
+    } catch {
+      // a path of no folder : nothing to compare
+    }
+  }
+  return out;
+};
+
+/**
+ * A file of a kind as a read, a save or a delete resolves it : its absolute path, and its path as
+ * those name it in what they answer. A request refused for a file hidden from the user answers in
+ * the same words (lib/designerForms.js).
+ *
+ * Args:
+ *   kind (string): the kind.
+ *   rel (string): the file's path, as the explorer shows it.
+ *
+ * Returns:
+ *   Promise<object>: { abs, name }.
+ *
+ * Raises:
+ *   BadRequestError: the path names no root of the kind, is not valid, or leads out of it.
+ */
+ProjectFiles.locate = async function (kind, rel) {
+  const { root, prefix, inner } = await rootOf(kind, rel);
+  const file = await resolveIn(root, inner);
+  return { abs: file.abs, name: shown(prefix, file.rel) };
+};
+
+/**
+ * Refuses a write of a form file (Form.formsFileTest) : the designer's forms write them, checked
+ * (their names, their roles, their validation, the forms hidden from a designer) ; here none of it
+ * would apply.
+ *
+ * Args:
+ *   abs (string): the path.
+ *   name (string): the path as the request names it.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: it is a form file.
+ */
+async function assertNotFormsFile(abs, name) {
+  if ((await Form.formsFileTest())(abs)) {
+    throw new Errors.AccessDeniedError(`'${name}' is a form file: it is written by the designer's forms, where it is checked`);
+  }
 }
 
 /** A path as the explorer shows it : its root's prefix first, when the kind has several. */
@@ -246,6 +331,7 @@ async function withWriteClaim(repository, write) {
  * Raises:
  *   BadRequestError: the path or the content is not valid.
  *   ConflictError: onlyNew and the file exists.
+ *   AccessDeniedError: it is a form file (Form.formsFileTest).
  */
 ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   if (typeof content !== "string") throw new Errors.BadRequestError("The content must be text");
@@ -253,6 +339,7 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
+  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     if (fs.existsSync(file.abs)) {
       if (onlyNew) throw new Errors.ConflictError(`File '${name}' exists already`);
@@ -277,11 +364,13 @@ ProjectFiles.write = async function (kind, rel, content, onlyNew = false) {
  *
  * Raises:
  *   NotFoundError: there is no such file.
+ *   AccessDeniedError: it is a form file (Form.formsFileTest).
  */
 ProjectFiles.remove = async function (kind, rel) {
   const { root, repository, prefix, inner } = await rootOf(kind, rel);
   const file = await resolveIn(root, inner);
   const name = shown(prefix, file.rel);
+  await assertNotFormsFile(file.abs, name);
   return withWriteClaim(repository, async () => {
     const stat = await fs.promises.lstat(file.abs).catch(() => null);
     if (!stat || !stat.isFile()) throw new Errors.NotFoundError(`File '${name}' not found`);

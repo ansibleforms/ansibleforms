@@ -3,6 +3,7 @@ import Form from '../models/form.model.js';
 import appConfig from '../../config/app.config.js';
 import { QueryPolicyError, authoritativeValues, findFieldOwner } from './queryPolicy.js';
 import { spliceExpressionValues } from './formEngine/placeholders.js';
+import { designsEverything } from './designerForms.js';
 
 /**
  * Who may evaluate what through POST /api/v2/expression.
@@ -19,11 +20,27 @@ import { spliceExpressionValues } from './formEngine/placeholders.js';
  * the caller only supplies data.
  *
  * A raw expression in the body is still accepted from a user with showSettings, or from a
- * designer who writes forms : they can already put any expression in one.
+ * designer who writes forms and sees every form, playbook and workflow : they can already put any
+ * expression in one. A designer limited to some of them (designAllForms, designAllPlaybooks,
+ * designAllWorkflows off) is not : fn.fnReadYamlFile would read the files hidden from them.
  */
 
 // the field types the browser evaluates itself (AppForm's aliases) - never on the server
 const LOCAL_TYPES = new Set(['local', 'local_out', 'credential', 'html']);
+
+/**
+ * Whether a field's expression runs on the server (POST /api/v2/expression) : one the browser does
+ * not evaluate itself (runLocal, or a type it evaluates : LOCAL_TYPES).
+ *
+ * Args:
+ *   field (object): the field.
+ *
+ * Returns:
+ *   boolean: true when it has an expression the server runs.
+ */
+export function runsOnServer(field) {
+  return !!(field && typeof field.expression === 'string' && field.expression && !field.runLocal && !LOCAL_TYPES.has(field.type));
+}
 
 /**
  * Whether a user may have a raw expression evaluated : one with the admin settings, or one who
@@ -31,7 +48,8 @@ const LOCAL_TYPES = new Set(['local', 'local_out', 'credential', 'html']);
  * option, and the right to save forms (allowFormDesign), as the designer's form writes require
  * (lib/middleware.js checkDesignerMiddleware and checkFormDesignMiddleware). A designer who may
  * only read the forms, or who works on playbooks or inventories alone, cannot put an
- * expression in a form, so may not run one either.
+ * expression in a form, so may not run one either ; nor may a designer some forms, playbooks or
+ * workflows are hidden from (lib/designerForms.js) : a raw expression reads any file of the server.
  *
  * Args:
  *   user (object): the caller ({ options }).
@@ -42,7 +60,7 @@ const LOCAL_TYPES = new Set(['local', 'local_out', 'credential', 'html']);
 export function mayRunRawExpression(user) {
   const options = user?.options || {};
   if (options.showSettings) return true;
-  return !!(appConfig.showDesigner && options.showDesigner && options.allowFormDesign);
+  return !!(appConfig.showDesigner && options.showDesigner && options.allowFormDesign && designsEverything(user));
 }
 
 /**
@@ -76,7 +94,7 @@ export async function resolveExpression(req) {
   }
   if (!mayRunRaw) {
     throw new QueryPolicyError(403, 'noAccess',
-      'A raw expression may only be run by a user with settings or designer access. Send formName and fieldName to run an expression defined on a form.');
+      'A raw expression may only be run by a user with settings access, or a designer who sees every form, playbook and workflow. Send formName and fieldName to run an expression defined on a form.');
   }
   return { expression: body.expression, noLog };
 }
@@ -97,7 +115,7 @@ export async function resolveFormExpression({ user, formName, subformName, field
     throw new QueryPolicyError(404, `Subform '${subformName}' is not part of form '${formName}'`);
   }
   const field = (owner.fields || []).find(f => f.name === fieldName);
-  if (!field || !field.expression || field.runLocal || LOCAL_TYPES.has(field.type)) {
+  if (!runsOnServer(field)) {
     throw new QueryPolicyError(404, `Field '${fieldName}' has no server expression on form '${owner.name}'`);
   }
   const expression = field.expression;
@@ -132,4 +150,4 @@ function readUserPath(user, path) {
   return cur;
 }
 
-export default { resolveExpression, resolveFormExpression };
+export default { runsOnServer, resolveExpression, resolveFormExpression };
