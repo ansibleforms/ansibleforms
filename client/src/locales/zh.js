@@ -1315,7 +1315,8 @@ export default {
         runners: '运行器，其任意 YAML 文件中 controller_runners: 列表的条目，按名称引用其凭据',
         notifications: '通知，其任意 YAML 文件中 controller_notifications: 列表的条目',
         syslog: 'Syslog 服务器，其任意 YAML 文件中 controller_syslog: 列表的条目',
-        chat_assistant: '聊天助手，在其某个 YAML 文件的 controller_chat_assistant: 下，密钥仅以环境变量引用',
+        chat_assistant:
+          '聊天助手的开关和设置，在其某个 YAML 文件的 controller_chat_assistant: 下，密钥仅以环境变量引用',
         mcp: 'MCP 设置按其环境变量名，在其某个 YAML 文件的 controller_mcp: 下',
         defaults: '主题、颜色、表单视图、时区、日期格式和语言，在其某个 YAML 文件的 controller_defaults: 下',
         logo: '徽标，在其某个 YAML 文件的 controller_logo: 下，图片按相对于该文件的路径指定',

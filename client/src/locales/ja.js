@@ -1341,7 +1341,7 @@ export default {
         notifications: '通知。任意の YAML ファイルの controller_notifications: リストの項目',
         syslog: 'Syslog サーバー。任意の YAML ファイルの controller_syslog: リストの項目',
         chat_assistant:
-          'チャットアシスタント。いずれかの YAML ファイルの controller_chat_assistant: の下、キーは環境変数の参照のみ',
+          'チャットアシスタントのスイッチと設定。いずれかの YAML ファイルの controller_chat_assistant: の下、キーは環境変数の参照のみ',
         mcp: 'MCP の設定を環境変数名で、いずれかの YAML ファイルの controller_mcp: の下に',
         defaults:
           'テーマ、色、フォームの表示、タイムゾーン、日付の形式、言語を、いずれかの YAML ファイルの controller_defaults: の下に',

@@ -122,7 +122,7 @@ beforeEach(() => {
   process.env.CHAT_KEY = "sk-from-env";
   for (const name of ["JOB_RETENTION_DAYS", "GIT_PULL_COMMAND", "ACCESS_TOKEN_ISSUER", "AUDIT_RETENTION_DAYS"]) delete process.env[name];
   delete process.env.DEFAULT_LANGUAGE;
-  for (const name of ["ENABLE_MCP", "MCP_READ_ONLY", "MCP_CHAT_FORMS_ONLY"]) delete process.env[name];
+  for (const name of ["ENABLE_MCP", "MCP_READ_ONLY", "MCP_CHAT_FORMS_ONLY", "ENABLE_CHAT"]) delete process.env[name];
   fs.rmSync(MANAGED, { force: true });
   audits.length = 0;
   acceptances = { 1: 5 };
@@ -195,7 +195,7 @@ describe("a type the app has one of : the chat assistant", () => {
     // no file gives it : written to <key>.yaml at the root
     assert.equal(report.file, "chat_assistant.yaml");
     assert.equal(p.file, "chat_assistant.yaml");
-    assert.deepEqual(readMapOf("cfg", "chat_assistant.yaml"), { provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
+    assert.deepEqual(readMapOf("cfg", "chat_assistant.yaml"), { enable_chat: false, provider: "openai", model: "gpt-5", max_turns: 20, allow_job_status: true });
     // edited in the app : only the model rewritten
     const before = await RepoObjects.snapshot("chat_assistant");
     fx.state.tables.chat_settings[0].model = "gpt-6";
@@ -261,6 +261,93 @@ describe("a type the app has one of : the chat assistant", () => {
     assert.equal(report.unlinked, 1);
     assert.equal(fx.state.tables.chat_settings[0].model, "last");
     assert.ok(fs.existsSync(path.join(fx.ROOT, "cfg", "chat-assistant.yaml")));
+  });
+});
+
+describe("the chat assistant's switch (ENABLE_CHAT), enable_chat in its map as the page saves it", () => {
+  const configController = async () => (await import("../src/controllers/v2/config.controller.js")).default;
+  // the page's Save of its switch : the environment settings' route, as the page calls it
+  const saveSwitch = async (body) => {
+    const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+    await (await configController()).saveEnv({ body, user: { user: { username: "root", options: { showSettings: true } } }, ip: "::1" }, res);
+    return res;
+  };
+
+  test("turned on : the switch handed over first in the map ; a pull applies it at once, checked as the page's Save", async () => {
+    fs.writeFileSync(MANAGED, "ENABLE_CHAT='1'\n");
+    process.env.ENABLE_CHAT = "1";
+    fx.cloneEmpty("cfg");
+    await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
+    assert.equal(readFlat("cfg", "chat_assistant.yaml").split("\n")[0], "enable_chat: true");
+    // switched off in git : saved as the page saves it, the chat off without a restart
+    const { default: appConfig } = await import("./__mocks__/app.config.js");
+    appConfig.enableChat = true;
+    writeRaw("cfg", "chat_assistant.yaml", "enable_chat: false\nmodel: gpt-5\n");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    assert.equal(appConfig.enableChat, false);
+    assert.equal(fx.state.tables.chat_settings[0].model, "gpt-5");
+    assert.match(fs.readFileSync(MANAGED, "utf8"), /ENABLE_CHAT='0'/);
+    assert.deepEqual(audits[0].detail, { changed: ["ENABLE_CHAT"], restartRequired: [] });
+    assert.doesNotMatch(RepoObjects.summaryText(await desc("chat_assistant"), summary), /restart/);
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).unchanged, 1);
+    // the switch alone : applied, the settings row left as it is
+    writeRaw("cfg", "chat_assistant.yaml", "enable_chat: true\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).updated, 1);
+    assert.equal(appConfig.enableChat, true);
+    assert.equal(fx.state.tables.chat_settings[0].model, "gpt-5");
+    // not a yes or no : refused, nothing applied
+    writeRaw("cfg", "chat_assistant.yaml", "enable_chat: maybe\nmodel: other\n");
+    const refused = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.equal(refused.refused.length, 1, JSON.stringify(refused));
+    assert.equal(fx.state.tables.chat_settings[0].model, "gpt-5");
+    appConfig.enableChat = false;
+  });
+
+  test("a save of the page's switch writes it back into the chat assistant's map, never into general's", async () => {
+    fx.cloneEmpty("cfg");
+    for (const key of ["chat_assistant", "general"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+    const general = readRaw("cfg", "general.yaml").toString();
+    writeRaw("cfg", "chat_assistant.yaml", "# the team's chat\nenable_chat: false\nmodel: gpt-5\n");
+    await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    const res = await saveSwitch({ ENABLE_CHAT: "1" });
+    assert.equal(res.code, 200, JSON.stringify(res.body));
+    assert.equal(readFlat("cfg", "chat_assistant.yaml"), "# the team's chat\nenable_chat: true\nmodel: gpt-5\n");
+    assert.equal(readRaw("cfg", "general.yaml").toString(), general, "the switch is the Chat assistant page's, not General's");
+    // and General's map never holds it
+    writeRaw("cfg", "general.yaml", "ENABLE_CHAT: true\n");
+    const summary = await RepoObjects.syncRepository(await desc("general"), "cfg");
+    assert.match(summary.refused[0].reasons.join(" "), /ENABLE_CHAT is not one Settings > System > General changes/);
+  });
+
+  test("set in the real environment : never written, a file giving it refused as General's, one without it applied", async () => {
+    process.env.ENABLE_CHAT = "1";
+    fx.cloneEmpty("cfg");
+    Object.assign(fx.state.tables.chat_settings[0], { provider: "openai", model: "gpt-5" });
+    await RepoObjects.activate(await desc("chat_assistant"), "cfg", { pull: false });
+    assert.equal(readMapOf("cfg", "chat_assistant.yaml").enable_chat, undefined, "the deployment's value is not the repository's");
+    writeRaw("cfg", "chat_assistant.yaml", "enable_chat: false\nmodel: gpt-6\n");
+    const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
+    assert.deepEqual(summary.refused[0]?.reasons, ["ENABLE_CHAT is set in the environment and cannot be changed from here"]);
+    assert.equal(fx.state.tables.chat_settings[0].model, "gpt-5", "refused whole");
+    assert.equal(process.env.ENABLE_CHAT, "1");
+    assert.equal(fs.existsSync(MANAGED), false, "nothing written");
+    writeRaw("cfg", "chat_assistant.yaml", "model: gpt-6\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg")).updated, 1);
+    assert.equal(fx.state.tables.chat_settings[0].model, "gpt-6");
+    // an edit in the app : the switch still never written
+    const before = await RepoObjects.snapshot("chat_assistant");
+    fx.state.tables.chat_settings[0].model = "gpt-7";
+    await RepoObjects.appUpdated("chat_assistant", before);
+    assert.equal(readFlat("cfg", "chat_assistant.yaml"), "model: gpt-7\n");
+  });
+
+  test("the config seed's chat section stays as it is : no switch in it, the file's schema has one", async () => {
+    const { seedSchema, chatFileItem } = await import("../src/lib/seed-schema.js");
+    assert.equal(seedSchema.properties.chat.properties.enable_chat, undefined);
+    assert.ok(!seedSchema.properties.chat.required.includes("enable_chat"));
+    assert.equal(Object.keys(chatFileItem.properties)[0], "enable_chat");
+    assert.equal(chatFileItem.required, undefined);
   });
 });
 

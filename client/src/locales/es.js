@@ -1354,7 +1354,7 @@ export default {
           'Notificaciones, entradas de una lista controller_notifications: en cualquiera de sus archivos YAML',
         syslog: 'Servidores syslog, entradas de una lista controller_syslog: en cualquiera de sus archivos YAML',
         chat_assistant:
-          'El asistente de chat, bajo controller_chat_assistant: en uno de sus archivos YAML, la clave solo como referencia de entorno',
+          'El interruptor y la configuración del asistente de chat, bajo controller_chat_assistant: en uno de sus archivos YAML, la clave solo como referencia de entorno',
         mcp: 'Los ajustes de MCP por su nombre de entorno, bajo controller_mcp: en uno de sus archivos YAML',
         defaults:
           'El tema, el color, la vista de los formularios, la zona horaria, el formato de fecha y el idioma, bajo controller_defaults: en uno de sus archivos YAML',

@@ -1345,7 +1345,7 @@ export default {
         notifications: 'Powiadomienia, wpisy listy controller_notifications: w dowolnym z jego plików YAML',
         syslog: 'Serwery syslog, wpisy listy controller_syslog: w dowolnym z jego plików YAML',
         chat_assistant:
-          'Asystent czatu, pod controller_chat_assistant: w jednym z jego plików YAML, klucz tylko jako odwołanie do zmiennej środowiskowej',
+          'Przełącznik i ustawienia asystenta czatu, pod controller_chat_assistant: w jednym z jego plików YAML, klucz tylko jako odwołanie do zmiennej środowiskowej',
         mcp: 'Ustawienia MCP według nazw zmiennych środowiskowych, pod controller_mcp: w jednym z jego plików YAML',
         defaults:
           'Motyw, kolor, widok formularzy, strefa czasowa, format daty i język, pod controller_defaults: w jednym z jego plików YAML',

@@ -1349,7 +1349,7 @@ export default {
         notifications: 'Meldingen, items van een controller_notifications:-lijst in een van zijn YAML-bestanden',
         syslog: 'Syslog-servers, items van een controller_syslog:-lijst in een van zijn YAML-bestanden',
         chat_assistant:
-          'De chat-assistent, onder controller_chat_assistant: in een van zijn YAML-bestanden, de sleutel alleen als omgevingsverwijzing',
+          'De schakelaar en instellingen van de chat-assistent, onder controller_chat_assistant: in een van zijn YAML-bestanden, de sleutel alleen als omgevingsverwijzing',
         mcp: 'De MCP-instellingen op hun omgevingsnaam, onder controller_mcp: in een van zijn YAML-bestanden',
         defaults:
           'Het thema, de kleur, de formulierweergave, de tijdzone, de datumnotatie en de taal, onder controller_defaults: in een van zijn YAML-bestanden',

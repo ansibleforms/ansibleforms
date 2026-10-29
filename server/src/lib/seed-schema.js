@@ -652,9 +652,12 @@ export const ldapDirectoryItem = {
 };
 
 // The chat assistant's settings as a repository holds them (lib/repoObjects/chatAssistant.js, its chat_assistant: map) :
-// the chat section's fields, none required - a file declares what it owns, its api key left out
-// when the app's stays in the database
-export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);
+// what the Chat assistant page saves - its switch (enable_chat : the ENABLE_CHAT environment
+// setting, named as its variable in lower case, as the Defaults page's default_language) first, then
+// the chat section's fields - none required : a file declares what it owns, its api key left out
+// when the app's stays in the database. The config seed's chat section stays as it is : the switch
+// is an environment setting, never the seed's (lib/seed.js applies the provider row only).
+export const chatFileItem = (({ required: _all, properties, ...section }) => ({ ...section, properties: { enable_chat: bool, ...properties } }))(chatSection);
 
 // The Settings > Appearance pages a repository holds one file each of (lib/repoObjects/defaults.js,
 // logo.js, icon.js, name.js) and the config seed one section each of : what each page saves, and

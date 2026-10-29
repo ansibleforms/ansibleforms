@@ -995,7 +995,8 @@
       config seed), forms with `enableForChat: true`, and users whose roles allow `allowChat`
       (the default). Form definitions and the values being filled in are sent to that
       provider ; passwords, credentials and job output never are. Takes effect at once,
-      without a restart. See the Chat assistant page of the documentation.
+      without a restart. A Chat assistant repository keeps it as `enable_chat` in its
+      `controller_chat_assistant:` map, never General's. See the Chat assistant page of the documentation.
   - name: API_TOKEN_MAX_DAYS
     version: 7.0.0
     type: number
@@ -6908,11 +6909,17 @@
       the file that gives it; turning it off reads it once more and the app keeps its values. A map removed from
       git changes nothing in the app.
 
-      **Chat assistant** (`controller_chat_assistant:`): the chat assistant's settings in the config seed's `chat:` format, every field
-      optional. `api_key` only as `${ENV}`, or left out (the one in the database stays); `credential` names an api
-      credential, and the map waits while it is missing.
+      **Chat assistant** (`controller_chat_assistant:`): what Settings > Connections > Chat assistant saves, every field
+      optional: its switch `enable_chat` (the `ENABLE_CHAT` environment setting, named as its variable in lower case,
+      as Defaults' `default_language`), then the settings in the config seed's `chat:` format. The switch is checked
+      and saved as the page's Save (the chat turns on or off at once, no restart, audited), and a save of the switch on
+      the page rewrites it in the map; the app writes it on or off. When the real environment sets `ENABLE_CHAT`
+      the app never writes it, and a map giving it is refused, nothing applied, as General refuses such a variable.
+      General never holds it. The config seed's `chat:` section has no switch. `api_key` only as `${ENV}`, or left
+      out (the one in the database stays); `credential` names an api credential, and the map waits while it is missing.
       ```yaml
       controller_chat_assistant:
+        enable_chat: true
         provider: openai
         model: gpt-5
         api_key: ${CHAT_API_KEY}
