@@ -216,6 +216,22 @@ describe("an object is its name within its type", () => {
   });
 });
 
+// ─── anchors and aliases ───────────────────────────────────────────────────────
+describe("an entry written back where the file uses anchors and aliases", () => {
+  test("an app delete of an entry whose anchor another entry uses : written, the other keeps its value, never back on the next pull", async () => {
+    write("ops", "creds.yaml", "credentials:\n  - name: a\n    credential_type: git\n    user: &u bot\n  - name: b\n    credential_type: git\n    user: *u\n");
+    await sync(credentials);
+    const before = { ...fx.rowNamed("credentials", "a") };
+    fx.state.tables.credentials = fx.state.tables.credentials.filter((r) => r.name !== "a");
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appDeleted("credentials", before), true);
+    const summary = await sync(credentials);
+    assert.equal(summary.created, 0);
+    assert.equal(fx.rowNamed("credentials", "a"), undefined);
+    assert.equal(fx.rowNamed("credentials", "b").user, "bot");
+  });
+});
+
 // ─── a file not read ───────────────────────────────────────────────────────────
 describe("what a file not read held stays as it is", () => {
   test("a file that cannot be read : its objects kept and still linked, the file refused when its lines give the key", async () => {

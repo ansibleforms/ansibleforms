@@ -528,6 +528,72 @@ function entryOf(seq, name, nameField = "name") {
 }
 
 /**
+ * The anchors set in a node and inside it (&u), each with the value it stands for now : what the
+ * aliases to them (*u) elsewhere in the file must keep once that node is changed or removed
+ * (keepAliases).
+ *
+ * Args:
+ *   doc (YAML.Document): the document.
+ *   node (YAML.Node): the node (an entry about to be edited or removed).
+ *
+ * Returns:
+ *   Map: anchor name -> { value (its value, aliases resolved), json (that value as JSON) } ; one
+ *     whose value cannot be resolved (too many aliases) left out.
+ */
+function anchorsIn(doc, node) {
+  const out = new Map();
+  YAML.visit(node, {
+    Node(_, n) {
+      if (!n.anchor || YAML.isAlias(n)) return;
+      try {
+        const value = n.toJS(doc);
+        out.set(n.anchor, { value, json: JSON.stringify(value) });
+      } catch {
+        // an alias bomb : never copied
+      }
+    },
+  });
+  return out;
+}
+
+/**
+ * Keeps the aliases to the anchors of a node changed or removed (anchorsIn, read before) : each
+ * alias whose anchor is gone, or stands for another value now, made a copy of the value it stood
+ * for - the entries that used it keep their values, the file stays valid YAML (no alias left
+ * without its anchor).
+ *
+ * Args:
+ *   doc (YAML.Document): the document, changed.
+ *   anchors (Map): anchorsIn's, read before the change.
+ */
+function keepAliases(doc, anchors) {
+  if (!anchors.size) return;
+  const now = new Map();
+  YAML.visit(doc, {
+    Node(_, n) {
+      if (n.anchor && !YAML.isAlias(n) && anchors.has(n.anchor)) now.set(n.anchor, n);
+    },
+  });
+  const changed = new Set();
+  for (const [name, { json }] of anchors) {
+    const node = now.get(name);
+    let same = false;
+    try {
+      same = !!node && JSON.stringify(node.toJS(doc)) === json;
+    } catch {
+      same = false;
+    }
+    if (!same) changed.add(name);
+  }
+  if (!changed.size) return;
+  YAML.visit(doc, {
+    Alias(_, alias) {
+      if (changed.has(alias.source)) return doc.createNode(anchors.get(alias.source).value);
+    },
+  });
+}
+
+/**
  * Applies edits to a map : each key set (a new one at its place in the key order), a key whose edit
  * is undefined removed.
  *
@@ -589,8 +655,12 @@ export function editListEntry(text, key, name, mutate, opts = {}) {
   const doc = mapDocument(text);
   const seq = listOf(doc, key);
   const entry = entryOf(seq, name, opts.nameField);
-  if (entry) mutate(doc, entry);
-  else if (opts.whole) seq.items.push(doc.createNode(sortedByOrder(opts.whole, opts.keyOrder || [])));
+  if (entry) {
+    // what another entry takes from it by an alias : kept as it was
+    const anchors = anchorsIn(doc, entry);
+    mutate(doc, entry);
+    keepAliases(doc, anchors);
+  } else if (opts.whole) seq.items.push(doc.createNode(sortedByOrder(opts.whole, opts.keyOrder || [])));
   else return text;
   return editedText(doc, text);
 }
@@ -649,11 +719,14 @@ export function removeListEntry(text, key, name, nameField = "name") {
   const seq = doc.contents.get(key, true);
   const entry = YAML.isSeq(seq) ? entryOf(seq, name, nameField) : null;
   if (!entry) return { text, empty: false };
+  // what another entry takes from it by an alias : a copy of it left there
+  const anchors = anchorsIn(doc, entry);
   const at = seq.items.indexOf(entry);
   // the comment right above the first entry is the list's to the writer : it goes with the entry
   // (one apart from it by an empty line is the list's own, and stays)
   if (at === 0 && seq.commentBefore && !entry.spaceBefore) seq.commentBefore = undefined;
   seq.items.splice(at, 1);
+  keepAliases(doc, anchors);
   // its last entry : the key goes too
   if (!seq.items.length) doc.contents.delete(key);
   if (!doc.contents.items.length) return { text: "", empty: true };

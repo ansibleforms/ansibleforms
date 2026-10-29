@@ -127,6 +127,28 @@ describe("entries added to a list", () => {
   });
 });
 
+describe("an entry another one takes a value from by an alias", () => {
+  const TEXT = "credentials:\n  - name: a\n    credential_type: git\n    user: &u bot\n  - name: b\n    credential_type: git\n    user: *u\n";
+
+  test("removed : the alias made a copy of its value, the file valid YAML", () => {
+    const out = removeListEntry(TEXT, "credentials", "a").text;
+    assert.equal(out, "credentials:\n  - name: b\n    credential_type: git\n    user: bot\n");
+  });
+
+  test("its anchored value edited : the other entry keeps the value it had ; another field edited : the alias stays", () => {
+    assert.equal(updateListEntry(TEXT, "credentials", "a", { user: "alice" }), TEXT.replace("&u bot", "alice").replace("*u", "bot"));
+    assert.equal(updateListEntry(TEXT, "credentials", "a", { description: "x" }), TEXT.replace("user: &u bot\n", "user: &u bot\n    description: x\n"));
+  });
+
+  test("a whole entry anchored and merged into another : removed, the other keeps what it took", () => {
+    const text = "credentials:\n  - &base\n    name: a\n    user: bot\n  - <<: *base\n    name: b\n";
+    const out = removeListEntry(text, "credentials", "a").text;
+    const doc = YAML.parseDocument(out);
+    assert.deepEqual(doc.errors, []);
+    assert.deepEqual(doc.toJS().credentials, [{ "<<": { name: "a", user: "bot" }, name: "b" }]);
+  });
+});
+
 describe("a large file", () => {
   test("its lines compared in memory linear in its length", () => {
     let text = "repositories:\n";
