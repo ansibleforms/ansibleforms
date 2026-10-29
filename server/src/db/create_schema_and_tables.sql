@@ -503,7 +503,7 @@ CREATE TABLE `repositories` (
   `use_for_playbooks` tinyint(4) DEFAULT NULL,
   -- added by a patch on an existing install ; keep both paths in sync (schema.model.js)
   `branch` varchar(250) DEFAULT NULL,
-  -- the Config usage of before 7.4.0 : split into the three below by a patch, no longer read
+  -- the Config usage of before 7.5.0 : split into the three below by a patch, no longer read
   `use_for_config` tinyint(4) DEFAULT 0,
   -- the roles, the categories and the constants, each from its own file (lib/configKeys.js)
   `use_for_roles` tinyint(4) DEFAULT 0,

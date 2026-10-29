@@ -6575,7 +6575,7 @@
       Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
       and inventories).
 
-      **Several forms repositories** are read in the order they were added (as before 7.4), so a form name
+      **Several forms repositories** are read in the order they were added (as before 7.5), so a form name
       defined in two of them always resolves to the same copy: the one in the repository added first, in the
       forms list, a form opened and the designer alike. The other copy is skipped, and the warning names both, for example `Form 'Deploy' is
       defined twice: forms-ops/forms/deploy.yaml is used, forms-team/forms/deploy.yaml is skipped (form names must

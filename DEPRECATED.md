@@ -22,8 +22,8 @@ Removed in 8.0.0. Each logs a warning when it is used.
 | the `mail_*` fields in `PUT /api/v2/settings` (ignored, it logs a warning ; a body of only them changes nothing and answers 400 saying where the mail settings went) | a mail channel (Connections > Notifications, `/api/v2/notificationchannel`) | 7.6.0 |
 | `POST /api/v2/settings/mailcheck` (with a masked password or no `mail_server` it tests the active mail channel, and logs a warning) | `POST /api/v2/notificationchannel/{id}/test` (a mail channel's Test button) | 7.6.0 |
 | `forms_yaml` in `GET` and `PUT /api/v2/settings/config` (a `PUT` with it logs a warning) | `config_yaml` | 7.6.0 |
-| a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.4.0 |
-| `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.4.0 |
+| a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.5.0 |
+| `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.5.0 |
 
 ## Upgrading from 6.5 to 7.0.0 - read first
 

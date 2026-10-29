@@ -139,7 +139,7 @@ function assertRepositoryAdminFields(req, existing) {
 }
 
 /**
- * A request's use_for_config (deprecated since 7.4.0, removed in 8) as the three flags it is now,
+ * A request's use_for_config (deprecated since 7.5.0, removed in 8) as the three flags it is now,
  * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
  * repositories.yaml take it (foldConfigItem) : before anything reads the request's flags, so the
  * admin rule and the one-repository rule apply to them. Said in the server log once the save is
@@ -174,7 +174,7 @@ function foldConfigUsage(req) {
  *   void
  */
 function configUsageApplied(name) {
-  logger.warning(`The repository '${name}' was sent use_for_config, deprecated since 7.4.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
+  logger.warning(`The repository '${name}' was sent use_for_config, deprecated since 7.5.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
 }
 
 const find = async function(req, res) {

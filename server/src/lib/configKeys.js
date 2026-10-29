@@ -3,7 +3,7 @@
 // : the roles (use_for_roles, Access), the categories and the constants (use_for_categories,
 // use_for_constants, Designer), one repository at most each. Each key is read on its own from its
 // type's repository : from its own file (roles.yaml, categories.yaml, constants.yaml) when there is
-// one, else from config.yaml (deprecated since 7.4.0, no longer read in 8.0.0 : said in the server
+// one, else from config.yaml (deprecated since 7.5.0, no longer read in 8.0.0 : said in the server
 // log once per load, in the repository's pull output and on its page), and written back to the file
 // it was read from - config.yaml stays config.yaml until it is moved - or a new one of its own.
 //
