@@ -43,6 +43,8 @@ const read = (file) => fs.readFileSync(file, "utf8");
 
 beforeEach(() => {
   warnings.length = 0;
+  // each test a node just started : no key file read yet
+  keys.resetKeyReadsForTests();
   fx.reset({
     repositories: [
       { id: 1, name: "access", use_for_roles: 1 },
@@ -129,7 +131,8 @@ describe("written back to the file it was read from", () => {
     const sources = await keys.keySources();
     const roles = sources.find((s) => s.key === "roles");
     assert.equal(roles.missing, true);
-    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), sources, read)).roles, [{ name: "base-role" }]);
+    // never read on this node : closed, never the base's
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), sources, read)).roles, [{ name: "admin", groups: ["local/admins"] }]);
     await assert.rejects(keys.writeConfigKeys({ roles: [{ name: "admin" }], categories: [] }, sources, { claim: false }), {
       status: 409,
       message: /The roles are held by repository 'access', which is not cloned/,
@@ -324,6 +327,8 @@ describe("a key file with anchors, or one that is not read", () => {
 
   test("a base whose replaced key has an anchor another key names : the base read as it was, that key replaced", async () => {
     writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    // the roles' repository cloned without a roles file : the base's (not cloned, they would be closed)
+    fx.cloneEmpty("access");
     const base = "constants: &c\n  base: 1\nextra: *c\n";
     const doc = YAML.parse(keys.composeConfig(base, await keys.keySources(), read));
     assert.deepEqual(doc, { constants: { env: "prod" }, extra: { base: 1 } });
@@ -536,5 +541,68 @@ describe("a roles file never read on this node, broken", () => {
     assert.ok(!everyone.roles.includes("admin"));
     const local = await User.getRolesAndOptions(["local/admins"], { username: "admin", type: "local" });
     assert.ok(local.roles.includes("admin"));
+  });
+});
+
+describe("a key file not there to read : gone from its repository, or its repository not cloned", () => {
+  // the base keeps the roles of before the repository held them (a save never takes a held key out
+  // of it) : bob was admin then, the repository's roles.yaml took that away
+  const base = YAML.stringify({ roles: [{ name: "admin", users: ["local/bob"], groups: ["local/admins"] }, { name: "default" }], categories: [{ name: "Base" }], constants: { base: 1 } });
+  const repoRoles = { roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default" }] };
+  const holding = (name, flags = { use_for_roles: 1 }) => {
+    fx.rowNamed("repositories", "access").use_for_roles = 0;
+    fx.state.tables.repositories.push({ id: 3, name, ...flags });
+  };
+  const served = async () => YAML.parse(keys.composeConfig(base, await keys.keySources(), read));
+  const admins = (doc) => doc.roles.find((r) => r.name === "admin").users || [];
+
+  test("roles.yaml read, then deleted in git : the roles last read, never the base's ; said on its page and in its pull output", async () => {
+    holding("moved-roles");
+    writeRaw("moved-roles", "roles.yaml", repoRoles);
+    assert.deepEqual(admins(await served()), []);
+    fs.rmSync(path.join(fx.ROOT, "moved-roles", "roles.yaml"));
+    assert.deepEqual((await served()).roles, repoRoles.roles, "bob never admin again");
+    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), [{ key: "roles", file: "roles.yaml", reason: "it is no longer in its repository" }]);
+    assert.match(await keys.deprecationLines("moved-roles"), /\nNot read: roles\.yaml: it is no longer in its repository - the roles last read from it/);
+    // a save of the roles writes the file again
+    await keys.writeConfigKeys({ roles: [{ name: "admin", groups: ["local/admins"] }] }, await keys.keySources(), { claim: false });
+    assert.deepEqual(readObj("moved-roles", "roles.yaml"), { roles: [{ name: "admin", groups: ["local/admins"] }] });
+    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), []);
+  });
+
+  test("the roles repository not cloned (a clone failing, a reset re-cloning it) : the roles last read, else closed", async () => {
+    // never read on this node : closed, never the base's
+    holding("uncloned-roles");
+    assert.deepEqual((await served()).roles, [{ name: "admin", groups: ["local/admins"] }]);
+    assert.deepEqual(await keys.repositoryKeyProblems("uncloned-roles"), [{ key: "roles", file: "roles.yaml", reason: "its repository is not cloned" }]);
+    assert.match(await keys.deprecationLines("uncloned-roles"), /\nNot read: roles\.yaml: its repository is not cloned - the roles last read from it \(else only the admin role of local\/admins\)/);
+    // read once, then its working copy gone while it is cloned again : the roles last read
+    writeRaw("uncloned-roles", "roles.yaml", repoRoles);
+    assert.deepEqual((await served()).roles, repoRoles.roles);
+    fs.rmSync(path.join(fx.ROOT, "uncloned-roles"), { recursive: true });
+    assert.deepEqual((await served()).roles, repoRoles.roles);
+  });
+
+  test("the categories and the constants : the same rule, the base's as their last resort", async () => {
+    holding("gone-design", { use_for_categories: 1, use_for_constants: 1 });
+    fx.rowNamed("repositories", "design").use_for_categories = 0;
+    fx.rowNamed("repositories", "design").use_for_constants = 0;
+    // never read, not cloned : the base's, said
+    assert.deepEqual((await served()).categories, [{ name: "Base" }]);
+    assert.deepEqual((await keys.repositoryKeyProblems("gone-design")).map((p) => p.reason), ["its repository is not cloned", "its repository is not cloned"]);
+    // never there on this node : the base's, nothing said (the first save writes the file)
+    fx.cloneEmpty("gone-design");
+    assert.deepEqual((await served()).constants, { base: 1 });
+    assert.deepEqual(await keys.repositoryKeyProblems("gone-design"), []);
+    // read, then deleted in git : the ones last read
+    writeRaw("gone-design", "categories.yaml", { categories: [{ name: "Ops" }] });
+    writeRaw("gone-design", "constants.yaml", { constants: { env: "prod" } });
+    assert.deepEqual((await served()).constants, { env: "prod" });
+    fs.rmSync(path.join(fx.ROOT, "gone-design", "categories.yaml"));
+    fs.rmSync(path.join(fx.ROOT, "gone-design", "constants.yaml"));
+    const doc = await served();
+    assert.deepEqual(doc.categories, [{ name: "Ops" }]);
+    assert.deepEqual(doc.constants, { env: "prod" });
+    assert.deepEqual((await keys.repositoryKeyProblems("gone-design")).map((p) => p.key), ["categories", "constants"]);
   });
 });

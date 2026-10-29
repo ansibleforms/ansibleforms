@@ -6592,8 +6592,13 @@
       (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own when the repository
       has neither; the repository's Push sends it as before. A key is written only when the save changes it, with
       the comments it was given in the config editor, which shows each key as its file writes it. While the
-      repository holding a key is not cloned (its clone failed, or is under way), the base configuration gives that
-      key and a save that changes it is refused, never written to the base in its place. A file holding a key that
+      repository holding a key is not cloned (its clone failed, or is under way, a Reset cloning it again), or its
+      file is gone after the server read it (deleted or renamed in git), the key is served as the server last read
+      it, else the roles as the admin role of `local/admins` only (never the base configuration's roles, which the
+      repository replaced) and the categories or constants from the base configuration; the repository's page and
+      its pull output say so. A repository that never had the file serves the base configuration's key until a
+      save writes the file. A save changing a key whose repository is not cloned is refused, never written to the
+      base in its place. A file holding a key that
       is a ytt template makes the configuration read only, as a templated base does, and a change to that key is
       refused. A designer backup restored puts each key back into the file of the repository holding it. An install upgraded from before gets the three flags on the repository it
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in

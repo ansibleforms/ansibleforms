@@ -26,8 +26,8 @@ import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js
 
 // each key : its usage type, its flag, its own file
 // ... and what its value is : a list (roles, categories) or a dictionary (constants)
-// ... and, for the roles, what is served when its file is not read and was never read on this node
-// (closed) : the local admins' admin role only - never the base configuration's roles, which the
+// ... and, for the roles, what is served when its file is not read (broken, or its repository not
+// cloned) and was never read on this node (closed) : the local admins' admin role only - never the base configuration's roles, which the
 // repository's replaced and may grant more than they do (composeConfig)
 export const CONFIG_KEYS = [
   { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: [{ name: "admin", groups: ["local/admins"] }] },
@@ -58,8 +58,9 @@ export const isTemplate = (text) => YTT_DIRECTIVE.test(String(text ?? ""));
  * config.yaml), whether that file is config.yaml (deprecated), whether it exists yet (a repository
  * with neither file gets its own on the first write). A key no repository holds is not listed : the
  * base configuration gives it. A key whose repository is not cloned (a clone that failed, or is
- * under way) is listed as missing : not read (the base configuration gives it meanwhile), and a
- * save of it refused (assertKeysWritable), never written to the base in its place.
+ * under way) is listed as missing : not read (its value last read on this node is served meanwhile,
+ * else the base's, the roles closed : composeConfig), and a save of it refused (assertKeysWritable),
+ * never written to the base in its place.
  *
  * Returns:
  *   Promise<object[]>: [{ key, flag, file, repository, path, deprecated, exists, missing }].
@@ -261,6 +262,41 @@ function keyText(doc, text, key) {
 const lastRead = new Map();
 const reported = new Map();
 const readKey = (source) => `${source.path}\n${source.key}`;
+// ... and the document each key was last read as from its repository, whichever of its files gave
+// it : a key whose file is gone afterwards (deleted or renamed in git), or whose repository is no
+// longer cloned (a reset re-cloning it, a clone failing), keeps it as it was (composeConfig)
+const lastHeld = new Map();
+const heldKey = (source) => `${source.repository}\n${source.key}`;
+
+/**
+ * Forgets every key file read on this node and what was said of them, as a node just started : for
+ * the tests, each of which starts from repositories of its own.
+ */
+export function resetKeyReadsForTests() {
+  lastRead.clear();
+  lastHeld.clear();
+  reported.clear();
+}
+
+/**
+ * Why a key a repository holds is not there to read : its repository not cloned (a clone failed,
+ * or one under way, a reset re-cloning it), or its file gone after it was read on this node
+ * (deleted or renamed in git). A repository that never gave its file on
+ * this node has none : its key is served from the base configuration until a save writes the file
+ * (the base's value is the one in force when the flag is set ; a node cannot tell a file deleted
+ * before it started from one never written).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string|null: why, null when its file is there, or never was on this node.
+ */
+const absentProblem = (source) => {
+  if (source.missing) return "its repository is not cloned";
+  if (!source.exists && lastHeld.has(heldKey(source))) return "it is no longer in its repository";
+  return null;
+};
 
 /**
  * What a key whose file is not read, and was never read on this node, is served as : the roles
@@ -286,26 +322,34 @@ const meanwhile = (key) => (CONFIG_KEYS.find((k) => k.key === key)?.closed ? "on
  *   string: the configuration's text : the base's, each key a repository holds as its file writes
  *     it (its comments, a ytt directive among them, kept), the base's other lines as they are ; the
  *     base as it is when no key comes from a repository. A key file that is not read (not valid
- *     YAML, not a dictionary, its key not a list or a dictionary as it should be) gives its key as
- *     it was last read on this node, else the base's - the roles closed instead (the local admins'
- *     admin role only : a node started while the file is broken never grants the base's roles the
- *     repository replaced) : said, never a failure of the whole configuration.
+ *     YAML, not a dictionary, its key not a list or a dictionary as it should be), or that is not
+ *     there to read (its repository not cloned, its file gone after it was read : absentProblem),
+ *     gives its key as it was last read on this node (from that file, else from its repository),
+ *     else the base's - the roles closed instead (the local admins' admin role only : a node
+ *     started while the file is broken or the repository not cloned never grants the base's roles
+ *     the repository replaced, which the base keeps since a save never takes a held key out of it)
+ *     : said, never a failure of the whole configuration. The categories and the constants, which
+ *     grant nothing, follow the same rule with the base's as their last resort.
  */
 export function composeConfig(baseText, sources, render) {
-  const present = sources.filter((s) => s.exists);
-  if (!present.length) return baseText;
+  // the files there, and the keys whose file is not there to read although it should be (absentProblem)
+  const laid = sources.filter((s) => s.exists || absentProblem(s));
+  if (!laid.length) return baseText;
   let text = String(baseText ?? "");
-  for (const s of present) {
+  for (const s of laid) {
     let from;
     try {
+      const absent = absentProblem(s);
+      if (absent) throw new Error(absent);
       from = keyDocument(s, render(s.path));
       lastRead.set(readKey(s), from);
+      lastHeld.set(heldKey(s), from);
       reported.delete(readKey(s));
     } catch (e) {
-      // a file that cannot be read : its key as it was last read, else the base's (the roles closed)
-      // - never the whole configuration lost with it (said once in the server log, in its pull
-      // output and on its page)
-      from = lastRead.get(readKey(s));
+      // a file that cannot be read, or is not there to read : its key as it was last read (from
+      // that file, else from its repository), else the base's (the roles closed) - never the whole
+      // configuration lost with it (said once in the server log, in its pull output and on its page)
+      from = (s.exists && lastRead.get(readKey(s))) || lastHeld.get(heldKey(s));
       const closed = CONFIG_KEYS.find((k) => k.key === s.key)?.closed;
       const line = `${s.repository}/${path.basename(s.path)} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
       if (reported.get(readKey(s)) !== line) logger.error(line);
@@ -369,8 +413,8 @@ export function keyFileProblem(source) {
 }
 
 /**
- * The key files of a repository that are not read (keyFileProblem), for its pull output and its
- * page.
+ * The key files of a repository that are not read (keyFileProblem), or not there to read although
+ * its key is served as last read or closed (absentProblem), for its pull output and its page.
  *
  * Args:
  *   name (string): the repository.
@@ -381,7 +425,7 @@ export function keyFileProblem(source) {
 export async function repositoryKeyProblems(name) {
   const out = [];
   for (const s of (await keySources()).filter((x) => x.repository === name)) {
-    const reason = keyFileProblem(s);
+    const reason = absentProblem(s) || keyFileProblem(s);
     if (reason) out.push({ key: s.key, file: path.basename(s.path), reason });
   }
   return out;
