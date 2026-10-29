@@ -6475,40 +6475,42 @@
       
       All forms appear together in the UI, automatically merged!
   - name: Schedules kept in a git repository
-    short: Schedules in YAML, one file per schedule
+    short: Schedules in YAML, entries of a schedules list in any file
     version: v7.5.0
     description: |
       The scheduler always runs from the database; a git repository is an optional source kept in step with it.
       One repository at most has the **Schedules** usage (`use_for_schedules`, Settings > Connections >
-      Repositories); a second one is refused, by the API and by the config seed. It holds one schedule per YAML file
-      in a folder named `schedules` at its root (`<repository>/schedules/<file>.yaml` or `.yml`). Nothing else in
-      the repository is read as a schedule. Without a schedules repository, schedules live in the database only and
-      recurring ones run on a cron.
+      Repositories); a second one is refused, by the API and by the config seed. Its schedules are the entries of
+      a top-level `schedules:` list, in any YAML file of the repository, any name, any folder, at any depth (see
+      *Repository usage types*, where a repository keeps them). A schedule is found by its name, never by its
+      file. Without a schedules repository, schedules live in the database only and recurring ones run on a cron.
 
-      **The file** is a single schedule, its template, inventory and credentials named by name or by natural key:
+      **An entry** is a single schedule, its template, inventory and credentials named by name or by natural key:
       ```yaml
-      name: Nightly log rotation
-      description: ''
-      rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
-      enabled: true
-      unified_job_template:
-        name: Nightly Workflow          # the AnsibleForms form it runs
-        type: workflow_job_template     # accepted, informational
-        organization: { name: Default } # accepted, ignored
-      extra_data:                       # the form's values (its extra vars)
-        retention_days: 14
-      limit: webservers                 # a prompt, see below
+      schedules:
+        - name: Nightly log rotation
+          description: ''
+          rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
+          enabled: true
+          unified_job_template:
+            name: Nightly Workflow          # the AnsibleForms form it runs
+            type: workflow_job_template     # accepted, informational
+            organization: { name: Default } # accepted, ignored
+          extra_data:                       # the form's values (its extra vars)
+            retention_days: 14
+          limit: webservers                 # a prompt, see below
+        - name: Weekly report
+          unified_job_template: Weekly Report   # the module's form : a plain name
+          rrule: DTSTART:20261019T060000Z RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO
       ```
-      `unified_job_template` may also be a plain name (the module's form), and a file may hold its one schedule in a
-      `schedules:` or `controller_schedules:` list of one item.
 
       **The prompts** become the reserved extra vars the job reads: `limit` (`__limit__`), `job_tags`
       (`__tags__`), `skip_tags` (`__skipTags__`), `verbosity` (`__verbosity__`), `diff_mode` (`__diff__`),
       `job_type: check` (`__check__`), `inventory` (`__inventory__`), `scm_branch` (`__scmBranch__`),
       `execution_environment` (`__executionEnvironment__`), `instance_groups` (`__instanceGroups__`) and
       `credentials` (each by its own name in `__credentials__`). `forks`, `timeout`, `job_slice_count` and `labels`
-      are checked and kept in the file, AnsibleForms has nothing to give them to. Any other key
-      (`natural_key`, `related`, `organization`, your own) is kept as it is when the app writes the file.
+      are checked and kept in the entry, AnsibleForms has nothing to give them to. Any other key
+      (`natural_key`, `related`, `organization`, your own) is kept as it is when the app writes the entry.
 
       **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (an IANA zone such as
       `Europe/Brussels`, or a fixed offset from `UTC-12` to `UTC+14` written `UTC+5` or `GMT-3`) or a UTC time
@@ -6525,9 +6527,10 @@
       had, and a rrule with a one time run is refused.
 
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
-      files are read in; a file named as a recurring schedule of the app replaces that schedule's definition (git
-      wins, its runs and history stay). Every other recurring schedule of the app is written to the repository as a
-      new file (`schedules/<name>.yaml`, a number added when the name is taken), waiting for the repository's Push:
+      entries are read in; an entry named as a recurring schedule of the app replaces that schedule's definition
+      (git wins, its runs and history stay). Every other recurring schedule of the app is written to the repository
+      as a new entry, at the end of the first file holding `schedules:` (else of `schedules.yaml` at its root, made),
+      waiting for the repository's Push:
       its cron becomes the rrule that fires at the same moments, in the scheduler's time zone (`LOG_TZ`). A cron that
       restricts both the day of the month and the day of the week (a cron fires on either, a rrule only on both), or
       that uses `L`, `W`, `#` or `?`, stays an app schedule, as do the one-time "Run later" jobs. Its launch
@@ -6536,22 +6539,23 @@
       another name) is kept in the app only, and the question says so. The result is shown and logged.
 
       **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
-      the worker, its files are read into Jobs > Scheduled: a new
-      file makes a schedule, a changed one changes it, a removed one removes it (its past jobs stay). A file with no
-      name, no rrule or a refused one, no `unified_job_template.name`, a form that does not exist, or a name another
-      schedule has, is refused alone: the repository's pull output and the server log name it and say why, a
-      schedule it made before stays as it was, and the other files still sync. When and how a schedule ran stays in
-      the database, never in the file.
+      the worker, its entries are read into Jobs > Scheduled: a new name makes a schedule, a changed entry changes
+      it, a removed one removes it (its past jobs stay), an entry moved to another file keeps its schedule. An entry
+      with no name, no rrule or a refused one, no `unified_job_template.name`, a form that does not exist, or a name
+      another schedule has (or another entry gives too), is refused alone: the repository's pull output and the
+      server log name it (`schedules.yaml#Nightly log rotation`) and say why, a schedule it made before stays as it
+      was, and the other entries still sync. When and how a schedule ran stays in the database, never in the file.
 
       **The app: back to git.** While the repository is used, every new recurring schedule is saved and written to it
-      as a new file named after it (`nightly-log-rotation.yaml`, in the export's form), edited with the rrule
-      editor; editing a repository schedule (its name, description, form, enabled, rrule, extra vars) writes its
-      file, only the fields changed; deleting one deletes its file. One-time "Run later" jobs stay in the database. As for the
+      as a new entry in the export's form (the first file holding `schedules:`, else `schedules.yaml`), edited with
+      the rrule editor; editing a repository schedule (its name, description, form, enabled, rrule, extra vars)
+      writes its entry where it is, only the fields changed; deleting one removes its entry (the file with it when
+      it holds nothing more). One-time "Run later" jobs stay in the database. As for the
       designer's forms, the change waits in the repository's working tree (its Push column says so) until the
       repository is pushed.
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and its
-      files read in (skipped, and said, when it cannot be reached), then its schedules are unlinked. They stay in
+      entries read in (skipped, and said, when it cannot be reached), then its schedules are unlinked. They stay in
       the app with their name, form, rrule, values, enabled and job options, and keep running on their rrule; the
       files in git are left as they are. Turning it on again goes through the same steps as the first time.
       Repository schedules run as the Schedule Service, as every recurring schedule.
@@ -6584,19 +6588,24 @@
       is; a new form whose name another forms repository already defines is refused, saying where it is.
 
       **Roles, Categories and Constants** (the Config usage of before, split) each read only their own key of the
-      base configuration, one repository at most each: `roles:` from the repository's `roles.yaml`, `categories:`
-      from `categories.yaml`, `constants:` from `constants.yaml`. When that file is missing, the key is read from
-      the repository's `config.yaml`, still working but deprecated: the server log says it once per load, the
-      repository's pull output and its page say it too, for example `roles read from config.yaml: deprecated,
-      move them to roles.yaml (config.yaml is no longer read in 8.0.0)`. The new file is preferred when both are
-      there. A key no repository holds comes from where the base configuration comes from (the database copy, or
+      base configuration, one repository at most each: `roles:`, `categories:` and `constants:` from the file of
+      the repository that gives that key at its top level, any name, any folder (one file may give all three). Two
+      files giving the same key are not read, both named on the repository's page and in its pull output. When no
+      file gives it, its own file at the root (`roles.yaml`, `categories.yaml`, `constants.yaml`) is read when it is
+      there, and refused when it does not give the key (a typo, `role:`): its key is never served from the base
+      configuration in its place. Else the key is read from the repository's `config.yaml`, still working but
+      deprecated: the server log says it once per load, the repository's pull output and its page say it too, for
+      example `roles read from config.yaml: deprecated, move them to a file of their own (roles: in any file,
+      roles.yaml for instance ; config.yaml is no longer read in 8.0.0)`. Any other file giving the key is preferred
+      to `config.yaml`. A key no repository holds comes from where the base configuration comes from (the database copy, or
       the `CONFIG_PATH` file), as before; the keys of the repositories are laid over it. The designer saving the
       categories or the constants, and a save of the roles, writes each key back into the file it was read from
-      (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own when the repository
-      has neither; the repository's Push sends it as before. A key is written only when the save changes it, with
+      (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own (`roles.yaml` ...) when
+      no file gives it; the repository's Push sends it as before. A key is written only when the save changes it, with
       the comments it was given in the config editor, which shows each key as its file writes it. While the
-      repository holding a key is not cloned (its clone failed, or is under way, a Reset cloning it again), or its
-      file is gone after the server read it (deleted or renamed in git), the key is served as the server last read
+      repository holding a key is not cloned (its clone failed, or is under way, a Reset cloning it again), or no
+      file gives it any more after the server read it (deleted, or its key taken out, in git), the key is served as
+      the server last read
       it, else the roles as the admin role of `local/admins` only (never the base configuration's roles, which the
       repository replaced) and the categories or constants from the base configuration; the repository's page and
       its pull output say so. A repository that never had the file serves the base configuration's key until a
@@ -6607,137 +6616,225 @@
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
       the server log. None gets them when the configuration was kept in the database (Config source), which was
       then served whole: the log says so, and Roles, Categories or Constants can be turned on by hand. The config
-      seed, a `repositories.yaml` and the API still take `use_for_config` as a deprecated alias of the three, with
+      seed, a repository's `repositories:` entries and the API still take `use_for_config` as a deprecated alias of the three, with
       a warning; a seed declaring it on several repositories leaves the three on the one holding them already (the
       one the upgrade gave them to), else gives them to the first one.
 
-      Every other type is an object type, one repository at most per type: one object
-      per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
-      `notifications/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
-      what the app has one of, one file at the repository's root (`chat-assistant.yaml`, `general.yaml`, `mcp.yaml`,
-      and one per Appearance page: `defaults.yaml`, `logo.yaml` and its image, `icon.yaml` and its image,
-      `name.yaml`, `links.yaml`). The repositories are a list in one file, `repositories.yaml`.
+      Every other type is an object type, one repository at most per type.
+
+      **Where a repository keeps them: by their content.** Any `.yaml` or `.yml` file of the repository, any name,
+      any folder, at any depth (its `.git` folder and every hidden folder or file left out; a link followed only
+      while it stays in the repository, one leading outside refused and said once in the pull output), holds the
+      types whose key it gives at its top level. One key per type:
+
+      | Key | Holds | Example entry |
+      | --- | --- | --- |
+      | `schedules:` | a list of schedules | `- name: Nightly` |
+      | `credentials:`, `secret_stores:`, `runners:`, `notifications:`, `sso:`, `ldap:`, `syslog:`, `labels:`, `announcements:`, `repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
+      | `disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
+      | `general:`, `mcp:`, `chat_assistant:`, `defaults:`, `logo:`, `icon:`, `name:`, `links:` | one map, what the app has one of | `default_theme: dark` |
+      | `roles:`, `categories:`, `constants:` | the base configuration's key, as before | |
+
+      A file may hold several types, and a type may be spread over many files. A file whose keys are no type's
+      (a form, a playbook, an inventory, a vars file) is none of theirs, and its keys are never read; a file mixing
+      a type's key with keys of its own: the type's key is read, the others left alone. A form (a map with a
+      `type`, as every form has) is never a type's file, whatever keys it has, and a key with a text, a number or a
+      yes or no under it (a vars file's `name: web`) is no type's either. Only the usages the repository holds are
+      read: a key of another type is left alone, its pull output says so once as a hint (`Not read, the repository
+      is not used for them: labels: (team/look.yaml) - turn the usage on to read them`).
+
+      **An object is its name within its type, never its file.** Each linked object knows the file its entry is in
+      (its page shows it); an entry moved to another file only changes that. Two entries of a type giving the same
+      name, in one file or two, are both refused, naming both places (`the name 'git-bot' is given twice: here
+      (a.yaml, entry 1) and in team/b.yaml (entry 2)`), and the object of that name stays as it was; two files
+      giving the same map (two `defaults:`) are refused the same way, nothing applied. A name changed in git is a
+      delete and a new object, except when, in one pull, exactly one object of the type is gone from a file and
+      exactly one new name of that type appears in that same file: that is its rename, and the object keeps its
+      secrets kept in the database, its id and what uses it (a rename is refused while something uses the object
+      by its old name, unless each user names the new one in the same commit; a disclaimer version never changes
+      its number). An entry that is refused or waits keeps the object of its name as it was, and an entry refused
+      without a name keeps the objects its file held whose entries are gone; the objects of a file that cannot be
+      read (not valid YAML) stay as they are, the file refused when its lines seem to give the type's key.
+
+      **The app writes back where the object is**: an edit rewrites only the fields it changed in that entry, the
+      file's comments, its other keys and entries kept; a new object of the app goes at the end of the first file
+      (by path) giving the type's key, else into `<key>.yaml` at the repository's root, made (`credentials.yaml`;
+      one of that name there that gives no such key, a form or a playbook, is never written to: `credentials-2.yaml`
+      then); a delete removes its entry, the key when its list is left empty, and the file when it holds nothing
+      more. Turning a usage on writes the app's objects the same way. Images (the logo's, the icon's) are named
+      relative to the file naming them, inside the repository.
+
+      **The designer** never lists, reads, writes nor deletes a file giving the key of a type its repository holds
+      (nor the images such a file names), and refuses to write a file whose content would give one; its forms load
+      never reads a file giving a type's key as forms.
+
+      A repository holding the credentials, the runners and its look, for example (any names would do):
+      ```yaml
+      # platform/access.yaml
+      credentials:
+        - name: git-bot
+          credential_type: git
+          user: bot
+          password: ${GIT_BOT_TOKEN}
+        - name: rte-main
+          credential_type: rte
+          password: ${RTE_MAIN_TOKEN}
+      runners:
+        - name: rte-main
+          type: rte
+          rte_mode: outbound
+          credential: rte-main
+          is_default: true
+      ```
+      ```yaml
+      # look.yml, the logo images/logo.png beside it
+      name:
+        app_name: ACME Automation
+      logo:
+        logo: images/logo.png
+      defaults:
+        default_theme: dark
+      ```
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
 
       **A new repository** cannot be read before its first clone, so its question also says that when the remote
-      already has these files, the version in git wins and replaces the app's. Once the clone is done, in the
+      already has these entries, the version in git wins and replaces the app's. Once the clone is done, in the
       background, its pull output says what each type took, for example `Now holds the schedules: 0 read from its
-      files, 0 replaced by a file of the same name, 2 written to it (waiting for Push), 1 kept in the app`, or why
+      files, 0 replaced by an entry of the same name, 2 written to schedules.yaml (waiting for Push), 1 kept in the
+      app`, or why
       one could not follow. A repository that could not be cloned then (or when its usage was turned on) says it is
       not cloned, and takes the app's objects on its first clone. When what a change will do cannot be read from the server, the question says so in
       one line instead of each type's section, and the change is still applied if confirmed.
   - name: Credentials and runners kept in a git repository
-    short: One YAML file per credential or runner, in the seed's format
+    short: Credentials and runners in YAML, in the seed's format
     version: v7.5.0
     description: |
-      A repository with the **Credentials** usage holds one credential per YAML file in its `credentials` folder; one
-      with the **Runners** usage holds one runner per file in its `runners` folder. One repository at most per type
-      (the same repository may hold both). A file is one item of the config seed's `credentials:` or `runners:`
-      section, so seed items and repository files are interchangeable:
+      A repository with the **Credentials** usage holds its credentials as the entries of a `credentials:` list, one
+      with the **Runners** usage its runners as the entries of a `runners:` list, in any YAML file of it, any name,
+      any folder (see *Repository usage types*). One repository at most per type (the same repository, and the same
+      file, may hold both). An entry is one item of the config seed's `credentials:` or `runners:` section, so seed
+      items and repository entries are interchangeable:
       ```yaml
-      # credentials/rte-main.yaml
-      name: rte-main
-      credential_type: rte
-      password: ${RTE_MAIN_TOKEN}
-      ```
-      ```yaml
-      # runners/rte-main.yaml
-      name: rte-main
-      type: rte
-      rte_mode: outbound
-      credential: rte-main
-      rte_max_jobs: 4
-      is_default: true
-      enabled: true
+      # connections.yaml
+      credentials:
+        - name: rte-main
+          credential_type: rte
+          password: ${RTE_MAIN_TOKEN}
+      runners:
+        - name: rte-main
+          type: rte
+          rte_mode: outbound
+          credential: rte-main
+          rte_max_jobs: 4
+          is_default: true
+          enabled: true
       ```
 
       **Secrets are never plain in git.** A credential's `password` (its token or client secret) and `client_key`,
       and a runner's own `token` or `password`, are written as `${ENV}` references only, resolved from the
       environment as the config seed resolves them. Only the secret fields are resolved: in any other field a
-      `${NAME}` stays plain text. A file holding a plain secret, or naming a variable that is not set, is refused and
+      `${NAME}` stays plain text. An entry holding a plain secret, or naming a variable that is not set, is refused and
       named in the pull output; so is one naming a variable of the server itself (`DB_*`, `ACCESS_TOKEN_*`,
       `ENCRYPTION_*`, `ADMIN_*`, `METRICS_TOKEN`, `RTE_JOIN_TOKEN` and the variables Settings > System > General
-      refuses), which the object would send wherever the file says. `RTE_TOKEN` and `VAULT_TOKEN` stay readable. A file or a folder that is a link leading outside the repository is never read nor
+      refuses), which the object would send wherever the entry says. `RTE_TOKEN` and `VAULT_TOKEN` stay readable. A file or a folder that is a link leading outside the repository is never read nor
       written through. An app object written to git (turning the usage on, a new object,
       an edit) is written without its secrets, which stay in the database; the pull output lists the objects whose
       secrets come from the database.
 
-      **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the files are read
-      in: a new file makes an object, a changed one changes it, a removed one removes it. After a **Reset**, or any
-      clone where the working tree was gone (a Pull or a Push included), an object whose file is not in the remote
-      (deleted in git, or written by the app and never pushed) is unlinked and kept in the app with its secrets,
-      never deleted, and never written back by the usage that clone turns on. A key taken out of a file
-      is taken out of the app too: the field gets the value a new object made from that file gets (a secret
-      excepted, kept in the database). A file renamed keeps its object, which follows it. A file the seed's schema
-      or the app's rules refuse (a credential type without its required fields, a runner of another type than its
-      credential) is refused alone, said in the pull output. A runner whose credential does not exist yet **waits**,
-      said in the pull output, and is read again when the credentials are next pulled. Removing a credential's file
-      while a runner, a repository, a secret store, a channel or a sign-in still uses it is refused: the credential
-      stays, the pull output says what uses it; renaming it in its file while something uses it is refused the same
-      way, unless every one of them is a repository object whose own file names the new name in the same commit
-      (the credential renamed, the runner following it). At the worker's start the types are read in a fixed order:
+      **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the entries are read
+      in, each found by its name: a new name makes an object, a changed entry changes it, a removed one removes it.
+      After a **Reset**, or any clone where the working tree was gone (a Pull or a Push included), an object whose
+      entry is not in the remote (deleted in git, or written by the app and never pushed) is unlinked and kept in the
+      app with its secrets, never deleted, and never written back by the usage that clone turns on. A key taken out
+      of an entry is taken out of the app too: the field gets the value a new object made from that entry gets (a
+      secret excepted, kept in the database). An entry moved to another file keeps its object, which follows it. An
+      entry the seed's schema or the app's rules refuse (a credential type without its required fields, a runner of
+      another type than its credential) is refused alone, said in the pull output with its place
+      (`connections.yaml#rte-main`). A runner whose credential does not exist yet **waits**, said in the pull output,
+      and is read again when the credentials are next pulled. Removing a credential's entry while a runner, a
+      repository, a secret store, a channel or a sign-in still uses it is refused: the credential stays, the pull
+      output says what uses it; renaming it in its file (the one name gone from that file, the one new name in it)
+      while something uses it is refused the same way, unless every one of them is a repository object whose own
+      entry names the new name in the same commit (the credential renamed, the runner following it). At the worker's start the types are read in a fixed order:
       credentials, secret stores, what signs in with them (runners ...), then the others.
 
-      **Turning it on** shows what it will do first: the app's objects written to the repository (those whose
-      secrets stay in the database said), the files whose name an app object has (git's version wins, the secret in
-      the database kept when the file gives none), and what stays in the app: objects the config seed manages,
-      runners an RTE registered itself or waiting for approval, and an object named as a file of the repository
-      that is refused or waits (it follows that file once the file is read in, never a second file of its name).
+      **Turning it on** shows what it will do first: the app's objects written to the repository, and the file they
+      go to (those whose secrets stay in the database said), the entries whose name an app object has (git's
+      version wins, the secret in the database kept when the entry gives none), and what stays in the app: objects
+      the config seed manages, runners an RTE registered itself or waiting for approval, and an object named as an
+      entry of the repository that is refused or waits (it follows that entry once it is read in, never a second
+      entry of its name).
       What the pull before it took is said in its report too. A repository a pull or a push holds for the whole
       wait is not turned on: the usage is turned off again, nothing written, said in its report - save it again in
       a moment. **The app: back to git.** Editing a linked object
-      rewrites only the fields that changed in its file (its `${ENV}` references, comments and other keys kept),
-      a new object is written as a new file, deleting one deletes its file; all wait for the repository's Push.
+      rewrites only the fields that changed in its entry (its `${ENV}` references, comments, other keys and the
+      file's other entries kept), a new object is written as a new entry (the first file holding the type's key,
+      else `credentials.yaml` or `runners.yaml`), deleting one removes its entry; all wait for the repository's Push.
       A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)
       with nothing changed, never saved in the app without its file.
-      The credential's and the runner's page show **Repository: <name>** for a linked object.
+      The credential's and the runner's page show **Repository: <name>** and the file of its entry for a linked
+      object.
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and read
       in, then its objects are unlinked; they stay in the app as they are, the files in git untouched.
   - name: Secret stores, notification channels, SSO, LDAP, syslog servers and labels kept in a git repository
-    short: One YAML file per object, in the seed's format
+    short: Lists of objects under their key, in the seed's format
     version: v7.5.0
     description: |
       Six more object types work exactly as the credentials and the runners (see *Credentials and runners kept in a
-      git repository*): one object per YAML file in the type's folder, one repository at most per type, two ways,
-      the same question before turning a type on or off, the same pull output, and **Repository: <name>** on the
-      object's page. Each file is in the config seed's format, so a seed item and a repository file are
-      interchangeable.
+      git repository*): the entries of a list under the type's key, in any YAML file of the repository, one
+      repository at most per type, two ways, the same question before turning a type on or off, the same pull
+      output, and **Repository: <name>** on the object's page. Each entry is in the config seed's format, so a seed
+      item and a repository entry are interchangeable.
 
-      | Usage | Folder | A file is | Names (waits when missing) | Secrets (`${ENV}` only) |
+      | Usage | Key | An entry is | Names (waits when missing) | Secrets (`${ENV}` only) |
       | --- | --- | --- | --- | --- |
-      | Secret stores | `secret-stores/` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
-      | Notifications | `notifications/` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
-      | SSO | `sso/` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
-      | LDAP | `ldap/` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
-      | Syslog | `syslog/` | an item of `syslog_servers:` | | |
-      | Labels | `labels/` | an item of `labels:` | | |
+      | Secret stores | `secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
+      | Notifications | `notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | LDAP | `ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
+      | Syslog | `syslog:` | an item of `syslog_servers:` | | |
+      | Labels | `labels:` | an item of `labels:` | | |
 
-      A file may leave a secret out: the one in the database stays (an object of the app is written to git without
-      its secrets, and the pull output says so). An SSO provider's file may therefore give neither its client
+      ```yaml
+      # access/directories.yaml
+      ldap:
+        - name: main
+          server: ldap.example.com
+          credential: ldap-bind
+          position: 1
+      sso:
+        - name: corp
+          provider: azuread
+          credential: corp-client
+          enable: true
+      ```
+
+      An entry may leave a secret out: the one in the database stays (an object of the app is written to git without
+      its secrets, and the pull output says so). An SSO provider's entry may therefore give neither its client
       secret nor a credential when the provider already has its secret in the app.
 
-      **LDAP.** One file per directory, `ldap/<name>.yaml`; the main directory's file is the seed's `ldap:` section
-      with `name: main`, and a file named `main` takes the main directory over. The main directory keeps its rules:
-      it is never renamed nor deleted, so removing its file while it is linked is refused, said in the pull output,
-      and the directory stays linked. The directories keep their lookup order: `position` is written to each file,
-      and moving a directory up or down in the app rewrites the positions of the files that changed.
+      **LDAP.** One entry per directory; the main directory's entry is the seed's `ldap:` section with `name: main`,
+      and an entry named `main` takes the main directory over. The main directory keeps its rules: it is never
+      renamed nor deleted, so removing its entry while it is linked is refused, said in the pull output, and the
+      directory stays linked. The directories keep their lookup order: `position` is written to each entry, and
+      moving a directory up or down in the app rewrites the positions of the entries that changed.
 
-      **Labels** keep their order the same way: `position` is in each file, a label moved in the app rewrites the
-      positions in the files, and a label without a position goes after the others.
+      **Labels** keep their order the same way: `position` is in each entry, a label moved in the app rewrites the
+      positions in the entries, and a label without a position goes after the others.
 
-      **Credentials they use** cannot lose their file: removing a credential's file while a secret store, a
+      **Credentials they use** cannot lose their entry: removing a credential's entry while a secret store, a
       notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
       is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
       then what names them; Pull all pulls the repositories in the same order.
   - name: Repositories kept in a git repository
-    short: The other repositories, in one repositories.yaml
+    short: The other repositories, entries of a repositories list
     version: v7.5.0
     description: |
       A repository with the **Repositories** usage (`use_for_repositories`, one repository at most) holds the other
-      repositories in its `repositories.yaml`: a `repositories:` list, each item in the config seed's format for
+      repositories as the entries of a `repositories:` list, in any YAML file of it, each item in the config seed's format for
       its `repositories:` section (name, uri, branch, description, `credential` by name, the `use_for_*` flags, the
       pull schedule `cron`, `rebase_on_start`). As in the seed, an entry may leave out its `branch`: the
       remote's default branch is used.
@@ -6753,15 +6850,15 @@
       It works as the other usage types (the same question before turning it on or off, the same pull output, a
       linked repository's page shows **Repository: <name>**), with these guard rails:
 
-      - **The holder is never in its own file**: an entry named as the repository holding the file is not
-        imported (said in the pull output), and turning the usage on never writes the holder to it.
-      - **No chains**: a file never sets `use_for_repositories` on another repository: refused, said, the
+      - **The holder is never in its own files**: an entry named as the repository holding it is not imported
+        (said in the pull output), and turning the usage on never writes the holder to it.
+      - **No chains**: an entry never sets `use_for_repositories` on another repository: refused, said, the
         entry's other fields applied.
       - **Credentials and order**: a repository names its credential by name and waits while it is missing. At
         the worker's start and in one pull the credentials are read first, then the repositories, then every
-        other type (a repository made from the file may hold any of them).
-      - **A repository made from the file** is cloned as one made in the app, and its usage types take their
-        objects as if they were ticked (git wins, no question: the file is the decision). A usage another
+        other type (a repository made from an entry may hold any of them).
+      - **A repository made from an entry** is cloned as one made in the app, and its usage types take their
+        objects as if they were ticked (git wins, no question: the entry is the decision). A usage another
         repository holds already is refused for it, said; its other usages apply.
       - **An entry removed** deletes its repository as the app's delete does: its objects unlinked, they stay in
         the app; its working copy removed. Never the holder, and never a repository with changes not pushed
@@ -6770,54 +6867,59 @@
       - **Secrets**: a credential by name only. An entry with a `user` or a `password`, or a user and token in
         its `uri` (`https://user:token@...`), is refused.
 
-      A `repositories:` that is not a list changes nothing in the app. A missing `repositories.yaml` deletes
-      nothing either: the repositories it listed stay in the app, no longer linked to it (said in the pull
-      output), so an entry the app writes next makes a file that never deletes the others.
+      A `repositories:` that is not a list changes nothing in the app (its file refused, said). No file giving
+      `repositories:` at all deletes nothing either: the repositories it listed stay in the app, no longer linked to
+      it (said in the pull output), so an entry the app writes next makes a file that never deletes the others.
 
   - name: Settings, chat, appearance, announcements and the disclaimer kept in a git repository
-    short: The last usage types, eight of them one file each
+    short: The last usage types, eight of them one map under their key
     version: v7.5.0
     description: |
       The last ten usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
       Eight are things the app has one of (chat, general settings, MCP, and the Appearance pages Defaults, Logo,
-      Icon, Name and Links): each is **one file** at the repository's root, holding what its menu item's page
-      saves and nothing else, so a save on a page writes its own file only. Turning the type on
-      writes the app's values to that file when the repository has none, or applies the file when it has one (git
-      wins); a pull applies it; a save in the app rewrites only the fields it changed; turning it off reads it once
-      more and the app keeps its values. A file removed from git changes nothing in the app.
+      Icon, Name and Links): each is **one map** under its key (`chat_assistant:`, `general:`, `mcp:`,
+      `defaults:`, `logo:`, `icon:`, `name:`, `links:`) in any YAML file of the repository, one file at most
+      giving it (two are refused, both named, nothing applied), holding what its menu item's page saves and
+      nothing else, so a save on a page writes its own map only. Several of them may share a file. Turning the
+      type on writes the app's values when no file gives it (to `<key>.yaml` at the root, made), or applies the
+      map when one does (git wins); a pull applies it; a save in the app rewrites only the fields it changed, in
+      the file that gives it; turning it off reads it once more and the app keeps its values. A map removed from
+      git changes nothing in the app.
 
-      **Chat assistant** (`chat-assistant.yaml`): the chat assistant's settings in the config seed's `chat:` format, every field
+      **Chat assistant** (`chat_assistant:`): the chat assistant's settings in the config seed's `chat:` format, every field
       optional. `api_key` only as `${ENV}`, or left out (the one in the database stays); `credential` names an api
-      credential, and the file waits while it is missing.
+      credential, and the map waits while it is missing.
       ```yaml
-      provider: openai
-      model: gpt-5
-      api_key: ${CHAT_API_KEY}
-      allow_job_status: false
+      chat_assistant:
+        provider: openai
+        model: gpt-5
+        api_key: ${CHAT_API_KEY}
+        allow_job_status: false
       ```
 
-      **General** (`general.yaml`): Settings > System > General by environment variable names, only those that
+      **General** (`general:`): Settings > System > General by environment variable names, only those that
       page changes (never one another page or the deployment owns, a refused one, or one set in the real
       environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
       command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
       `ENABLE_CONFIG_IN_DATABASE`, ytt (`USE_YTT`, `YTT_*`), `EXPRESSION_SANITIZER`, `CONTENT_SECURITY_POLICY`,
       `REST_ALLOWED_HOSTS`, `REST_DENIED_HOSTS`, `REST_IGNORE_CERTS`, the Microsoft sign-in addresses
-      (`ENTRA_*_URI`, `AZURE_*_URI`), `TRUST_PROXY`, `PORT`, `HTTPS`, `HTTPS_KEY` and `HTTPS_CERT`: a file setting one
+      (`ENTRA_*_URI`, `AZURE_*_URI`), `TRUST_PROXY`, `PORT`, `HTTPS`, `HTTPS_KEY` and `HTTPS_CERT`: a map setting one
       is refused, said with why in the pull output, and the app never writes them to it. A variable whose name ends
-      in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as `${ENV}`. A pull applies the file exactly as the page's Save: every value checked first (a file with one bad
+      in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as `${ENV}`. A pull applies the map exactly as the page's Save: every value checked first (a map with one bad
       value changes nothing), the managed file written, the other nodes told, each variable applied at once or
       said to need a restart (in the pull output), and the change audited. The app writes the variables saved from
       the page, each in its documented type: a number as a number, a yes or no as `true` or `false`, a text as
-      text (quoted when it looks like a number). A file may give a value either way (`30` or `"30"`, `true` or
+      text (quoted when it looks like a number). A map may give a value either way (`30` or `"30"`, `true` or
       `1`): both are read the same.
       ```yaml
-      JOB_RETENTION_DAYS: 30
-      LOG_LEVEL: info
-      METRICS_TOKEN: ${METRICS_TOKEN}
+      general:
+        JOB_RETENTION_DAYS: 30
+        LOG_LEVEL: info
+        METRICS_TOKEN: ${METRICS_TOKEN}
       ```
 
-      **MCP** (`mcp.yaml`): Settings > Connections > MCP by environment variable names, every switch that page
+      **MCP** (`mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
       changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
       never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
@@ -6826,54 +6928,58 @@
       A variable it declares that is set in the real environment keeps the environment's value: said in the
       server log, the seed's value not applied, and the start goes on.
       ```yaml
-      ENABLE_MCP: true
-      MCP_READ_ONLY: true
-      MCP_CHAT_FORMS_ONLY: false
+      mcp:
+        ENABLE_MCP: true
+        MCP_READ_ONLY: true
+        MCP_CHAT_FORMS_ONLY: false
       ```
 
-      **Defaults** (`defaults.yaml`): what Settings > Appearance > Defaults saves, the theme and its colour, the
+      **Defaults** (`defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the
       forms view, the time zone, the date format and the language (`default_theme`, `default_theme_color`,
       `forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed has a
       `defaults:` section in the same format.
       ```yaml
-      default_theme: dark
-      default_theme_color: "#198754"
-      forms_view: tiles
-      default_timezone: Europe/Brussels
-      default_date_format: DD/MM/YYYY
-      default_language: fr
+      defaults:
+        default_theme: dark
+        default_theme_color: "#198754"
+        forms_view: tiles
+        default_timezone: Europe/Brussels
+        default_date_format: DD/MM/YYYY
+        default_language: fr
       ```
 
-      **Logo** (`logo.yaml` and its image) and **Icon** (`icon.yaml` and its image): the logo and the website icon,
-      each an image file beside its YAML named by its path. The images are read and written as binary and checked
-      as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon 256 KB); an empty
-      value restores the bundled one. An image changed in the app is written to the file its YAML names (beside it
-      with the new extension when its type changed), or as `logo.<ext>` / `icon.<ext>` when it names none; a file
-      of that name already there that the YAML does not name is never overwritten: the write is refused, said in
-      the server log. The config seed has `logo:` and `icon:` sections in the same format, the images relative to
-      the seed file.
+      **Logo** (`logo:` and its image) and **Icon** (`icon:` and its image): the logo and the website icon, each an
+      image file of the repository its map names by its path, relative to the file naming it (`../images/logo.png`
+      reaches a folder beside that file's), never outside the repository. The images are read and written as
+      binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
+      256 KB); an empty value restores the bundled one. An image changed in the app is written to the file its map
+      names (beside it with the new extension when its type changed), or as `logo.<ext>` / `icon.<ext>` beside the
+      file when it names none; a file of that name already there that the map does not name is never overwritten:
+      the write is refused, said in the server log. The config seed has `logo:` and `icon:` sections in the same
+      format, the images relative to the seed file.
       ```yaml
-      # logo.yaml, logo.png beside it
-      logo: logo.png
-      ```
-      ```yaml
-      # icon.yaml, icon.svg beside it
-      icon: icon.svg
+      # branding.yaml, the images in its assets folder
+      logo:
+        logo: assets/logo.png
+      icon:
+        icon: assets/icon.svg
       ```
 
-      **Name** (`name.yaml`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
+      **Name** (`name:`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
       `name:` section in the same format.
       ```yaml
-      app_name: ACME Automation
+      name:
+        app_name: ACME Automation
       ```
 
-      **Links** (`links.yaml`): Settings > Appearance > Links, its own usage type: the header's links
+      **Links** (`links:`): Settings > Appearance > Links, its own usage type: the header's links
       (`header_links`, each `id`, `label`, `url`, `icon`, `newTab` and `parent`) and whether the Designer's link
       shows (`show_designer`). The config seed has a `links:` section in the same format.
       ```yaml
-      show_designer: true
-      header_links:
-        - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
+      links:
+        show_designer: true
+        header_links:
+          - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
       ```
 
       As every seed section, the seed's `defaults:`, `logo:`, `icon:`, `name:` and `links:` lock what they declare,
@@ -6882,38 +6988,40 @@
       released, and all are when the seed is turned off. The seed's `mcp:` does the same on the MCP page, variable
       by variable. A Defaults, Logo, Icon, Name, Links or MCP repository and the seed never own the same field: the
       seed keeps the fields it declares (listed as staying in the app when the repository is made the type's, never written to its
-      file, and not applied from it, said in the pull output); the repository holds the others.
+      map, and not applied from it, said in the pull output); the repository holds the others.
 
-      **Announcements** (`announcements/`, one file each): named (what a pull finds them by), with their
+      **Announcements** (`announcements:`, a list): named (what a pull finds them by), with their
       `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,
-      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. A
-      file whose end is already past is not imported: no refusal, an information line in the pull output (`Not
-      imported, already ended: Maintenance (announcements/maintenance.yaml)`), and the announcement of it, if the
-      app has it, is removed from the app. The file stays in git as it is; the app's own removal of an ended
-      announcement never deletes nor rewrites its file. Turning the usage on skips them too, and its question
+      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. An
+      entry whose end is already past is not imported: no refusal, an information line in the pull output (`Not
+      imported, already ended: Maintenance (announcements.yaml#Maintenance)`), and the announcement of it, if the
+      app has it, is removed from the app. The entry stays in git as it is; the app's own removal of an ended
+      announcement never deletes nor rewrites its entry. Turning the usage on skips them too, and its question
       says how many. The seed's `announcements:` section takes the same items, an ended one left out.
       ```yaml
-      name: Maintenance
-      message: The app is down on Sunday from 8 to 10.
-      level: warning
-      start_at: 2030-01-06T08:00:00Z
-      end_at: 2030-01-06T10:00:00Z
+      announcements:
+        - name: Maintenance
+          message: The app is down on Sunday from 8 to 10.
+          level: warning
+          start_at: 2030-01-06T08:00:00Z
+          end_at: 2030-01-06T10:00:00Z
       ```
 
-      **Disclaimer** (`disclaimer/`, one file per version): `version` (its number, what a pull finds it by),
+      **Disclaimer** (`disclaimer:`, a list of versions): `version` (its number, what a pull finds it by),
       `title`, `text`, `checkbox_label` and `enabled` (the version in force, the disclaimer on; one at most). A
       changed title, text or label arriving from git is a **correction** of that version, as the app's save makes
-      one; with `ask_again: true` in the file, everyone who accepted it is asked again (a key of the file only:
-      never written back, and nothing happens while the text does not change). A version keeps its number: a file
-      whose `version` changes is refused, a new version is a new file. Who accepted what is never in git.
+      one; with `ask_again: true` in the entry, everyone who accepted it is asked again (a key of the entry only:
+      never written back, and nothing happens while the text does not change). A version keeps its number: an
+      entry whose `version` changes is refused, a new version is a new entry. Who accepted what is never in git.
       The seed's `disclaimer:` section takes the same items.
       ```yaml
-      version: 2
-      title: Terms of use
-      text: Use this tool for your own team's systems only.
-      checkbox_label: I agree
-      enabled: true
-      ask_again: true
+      disclaimer:
+        - version: 2
+          title: Terms of use
+          text: Use this tool for your own team's systems only.
+          checkbox_label: I agree
+          enabled: true
+          ask_again: true
       ```
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
