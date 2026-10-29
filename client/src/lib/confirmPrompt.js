@@ -4,7 +4,8 @@
 /*  by AppConfirmDialog (App.vue) and asked with askConfirm, in   */
 /*  place of the browser's confirm() ("localhost says"). It       */
 /*  answers true for its button, false for Cancel, the cross,     */
-/*  Escape or the backdrop.                                       */
+/*  Escape or the backdrop. BsModal is not a Bootstrap instance,  */
+/*  so Escape is heard here, while the question is open.          */
 /*                                                                */
 /******************************************************************/
 import { reactive } from 'vue';
@@ -18,6 +19,22 @@ export const confirmPrompt = reactive({
   icon: 'circle-question',
   resolve: null,
 });
+
+/**
+ * Turns the open question down on Escape. Heard on the window, in its capture phase, so the
+ * question answers first and what lies under it (a modal, the chat, a popover) does not hear
+ * the same press and close as well.
+ *
+ * Args:
+ *   event (KeyboardEvent): a key press anywhere on the page.
+ */
+function onEscape(event) {
+  // only Escape, and only while a question waits for its answer
+  if (event.key !== 'Escape' || !confirmPrompt.open) return;
+  event.preventDefault();
+  event.stopPropagation();
+  answerConfirm(false);
+}
 
 /**
  * Asks a question in the app's modal.
@@ -35,6 +52,8 @@ export function askConfirm(message, { title = '', ok = '', icon = 'circle-questi
   confirmPrompt.resolve?.(false);
   return new Promise((resolve) => {
     Object.assign(confirmPrompt, { open: true, title, message, ok: ok || title, icon, resolve });
+    // Escape turns it down while it is open (once : adding the same listener again is a no-op)
+    window.addEventListener('keydown', onEscape, true);
   });
 }
 
@@ -45,6 +64,8 @@ export function askConfirm(message, { title = '', ok = '', icon = 'circle-questi
  *   yes (boolean): its button (true), or closed (false).
  */
 export function answerConfirm(yes) {
+  // answered : Escape is no longer the question's
+  window.removeEventListener('keydown', onEscape, true);
   const resolve = confirmPrompt.resolve;
   Object.assign(confirmPrompt, { open: false, title: '', message: '', ok: '', icon: 'circle-question', resolve: null });
   resolve?.(yes);
