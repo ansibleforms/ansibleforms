@@ -25,7 +25,7 @@ import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
 import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
-import { designsAllForms, designsEverything, designerConfig, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
+import { designsAllForms, designsEverything, designerConfig, designerWarnings, designerForms, designerWorkflowFiles, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -62,6 +62,10 @@ const findList = async function(req,res){
     // remove roles and remove constants
     delete formConfig.roles
     delete formConfig.constants
+    // the forms are the user's roles' already ; the loader's warning of a name defined twice is
+    // not, so without designAllForms the ones naming a form hidden from them are left out
+    // (lib/designerForms.js)
+    formConfig.warnings = await designerWarnings(formConfig.warnings, req?.user?.user)
     // this is sufficient for frontend to display the forms
     res.json(RestResult.single(formConfig))
   }catch(err){
@@ -401,10 +405,11 @@ const save = async function(req,res){
       // the three, a new or changed expression or query the server runs (lib/designerForms.js)
       try {
         let sent = null
-        try { sent = Form.parse(newConfig) || {} } catch { sent = null }
+        let unread = null
+        try { sent = Form.parse(newConfig) || {} } catch (e) { sent = null; unread = e }
         if(!designsEverything(user)){
-          // not read : refused as Form.save would refuse it, nothing laid over
-          if(sent === null) Form.parse(newConfig)
+          // not read : refused as Form.save would refuse it (a 400), nothing laid over
+          if(sent === null) throw new Errors.BadRequestError(helpers.getError(unread))
           const stored = await Form.load(undefined,undefined,true)
           // no expression nor query the forms do not have already (it would read the hidden files)
           assertServerCodeKept(sent.forms, stored.forms, user)
@@ -520,7 +525,9 @@ const formNames = async function(req,res){
 const formsLinked = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    res.json(RestResult.list(formLinks(formConfig.forms)))
+    // reached with a part of the settings only, and designAllForms off : the forms their designer
+    // shows, never the hidden ones (lib/designerForms.js)
+    res.json(RestResult.list(formLinks(designerForms(formConfig.forms, req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -531,7 +538,9 @@ const formsLinked = async function(req,res){
 const formsCredentials = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    res.json(RestResult.list(formCredentials(formConfig.forms)))
+    // with the connections settings only, and designAllForms off : the forms their designer shows
+    // (lib/designerForms.js)
+    res.json(RestResult.list(formCredentials(designerForms(formConfig.forms, req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -541,7 +550,9 @@ const formsCredentials = async function(req,res){
 // credential's Used by tab
 const workflowsCredentials = async function(req,res){
   try{
-    res.json(RestResult.list(await workflowCredentials()))
+    // with the connections settings only, and designAllWorkflows off : the workflow files their
+    // designer shows (lib/designerForms.js)
+    res.json(RestResult.list(await workflowCredentials(await designerWorkflowFiles(req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }

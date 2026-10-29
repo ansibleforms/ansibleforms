@@ -38,7 +38,12 @@
 // without designAllForms the form files are in none of them either (Form.formsFileTest).
 //
 // The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
-// the lines naming files, and the form names defined twice they are not told of.
+// the lines naming files, and the form names defined twice they are not told of ; the load's warning
+// of a form name defined twice (the forms list, the designer) is left out unless both copies are theirs.
+//
+// A designer some forms, playbooks or workflows are hidden from adds no expression nor query the
+// server runs to a form (assertServerCodeKept), and runs no raw expression either
+// (lib/expressionPolicy.js mayRunRawExpression) : either would read any file of the server.
 //
 // The inventories, the vars files, the categories and the constants stay as they are for every
 // designer.
@@ -204,16 +209,66 @@ export async function designerConfig(config, user, unloaded = []) {
   if (designsAllForms(user)) return config;
   const { visible, readOnly, taken } = designerScope(config.forms, user, unloaded);
   const forms = (config.forms || []).filter((f) => visible.has(f.name) || readOnly.has(f.name)).map((f) => (readOnly.has(f.name) ? { ...f, readOnly: true } : f));
-  // a duplicate naming a hidden form : its warning left out
-  const hiddenNotices = new Set((await Form.duplicates()).filter((d) => !duplicateShown(d, user)).map((d) => d.notice));
   // a hidden form failing validation : its error left out
   const hiddenErrors = [...taken].map((name) => Form.validationError(name, ""));
   return {
     ...config,
     forms,
-    warnings: (config.warnings || []).filter((w) => !hiddenNotices.has(w)),
+    // a duplicate naming a hidden form : its warning left out
+    warnings: (await designerWarnings(config.warnings, user)) || [],
     errors: (config.errors || []).filter((e) => !hiddenErrors.some((start) => String(e).startsWith(start))),
   };
+}
+
+/**
+ * A load's warnings as a user reads them : without the "defined twice" warnings naming a form
+ * hidden from them (duplicateShown). The forms list (GET /api/v2/config/formlist) is filtered by
+ * the user's roles already, but the loader warns of every name defined twice, whoever it belongs to.
+ *
+ * Args:
+ *   warnings (string[]): the load's warnings.
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   Promise<string[]>: the warnings (the same ones when they design every form).
+ */
+export async function designerWarnings(warnings, user) {
+  if (designsAllForms(user) || !Array.isArray(warnings)) return warnings;
+  const hiddenNotices = new Set((await Form.duplicates()).filter((d) => !duplicateShown(d, user)).map((d) => d.notice));
+  return warnings.filter((w) => !hiddenNotices.has(w));
+}
+
+/**
+ * The forms a user is told of outside the designer (the settings pages' Forms tabs, a credential's
+ * Used by tab) : every form with the full settings or designAllForms, else the forms their
+ * designer shows (designerScope : theirs, and the subforms they use or no hidden form uses).
+ *
+ * Args:
+ *   forms (object[]): every form (Form.load(undefined, undefined, true)).
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   object[]: the forms (the same ones when nothing is left out for them).
+ */
+export function designerForms(forms, user) {
+  if (user?.options?.showSettings || designsAllForms(user)) return forms;
+  const { visible, readOnly } = designerScope(forms, user);
+  return (forms || []).filter((f) => visible.has(f?.name) || readOnly.has(f?.name));
+}
+
+/**
+ * Which workflow files a user is told of outside the designer (a credential's Used by tab) : every
+ * one with the full settings, else those their designer shows (fileVisibility).
+ *
+ * Args:
+ *   user (object): the signed-in user.
+ *
+ * Returns:
+ *   Promise<function|null>: (absolute path) => whether it is shown ; null when every one is.
+ */
+export async function designerWorkflowFiles(user) {
+  if (user?.options?.showSettings) return null;
+  return fileVisibility("workflows", user);
 }
 
 /**
@@ -631,6 +686,9 @@ export default {
   designerScope,
   duplicateShown,
   designerConfig,
+  designerWarnings,
+  designerForms,
+  designerWorkflowFiles,
   designerSave,
   assertServerCodeKept,
   fileVisibility,

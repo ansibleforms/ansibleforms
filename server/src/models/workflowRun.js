@@ -133,14 +133,20 @@ export async function listWorkflows(shown = null) {
  * The credentials each of the designer's workflows names : its job template nodes' (the export's
  * related.credentials, or credentials), for a credential's Used by tab.
  *
+ * Args:
+ *   shown (function): (file) => whether a workflow file (its absolute path) is shown to the user ;
+ *     every one when not given.
+ *
  * Returns:
  *   Promise<object[]>: { name, description, file, credentials: [{ name, where }] } for the
  *     workflows that name at least one credential, sorted by name ; where says the file and the
  *     node, such as "deploy.yaml, node configure".
  */
-export async function workflowCredentials() {
+export async function workflowCredentials(shown = null) {
   const out = [];
-  for (const { workflow, rel } of await allWorkflows()) {
+  for (const { workflow, rel, file } of await allWorkflows()) {
+    // a workflow file hidden from the user (lib/designerForms.js) : not named
+    if (shown && !shown(path.resolve(file))) continue;
     const credentials = [];
     for (const node of workflow.nodes || []) {
       const nodeName = node.identifier || node.name || "?";

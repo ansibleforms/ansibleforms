@@ -36,7 +36,7 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: Form, duplicateNotice } = await import("../src/models/form.model.js");
-const { designsAllForms, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, assertWorkflowFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
+const { designsAllForms, duplicateShown, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, assertWorkflowFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
 const { default: ansibleConfig } = await import("../config/ansible.config.js");
 const { default: ProjectFiles } = await import("../src/models/projectFiles.model.js");
 const { listWorkflows } = await import("../src/models/workflowRun.js");
@@ -473,5 +473,81 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     assert.equal(row.pull_output, "Updating 1..2\n 1 file changed");
     assert.doesNotMatch(row.push_output, /team\.yml/);
     assert.equal((await designerRepositories([{ pull_output: pull }], everything))[0].pull_output, pull);
+  });
+});
+
+describe("a form name defined twice : its warning only to a designer who reaches both copies", () => {
+  test("the loader's warning left out of the designer's config when a copy is hidden", async () => {
+    // a second copy of the user's form, the team's
+    fs.writeFileSync(path.join(ROOT, "forms", "forms", "zz-copy.yaml"), YAML.stringify(form("Ops deploy", ["team"])));
+    const [d] = await Form.duplicates();
+    const warning = d.notice;
+    assert.ok((await load()).warnings.includes(warning), "the loader warns");
+    assert.equal(d.name, "Ops deploy");
+    assert.deepEqual([d.used.roles, d.skipped.roles], [["ops"], ["team"]]);
+    assert.equal(duplicateShown(d, limited), false);
+    assert.equal(duplicateShown(d, everything), true);
+    assert.equal(duplicateShown({ ...d, skipped: { roles: ["default"] } }, limited), true);
+    const res = await call(configController.findAll, { user: { user: limited } });
+    assert.equal(res.body.warnings.includes(warning), false);
+    assert.ok((await call(configController.findAll, { user: { user: everything } })).body.warnings.includes(warning));
+  });
+});
+
+// ─── the other routes naming forms and workflow files ──────────────────────────
+describe("the routes outside the designer's config name nothing hidden from a limited user", () => {
+  const settingsPart = (o = {}) => ({ ...limited, options: { ...limited.options, showConnectionsSettings: true, showAppearanceSettings: true, ...o } });
+  const named = (res) => JSON.stringify(res.body);
+
+  test("the forms list and a form opened : the user's forms as for everyone, no warning naming a hidden form", async () => {
+    // a copy of the team's form read first : the loader warns of the second, whoever it belongs to
+    fs.writeFileSync(path.join(ROOT, "forms", "forms", "a-copy.yaml"), YAML.stringify(form("Team deploy", ["team"])));
+    const warning = (await Form.duplicates()).find((d) => d.name === "Team deploy").notice;
+    const list = await call(configController.findList, { user: { user: limited } });
+    assert.deepEqual(names(list.body.forms).sort(), ["Everyone", "Ops deploy"]);
+    assert.doesNotMatch(named(list), /Team deploy/);
+    // a form opened : the loader stops at it, warning of no other form's copies
+    const one = await call(configController.findOne, { user: { user: limited }, query: { name: "Everyone" } });
+    assert.equal(one.code, 200);
+    assert.doesNotMatch(named(one), /Team deploy/);
+    // a designer of every form is still warned
+    assert.ok((await call(configController.findList, { user: { user: everything } })).body.warnings.includes(warning));
+  });
+
+  test("the settings pages' Forms tabs : the forms the user's designer shows, every form with the full settings", async () => {
+    const res = await call(configController.formsLinked, { user: { user: settingsPart() } });
+    assert.deepEqual(res.body.records.map((f) => f.name).sort(), ["Everyone", "Ops deploy"]);
+    assert.doesNotMatch(named(res), /Team deploy/);
+    const full = await call(configController.formsLinked, { user: { user: settingsPart({ showSettings: true }) } });
+    assert.ok(full.body.records.some((f) => f.name === "Team deploy"));
+    assert.ok((await call(configController.formsLinked, { user: { user: { ...everything, options: { ...everything.options, showConnectionsSettings: true } } } })).body.records.some((f) => f.name === "Team deploy"));
+  });
+
+  test("a credential's Used by tab : no hidden form, no hidden workflow file", async () => {
+    appConfig.workflowsPath = path.join(ROOT, "workflows");
+    fs.mkdirSync(appConfig.workflowsPath, { recursive: true });
+    const node = { identifier: "n0", unified_job_template: { type: "job_template", name: "x.yaml" }, related: { credentials: [{ name: "vault-team" }] } };
+    const wf = (name) => YAML.stringify({ workflow_job_templates: [{ name, related: { workflow_nodes: [node] } }] });
+    fs.writeFileSync(path.join(appConfig.workflowsPath, "team-flow.yml"), wf("Team flow"));
+    fs.writeFileSync(path.join(appConfig.workflowsPath, "free.yml"), wf("Free"));
+    fs.writeFileSync(
+      path.join(ROOT, "forms", "forms", "deploy.yaml"),
+      YAML.stringify([
+        { ...OPS, ansibleCredentials: "ops-ssh" },
+        { ...TEAM, ansibleCredentials: "team-ssh" },
+        OPEN,
+        { name: "Team flow form", type: "workflow", workflow: "team-flow.yml", roles: ["team"], categories: [], fields: [] },
+      ]),
+    );
+    const user = settingsPart({ designAllWorkflows: false });
+    const forms = await call(configController.formsCredentials, { user: { user } });
+    assert.deepEqual(forms.body.records.map((f) => f.name), ["Ops deploy"]);
+    assert.doesNotMatch(named(forms), /Team deploy|team-ssh/);
+    const flows = await call(configController.workflowsCredentials, { user: { user } });
+    assert.deepEqual(flows.body.records.map((f) => f.file), ["free.yml"]);
+    // the full settings : every one
+    const full = settingsPart({ designAllWorkflows: false, showSettings: true });
+    assert.equal((await call(configController.formsCredentials, { user: { user: full } })).body.records.length, 2);
+    assert.deepEqual((await call(configController.workflowsCredentials, { user: { user: full } })).body.records.map((f) => f.file).sort(), ["free.yml", "team-flow.yml"]);
   });
 });
