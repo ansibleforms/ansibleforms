@@ -16,6 +16,8 @@ export default seedType({
   noun: "secret store",
   // its own token, and a CyberArk client certificate's key
   secrets: ["token", "client_key"],
+  // what it is besides its name : a rename changing one of them is another store
+  identity: ["type", "url"],
   references: [{ field: "credential", type: "credentials" }],
   // secret_stores.description has no default in the table
   defaults: { description: "" },

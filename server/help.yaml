@@ -6649,10 +6649,13 @@
       (a.yaml, entry 1) and in team/b.yaml (entry 2)`), and the object of that name stays as it was; two files
       giving the same map (two `defaults:`) are refused the same way, nothing applied. A name changed in git is a
       delete and a new object, except when, in one pull, exactly one object of the type is gone from a file and
-      exactly one new name of that type appears in that same file: that is its rename, and the object keeps its
-      secrets kept in the database, its id and what uses it (a rename is refused while something uses the object
-      by its old name, unless each user names the new one in the same commit; a disclaimer version never changes
-      its number). An entry that is refused or waits keeps the object of its name as it was, and an entry refused
+      exactly one new name of that type appears in that same file, what tells the object apart besides its name
+      unchanged (a credential's `credential_type`, `host` and `user`; a runner's `type`, `uri` and `username`; a
+      notification channel's `type`; a secret store's `type` and `url`): that is its rename, said in the pull
+      output (`Renamed prod-db to main-db (its secrets kept)`), and the object keeps its secrets kept in the
+      database, its id and what uses it (a rename is refused while something uses the object by its old name,
+      unless each user names the new one in the same commit; a disclaimer version never changes its number). One
+      of those fields changed too is another object: the one gone is deleted and a new one made. An entry that is refused or waits keeps the object of its name as it was, and an entry refused
       without a name keeps the objects its file held whose entries are gone; the objects of a file that cannot be
       read (not valid YAML) stay as they are, the file refused when its lines seem to give the type's key.
 

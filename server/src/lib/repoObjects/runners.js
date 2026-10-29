@@ -20,6 +20,8 @@ export default seedType({
   noun: "runner",
   // its own secrets, deprecated in favour of its credential
   secrets: ["token", "password"],
+  // what it is besides its name : a rename changing one of them is another runner
+  identity: ["type", "uri", "username"],
   references: [{ field: "credential", type: "credentials" }],
   // turned off is what a file says : on is the default
   keepFalse: ["enabled"],

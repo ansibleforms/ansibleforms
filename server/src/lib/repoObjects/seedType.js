@@ -107,6 +107,9 @@ export const KEPT_REASONS = {
  *       disclaimer's ask_again : how a changed text is applied) : never compared.
  *     renameRefused (string): why its objects never change their name (a disclaimer version keeps
  *       its number) : an entry renamed in its file is refused with it, its object kept.
+ *     identity (string[]): the fields that tell what an object is besides its name (a credential's
+ *       type, host and user) : an entry renamed in its file whose identity changed too is another
+ *       object, never the rename of the one gone (its secrets never handed to it).
  *     oneOnly (object[]): the yes or no fields one object at most has on (lib/repoObjects/engine.js
  *       oneOnlyClashes) : [{ field, label (what it makes the object : the default), by (the field
  *       each one is per : a runner's type), when ((object) => whether the rule is the object's) }].
@@ -233,6 +236,7 @@ export function seedType(spec) {
 
     usersOf: spec.usersOf,
     renameRefused: spec.renameRefused,
+    identity: spec.identity || [],
     undeletable: spec.undeletable,
     notImported: spec.notImported,
     canonical,

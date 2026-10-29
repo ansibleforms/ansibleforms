@@ -17,6 +17,8 @@ export default seedType({
   noun: "notification channel",
   // a Slack or Teams incoming webhook's address is its secret
   secrets: ["webhook_url"],
+  // what it is besides its name : a rename changing it is another channel
+  identity: ["type"],
   references: [
     { field: "credential", type: "credentials" },
     { field: "token_credential", type: "credentials" },

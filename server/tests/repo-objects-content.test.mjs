@@ -155,6 +155,20 @@ describe("an object is its name within its type", () => {
     const row = fx.rowNamed("credentials", "github");
     assert.equal(row.id, 7);
     assert.equal(row.password, "enc:db-only");
+    assert.match(RepoObjects.summaryText(credentials, summary), /\nRenamed git to github \(its secrets kept\)/);
+  });
+
+  test("a name gone and an unrelated one new in a file (its type, host or user changed too) : deleted and made anew, no secret handed over", async () => {
+    fx.state.tables.credentials.push({ id: 7, name: "prod-db", credential_type: "git", user: "bot", password: "enc:PROD", repository: "ops", repo_file: "creds.yaml" });
+    write("ops", "creds.yaml", { credentials: [git("other"), { name: "prod-db", credential_type: "git", user: "bot" }] });
+    await sync(credentials);
+    write("ops", "creds.yaml", { credentials: [git("other"), { name: "test-db", credential_type: "git", user: "tester" }] });
+    const summary = await sync(credentials);
+    assert.deepEqual([summary.created, summary.deleted], [1, 1]);
+    const row = fx.rowNamed("credentials", "test-db");
+    assert.notEqual(row.id, 7);
+    assert.notEqual(row.password, "enc:PROD");
+    assert.doesNotMatch(RepoObjects.summaryText(credentials, summary), /Renamed/);
   });
 
   test("two names gone and two new in a file, or a name gone from one file and new in another : deleted and made anew", async () => {

@@ -17,6 +17,8 @@ export default seedType({
   noun: "credential",
   // the password (or the token, the client secret it stands for) and a client certificate's key
   secrets: ["password", "client_key"],
+  // what it is besides its name : a rename changing one of them is another credential
+  identity: ["credential_type", "host", "user"],
   // is_database follows its type ; vault_path is deprecated (secret_store and secret_ref)
   skip: ["is_database", "vault_path"],
   // credentials.description has no default in the table

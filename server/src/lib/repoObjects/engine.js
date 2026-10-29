@@ -615,6 +615,25 @@ function declaredOf(desc, row) {
 }
 
 /**
+ * Whether an entry is the same object as the one gone from its file, by what tells the type's
+ * objects apart besides their name (descriptor.identity : a credential's type, host and user) :
+ * each field the same in both, a value given in neither the same too. A type that names no such
+ * field : always.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   row (object): the object gone from the file.
+ *   object (object): the new entry's object.
+ *
+ * Returns:
+ *   boolean: true when none of those fields changed.
+ */
+function sameIdentity(desc, row, object) {
+  const valueOf = (v) => (given(v) ? String(v).trim() : "");
+  return (desc.identity || []).every((field) => valueOf(row?.[field]) === valueOf(object?.[field]));
+}
+
+/**
  * Whether every object that uses an object by its name follows its rename : each one is an object
  * of a repository, of a type that names this one (descriptor.references), whose own entry - as the
  * working copy has it now : the same commit - names it by its new name. The rename is then taken,
@@ -658,10 +677,11 @@ async function followsRename(desc, row, to, users) {
  *
  * Renames : a name changed in git is a delete and a new object, except when, in one pull, exactly
  * one object of the type linked to a file is gone from it and exactly one new name of the type
- * appeared in that same file : that is its rename - the object keeps its secrets kept in the
- * database, its state, its id and what uses it (a rename refused while something uses it, unless
- * each user follows it in the same commit : followsRename ; never for a type whose objects keep
- * their name : descriptor.renameRefused).
+ * appeared in that same file, what tells it apart besides its name unchanged (descriptor.identity :
+ * a credential's type, host and user) : that is its rename - the object keeps its secrets kept in
+ * the database, its state, its id and what uses it (a rename refused while something uses it,
+ * unless each user follows it in the same commit : followsRename ; never for a type whose objects
+ * keep their name : descriptor.renameRefused). A rename is said in the pull output.
  *
  * A refused entry - not valid, a name two entries give, a name another object has - changes
  * nothing : an object of its name stays as it was, a new one is not made ; an entry that names an
@@ -764,7 +784,7 @@ export async function syncRepository(desc, name, opts = {}) {
     else if (unmatchedRefused.has(row.repo_file)) keep(row, `${row.repo_file} (an entry of it refused, kept as it was)`);
   }
   // step 6 : a rename in a file : the one object of the type gone from a file, the one new name in
-  // that same file
+  // that same file, what tells it apart besides its name unchanged (sameIdentity)
   const goneIn = new Map();
   for (const row of own.values()) {
     if (matched.has(row.id) || kept.has(row.id)) continue;
@@ -782,6 +802,8 @@ export async function syncRepository(desc, name, opts = {}) {
     if (gone.length !== 1 || fresh.length !== 1) continue;
     const [row] = gone;
     const [f] = fresh;
+    // another object (its type, its host ... changed too) : the one gone deleted, a new one made
+    if (!sameIdentity(desc, row, f.object)) continue;
     // a type whose objects keep their name (a disclaimer version its number) : refused, kept
     if (desc.renameRefused) {
       f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${desc.renameRefused}`];
@@ -917,6 +939,7 @@ export async function syncRepository(desc, name, opts = {}) {
         }
         await desc.store.update(row, f.object);
         summary.updated++;
+        if (f.renamed) summary.notes.push(`Renamed ${f.renamed} to ${f.object.name}${desc.secrets?.length ? " (its secrets kept)" : ""}`);
       } else {
         await desc.store.insert(f.object, name, f.repoFile);
         summary.created++;
