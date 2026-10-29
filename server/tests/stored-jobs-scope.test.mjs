@@ -34,11 +34,23 @@ vi.mock("../src/models/crud.model.js", () => ({
   },
 }));
 
-// the forms a user may open : Demo and Other share, Locked turns sharing off, Hidden is no one's
+// the forms a user may open : Demo and Other share, Locked turns sharing off, Hidden is no one's.
+// Users has a password inside its list rows and its yaml subform, as the browser's Store keeps them
+const userSubform = { name: "user", fields: [{ name: "login", type: "text" }, { name: "pw", type: "password" }] };
+const usersForm = {
+  name: "Users",
+  fields: [
+    { name: "team", type: "text" },
+    { name: "admin_pw", type: "password" },
+    { name: "users", type: "list", subform: "user" },
+    { name: "owner", type: "yaml", subform: "user" },
+  ],
+  subforms: [userSubform],
+};
 vi.mock("../src/models/form.model.js", () => ({
   default: {
     load: vi.fn(async (_roles, name) => ({
-      forms: name === "Hidden" ? [] : [{ name, ...(name === "Locked" ? { allowStoredJobSharing: false } : {}) }],
+      forms: name === "Hidden" ? [] : name === "Users" ? [usersForm] : [{ name, ...(name === "Locked" ? { allowStoredJobSharing: false } : {}) }],
     })),
   },
 }));
@@ -225,6 +237,35 @@ describe("a shared stored job", () => {
   test("a form that turns sharing off refuses a shared one", async () => {
     const res = await call("create", sharer, { body: { name: "n", form_name: "Locked", form_data: "{}", visibility: "shared" } });
     assert.equal(res.statusCode, 403);
+  });
+
+  // the browser's Store leaves out the form's own password fields, not those of its list or yaml
+  // subform rows : another user gets the stored job without them, its owner and a settings user
+  // (who edits everyone's) as stored
+  test("another user's password values in list and yaml rows never reach a user it is shared with", async () => {
+    const formData = {
+      team: "ops",
+      users: [{ login: "svc1", pw: "S3cret!" }, { login: "svc2", pw: "Other!" }],
+      owner: { login: "boss", pw: "Boss!" },
+    };
+    rows = [{ id: 7, name: "batch", form_name: "Users", username: "local/alice", visibility: "shared", form_data: JSON.stringify(formData) }];
+    const one = await call("findById", viewer, { params: { id: "7" } });
+    const list = await call("find", viewer, { query: { form_name: "Users" } });
+    assert.equal(one.statusCode, 200);
+    for (const body of [one.body, list.body]) {
+      assert.ok(!/S3cret!|Other!|Boss!/.test(JSON.stringify(body)));
+    }
+    assert.deepEqual(JSON.parse(one.body.form_data), {
+      team: "ops",
+      users: [{ login: "svc1" }, { login: "svc2" }],
+      owner: { login: "boss" },
+    });
+    assert.deepEqual(JSON.parse(list.body.records[0].form_data), JSON.parse(one.body.form_data));
+    // its owner and a settings user get it as stored
+    for (const who of [alice, admin]) {
+      assert.deepEqual(JSON.parse((await call("findById", who, { params: { id: "7" } })).body.form_data), formData);
+    }
+    assert.deepEqual(JSON.parse((await call("find", alice, { query: { form_name: "Users" } })).body.records[0].form_data), formData);
   });
 
   test("a visibility other than private or shared is a 400 ; private needs no option", async () => {

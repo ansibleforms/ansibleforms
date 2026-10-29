@@ -5,7 +5,7 @@ import Errors from "../../lib/errors.js";
 import i18n from "../../lib/i18n.js";
 import { publicError } from "./publicError.js";
 import Form from "../../models/form.model.js";
-import { ownerOf, seesShared, visibilityRefusal } from "../../lib/storedJobScope.js";
+import { ownerOf, seesShared, storedJobFor, visibilityRefusal } from "../../lib/storedJobScope.js";
 
 // The columns a caller may write. Everything else in the body is dropped :
 //  - id : the row key. On create a chosen id is inserted as is, and on update it moves the
@@ -94,7 +94,10 @@ const stored_jobsController = {
         const all = await CrudModel.findAll('stored_jobs');
         const ofForm = all.filter(s => s.form_name === req.query.form_name);
         const formObj = ofForm.some(s => s.username !== username) ? await formFor(req, req.query.form_name) : undefined;
-        const filtered = ofForm.filter(s => s.username === username || seesShared(req.user.user, s, formObj));
+        // another user's shared one without its password values (storedJobScope.storedJobFor)
+        const filtered = ofForm
+          .filter(s => s.username === username || seesShared(req.user.user, s, formObj))
+          .map(s => storedJobFor(req.user.user, s, formObj));
         return res.json(RestResult.list(filtered));
       } else {
         // The stored jobs page. Scoped exactly like findById, update and delete below :
@@ -136,10 +139,12 @@ const stored_jobsController = {
       
       // Verify user owns this item (or is admin), or it is shared with them (opened in its form
       // with ?storedJob=<id>, from the Load list)
-      if (!isAdmin && item.username !== username && !seesShared(req.user.user, item, await formFor(req, item.form_name))) {
+      const formObj = (isAdmin || item.username === username) ? undefined : await formFor(req, item.form_name);
+      if (!isAdmin && item.username !== username && !seesShared(req.user.user, item, formObj)) {
         throw new Errors.AccessDeniedError(i18n.t(req, 'resources.storedJobNoAccess'));
       }
-      return res.json(RestResult.single(item));
+      // a shared one without its password values (storedJobScope.storedJobFor)
+      return res.json(RestResult.single(storedJobFor(req.user.user, item, formObj)));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));
     }
