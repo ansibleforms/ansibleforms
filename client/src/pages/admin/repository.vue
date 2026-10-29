@@ -498,8 +498,13 @@ onMounted(async () => {
                 )
               }}
             </div>
-            <!-- a form name it shares with another forms repository : the copy used, the one skipped -->
-            <div v-for="d in repo.formDuplicates || []" :key="d.skipped.place" class="alert alert-warning py-2">
+            <!-- a form name it shares with another forms repository : the copy used, the one skipped
+                 (keyed on both : one file may hold two of them) -->
+            <div
+              v-for="d in repo.formDuplicates || []"
+              :key="`${d.name}|${d.skipped.place}`"
+              class="alert alert-warning py-2"
+            >
               <FaIcon icon="triangle-exclamation" class="me-2" />{{
                 t('settings.repositories.formDuplicate', { name: d.name, used: d.used.place, skipped: d.skipped.place })
               }}

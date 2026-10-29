@@ -727,4 +727,9 @@ describe('a form name defined in two forms repositories', () => {
       for (const p of ['{name}', '{used}', '{skipped}']) expect(r.formDuplicate, lang).toContain(p);
     }
   });
+  it('one warning per duplicate, two in one file included : each keyed on its name and its place', () => {
+    const page = read('pages/admin/repository.vue');
+    const loop = page.slice(page.indexOf('v-for="d in repo.formDuplicates'));
+    expect(loop.slice(0, loop.indexOf('>'))).toContain(':key="`${d.name}|${d.skipped.place}`"');
+  });
 });
