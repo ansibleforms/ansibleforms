@@ -58,8 +58,10 @@ describe('the Schedules usage of a repository', () => {
       category: 'jobs',
       objects: true,
       oneOnly: true,
-      folder: 'schedules',
     });
+    // read from the entries of its schedules: lists, wherever they are : no folder, no file of its own
+    expect(usageType('schedules').folder).toBeUndefined();
+    expect(usageType('schedules').single).toBeUndefined();
   });
 
   it('makes a repository one the app pushes back to', () => {
@@ -173,6 +175,7 @@ describe('the question before the Schedules usage changes', () => {
       clashes: ['Backup'],
       planned: 1,
       linked: 3,
+      file: 'ops/schedules.yml',
       unpushed: true,
     };
   });
@@ -186,7 +189,7 @@ describe('the question before the Schedules usage changes', () => {
     expect(confirmPrompt.ok).toBe('settings.repositories.usageOnButton');
     const text = confirmPrompt.details.join('\n');
     expect(text).toContain(
-      'settings.repositories.usageOnWritten {"type":"settings.repositories.usageTypes.schedules","name":"ops","folder":"schedules","count":2}',
+      'settings.repositories.usageOnWrittenList {"type":"settings.repositories.usageTypes.schedules","name":"ops","file":"ops/schedules.yml","count":2}',
     );
     expect(text).toContain('settings.repositories.usageOnClashes {"names":"Backup"}');
     expect(text).toContain('settings.repositories.schedulesOnKept {"names":"First or Monday (0 0 1 * 1)"}');

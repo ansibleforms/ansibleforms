@@ -87,7 +87,7 @@ onMounted(async () => {
     >
       <!-- General : the switch first, as on the MCP page ; the settings wait for it -->
       <template #tab-top-general="{ searching }">
-        <!-- kept in a repository's chat-assistant.yaml : which one -->
+        <!-- kept under chat_assistant: in a repository's file : which one, and the file -->
         <AppRepositorySource v-show="!searching" type="chat_assistant" />
         <div v-if="envRestartPending.length" class="alert alert-warning py-2">
           <FaIcon icon="triangle-exclamation" class="me-2" />

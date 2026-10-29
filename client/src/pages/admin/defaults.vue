@@ -253,7 +253,7 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
-          <!-- kept in a repository's defaults.yaml : which one -->
+          <!-- kept under defaults: in a repository's file : which one, and the file -->
           <AppRepositorySource v-show="!searching" type="defaults" />
           <AppSeedNotice
             v-if="

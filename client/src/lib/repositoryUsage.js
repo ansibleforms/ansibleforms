@@ -29,24 +29,22 @@ export const USAGE_CATEGORIES = ['designer', 'jobs', 'system', 'appearance', 'ac
 //   key       the type (its label : settings.repositories.usageTypes.<key>, its hint : usageHints)
 //   flag      the repository's column
 //   category  its heading
-//   objects   one object per file in its folder, kept in step both ways : turning it on or off
-//             asks first (what it will take, or let go)
+//   objects   kept in step both ways, read from the entries its key gives in any YAML file of the
+//             repository (credentials:) : turning it on or off asks first (what it will take, or
+//             let go)
 //   oneOnly   one repository at most : greyed on the others, with who has it
-//   folder    its folder in the repository (an object type), or
-//   file      its one file at the repository's root (a type the app has one of : chat-assistant.yaml)
-//   list      its one file holding its objects as a list (repositories.yaml)
+//   single    the app has one of it : one map under its key (chat_assistant:), in one file at most
 //   labelKey  its label's translation when it is its menu item's (settings.repositories.usageTypes.<key>
 //             when not given)
 export const USAGE_TYPES = [
-  // the base configuration's keys : each from its own file (roles.yaml, categories.yaml,
-  // constants.yaml ; config.yaml still read, deprecated), named as their menu items name them
+  // the base configuration's keys : each from the file giving it (roles:, categories:, constants: ;
+  // config.yaml still read, deprecated), named as their menu items name them
   {
     key: 'categories',
     flag: 'use_for_categories',
     category: 'designer',
     labelKey: 'sidebar.categories',
     oneOnly: true,
-    file: 'categories.yaml',
   },
   {
     key: 'constants',
@@ -54,7 +52,6 @@ export const USAGE_TYPES = [
     category: 'designer',
     labelKey: 'sidebar.constants',
     oneOnly: true,
-    file: 'constants.yaml',
   },
   { key: 'forms', flag: 'use_for_forms', category: 'designer' },
   { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
@@ -67,7 +64,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'schedules',
   },
   // named as its menu item names it (System > General)
   {
@@ -77,9 +73,9 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.ansibleForms',
     objects: true,
     oneOnly: true,
-    file: 'general.yaml',
+    single: true,
   },
-  // the Appearance pages, one file each holding what its page saves, in the menu's order, each
+  // the Appearance pages, one key each holding what its page saves, in the menu's order, each
   // named as its menu item names it (Defaults, Logo, Icon, Name)
   {
     key: 'defaults',
@@ -88,7 +84,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.defaults',
     objects: true,
     oneOnly: true,
-    file: 'defaults.yaml',
+    single: true,
   },
   {
     key: 'logo',
@@ -97,7 +93,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.logo',
     objects: true,
     oneOnly: true,
-    file: 'logo.yaml',
+    single: true,
   },
   {
     key: 'icon',
@@ -106,7 +102,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.icon',
     objects: true,
     oneOnly: true,
-    file: 'icon.yaml',
+    single: true,
   },
   {
     key: 'name',
@@ -115,7 +111,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.name',
     objects: true,
     oneOnly: true,
-    file: 'name.yaml',
+    single: true,
   },
   // named as its menu item names it (Links)
   {
@@ -125,7 +121,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.links',
     objects: true,
     oneOnly: true,
-    file: 'links.yaml',
+    single: true,
   },
   {
     key: 'labels',
@@ -134,7 +130,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'labels',
   },
   {
     key: 'announcements',
@@ -143,7 +138,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'announcements',
   },
   {
     key: 'disclaimer',
@@ -151,7 +145,6 @@ export const USAGE_TYPES = [
     category: 'access',
     objects: true,
     oneOnly: true,
-    folder: 'disclaimer',
   },
   {
     key: 'roles',
@@ -159,11 +152,10 @@ export const USAGE_TYPES = [
     category: 'access',
     labelKey: 'sidebar.roles',
     oneOnly: true,
-    file: 'roles.yaml',
   },
-  { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true, folder: 'ldap' },
-  { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true, folder: 'sso' },
-  // the other repositories, a list in its repositories.yaml, named as its menu item names it
+  { key: 'ldap', flag: 'use_for_ldap', category: 'access', objects: true, oneOnly: true },
+  { key: 'sso', flag: 'use_for_sso', category: 'access', objects: true, oneOnly: true },
+  // the other repositories, the entries of its repositories: lists, named as its menu item names it
   {
     key: 'repositories',
     flag: 'use_for_repositories',
@@ -171,7 +163,6 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.repositories',
     objects: true,
     oneOnly: true,
-    list: 'repositories.yaml',
   },
   {
     key: 'credentials',
@@ -180,7 +171,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'credentials',
   },
   {
     key: 'secret_stores',
@@ -189,7 +179,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'secret-stores',
   },
   {
     key: 'runners',
@@ -198,7 +187,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'runners',
   },
   {
     key: 'notifications',
@@ -208,7 +196,6 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.notifications',
     objects: true,
     oneOnly: true,
-    folder: 'notifications',
   },
   // named as its menu item names it (Chat assistant)
   {
@@ -218,7 +205,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.chat',
     objects: true,
     oneOnly: true,
-    file: 'chat-assistant.yaml',
+    single: true,
   },
   // named as its menu item names it (MCP)
   {
@@ -228,7 +215,7 @@ export const USAGE_TYPES = [
     labelKey: 'sidebar.mcp',
     objects: true,
     oneOnly: true,
-    file: 'mcp.yaml',
+    single: true,
   },
   {
     key: 'syslog',
@@ -237,7 +224,6 @@ export const USAGE_TYPES = [
 
     objects: true,
     oneOnly: true,
-    folder: 'syslog',
   },
 ];
 
@@ -594,18 +580,19 @@ function keptText(t, k, key) {
  */
 export function activationLines(t, key, name, p) {
   const type = usageLabel(t, key);
-  const { file, folder, list } = usageType(key) || {};
+  const { single } = usageType(key) || {};
   const count = (p.written || []).length;
-  // a type the app has one of : written as its one file, when the repository has none yet ; a type
-  // kept as a list in one file : its objects written to it ; else one file each in its folder
+  // the file its objects go to : the first giving the type's key, else <key>.yaml (the preview's)
+  const file = p.file || `${key}.yaml`;
+  // a type the app has one of : written to that file when no file gives it yet, else that file
+  // read ; another : its objects written as entries of that file
   let lines;
   // a type the app has one of, which the config seed holds whole (nothing written) and the
   // repository has no file of : its kept line says it
-  if (file && !count && !p.files && (p.kept || []).some((k) => k.whole)) lines = [];
-  else if (file)
+  if (single && !count && !p.files && (p.kept || []).some((k) => k.whole)) lines = [];
+  else if (single)
     lines = [t(`settings.repositories.${count ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, { type, name, file })];
-  else if (list) lines = [t('settings.repositories.usageOnWrittenList', { type, name, file: list, count })];
-  else lines = [t('settings.repositories.usageOnWritten', { type, name, folder: folder || key, count })];
+  else lines = [t('settings.repositories.usageOnWrittenList', { type, name, file, count })];
   lines.push(
     (p.clashes || []).length
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })
@@ -877,8 +864,9 @@ export function repositorySourceFields(t, row) {
 }
 
 /**
- * Where a type kept in one file is (the chat's, the settings', the defaults') : the repository
- * used for it and its file, as a record of a repository says it ; none when no repository holds it.
+ * Where a type the app has one of is (the chat's, the settings', the defaults') : the repository
+ * used for it and the file giving its key, as a record of a repository says it ; none when no
+ * repository holds it.
  * Read with the settings (source_<type>), so a page of a part of the settings on its own shows it
  * without reading the repositories.
  *
@@ -889,7 +877,7 @@ export function repositorySourceFields(t, row) {
  *   Promise<object|null>: { repository, repo_file }, or null.
  */
 export async function singleTypeSource(key) {
-  if (!usageType(key)?.file) return null;
+  if (!usageType(key)?.single) return null;
   try {
     const res = await axios.get('/api/v2/settings/');
     const source = res.data?.[`source_${key}`];

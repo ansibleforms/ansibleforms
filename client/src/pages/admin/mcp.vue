@@ -15,7 +15,7 @@ import { useSeedManaged } from '@/composables/useSeedManaged';
 /*  Settings > Connections > MCP : the MCP server for AI agents   */
 /*  (its switch and its two options, environment variables that   */
 /*  apply without a restart), and how a client connects to it.    */
-/*  An MCP repository keeps the switches in its mcp.yaml ; the    */
+/*  An MCP repository keeps the switches under mcp: in a file ;  */
 /*  config seed's mcp section holds them per variable (read only) */
 /*                                                                */
 /******************************************************************/

@@ -412,7 +412,7 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
-          <!-- kept in a repository's links.yaml : which one -->
+          <!-- kept under links: in a repository's file : which one, and the file -->
           <AppRepositorySource v-show="!searching" type="links" />
           <AppSeedNotice v-if="seeded('header_links', 'show_designer')" />
           <div v-if="envRestartPending.length" class="alert alert-warning py-2">

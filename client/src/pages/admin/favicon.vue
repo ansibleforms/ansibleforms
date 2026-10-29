@@ -177,7 +177,7 @@ onMounted(async () => {
       </template>
       <template #default>
         <AppSeedNotice v-if="seeded('icon')" />
-        <!-- kept in a repository's icon.yaml, the image beside it : which one -->
+        <!-- kept under icon: in a repository's file, the image it names : which one, and the file -->
         <AppRepositorySource type="icon" />
         <div class="row g-3">
           <div class="col-md-6">

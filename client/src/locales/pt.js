@@ -1338,32 +1338,36 @@ export default {
         playbooks: 'Playbooks Ansible executados pelos formulários (só um repositório)',
         workflows: 'Workflows construídos, editados e enviados de volta pelo designer',
         inventories: 'Um inventário: inventory.yaml, group_vars e host_vars na raiz',
-        schedules: 'Agendamentos em YAML, um por ficheiro na sua pasta schedules',
-        sso: 'Fornecedores SSO em YAML, um por ficheiro na sua pasta sso, que nomeiam a sua credencial',
-        ldap: 'Diretórios LDAP em YAML, um por ficheiro na sua pasta ldap, pela sua ordem de pesquisa',
-        disclaimer: 'Versões do aviso legal em YAML, uma por ficheiro na sua pasta disclaimer',
+        schedules: 'Agendamentos, entradas de uma lista schedules: em qualquer um dos seus ficheiros YAML',
+        sso: 'Fornecedores SSO, entradas de uma lista sso: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        ldap: 'Diretórios LDAP, entradas de uma lista ldap: em qualquer um dos seus ficheiros YAML, pela sua ordem de pesquisa',
+        disclaimer: 'Versões do aviso legal, entradas de uma lista disclaimer: em qualquer um dos seus ficheiros YAML',
         credentials:
-          'Credenciais em YAML, uma por ficheiro na sua pasta credentials, segredos só como referências de ambiente',
+          'Credenciais, entradas de uma lista credentials: em qualquer um dos seus ficheiros YAML, segredos só como referências de ambiente',
         secret_stores:
-          'Cofres de segredos em YAML, um por ficheiro na sua pasta secret-stores, que nomeiam a sua credencial',
-        runners: 'Runners em YAML, um por ficheiro na sua pasta runners, que nomeiam a sua credencial',
-        notifications: 'Notificações em YAML, uma por ficheiro na sua pasta notifications',
-        syslog: 'Servidores syslog em YAML, um por ficheiro na sua pasta syslog',
-        chat_assistant: 'O assistente de chat no seu chat-assistant.yaml, a chave só como referência de ambiente',
-        mcp: 'As definições de MCP pelo seu nome de ambiente, no seu mcp.yaml',
+          'Cofres de segredos, entradas de uma lista secret_stores: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        runners:
+          'Runners, entradas de uma lista runners: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        notifications: 'Notificações, entradas de uma lista notifications: em qualquer um dos seus ficheiros YAML',
+        syslog: 'Servidores syslog, entradas de uma lista syslog: em qualquer um dos seus ficheiros YAML',
+        chat_assistant:
+          'O assistente de chat, sob chat_assistant: num dos seus ficheiros YAML, a chave só como referência de ambiente',
+        mcp: 'As definições de MCP pelo seu nome de ambiente, sob mcp: num dos seus ficheiros YAML',
         defaults:
-          'O tema, a cor, a vista dos formulários, o fuso horário, o formato de data e o idioma, no seu defaults.yaml',
-        logo: 'O logótipo, indicado no seu logo.yaml, a imagem ao lado',
-        icon: 'O ícone do site, indicado no seu icon.yaml, a imagem ao lado',
-        name: 'O nome da aplicação, no seu name.yaml',
-        links: 'As ligações do cabeçalho e a do designer, no seu links.yaml',
-        labels: 'As etiquetas ao lado do logótipo em YAML, uma por ficheiro na sua pasta labels, pela sua ordem',
-        announcements: 'Anúncios em YAML, um por ficheiro na sua pasta announcements',
-        general: 'As definições Geral pelo seu nome de ambiente, no seu general.yaml',
-        roles: 'As funções, no seu roles.yaml (config.yaml ainda lido, obsoleto)',
-        categories: 'As categorias, no seu categories.yaml (config.yaml ainda lido, obsoleto)',
-        constants: 'As constantes, no seu constants.yaml (config.yaml ainda lido, obsoleto)',
-        repositories: 'Os outros repositórios, no seu repositories.yaml',
+          'O tema, a cor, a vista dos formulários, o fuso horário, o formato de data e o idioma, sob defaults: num dos seus ficheiros YAML',
+        logo: 'O logótipo, sob logo: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
+        icon: 'O ícone do site, sob icon: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
+        name: 'O nome da aplicação, sob name: num dos seus ficheiros YAML',
+        links: 'As ligações do cabeçalho e a do designer, sob links: num dos seus ficheiros YAML',
+        labels:
+          'As etiquetas ao lado do logótipo, entradas de uma lista labels: em qualquer um dos seus ficheiros YAML, pela sua ordem',
+        announcements: 'Anúncios, entradas de uma lista announcements: em qualquer um dos seus ficheiros YAML',
+        general: 'As definições Geral pelo seu nome de ambiente, sob general: num dos seus ficheiros YAML',
+        roles: 'As funções, sob roles: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+        categories: 'As categorias, sob categories: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+        constants: 'As constantes, sob constants: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+        repositories:
+          'Os outros repositórios, entradas de uma lista repositories: em qualquer um dos seus ficheiros YAML',
       },
       usageOnTitle: 'Ativar {type}',
       usageOnQuestion: 'Usar {name} para {type}?',
@@ -1376,10 +1380,8 @@ export default {
       usageChangeButton: 'Guardar a utilização',
       usageOnHeading: '{type}: ativado',
       usageOffHeading: '{type}: desativado',
-      usageOnWritten:
-        '{type} desta aplicação escritos em {name}, um ficheiro YAML cada na sua pasta {folder}: {count}.',
-      usageOnWrittenFile: '{type} desta aplicação escritos em {name} como {file}, à espera do Push.',
-      usageOnWrittenList: '{type} desta aplicação escritos em {name}, no seu {file}: {count}.',
+      usageOnWrittenFile: '{type} desta aplicação escritos em {name}, em {file}, à espera do Push.',
+      usageOnWrittenList: '{type} desta aplicação escritos em {name}, em {file}: {count}.',
       usageOnReadFile: '{name} já tem {file}: ganha a versão do git e substitui {type} desta aplicação.',
       usageOnGitWins:
         'Quando o mesmo nome está no git e nesta aplicação, ganha a versão do git e substitui a da aplicação.',
@@ -1387,12 +1389,12 @@ export default {
       usageOnKept: 'Estes ficam nesta aplicação: {names}.',
       usageOnWithoutSecret:
         'Escritos sem os seus segredos, que ficam na base de dados (o git nunca guarda um segredo em claro): {names}.',
-      usageOnAppOnly: 'Ficam só na aplicação, nenhum campo do ficheiro do agendamento os dá: {names}.',
+      usageOnAppOnly: 'Ficam só na aplicação, nenhum campo da entrada do agendamento os dá: {names}.',
       usageOnSkipped: 'Já terminados no git, não importados: {count}.',
       formDuplicate:
         "O formulário '{name}' está definido duas vezes: é usado {used}, {skipped} é ignorado (os nomes de formulário devem ser únicos entre os repositórios de formulários)",
       configDeprecated:
-        '{key} lidos de config.yaml: obsoleto, mova-os para {file} (config.yaml deixa de ser lido na 8.0.0)',
+        '{key} lidos de config.yaml: obsoleto, mova-os para um ficheiro próprio, {file} por exemplo (config.yaml deixa de ser lido na 8.0.0)',
       configNotRead:
         '{file} não é lido ({reason}): são usados os {key} lidos dele pela última vez, senão os da configuração base, até ser corrigido no git',
       configRolesNotRead:

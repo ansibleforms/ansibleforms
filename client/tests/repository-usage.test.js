@@ -269,7 +269,10 @@ describe('one question when a save turns several object types on or off', () => 
       all.map((key) => `settings.repositories.usageOnHeading {"type":"${usageLabel(t, key).split(' ')[0]}"}`),
     );
     const text = d.map((x) => x.heading || x).join('\n');
-    expect(text).toContain('"folder":"credentials","count":2');
+    // written as entries of the file the preview names : <key>.yaml when it names none
+    expect(text).toContain(
+      'settings.repositories.usageOnWrittenList {"type":"settings.repositories.usageTypes.credentials","name":"ops","file":"credentials.yaml","count":2}',
+    );
     expect(text).toContain('settings.repositories.usageOnWithoutSecret {"names":"git, api"}');
     expect(text).toContain(
       'settings.repositories.usageOnKept {"names":"seeded (settings.repositories.usageKeptWhy.seed)"}',
@@ -459,7 +462,7 @@ describe('what the question can and cannot know', () => {
     expect(d[0]).toBe('settings.repositories.usagePreviewFailed');
     expect(d.filter((x) => x.heading)).toEqual([]);
     const text = d.join(' ');
-    for (const key of ['usageOnWritten', 'usageOnReadFile', 'usageOnGitWins', 'usageOffKept'])
+    for (const key of ['usageOnWrittenList', 'usageOnWrittenFile', 'usageOnReadFile', 'usageOnGitWins', 'usageOffKept'])
       expect(text).not.toContain(key);
     // what is true of every type is still said
     expect(d).toContain('settings.repositories.usageOnAfter');
@@ -518,14 +521,14 @@ describe("a schedule's launch options no field of its file gives", () => {
   });
 });
 
-describe('the types kept in one file : the chat, the settings, the Appearance pages', () => {
-  it('say their file : the app written to it, or the one in git applied', () => {
+describe('the types the app has one of : the chat, the settings, the Appearance pages', () => {
+  it('say their file : the app written to it, or the one in git applied ; the one the preview names', () => {
     expect(activationLines(t, 'chat_assistant', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
-      'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat-assistant.yaml"}',
+      'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat_assistant.yaml"}',
     );
-    expect(activationLines(t, 'defaults', 'cfg', { written: [], clashes: ['Defaults'] })[0]).toBe(
-      'settings.repositories.usageOnReadFile {"type":"sidebar.defaults","name":"cfg","file":"defaults.yaml"}',
-    );
+    expect(
+      activationLines(t, 'defaults', 'cfg', { written: [], clashes: ['Defaults'], file: 'look/site.yml' })[0],
+    ).toBe('settings.repositories.usageOnReadFile {"type":"sidebar.defaults","name":"cfg","file":"look/site.yml"}');
   });
 
   it("the config seed's chat : said staying with the seed, by its type, no file said written or read", () => {
@@ -607,8 +610,8 @@ describe('the fields the config seed manages : read only on the Appearance pages
   });
 });
 
-describe('the Appearance pages : one type and one file each, in the menu order', () => {
-  it('Defaults, Logo, Icon, Name each a one-only type with its own file, named as the sidebar names it', () => {
+describe('the Appearance pages : one type and one key each, in the menu order', () => {
+  it('Defaults, Logo, Icon, Name each a one-only type the app has one of, named as the sidebar names it', () => {
     for (const [key, label] of [
       ['defaults', 'sidebar.defaults'],
       ['logo', 'sidebar.logo'],
@@ -617,7 +620,7 @@ describe('the Appearance pages : one type and one file each, in the menu order',
     ]) {
       expect(USAGE_TYPES.find((u) => u.key === key)).toMatchObject({
         flag: `use_for_${key}`,
-        file: `${key}.yaml`,
+        single: true,
         labelKey: label,
         oneOnly: true,
         objects: true,
@@ -640,12 +643,12 @@ describe('the Appearance pages : one type and one file each, in the menu order',
 });
 
 describe('the header links : their own type, after Name', () => {
-  it('Links is a one-file type of Appearance, after Name, in both lists and the apply order', () => {
+  it('Links is a type of Appearance the app has one of, after Name, in both lists and the apply order', () => {
     const appearance = typesOf('appearance').map((u) => u.key);
     expect(appearance).toEqual(['defaults', 'logo', 'icon', 'name', 'links', 'labels', 'announcements']);
     expect(server.USAGE_TYPES.filter((u) => u.category === 'appearance').map((u) => u.key)).toEqual(appearance);
     expect(USAGE_TYPES.find((u) => u.key === 'links')).toMatchObject({
-      file: 'links.yaml',
+      single: true,
       oneOnly: true,
       objects: true,
     });
@@ -663,13 +666,13 @@ describe('the header links : their own type, after Name', () => {
   });
 });
 
-describe('the MCP settings : one mcp.yaml, in Connections', () => {
+describe('the MCP settings : one mcp: map, in Connections', () => {
   it('between Chat assistant and Syslog, named as its menu item, applied with the independent types', () => {
     expect(USAGE_TYPES.find((u) => u.key === 'mcp')).toMatchObject({
       flag: 'use_for_mcp',
       category: 'connections',
       labelKey: 'sidebar.mcp',
-      file: 'mcp.yaml',
+      single: true,
       oneOnly: true,
       objects: true,
     });
@@ -687,7 +690,7 @@ describe('the MCP settings : one mcp.yaml, in Connections', () => {
     expect(page).toContain(':disabled="seeded(e.name) || (e.name !== \'ENABLE_MCP\' && !mcpOn)"');
   });
 
-  it('its hint in every language ; Settings named General, as its menu item, in its general.yaml', async () => {
+  it('its hint in every language ; Settings named General, as its menu item, under its general: key', async () => {
     const tt = (key) => key;
     expect(usageBadges(tt, { use_for_general: 1, use_for_mcp: 1 })).toBe(
       '<span class="badge af-usage-badge me-1">sidebar.ansibleForms</span>' +
@@ -697,45 +700,54 @@ describe('the MCP settings : one mcp.yaml, in Connections', () => {
     expect(usageLabel(tt, 'general')).toBe('sidebar.ansibleForms');
     for (const lang of LANGS) {
       const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
-      expect(r.usageHints.mcp, lang).toContain('mcp.yaml');
-      expect(r.usageHints.general, lang).toContain('general.yaml');
+      expect(r.usageHints.mcp, lang).toContain('mcp:');
+      expect(r.usageHints.general, lang).toContain('general:');
       expect(r.usageTypes.settings, lang).toBeUndefined();
     }
   });
 });
 
-describe('the files and folders follow the labels', () => {
-  it('Chat assistant in chat-assistant.yaml, Notifications in notifications/, as on both sides', async () => {
+describe('the keys follow the types', () => {
+  it('Chat assistant under chat_assistant:, Notifications under notifications:, as on both sides', async () => {
     expect(USAGE_TYPES.find((u) => u.key === 'chat_assistant')).toMatchObject({
       flag: 'use_for_chat_assistant',
       labelKey: 'sidebar.chat',
-      file: 'chat-assistant.yaml',
+      single: true,
     });
     expect(USAGE_TYPES.find((u) => u.key === 'notifications')).toMatchObject({
       flag: 'use_for_notifications',
       labelKey: 'sidebar.notifications',
-      folder: 'notifications',
     });
+    // no file name nor folder of their own : read by their content
+    for (const u of USAGE_TYPES) expect([u.file, u.folder, u.list], u.key).toEqual([undefined, undefined, undefined]);
+    // the same key on both sides, a list type or one the app has one of alike
+    for (const u of USAGE_TYPES.filter((x) => x.objects)) expect(!!server.typeOf(u.key).single, u.key).toBe(!!u.single);
     expect(server.USAGE_FLAGS).toEqual(expect.arrayContaining(['use_for_chat_assistant', 'use_for_notifications']));
     for (const lang of LANGS) {
       const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
-      expect(r.usageHints.chat_assistant, lang).toContain('chat-assistant.yaml');
-      expect(r.usageHints.notifications, lang).toContain('notifications');
+      // each hint names the key its files give, never a file name nor a folder
+      for (const u of USAGE_TYPES.filter((x) => x.objects || ['roles', 'categories', 'constants'].includes(x.key))) {
+        expect(r.usageHints[u.key], `${lang}: ${u.key}`).toContain(`${u.key}:`);
+        expect(r.usageHints[u.key], `${lang}: ${u.key}`).not.toMatch(/\b[\w-]+\.yaml\b(?<!config\.yaml)/);
+      }
       expect(r.usageHints.chat, lang).toBeUndefined();
       expect(r.usageHints.notification_channels, lang).toBeUndefined();
     }
   });
 });
 
-describe('the repositories : a list in one repositories.yaml', () => {
-  it('first of Connections, named as its menu item, its question says the list file', () => {
+describe('the repositories : entries of a repositories: list', () => {
+  it('first of Connections, named as its menu item, its question says the file they go to', () => {
     expect(USAGE_TYPES.find((u) => u.key === 'repositories')).toMatchObject({
       labelKey: 'sidebar.repositories',
-      list: 'repositories.yaml',
       oneOnly: true,
     });
     expect(
-      activationLines(t, 'repositories', 'hub', { written: ['a', 'b'], kept: [{ name: 'hub', code: 'holder' }] }),
+      activationLines(t, 'repositories', 'hub', {
+        written: ['a', 'b'],
+        kept: [{ name: 'hub', code: 'holder' }],
+        file: 'repositories.yaml',
+      }),
     ).toEqual(
       expect.arrayContaining([
         'settings.repositories.usageOnWrittenList {"type":"sidebar.repositories","name":"hub","file":"repositories.yaml","count":2}',

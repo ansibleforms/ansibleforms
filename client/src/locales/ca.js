@@ -1338,32 +1338,37 @@ export default {
         playbooks: "Playbooks d'Ansible que executen els formularis (un sol repositori)",
         workflows: 'Workflows del dissenyador, editats i enviats de tornada pel dissenyador',
         inventories: 'Un inventari: inventory.yaml, group_vars i host_vars a la seva arrel',
-        schedules: 'Programacions en YAML, una per fitxer a la seva carpeta schedules',
-        sso: 'Proveïdors SSO en YAML, un per fitxer a la seva carpeta sso, que nomenen la seva credencial',
-        ldap: 'Directoris LDAP en YAML, un per fitxer a la seva carpeta ldap, en el seu ordre de cerca',
-        disclaimer: "Versions de l'avís legal en YAML, una per fitxer a la seva carpeta disclaimer",
+        schedules: "Programacions, entrades d'una llista schedules: en qualsevol dels seus fitxers YAML",
+        sso: "Proveïdors SSO, entrades d'una llista sso: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        ldap: "Directoris LDAP, entrades d'una llista ldap: en qualsevol dels seus fitxers YAML, en el seu ordre de cerca",
+        disclaimer: "Versions de l'avís legal, entrades d'una llista disclaimer: en qualsevol dels seus fitxers YAML",
         credentials:
-          "Credencials en YAML, una per fitxer a la seva carpeta credentials, secrets només com a referències d'entorn",
+          "Credencials, entrades d'una llista credentials: en qualsevol dels seus fitxers YAML, secrets només com a referències d'entorn",
         secret_stores:
-          'Magatzems de secrets en YAML, un per fitxer a la seva carpeta secret-stores, que nomenen la seva credencial',
-        runners: 'Runners en YAML, un per fitxer a la seva carpeta runners, que nomenen la seva credencial',
-        notifications: 'Notificacions en YAML, una per fitxer a la seva carpeta notifications',
-        syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
-        chat_assistant: "L'assistent de xat al seu chat-assistant.yaml, la clau només com a referència d'entorn",
-        mcp: "Els ajustos de MCP pel seu nom d'entorn, al seu mcp.yaml",
+          "Magatzems de secrets, entrades d'una llista secret_stores: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        runners:
+          "Runners, entrades d'una llista runners: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        notifications: "Notificacions, entrades d'una llista notifications: en qualsevol dels seus fitxers YAML",
+        syslog: "Servidors syslog, entrades d'una llista syslog: en qualsevol dels seus fitxers YAML",
+        chat_assistant:
+          "L'assistent de xat, sota chat_assistant: en un dels seus fitxers YAML, la clau només com a referència d'entorn",
+        mcp: "Els ajustos de MCP pel seu nom d'entorn, sota mcp: en un dels seus fitxers YAML",
         defaults:
-          "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, al seu defaults.yaml",
-        logo: 'El logotip, indicat al seu logo.yaml, la imatge al costat',
-        icon: 'La icona del lloc web, indicada al seu icon.yaml, la imatge al costat',
-        name: "El nom de l'aplicació, al seu name.yaml",
-        links: 'Els enllaços de la capçalera i el del dissenyador, al seu links.yaml',
-        labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
-        announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',
-        general: "Els ajustos de General pel seu nom d'entorn, al seu general.yaml",
-        roles: 'Els rols, al seu roles.yaml (config.yaml encara es llegeix, obsolet)',
-        categories: 'Les categories, al seu categories.yaml (config.yaml encara es llegeix, obsolet)',
-        constants: 'Les constants, al seu constants.yaml (config.yaml encara es llegeix, obsolet)',
-        repositories: 'Els altres repositoris, al seu repositories.yaml',
+          "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, sota defaults: en un dels seus fitxers YAML",
+        logo: 'El logotip, sota logo: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
+        icon: 'La icona del lloc web, sota icon: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
+        name: "El nom de l'aplicació, sota name: en un dels seus fitxers YAML",
+        links: 'Els enllaços de la capçalera i el del dissenyador, sota links: en un dels seus fitxers YAML',
+        labels:
+          "Les etiquetes al costat del logotip, entrades d'una llista labels: en qualsevol dels seus fitxers YAML, en el seu ordre",
+        announcements: "Anuncis, entrades d'una llista announcements: en qualsevol dels seus fitxers YAML",
+        general: "Els ajustos de General pel seu nom d'entorn, sota general: en un dels seus fitxers YAML",
+        roles: 'Els rols, sota roles: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+        categories:
+          'Les categories, sota categories: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+        constants:
+          'Les constants, sota constants: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+        repositories: "Els altres repositoris, entrades d'una llista repositories: en qualsevol dels seus fitxers YAML",
       },
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: 'Fer servir {name} per a {type}?',
@@ -1376,10 +1381,8 @@ export default {
       usageChangeButton: "Desar l'ús",
       usageOnHeading: '{type}: activat',
       usageOffHeading: '{type}: desactivat',
-      usageOnWritten:
-        "{type} d'aquesta aplicació escrits a {name}, un fitxer YAML cadascun a la seva carpeta {folder}: {count}.",
-      usageOnWrittenFile: "{type} d'aquesta aplicació escrits a {name} com a {file}, a l'espera del Push.",
-      usageOnWrittenList: "{type} d'aquesta aplicació escrits a {name}, al seu {file}: {count}.",
+      usageOnWrittenFile: "{type} d'aquesta aplicació escrits a {name}, a {file}, a l'espera del Push.",
+      usageOnWrittenList: "{type} d'aquesta aplicació escrits a {name}, a {file}: {count}.",
       usageOnReadFile: "{name} ja té {file}: guanya la versió de git i substitueix {type} d'aquesta aplicació.",
       usageOnGitWins:
         "Quan el mateix nom és a git i en aquesta aplicació, guanya la versió de git i substitueix la de l'aplicació.",
@@ -1388,12 +1391,12 @@ export default {
       usageOnKept: 'Aquests es queden en aquesta aplicació: {names}.',
       usageOnWithoutSecret:
         'Escrits sense els seus secrets, que es queden a la base de dades (git mai no guarda un secret en clar): {names}.',
-      usageOnAppOnly: "Es queden només a l'aplicació, cap camp del fitxer de la planificació no els dona: {names}.",
+      usageOnAppOnly: "Es queden només a l'aplicació, cap camp de l'entrada de la planificació no els dona: {names}.",
       usageOnSkipped: 'Ja acabats a git, no importats: {count}.',
       formDuplicate:
         "El formulari '{name}' està definit dues vegades: s'utilitza {used} i s'omet {skipped} (els noms de formulari han de ser únics entre els repositoris de formularis)",
       configDeprecated:
-        '{key} llegits de config.yaml: obsolet, mou-los a {file} (config.yaml ja no es llegeix a la 8.0.0)',
+        '{key} llegits de config.yaml: obsolet, mou-los a un fitxer propi, {file} per exemple (config.yaml ja no es llegeix a la 8.0.0)',
       configNotRead:
         "{file} no es llegeix ({reason}): s'utilitzen els {key} llegits d'aquest fitxer per última vegada, si no els de la configuració base, fins que es corregeixi a git",
       configRolesNotRead:

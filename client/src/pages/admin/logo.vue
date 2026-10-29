@@ -166,7 +166,7 @@ onMounted(async () => {
       </template>
       <template #default>
         <AppSeedNotice v-if="seeded('logo')" />
-        <!-- kept in a repository's logo.yaml, the image beside it : which one -->
+        <!-- kept under logo: in a repository's file, the image it names : which one, and the file -->
         <AppRepositorySource type="logo" />
         <div class="row">
           <div class="col-md-6">

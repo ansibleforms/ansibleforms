@@ -293,7 +293,7 @@ const { search, searching, matches, matchingKeys, shownTabs, tabShown, searchHea
 // each tab's fields : [key, label, help], only those it shows (as the template's v-if)
 const tabFields = computed(() => ({
   details: [
-    // one listed in a repositories repository's repositories.yaml : where it comes from
+    // one listed in a repositories repository's repositories: entries : where it comes from
     ...repositorySourceFields(t, repo.value),
     ['pull', t('settings.fields.pull')],
     ['push', t('settings.fields.push')],
@@ -483,7 +483,7 @@ onMounted(async () => {
                 <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
               </h6>
             </template>
-            <!-- listed in a repositories repository's repositories.yaml : which one -->
+            <!-- listed in a repositories repository's repositories: entries : which one -->
             <AppRepositorySource v-show="fieldShown('source')" :record="repo" />
             <!-- its roles, categories or constants read from config.yaml : deprecated, a line each -->
             <div v-for="d in repo.deprecations || []" :key="d.key" class="alert alert-warning py-2">

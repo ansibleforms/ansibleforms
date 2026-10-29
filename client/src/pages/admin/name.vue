@@ -90,7 +90,7 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="1" />
         <template v-else>
-          <!-- kept in a repository's name.yaml : which one -->
+          <!-- kept under name: in a repository's file : which one, and the file -->
           <AppRepositorySource type="name" />
           <AppSeedNotice v-if="seeded('app_name')" />
           <fieldset :disabled="seeded('app_name')">

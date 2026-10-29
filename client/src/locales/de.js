@@ -1341,31 +1341,37 @@ export default {
         playbooks: 'Ansible-Playbooks, die die Formulare ausführen (nur ein Repository)',
         workflows: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
         inventories: 'Ein Inventar: inventory.yaml, group_vars und host_vars in seiner Wurzel',
-        schedules: 'Zeitpläne in YAML, einer pro Datei im Ordner schedules',
-        sso: 'SSO-Anbieter in YAML, je eine Datei in seinem Ordner sso, die ihre Anmeldedaten benennen',
-        ldap: 'LDAP-Verzeichnisse in YAML, je eine Datei in seinem Ordner ldap, in ihrer Suchreihenfolge',
-        disclaimer: 'Versionen des Haftungsausschlusses in YAML, je eine Datei in seinem Ordner disclaimer',
+        schedules: 'Zeitpläne, Einträge einer Liste schedules: in einer seiner YAML-Dateien',
+        sso: 'SSO-Anbieter, Einträge einer Liste sso: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        ldap: 'LDAP-Verzeichnisse, Einträge einer Liste ldap: in einer seiner YAML-Dateien, in ihrer Suchreihenfolge',
+        disclaimer: 'Versionen des Haftungsausschlusses, Einträge einer Liste disclaimer: in einer seiner YAML-Dateien',
         credentials:
-          'Anmeldedaten in YAML, je eine Datei in seinem Ordner credentials, Geheimnisse nur als Umgebungsverweise',
+          'Anmeldedaten, Einträge einer Liste credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
         secret_stores:
-          'Secret Stores in YAML, je eine Datei in seinem Ordner secret-stores, die ihre Anmeldedaten benennen',
-        runners: 'Runner in YAML, je eine Datei in seinem Ordner runners, die ihre Anmeldedaten benennen',
-        notifications: 'Benachrichtigungen in YAML, je eine Datei in seinem Ordner notifications',
-        syslog: 'Syslog-Server in YAML, je eine Datei in seinem Ordner syslog',
-        chat_assistant: 'Der Chat-Assistent in seiner chat-assistant.yaml, der Schlüssel nur als Umgebungsverweis',
-        mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, in seiner mcp.yaml',
-        defaults: 'Design, Farbe, Formularansicht, Zeitzone, Datumsformat und Sprache, in seiner defaults.yaml',
-        logo: 'Das Logo, benannt in seiner logo.yaml, das Bild daneben',
-        icon: 'Das Website-Symbol, benannt in seiner icon.yaml, das Bild daneben',
-        name: 'Der Name der App, in seiner name.yaml',
-        links: 'Die Links der Kopfzeile und der Link zum Designer, in seiner links.yaml',
-        labels: 'Die Labels neben dem Logo in YAML, je eine Datei in seinem Ordner labels, in ihrer Reihenfolge',
-        announcements: 'Ankündigungen in YAML, je eine Datei in seinem Ordner announcements',
-        general: 'Die Einstellungen unter Allgemein nach ihrem Umgebungsnamen, in seiner general.yaml',
-        roles: 'Die Rollen, in seiner roles.yaml (config.yaml wird noch gelesen, veraltet)',
-        categories: 'Die Kategorien, in seiner categories.yaml (config.yaml wird noch gelesen, veraltet)',
-        constants: 'Die Konstanten, in seiner constants.yaml (config.yaml wird noch gelesen, veraltet)',
-        repositories: 'Die anderen Repositories, in seiner repositories.yaml',
+          'Secret Stores, Einträge einer Liste secret_stores: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        runners: 'Runner, Einträge einer Liste runners: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        notifications: 'Benachrichtigungen, Einträge einer Liste notifications: in einer seiner YAML-Dateien',
+        syslog: 'Syslog-Server, Einträge einer Liste syslog: in einer seiner YAML-Dateien',
+        chat_assistant:
+          'Der Chat-Assistent, unter chat_assistant: in einer seiner YAML-Dateien, der Schlüssel nur als Umgebungsverweis',
+        mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, unter mcp: in einer seiner YAML-Dateien',
+        defaults:
+          'Design, Farbe, Formularansicht, Zeitzone, Datumsformat und Sprache, unter defaults: in einer seiner YAML-Dateien',
+        logo: 'Das Logo, unter logo: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        icon: 'Das Website-Symbol, unter icon: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        name: 'Der Name der App, unter name: in einer seiner YAML-Dateien',
+        links: 'Die Links der Kopfzeile und der Link zum Designer, unter links: in einer seiner YAML-Dateien',
+        labels:
+          'Die Labels neben dem Logo, Einträge einer Liste labels: in einer seiner YAML-Dateien, in ihrer Reihenfolge',
+        announcements: 'Ankündigungen, Einträge einer Liste announcements: in einer seiner YAML-Dateien',
+        general:
+          'Die Einstellungen unter Allgemein nach ihrem Umgebungsnamen, unter general: in einer seiner YAML-Dateien',
+        roles: 'Die Rollen, unter roles: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        categories:
+          'Die Kategorien, unter categories: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        constants:
+          'Die Konstanten, unter constants: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        repositories: 'Die anderen Repositories, Einträge einer Liste repositories: in einer seiner YAML-Dateien',
       },
       usageOnTitle: '{type} einschalten',
       usageOnQuestion: '{name} für {type} verwenden?',
@@ -1378,10 +1384,8 @@ export default {
       usageChangeButton: 'Verwendung speichern',
       usageOnHeading: '{type}: eingeschaltet',
       usageOffHeading: '{type}: ausgeschaltet',
-      usageOnWritten:
-        '{type} dieser App, die nach {name} geschrieben werden, je eine YAML-Datei in seinem Ordner {folder}: {count}.',
-      usageOnWrittenFile: '{type} dieser App als {file} nach {name} geschrieben, wartet auf Push.',
-      usageOnWrittenList: '{type} dieser App nach {name} geschrieben, in seine {file}: {count}.',
+      usageOnWrittenFile: '{type} dieser App nach {name} in {file} geschrieben, wartet auf Push.',
+      usageOnWrittenList: '{type} dieser App nach {name} geschrieben, in {file}: {count}.',
       usageOnReadFile: '{name} hat bereits {file}: die Version in git gewinnt und ersetzt {type} dieser App.',
       usageOnGitWins:
         'Steht derselbe Name in git und in dieser App, gewinnt die Version in git und ersetzt die der App.',
@@ -1389,12 +1393,12 @@ export default {
       usageOnKept: 'Diese bleiben in dieser App: {names}.',
       usageOnWithoutSecret:
         'Ohne ihre Geheimnisse geschrieben, die in der Datenbank bleiben (git enthält nie ein Geheimnis im Klartext): {names}.',
-      usageOnAppOnly: 'Nur in der App behalten, kein Feld der Zeitplandatei gibt sie wieder: {names}.',
+      usageOnAppOnly: 'Nur in der App behalten, kein Feld des Zeitplaneintrags gibt sie wieder: {names}.',
       usageOnSkipped: 'In git bereits beendet, nicht importiert: {count}.',
       formDuplicate:
         "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",
       configDeprecated:
-        '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie nach {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
+        '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie in eine eigene Datei, zum Beispiel {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
       configNotRead:
         '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen {key}, sonst die der Basiskonfiguration, werden verwendet, bis die Datei in git korrigiert ist',
       configRolesNotRead:
