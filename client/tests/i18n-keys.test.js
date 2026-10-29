@@ -137,3 +137,63 @@ describe('keys built by concatenation are covered too', () => {
     expect(gaps).toEqual([]);
   });
 });
+
+// The Run later, schedule and store panels of the form page are seen by every user who runs a
+// form, so their words must go through t(). A literal sentence in the template stays English
+// whatever the user picked (it shipped that way: "Select the date and time to run this job
+// once" under the Run later picker).
+describe('the form page panels carry no hard-coded English', () => {
+  const src = readFileSync(path.join(root, 'src/pages/form.vue'), 'utf8');
+  // only the template is rendered text; comments are not shown to the user, so each one is cut
+  // out from its opening to its closing mark (an unclosed one, to the end)
+  const withoutComments = (text) => {
+    let out = '';
+    let at = 0;
+    for (;;) {
+      const open = text.indexOf('<!--', at);
+      if (open < 0) return out + text.slice(at);
+      out += text.slice(at, open);
+      const close = text.indexOf('-->', open + 4);
+      if (close < 0) return out;
+      at = close + 3;
+    }
+  };
+  const template = withoutComments(src.slice(src.indexOf('<template>'), src.lastIndexOf('</template>')));
+  // the panels, from the schedule off-canvas to the end of the store off-canvas
+  const start = template.indexOf(':show="showScheduleOffcanvas"');
+  const end = template.indexOf('</BsOffCanvas>', template.indexOf(':show="showStoreOffcanvas"'));
+  const panels = template.slice(start, end);
+
+  it('found both panels, so this is not vacuous', () => {
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    expect(panels).toContain("t('form.runAt')");
+  });
+
+  it('has no literal word between tags', () => {
+    const literals = [];
+    for (const m of panels.matchAll(/>([^<>]*)</g)) {
+      // drop the interpolations; what remains is text written straight into the page
+      const text = m[1].replace(/\{\{[\s\S]*?\}\}/g, '').trim();
+      if (/[A-Za-z]{2,}/.test(text)) literals.push(text);
+    }
+    expect(literals).toEqual([]);
+  });
+
+  it('has no literal placeholder', () => {
+    // a bound :placeholder is fine, a static one with words in it is English for everybody
+    const literals = [...panels.matchAll(/\splaceholder="([^"]*)"/g)]
+      .map((m) => m[1])
+      .filter((v) => /[A-Za-z]{2,}/.test(v));
+    expect(literals).toEqual([]);
+  });
+
+  it('and its bound placeholders are no English strings either', () => {
+    const literals = [...panels.matchAll(/:placeholder="([^"]*)"/g)]
+      .map((m) => m[1])
+      // what t() translates is fine; a quoted sentence or name left over is not
+      .map((v) => v.replace(/\bt\(\s*'[^']*'\s*\)/g, ''))
+      .filter((v) => /'[^']*\s[^']*'|'[A-Z][a-z]/.test(v));
+    expect(literals).toEqual([]);
+  });
+});
