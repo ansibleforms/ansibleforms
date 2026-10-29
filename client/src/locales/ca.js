@@ -1342,7 +1342,7 @@ export default {
       lastPushOutput: "Sortida de l'últim push",
       showPullOutput: "Mostra la sortida de l'últim pull",
       showPushOutput: "Mostra la sortida de l'últim push",
-      notFound: "No hi ha cap repositori anomenat '{name}'.",
+      notFound: "No hi ha cap repositori amb l'id '{id}'.",
       ownUser: 'Encara té el seu propi usuari ({user}): trieu una credencial per substituir-lo.',
       pull: 'Pull',
       pullAll: 'Pull de tots',

@@ -1330,7 +1330,7 @@ export default {
       lastPushOutput: '前回のプッシュの出力',
       showPullOutput: '前回のプルの出力を表示',
       showPushOutput: '前回のプッシュの出力を表示',
-      notFound: "'{name}' という名前のリポジトリはありません。",
+      notFound: "ID '{id}' のリポジトリはありません。",
       ownUser: 'まだ独自のユーザー ({user}) があります：置き換える資格情報を選択してください。',
       pull: 'プル',
       pullAll: 'すべてプル',

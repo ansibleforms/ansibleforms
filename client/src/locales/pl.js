@@ -1335,7 +1335,7 @@ export default {
       lastPushOutput: 'Wynik ostatniego push',
       showPullOutput: 'Pokaż wynik ostatniego pull',
       showPushOutput: 'Pokaż wynik ostatniego push',
-      notFound: "Nie ma repozytorium o nazwie '{name}'.",
+      notFound: "Nie ma repozytorium o id '{id}'.",
       ownUser: 'Ma jeszcze własnego użytkownika ({user}): wybierz poświadczenie, aby go zastąpić.',
       pull: 'Pull',
       pullAll: 'Pull wszystkich',

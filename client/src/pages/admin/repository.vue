@@ -235,12 +235,6 @@ function takenBy(usage) {
 }
 
 /**
- * Loads the repository, the others (for the one-only usages) and the credentials.
- *
- * Args:
- *   keepEdits (boolean): keep what is being edited (a status refresh while running).
- */
-/**
  * Reads the name of the repository the address numbers, from the repositories list.
  *
  * Returns:
@@ -253,9 +247,24 @@ async function resolveName() {
   repoName.value = records.find((r) => String(r.id) === repoId.value)?.name || '';
 }
 
+/**
+ * Loads the repository, the others (for the one-only usages) and the credentials.
+ *
+ * Args:
+ *   keepEdits (boolean): keep what is being edited (a status refresh while running).
+ */
 async function load(keepEdits = false) {
   const auth = TokenStorage.getAuthentication();
   if (!repoName.value) await resolveName();
+  // no repository has the number in the address : the page says so, as every record's page does.
+  // It never asks for an empty name, the repositories' list's own address, whose first record it
+  // would then show (and save, delete, pull or push) in this one's place.
+  if (!repoName.value) {
+    repo.value = null;
+    edit.value = null;
+    loaded.value = true;
+    return;
+  }
   try {
     const res = await axios.get(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, auth);
     const record = res.data.records ? res.data.records[0] : res.data;
@@ -494,7 +503,7 @@ onMounted(async () => {
       <template #default>
         <div v-if="loaded && !repo" class="empty-state">
           <FaIcon icon="fab,git" class="empty-state-icon" />
-          <span>{{ t('settings.repositories.notFound', { name: repoName || '#' + repoId }) }}</span>
+          <span>{{ t('settings.repositories.notFound', { id: repoId }) }}</span>
         </div>
         <!-- the record loading : its fields as grey placeholders, where they come -->
         <AppSkeleton v-else-if="!loaded && !repo" shape="form" :count="3" />

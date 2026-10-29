@@ -1297,7 +1297,7 @@ export default {
       lastPushOutput: '上次推送的输出',
       showPullOutput: '显示上次拉取的输出',
       showPushOutput: '显示上次推送的输出',
-      notFound: "没有名为 '{name}' 的仓库。",
+      notFound: "没有 ID 为 '{id}' 的仓库。",
       ownUser: '它仍有自己的用户 ({user})：请选择一个凭据来替换它。',
       pull: '拉取',
       pullAll: '全部拉取',
