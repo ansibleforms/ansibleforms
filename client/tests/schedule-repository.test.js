@@ -292,3 +292,27 @@ describe('a rrule is checked on its text', () => {
     expect(zoneOf('DTSTART:20261020T020000Z RRULE:FREQ=DAILY;INTERVAL=1')).toBe('UTC');
   });
 });
+
+describe('a refused rrule in the New schedule dialog', () => {
+  it('says why once : under the editor (BsRrule), not again among the dialog errors', () => {
+    const value = 'DTSTART;TZID=UTC:20261020T020000 RRULE:FREQ=DAILY';
+    // the field's validator : the message the editor shows under its box, the same reason
+    const reason = rruleProblem(value);
+    expect(reason).not.toBe('');
+    expect(field('schedules', 'rrule').validator(value)).toBe(
+      `settings.schedules.rruleInvalid ${JSON.stringify({ reason })}`,
+    );
+    const editor = readFileSync(join(import.meta.dirname, '../src/components/BsRrule.vue'), 'utf8');
+    expect(editor).toContain('const textProblem = computed(() => rruleProblem(props.modelValue));');
+    expect(editor).toMatch(
+      /<small v-if="problem" class="text-danger[^"]*">\{\{\s*t\('settings\.schedules\.rruleInvalid', \{ reason: problem \}\)/,
+    );
+    // the dialog (AppAdminMulti, its rrule field) lists the other errors only : not that validator's
+    const multi = readFileSync(join(import.meta.dirname, '../src/components/AppAdminMulti.vue'), 'utf8');
+    const block = multi.slice(multi.indexOf('<!-- RRULE FIELD'), multi.indexOf('<!-- USAGE FIELD'));
+    expect(block).toContain('<BsRrule');
+    expect(block.match(/v-for="error in [^"]+"/g)).toEqual([
+      `v-for="error in $v.item[field.key].$errors.filter((e) => e.$validator !== 'custom')"`,
+    ]);
+  });
+});

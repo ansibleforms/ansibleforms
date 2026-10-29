@@ -1943,8 +1943,13 @@ defineExpose({
               :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
             />
             <small v-if="field.help" class="form-text text-muted d-block mt-1">{{ textOf(field.help) }}</small>
+            <!-- why it is refused, BsRrule says under its box : here only the other errors (required),
+                 not the validator's same reason a second time -->
             <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
-              <div v-for="error in $v.item[field.key].$errors" :key="error.$uid">
+              <div
+                v-for="error in $v.item[field.key].$errors.filter((e) => e.$validator !== 'custom')"
+                :key="error.$uid"
+              >
                 {{ error.$message }}
               </div>
             </div>
