@@ -6754,7 +6754,9 @@
       an edit) is written without its secrets, which stay in the database; the pull output lists the objects whose
       secrets come from the database. A secret typed in the app for an object whose entry gives that secret as an
       `${ENV}` reference is refused (409), nothing saved: the next pull would put the variable's value back, so
-      change the variable, or the entry in git.
+      change the variable, or the entry in git. An object whose entry is no longer in git (removed, or renamed there
+      while the rename is refused) is never written back as a second entry: an edit of a field its entry would
+      hold is refused the same way, until it is fixed in git.
 
       **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the entries are read
       in, each found by its name: a new name makes an object, a changed entry changes it, a removed one removes it.

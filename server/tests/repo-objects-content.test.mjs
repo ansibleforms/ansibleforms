@@ -238,6 +238,26 @@ describe("an object is its name within its type", () => {
     assert.doesNotMatch(RepoObjects.summaryText(credentials, summary), /Renamed/);
   });
 
+  test("an app edit of an object whose rename git refused : refused, never a second entry beside the renamed one", async () => {
+    const { default: Credential } = await import("../src/models/credential.model.v2.js");
+    write("ops", "creds.yaml", { controller_credentials: [{ name: "git", credential_type: "git", user: "bot", password: "${GIT_PW}" }] });
+    await sync(credentials);
+    // a runner still uses 'git' : its rename in git is refused, the object kept as 'git'
+    fx.state.tables.runners.push({ id: 50, name: "rte1", type: "rte", credential: "git", repository: null, repo_file: null });
+    write("ops", "creds.yaml", { controller_credentials: [{ name: "github", credential_type: "git", user: "bot", password: "${GIT_PW}" }] });
+    const summary = await sync(credentials);
+    assert.match(summary.refused[0].reasons[0], /it renames 'git' to 'github'/);
+    const text = fx.textOf("ops", "creds.yaml");
+    const before = { ...fx.rowNamed("credentials", "git") };
+    await assert.rejects(Credential.update({ description: "edited" }, before.id), (e) => e.status === 409 && /no entry in repository 'ops' any more/.test(e.message));
+    assert.equal(fx.rowNamed("credentials", "git").description, before.description);
+    // the write itself never appends it
+    fx.rowNamed("credentials", "git").description = "edited";
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appUpdated("credentials", before, before.id), false);
+    assert.equal(fx.textOf("ops", "creds.yaml"), text);
+  });
+
   test("two names gone and two new in a file, or a name gone from one file and new in another : deleted and made anew", async () => {
     write("ops", "x.yaml", { controller_credentials: [git("a"), git("b")] });
     write("ops", "y.yaml", { controller_credentials: [git("c")] });

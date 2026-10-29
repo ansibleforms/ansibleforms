@@ -344,33 +344,48 @@ export async function assertLinkedReadable(before) {
 }
 
 /**
- * Refuses a secret typed in the app for an object of a repository whose entry gives that secret as
- * an ${ENV} reference : the app never writes a secret to git, and the next pull would put the
- * variable's value back, the one typed lost without a word. A secret left as it is (the mask sent
- * back, nothing, the same value) is no change.
+ * Refuses an edit in the app of an object of a repository that git would undo, before anything is
+ * written : a secret typed for an object whose entry gives that secret as an ${ENV} reference (the
+ * app never writes a secret to git, the next pull would put the variable's value back), or a field
+ * its entry holds changed while no file of its repository has its entry any more (removed or
+ * renamed in git, the rename refused : written back, it would be a second entry beside the renamed
+ * one, a second object on the next pull). A secret left as it is (the mask sent back, nothing, the
+ * same value) is no change ; a field its entry does not hold (a repository's status) is never
+ * refused.
  *
  * Args:
- *   model (string): the crud model saving (credential, runner ...).
+ *   model (string): the crud model saving (credential, runner, label ...).
  *   id (number|string): the object.
  *   data (object): the fields the save writes.
  *
  * Raises:
- *   Errors.ConflictError: such a secret, the variable its entry names said.
+ *   Errors.ConflictError: such an edit, why said.
  */
-export async function assertSecretsEditable(model, id, data) {
+export async function assertAppEdit(model, id, data) {
   if (!data || typeof data !== "object") return;
   for (const key of BUILT_OBJECT_TYPES) {
     const desc = await descriptorOf(key);
-    if (desc.single || desc.model !== model || !desc.secrets?.length) continue;
-    const typed = desc.secrets.filter((s) => given(data[s]) && !isMasked(data[s]));
-    if (!typed.length) return;
-    const row = await desc.store.byId(id).catch(() => null);
-    if (!row?.repository || !row.repo_file) return;
-    const entry = declaredOf(desc, row) || {};
-    const fromEnv = typed.filter((s) => String(data[s]) !== String(row[s] ?? "") && typeof entry[s] === "string" && /\$\{[^}]+\}/.test(entry[s]));
+    if (desc.single || desc.model !== model) continue;
+    if (typeof desc.store.byId !== "function") return;
+    const row = await Promise.resolve()
+      .then(() => desc.store.byId(id))
+      .catch(() => null);
+    if (!row?.repository || !row.repo_file || !cloned(row.repository)) return;
+    const entry = declaredOf(desc, row);
+    // a secret its entry takes from the environment
+    const typed = (desc.secrets || []).filter((s) => given(data[s]) && !isMasked(data[s]) && String(data[s]) !== String(row[s] ?? ""));
+    const fromEnv = typed.filter((s) => typeof entry?.[s] === "string" && /\$\{[^}]+\}/.test(entry[s]));
     if (fromEnv.length) {
       const refs = fromEnv.map((s) => `${s}: ${entry[s]}`).join(", ");
       throw new Errors.ConflictError(`The ${fromEnv.join(" and ")} of ${desc.noun} '${row.name}' comes from the environment variable its entry in ${row.repository}/${row.repo_file} names (${refs}): change it there, not in the app - nothing was saved`);
+    }
+    // no entry of its name in git any more : a field its entry would hold changed is refused
+    if (!entry) {
+      // its entry as the app would write it, before and after the edit
+      const entryOf = async (r) => desc.entryOf(await desc.candidateOf({ ...r, repository: null })) || {};
+      if (canonicalJson(await entryOf(row)) !== canonicalJson(await entryOf({ ...row, ...data }))) {
+        throw new Errors.ConflictError(`The ${desc.noun} '${row.name}' has no entry in repository '${row.repository}' any more (removed or renamed in git, see its pull output): change it in git - nothing was saved`);
+      }
     }
     return;
   }
@@ -2206,8 +2221,8 @@ export async function appCreated(desc, id) {
  * An object of a repository edited in the app : only the fields the edit changed written into its
  * entry, where it is now (descriptor.entryEdits : the object before and after it), the rest of it -
  * the keys the app does not use, its ${ENV} references, its comments, the file's other keys and
- * entries - kept ; an entry no file holds any more written again, whole, in the file it is linked
- * to. Its secrets are never written.
+ * entries - kept ; an entry no file holds any more (removed, or renamed in git) is never written
+ * again. Its secrets are never written.
  *
  * Args:
  *   desc (object): the type's descriptor.
@@ -2229,8 +2244,9 @@ export async function appUpdated(desc, before, id) {
   if (!at.repository || !at.repo_file) return false;
   return withWriteClaim(at.repository, async () => {
     const edits = desc.entryEdits(row, before);
-    const whole = desc.entryOf(await desc.candidateOf({ ...row, repository: null }));
-    const file = editEntry(desc, at.repository, before.name, at.repo_file, (doc, map) => applyEdits(doc, map, edits, desc.keyOrder || []), whole);
+    // its entry where it is now ; one no file holds any more (removed, or renamed in git) is never
+    // written again beside the renamed one (the save is refused before : assertAppEdit)
+    const file = editEntry(desc, at.repository, before.name, at.repo_file, (doc, map) => applyEdits(doc, map, edits, desc.keyOrder || []));
     if (!file) return false;
     // found in another file than the one it was linked to : linked to it
     if (file !== at.repo_file) await desc.store.link(row.id, at.repository, file);
@@ -2749,7 +2765,7 @@ export default {
   targetFileOf,
   assertTypeReadable,
   assertLinkedReadable,
-  assertSecretsEditable,
+  assertAppEdit,
   filesNow,
   writeEntries,
   entryFileOf,

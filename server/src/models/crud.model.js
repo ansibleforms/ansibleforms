@@ -294,12 +294,6 @@ class CrudModel {
     // data = await this.preProcess(modelName, data, 'update');
     this.stripManaged(data, opts);
     this.stripRepoLink(modelName, data, opts);
-    // a secret typed in the app that its repository entry gives as an ${ENV} reference : refused
-    // before anything is written, the next pull would put the variable's value back
-    if (!opts.fromRepo && !opts.fromSeed && !opts.fromRte) {
-      const { assertSecretsEditable } = await import('../lib/repoObjects/engine.js');
-      await assertSecretsEditable(modelName, id, data);
-    }
     const config = this.getConfig(modelName);
     const cache = this.getCache(modelName);
     const key = config.fields.find(f => f.isKey)?.name || 'id';
@@ -308,6 +302,12 @@ class CrudModel {
     this.assertValidCronFields(modelName, data);
     await this.checkExist(modelName, id);
     if (!opts.fromSeed) await this.assertNotManaged(modelName, id);
+    // an edit of a repository's object git would undo (a secret its entry takes from the
+    // environment, an entry gone or renamed in git) : refused before anything is written
+    if (!opts.fromRepo && !opts.fromSeed && !opts.fromRte) {
+      const { assertAppEdit } = await import('../lib/repoObjects/engine.js');
+      await assertAppEdit(modelName, id, data);
+    }
     const fieldValues = this.getFieldValues(modelName, data, true);
     // nothing it knows to change (unknown keys only, or an empty body) : said, rather than an
     // UPDATE with an empty SET, whose SQL syntax error MySQL would have answered with
