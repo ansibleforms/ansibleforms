@@ -1310,7 +1310,8 @@ async function filesNow(desc, name) {
   if (cloned(name)) {
     const ctx = await desc.previewContext?.();
     // a list file's entries, or each file of the folder ; a list file that cannot be read (a link
-    // that leads outside the repository) is said refused, as its sync refuses it
+    // that leads outside the repository), or a folder (no access, not a folder), is said refused,
+    // as its sync refuses it
     let parsedFiles = [];
     const links = [];
     try {
@@ -1324,7 +1325,7 @@ async function filesNow(desc, name) {
             }
           });
     } catch (e) {
-      refused.push({ file: desc.listFile, reasons: [e.message || String(e)] });
+      refused.push({ file: desc.listFile || desc.folder, reasons: [e.message || String(e)] });
     }
     // a file that is a link leading outside, or a folder : refused, as its sync refuses it
     refused.push(...links.map((l) => ({ file: l.file, reasons: [l.reason] })));

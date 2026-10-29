@@ -154,6 +154,30 @@ describe("a pull reads the credentials folder", () => {
     assert.equal(fx.rowNamed("credentials", "b").repository, "creds");
     assert.match(summary.refused[0].reasons[0], /its file is gone, but runner 'rte1' still uses 'b'/);
   });
+
+  test("a folder that cannot be read (no access, not a folder) : the sync refused, said, nothing deleted", async () => {
+    fx.writeFile("creds", "credentials", "a.yaml", gitCredential("a"));
+    await RepoObjects.syncRepository(credentials, "creds");
+    const dir = path.join(fx.ROOT, "creds", "credentials");
+    fs.chmodSync(dir, 0o000);
+    let out;
+    try {
+      out = await RepoObjects.syncText(credentials, "creds");
+    } finally {
+      fs.chmodSync(dir, 0o755);
+    }
+    assert.match(out, /Credentials not synchronized: the credentials folder cannot be read: EACCES/);
+    assert.equal(fx.rowNamed("credentials", "a").repository, "creds");
+    // a file where the folder is
+    fs.rmSync(dir, { recursive: true });
+    fs.writeFileSync(dir, "not a folder");
+    assert.match(await RepoObjects.syncText(credentials, "creds"), /the credentials folder cannot be read: ENOTDIR/);
+    assert.ok(fx.rowNamed("credentials", "a"));
+    assert.match(JSON.stringify((await RepoObjects.preview(credentials, "creds")).refused), /credentials folder cannot be read: ENOTDIR/);
+    // no folder at all : no files, the credential goes
+    fs.rmSync(dir);
+    assert.equal((await RepoObjects.syncRepository(credentials, "creds")).deleted, 1);
+  });
 });
 
 describe("the value a new row gets, as information_schema says it", () => {

@@ -408,15 +408,22 @@ export function fileNameFor(name, taken = () => false, fallback = "object") {
  *   refused (object[]|null): filled with each entry of that name left out : { file, reason }.
  *
  * Returns:
- *   string[]: the files, relative to the repository (credentials/git.yaml).
+ *   string[]: the files, relative to the repository (credentials/git.yaml) ; none when the folder
+ *     is not there.
+ *
+ * Raises:
+ *   Error: a folder that is there but cannot be read (no access, not a folder) : never taken for
+ *     an empty one, whose sync would delete every object of the type.
  */
 export function filesIn(repoDir, folder, pattern = YAML_FILE, refused = null) {
   const dir = path.join(repoDir, folder);
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (e) {
+    // no folder : no files ; any other failure is no answer
+    if (e.code === "ENOENT") return [];
+    throw new Error(`the ${folder} folder cannot be read: ${e.code || e.message}`, { cause: e });
   }
   const files = [];
   for (const entry of entries) {
