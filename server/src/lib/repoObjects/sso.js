@@ -20,6 +20,10 @@ export default seedType({
   noun: "SSO provider",
   secrets: ["client_secret"],
   references: [{ field: "credential", type: "credentials" }],
-  // one provider of a type used for sign-in
-  oneOnly: [{ field: "enable", label: "used for sign-in", by: "provider" }],
+  // one provider of a type used for sign-in ; one provider of all the login page skips to (the
+  // model turns it off on every other provider on save, whatever their type)
+  oneOnly: [
+    { field: "enable", label: "used for sign-in", by: "provider" },
+    { field: "auto_login", label: "the provider the login page skips to" },
+  ],
 });

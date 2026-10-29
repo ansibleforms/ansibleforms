@@ -438,6 +438,12 @@ describe("a change in the app that changes other objects of the type too", () =>
   });
 });
 
+// an SSO provider of its own type by its name : b an Entra ID one, the others OpenID Connect
+const SSO_OF = (name) =>
+  name === "b"
+    ? { name, provider: "azuread", issuer: "https://idp", tenant_id: "contoso.com", client_id: "id" }
+    : { name, provider: "oidc", issuer: "https://idp", client_id: "id" };
+
 describe("a flag one object at most has, that two files give", () => {
   // the object holding it in the app, the other one ; each file says it : the pull applies it from
   // neither, said, and the next pull changes nothing (it flipped on every pull before)
@@ -468,6 +474,16 @@ describe("a flag one object at most has, that two files give", () => {
       field: "enable",
       row: (id, name, on) => ({ id, name, provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "enc:s", enable: on, managed: 0 }),
       file: (name) => ({ name, provider: "oidc", issuer: "https://idp", client_id: "id", enable: true }),
+    },
+    {
+      // one of all the providers, whatever their type (the model turns it off on every other one)
+      what: "the provider the login page skips to",
+      key: "sso",
+      folder: "sso",
+      table: "oauth2_providers",
+      field: "auto_login",
+      row: (id, name, on) => ({ ...SSO_OF(name), id, client_secret: "enc:s", enable: 0, auto_login: on, managed: 0 }),
+      file: (name) => ({ ...SSO_OF(name), enable: false, auto_login: true }),
     },
   ];
 
