@@ -18,6 +18,7 @@
 // A link is followed only while it stays in the repository : one that leads outside (or nowhere)
 // is never read, said refused ; a folder reached twice (a link back up the tree) is walked once.
 import fs from "fs";
+import crypto from "crypto";
 import path from "path";
 import YAML from "yaml";
 import { CONTENT_KEYS } from "./types.js";
@@ -30,14 +31,19 @@ import { YAML_FILE } from "./yamlFile.js";
 // how deep a walk goes below the repository's root
 const MAX_DEPTH = 24;
 
-// the files parsed, by their absolute path, with the text they were parsed from : parsed again only
-// when their text changed
+// the files read, by their absolute path, with the digest of the text they were read from : parsed
+// again only when their text changed
 const MAX_CACHED = 20000;
 const parsed = new Map();
 
 // a line of a file that may give a type's key : the key at the start of the line (quoted or not),
-// then a colon - a file without one is no type's, never parsed here
-const KEY_LINE = new RegExp(`^["']?(${CONTENT_KEYS.join("|")})["']?[ \\t]*:`, "gm");
+// then a colon and nothing on the line (a list or a map below it), or a flow list or map, an anchor,
+// a tag, an alias - never a text (a vars file's name: web) ; a file without one is no type's,
+// never parsed here
+const KEY_LINE = new RegExp(`^["']?(${CONTENT_KEYS.join("|")})["']?[ \\t]*:[ \\t]*(?:[[{&!*#]|\\r?$)`, "gm");
+
+// a form's line : its type (a form that cannot be read is the forms load's to say, never a type's)
+const FORM_LINE = /^["']?type["']?[ \t]*:/m;
 
 // a file written as one flow map ({ credentials: [...] }) : parsed too
 const FLOW_START = /^(?:\s*(?:#[^\n]*)?\n)*\s*(?:---\s*\n\s*)?\{/;
@@ -77,6 +83,8 @@ function hintedKeys(text) {
 export function contentOf(text) {
   const none = { keys: [], data: {}, errors: [], hints: [] };
   const source = String(text ?? "");
+  // a form (its type at its top level) : none, never parsed here
+  if (FORM_LINE.test(source)) return none;
   const hints = hintedKeys(source);
   if (!hints.length && !FLOW_START.test(source)) return none;
   const doc = YAML.parseDocument(source, { prettyErrors: false });
@@ -103,7 +111,8 @@ export function contentOf(text) {
 
 /**
  * A file's content (contentOf) : its text read, parsed again only when it is not the text last
- * parsed for that path (a text that may give no type's key is never parsed).
+ * parsed for that path (its digest compared ; a text that may give no type's key, or a form's, is
+ * never parsed).
  *
  * Args:
  *   abs (string): the file.
@@ -118,14 +127,12 @@ function fileContent(abs) {
   } catch (e) {
     return { keys: [], data: {}, errors: [`cannot be read: ${e.code || e.message}`], hints: [] };
   }
+  const hash = crypto.createHash("sha1").update(text).digest("base64");
   const hit = parsed.get(abs);
-  if (hit && hit.text === text) return hit.content;
+  if (hit && hit.hash === hash) return hit.content;
   const content = contentOf(text);
-  // only what was parsed is kept : a text giving no key is told apart without parsing
-  if (content.keys.length || content.errors.length) {
-    if (parsed.size >= MAX_CACHED) parsed.delete(parsed.keys().next().value);
-    parsed.set(abs, { text, content });
-  } else parsed.delete(abs);
+  if (parsed.size >= MAX_CACHED) parsed.delete(parsed.keys().next().value);
+  parsed.set(abs, { hash, content });
   return content;
 }
 

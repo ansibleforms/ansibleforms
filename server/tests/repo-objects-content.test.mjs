@@ -84,6 +84,10 @@ describe("any YAML file, any name, any folder, any depth", () => {
     // a flow map is read too ; a text that cannot be read says the keys its lines seem to give
     assert.deepEqual(contentOf("{credentials: [{name: a}]}\n").keys, ["credentials"]);
     assert.deepEqual(contentOf("credentials:\n  - name: [broken\n").hints, ["credentials"]);
+    // a file of CRLF lines the same ; a broken vars file or form seems to give none
+    assert.deepEqual(contentOf("credentials:\r\n  - name: a\r\n").keys, ["credentials"]);
+    assert.deepEqual(contentOf("name: web\nports: [80\n").hints, []);
+    assert.deepEqual(contentOf("name: Deploy\ntype: ansible\nroles: [\n"), { keys: [], data: {}, errors: [], hints: [] });
   });
 });
 
@@ -124,6 +128,8 @@ describe("several types in one file, a type over several files", () => {
   test("a key of a type the repository does not hold : never read, said once as a hint", async () => {
     write("ops", "a.yaml", { credentials: [git("a")], labels: [{ name: "PROD" }], sso: [] });
     write("ops", "b.yaml", { labels: [{ name: "DEV" }] });
+    // the base configuration a forms repository may serve : never a hint
+    write("ops", "config.yaml", { roles: [{ name: "admin" }] });
     const out = await RepoObjects.afterGit("ops", fx.rowNamed("repositories", "ops"));
     assert.equal(out.match(/Not read, the repository is not used for them/g).length, 1);
     assert.match(out, /\nNot read, the repository is not used for them: labels: \(a\.yaml, b\.yaml\), sso: \(a\.yaml\) - turn the usage on to read them/);

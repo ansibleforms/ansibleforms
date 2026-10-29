@@ -1365,6 +1365,8 @@ function notHeldHint(scan, repo) {
   for (const f of scan.files) {
     for (const key of f.keys) {
       if (flagOn(repo?.[typeOf(key)?.flag])) continue;
+      // config.yaml of before : the base configuration a forms repository may serve, never a hint
+      if (typeOf(key)?.config && f.file === "config.yaml") continue;
       notHeld.set(key, [...(notHeld.get(key) || []), f.file]);
     }
   }
