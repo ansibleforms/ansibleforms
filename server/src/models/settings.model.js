@@ -315,7 +315,22 @@ async function backupConfig(source='active'){
     logger.warning("No config snapshot was written, this change can not be rolled back")
   }
 }
-Settings.importConfig = async function(){
+/**
+ * Loads config.yaml (the repository copy when a use_for_config repository holds it) into the
+ * database, replacing the database copy after a restore point of it.
+ *
+ * Args:
+ *   options (object): optional :
+ *     assertRoles (function): awaited with the roles of the file (null for a ytt template,
+ *       whose roles cannot be read) before anything is written ; it throws to refuse.
+ *
+ * Returns:
+ *   Promise<string>: the message for the user.
+ *
+ * Raises:
+ *   Error: the file is missing, not valid YAML or fails the base schema, or assertRoles refused.
+ */
+Settings.importConfig = async function({ assertRoles } = {}){
   await Settings.assertDesignerNotLocked()
   const configPath = (await Repository.getConfigPath()) || appConfig.configPath
   if(!fs.existsSync(configPath)){
@@ -331,6 +346,8 @@ Settings.importConfig = async function(){
   // config, so the import bricked every form through the UI with no way back but the
   // restore point. A ytt template is skipped: it is not plain YAML until ytt renders it,
   // which is the same reason the visual editors go read-only on one (/^\s*#@/m).
+  // the roles of the file, for assertRoles : null while they cannot be read (a ytt template)
+  let roles = null
   if(!/^\s*#@/m.test(configFile)){
     let parsed
     try{
@@ -347,6 +364,7 @@ Settings.importConfig = async function(){
       roles: parsed?.roles || [],
       constants: parsed?.constants || {}
     })
+    roles = parsed?.roles || []
   }else{
     logger.warning(`${configPath} is a ytt template, importing it without validation`)
   }
@@ -359,6 +377,8 @@ Settings.importConfig = async function(){
   // config_source to 'database' is a supported migration path. A 'database'
   // snapshot is restored back into the database whatever the active source is
   // (see configBackupPathForSource in form.model.js), so that stays safe.
+  // the caller's check of the roles, before the restore point and the write
+  if (assertRoles) await assertRoles(roles)
   await backupConfig('database')
   var settings = await Settings.findFormsYaml()
   settings.forms_yaml = configFile

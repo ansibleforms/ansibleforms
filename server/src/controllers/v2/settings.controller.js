@@ -12,6 +12,8 @@ import yaml from 'yaml';
 import appConfig from '../../../config/app.config.js';
 import { auditConfigChange, configHash as auditConfigHash } from '../../lib/configAudit.js';
 import { readableSettingsFields, writableSettingsFields } from '../../lib/settingsSections.js';
+import { assertAdminRoleUnchanged } from '../../lib/adminGrants.js';
+import Errors from '../../lib/errors.js';
 
 
 // Config edits are exclusive with an active designer session : the designer
@@ -169,9 +171,14 @@ const importConfig = async function(req, res) {
     try {
       // rewrites the DB config from config.yaml : same designer-lock guard as saveConfig
       if (await refuseWhileDesignerLocked(req, res)) return;
-      const message = await Settings.importConfig();
+      // who is an admin is the admin's : the model hands the roles of the file to this check
+      // before it writes, and a non-admin whose file changes the admin role is refused
+      const message = await Settings.importConfig({ assertRoles: (roles) => assertAdminRoleUnchanged(req, roles) });
       res.json(RestResult.single({ message }));
     } catch(err) {
+      if (err instanceof Errors.AccessDeniedError) {
+        return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedImportConfig'), err.message));
+      }
       res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedImportConfig'), Helpers.getError(err)));
     }
 };
@@ -223,6 +230,16 @@ const saveConfig = async function(req, res) {
       Form.assertRequiredRoles({ roles: parsed?.roles });
     } catch(err) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
+    }
+    try {
+      // Settings > Roles saves through here : a user with settings access edits the other
+      // roles, but only an admin changes who the admin role makes an admin
+      await assertAdminRoleUnchanged(req, parsed?.roles || []);
+    } catch(err) {
+      if (err instanceof Errors.AccessDeniedError) {
+        return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), err.message));
+      }
+      return res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
     }
     try {
       // Optimistic concurrency : the client sends back the baseHash getConfig gave
