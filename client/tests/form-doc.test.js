@@ -31,6 +31,7 @@ import {
   placeOf,
   orderFor,
 } from '@/lib/formDoc';
+import { yamlText } from '@/lib/yamlBlock';
 
 const FORM = `# the form
 name: Deploy
@@ -283,5 +284,67 @@ describe("the form's place in the forms list", () => {
     // the place it gets is the place asked for
     for (const place of ['first', 'after:Hello', 'after:Backup', 'after:Deploy'])
       expect(placeOf(orderFor(place, others), 'Me', others), place).toBe(place);
+  });
+});
+
+describe('the lists and maps an edit changes, written one item per line', () => {
+  // the form as people write it short : flow lists and maps
+  const FLOW = `name: Deploy
+type: ansible
+playbook: deploy.yaml
+categories: [Linux, Web]
+roles: [admin, ops]
+tags: [ keep, me ]
+notifications: { onSuccess: [ ops@example.com ] }
+fields: [{ name: user, type: text }]
+`;
+
+  test('flow lists are still read', () => {
+    const doc = parse(FLOW);
+    expect(formList(doc, 'roles')).toEqual(['admin', 'ops']);
+    expect(formList(doc, 'categories')).toEqual(['Linux', 'Web']);
+    expect(readFields(doc).map((r) => r.name)).toEqual(['user']);
+  });
+
+  test('a role added writes the roles one per line, the rest as written', () => {
+    const doc = parse(FLOW);
+    setFormList(doc, 'roles', ['admin', 'ops', 'dev']);
+    const out = yamlText(doc);
+    expect(out).toContain('roles:\n  - admin\n  - ops\n  - dev\n');
+    expect(out).not.toContain('[ admin');
+    // the lists and maps the edit did not touch keep their style
+    expect(out).toContain('categories: [ Linux, Web ]');
+    expect(out).toContain('tags: [ keep, me ]');
+    expect(out).toContain('notifications: { onSuccess: [ ops@example.com ] }');
+    expect(YAML.parse(out).roles).toEqual(['admin', 'ops', 'dev']);
+  });
+
+  test('a category removed writes the categories one per line', () => {
+    const doc = parse(FLOW);
+    setFormList(doc, 'categories', ['Web']);
+    expect(doc.toString()).toContain('categories:\n  - Web\n');
+  });
+
+  test('the same list set again keeps its style', () => {
+    const doc = parse(FLOW);
+    setFormList(doc, 'roles', ['admin', 'ops']);
+    expect(yamlText(doc)).toContain('roles: [ admin, ops ]');
+  });
+
+  test('a setting changed inside a flow map writes it one key per line', () => {
+    const doc = parse(FLOW);
+    setFormIn(doc, 'notifications', 'onFailure', ['ops@example.com']);
+    const out = yamlText(doc);
+    expect(out).toContain('notifications:\n  onSuccess: [ ops@example.com ]\n  onFailure:\n    - ops@example.com\n');
+  });
+
+  test('a field changed in a flow fields list writes the list and the field one item per line', () => {
+    const doc = parse(FLOW);
+    const [user] = readFields(doc);
+    setFieldRequired(user.node, true);
+    const out = yamlText(doc);
+    expect(out).toContain('fields:\n  - name: user\n    type: text\n    required: true\n');
+    addField(doc);
+    expect(YAML.parse(yamlText(doc)).fields).toHaveLength(2);
   });
 });

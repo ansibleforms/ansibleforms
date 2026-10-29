@@ -86,3 +86,13 @@ describe('an inventory edited', () => {
     expect(editSetVar('all:\n  vars:\n    a: ~\n', { path: ['all'] }, 'b', '1')).toContain('a: ~');
   });
 });
+
+describe('an inventory written short', () => {
+  const FLOW = 'all:\n  hosts:\n    web1: { http_port: 8080 }\n    web2: { a: 1 }\n';
+
+  it('writes a map an edit changes one key per line, the rest as written', () => {
+    const out = editSetVar(FLOW, { path: ['all'], host: 'web1' }, 'ansible_user', 'deploy');
+    expect(out).toContain('web1:\n      http_port: 8080\n      ansible_user: deploy\n');
+    expect(out).toContain('web2: { a: 1 }');
+  });
+});

@@ -7,16 +7,20 @@
 /*  name, type, label and required set, fields moved, removed     */
 /*  and added - each edit on the YAML                             */
 /*  document itself, so comments, quoting and every other key of  */
-/*  the form and of its fields stay as they were written.         */
+/*  the form and of its fields stay as they were written. A list  */
+/*  or a map an edit changes or creates is written one item per   */
+/*  line (lib/yamlBlock.js), even when it was written [a, b].     */
 /*                                                                */
 /******************************************************************/
 import YAML from 'yaml';
 import { forbiddenFieldKeys, requiredFieldKeys, forbiddenFormKeys } from '@/config/formFields';
+import { toBlock, putKey, dropKey } from '@/lib/yamlBlock';
 
 /**
  * Sets a key of a map : an existing scalar keeps its node (its quoting, its comment) ;
  * undefined removes the key. An empty placeholder ("") that gets a value loses its quotes,
- * so the value is written plain where YAML allows it.
+ * so the value is written plain where YAML allows it. A key added, replaced or removed
+ * writes the map one key per line.
  *
  * Args:
  *   map (object): the YAML map.
@@ -25,7 +29,7 @@ import { forbiddenFieldKeys, requiredFieldKeys, forbiddenFormKeys } from '@/conf
  */
 export function setKey(map, key, value) {
   if (value === undefined) {
-    map.delete(key);
+    dropKey(map, key);
     return;
   }
   const node = map.get(key, true);
@@ -33,7 +37,7 @@ export function setKey(map, key, value) {
     // the quotes were only there to write an empty string : the YAML picks them anew
     if (node.value === '' && value !== '') node.type = undefined;
     node.value = value;
-  } else map.set(key, value);
+  } else putKey(map, key, value);
 }
 
 /**
@@ -121,10 +125,7 @@ export function setFieldType(node, type) {
   setKey(node, 'type', type);
   const removed = [];
   for (const key of forbiddenFieldKeys[type] || []) {
-    if (node.has(key)) {
-      node.delete(key);
-      removed.push(key);
-    }
+    if (dropKey(node, key)) removed.push(key);
   }
   const sets = requiredFieldKeys[type];
   const needs = sets && !sets.some((set) => set.every((key) => node.has(key))) ? sets : null;
@@ -164,6 +165,7 @@ export function moveField(doc, index, step) {
   if (index < 0 || index >= seq.items.length || to < 0 || to >= seq.items.length) return false;
   hoistComment(seq);
   seq.items.splice(to, 0, seq.items.splice(index, 1)[0]);
+  toBlock(seq);
   return true;
 }
 
@@ -183,6 +185,7 @@ export function removeField(doc, index) {
   if (index < 0 || index >= seq.items.length) return false;
   hoistComment(seq);
   seq.items.splice(index, 1);
+  toBlock(seq);
   return true;
 }
 
@@ -199,8 +202,8 @@ export function removeField(doc, index) {
 export function addField(doc) {
   const state = fieldsState(doc);
   const field = { name: '', type: 'text', label: '' };
-  if (state === 'list') doc.get('fields', true).items.push(doc.createNode(field));
-  else if (state === 'none') doc.set('fields', doc.createNode([field]));
+  if (state === 'list') toBlock(doc.get('fields', true)).items.push(doc.createNode(field));
+  else if (state === 'none') putKey(doc.contents, 'fields', doc.createNode([field]));
   else return false;
   return true;
 }
@@ -235,10 +238,7 @@ export function setFormType(doc, type) {
   setKey(doc.contents, 'type', type);
   const removed = [];
   for (const key of forbiddenFormKeys[type] || []) {
-    if (doc.contents.has(key)) {
-      doc.contents.delete(key);
-      removed.push(key);
-    }
+    if (dropKey(doc.contents, key)) removed.push(key);
   }
   return removed;
 }
@@ -264,7 +264,8 @@ export function formList(doc, key) {
 /**
  * Sets a list of strings of the form, keeping the node of every string it already held (its
  * quoting, its comment). No categories : the key goes (the form is then in Default) ; roles
- * stay, empty, as the schema requires them.
+ * stay, empty, as the schema requires them. The list, changed, is written one item per line,
+ * even when it was written [a, b].
  *
  * Args:
  *   doc (object): the form's YAML document.
@@ -277,16 +278,20 @@ export function formList(doc, key) {
 export function setFormList(doc, key, list) {
   if (formList(doc, key) === null) return false;
   if (!list.length && key === 'categories') {
-    doc.contents.delete(key);
+    dropKey(doc.contents, key);
     return true;
   }
   const seq = doc.get(key, true);
   if (!YAML.isSeq(seq)) {
-    doc.set(key, doc.createNode(list));
+    putKey(doc.contents, key, doc.createNode(list));
     return true;
   }
   const kept = new Map(seq.items.map((i) => [i.value, i]));
-  seq.items = list.map((v) => kept.get(v) || doc.createNode(v));
+  const items = list.map((v) => kept.get(v) || doc.createNode(v));
+  // the same strings in the same order : nothing changed, the list keeps its style
+  if (items.length === seq.items.length && items.every((item, i) => item === seq.items[i])) return true;
+  seq.items = items;
+  toBlock(seq);
   return true;
 }
 
@@ -332,7 +337,7 @@ export function fieldDefaultText(node) {
 export function setFieldDefault(node, text) {
   const d = String(text ?? '');
   if (!d.trim()) {
-    node.delete('default');
+    dropKey(node, 'default');
     return;
   }
   const n = Number(d.trim());
@@ -383,7 +388,7 @@ export function fieldValuesText(node) {
  */
 export function setFieldValues(doc, node, text) {
   if (!String(text ?? '').trim()) {
-    node.delete('values');
+    dropKey(node, 'values');
     return '';
   }
   let parsed;
@@ -393,7 +398,7 @@ export function setFieldValues(doc, node, text) {
     return e?.message || String(e);
   }
   if (!Array.isArray(parsed)) return 'not a list';
-  node.set('values', doc.createNode(parsed));
+  putKey(node, 'values', doc.createNode(parsed));
   return '';
 }
 
@@ -440,7 +445,7 @@ export function setFieldProp(doc, node, prop, input) {
   if (prop.kind === 'number') {
     const text = String(input ?? '').trim();
     if (!text) {
-      node.delete(prop.key);
+      dropKey(node, prop.key);
       return '';
     }
     const n = Number(text);
@@ -456,7 +461,7 @@ export function setFieldProp(doc, node, prop, input) {
       return e?.message || String(e);
     }
     if (parsed === null || parsed === undefined) parsed = '';
-    if (typeof parsed === 'object') node.set(prop.key, doc.createNode(parsed));
+    if (typeof parsed === 'object') putKey(node, prop.key, doc.createNode(parsed));
     else setKey(node, prop.key, parsed);
     return '';
   }
@@ -490,7 +495,7 @@ export function addFieldProp(doc, node, prop) {
     select: prop.options?.[0] ?? '',
     yaml: prop.init ?? '',
   }[prop.kind];
-  node.set(prop.key, typeof start === 'object' ? doc.createNode(start) : start);
+  putKey(node, prop.key, typeof start === 'object' ? doc.createNode(start) : start);
 }
 
 // ─── the form's nested settings : notifications, approval, credentials ────────
@@ -523,8 +528,8 @@ export function formObject(doc, key) {
  *   start (object|undefined): what it starts as, or undefined to remove it.
  */
 export function setFormObject(doc, key, start) {
-  if (start === undefined) doc.delete(key);
-  else if (!doc.has(key)) doc.set(key, doc.createNode(start));
+  if (start === undefined) dropKey(doc.contents, key);
+  else if (!doc.has(key)) putKey(doc.contents, key, doc.createNode(start));
 }
 
 /**
@@ -541,10 +546,10 @@ export function setFormIn(doc, key, sub, value) {
   const map = doc.get(key, true);
   if (!YAML.isMap(map)) return;
   if (value === undefined) {
-    map.delete(sub);
+    dropKey(map, sub);
     return;
   }
-  if (typeof value === 'object') map.set(sub, doc.createNode(value));
+  if (typeof value === 'object') putKey(map, sub, doc.createNode(value));
   else setKey(map, sub, value);
 }
 
@@ -564,7 +569,8 @@ export function renameFormCredential(doc, from, to) {
   if (!pair) return;
   if (to === undefined) map.items.splice(map.items.indexOf(pair), 1);
   else pair.key = doc.createNode(to);
-  if (!map.items.length) doc.delete('credentials');
+  toBlock(map);
+  if (!map.items.length) dropKey(doc.contents, 'credentials');
 }
 
 // an email as the schema takes it (server/schema/form_schema.json, /email)

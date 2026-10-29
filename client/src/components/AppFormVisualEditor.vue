@@ -71,6 +71,7 @@ import {
   placeOf,
   orderFor,
 } from '@/lib/formDoc';
+import { yamlText } from '@/lib/yamlBlock';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -131,7 +132,8 @@ watch(
 function change(edit) {
   if (locked.value || !doc.value) return undefined;
   const result = edit(doc.value);
-  lastText = doc.value.toString();
+  // the lists and maps the edit changed or created one item per line, the rest as written
+  lastText = yamlText(doc.value);
   rev.value++;
   emit('update:modelValue', lastText);
   return result;

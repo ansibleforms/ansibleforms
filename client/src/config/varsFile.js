@@ -1,7 +1,23 @@
 // The Visual tab of the designer's Vars files section : a vars file's variables as rows, changed
 // in place on the file's own text (a value, a new key or list item, a key deleted), so its
-// comments and quoting stay. Pure : the component (AppVarsEditor) draws it.
+// comments and quoting stay ; a list or a map an edit changes or creates is written one item per
+// line (lib/yamlBlock.js). Pure : the component (AppVarsEditor) draws it.
 import YAML from 'yaml';
+import { toBlock, yamlText } from '@/lib/yamlBlock';
+
+/**
+ * The list or map a path's last key or index is in : the top of the file for a path of one.
+ *
+ * Args:
+ *   doc (YAML.Document): the file's document.
+ *   path (Array): the keys and indexes down to a value.
+ *
+ * Returns:
+ *   any: its list or map (another node, or nothing, when the path does not lead there).
+ */
+function parentOf(doc, path) {
+  return path.length > 1 ? doc.getIn(path.slice(0, -1), true) : doc.contents;
+}
 
 /**
  * What a YAML file is, for the Visual tab : variables (a map) it can show, or not.
@@ -85,8 +101,11 @@ export function setVar(text, path, value) {
   const doc = YAML.parseDocument(text || '');
   const node = doc.getIn(path, true);
   if (YAML.isScalar(node)) node.value = value;
-  else doc.setIn(path, value);
-  return doc.toString();
+  else {
+    doc.setIn(path, value);
+    toBlock(parentOf(doc, path));
+  }
+  return yamlText(doc);
 }
 
 /**
@@ -102,7 +121,8 @@ export function setVar(text, path, value) {
 export function deleteVar(text, path) {
   const doc = YAML.parseDocument(text || '');
   doc.deleteIn(path);
-  return doc.toString();
+  toBlock(parentOf(doc, path));
+  return yamlText(doc);
 }
 
 /**
@@ -130,7 +150,8 @@ export function addVar(text, path, key, value) {
     if (parent.has(key)) throw new Error('exists');
     parent.set(key, doc.createNode(value));
   }
-  return doc.toString();
+  toBlock(parent);
+  return yamlText(doc);
 }
 
 /**
@@ -157,6 +178,9 @@ export function renameVar(text, path, newKey) {
   if (parent.has(newKey)) throw new Error('exists');
   const pair = parent.items.find((p) => (YAML.isScalar(p.key) ? p.key.value : p.key) === old);
   if (YAML.isScalar(pair.key)) pair.key.value = newKey;
-  else pair.key = doc.createNode(newKey);
-  return doc.toString();
+  else {
+    pair.key = doc.createNode(newKey);
+    toBlock(parent);
+  }
+  return yamlText(doc);
 }
