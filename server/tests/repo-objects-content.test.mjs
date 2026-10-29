@@ -87,7 +87,7 @@ describe("any YAML file, any name, any folder, any depth", () => {
     // a file of CRLF lines the same ; a broken vars file or form seems to give none
     assert.deepEqual(contentOf("controller_credentials:\r\n  - name: a\r\n").keys, ["credentials"]);
     assert.deepEqual(contentOf("name: web\nports: [80\n").hints, []);
-    assert.deepEqual(contentOf("name: Deploy\ntype: ansible\nroles: [\n"), { keys: [], data: {}, errors: [], hints: [] });
+    assert.deepEqual(contentOf("name: Deploy\ntype: ansible\nroles: [\n"), { keys: [], data: {}, errors: [], hints: [], misfits: [] });
   });
 });
 
@@ -111,6 +111,28 @@ describe("a plain key is no type's : only controller_ and the type's key", () =>
     assert.equal((await RepoObjects.appCreated("labels", 900)).file, "labels.yaml");
     assert.deepEqual(fx.readEntry("look", "labels.yaml", "labels").map((e) => e.name), ["PROD"]);
     assert.equal(fx.textOf("look", "group_vars/all.yml"), vars);
+  });
+
+  test("a type's key without its shape (controller_labels: [web, frontend]) : no type's, never written to, what it held kept", async () => {
+    fx.reset({ repositories: [{ id: 1, name: "look", use_for_labels: 1, use_for_name: 1 }] });
+    const vars = "# vars of the web role\ncontroller_labels:\n  - web\n  - frontend\nhttp_port: 80\n";
+    write("look", "group_vars/all.yml", vars);
+    assert.deepEqual(contentOf(vars), { keys: [], data: {}, errors: [], hints: [], misfits: ["labels"] });
+    assert.deepEqual(contentOf("controller_name:\n  - x\n").misfits, ["name"]);
+    assert.equal(holdsTypeKeys(path.join(fx.ROOT, "look", "group_vars/all.yml")), false, "the designer's");
+    const labels = await RepoObjects.descriptorOf("labels");
+    const read = await sync(labels, "look");
+    assert.equal(read.created, 0);
+    assert.deepEqual(read.refused, [{ file: "group_vars/all.yml", reasons: ["'controller_labels' must be a list of label entries (dictionaries): not read, never written to"] }]);
+    fx.state.tables.labels.push({ id: 900, name: "PROD", color: "red", position: 1, repository: null, repo_file: null });
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.appCreated("labels", 900)).file, "labels.yaml");
+    assert.equal(fx.textOf("look", "group_vars/all.yml"), vars);
+    // a type's file turned into one : its objects kept as they were, never deleted
+    write("look", "labels.yaml", "controller_labels:\n  - PROD\n");
+    const again = await sync(labels, "look");
+    assert.equal(again.deleted, 0);
+    assert.equal(fx.rowNamed("labels", "PROD").repo_file, "labels.yaml");
   });
 
   test("an Ansible Galaxy requirements file giving roles: : never read as the roles, never written to", async () => {

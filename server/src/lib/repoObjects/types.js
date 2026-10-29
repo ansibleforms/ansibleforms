@@ -39,6 +39,7 @@ export const CATEGORIES = ["designer", "jobs", "system", "appearance", "access",
 //   single     the app has one object of it (a map under its key, in one file at most) : the
 //              others are lists of objects, found by their name
 //   config     a key of the base configuration (lib/configKeys.js), read from the file giving it
+//   map        a configuration key whose value is one map (the constants) : the others a list
 //   oneOnly    one repository at most (the server refuses a second)
 //   label      how the server's messages name it
 //   references the object types its objects name (a runner its credential) : read again when
@@ -46,7 +47,7 @@ export const CATEGORIES = ["designer", "jobs", "system", "appearance", "access",
 //   options    the role options that open its page, when not its category's (CATEGORY_OPTIONS)
 export const USAGE_TYPES = [
   { key: "categories", config: true, flag: "use_for_categories", category: "designer", oneOnly: true, label: "categories" },
-  { key: "constants", config: true, flag: "use_for_constants", category: "designer", oneOnly: true, label: "constants" },
+  { key: "constants", config: true, map: true, flag: "use_for_constants", category: "designer", oneOnly: true, label: "constants" },
   { key: "forms", flag: "use_for_forms", category: "designer", label: "forms" },
   { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
@@ -106,6 +107,27 @@ export const fileKeyOf = (key) => `${KEY_PREFIX}${key}`;
 
 // the top-level keys a repository's YAML files hold the types by, in CONTENT_KEYS' order
 export const FILE_KEYS = CONTENT_KEYS.map(fileKeyOf);
+
+/**
+ * Whether a value under a type's key has the type's shape : one map for a type the app has one of
+ * (and the constants), else a list of maps (an entry each) ; nothing under the key (none yet) fits
+ * either. Any other value (a vars file's list of names : controller_labels: [web, frontend]) is no
+ * type's.
+ *
+ * Args:
+ *   key (string): the type (labels).
+ *   value (any): the value under its key.
+ *
+ * Returns:
+ *   boolean: true when it fits.
+ */
+export function fitsType(key, value) {
+  if (value === null || value === undefined) return true;
+  const isMap = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  const type = typeOf(key);
+  if (type?.single || type?.map) return isMap(value);
+  return Array.isArray(value) && value.every(isMap);
+}
 
 /**
  * The type a top-level key of a repository's file gives.
@@ -282,4 +304,4 @@ export function objectTypesOf(repo) {
   });
 }
 
-export default { CATEGORIES, USAGE_TYPES, CONTENT_KEYS, KEY_PREFIX, FILE_KEYS, fileKeyOf, typeKeyOf, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, mayReadType, objectTypesOf };
+export default { CATEGORIES, USAGE_TYPES, CONTENT_KEYS, KEY_PREFIX, FILE_KEYS, fileKeyOf, typeKeyOf, fitsType, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, mayReadType, objectTypesOf };

@@ -23,7 +23,7 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import YAML from "yaml";
-import { FILE_KEYS, typeKeyOf } from "./types.js";
+import { FILE_KEYS, typeKeyOf, fitsType } from "./types.js";
 import { YAML_FILE } from "./yamlFile.js";
 
 // ===========================================================================
@@ -129,7 +129,7 @@ function severalDocuments(text) {
  *     type keys its lines seem to give, when it cannot be read) }.
  */
 export function contentOf(text) {
-  const none = { keys: [], data: {}, errors: [], hints: [] };
+  const none = { keys: [], data: {}, errors: [], hints: [], misfits: [] };
   // its byte order mark left out : the first line's key read as any other
   const source = String(text ?? "").replace(BOM, "");
   // its lines as they are at its top level, even when that is indented
@@ -157,11 +157,14 @@ export function contentOf(text) {
     .map((pair) => (YAML.isScalar(pair.key) ? pair.key.value : pair.key))
     .filter((k) => typeKeyOf(k));
   if (!fileKeys.length) return none;
-  const keys = fileKeys.map(typeKeyOf);
   try {
     // its aliases expanded : too many (an alias bomb) is refused, never thrown
     const all = doc.toJS() || {};
-    return { keys, data: Object.fromEntries(fileKeys.map((k) => [typeKeyOf(k), all[k]])), errors: [], hints: [] };
+    // a value without the type's shape (a list of names, a map under a list type's key) : no type's
+    // - never read as entries nor written to, said apart (misfits)
+    const fitting = fileKeys.filter((k) => fitsType(typeKeyOf(k), all[k]));
+    const misfits = fileKeys.filter((k) => !fitting.includes(k)).map(typeKeyOf);
+    return { keys: fitting.map(typeKeyOf), data: Object.fromEntries(fitting.map((k) => [typeKeyOf(k), all[k]])), errors: [], hints: [], misfits };
   } catch (e) {
     return { ...none, errors: [`not valid YAML: ${e.message || e}`], hints };
   }
@@ -183,7 +186,7 @@ function fileContent(abs) {
   try {
     text = fs.readFileSync(abs, "utf8");
   } catch (e) {
-    return { keys: [], data: {}, errors: [`cannot be read: ${e.code || e.message}`], hints: [] };
+    return { keys: [], data: {}, errors: [`cannot be read: ${e.code || e.message}`], hints: [], misfits: [] };
   }
   const hash = crypto.createHash("sha1").update(text).digest("base64");
   const hit = parsed.get(abs);
@@ -209,8 +212,8 @@ function fileContent(abs) {
  * Returns:
  *   object: the scan : {
  *     dir,
- *     files: [{ file (relative, with forward slashes), keys, data, size, mtimeMs }] - those holding
- *       a type's key,
+ *     files: [{ file (relative, with forward slashes), keys, data, misfits, size, mtimeMs }] - those
+ *       holding a type's key (misfits : the type keys it gives without their shape),
  *     unreadable: [{ file, errors, hints }] - those that cannot be read, the keys their lines seem
  *       to give,
  *     refused: [{ file, reason }] - the links never read,
@@ -220,6 +223,8 @@ function fileContent(abs) {
  *       when none of them changed between them),
  *     holding(key) : the files holding a key, sorted ([{ file, value }]),
  *     hinted(key) : the unreadable files whose lines seem to give it,
+ *     misfit(key) : the files giving its key with a value that has not its shape (types.js
+ *       fitsType : a list of names under a list type's key), never read nor written to,
  *   }
  *   A tree that is not there scans as empty.
  */
@@ -284,7 +289,9 @@ export function scanRepository(dir) {
       stamp.push(`${childRel}:${st.size}:${st.mtimeMs}`);
       const content = fileContent(real);
       if (content.errors.length) unreadable.push({ file: childRel, errors: content.errors, hints: content.hints });
-      else if (content.keys.length) files.push({ file: childRel, keys: content.keys, data: content.data, size: st.size, mtimeMs: st.mtimeMs });
+      else if (content.keys.length || content.misfits?.length) {
+        files.push({ file: childRel, keys: content.keys, data: content.data, misfits: content.misfits || [], size: st.size, mtimeMs: st.mtimeMs });
+      }
     }
   };
   walk(root, "", 0);
@@ -318,6 +325,7 @@ function scanOf(dir, files, unreadable, refused, stamp, blocked = []) {
     // a copy of each value : a reader may change what it is handed
     holding: (key) => files.filter((f) => f.keys.includes(key)).map((f) => ({ file: f.file, value: structuredClone(f.data[key]) })),
     hinted: (key) => unreadable.filter((u) => u.hints.includes(key)),
+    misfit: (key) => files.filter((f) => f.misfits?.includes(key)).map((f) => f.file),
   };
 }
 

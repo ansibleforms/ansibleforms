@@ -6642,7 +6642,9 @@
       (a form, a playbook, an inventory, a vars file) is none of theirs, and its keys are never read; a file mixing
       a type's key with keys of its own: the type's key is read, the others left alone. A form (a map with a
       `type`, as every form has) is never a type's file, whatever keys it has, and a key with a text, a number or a
-      yes or no under it (a vars file's `name: web`) is no type's either. Only the usages the repository holds are
+      yes or no under it (a vars file's `name: web`) is no type's either, nor is one whose value has not the type's
+      shape (a list of names under `controller_labels:`, a list under the key of a map): that file is never read nor
+      written to, refused in the pull output, and the objects linked to it are kept. Only the usages the repository holds are
       read: a key of another type is left alone, its pull output says so once as a hint (`Not read, the repository
       is not used for them: controller_labels: (team/look.yaml) - turn the usage on to read them`).
 

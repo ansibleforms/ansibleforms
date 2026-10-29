@@ -556,6 +556,11 @@ async function readEntries(desc, name, ctx, scan) {
   // the files whose linked objects stay as they are, whatever the entries : not read, or not a list
   const held = new Set([...scan.unreadable.map((u) => u.file), ...scan.refused.map((r) => r.file)]);
   for (const u of scan.hinted(desc.key)) refused.push({ file: u.file, reasons: u.errors });
+  // its key with a value of another shape (a list of names) : never read, what it held kept
+  for (const file of misfitsOf(desc, scan)) {
+    held.add(file);
+    refused.push({ file, reasons: [misfitReason(desc)] });
+  }
   const holding = scan.holding(desc.key);
   for (const { file, value } of holding) {
     // the key with nothing after it : no entry
@@ -673,6 +678,32 @@ function sameIdentity(desc, row, object) {
   const valueOf = (v) => (given(v) ? String(v).trim() : "");
   return (desc.identity || []).every((field) => valueOf(row?.[field]) === valueOf(object?.[field]));
 }
+
+/**
+ * The files of a scan giving a type's key with a value that has not the type's shape (types.js
+ * fitsType : a list of names under a list type's key, a list under a map's) : never read nor
+ * written to.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *   scan (object): the repository's files (scanOf).
+ *
+ * Returns:
+ *   string[]: the files.
+ */
+const misfitsOf = (desc, scan) => (scan.misfit ? scan.misfit(desc.key) : []);
+
+/**
+ * Why a file giving a type's key without its shape is not read.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   string: the reason.
+ */
+const misfitReason = (desc) =>
+  desc.single ? `'${fileKey(desc)}' must be a dictionary: not read, never written to` : `'${fileKey(desc)}' must be a list of ${desc.noun} entries (dictionaries): not read, never written to`;
 
 /**
  * Whether every object that uses an object by its name follows its rename : each one is an object
@@ -1613,6 +1644,7 @@ export async function filesNow(desc, name) {
   refused.push(...scan.refused.map((r) => ({ file: r.file, reasons: [r.reason] })));
   refused.push(...scan.blocked.map((b) => ({ file: b.file, reasons: [`the folder cannot be read: ${b.reason}`] })));
   for (const u of scan.hinted(desc.key)) refused.push({ file: u.file, reasons: u.errors });
+  for (const file of misfitsOf(desc, scan)) refused.push({ file, reasons: [misfitReason(desc)] });
   for (const { file, value } of scan.holding(desc.key)) {
     if (value === null || value === undefined) continue;
     if (!Array.isArray(value)) {
@@ -2188,6 +2220,7 @@ export async function appDeleted(desc, before) {
 function singleOf(desc, scan) {
   const holding = scan.holding(desc.key);
   const refused = scan.hinted(desc.key).map((u) => ({ file: u.file, reasons: u.errors }));
+  for (const file of misfitsOf(desc, scan)) refused.push({ file, reasons: [misfitReason(desc)] });
   if (holding.length > 1) {
     const files = holding.map((f) => f.file);
     refused.push({ file: files.join(", "), reasons: [`${fileKey(desc)}: is given by ${files.length} files (${files.join(", ")}): one file at most gives it`] });

@@ -114,7 +114,8 @@ export async function keySources() {
     const scan = scans.get(repo.name);
     // the files giving it (or one that cannot be read, its lines seeming to give it), config.yaml
     // of before (its plain keys) only when none does
-    const own = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file)].sort();
+    // ... or one giving it with a value of another shape (refused when read : keyDocument)
+    const own = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file), ...scan.misfit(k.key)].sort();
     const named = path.join(dir, k.file);
     const legacy = path.join(dir, LEGACY_FILE);
     if (own.length) {
