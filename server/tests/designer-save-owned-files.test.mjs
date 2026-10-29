@@ -143,3 +143,19 @@ test("a playbook, the playbooks folder and the vars folder of a forms repository
   }
 
 });
+
+test("the forms load of a repository serving its forms from its root never reads the files its other usages own as forms", async () => {
+  // ops holds labels and credentials as well : their folders and its roles.yaml are theirs
+  REPOS[0] = { ...OPS, use_for_labels: 1, use_for_credentials: 1 };
+  fs.mkdirSync(ops("labels"));
+  fs.writeFileSync(ops("labels/prod.yaml"), YAML.stringify({ name: "prod", color: "red" }));
+  fs.mkdirSync(ops("credentials"));
+  fs.writeFileSync(ops("credentials/git.yaml"), YAML.stringify({ name: "git", credential_type: "git", user: "bot", password: "${GIT_PW}" }));
+  const { default: Form } = await import("../src/models/form.model.js");
+  const loaded = await Form.load(["admin"], "", true);
+  assert.deepEqual(loaded.forms.map((f) => f.name), ["Deploy"]);
+  assert.deepEqual(loaded.errors, [], "no file of the labels, the credentials or the roles read as a form");
+  // the same usages turned off : their files are plain files of the forms' root again
+  REPOS[0] = { ...OPS, use_for_roles: 0 };
+  assert.match((await Form.load(["admin"], "", true)).errors.join("\n"), /no name|Failed to validate form/);
+});

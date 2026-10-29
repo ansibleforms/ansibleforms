@@ -9,7 +9,7 @@
 // (models/projectFiles.model.js) never list, read, write nor delete them, even in a repository used
 // for workflows, inventories, playbooks or vars files as well - writing roles.yaml there made a
 // designer an admin ; nor does its forms save (models/form.model.js) write a form file onto one, in
-// a repository serving its forms from its root. A path is checked against every repository whose
+// a repository serving its forms from its root, nor its forms load read one as forms. A path is checked against every repository whose
 // working tree it is in, as the disk resolves it : a local folder holding the repositories' root, or
 // a form file named '../other/roles.yaml', reaches another repository's files.
 import fs from "fs";

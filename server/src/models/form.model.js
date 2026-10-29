@@ -20,7 +20,7 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
-import { findOwner, realPathOf } from "../lib/repoObjects/ownedPaths.js";
+import { findOwner, ownerTest, realPathOf } from "../lib/repoObjects/ownedPaths.js";
 import { isInside } from "../lib/projectFiles.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
@@ -298,10 +298,15 @@ async function getSaveTargets() {
  *   kept. Before, one unreadable subfolder threw out of the whole walk and the
  *   complete forms folder looked empty.
  *
+ * - a file or a folder skip says to skip (one a usage type of a repository owns :
+ *   lib/repoObjects/ownedPaths.js ownerTest) is neither listed nor walked.
+ *
  * Args:
  *   root (string): The forms folder to walk.
  *   onWarn (function): Optional callback receiving a human readable warning for
  *     every skipped folder or broken link. Defaults to logger.warning.
+ *   skip (function|null): Optional (absolute path) => truthy for a file or a folder
+ *     to leave out. Defaults to none.
  *
  * Returns:
  *   string[]: The yaml file paths, relative to root, in walk order.
@@ -310,7 +315,7 @@ async function getSaveTargets() {
  *   Error: When root itself cannot be read ; the callers treat that as "this forms
  *     folder failed to load" and skip it as a whole.
  */
-function walkYamlFiles(root, onWarn = (m) => logger.warning(m)) {
+function walkYamlFiles(root, onWarn = (m) => logger.warning(m), skip = null) {
   const files = []
   const visited = new Set()
   const walk = (dir, isRoot) => {
@@ -342,6 +347,8 @@ function walkYamlFiles(root, onWarn = (m) => logger.warning(m)) {
     for (const entry of entries) {
       if (entry.name === ".git") continue
       const fullPath = path.join(dir, entry.name)
+      // a file or a folder the caller leaves out (owned by a usage type) : never listed nor walked
+      if (skip && skip(fullPath)) continue
       // A SYMLINK is neither isDirectory() nor isFile() - readdirSync does not follow
       // them - so resolve it. A symlinked form yaml is a normal way to share one form
       // between an app and a git checkout, and must be both listed and deletable.
@@ -798,7 +805,10 @@ export function duplicateNotice(name, used, skipped) {
 
 /**
  * Every form of the folders, each with where it is, in the order they are read (the folders in
- * turn, the files of each sorted).
+ * turn, the files of each sorted). A file or a folder a usage type of a repository owns (roles.yaml,
+ * general.yaml, credentials/, labels/ ... : lib/repoObjects/ownedPaths.js, as the designer's file
+ * explorers skip them) is never read as forms : a repository holding objects that serves its forms
+ * from its root would give each of them as a form that does not validate.
  *
  * Args:
  *   formsdirs (object[]): the folders (formsFolders).
@@ -806,10 +816,12 @@ export function duplicateNotice(name, used, skipped) {
  *   error (function): (message) => an error (a file that cannot be read or parsed).
  *
  * Returns:
- *   object[]: [{ form, repository, place }].
+ *   Promise<object[]>: [{ form, repository, place }].
  */
-function collectForms(formsdirs, warn, error) {
+async function collectForms(formsdirs, warn, error) {
   const out = []
+  // what the usage types own, tested once for every folder
+  const owned = await ownerTest()
   // when several forms repos exist, tag each form with the repo it came from so a save writes it
   // back there even if another repo has a same-named file
   const tagRepository = formsdirs.filter((d) => d.name).length > 1
@@ -821,7 +833,7 @@ function collectForms(formsdirs, warn, error) {
       // walkYamlFiles skips an unreadable subfolder on its own (with a warning) and
       // guards against symbolic link loops
       if (fs.existsSync(formsdirpath)) {
-        files = walkYamlFiles(formsdirpath, warn);
+        files = walkYamlFiles(formsdirpath, warn, owned);
       } else {
         warn(`Failed to load forms directory '${formsdirpath}'.`);
         continue; // skip this directory
@@ -897,7 +909,7 @@ function duplicatesOf(entries) {
  *   Promise<object[]>: the duplicates (duplicatesOf) it holds a copy of, used or skipped.
  */
 Form.duplicates = async function(repository = null) {
-  const all = duplicatesOf(collectForms(await formsFolders(), () => {}, () => {}))
+  const all = duplicatesOf(await collectForms(await formsFolders(), () => {}, () => {}))
   return repository ? all.filter((d) => d.used.repository === repository || d.skipped.repository === repository) : all
 }
 
@@ -928,10 +940,10 @@ Form.duplicateLines = async function(repository) {
  *   formsDirs (object[]): the forms folders, in the order they are read (formsFolders).
  *
  * Returns:
- *   Map<string, Set<string>>: by the file's absolute path, the names of the copies skipped in it.
+ *   Promise<Map<string, Set<string>>>: by the file's absolute path, the names of the copies skipped in it.
  */
-function skippedCopies(formsDirs) {
-  const entries = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+async function skippedCopies(formsDirs) {
+  const entries = await collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
   const first = new Set()
   const out = new Map()
   for (const e of entries) {
@@ -987,7 +999,7 @@ Form.formsFileTest = async function() {
  */
 Form.unloaded = async function() {
   const first = new Map()
-  for (const e of collectForms(await formsFolders(), () => {}, () => {})) {
+  for (const e of await collectForms(await formsFolders(), () => {}, () => {})) {
     if (e.form?.name && !first.has(e.form.name)) first.set(e.form.name, e)
   }
   // validated as the loader validates them : a form that loads is answered from its cache
@@ -1037,12 +1049,15 @@ Form.nameTaken = (name) => `The form name '${name}' is already taken`
  *   conceal (boolean): say only that the name is taken, not where (a designer without
  *     designAllForms : a copy may be one hidden from them).
  *
+ * Returns:
+ *   Promise<void>
+ *
  * Raises:
  *   Errors.ConflictError: the names, and where each is already defined (a 409).
  */
-function assertNoDuplicateForms(groups, formsDirs, conceal = false) {
+async function assertNoDuplicateForms(groups, formsDirs, conceal = false) {
   // where each name is defined now, by folder
-  const existing = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+  const existing = await collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
   const clashes = []
   for (const g of groups) for (const f of g.forms || []) {
     const copies = existing.filter((e) => e.form?.name === f.name)
@@ -1114,7 +1129,7 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
     error("The base config has a 'forms' section. Since 7.0.0 forms are no longer read from the base config - move each form to its own file in the forms folder (FORMS_FOLDER_PATH).")
   }
   // every form of the folders, with where it is, in the order they are read
-  const entries = collectForms(formsdirs, warn, error)
+  const entries = await collectForms(formsdirs, warn, error)
   var unvalidatedForms = entries.map((e) => e.form);
   // the first copy of each name : the one used, named when another copy is skipped
   const firstOf = new Map()
@@ -1964,7 +1979,7 @@ Form.save = async function(data, options = {}){
   }
 
   // a form name defined twice, or new here and already another forms repository's : refused
-  assertNoDuplicateForms(Object.values(groups), formsDirs, options.conceal)
+  await assertNoDuplicateForms(Object.values(groups), formsDirs, options.conceal)
 
   // repository and source are internal placement fields : never write them to a form file or config
   // source is re-stamped from the filename on load ; repository pins a form to its repo
@@ -2006,7 +2021,7 @@ Form.save = async function(data, options = {}){
     )
     // the copies the loader skipped (a form name another forms folder defines first) : never in
     // the payload, so a file holding one with other forms would lose it when written again ; kept
-    const skipped = skippedCopies(formsDirs)
+    const skipped = await skippedCopies(formsDirs)
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)
