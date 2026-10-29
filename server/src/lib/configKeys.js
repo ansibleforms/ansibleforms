@@ -2,10 +2,14 @@
 // The base configuration's keys a repository may hold, one usage type each (lib/repoObjects/types.js)
 // : the roles (use_for_roles, Access), the categories and the constants (use_for_categories,
 // use_for_constants, Designer), one repository at most each. Each key is read on its own from its
-// type's repository : from its own file (roles.yaml, categories.yaml, constants.yaml) when there is
-// one, else from config.yaml (deprecated since 7.5.0, no longer read in 8.0.0 : said in the server
-// log once per load, in the repository's pull output and on its page), and written back to the file
-// it was read from - config.yaml stays config.yaml until it is moved - or a new one of its own.
+// type's repository : from the file that gives it at its top level (roles:, categories:,
+// constants:), any name, any folder (lib/repoObjects/repoFiles.js) - two files giving it are not
+// read, both named ; its own file at the root (roles.yaml) without the key is read and refused,
+// never the base's served in its place - else from the config.yaml of before at its root, which
+// may leave it out
+// (deprecated since 7.5.0, no longer read in 8.0.0 : said in the server log once per load, in the
+// repository's pull output and on its page), and written back to the file it was read from -
+// config.yaml stays config.yaml until it is moved - or a new one of its own (roles.yaml ...).
 //
 // A key no repository holds comes from where the base configuration comes from (the database copy,
 // the CONFIG_PATH file : models/form.model.js getBaseConfig, models/settings.model.js) : the keys of
@@ -19,12 +23,13 @@ import mysql from "../models/db.model.js";
 import Repo from "../models/repo.model.js";
 import _ from "lodash";
 import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js";
+import { scanRepository } from "./repoObjects/repoFiles.js";
 
 // ===========================================================================
 // THE KEYS
 // ===========================================================================
 
-// each key : its usage type, its flag, its own file
+// each key : its usage type, its flag, the file a repository giving it nowhere gets on the first write
 // ... and what its value is : a list (roles, categories) or a dictionary (constants)
 // ... and, for the roles, what is served when its file is not read (broken, or its repository not
 // cloned) and was never read on this node (closed) : the local admins' admin role only - never the base configuration's roles, which the
@@ -61,20 +66,27 @@ const YTT_DIRECTIVE = /^\s*#@/m;
 export const isTemplate = (text) => YTT_DIRECTIVE.test(String(text ?? ""));
 
 /**
- * Where each key held by a repository is : its repository, the file it is read from (its own, else
- * config.yaml), whether that file is config.yaml (deprecated), whether it exists yet (a repository
- * with neither file gets its own on the first write). A key no repository holds is not listed : the
- * base configuration gives it. A key whose repository is not cloned (a clone that failed, or is
- * under way) is listed as missing : not read (its value last read on this node is served meanwhile,
- * else the base's, the roles closed : composeConfig), and a save of it refused (assertKeysWritable),
- * never written to the base in its place.
+ * Where each key held by a repository is : its repository, the file it is read from (the one giving
+ * it at its top level, any name, any folder ; else its own file at the root - roles.yaml - when it
+ * is there without the key, read and refused, never the base's in its place ; else config.yaml at
+ * its root, which may leave it out),
+ * whether that file is config.yaml (deprecated), whether it exists yet (a repository with neither
+ * gets a file of its own on the first write : roles.yaml ...), and the files when several give it
+ * (not read : keyFileProblem). A key no repository holds is not listed : the base configuration
+ * gives it. A key whose repository is not cloned (a clone that failed, or is under way) is listed as
+ * missing : not read (its value last read on this node is served meanwhile, else the base's, the
+ * roles closed : composeConfig), and a save of it refused (assertKeysWritable), never written to
+ * the base in its place.
  *
  * Returns:
- *   Promise<object[]>: [{ key, flag, file, repository, path, deprecated, exists, missing }].
+ *   Promise<object[]>: [{ key, flag, file (relative to the repository), repository, path,
+ *     deprecated, exists, missing, several (the files giving it, when more than one), notGiving
+ *     (its own file there, giving no key : refused) }].
  */
 export async function keySources() {
   const rows = await mysql.do(`SELECT name, ${CONFIG_KEYS.map((k) => k.flag).join(", ")} FROM AnsibleForms.\`repositories\` ORDER BY name`);
   const out = [];
+  const scans = new Map();
   for (const k of CONFIG_KEYS) {
     const repo = (rows || []).find((r) => Number(r[k.flag]) && Repo.isValidName(r.name));
     if (!repo) continue;
@@ -83,11 +95,23 @@ export async function keySources() {
       out.push({ ...k, repository: repo.name, path: path.join(dir, k.file), deprecated: false, exists: false, missing: true });
       continue;
     }
-    const own = path.join(dir, k.file);
+    // the repository's files, read once for its keys
+    if (!scans.has(repo.name)) scans.set(repo.name, scanRepository(dir));
+    const scan = scans.get(repo.name);
+    // the files giving it, config.yaml of before only when no other one does (or one that cannot
+    // be read, its lines seeming to give it)
+    const giving = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file)].sort();
+    const own = giving.filter((f) => f !== LEGACY_FILE);
+    const named = path.join(dir, k.file);
     const legacy = path.join(dir, LEGACY_FILE);
-    if (fs.existsSync(own)) out.push({ ...k, repository: repo.name, path: own, deprecated: false, exists: true });
-    else if (fs.existsSync(legacy)) out.push({ ...k, repository: repo.name, path: legacy, deprecated: true, exists: true });
-    else out.push({ ...k, repository: repo.name, path: own, deprecated: false, exists: false });
+    if (own.length) {
+      out.push({ ...k, file: own[0], repository: repo.name, path: path.join(dir, own[0]), deprecated: false, exists: true, ...(own.length > 1 ? { several: own } : {}) });
+    } else if (fs.existsSync(named)) {
+      // no file gives it, but its own file is there (a typo in its key, a plain map) : read, and
+      // not taken (keyDocument) - never the base's in its place, the roles closed
+      out.push({ ...k, repository: repo.name, path: named, deprecated: false, exists: true, notGiving: true });
+    } else if (fs.existsSync(legacy)) out.push({ ...k, file: LEGACY_FILE, repository: repo.name, path: legacy, deprecated: true, exists: true });
+    else out.push({ ...k, repository: repo.name, path: named, deprecated: false, exists: false });
   }
   return out;
 }
@@ -102,7 +126,7 @@ export async function keySources() {
  *   string: the notice.
  */
 export const deprecationNotice = (source) =>
-  `${source.key} read from ${LEGACY_FILE}: deprecated, move them to ${source.file} (${LEGACY_FILE} is no longer read in 8.0.0)`;
+  `${source.key} read from ${LEGACY_FILE}: deprecated, move them to a file of their own (${source.key}: in any file, ${CONFIG_KEYS.find((k) => k.key === source.key)?.file || `${source.key}.yaml`} for instance ; ${LEGACY_FILE} is no longer read in 8.0.0)`;
 
 /**
  * The keys of a repository read from config.yaml, for its pull output and its page.
@@ -114,7 +138,8 @@ export const deprecationNotice = (source) =>
  *   Promise<object[]>: [{ key, file, notice }] ; none when it reads none from config.yaml.
  */
 export async function repositoryDeprecations(name) {
-  return (await keySources()).filter((s) => s.repository === name && s.deprecated).map((s) => ({ key: s.key, file: s.file, notice: deprecationNotice(s) }));
+  // file : the file of its own it may move to (roles.yaml ...)
+  return (await keySources()).filter((s) => s.repository === name && s.deprecated).map((s) => ({ key: s.key, file: CONFIG_KEYS.find((k) => k.key === s.key).file, notice: deprecationNotice(s) }));
 }
 
 /**
@@ -287,8 +312,8 @@ export function resetKeyReadsForTests() {
 
 /**
  * Why a key a repository holds is not there to read : its repository not cloned (a clone failed,
- * or one under way, a reset re-cloning it), or its file gone after it was read on this node
- * (deleted or renamed in git). A repository that never gave its file on
+ * or one under way, a reset re-cloning it), or no file giving it any more after it was read on this
+ * node (deleted, or its key taken out, in git). A repository that never gave its file on
  * this node has none : its key is served from the base configuration until a save writes the file
  * (the base's value is the one in force when the flag is set ; a node cannot tell a file deleted
  * before it started from one never written).
@@ -301,7 +326,7 @@ export function resetKeyReadsForTests() {
  */
 const absentProblem = (source) => {
   if (source.missing) return "its repository is not cloned";
-  if (!source.exists && lastHeld.has(heldKey(source))) return "it is no longer in its repository";
+  if (!source.exists && lastHeld.has(heldKey(source))) return `no file of its repository gives ${source.key}: any more`;
   return null;
 };
 
@@ -358,7 +383,7 @@ export function composeConfig(baseText, sources, render) {
       // configuration lost with it (said once in the server log, in its pull output and on its page)
       from = (s.exists && lastRead.get(readKey(s))) || lastHeld.get(heldKey(s));
       const closed = CONFIG_KEYS.find((k) => k.key === s.key)?.closed;
-      const line = `${s.repository}/${path.basename(s.path)} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
+      const line = `${s.repository}/${s.file} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
       if (reported.get(readKey(s)) !== line) logger.error(line);
       reported.set(readKey(s), line);
       if (!from && closed) from = mapDocument(YAML.stringify({ [s.key]: closed }));
@@ -385,7 +410,11 @@ export function composeConfig(baseText, sources, render) {
  *   Error: why it is not read.
  */
 function keyDocument(source, text) {
+  // several files giving it : none of them read, each named
+  if (source.several) throw new Error(`${source.several.length} files give its ${source.key} (${source.several.join(", ")}): one file at most gives them`);
   const doc = mapDocument(text);
+  // its own file giving no key (a typo, a plain map, a form saved under its name) : never read
+  if (source.notGiving) throw new Error(`it does not give its ${source.key} (a top-level '${source.key}:' key)`);
   const value = (doc.toJS() || {})[source.key];
   // a key's own file without its key (a plain map, a typo in the key) : not read - taken as it is,
   // it would serve the base's value without a word ; config.yaml of before may give some keys only
@@ -433,7 +462,7 @@ export async function repositoryKeyProblems(name) {
   const out = [];
   for (const s of (await keySources()).filter((x) => x.repository === name)) {
     const reason = absentProblem(s) || keyFileProblem(s);
-    if (reason) out.push({ key: s.key, file: path.basename(s.path), reason });
+    if (reason) out.push({ key: s.key, file: s.file, reason });
   }
   return out;
 }
@@ -463,8 +492,8 @@ export function assertKeysWritable(doc, sources, served) {
   const refused = [];
   for (const s of changed) {
     if (s.missing) refused.push(`The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`);
-    else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${path.basename(s.path)}, a ytt template: change them in git`);
-    else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${path.basename(s.path)}, which is not read (${keyFileProblem(s)}): fix it in git`);
+    else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, a ytt template: change them in git`);
+    else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, which is not read (${keyFileProblem(s)}): fix it in git`);
   }
   if (refused.length) throw new Errors.ConflictError(refused.join("; "));
 }
@@ -521,7 +550,7 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
         if (saved) next = withKeyOf(text, s.key, saved);
         else next = text.trim() ? updateMapFile(text, { [s.key]: doc[s.key] }) : newMapFile({ [s.key]: doc[s.key] });
         if (next !== text) fs.writeFileSync(s.path, next, "utf8");
-        logger.info(`Saved the ${s.key} into ${repository}/${path.basename(s.path)}`);
+        logger.info(`Saved the ${s.key} into ${repository}/${s.file}`);
       }
     } finally {
       if (opts.claim && prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));

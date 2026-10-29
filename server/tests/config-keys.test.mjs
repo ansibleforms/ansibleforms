@@ -35,7 +35,7 @@ const realConfig = (await import("../config/app.config.js")).default;
 // the base configuration : a file of the test's own
 const BASE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-config-")), "config.yaml");
 const writeRaw = (repo, file, obj) => {
-  fs.mkdirSync(path.join(fx.ROOT, repo), { recursive: true });
+  fs.mkdirSync(path.dirname(path.join(fx.ROOT, repo, file)), { recursive: true });
   fs.writeFileSync(path.join(fx.ROOT, repo, file), typeof obj === "string" ? obj : YAML.stringify(obj));
 };
 const readObj = (repo, file) => YAML.parse(fs.readFileSync(path.join(fx.ROOT, repo, file), "utf8"));
@@ -79,7 +79,7 @@ describe("each key from its own file", () => {
     let [roles] = await keys.keySources();
     assert.equal(path.basename(roles.path), "config.yaml");
     assert.equal(roles.deprecated, true);
-    assert.equal(keys.deprecationNotice(roles), "roles read from config.yaml: deprecated, move them to roles.yaml (config.yaml is no longer read in 8.0.0)");
+    assert.equal(keys.deprecationNotice(roles), "roles read from config.yaml: deprecated, move them to a file of their own (roles: in any file, roles.yaml for instance ; config.yaml is no longer read in 8.0.0)");
     assert.deepEqual(await keys.repositoryDeprecations("access"), [{ key: "roles", file: "roles.yaml", notice: keys.deprecationNotice(roles) }]);
     assert.match(await keys.deprecationLines("access"), /^\nDeprecated: roles read from config.yaml/);
     // only its own key : the categories of that config.yaml are not the design repository's
@@ -357,6 +357,11 @@ describe("a key file with anchors, or one that is not read", () => {
       status: 409,
       message: /late\/categories\.yaml, which is not read \(not a YAML dictionary\): fix it in git/,
     });
+    // a file of another name that cannot be read, seeming to give them : the same
+    fs.rmSync(path.join(fx.ROOT, "late", "categories.yaml"));
+    writeRaw("late", "team/cats.yml", "categories: [\n");
+    assert.match((await keys.repositoryKeyProblems("late"))[0].reason, /^not valid YAML/);
+    assert.equal((await keys.repositoryKeyProblems("late"))[0].file, "team/cats.yml");
   });
 
   test("a key's own file without its key (a plain map, a typo) : not read, said ; config.yaml of before may leave keys out", async () => {
@@ -591,8 +596,8 @@ describe("a key file not there to read : gone from its repository, or its reposi
     assert.deepEqual(admins(await served()), []);
     fs.rmSync(path.join(fx.ROOT, "moved-roles", "roles.yaml"));
     assert.deepEqual((await served()).roles, repoRoles.roles, "bob never admin again");
-    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), [{ key: "roles", file: "roles.yaml", reason: "it is no longer in its repository" }]);
-    assert.match(await keys.deprecationLines("moved-roles"), /\nNot read: roles\.yaml: it is no longer in its repository - the roles last read from it/);
+    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), [{ key: "roles", file: "roles.yaml", reason: "no file of its repository gives roles: any more" }]);
+    assert.match(await keys.deprecationLines("moved-roles"), /\nNot read: roles\.yaml: no file of its repository gives roles: any more - the roles last read from it/);
     // a save of the roles writes the file again
     await keys.writeConfigKeys({ roles: [{ name: "admin", groups: ["local/admins"] }] }, await keys.keySources(), { claim: false });
     assert.deepEqual(readObj("moved-roles", "roles.yaml"), { roles: [{ name: "admin", groups: ["local/admins"] }] });
