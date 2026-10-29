@@ -6608,7 +6608,7 @@
           "storedjob"
         ],
         "summary": "List stored jobs, filter by form, or get one by name",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). By name only the caller's own are searched; by form_name the caller's own and, with the allowStoredJobsViewAll role option, the ones other users shared (visibility shared) of a form the caller may open that does not set allowStoredJobSharing: false. The full list shows everyone's to a user with the settings permission, otherwise only the caller's own.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). By name only the caller's own are searched; by form_name the caller's own and, with the allowStoredJobsViewAll role option, the ones other users shared (visibility shared) of a form the caller may open that does not set allowStoredJobSharing: false; another user's comes without the values of its password fields, in list and yaml rows too. The full list shows everyone's to a user with the settings permission, otherwise only the caller's own.",
         "parameters": [
           {
             "name": "name",
@@ -6686,7 +6686,7 @@
           "storedjob"
         ],
         "summary": "Get a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs, and the ones shared with them (see the list by form_name).",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs, and the ones shared with them (see the list by form_name). One shared by another user comes without the values of its password fields, in list and yaml rows too.",
         "parameters": [
           {
             "name": "id",

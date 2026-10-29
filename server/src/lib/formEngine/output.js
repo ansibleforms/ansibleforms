@@ -188,6 +188,35 @@ export function filterRawFormData(fields, values, subforms = []) {
   return out;
 }
 
+/**
+ * What a wizard keeps of its step drafts for a relaunch or a stored job : each draft filtered by
+ * its step's subform (filterRawFormData, so no password), and the skips of its optional steps
+ * only. A step is named as the browser and the drafts name it (its name, else its subform) ; the
+ * summary step and a step without a subform hold no draft.
+ *
+ * Args:
+ *   formObj (object): the wizard form, its subforms inlined.
+ *   drafts (object): the step drafts, by step name.
+ *   skipped (object): the skipped steps, by step name.
+ *
+ * Returns:
+ *   object: `{ __wizard__: true, drafts, skipped }`, filtered.
+ */
+export function filterWizardRawFormData(formObj, drafts, skipped) {
+  const subforms = formObj?.subforms || [];
+  const kept = {};
+  const skips = {};
+  for (const step of formObj?.wizard || []) {
+    if (!step || step.summary || !step.subform) continue;
+    const name = step.name || step.subform;
+    const sub = subforms.find((s) => s?.name === step.subform);
+    const draft = drafts?.[name];
+    if (sub && draft && typeof draft === 'object' && !Array.isArray(draft)) kept[name] = filterRawFormData(sub.fields || [], draft, subforms);
+    if (step.optional === true && skipped?.[name] === true) skips[name] = true;
+  }
+  return { __wizard__: true, drafts: kept, skipped: skips };
+}
+
 function subformFor(field, subforms) {
   return (typeof field?.subform === 'string') ? (subforms || []).find((s) => s?.name === field.subform) : field?.subform;
 }
@@ -308,4 +337,4 @@ export function canonicalJson(value) {
   return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJson(value[k])).join(',') + '}';
 }
 
-export default { listMarkers, deepClone, buildFormOutput, buildLaunchPayload, readModelPath, collectCredentials, filterRawFormData, maskPasswords, canonicalJson };
+export default { listMarkers, deepClone, buildFormOutput, buildLaunchPayload, readModelPath, collectCredentials, filterRawFormData, filterWizardRawFormData, maskPasswords, canonicalJson };

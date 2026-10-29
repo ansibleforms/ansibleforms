@@ -2,13 +2,13 @@
 import { z } from 'zod';
 import { resolveForm, normalizeFields, isDynamicField } from '../lib/formEngine/resolve.js';
 import { scanDependencies } from '../lib/formEngine/placeholders.js';
-import { buildLaunchPayload, filterRawFormData, maskPasswords } from '../lib/formEngine/output.js';
+import { buildLaunchPayload, filterRawFormData, filterWizardRawFormData, maskPasswords } from '../lib/formEngine/output.js';
 import { sha256 } from '../lib/formEngine/node/hash.js';
 import { createFormServices } from '../lib/formServices.js';
 import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
 import yaml from 'yaml';
-import { ownerOf as storedJobOwner, seesShared } from '../lib/storedJobScope.js';
+import { ownerOf as storedJobOwner, seesShared, storedFormDataFor } from '../lib/storedJobScope.js';
 
 /**
  * The MCP tools. Deliberately technical : they expose the form flow a browser goes through
@@ -508,18 +508,10 @@ export function createHandlers({ user, deps, policy = {} }) {
 
   /**
    * What a wizard job keeps of its drafts : each filtered by its step's subform (no passwords),
-   * the skips of its optional steps only.
+   * the skips of its optional steps only (formEngine/output.js filterWizardRawFormData).
    */
   function wizardRawFormData(formObj, drafts, skipped) {
-    const kept = {};
-    const skips = {};
-    for (const step of wizardSteps(formObj)) {
-      const sub = (formObj.subforms || []).find((s) => s?.name === step.subform);
-      const draft = drafts?.[step.name];
-      if (sub && draft && typeof draft === 'object' && !Array.isArray(draft)) kept[step.name] = filterRawFormData(sub.fields || [], draft, formObj.subforms || []);
-      if (step.optional && skipped?.[step.name] === true) skips[step.name] = true;
-    }
-    return { __wizard__: true, drafts: kept, skipped: skips };
+    return filterWizardRawFormData(formObj, drafts, skipped);
   }
 
   /**
@@ -867,18 +859,16 @@ export function createHandlers({ user, deps, policy = {} }) {
     async getStoredJob({ id, form, name }) {
       const row = await visibleStored({ id, form, name });
       // the form's password fields left out, in list rows too (the browser kept those in its rows),
+      // as the stored jobs routes leave them out for another user (storedJobScope.storedFormDataFor),
       // then secret-looking values masked as a job's are. A row of a form that cannot be loaded
       // (one stored from a subform) keeps no list or object value : it could hold any secret.
-      let values = storedValues(row);
+      let formObj;
       try {
-        const { formObj } = await loadForm(row.form_name);
-        // a wizard's are its step drafts, each filtered by its step's subform
-        values = isWizard(formObj)
-          ? (values.__wizard__ === true ? wizardRawFormData(formObj, values.drafts, values.skipped) : {})
-          : filterRawFormData(normalizeFields(formObj.fields), values, formObj.subforms || []);
+        ({ formObj } = await loadForm(row.form_name));
       } catch {
-        values = Object.fromEntries(Object.entries(values).filter(([, v]) => v === null || typeof v !== 'object'));
+        formObj = undefined;
       }
+      const values = storedFormDataFor(formObj, storedValues(row));
       return { ...storedSummary(row), values: parseJson(await Job.maskExtravars(row.form_name, JSON.stringify(values)), {}) };
     },
 
