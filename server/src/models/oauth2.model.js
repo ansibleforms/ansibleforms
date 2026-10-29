@@ -8,26 +8,54 @@ import { isSingleTenant } from '../auth/auth_entraid.js';
 class OAuth2 extends CrudModel {
     static modelName = 'oauth2';
 
-    // Unset enable on the other providers of the same type when this one is enabled : the enabled
-    // one of a type is the one its login button signs in with.
-    //
-    // Same trap as Awx.preProcess : this WRITES, and it ran before the required-field
-    // check and before the managed guard, so a POST with no `name` answered 400 having
-    // already switched off a seed-declared SSO provider. The blanket update now spares
-    // managed rows, and a caller trying to displace one is refused instead.
-    static async preProcess(data, _action, opts = {}) {
-        if (data.enable) {
+    /**
+     * Unset enable on the other providers of the same type when this one is enabled : the enabled
+     * one of a type is the one its login button signs in with.
+     *
+     * Same trap as Awx.preProcess : this WRITES, and it ran before the required-field
+     * check and before the managed guard, so a POST with no `name` answered 400 having
+     * already switched off a seed-declared SSO provider. The blanket update now spares
+     * managed rows, and a caller trying to displace one is refused instead.
+     *
+     * An update names only the fields it changes, so the type and the in-use state are the
+     * resulting row's : the request's, else the stored ones. Reading only the request bound an
+     * absent provider as NULL, which matched no row, so the seed guard never fired and two
+     * providers of one type stayed in use (sign-in takes the lowest id).
+     *
+     * Args:
+     *   data (object): The fields to write, enable normalised to 1 or 0 here.
+     *   _action (string): 'create' or 'update'.
+     *   opts (object): { fromSeed: true } for the declarative config seed only.
+     *   current (object): The stored row on an update ({ provider, enable }), empty on a create.
+     *
+     * Returns:
+     *   Promise<object>: The data to write.
+     *
+     * Raises:
+     *   AccessDeniedError: When the type's provider in use is managed by the config seed.
+     */
+    static async preProcess(data, _action, opts = {}, current = {}) {
+        // Step 1 : enable is 1 or 0, like auto_login ('0' is a string, and truthy)
+        if (data.enable !== undefined && data.enable !== null) {
+            data.enable = data.enable && data.enable !== '0' ? 1 : 0;
+        }
+        // Step 2 : the resulting row's type and in-use state
+        const provider = data.provider ?? current.provider;
+        const enabled = data.enable ?? current.enable;
+        const typeChanged = data.provider !== undefined && current.provider !== undefined && data.provider !== current.provider;
+        // Step 3 : a row put in use, or an in-use row moved to another type, is the only one of its type
+        if (enabled && (data.enable || typeChanged)) {
             if (!opts.fromSeed) {
-                const held = await mysql.do('SELECT name FROM AnsibleForms.`oauth2_providers` WHERE enable = 1 AND managed = 1 AND provider = ?', [data.provider]);
+                const held = await mysql.do('SELECT name FROM AnsibleForms.`oauth2_providers` WHERE enable = 1 AND managed = 1 AND provider = ?', [provider]);
                 if (held.length) {
-                    throw new Errors.AccessDeniedError(`The enabled '${data.provider}' provider is managed by the config seed ('${held[0].name}') and cannot be displaced here`);
+                    throw new Errors.AccessDeniedError(`The enabled '${provider}' provider is managed by the config seed ('${held[0].name}') and cannot be displaced here`);
                 }
             }
             logger.info('Unsetting enable on all other OAuth2 records');
             // the seed clears every row of this provider type ; an API caller only the
             // unmanaged ones (see the matching note in runner.model.js)
             await mysql.do('UPDATE AnsibleForms.`oauth2_providers` SET enable = 0 WHERE provider = ?'
-              + (opts.fromSeed ? '' : ' AND managed = 0'), [data.provider]);
+              + (opts.fromSeed ? '' : ' AND managed = 0'), [provider]);
         }
         // Skip the login page : one provider at most sends users straight to it, the others stop
         if (data.auto_login && data.auto_login !== '0') {
@@ -103,7 +131,9 @@ class OAuth2 extends CrudModel {
             const credential = 'credential' in data ? data.credential : current.credential;
             if (!credential) this.assertEntraTenant(data.provider ?? current.provider, 'tenant_id' in data ? data.tenant_id : current.tenant_id);
         }
-        data = await this.preProcess(data, 'update', opts);
+        // the stored type and in-use state : the request names only what it changes
+        const stored = (await mysql.do('SELECT provider, enable FROM AnsibleForms.`oauth2_providers` WHERE id=?', [id]))?.[0] || {};
+        data = await this.preProcess(data, 'update', opts, stored);
         return super.update(this.modelName, data, id, opts);
     }
     static async delete(id, opts = {}) {
