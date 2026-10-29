@@ -2539,12 +2539,14 @@ onBeforeUnmount(() => {
           type="text"
           class="form-control"
           v-model="scheduleForm.name"
-          :placeholder="scheduleAction === 'schedule' ? 'e.g., Daily Backup' : 'e.g., Maintenance Window'"
+          :placeholder="
+            scheduleAction === 'schedule' ? t('form.scheduleNamePlaceholder') : t('form.jobNamePlaceholder')
+          "
           :disabled="scheduleSubmitting"
         />
-        <small class="form-text text-muted"
-          >A descriptive name for this {{ scheduleAction === 'schedule' ? 'schedule' : 'job' }}</small
-        >
+        <small class="form-text text-muted">{{
+          scheduleAction === 'schedule' ? t('form.scheduleNameHint') : t('form.jobNameHint')
+        }}</small>
       </div>
 
       <div class="mb-3" v-if="scheduleAction === 'schedule'">
@@ -2565,7 +2567,7 @@ onBeforeUnmount(() => {
           teleport
           :disabled="scheduleSubmitting"
         />
-        <small class="form-text text-muted">Select the date and time to run this job once</small>
+        <small class="form-text text-muted">{{ t('form.runAtHint') }}</small>
       </div>
     </template>
     <template #actions>
@@ -2596,7 +2598,7 @@ onBeforeUnmount(() => {
           type="text"
           class="form-control"
           v-model="storeForm.name"
-          placeholder="e.g., Production Config"
+          :placeholder="t('form.storeNamePlaceholder')"
           :disabled="storeSubmitting"
         />
       </div>
