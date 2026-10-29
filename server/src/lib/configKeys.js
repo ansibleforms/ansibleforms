@@ -2,11 +2,12 @@
 // The base configuration's keys a repository may hold, one usage type each (lib/repoObjects/types.js)
 // : the roles (use_for_roles, Access), the categories and the constants (use_for_categories,
 // use_for_constants, Designer), one repository at most each. Each key is read on its own from its
-// type's repository : from the file that gives it at its top level (roles:, categories:,
-// constants:), any name, any folder (lib/repoObjects/repoFiles.js) - two files giving it are not
+// type's repository : from the file that gives it at its top level (controller_roles:,
+// controller_categories:, controller_constants:), any name, any folder
+// (lib/repoObjects/repoFiles.js) - two files giving it are not
 // read, both named ; its own file at the root (roles.yaml) without the key is read and refused,
 // never the base's served in its place - else from the config.yaml of before at its root, which
-// may leave it out
+// may leave it out, its keys plain there (roles:, categories:, constants:)
 // (deprecated since 7.5.0, no longer read in 8.0.0 : said in the server log once per load, in the
 // repository's pull output and on its page), and written back to the file it was read from -
 // config.yaml stays config.yaml until it is moved - or a new one of its own (roles.yaml ...).
@@ -24,6 +25,7 @@ import Repo from "../models/repo.model.js";
 import _ from "lodash";
 import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js";
 import { scanRepository } from "./repoObjects/repoFiles.js";
+import { fileKeyOf } from "./repoObjects/types.js";
 
 // ===========================================================================
 // THE KEYS
@@ -49,6 +51,18 @@ export const CONFIG_KEYS = [
 
 // the one file the three keys were in before (use_for_config) : still read, deprecated
 export const LEGACY_FILE = "config.yaml";
+
+/**
+ * The top-level key a key's file gives it by : controller_ and the key (controller_roles), the
+ * plain key in config.yaml of before (roles).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string: the key, as its file writes it.
+ */
+export const fileKeyIn = (source) => (source.deprecated ? source.key : fileKeyOf(source.key));
 
 // a ytt template : a line starting (after spaces) with #@, the test the settings pages, the
 // designer and the health page use
@@ -98,10 +112,9 @@ export async function keySources() {
     // the repository's files, read once for its keys
     if (!scans.has(repo.name)) scans.set(repo.name, scanRepository(dir));
     const scan = scans.get(repo.name);
-    // the files giving it, config.yaml of before only when no other one does (or one that cannot
-    // be read, its lines seeming to give it)
-    const giving = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file)].sort();
-    const own = giving.filter((f) => f !== LEGACY_FILE);
+    // the files giving it (or one that cannot be read, its lines seeming to give it), config.yaml
+    // of before (its plain keys) only when none does
+    const own = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file)].sort();
     const named = path.join(dir, k.file);
     const legacy = path.join(dir, LEGACY_FILE);
     if (own.length) {
@@ -126,7 +139,7 @@ export async function keySources() {
  *   string: the notice.
  */
 export const deprecationNotice = (source) =>
-  `${source.key} read from ${LEGACY_FILE}: deprecated, move them to a file of their own (${source.key}: in any file, ${CONFIG_KEYS.find((k) => k.key === source.key)?.file || `${source.key}.yaml`} for instance ; ${LEGACY_FILE} is no longer read in 8.0.0)`;
+  `${source.key} read from ${LEGACY_FILE}: deprecated, move them to a file of their own (${fileKeyOf(source.key)}: in any file, ${CONFIG_KEYS.find((k) => k.key === source.key)?.file || `${source.key}.yaml`} for instance ; ${LEGACY_FILE} is no longer read in 8.0.0)`;
 
 /**
  * The keys of a repository read from config.yaml, for its pull output and its page.
@@ -203,8 +216,10 @@ function mapDocument(text) {
  *
  * Args:
  *   text (string): the text to change.
- *   key (string): the key.
+ *   key (string): the key, as the text writes it (roles in the configuration, controller_roles in
+ *     a key's file).
  *   from (YAML.Document): the document that gives it (mapDocument).
+ *   fromKey (string): the key as `from` writes it ; the same when not given.
  *
  * Returns:
  *   string: the text, as it is when `from` has no such key.
@@ -212,12 +227,12 @@ function mapDocument(text) {
  * Raises:
  *   Error: the text is not valid YAML, or not a map.
  */
-function withKeyOf(text, key, from) {
-  const pair = from.contents.items.find((p) => keyOf(p) === key);
+function withKeyOf(text, key, from, fromKey = key) {
+  const pair = from.contents.items.find((p) => keyOf(p) === fromKey);
   if (!pair) return text;
   const original = String(text ?? "");
   // what the text must read as : its keys, that one's value the one `from` reads as
-  const wanted = { ...(mapDocument(original).toJS() || {}), [key]: (from.toJS() || {})[key] };
+  const wanted = { ...(mapDocument(original).toJS() || {}), [key]: (from.toJS() || {})[fromKey] };
   const laid = (valueOf) => {
     const doc = mapDocument(original);
     const value = valueOf(doc);
@@ -230,7 +245,10 @@ function withKeyOf(text, key, from) {
         there.key.commentBefore = pair.key.commentBefore;
       }
     } else {
-      doc.contents.items.push(doc.createPair(YAML.isNode(pair.key) ? pair.key.clone() : key, value));
+      // the key as the text writes it, the comment above it kept
+      const newKey = YAML.isNode(pair.key) ? pair.key.clone() : doc.createNode(key);
+      if (YAML.isScalar(newKey)) newKey.value = key;
+      doc.contents.items.push(doc.createPair(newKey, value));
     }
     return original.trim() ? editedText(doc, original) : doc.toString({ lineWidth: 0 });
   };
@@ -288,8 +306,8 @@ function keyText(doc, text, key) {
 // READ : THE KEYS LAID OVER THE BASE CONFIGURATION
 // ===========================================================================
 
-// the document of each key file last read whole, by its path and its key (a config.yaml of before
-// gives several keys, each read and checked on its own) : a file broken in git afterwards keeps its
+// the document of each key file last read whole ({ doc, key : the key as it writes it }), by its
+// path and its key (a config.yaml of before gives several keys, each read and checked on its own) : a file broken in git afterwards keeps its
 // keys as they were (composeConfig) ; and what was last said of a file that is not read
 const lastRead = new Map();
 const reported = new Map();
@@ -326,7 +344,7 @@ export function resetKeyReadsForTests() {
  */
 const absentProblem = (source) => {
   if (source.missing) return "its repository is not cloned";
-  if (!source.exists && lastHeld.has(heldKey(source))) return `no file of its repository gives ${source.key}: any more`;
+  if (!source.exists && lastHeld.has(heldKey(source))) return `no file of its repository gives ${fileKeyOf(source.key)}: any more`;
   return null;
 };
 
@@ -373,7 +391,7 @@ export function composeConfig(baseText, sources, render) {
     try {
       const absent = absentProblem(s);
       if (absent) throw new Error(absent);
-      from = keyDocument(s, render(s.path));
+      from = { doc: keyDocument(s, render(s.path)), key: fileKeyIn(s) };
       lastRead.set(readKey(s), from);
       lastHeld.set(heldKey(s), from);
       reported.delete(readKey(s));
@@ -386,10 +404,10 @@ export function composeConfig(baseText, sources, render) {
       const line = `${s.repository}/${s.file} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
       if (reported.get(readKey(s)) !== line) logger.error(line);
       reported.set(readKey(s), line);
-      if (!from && closed) from = mapDocument(YAML.stringify({ [s.key]: closed }));
+      if (!from && closed) from = { doc: mapDocument(YAML.stringify({ [s.key]: closed })), key: s.key };
       if (!from) continue;
     }
-    text = withKeyOf(text, s.key, from);
+    text = withKeyOf(text, s.key, from.doc, from.key);
   }
   return text;
 }
@@ -414,11 +432,11 @@ function keyDocument(source, text) {
   if (source.several) throw new Error(`${source.several.length} files give its ${source.key} (${source.several.join(", ")}): one file at most gives them`);
   const doc = mapDocument(text);
   // its own file giving no key (a typo, a plain map, a form saved under its name) : never read
-  if (source.notGiving) throw new Error(`it does not give its ${source.key} (a top-level '${source.key}:' key)`);
-  const value = (doc.toJS() || {})[source.key];
+  if (source.notGiving) throw new Error(`it does not give its ${source.key} (a top-level '${fileKeyIn(source)}:' key)`);
+  const value = (doc.toJS() || {})[fileKeyIn(source)];
   // a key's own file without its key (a plain map, a typo in the key) : not read - taken as it is,
   // it would serve the base's value without a word ; config.yaml of before may give some keys only
-  if (value === undefined && !source.deprecated) throw new Error(`it does not give its ${source.key} (a top-level '${source.key}:' key)`);
+  if (value === undefined && !source.deprecated) throw new Error(`it does not give its ${source.key} (a top-level '${fileKeyIn(source)}:' key)`);
   const list = CONFIG_KEYS.find((k) => k.key === source.key)?.list;
   if (value === undefined || value === null || list === undefined) return doc;
   if (list && !Array.isArray(value)) throw new Error(`its ${source.key} must be a list`);
@@ -547,8 +565,10 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
       for (const s of list) {
         const text = fs.existsSync(s.path) ? fs.readFileSync(s.path, "utf8") : "";
         let next;
-        if (saved) next = withKeyOf(text, s.key, saved);
-        else next = text.trim() ? updateMapFile(text, { [s.key]: doc[s.key] }) : newMapFile({ [s.key]: doc[s.key] });
+        // the key as its file writes it (controller_roles ; roles in config.yaml of before)
+        const key = fileKeyIn(s);
+        if (saved) next = withKeyOf(text, key, saved, s.key);
+        else next = text.trim() ? updateMapFile(text, { [key]: doc[s.key] }) : newMapFile({ [key]: doc[s.key] });
         if (next !== text) fs.writeFileSync(s.path, next, "utf8");
         logger.info(`Saved the ${s.key} into ${repository}/${s.file}`);
       }

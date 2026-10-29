@@ -1341,37 +1341,43 @@ export default {
         playbooks: 'Ansible-Playbooks, die die Formulare ausführen (nur ein Repository)',
         workflows: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
         inventories: 'Ein Inventar: inventory.yaml, group_vars und host_vars in seiner Wurzel',
-        schedules: 'Zeitpläne, Einträge einer Liste schedules: in einer seiner YAML-Dateien',
-        sso: 'SSO-Anbieter, Einträge einer Liste sso: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
-        ldap: 'LDAP-Verzeichnisse, Einträge einer Liste ldap: in einer seiner YAML-Dateien, in ihrer Suchreihenfolge',
-        disclaimer: 'Versionen des Haftungsausschlusses, Einträge einer Liste disclaimer: in einer seiner YAML-Dateien',
+        schedules: 'Zeitpläne, Einträge einer Liste controller_schedules: in einer seiner YAML-Dateien',
+        sso: 'SSO-Anbieter, Einträge einer Liste controller_sso: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        ldap: 'LDAP-Verzeichnisse, Einträge einer Liste controller_ldap: in einer seiner YAML-Dateien, in ihrer Suchreihenfolge',
+        disclaimer:
+          'Versionen des Haftungsausschlusses, Einträge einer Liste controller_disclaimer: in einer seiner YAML-Dateien',
         credentials:
-          'Anmeldedaten, Einträge einer Liste credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
+          'Anmeldedaten, Einträge einer Liste controller_credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
         secret_stores:
-          'Secret Stores, Einträge einer Liste secret_stores: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
-        runners: 'Runner, Einträge einer Liste runners: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
-        notifications: 'Benachrichtigungen, Einträge einer Liste notifications: in einer seiner YAML-Dateien',
-        syslog: 'Syslog-Server, Einträge einer Liste syslog: in einer seiner YAML-Dateien',
+          'Secret Stores, Einträge einer Liste controller_secret_stores: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        runners:
+          'Runner, Einträge einer Liste controller_runners: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        notifications:
+          'Benachrichtigungen, Einträge einer Liste controller_notifications: in einer seiner YAML-Dateien',
+        syslog: 'Syslog-Server, Einträge einer Liste controller_syslog: in einer seiner YAML-Dateien',
         chat_assistant:
-          'Der Chat-Assistent, unter chat_assistant: in einer seiner YAML-Dateien, der Schlüssel nur als Umgebungsverweis',
-        mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, unter mcp: in einer seiner YAML-Dateien',
+          'Der Chat-Assistent, unter controller_chat_assistant: in einer seiner YAML-Dateien, der Schlüssel nur als Umgebungsverweis',
+        mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, unter controller_mcp: in einer seiner YAML-Dateien',
         defaults:
-          'Design, Farbe, Formularansicht, Zeitzone, Datumsformat und Sprache, unter defaults: in einer seiner YAML-Dateien',
-        logo: 'Das Logo, unter logo: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
-        icon: 'Das Website-Symbol, unter icon: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
-        name: 'Der Name der App, unter name: in einer seiner YAML-Dateien',
-        links: 'Die Links der Kopfzeile und der Link zum Designer, unter links: in einer seiner YAML-Dateien',
+          'Design, Farbe, Formularansicht, Zeitzone, Datumsformat und Sprache, unter controller_defaults: in einer seiner YAML-Dateien',
+        logo: 'Das Logo, unter controller_logo: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        icon: 'Das Website-Symbol, unter controller_icon: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        name: 'Der Name der App, unter controller_name: in einer seiner YAML-Dateien',
+        links:
+          'Die Links der Kopfzeile und der Link zum Designer, unter controller_links: in einer seiner YAML-Dateien',
         labels:
-          'Die Labels neben dem Logo, Einträge einer Liste labels: in einer seiner YAML-Dateien, in ihrer Reihenfolge',
-        announcements: 'Ankündigungen, Einträge einer Liste announcements: in einer seiner YAML-Dateien',
+          'Die Labels neben dem Logo, Einträge einer Liste controller_labels: in einer seiner YAML-Dateien, in ihrer Reihenfolge',
+        announcements: 'Ankündigungen, Einträge einer Liste controller_announcements: in einer seiner YAML-Dateien',
         general:
-          'Die Einstellungen unter Allgemein nach ihrem Umgebungsnamen, unter general: in einer seiner YAML-Dateien',
-        roles: 'Die Rollen, unter roles: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+          'Die Einstellungen unter Allgemein nach ihrem Umgebungsnamen, unter controller_general: in einer seiner YAML-Dateien',
+        roles:
+          'Die Rollen, unter controller_roles: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
         categories:
-          'Die Kategorien, unter categories: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+          'Die Kategorien, unter controller_categories: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
         constants:
-          'Die Konstanten, unter constants: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
-        repositories: 'Die anderen Repositories, Einträge einer Liste repositories: in einer seiner YAML-Dateien',
+          'Die Konstanten, unter controller_constants: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        repositories:
+          'Die anderen Repositories, Einträge einer Liste controller_repositories: in einer seiner YAML-Dateien',
       },
       usageOnTitle: '{type} einschalten',
       usageOnQuestion: '{name} für {type} verwenden?',

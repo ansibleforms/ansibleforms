@@ -52,7 +52,7 @@ import { fileBeside, fileInRepository, appendListEntries, editListEntry, removeL
 import { scanRepository } from "./repoFiles.js";
 import { given } from "./secrets.js";
 import { canonicalJson } from "../seedCompare.js";
-import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
+import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf, fileKeyOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 
 // ===========================================================================
@@ -113,6 +113,18 @@ const titleOf = (desc) => desc.title || desc.key;
  *   string: what the type holds, as a sentence names it (General, the credentials).
  */
 const holdingOf = (desc) => (desc.single ? titleOf(desc) : `the ${titleOf(desc).toLowerCase()}`);
+
+/**
+ * The top-level key a repository's files give a type by (types.js fileKeyOf : controller_ and its
+ * key) : the one read, written and said in the messages.
+ *
+ * Args:
+ *   desc (object): the type's descriptor.
+ *
+ * Returns:
+ *   string: its file key (controller_credentials).
+ */
+const fileKey = (desc) => fileKeyOf(desc.key);
 
 /**
  * Whether a repository's working tree is there.
@@ -299,7 +311,7 @@ export function assertTypeReadable(desc, name, scan = scanOf(name)) {
   const unread = scan.hinted(desc.key);
   if (!unread.length) return;
   const files = unread.map((u) => `${u.file} (${u.errors.join("; ")})`).join(", ");
-  throw new Errors.ConflictError(`Repository '${name}' cannot be written for ${holdingOf(desc)}: ${files} seems to give ${desc.key}: but cannot be read - fix it in git and pull, then save again`);
+  throw new Errors.ConflictError(`Repository '${name}' cannot be written for ${holdingOf(desc)}: ${files} seems to give ${fileKey(desc)}: but cannot be read - fix it in git and pull, then save again`);
 }
 
 /**
@@ -352,7 +364,7 @@ function readRepoFile(repository, repoFile) {
 export function writeEntries(desc, repository, repoFile, entries) {
   const text = readRepoFile(repository, repoFile);
   const skipped = [];
-  const next = appendListEntries(text, desc.key, entries, desc.keyOrder || [], desc.nameField || "name", skipped);
+  const next = appendListEntries(text, fileKey(desc), entries, desc.keyOrder || [], desc.nameField || "name", skipped);
   if (skipped.length) {
     throw new Errors.ConflictError(`${repository}/${repoFile} has an entry named ${skipped.map((n) => `'${n}'`).join(", ")} already: not written beside it`);
   }
@@ -376,7 +388,7 @@ export function writeEntries(desc, repository, repoFile, entries) {
 export function entryFileOf(desc, repository, name, hint = null) {
   const field = desc.nameField || "name";
   try {
-    if (hint && hasListEntry(readRepoFile(repository, hint), desc.key, name, field)) return hint;
+    if (hint && hasListEntry(readRepoFile(repository, hint), fileKey(desc), name, field)) return hint;
   } catch {
     // its file outside the repository : looked for among the others
   }
@@ -404,7 +416,7 @@ export function entryFileOf(desc, repository, name, hint = null) {
 export function editEntry(desc, repository, name, hint, mutate, whole = null) {
   const file = entryFileOf(desc, repository, name, hint) || hint;
   const text = readRepoFile(repository, file);
-  const next = editListEntry(text, desc.key, name, mutate, { nameField: desc.nameField || "name", whole, keyOrder: desc.keyOrder || [] });
+  const next = editListEntry(text, fileKey(desc), name, mutate, { nameField: desc.nameField || "name", whole, keyOrder: desc.keyOrder || [] });
   if (next === text) return null;
   writeRepoFile(repository, file, next);
   return file;
@@ -427,7 +439,7 @@ export function removeEntry(desc, repository, name, hint = null) {
   const file = entryFileOf(desc, repository, name, hint);
   if (!file) return null;
   const text = readRepoFile(repository, file);
-  const out = removeListEntry(text, desc.key, name, desc.nameField || "name");
+  const out = removeListEntry(text, fileKey(desc), name, desc.nameField || "name");
   if (out.text === text && !out.empty) return null;
   writeRepoFile(repository, file, out.empty ? "" : out.text);
   return file;
@@ -550,7 +562,7 @@ async function readEntries(desc, name, ctx, scan) {
     if (value === null || value === undefined) continue;
     if (!Array.isArray(value)) {
       held.add(file);
-      refused.push({ file, reasons: [`'${desc.key}' must be a list of ${desc.noun} entries`] });
+      refused.push({ file, reasons: [`'${fileKey(desc)}' must be a list of ${desc.noun} entries`] });
       continue;
     }
     value.forEach((item, index) => {
@@ -752,7 +764,7 @@ export async function syncRepository(desc, name, opts = {}) {
   if (!any && desc.noKeyUnlinks) {
     const unlinked = await desc.store.unlink(name);
     if (unlinked) CrudModel.changed(desc.model);
-    summary.notes.push(`No file of the repository gives ${desc.key}: - the app keeps ${holdingOf(desc)} as it has them${unlinked ? `, ${unlinked} no longer linked to it` : ""}`);
+    summary.notes.push(`No file of the repository gives ${fileKey(desc)}: - the app keeps ${holdingOf(desc)} as it has them${unlinked ? `, ${unlinked} no longer linked to it` : ""}`);
     return summary;
   }
   // step 2 : the objects there are : this repository's by name, the names of the others
@@ -1429,13 +1441,11 @@ function notHeldHint(scan, repo) {
   for (const f of scan.files) {
     for (const key of f.keys) {
       if (flagOn(repo?.[typeOf(key)?.flag])) continue;
-      // config.yaml of before : the base configuration a forms repository may serve, never a hint
-      if (typeOf(key)?.config && f.file === "config.yaml") continue;
       notHeld.set(key, [...(notHeld.get(key) || []), f.file]);
     }
   }
   if (!notHeld.size) return "";
-  const what = [...notHeld].map(([key, files]) => `${key}: (${files.join(", ")})`).join(", ");
+  const what = [...notHeld].map(([key, files]) => `${fileKeyOf(key)}: (${files.join(", ")})`).join(", ");
   return `\nNot read, the repository is not used for them: ${what} - turn the usage on to read them`;
 }
 
@@ -1606,7 +1616,7 @@ export async function filesNow(desc, name) {
   for (const { file, value } of scan.holding(desc.key)) {
     if (value === null || value === undefined) continue;
     if (!Array.isArray(value)) {
-      refused.push({ file, reasons: [`'${desc.key}' must be a list of ${desc.noun} entries`] });
+      refused.push({ file, reasons: [`'${fileKey(desc)}' must be a list of ${desc.noun} entries`] });
       continue;
     }
     for (const item of value) {
@@ -2180,12 +2190,12 @@ function singleOf(desc, scan) {
   const refused = scan.hinted(desc.key).map((u) => ({ file: u.file, reasons: u.errors }));
   if (holding.length > 1) {
     const files = holding.map((f) => f.file);
-    refused.push({ file: files.join(", "), reasons: [`${desc.key}: is given by ${files.length} files (${files.join(", ")}): one file at most gives it`] });
+    refused.push({ file: files.join(", "), reasons: [`${fileKey(desc)}: is given by ${files.length} files (${files.join(", ")}): one file at most gives it`] });
   }
   const first = holding[0] || null;
   let value = first ? first.value : null;
   if (first && (value === null || value === undefined)) value = {};
-  if (first && (typeof value !== "object" || Array.isArray(value))) refused.push({ file: first.file, reasons: [`'${desc.key}' must be a dictionary`] });
+  if (first && (typeof value !== "object" || Array.isArray(value))) refused.push({ file: first.file, reasons: [`'${fileKey(desc)}' must be a dictionary`] });
   return { file: first?.file || null, value, refused };
 }
 
@@ -2221,14 +2231,14 @@ function writeSingle(desc, name, file, out, gone = []) {
   // step 1 : nothing written when one of them would overwrite a file that is not the type's
   for (const extra of extras) {
     if (extra.own || !fs.existsSync(extra.abs) || Buffer.compare(fs.readFileSync(extra.abs), extra.buffer) === 0) continue;
-    throw new Error(`'${extra.name}' is in repository '${name}' already and is not the one ${file} names: rename or remove it, or name the image under ${desc.key}: in ${file}`);
+    throw new Error(`'${extra.name}' is in repository '${name}' already and is not the one ${file} names: rename or remove it, or name the image under ${fileKey(desc)}: in ${file}`);
   }
   // step 2 : the YAML, then the files it names
   let written = false;
   const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
   let next = text;
-  if (out.object) next = editMapEntry(text, desc.key, (doc, map) => applyEdits(doc, map, sortedByOrder(out.object, desc.keyOrder || []), desc.keyOrder || []));
-  else if (out.edits && Object.keys(out.edits).length) next = editMapEntry(text, desc.key, (doc, map) => applyEdits(doc, map, out.edits, out.keyOrder || desc.keyOrder || []));
+  if (out.object) next = editMapEntry(text, fileKey(desc), (doc, map) => applyEdits(doc, map, sortedByOrder(out.object, desc.keyOrder || []), desc.keyOrder || []));
+  else if (out.edits && Object.keys(out.edits).length) next = editMapEntry(text, fileKey(desc), (doc, map) => applyEdits(doc, map, out.edits, out.keyOrder || desc.keyOrder || []));
   if (next !== text) {
     writeRepoFile(name, file, next);
     written = true;
@@ -2274,7 +2284,7 @@ async function syncSingle(desc, name, opts = {}) {
     return summary;
   }
   if (!file) {
-    summary.notes.push(`No file of the repository gives ${desc.key}: - the app keeps ${holdingOf(desc)} as it is`);
+    summary.notes.push(`No file of the repository gives ${fileKey(desc)}: - the app keeps ${holdingOf(desc)} as it is`);
     return summary;
   }
   const raw = value;
@@ -2293,7 +2303,7 @@ async function syncSingle(desc, name, opts = {}) {
   const current = await desc.current();
   // the config seed's whole object (the chat assistant's settings) : not applied, said
   if (desc.heldBySeed(current)) {
-    summary.notes.push(`Kept by the config seed, not applied: ${desc.key}: of ${file}`);
+    summary.notes.push(`Kept by the config seed, not applied: ${fileKey(desc)}: of ${file}`);
     summary.unchanged = 1;
     return summary;
   }
@@ -2314,10 +2324,10 @@ async function syncSingle(desc, name, opts = {}) {
     keptSecrets(await desc.current());
     summary.updated = 1;
     CrudModel.changed(desc.model);
-    logger.notice(`Applied ${desc.key}: of ${name}/${file}: the app follows git for ${holdingOf(desc)} from now on`);
+    logger.notice(`Applied ${fileKey(desc)}: of ${name}/${file}: the app follows git for ${holdingOf(desc)} from now on`);
   } catch (e) {
     summary.refused.push({ file, reasons: [`not saved: ${e.message || e}`] });
-    logger.warning(`Could not apply ${desc.key}: of ${name}/${file}: ${e.message || e}`);
+    logger.warning(`Could not apply ${fileKey(desc)}: of ${name}/${file}: ${e.message || e}`);
   }
   return summary;
 }

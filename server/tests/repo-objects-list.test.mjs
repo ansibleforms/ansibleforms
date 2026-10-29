@@ -59,9 +59,9 @@ const desc = () => RepoObjects.descriptorOf("repositories");
 
 const writeList = (items) => {
   fs.mkdirSync(path.join(fx.ROOT, "hub"), { recursive: true });
-  fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), YAML.stringify({ repositories: items }));
+  fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), YAML.stringify({ controller_repositories: items }));
 };
-const readList = () => YAML.parse(fs.readFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "utf8")).repositories;
+const readList = () => YAML.parse(fs.readFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "utf8")).controller_repositories;
 const entry = (name, extra = {}) => ({ name, uri: `https://git.example.com/${name}.git`, branch: "main", ...extra });
 
 beforeEach(() => {
@@ -121,7 +121,7 @@ describe("a pull of repositories.yaml", () => {
 
   test("a repositories.yaml that is a link leading outside the repository is never read", async () => {
     const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-")), "list.yaml");
-    fs.writeFileSync(outside, YAML.stringify({ repositories: [entry("planted")] }));
+    fs.writeFileSync(outside, YAML.stringify({ controller_repositories: [entry("planted")] }));
     fs.mkdirSync(path.join(fx.ROOT, "hub"), { recursive: true });
     fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
     const out = await RepoObjects.afterGit("hub", fx.rowNamed("repositories", "hub"));
@@ -197,13 +197,13 @@ describe("a pull of repositories.yaml", () => {
   test("no repositories.yaml, or one that is no list : nothing changes", async () => {
     writeList([entry("forms")]);
     await RepoObjects.syncRepository(await desc(), "hub");
-    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "repositories:\n  name: forms\n");
+    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "controller_repositories:\n  name: forms\n");
     const broken = await RepoObjects.syncRepository(await desc(), "hub");
     assert.equal(broken.deleted, 0);
-    assert.match(broken.refused[0].reasons[0], /'repositories' must be a list/);
+    assert.match(broken.refused[0].reasons[0], /'controller_repositories' must be a list/);
     assert.equal(fx.rowNamed("repositories", "forms").repository, "hub", "kept, still linked");
     // a text under the key : no list of repositories, none given (unlinked, never deleted)
-    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "repositories: nope\n");
+    fs.writeFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "controller_repositories: nope\n");
     assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).deleted, 0);
     fs.rmSync(path.join(fx.ROOT, "hub", "repositories.yaml"));
     assert.equal((await RepoObjects.syncRepository(await desc(), "hub")).deleted, 0);
@@ -223,7 +223,7 @@ describe("a pull of repositories.yaml", () => {
     fx.cloneEmpty("hub");
     CrudModel.flushAllLocal();
     const text = await RepoObjects.afterGit("hub", { name: "hub", use_for_repositories: 1 }, { reset: true });
-    assert.match(text, /No file of the repository gives repositories: - the app keeps the repositories as it has them, 2 no longer linked to it/);
+    assert.match(text, /No file of the repository gives controller_repositories: - the app keeps the repositories as it has them, 2 no longer linked to it/);
     assert.equal(fx.rowNamed("repositories", "forms-a").repository, null);
     // one made in the app, pushed, then pulled : the others stay
     fx.state.tables.repositories.push({ id: 9, name: "new-one", uri: "https://git/n.git", branch: "main", description: "" });
@@ -242,7 +242,7 @@ describe("the question asked before it is turned on", () => {
   test("a repositories.yaml, or a one-file type's file, that is a link leading outside : said refused, never an error", async () => {
     fx.cloneEmpty("hub");
     const outside = path.join(os.tmpdir(), `af-outside-${process.pid}.yaml`);
-    fs.writeFileSync(outside, "repositories: []\n");
+    fs.writeFileSync(outside, "controller_repositories: []\n");
     try {
       fs.symlinkSync(outside, path.join(fx.ROOT, "hub", "repositories.yaml"));
       const p = await RepoObjects.preview(await desc(), "hub");
@@ -296,7 +296,7 @@ describe("the app's repositories to repositories.yaml", () => {
     await RepoObjects.activate(await desc(), "hub", { pull: false });
     assert.equal(
       fs.readFileSync(path.join(fx.ROOT, "hub", "repositories.yaml"), "utf8"),
-      "repositories:\n  - name: forms\n    uri: https://git/forms.git\n    branch: main\n  - name: ops\n    uri: https://git/ops.git\n    branch: main\n",
+      "controller_repositories:\n  - name: forms\n    uri: https://git/forms.git\n    branch: main\n  - name: ops\n    uri: https://git/ops.git\n    branch: main\n",
     );
   });
 

@@ -59,9 +59,9 @@ beforeEach(() => {
 
 describe("each key from its own file", () => {
   test("roles.yaml, categories.yaml, constants.yaml : read, laid over the base", async () => {
-    writeRaw("access", "roles.yaml", { roles: [{ name: "admin" }] });
-    writeRaw("design", "categories.yaml", { categories: [{ name: "Ops" }] });
-    writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    writeRaw("access", "roles.yaml", { controller_roles: [{ name: "admin" }] });
+    writeRaw("design", "categories.yaml", { controller_categories: [{ name: "Ops" }] });
+    writeRaw("design", "constants.yaml", { controller_constants: { env: "prod" } });
     const sources = await keys.keySources();
     assert.deepEqual(sources.map((s) => [s.key, s.repository, path.basename(s.path), s.deprecated]), [
       ["roles", "access", "roles.yaml", false],
@@ -79,14 +79,14 @@ describe("each key from its own file", () => {
     let [roles] = await keys.keySources();
     assert.equal(path.basename(roles.path), "config.yaml");
     assert.equal(roles.deprecated, true);
-    assert.equal(keys.deprecationNotice(roles), "roles read from config.yaml: deprecated, move them to a file of their own (roles: in any file, roles.yaml for instance ; config.yaml is no longer read in 8.0.0)");
+    assert.equal(keys.deprecationNotice(roles), "roles read from config.yaml: deprecated, move them to a file of their own (controller_roles: in any file, roles.yaml for instance ; config.yaml is no longer read in 8.0.0)");
     assert.deepEqual(await keys.repositoryDeprecations("access"), [{ key: "roles", file: "roles.yaml", notice: keys.deprecationNotice(roles) }]);
     assert.match(await keys.deprecationLines("access"), /^\nDeprecated: roles read from config.yaml/);
     // only its own key : the categories of that config.yaml are not the design repository's
     const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
     assert.deepEqual(doc.roles, [{ name: "old" }]);
     assert.deepEqual(doc.categories, [{ name: "Base" }]);
-    writeRaw("access", "roles.yaml", { roles: [{ name: "new" }] });
+    writeRaw("access", "roles.yaml", { controller_roles: [{ name: "new" }] });
     [roles] = await keys.keySources();
     assert.equal(path.basename(roles.path), "roles.yaml");
     assert.deepEqual(await keys.repositoryDeprecations("access"), []);
@@ -116,8 +116,8 @@ describe("written back to the file it was read from", () => {
     const config = read(path.join(fx.ROOT, "access", "config.yaml"));
     assert.ok(config.startsWith("# ours\nroles:\n  - name: admin\n"), config);
     assert.match(config, /categories:\n {2}- name: Old/);
-    assert.deepEqual(readObj("design", "categories.yaml"), { categories: [{ name: "Ops" }] });
-    assert.deepEqual(readObj("design", "constants.yaml"), { constants: { a: 1 } });
+    assert.deepEqual(readObj("design", "categories.yaml"), { controller_categories: [{ name: "Ops" }] });
+    assert.deepEqual(readObj("design", "constants.yaml"), { controller_constants: { a: 1 } });
     assert.equal(rest.roles, undefined);
     // what no repository holds goes to the base, the base's other keys kept
     const base = YAML.parse(keys.mergeIntoBase(read(BASE), { extra: true }));
@@ -141,7 +141,7 @@ describe("written back to the file it was read from", () => {
     assert.deepEqual(YAML.parse(read(BASE)).roles, [{ name: "base-role" }]);
     // the keys it does not hold are still saved
     await keys.writeConfigKeys({ categories: [{ name: "Ops" }] }, sources, { claim: false });
-    assert.deepEqual(readObj("design", "categories.yaml"), { categories: [{ name: "Ops" }] });
+    assert.deepEqual(readObj("design", "categories.yaml"), { controller_categories: [{ name: "Ops" }] });
   });
 
   test("the claim of each repository is taken when the caller does not hold it", async () => {
@@ -172,7 +172,7 @@ describe("as it is written : its comments, a ytt template", () => {
   });
 
   test("a key file that is a ytt template : said templated, never written over, the same value saved left alone", async () => {
-    const TEMPLATE = '#@ load("@ytt:data", "data")\nconstants:\n  env: #@ data.values.env\n';
+    const TEMPLATE = '#@ load("@ytt:data", "data")\ncontroller_constants:\n  env: #@ data.values.env\n';
     writeRaw("design", "constants.yaml", TEMPLATE);
     fx.cloneEmpty("access");
     const { default: Settings } = await import("../src/models/settings.model.js");
@@ -210,12 +210,12 @@ describe("as it is written : its comments, a ytt template", () => {
     assert.doesNotThrow(() => keys.assertKeysWritable(served, sources, served));
     const { rest } = await keys.writeConfigKeys({ ...served, categories: [{ name: "Ops" }] }, sources, { claim: false, served });
     assert.equal(rest.roles, undefined, "never written to the base in its place");
-    assert.deepEqual(readObj("design", "categories.yaml"), { categories: [{ name: "Ops" }] });
+    assert.deepEqual(readObj("design", "categories.yaml"), { controller_categories: [{ name: "Ops" }] });
     assert.throws(() => keys.assertKeysWritable({ ...served, roles: [{ name: "admin" }] }, sources, served), { status: 409, message: /held by repository 'access', which is not cloned/ });
   });
 
   test("a designer backup restored : the keys a repository holds go back to its file, not into the base", async () => {
-    writeRaw("access", "roles.yaml", "# the roles\nroles:\n  - name: admin\n");
+    writeRaw("access", "roles.yaml", "# the roles\ncontroller_roles:\n  - name: admin\n");
     fx.cloneEmpty("design");
     const backups = fs.mkdtempSync(path.join(os.tmpdir(), "af-config-backups-"));
     realConfig.formsBackupPath = backups;
@@ -225,13 +225,13 @@ describe("as it is written : its comments, a ytt template", () => {
     const name = await Form.backup(true);
     assert.ok(name);
     // changed since : in git and in the base
-    writeRaw("access", "roles.yaml", "# the roles\nroles:\n  - name: admin\n  - name: later\n");
+    writeRaw("access", "roles.yaml", "# the roles\ncontroller_roles:\n  - name: admin\n  - name: later\n");
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role" }], categories: [{ name: "Base" }], constants: { base: 2 } }));
     await Form.restoreBackup(name, true);
-    assert.equal(read(path.join(fx.ROOT, "access", "roles.yaml")), "# the roles\nroles:\n  - name: admin\n");
+    assert.equal(read(path.join(fx.ROOT, "access", "roles.yaml")), "# the roles\ncontroller_roles:\n  - name: admin\n");
     assert.deepEqual(YAML.parse(read(BASE)).roles, [{ name: "base-role" }], "the repository's roles not baked into the base");
     // the constants design holds (no file of its own yet) : given one, as a save would
-    assert.deepEqual(readObj("design", "constants.yaml"), { constants: { base: 1 } });
+    assert.deepEqual(readObj("design", "constants.yaml"), { controller_constants: { base: 1 } });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { base: 1 });
   });
 });
@@ -326,7 +326,7 @@ describe("a key file with anchors, or one that is not read", () => {
   });
 
   test("a base whose replaced key has an anchor another key names : the base read as it was, that key replaced", async () => {
-    writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    writeRaw("design", "constants.yaml", { controller_constants: { env: "prod" } });
     // the roles' repository cloned without a roles file : the base's (not cloned, they would be closed)
     fx.cloneEmpty("access");
     const base = "constants: &c\n  base: 1\nextra: *c\n";
@@ -335,10 +335,10 @@ describe("a key file with anchors, or one that is not read", () => {
   });
 
   test("a key file that is not read : its key as last read, else the base's ; said on its page and in its pull output", async () => {
-    writeRaw("access", "roles.yaml", { roles: [{ name: "admin" }] });
+    writeRaw("access", "roles.yaml", { controller_roles: [{ name: "admin" }] });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles, [{ name: "admin" }]);
     // a top-level list, then not YAML at all : the roles last read stay
-    for (const broken of ["- name: admin\n", "roles: [\n", "roles:\n  admin: {}\n"]) {
+    for (const broken of ["- name: admin\n", "controller_roles: [\n", "controller_roles:\n  admin: {}\n"]) {
       writeRaw("access", "roles.yaml", broken);
       const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
       assert.deepEqual(doc.roles, [{ name: "admin" }], broken);
@@ -359,18 +359,18 @@ describe("a key file with anchors, or one that is not read", () => {
     });
     // a file of another name that cannot be read, seeming to give them : the same
     fs.rmSync(path.join(fx.ROOT, "late", "categories.yaml"));
-    writeRaw("late", "team/cats.yml", "categories: [\n");
+    writeRaw("late", "team/cats.yml", "controller_categories: [\n");
     assert.match((await keys.repositoryKeyProblems("late"))[0].reason, /^not valid YAML/);
     assert.equal((await keys.repositoryKeyProblems("late"))[0].file, "team/cats.yml");
   });
 
   test("a key's own file without its key (a plain map, a typo) : not read, said ; config.yaml of before may leave keys out", async () => {
-    writeRaw("design", "constants.yaml", { constants: { env: "prod" } });
+    writeRaw("design", "constants.yaml", { controller_constants: { env: "prod" } });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { env: "prod" });
     // the plain map : the constants last read stay, never the base's
     writeRaw("design", "constants.yaml", { env: "test" });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { env: "prod" });
-    assert.deepEqual(await keys.repositoryKeyProblems("design"), [{ key: "constants", file: "constants.yaml", reason: "it does not give its constants (a top-level 'constants:' key)" }]);
+    assert.deepEqual(await keys.repositoryKeyProblems("design"), [{ key: "constants", file: "constants.yaml", reason: "it does not give its constants (a top-level 'controller_constants:' key)" }]);
     // a typo in the roles' key : the roles last read (else closed), never the base's
     writeRaw("access", "roles.yaml", { role: [{ name: "everyone", groups: ["local/users"] }] });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles.map((r) => r.name), ["admin", "default"]);
@@ -386,7 +386,7 @@ describe("a key file with anchors, or one that is not read", () => {
 
   test("the forms load with a key file broken in git : the roles last read served, never a failure", async () => {
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "base-role", groups: [] }], categories: [{ name: "Default", icon: "bars" }], constants: {} }));
-    writeRaw("access", "roles.yaml", { roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }] });
+    writeRaw("access", "roles.yaml", { controller_roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }] });
     const { default: Form } = await import("../src/models/form.model.js");
     assert.deepEqual((await Form.load(["admin"], "", false, true)).roles.map((r) => r.name), ["admin", "default"]);
     writeRaw("access", "roles.yaml", "- name: admin\n");
@@ -474,7 +474,7 @@ describe("the editor saved after a key file's anchors were laid as their values"
     // the configuration shown is the whole text as read, its comments and aliases gone
     const base = "# my config\ncategories:\n  # the ops team\n  - name: Ops # main\n    icon: bars\nconstants: &c\n  admins: &admins\n    - local/admins\nroles:\n  # admin role\n  - name: admin\n    groups: *admins\n";
     const sources = [{ key: "constants", repository: "design", path: "/x/constants.yaml", exists: true }];
-    const shown = keys.composeConfig(base, sources, () => "constants:\n  env: prod\n");
+    const shown = keys.composeConfig(base, sources, () => "controller_constants:\n  env: prod\n");
     assert.doesNotMatch(shown, /# admin role/);
     const served = YAML.parse(shown);
     // a category added, nothing else changed
@@ -487,7 +487,7 @@ describe("the editor saved after a key file's anchors were laid as their values"
     // the settings' editor : the same, the text it showed being the one served
     fx.rowNamed("repositories", "access").use_for_roles = 0;
     fs.writeFileSync(BASE, base);
-    writeRaw("design", "constants.yaml", "constants:\n  env: prod\n");
+    writeRaw("design", "constants.yaml", "controller_constants:\n  env: prod\n");
     const { default: Settings } = await import("../src/models/settings.model.js");
     const editor = await Settings.getActiveConfig();
     await Settings.saveActiveConfig(editor.replace("icon: bars", "icon: bars\n  - name: Dev\n    icon: code"), { ignoreDesignerLock: true });
@@ -535,7 +535,7 @@ describe("a roles file never read on this node, broken", () => {
     fx.rowNamed("repositories", "access").use_for_roles = 0;
     fx.state.tables.repositories.push({ id: 3, name: "fresh-roles", use_for_roles: 1 });
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "admin", groups: ["corp/everyone"] }, { name: "default", groups: [] }], categories: [{ name: "Base" }] }));
-    writeRaw("fresh-roles", "roles.yaml", "roles:\n  admin: {}\n");
+    writeRaw("fresh-roles", "roles.yaml", "controller_roles:\n  admin: {}\n");
     const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
     assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }]);
     assert.deepEqual(doc.categories, [{ name: "Base" }], "the other keys untouched");
@@ -566,7 +566,7 @@ describe("a roles file never read on this node, broken", () => {
     fx.state.tables.repositories.push({ id: 3, name: "fresh-roles", use_for_roles: 1 });
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "admin", groups: ["corp/everyone"] }, { name: "default", groups: [] }], categories: [{ name: "Default", icon: "bars" }], constants: {} }));
     // broken in git, never read on this node (a restart) : closed
-    writeRaw("fresh-roles", "roles.yaml", "roles:\n  - name: admin\n    groups: [local/admins\n");
+    writeRaw("fresh-roles", "roles.yaml", "controller_roles:\n  - name: admin\n    groups: [local/admins\n");
     const { default: Form } = await import("../src/models/form.model.js");
     const config = await Form.load(["admin"], "", false, true);
     assert.deepEqual(config.roles.map((r) => r.name), ["admin", "default"]);
@@ -582,7 +582,7 @@ describe("a key file not there to read : gone from its repository, or its reposi
   // the base keeps the roles of before the repository held them (a save never takes a held key out
   // of it) : bob was admin then, the repository's roles.yaml took that away
   const base = YAML.stringify({ roles: [{ name: "admin", users: ["local/bob"], groups: ["local/admins"] }, { name: "default" }], categories: [{ name: "Base" }], constants: { base: 1 } });
-  const repoRoles = { roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default" }] };
+  const repoRoles = { controller_roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default" }] };
   const holding = (name, flags = { use_for_roles: 1 }) => {
     fx.rowNamed("repositories", "access").use_for_roles = 0;
     fx.state.tables.repositories.push({ id: 3, name, ...flags });
@@ -595,12 +595,12 @@ describe("a key file not there to read : gone from its repository, or its reposi
     writeRaw("moved-roles", "roles.yaml", repoRoles);
     assert.deepEqual(admins(await served()), []);
     fs.rmSync(path.join(fx.ROOT, "moved-roles", "roles.yaml"));
-    assert.deepEqual((await served()).roles, repoRoles.roles, "bob never admin again");
-    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), [{ key: "roles", file: "roles.yaml", reason: "no file of its repository gives roles: any more" }]);
-    assert.match(await keys.deprecationLines("moved-roles"), /\nNot read: roles\.yaml: no file of its repository gives roles: any more - the roles last read from it/);
+    assert.deepEqual((await served()).roles, repoRoles.controller_roles, "bob never admin again");
+    assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), [{ key: "roles", file: "roles.yaml", reason: "no file of its repository gives controller_roles: any more" }]);
+    assert.match(await keys.deprecationLines("moved-roles"), /\nNot read: roles\.yaml: no file of its repository gives controller_roles: any more - the roles last read from it/);
     // a save of the roles writes the file again
     await keys.writeConfigKeys({ roles: [{ name: "admin", groups: ["local/admins"] }] }, await keys.keySources(), { claim: false });
-    assert.deepEqual(readObj("moved-roles", "roles.yaml"), { roles: [{ name: "admin", groups: ["local/admins"] }] });
+    assert.deepEqual(readObj("moved-roles", "roles.yaml"), { controller_roles: [{ name: "admin", groups: ["local/admins"] }] });
     assert.deepEqual(await keys.repositoryKeyProblems("moved-roles"), []);
   });
 
@@ -612,9 +612,9 @@ describe("a key file not there to read : gone from its repository, or its reposi
     assert.match(await keys.deprecationLines("uncloned-roles"), /\nNot read: roles\.yaml: its repository is not cloned - the roles last read from it \(else only the admin role of local\/admins\)/);
     // read once, then its working copy gone while it is cloned again : the roles last read
     writeRaw("uncloned-roles", "roles.yaml", repoRoles);
-    assert.deepEqual((await served()).roles, repoRoles.roles);
+    assert.deepEqual((await served()).roles, repoRoles.controller_roles);
     fs.rmSync(path.join(fx.ROOT, "uncloned-roles"), { recursive: true });
-    assert.deepEqual((await served()).roles, repoRoles.roles);
+    assert.deepEqual((await served()).roles, repoRoles.controller_roles);
   });
 
   test("the categories and the constants : the same rule, the base's as their last resort", async () => {
@@ -629,8 +629,8 @@ describe("a key file not there to read : gone from its repository, or its reposi
     assert.deepEqual((await served()).constants, { base: 1 });
     assert.deepEqual(await keys.repositoryKeyProblems("gone-design"), []);
     // read, then deleted in git : the ones last read
-    writeRaw("gone-design", "categories.yaml", { categories: [{ name: "Ops" }] });
-    writeRaw("gone-design", "constants.yaml", { constants: { env: "prod" } });
+    writeRaw("gone-design", "categories.yaml", { controller_categories: [{ name: "Ops" }] });
+    writeRaw("gone-design", "constants.yaml", { controller_constants: { env: "prod" } });
     assert.deepEqual((await served()).constants, { env: "prod" });
     fs.rmSync(path.join(fx.ROOT, "gone-design", "categories.yaml"));
     fs.rmSync(path.join(fx.ROOT, "gone-design", "constants.yaml"));

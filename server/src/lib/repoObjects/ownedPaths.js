@@ -23,7 +23,7 @@ import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
 import logger from "../logger.js";
 import Errors from "../errors.js";
-import { USAGE_TYPES, typeOf } from "./types.js";
+import { USAGE_TYPES, typeOf, fileKeyOf } from "./types.js";
 import { CONFIG_KEYS, LEGACY_FILE } from "../configKeys.js";
 import { scanRepository, contentOf, holdsTypeKeys } from "./repoFiles.js";
 
@@ -283,7 +283,7 @@ export async function assertContentNotOwned(abs, content, name) {
   if (!keys.length) return;
   for (const tree of (await ownersTest()).treesOf(abs)) {
     const key = keys.find((k) => tree.held.has(k));
-    if (key) throw new Errors.AccessDeniedError(`'${name}' gives ${key}:, the ${tree.held.get(key)} of repository '${tree.repository}': it is not written in the designer`);
+    if (key) throw new Errors.AccessDeniedError(`'${name}' gives ${fileKeyOf(key)}:, the ${tree.held.get(key)} of repository '${tree.repository}': it is not written in the designer`);
   }
 }
 

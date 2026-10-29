@@ -48,7 +48,7 @@ describe("the other writers keep untouched lines too", () => {
   });
 
   test("a schedule entry", () => {
-    const text = "schedules:\n  - name: Nightly          # the schedule\n    description: old       # what it does\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n    team_owner: platform   # our own key\n    unified_job_template: Nightly\n";
+    const text = "controller_schedules:\n  - name: Nightly          # the schedule\n    description: old       # what it does\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n    team_owner: platform   # our own key\n    unified_job_template: Nightly\n";
     const out = updateScheduleText(text, "Nightly", { description: "new" });
     assert.equal(out, text.replace("description: old       # what it does", "description: new       # what it does"));
   });

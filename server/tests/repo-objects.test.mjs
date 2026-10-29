@@ -255,7 +255,7 @@ describe("a link in the repository that leads outside it", () => {
     fx.writeEntry("creds", "credentials/planted.yaml", "credentials", gitCredential("planted"));
     await RepoObjects.syncRepository(credentials, "creds");
     const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-outside-")), "x.yaml");
-    fs.writeFileSync(outside, YAML.stringify({ credentials: [gitCredential("planted", { user: "evil" }), gitCredential("other")] }));
+    fs.writeFileSync(outside, YAML.stringify({ controller_credentials: [gitCredential("planted", { user: "evil" }), gitCredential("other")] }));
     fx.removeFile("creds", "credentials", "planted.yaml");
     fs.symlinkSync(outside, path.join(fx.ROOT, "creds", "credentials", "planted.yaml"));
     fs.symlinkSync(path.dirname(outside), path.join(fx.ROOT, "creds", "linked"));
@@ -501,7 +501,7 @@ describe("a save while the repository is busy", () => {
 describe("an edit in the app goes to the file", () => {
   test("only the changed fields are written : the ${ENV} reference, the comments and the unknown order kept", async () => {
     // its entry among others, the file holding another key the app does not read
-    const original = `# the bot's\ncredentials:\n  - name: git # ours\n    password: \${GIT_PW}\n    credential_type: git\n    user: bot\n  # the other one\n  - name: other\n    credential_type: git\nnotes: kept\n`;
+    const original = `# the bot's\ncontroller_credentials:\n  - name: git # ours\n    password: \${GIT_PW}\n    credential_type: git\n    user: bot\n  # the other one\n  - name: other\n    credential_type: git\nnotes: kept\n`;
     fx.writeEntry("creds", "credentials/git.yaml", "credentials", original);
     await RepoObjects.syncRepository(credentials, "creds");
     const before = { ...fx.rowNamed("credentials", "git") };
@@ -540,7 +540,7 @@ describe("an edit in the app goes to the file", () => {
   });
 
   test("deleting the last entry of a key : the key goes, the file stays with its other keys", async () => {
-    fx.writeFile("creds", ".", "mixed.yaml", `labels:\n  - name: kept\ncredentials:\n  - name: git\n    credential_type: git\n`);
+    fx.writeFile("creds", ".", "mixed.yaml", `labels:\n  - name: kept\ncontroller_credentials:\n  - name: git\n    credential_type: git\n`);
     await RepoObjects.syncRepository(credentials, "creds");
     assert.equal(await RepoObjects.appDeleted("credentials", fx.rowNamed("credentials", "git")), true);
     assert.equal(fx.textOf("creds", "mixed.yaml"), "labels:\n  - name: kept\n");
@@ -772,7 +772,7 @@ describe("a pull goes on past what fails", () => {
     const lines = ["a: &a [x, x, x, x, x, x, x, x, x, x]"];
     for (const [i, n] of ["b", "c", "d", "e", "f", "g"].entries()) lines.push(`${n}: &${n} [${Array(10).fill(`*${"abcdef"[i]}`).join(", ")}]`);
     fs.mkdirSync(path.join(fx.ROOT, "creds", "credentials"), { recursive: true });
-    fs.writeFileSync(path.join(fx.ROOT, "creds", "credentials", "bomb.yaml"), [...lines, "credentials:", "  - name: bomb", "    credential_type: git", ""].join("\n"));
+    fs.writeFileSync(path.join(fx.ROOT, "creds", "credentials", "bomb.yaml"), [...lines, "controller_credentials:", "  - name: bomb", "    credential_type: git", ""].join("\n"));
     const summary = await RepoObjects.syncRepository(credentials, "creds");
     assert.equal(summary.created, 1);
     assert.ok(fx.rowNamed("credentials", "good"));

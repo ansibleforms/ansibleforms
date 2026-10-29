@@ -1,4 +1,4 @@
-// A schedule of a schedules repository (use_for_schedules) : an entry of a schedules: list in any
+// A schedule of a schedules repository (use_for_schedules) : an entry of a controller_schedules: list in any
 // YAML file of the repository (lib/repoObjects/repoFiles.js), in one of two shapes - the export
 // form (its template, inventory and credentials as natural keys { name, type, organization }, its
 // credentials under related, its own natural_key) or the module form (the template and inventory
@@ -10,13 +10,14 @@
 import YAML from "yaml";
 import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
 import { setKey as setMapKey, same, editListEntry } from "./repoObjects/yamlFile.js";
+import { fileKeyOf } from "./repoObjects/types.js";
 
 // ===========================================================================
 // CONSTANTS
 // ===========================================================================
 
-// the key of the lists the schedules are entries of, in a repository's files
-export const SCHEDULES_KEY = "schedules";
+// the key of the lists the schedules are entries of, in a repository's files (controller_schedules)
+export const SCHEDULES_KEY = fileKeyOf("schedules");
 
 // the keys of a schedule in the export's order (its own fields, its prompts, then
 // unified_job_template, enabled and rrule, then related and natural_key) : a new file is written in it, a key added to a file goes to its
@@ -430,7 +431,7 @@ export function updateScheduleEntry(doc, node, edits) {
 
 /**
  * The fields the app edits written into a schedule's entry of a file (updateScheduleEntry), found
- * by its name in the file's schedules: list ; the rest of the file kept.
+ * by its name in the file's controller_schedules: list ; the rest of the file kept.
  *
  * Args:
  *   text (string): the file's text.
@@ -443,7 +444,7 @@ export function updateScheduleEntry(doc, node, edits) {
  *   string: the file's new text.
  *
  * Raises:
- *   Error: the file is not a map of valid YAML, or its schedules: no list.
+ *   Error: the file is not a map of valid YAML, or its controller_schedules: no list.
  */
 export function updateScheduleText(text, name, edits, whole = null) {
   return editListEntry(text, SCHEDULES_KEY, name, (doc, node) => updateScheduleEntry(doc, node, edits), { whole, keyOrder: KEY_ORDER });

@@ -17,8 +17,10 @@
 //
 // Where a repository keeps them is its files' content, never their names nor their folders
 // (lib/repoObjects/repoFiles.js) : any YAML file of the repository, at any depth, whose top-level
-// key is a type's key (credentials:, defaults:, roles: ...) holds that type - a list of objects
-// for most, one map for a type the app has one of (single).
+// key is a type's file key - controller_ and the type's key (controller_credentials:,
+// controller_defaults:, controller_roles: ...) - holds that type : a list of objects for most, one
+// map for a type the app has one of (single). A plain key (credentials:, roles:) is no type's : an
+// Ansible file may give it (a Galaxy requirements file's roles:, a vars file's labels:).
 
 import Errors from "../errors.js";
 
@@ -84,9 +86,41 @@ const CATEGORY_OPTIONS = {
   connections: ["showSettings", "showConnectionsSettings"],
 };
 
-// the top-level keys a repository's YAML files hold the types by (lib/repoObjects/repoFiles.js) :
-// each object type's and each configuration key's, its key in this list
+// the types a repository's YAML files hold by a top-level key (lib/repoObjects/repoFiles.js) : each
+// object type and each configuration key, by its type's key
 export const CONTENT_KEYS = USAGE_TYPES.filter((t) => t.objects || t.config).map((t) => t.key);
+
+// the prefix of every top-level key a type is given by in a repository's files
+export const KEY_PREFIX = "controller_";
+
+/**
+ * The top-level key a repository's files give a type by : the prefix and the type's key.
+ *
+ * Args:
+ *   key (string): the type (credentials).
+ *
+ * Returns:
+ *   string: its file key (controller_credentials).
+ */
+export const fileKeyOf = (key) => `${KEY_PREFIX}${key}`;
+
+// the top-level keys a repository's YAML files hold the types by, in CONTENT_KEYS' order
+export const FILE_KEYS = CONTENT_KEYS.map(fileKeyOf);
+
+/**
+ * The type a top-level key of a repository's file gives.
+ *
+ * Args:
+ *   fileKey (any): the key (controller_credentials).
+ *
+ * Returns:
+ *   string|null: the type (credentials) ; null when it gives none (a plain credentials: among them).
+ */
+export function typeKeyOf(fileKey) {
+  if (typeof fileKey !== "string" || !fileKey.startsWith(KEY_PREFIX)) return null;
+  const key = fileKey.slice(KEY_PREFIX.length);
+  return CONTENT_KEYS.includes(key) ? key : null;
+}
 
 // every usage flag, as the repositories table, its API and the config seed know them
 export const USAGE_FLAGS = USAGE_TYPES.map((t) => t.flag);
@@ -248,4 +282,4 @@ export function objectTypesOf(repo) {
   });
 }
 
-export default { CATEGORIES, USAGE_TYPES, CONTENT_KEYS, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, mayReadType, objectTypesOf };
+export default { CATEGORIES, USAGE_TYPES, CONTENT_KEYS, KEY_PREFIX, FILE_KEYS, fileKeyOf, typeKeyOf, USAGE_FLAGS, ONE_ONLY_FLAGS, APPLY_ORDER, typeOf, typeOfFlag, flagValue, flagOn, normalizeUsageFlags, mayReadType, objectTypesOf };

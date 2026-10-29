@@ -47,6 +47,8 @@ const { default: configController } = await import("../src/controllers/v2/config
 
 const ROLES = [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }];
 const ROLES_TEXT = YAML.stringify({ roles: ROLES });
+// the roles as their own file gives them
+const ROLES_FILE = YAML.stringify({ controller_roles: ROLES });
 const admin = { username: "admin", roles: ["admin"], options: { showDesigner: true, allowFormDesign: true } };
 const form = (name, source) => ({ name, type: "ansible", playbook: "x.yaml", roles: ["admin"], categories: [], fields: [], source });
 const save = async (forms) => {
@@ -60,7 +62,7 @@ beforeEach(() => {
   REPOS.splice(0, REPOS.length, { ...OPS });
   for (const name of fs.readdirSync(ROOT)) fs.rmSync(path.join(ROOT, name), { recursive: true, force: true });
   fs.mkdirSync(path.join(ROOT, "ops", ".git"), { recursive: true });
-  fs.writeFileSync(ops("roles.yaml"), ROLES_TEXT);
+  fs.writeFileSync(ops("roles.yaml"), ROLES_FILE);
   fs.writeFileSync(ops("deploy.yaml"), YAML.stringify(form("Deploy")));
   appConfig.configPath = path.join(ROOT, "config.yaml");
   appConfig.formsStagingPath = path.join(ROOT, "staging");
@@ -73,7 +75,7 @@ test("a form saved as roles.yaml is refused, saying why, and the roles stay as t
   const res = await save([form("Deploy", "deploy.yaml"), form("Escalate", "roles.yaml")]);
   assert.equal(res.code, 409, JSON.stringify(res.body));
   assert.match(res.body.details, /The form file 'roles\.yaml' belongs to the roles of repository 'ops': save the form to another file/);
-  assert.equal(fs.readFileSync(ops("roles.yaml"), "utf8"), ROLES_TEXT);
+  assert.equal(fs.readFileSync(ops("roles.yaml"), "utf8"), ROLES_FILE);
 });
 
 test("a form file of the repository's own still saves ; config.yaml, the roles may be read from, is refused even before it is there", async () => {
@@ -149,8 +151,8 @@ test("the forms load of a repository serving its forms from its root never reads
   // roles.yaml are theirs
   REPOS[0] = { ...OPS, use_for_labels: 1, use_for_credentials: 1 };
   fs.mkdirSync(ops("team/deep"), { recursive: true });
-  fs.writeFileSync(ops("team/deep/branding.yml"), YAML.stringify({ labels: [{ name: "prod", color: "red" }] }));
-  fs.writeFileSync(ops("secrets.yaml"), YAML.stringify({ credentials: [{ name: "git", credential_type: "git", user: "bot", password: "${GIT_PW}" }] }));
+  fs.writeFileSync(ops("team/deep/branding.yml"), YAML.stringify({ controller_labels: [{ name: "prod", color: "red" }] }));
+  fs.writeFileSync(ops("secrets.yaml"), YAML.stringify({ controller_credentials: [{ name: "git", credential_type: "git", user: "bot", password: "${GIT_PW}" }] }));
   const { default: Form } = await import("../src/models/form.model.js");
   const loaded = await Form.load(["admin"], "", true);
   assert.deepEqual(loaded.forms.map((f) => f.name), ["Deploy"]);

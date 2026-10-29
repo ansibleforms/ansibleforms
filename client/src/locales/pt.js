@@ -1338,36 +1338,41 @@ export default {
         playbooks: 'Playbooks Ansible executados pelos formulários (só um repositório)',
         workflows: 'Workflows construídos, editados e enviados de volta pelo designer',
         inventories: 'Um inventário: inventory.yaml, group_vars e host_vars na raiz',
-        schedules: 'Agendamentos, entradas de uma lista schedules: em qualquer um dos seus ficheiros YAML',
-        sso: 'Fornecedores SSO, entradas de uma lista sso: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
-        ldap: 'Diretórios LDAP, entradas de uma lista ldap: em qualquer um dos seus ficheiros YAML, pela sua ordem de pesquisa',
-        disclaimer: 'Versões do aviso legal, entradas de uma lista disclaimer: em qualquer um dos seus ficheiros YAML',
+        schedules: 'Agendamentos, entradas de uma lista controller_schedules: em qualquer um dos seus ficheiros YAML',
+        sso: 'Fornecedores SSO, entradas de uma lista controller_sso: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        ldap: 'Diretórios LDAP, entradas de uma lista controller_ldap: em qualquer um dos seus ficheiros YAML, pela sua ordem de pesquisa',
+        disclaimer:
+          'Versões do aviso legal, entradas de uma lista controller_disclaimer: em qualquer um dos seus ficheiros YAML',
         credentials:
-          'Credenciais, entradas de uma lista credentials: em qualquer um dos seus ficheiros YAML, segredos só como referências de ambiente',
+          'Credenciais, entradas de uma lista controller_credentials: em qualquer um dos seus ficheiros YAML, segredos só como referências de ambiente',
         secret_stores:
-          'Cofres de segredos, entradas de uma lista secret_stores: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+          'Cofres de segredos, entradas de uma lista controller_secret_stores: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
         runners:
-          'Runners, entradas de uma lista runners: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
-        notifications: 'Notificações, entradas de uma lista notifications: em qualquer um dos seus ficheiros YAML',
-        syslog: 'Servidores syslog, entradas de uma lista syslog: em qualquer um dos seus ficheiros YAML',
+          'Runners, entradas de uma lista controller_runners: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        notifications:
+          'Notificações, entradas de uma lista controller_notifications: em qualquer um dos seus ficheiros YAML',
+        syslog: 'Servidores syslog, entradas de uma lista controller_syslog: em qualquer um dos seus ficheiros YAML',
         chat_assistant:
-          'O assistente de chat, sob chat_assistant: num dos seus ficheiros YAML, a chave só como referência de ambiente',
-        mcp: 'As definições de MCP pelo seu nome de ambiente, sob mcp: num dos seus ficheiros YAML',
+          'O assistente de chat, sob controller_chat_assistant: num dos seus ficheiros YAML, a chave só como referência de ambiente',
+        mcp: 'As definições de MCP pelo seu nome de ambiente, sob controller_mcp: num dos seus ficheiros YAML',
         defaults:
-          'O tema, a cor, a vista dos formulários, o fuso horário, o formato de data e o idioma, sob defaults: num dos seus ficheiros YAML',
-        logo: 'O logótipo, sob logo: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
-        icon: 'O ícone do site, sob icon: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
-        name: 'O nome da aplicação, sob name: num dos seus ficheiros YAML',
-        links: 'As ligações do cabeçalho e a do designer, sob links: num dos seus ficheiros YAML',
+          'O tema, a cor, a vista dos formulários, o fuso horário, o formato de data e o idioma, sob controller_defaults: num dos seus ficheiros YAML',
+        logo: 'O logótipo, sob controller_logo: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
+        icon: 'O ícone do site, sob controller_icon: num dos seus ficheiros YAML, a imagem indicada em relação a esse ficheiro',
+        name: 'O nome da aplicação, sob controller_name: num dos seus ficheiros YAML',
+        links: 'As ligações do cabeçalho e a do designer, sob controller_links: num dos seus ficheiros YAML',
         labels:
-          'As etiquetas ao lado do logótipo, entradas de uma lista labels: em qualquer um dos seus ficheiros YAML, pela sua ordem',
-        announcements: 'Anúncios, entradas de uma lista announcements: em qualquer um dos seus ficheiros YAML',
-        general: 'As definições Geral pelo seu nome de ambiente, sob general: num dos seus ficheiros YAML',
-        roles: 'As funções, sob roles: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
-        categories: 'As categorias, sob categories: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
-        constants: 'As constantes, sob constants: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+          'As etiquetas ao lado do logótipo, entradas de uma lista controller_labels: em qualquer um dos seus ficheiros YAML, pela sua ordem',
+        announcements:
+          'Anúncios, entradas de uma lista controller_announcements: em qualquer um dos seus ficheiros YAML',
+        general: 'As definições Geral pelo seu nome de ambiente, sob controller_general: num dos seus ficheiros YAML',
+        roles: 'As funções, sob controller_roles: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+        categories:
+          'As categorias, sob controller_categories: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
+        constants:
+          'As constantes, sob controller_constants: num dos seus ficheiros YAML (config.yaml ainda lido, obsoleto)',
         repositories:
-          'Os outros repositórios, entradas de uma lista repositories: em qualquer um dos seus ficheiros YAML',
+          'Os outros repositórios, entradas de uma lista controller_repositories: em qualquer um dos seus ficheiros YAML',
       },
       usageOnTitle: 'Ativar {type}',
       usageOnQuestion: 'Usar {name} para {type}?',

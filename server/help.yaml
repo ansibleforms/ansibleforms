@@ -6481,13 +6481,13 @@
       The scheduler always runs from the database; a git repository is an optional source kept in step with it.
       One repository at most has the **Schedules** usage (`use_for_schedules`, Settings > Connections >
       Repositories); a second one is refused, by the API and by the config seed. Its schedules are the entries of
-      a top-level `schedules:` list, in any YAML file of the repository, any name, any folder, at any depth (see
+      a top-level `controller_schedules:` list, in any YAML file of the repository, any name, any folder, at any depth (see
       *Repository usage types*, where a repository keeps them). A schedule is found by its name, never by its
       file. Without a schedules repository, schedules live in the database only and recurring ones run on a cron.
 
       **An entry** is a single schedule, its template, inventory and credentials named by name or by natural key:
       ```yaml
-      schedules:
+      controller_schedules:
         - name: Nightly log rotation
           description: ''
           rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
@@ -6529,7 +6529,7 @@
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
       entries are read in; an entry named as a recurring schedule of the app replaces that schedule's definition
       (git wins, its runs and history stay). Every other recurring schedule of the app is written to the repository
-      as a new entry, at the end of the first file holding `schedules:` (else of `schedules.yaml` at its root, made),
+      as a new entry, at the end of the first file holding `controller_schedules:` (else of `schedules.yaml` at its root, made),
       waiting for the repository's Push:
       its cron becomes the rrule that fires at the same moments, in the scheduler's time zone (`LOG_TZ`). A cron that
       restricts both the day of the month and the day of the week (a cron fires on either, a rrule only on both), or
@@ -6547,7 +6547,7 @@
       was, and the other entries still sync. When and how a schedule ran stays in the database, never in the file.
 
       **The app: back to git.** While the repository is used, every new recurring schedule is saved and written to it
-      as a new entry in the export's form (the first file holding `schedules:`, else `schedules.yaml`), edited with
+      as a new entry in the export's form (the first file holding `controller_schedules:`, else `schedules.yaml`), edited with
       the rrule editor; editing a repository schedule (its name, description, form, enabled, rrule, extra vars)
       writes its entry where it is, only the fields changed; deleting one removes its entry (the file with it when
       it holds nothing more). One-time "Run later" jobs stay in the database. As for the
@@ -6588,15 +6588,16 @@
       is; a new form whose name another forms repository already defines is refused, saying where it is.
 
       **Roles, Categories and Constants** (the Config usage of before, split) each read only their own key of the
-      base configuration, one repository at most each: `roles:`, `categories:` and `constants:` from the file of
-      the repository that gives that key at its top level, any name, any folder (one file may give all three). Two
+      base configuration, one repository at most each: `controller_roles:`, `controller_categories:` and
+      `controller_constants:` from the file of the repository that gives that key at its top level, any name, any
+      folder (one file may give all three). Two
       files giving the same key are not read, both named on the repository's page and in its pull output. When no
       file gives it, its own file at the root (`roles.yaml`, `categories.yaml`, `constants.yaml`) is read when it is
       there, and refused when it does not give the key (a typo, `role:`): its key is never served from the base
-      configuration in its place. Else the key is read from the repository's `config.yaml`, still working but
-      deprecated: the server log says it once per load, the repository's pull output and its page say it too, for
-      example `roles read from config.yaml: deprecated, move them to a file of their own (roles: in any file,
-      roles.yaml for instance ; config.yaml is no longer read in 8.0.0)`. Any other file giving the key is preferred
+      configuration in its place. Else the key is read from the repository's `config.yaml` (its plain `roles:`,
+      `categories:` and `constants:`, as the base configuration writes them), still working but deprecated: the server log says it once per load, the repository's pull output and its page say it too, for
+      example `roles read from config.yaml: deprecated, move them to a file of their own (controller_roles: in any
+      file, roles.yaml for instance ; config.yaml is no longer read in 8.0.0)`. Any other file giving the key is preferred
       to `config.yaml`. A key no repository holds comes from where the base configuration comes from (the database copy, or
       the `CONFIG_PATH` file), as before; the keys of the repositories are laid over it. The designer saving the
       categories or the constants, and a save of the roles, writes each key back into the file it was read from
@@ -6616,7 +6617,7 @@
       read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
       the server log. None gets them when the configuration was kept in the database (Config source), which was
       then served whole: the log says so, and Roles, Categories or Constants can be turned on by hand. The config
-      seed, a repository's `repositories:` entries and the API still take `use_for_config` as a deprecated alias of the three, with
+      seed, a repository's `controller_repositories:` entries and the API still take `use_for_config` as a deprecated alias of the three, with
       a warning; a seed declaring it on several repositories leaves the three on the one holding them already (the
       one the upgrade gave them to), else gives them to the first one.
 
@@ -6625,15 +6626,17 @@
       **Where a repository keeps them: by their content.** Any `.yaml` or `.yml` file of the repository, any name,
       any folder, at any depth (its `.git` folder and every hidden folder or file left out; a link followed only
       while it stays in the repository, one leading outside refused and said once in the pull output), holds the
-      types whose key it gives at its top level. One key per type:
+      types whose key it gives at its top level. One key per type, always `controller_` and the type's key; a plain
+      key (`credentials:`, a Galaxy requirements file's `roles:`, a vars file's `labels:`) is no type's, never read
+      nor written by the app:
 
       | Key | Holds | Example entry |
       | --- | --- | --- |
-      | `schedules:` | a list of schedules | `- name: Nightly` |
-      | `credentials:`, `secret_stores:`, `runners:`, `notifications:`, `sso:`, `ldap:`, `syslog:`, `labels:`, `announcements:`, `repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
-      | `disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
-      | `general:`, `mcp:`, `chat_assistant:`, `defaults:`, `logo:`, `icon:`, `name:`, `links:` | one map, what the app has one of | `default_theme: dark` |
-      | `roles:`, `categories:`, `constants:` | the base configuration's key, as before | |
+      | `controller_schedules:` | a list of schedules | `- name: Nightly` |
+      | `controller_credentials:`, `controller_secret_stores:`, `controller_runners:`, `controller_notifications:`, `controller_sso:`, `controller_ldap:`, `controller_syslog:`, `controller_labels:`, `controller_announcements:`, `controller_repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
+      | `controller_disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
+      | `controller_general:`, `controller_mcp:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
+      | `controller_roles:`, `controller_categories:`, `controller_constants:` | the base configuration's key, as before | |
 
       A file may hold several types, and a type may be spread over many files. A file whose keys are no type's
       (a form, a playbook, an inventory, a vars file) is none of theirs, and its keys are never read; a file mixing
@@ -6641,13 +6644,13 @@
       `type`, as every form has) is never a type's file, whatever keys it has, and a key with a text, a number or a
       yes or no under it (a vars file's `name: web`) is no type's either. Only the usages the repository holds are
       read: a key of another type is left alone, its pull output says so once as a hint (`Not read, the repository
-      is not used for them: labels: (team/look.yaml) - turn the usage on to read them`).
+      is not used for them: controller_labels: (team/look.yaml) - turn the usage on to read them`).
 
       **An object is its name within its type, never its file.** Each linked object knows the file its entry is in
       (its page shows it); an entry moved to another file only changes that. Two entries of a type giving the same
       name, in one file or two, are both refused, naming both places (`the name 'git-bot' is given twice: here
       (a.yaml, entry 1) and in team/b.yaml (entry 2)`), and the object of that name stays as it was; two files
-      giving the same map (two `defaults:`) are refused the same way, nothing applied. A name changed in git is a
+      giving the same map (two `controller_defaults:`) are refused the same way, nothing applied. A name changed in git is a
       delete and a new object, except when, in one pull, exactly one object of the type is gone from a file and
       exactly one new name of that type appears in that same file, what tells the object apart besides its name
       unchanged (a credential's `credential_type`, `host` and `user`; a runner's `type`, `uri` and `username`; a
@@ -6663,8 +6666,8 @@
 
       **The app writes back where the object is**: an edit rewrites only the fields it changed in that entry, the
       file's comments, its other keys and entries kept; a new object of the app goes at the end of the first file
-      (by path) giving the type's key, else into `<key>.yaml` at the repository's root, made (`credentials.yaml`;
-      one of that name there that gives no such key, a form or a playbook, is never written to: `credentials-2.yaml`
+      (by path) giving the type's key, else into `<key>.yaml` at the repository's root, made (`credentials.yaml`
+      holding `controller_credentials:`; one of that name there that gives no such key, a form or a playbook, is never written to: `credentials-2.yaml`
       then); a delete removes its entry, the key when its list is left empty, and the file when it holds nothing
       more. Turning a usage on writes the app's objects the same way. Images (the logo's, the icon's) are named
       relative to the file naming them, inside the repository.
@@ -6676,7 +6679,7 @@
       A repository holding the credentials, the runners and its look, for example (any names would do):
       ```yaml
       # platform/access.yaml
-      credentials:
+      controller_credentials:
         - name: git-bot
           credential_type: git
           user: bot
@@ -6684,7 +6687,7 @@
         - name: rte-main
           credential_type: rte
           password: ${RTE_MAIN_TOKEN}
-      runners:
+      controller_runners:
         - name: rte-main
           type: rte
           rte_mode: outbound
@@ -6693,11 +6696,11 @@
       ```
       ```yaml
       # look.yml, the logo images/logo.png beside it
-      name:
+      controller_name:
         app_name: ACME Automation
-      logo:
+      controller_logo:
         logo: images/logo.png
-      defaults:
+      controller_defaults:
         default_theme: dark
       ```
 
@@ -6716,18 +6719,18 @@
     short: Credentials and runners in YAML, in the seed's format
     version: v7.5.0
     description: |
-      A repository with the **Credentials** usage holds its credentials as the entries of a `credentials:` list, one
-      with the **Runners** usage its runners as the entries of a `runners:` list, in any YAML file of it, any name,
+      A repository with the **Credentials** usage holds its credentials as the entries of a `controller_credentials:` list, one
+      with the **Runners** usage its runners as the entries of a `controller_runners:` list, in any YAML file of it, any name,
       any folder (see *Repository usage types*). One repository at most per type (the same repository, and the same
       file, may hold both). An entry is one item of the config seed's `credentials:` or `runners:` section, so seed
       items and repository entries are interchangeable:
       ```yaml
       # connections.yaml
-      credentials:
+      controller_credentials:
         - name: rte-main
           credential_type: rte
           password: ${RTE_MAIN_TOKEN}
-      runners:
+      controller_runners:
         - name: rte-main
           type: rte
           rte_mode: outbound
@@ -6799,21 +6802,21 @@
 
       | Usage | Key | An entry is | Names (waits when missing) | Secrets (`${ENV}` only) |
       | --- | --- | --- | --- | --- |
-      | Secret stores | `secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
-      | Notifications | `notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
-      | SSO | `sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
-      | LDAP | `ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
-      | Syslog | `syslog:` | an item of `syslog_servers:` | | |
-      | Labels | `labels:` | an item of `labels:` | | |
+      | Secret stores | `controller_secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
+      | Notifications | `controller_notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `controller_sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | LDAP | `controller_ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
+      | Syslog | `controller_syslog:` | an item of `syslog_servers:` | | |
+      | Labels | `controller_labels:` | an item of `labels:` | | |
 
       ```yaml
       # access/directories.yaml
-      ldap:
+      controller_ldap:
         - name: main
           server: ldap.example.com
           credential: ldap-bind
           position: 1
-      sso:
+      controller_sso:
         - name: corp
           provider: azuread
           credential: corp-client
@@ -6842,12 +6845,12 @@
     version: v7.5.0
     description: |
       A repository with the **Repositories** usage (`use_for_repositories`, one repository at most) holds the other
-      repositories as the entries of a `repositories:` list, in any YAML file of it, each item in the config seed's format for
+      repositories as the entries of a `controller_repositories:` list, in any YAML file of it, each item in the config seed's format for
       its `repositories:` section (name, uri, branch, description, `credential` by name, the `use_for_*` flags, the
       pull schedule `cron`, `rebase_on_start`). As in the seed, an entry may leave out its `branch`: the
       remote's default branch is used.
       ```yaml
-      repositories:
+      controller_repositories:
         - name: forms
           uri: https://git.example.com/forms.git
           branch: main
@@ -6875,8 +6878,8 @@
       - **Secrets**: a credential by name only. An entry with a `user` or a `password`, or a user and token in
         its `uri` (`https://user:token@...`), is refused.
 
-      A `repositories:` that is not a list changes nothing in the app (its file refused, said). No file giving
-      `repositories:` at all deletes nothing either: the repositories it listed stay in the app, no longer linked to
+      A `controller_repositories:` that is not a list changes nothing in the app (its file refused, said). No file giving
+      `controller_repositories:` at all deletes nothing either: the repositories it listed stay in the app, no longer linked to
       it (said in the pull output), so an entry the app writes next makes a file that never deletes the others.
 
   - name: Settings, chat, appearance, announcements and the disclaimer kept in a git repository
@@ -6886,8 +6889,8 @@
       The last ten usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
       Eight are things the app has one of (chat, general settings, MCP, and the Appearance pages Defaults, Logo,
-      Icon, Name and Links): each is **one map** under its key (`chat_assistant:`, `general:`, `mcp:`,
-      `defaults:`, `logo:`, `icon:`, `name:`, `links:`) in any YAML file of the repository, one file at most
+      Icon, Name and Links): each is **one map** under its key (`controller_chat_assistant:`, `controller_general:`, `controller_mcp:`,
+      `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:`) in any YAML file of the repository, one file at most
       giving it (two are refused, both named, nothing applied), holding what its menu item's page saves and
       nothing else, so a save on a page writes its own map only. Several of them may share a file. Turning the
       type on writes the app's values when no file gives it (to `<key>.yaml` at the root, made), or applies the
@@ -6895,18 +6898,18 @@
       the file that gives it; turning it off reads it once more and the app keeps its values. A map removed from
       git changes nothing in the app.
 
-      **Chat assistant** (`chat_assistant:`): the chat assistant's settings in the config seed's `chat:` format, every field
+      **Chat assistant** (`controller_chat_assistant:`): the chat assistant's settings in the config seed's `chat:` format, every field
       optional. `api_key` only as `${ENV}`, or left out (the one in the database stays); `credential` names an api
       credential, and the map waits while it is missing.
       ```yaml
-      chat_assistant:
+      controller_chat_assistant:
         provider: openai
         model: gpt-5
         api_key: ${CHAT_API_KEY}
         allow_job_status: false
       ```
 
-      **General** (`general:`): Settings > System > General by environment variable names, only those that
+      **General** (`controller_general:`): Settings > System > General by environment variable names, only those that
       page changes (never one another page or the deployment owns, a refused one, or one set in the real
       environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
       command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
@@ -6921,13 +6924,13 @@
       text (quoted when it looks like a number). A map may give a value either way (`30` or `"30"`, `true` or
       `1`): both are read the same.
       ```yaml
-      general:
+      controller_general:
         JOB_RETENTION_DAYS: 30
         LOG_LEVEL: info
         METRICS_TOKEN: ${METRICS_TOKEN}
       ```
 
-      **MCP** (`mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
+      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
       changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
       never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
@@ -6936,18 +6939,18 @@
       A variable it declares that is set in the real environment keeps the environment's value: said in the
       server log, the seed's value not applied, and the start goes on.
       ```yaml
-      mcp:
+      controller_mcp:
         ENABLE_MCP: true
         MCP_READ_ONLY: true
         MCP_CHAT_FORMS_ONLY: false
       ```
 
-      **Defaults** (`defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the
+      **Defaults** (`controller_defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the
       forms view, the time zone, the date format and the language (`default_theme`, `default_theme_color`,
       `forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed has a
       `defaults:` section in the same format.
       ```yaml
-      defaults:
+      controller_defaults:
         default_theme: dark
         default_theme_color: "#198754"
         forms_view: tiles
@@ -6956,7 +6959,7 @@
         default_language: fr
       ```
 
-      **Logo** (`logo:` and its image) and **Icon** (`icon:` and its image): the logo and the website icon, each an
+      **Logo** (`controller_logo:` and its image) and **Icon** (`controller_icon:` and its image): the logo and the website icon, each an
       image file of the repository its map names by its path, relative to the file naming it (`../images/logo.png`
       reaches a folder beside that file's), never outside the repository. The images are read and written as
       binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
@@ -6967,24 +6970,24 @@
       format, the images relative to the seed file.
       ```yaml
       # branding.yaml, the images in its assets folder
-      logo:
+      controller_logo:
         logo: assets/logo.png
-      icon:
+      controller_icon:
         icon: assets/icon.svg
       ```
 
-      **Name** (`name:`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
+      **Name** (`controller_name:`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
       `name:` section in the same format.
       ```yaml
-      name:
+      controller_name:
         app_name: ACME Automation
       ```
 
-      **Links** (`links:`): Settings > Appearance > Links, its own usage type: the header's links
+      **Links** (`controller_links:`): Settings > Appearance > Links, its own usage type: the header's links
       (`header_links`, each `id`, `label`, `url`, `icon`, `newTab` and `parent`) and whether the Designer's link
       shows (`show_designer`). The config seed has a `links:` section in the same format.
       ```yaml
-      links:
+      controller_links:
         show_designer: true
         header_links:
           - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
@@ -6998,7 +7001,7 @@
       seed keeps the fields it declares (listed as staying in the app when the repository is made the type's, never written to its
       map, and not applied from it, said in the pull output); the repository holds the others.
 
-      **Announcements** (`announcements:`, a list): named (what a pull finds them by), with their
+      **Announcements** (`controller_announcements:`, a list): named (what a pull finds them by), with their
       `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,
       compared in UTC). One made in the app is written with the start of its message as its name and keeps it. An
       entry whose end is already past is not imported: no refusal, an information line in the pull output (`Not
@@ -7007,7 +7010,7 @@
       announcement never deletes nor rewrites its entry. Turning the usage on skips them too, and its question
       says how many. The seed's `announcements:` section takes the same items, an ended one left out.
       ```yaml
-      announcements:
+      controller_announcements:
         - name: Maintenance
           message: The app is down on Sunday from 8 to 10.
           level: warning
@@ -7015,7 +7018,7 @@
           end_at: 2030-01-06T10:00:00Z
       ```
 
-      **Disclaimer** (`disclaimer:`, a list of versions): `version` (its number, what a pull finds it by),
+      **Disclaimer** (`controller_disclaimer:`, a list of versions): `version` (its number, what a pull finds it by),
       `title`, `text`, `checkbox_label` and `enabled` (the version in force, the disclaimer on; one at most). A
       changed title, text or label arriving from git is a **correction** of that version, as the app's save makes
       one; with `ask_again: true` in the entry, everyone who accepted it is asked again (a key of the entry only:
@@ -7023,7 +7026,7 @@
       entry whose `version` changes is refused, a new version is a new entry. Who accepted what is never in git.
       The seed's `disclaimer:` section takes the same items.
       ```yaml
-      disclaimer:
+      controller_disclaimer:
         - version: 2
           title: Terms of use
           text: Use this tool for your own team's systems only.

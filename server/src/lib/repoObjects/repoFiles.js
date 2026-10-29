@@ -1,9 +1,11 @@
 'use strict';
 // The files of a repository as the usage types read them : by their content, never by their names
 // nor their folders. Any .yaml or .yml file of a repository's working tree, at any depth (its .git
-// folder, and every hidden folder or file, left out), whose top-level key is a type's key
-// (lib/repoObjects/types.js CONTENT_KEYS : credentials:, schedules:, defaults:, roles: ...) holds
-// that type : a list of objects under it, or one map for a type the app has one of. A file may
+// folder, and every hidden folder or file, left out), whose top-level key is a type's file key
+// (lib/repoObjects/types.js FILE_KEYS : controller_credentials:, controller_schedules:,
+// controller_roles: ...) holds that type : a list of objects under it, or one map for a type the
+// app has one of. A plain key (credentials:, roles: - a Galaxy requirements file's, a vars file's
+// labels:) is no type's. What a file holds is said by the types' own keys (credentials). A file may
 // hold several types, a type may be spread over many files ; a file whose keys are no type's (a
 // form, a playbook, an inventory, a vars file) is none of theirs, a form (a map with a `type`, as
 // every form has) never is one, whatever other keys it has (its roles, its categories, its icon),
@@ -21,7 +23,7 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import YAML from "yaml";
-import { CONTENT_KEYS } from "./types.js";
+import { FILE_KEYS, typeKeyOf } from "./types.js";
 import { YAML_FILE } from "./yamlFile.js";
 
 // ===========================================================================
@@ -36,11 +38,11 @@ const MAX_DEPTH = 24;
 const MAX_CACHED = 20000;
 const parsed = new Map();
 
-// a line of a file that may give a type's key : the key at the start of the line (quoted or not),
+// a line of a file that may give a type's file key : the key at the start of the line (quoted or not),
 // then a colon and nothing on the line (a list or a map below it), or a flow list or map, an anchor,
 // a tag, an alias - never a text (a vars file's name: web) ; a file without one is no type's,
 // never parsed here
-const KEY_LINE = new RegExp(`^["']?(${CONTENT_KEYS.join("|")})["']?[ \\t]*:[ \\t]*(?:[[{&!*#]|\\r?$)`, "gm");
+const KEY_LINE = new RegExp(`^["']?(${FILE_KEYS.join("|")})["']?[ \\t]*:[ \\t]*(?:[[{&!*#]|\\r?$)`, "gm");
 
 // a form's line : its type (a form that cannot be read is the forms load's to say, never a type's)
 const FORM_LINE = /^["']?type["']?[ \t]*:/m;
@@ -59,17 +61,17 @@ const BOM = /^\uFEFF/;
 // ===========================================================================
 
 /**
- * The keys a text's lines may give a type by (KEY_LINE) : what a file that cannot be read is
- * taken to hold.
+ * The types a text's lines may give by their file key (KEY_LINE) : what a file that cannot be read
+ * is taken to hold.
  *
  * Args:
  *   text (string): the text.
  *
  * Returns:
- *   string[]: the type keys, each once.
+ *   string[]: the types' keys (credentials), each once.
  */
 function hintedKeys(text) {
-  return [...new Set([...String(text ?? "").matchAll(KEY_LINE)].map((m) => m[1]))];
+  return [...new Set([...String(text ?? "").matchAll(KEY_LINE)].map((m) => typeKeyOf(m[1])))];
 }
 
 /**
@@ -110,8 +112,9 @@ function severalDocuments(text) {
 }
 
 /**
- * What a YAML text holds of the types : the type keys it gives at its top level with a list or a
- * map under them (or nothing yet), and their values. A form (a map with a `type` key, as every form
+ * What a YAML text holds of the types : the types whose file key (controller_credentials) it gives
+ * at its top level with a list or a map under them (or nothing yet), and their values - said by the
+ * types' own keys (credentials). A form (a map with a `type` key, as every form
  * has), a list (a playbook) or any other value holds none. A text that cannot be read (not valid
  * YAML, keys given twice, too many aliases, several documents) holds none either, the keys its
  * lines seem to give said (hints). A byte order mark at its start is left out, and its top-level
@@ -149,15 +152,16 @@ export function contentOf(text) {
   // a type's key whose value is a text, a number or a yes or no (a vars file's name: web) : no
   // type's - a type is a list or a map under its key (nothing after it : none yet)
   const scalar = (node) => YAML.isScalar(node) && node.value !== null && node.value !== undefined;
-  const keys = doc.contents.items
+  const fileKeys = doc.contents.items
     .filter((pair) => !scalar(pair.value))
     .map((pair) => (YAML.isScalar(pair.key) ? pair.key.value : pair.key))
-    .filter((k) => CONTENT_KEYS.includes(k));
-  if (!keys.length) return none;
+    .filter((k) => typeKeyOf(k));
+  if (!fileKeys.length) return none;
+  const keys = fileKeys.map(typeKeyOf);
   try {
     // its aliases expanded : too many (an alias bomb) is refused, never thrown
     const all = doc.toJS() || {};
-    return { keys, data: Object.fromEntries(keys.map((k) => [k, all[k]])), errors: [], hints: [] };
+    return { keys, data: Object.fromEntries(fileKeys.map((k) => [typeKeyOf(k), all[k]])), errors: [], hints: [] };
   } catch (e) {
     return { ...none, errors: [`not valid YAML: ${e.message || e}`], hints };
   }

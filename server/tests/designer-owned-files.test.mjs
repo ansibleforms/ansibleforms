@@ -52,8 +52,8 @@ const write = (rel, text) => {
   fs.mkdirSync(path.dirname(path.join(fx.ROOT, "ops", rel)), { recursive: true });
   fs.writeFileSync(path.join(fx.ROOT, "ops", rel), text);
 };
-const ROLES = YAML.stringify({ roles: [{ name: "admin", groups: ["local/admins"] }] });
-const ESCALATE = YAML.stringify({ roles: [{ name: "admin", groups: ["local/admins"], users: ["local/eve"] }] });
+const ROLES = YAML.stringify({ controller_roles: [{ name: "admin", groups: ["local/admins"] }] });
+const ESCALATE = YAML.stringify({ controller_roles: [{ name: "admin", groups: ["local/admins"], users: ["local/eve"] }] });
 
 beforeEach(() => {
   appConfig.repoPath = fx.ROOT;
@@ -65,12 +65,12 @@ beforeEach(() => {
   fs.mkdirSync(path.join(fx.ROOT, "local"), { recursive: true });
   write("roles.yaml", ROLES);
   write("config.yaml", YAML.stringify({ constants: { env: "prod" } }));
-  write("credentials/git.yaml", YAML.stringify({ credentials: [{ name: "git", password: "${GIT_PASSWORD}" }] }));
-  write("general.yaml", "general:\n  LOG_LEVEL: info\n");
-  write("repositories.yaml", "repositories: []\n");
+  write("credentials/git.yaml", YAML.stringify({ controller_credentials: [{ name: "git", password: "${GIT_PASSWORD}" }] }));
+  write("general.yaml", "controller_general:\n  LOG_LEVEL: info\n");
+  write("repositories.yaml", "controller_repositories: []\n");
   // the logo's map names its image relative to its file
-  write("branding/logo.yaml", YAML.stringify({ logo: { logo: "../images/logo.png" } }));
-  write("name.yaml", YAML.stringify({ name: { app_name: "Ops" } }));
+  write("branding/logo.yaml", YAML.stringify({ controller_logo: { logo: "../images/logo.png" } }));
+  write("name.yaml", YAML.stringify({ controller_name: { app_name: "Ops" } }));
   write("images/logo.png", PNG);
   write("deploy.yml", "workflow_job_templates: []\n");
 });
@@ -83,8 +83,8 @@ describe("a file a usage type of the repository owns", () => {
     assert.equal(fs.readFileSync(path.join(fx.ROOT, "ops", "roles.yaml"), "utf8"), ROLES);
     // config.yaml (the keys read from it, deprecated), a new file of an object type's folder, a list file
     await assert.rejects(ProjectFiles.write("workflows", "ops/config.yaml", ESCALATE), denied);
-    await assert.rejects(ProjectFiles.write("inventories", "ops/credentials/new.yaml", "credentials:\n  - name: new\n", true), denied);
-    await assert.rejects(ProjectFiles.write("playbooks", "repositories.yaml", "repositories: []\n"), denied);
+    await assert.rejects(ProjectFiles.write("inventories", "ops/credentials/new.yaml", "controller_credentials:\n  - name: new\n", true), denied);
+    await assert.rejects(ProjectFiles.write("playbooks", "repositories.yaml", "controller_repositories: []\n"), denied);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "credentials", "new.yaml")), false);
   });
 
@@ -110,7 +110,7 @@ describe("a file a usage type of the repository owns", () => {
     fs.rmSync(path.join(fx.ROOT, "ops", "roles.yaml"));
     fs.symlinkSync(".", path.join(fx.ROOT, "ops", "sub"));
     await assert.rejects(ProjectFiles.write("workflows", "ops/sub/roles.yaml", ESCALATE, true), denied);
-    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/credentials/evil.yaml", "credentials:\n  - name: evil\n", true), denied);
+    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/credentials/evil.yaml", "controller_credentials:\n  - name: evil\n", true), denied);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "roles.yaml")), false);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "credentials", "evil.yaml")), false);
   });
@@ -119,18 +119,18 @@ describe("a file a usage type of the repository owns", () => {
     // any name, any depth
     await assert.rejects(ProjectFiles.write("workflows", "ops/a/b/c/anything.yml", ESCALATE, true), {
       status: 403,
-      message: "'ops/a/b/c/anything.yml' gives roles:, the roles of repository 'ops': it is not written in the designer",
+      message: "'ops/a/b/c/anything.yml' gives controller_roles:, the roles of repository 'ops': it is not written in the designer",
     });
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "a")), false);
     // a file of the explorer's turned into one : refused, left as it was
-    await assert.rejects(ProjectFiles.write("workflows", "ops/deploy.yml", "workflow_job_templates: []\ncredentials:\n  - name: x\n"), denied);
+    await assert.rejects(ProjectFiles.write("workflows", "ops/deploy.yml", "workflow_job_templates: []\ncontroller_credentials:\n  - name: x\n"), denied);
     assert.equal(fs.readFileSync(path.join(fx.ROOT, "ops", "deploy.yml"), "utf8"), "workflow_job_templates: []\n");
     // one written in git elsewhere : hidden and refused as soon as it gives the key
-    write("team/extra.yaml", YAML.stringify({ notes: "kept", labels: [] , credentials: [{ name: "x" }] }));
+    write("team/extra.yaml", YAML.stringify({ notes: "kept", controller_labels: [] , controller_credentials: [{ name: "x" }] }));
     assert.equal((await ProjectFiles.list("workflows")).files.some((f) => f.path === "ops/team/extra.yaml"), false);
     await assert.rejects(ProjectFiles.read("workflows", "ops/team/extra.yaml"), denied);
     // a key the repository does not hold, a form, a file named as a type's : the designer's
-    await ProjectFiles.write("workflows", "ops/labels.yaml", "labels:\n  - name: PROD\n");
+    await ProjectFiles.write("workflows", "ops/labels.yaml", "controller_labels:\n  - name: PROD\n");
     await ProjectFiles.write("workflows", "ops/credentials-notes.yaml", "notes: about the credentials\n");
     await ProjectFiles.write("workflows", "ops/form.yaml", YAML.stringify({ name: "a form", type: "ansible", roles: ["public"], icon: "x" }));
     const listed = (await ProjectFiles.list("workflows")).files.map((f) => f.path);

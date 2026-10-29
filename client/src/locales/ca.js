@@ -1338,37 +1338,40 @@ export default {
         playbooks: "Playbooks d'Ansible que executen els formularis (un sol repositori)",
         workflows: 'Workflows del dissenyador, editats i enviats de tornada pel dissenyador',
         inventories: 'Un inventari: inventory.yaml, group_vars i host_vars a la seva arrel',
-        schedules: "Programacions, entrades d'una llista schedules: en qualsevol dels seus fitxers YAML",
-        sso: "Proveïdors SSO, entrades d'una llista sso: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
-        ldap: "Directoris LDAP, entrades d'una llista ldap: en qualsevol dels seus fitxers YAML, en el seu ordre de cerca",
-        disclaimer: "Versions de l'avís legal, entrades d'una llista disclaimer: en qualsevol dels seus fitxers YAML",
+        schedules: "Programacions, entrades d'una llista controller_schedules: en qualsevol dels seus fitxers YAML",
+        sso: "Proveïdors SSO, entrades d'una llista controller_sso: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        ldap: "Directoris LDAP, entrades d'una llista controller_ldap: en qualsevol dels seus fitxers YAML, en el seu ordre de cerca",
+        disclaimer:
+          "Versions de l'avís legal, entrades d'una llista controller_disclaimer: en qualsevol dels seus fitxers YAML",
         credentials:
-          "Credencials, entrades d'una llista credentials: en qualsevol dels seus fitxers YAML, secrets només com a referències d'entorn",
+          "Credencials, entrades d'una llista controller_credentials: en qualsevol dels seus fitxers YAML, secrets només com a referències d'entorn",
         secret_stores:
-          "Magatzems de secrets, entrades d'una llista secret_stores: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+          "Magatzems de secrets, entrades d'una llista controller_secret_stores: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
         runners:
-          "Runners, entrades d'una llista runners: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
-        notifications: "Notificacions, entrades d'una llista notifications: en qualsevol dels seus fitxers YAML",
-        syslog: "Servidors syslog, entrades d'una llista syslog: en qualsevol dels seus fitxers YAML",
+          "Runners, entrades d'una llista controller_runners: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        notifications:
+          "Notificacions, entrades d'una llista controller_notifications: en qualsevol dels seus fitxers YAML",
+        syslog: "Servidors syslog, entrades d'una llista controller_syslog: en qualsevol dels seus fitxers YAML",
         chat_assistant:
-          "L'assistent de xat, sota chat_assistant: en un dels seus fitxers YAML, la clau només com a referència d'entorn",
-        mcp: "Els ajustos de MCP pel seu nom d'entorn, sota mcp: en un dels seus fitxers YAML",
+          "L'assistent de xat, sota controller_chat_assistant: en un dels seus fitxers YAML, la clau només com a referència d'entorn",
+        mcp: "Els ajustos de MCP pel seu nom d'entorn, sota controller_mcp: en un dels seus fitxers YAML",
         defaults:
-          "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, sota defaults: en un dels seus fitxers YAML",
-        logo: 'El logotip, sota logo: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
-        icon: 'La icona del lloc web, sota icon: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
-        name: "El nom de l'aplicació, sota name: en un dels seus fitxers YAML",
-        links: 'Els enllaços de la capçalera i el del dissenyador, sota links: en un dels seus fitxers YAML',
+          "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, sota controller_defaults: en un dels seus fitxers YAML",
+        logo: 'El logotip, sota controller_logo: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
+        icon: 'La icona del lloc web, sota controller_icon: en un dels seus fitxers YAML, la imatge indicada respecte a aquest fitxer',
+        name: "El nom de l'aplicació, sota controller_name: en un dels seus fitxers YAML",
+        links: 'Els enllaços de la capçalera i el del dissenyador, sota controller_links: en un dels seus fitxers YAML',
         labels:
-          "Les etiquetes al costat del logotip, entrades d'una llista labels: en qualsevol dels seus fitxers YAML, en el seu ordre",
-        announcements: "Anuncis, entrades d'una llista announcements: en qualsevol dels seus fitxers YAML",
-        general: "Els ajustos de General pel seu nom d'entorn, sota general: en un dels seus fitxers YAML",
-        roles: 'Els rols, sota roles: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+          "Les etiquetes al costat del logotip, entrades d'una llista controller_labels: en qualsevol dels seus fitxers YAML, en el seu ordre",
+        announcements: "Anuncis, entrades d'una llista controller_announcements: en qualsevol dels seus fitxers YAML",
+        general: "Els ajustos de General pel seu nom d'entorn, sota controller_general: en un dels seus fitxers YAML",
+        roles: 'Els rols, sota controller_roles: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
         categories:
-          'Les categories, sota categories: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+          'Les categories, sota controller_categories: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
         constants:
-          'Les constants, sota constants: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
-        repositories: "Els altres repositoris, entrades d'una llista repositories: en qualsevol dels seus fitxers YAML",
+          'Les constants, sota controller_constants: en un dels seus fitxers YAML (config.yaml encara es llegeix, obsolet)',
+        repositories:
+          "Els altres repositoris, entrades d'una llista controller_repositories: en qualsevol dels seus fitxers YAML",
       },
       usageOnTitle: 'Activar {type}',
       usageOnQuestion: 'Fer servir {name} per a {type}?',

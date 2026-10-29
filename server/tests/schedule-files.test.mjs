@@ -95,9 +95,9 @@ timeout: 10
 `;
 
 // a schedule's text as the only entry of a file's schedules: list, and a schedule of a text
-const asFile = (text) => `schedules:\n${text.trimEnd().split("\n").map((l, i) => (i === 0 ? `  - ${l}` : l ? `    ${l}` : l)).join("\n")}\n`;
+const asFile = (text) => `controller_schedules:\n${text.trimEnd().split("\n").map((l, i) => (i === 0 ? `  - ${l}` : l ? `    ${l}` : l)).join("\n")}\n`;
 const parse = (text) => parseSchedule(YAML.parse(text));
-const entryIn = (text, i = 0) => YAML.parse(text).schedules[i];
+const entryIn = (text, i = 0) => YAML.parse(text).controller_schedules[i];
 
 describe("reading a schedule file", () => {
   test("the export's object : its template's name is the form, its prompts are the job's reserved extra vars", () => {
@@ -141,8 +141,8 @@ describe("reading a schedule file", () => {
   });
 
   test("several schedules in one file, beside other keys : each read from its entry", () => {
-    const text = `${asFile(EXPORTED)}${asFile(MODULE).replace("schedules:\n", "")}credentials:\n  - name: other\n`;
-    assert.equal(YAML.parse(text).schedules.length, 2);
+    const text = `${asFile(EXPORTED)}${asFile(MODULE).replace("controller_schedules:\n", "")}credentials:\n  - name: other\n`;
+    assert.equal(YAML.parse(text).controller_schedules.length, 2);
     assert.equal(parseSchedule(entryIn(text, 0)).schedule.form, "Nightly Workflow");
     assert.equal(parseSchedule(entryIn(text, 1)).schedule.form, "Demo Job Template");
     assert.equal(scheduleEntryOf(text, "SCHED2").name, "sched2", "found by its name, case aside");
@@ -259,7 +259,7 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
     const file = asFile(EXPORTED);
     assert.equal(updateScheduleText(file, "Missing", { enabled: false }), file);
     const added = updateScheduleText(file, "Missing", {}, newScheduleEntry({ name: "Missing", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1", form: "Report" }));
-    assert.deepEqual(YAML.parse(added).schedules.map((e) => e.name), ["Nightly log rotation", "Missing"]);
+    assert.deepEqual(YAML.parse(added).controller_schedules.map((e) => e.name), ["Nightly log rotation", "Missing"]);
   });
 
   test("a new entry : the export's form, nothing of AnsibleForms' own, read back the same (round trip)", () => {
@@ -271,7 +271,7 @@ rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
       form: "Report",
       extraData: { to: "ops@example.com" },
     };
-    const text = appendListEntries("", "schedules", [newScheduleEntry(values)]);
+    const text = appendListEntries("", "controller_schedules", [newScheduleEntry(values)]);
     const obj = entryIn(text);
     assert.deepEqual(Object.keys(obj), ["name", "description", "extra_data", "unified_job_template", "enabled", "rrule", "natural_key"]);
     assert.deepEqual(obj.unified_job_template, { name: "Report", type: "job_template" });

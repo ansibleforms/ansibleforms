@@ -85,6 +85,7 @@ const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js")
 const { default: CrudModel } = await import("../src/models/crud.model.js");
 const { default: logger } = await import("./__mocks__/logger.js");
 const desc = (key) => RepoObjects.descriptorOf(key);
+const { fileKeyOf } = await import("../src/lib/repoObjects/types.js");
 
 // a PNG as the sniffing reads it : its signature, then anything
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("rest of the image")]);
@@ -103,13 +104,13 @@ const KEY_OF = {
   "links.yaml": "links",
 };
 // a type's map as text (provider: openai ...), written under its key, and read back so
-const wrapped = (key, text) => `${key}:\n${String(text).split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`;
+const wrapped = (key, text) => `${fileKeyOf(key)}:\n${String(text).split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`;
 const unwrapped = (text) => text.split("\n").slice(1).map((l) => l.replace(/^ {2}/, "")).join("\n");
 const writeRaw = (repo, file, content) => {
   fs.mkdirSync(path.dirname(path.join(fx.ROOT, repo, file)), { recursive: true });
   const key = KEY_OF[path.basename(file)];
-  // a text already under its key (logo:\n  logo: logo.png) written as it is
-  const under = typeof content === "string" && new RegExp(`^${key}:[ \\t]*(\\n|$)`, "m").test(content);
+  // a text already under its key (controller_logo:\n  logo: logo.png) written as it is
+  const under = typeof content === "string" && new RegExp(`^${fileKeyOf(key)}:[ \\t]*(\\n|$)`, "m").test(content);
   fs.writeFileSync(path.join(fx.ROOT, repo, file), typeof content === "string" && key && !under ? wrapped(key, content) : content);
 };
 const readRaw = (repo, file) => fs.readFileSync(path.join(fx.ROOT, repo, file));
@@ -246,7 +247,7 @@ describe("a type the app has one of : the chat assistant", () => {
     const summary = await RepoObjects.syncRepository(await desc("chat_assistant"), "cfg");
     assert.deepEqual(summary.refused, []);
     assert.equal(fx.state.tables.chat_settings[0].model, "seeded");
-    assert.match(RepoObjects.summaryText(await desc("chat_assistant"), summary), /Kept by the config seed, not applied: chat_assistant: of chat-assistant\.yaml/);
+    assert.match(RepoObjects.summaryText(await desc("chat_assistant"), summary), /Kept by the config seed, not applied: controller_chat_assistant: of chat-assistant\.yaml/);
     // the app's own write (the seed's apply) never reaches the file
     const before = await RepoObjects.snapshot("chat_assistant");
     fx.state.tables.chat_settings[0].model = "seeded-2";
@@ -778,9 +779,9 @@ describe("the log names a type kept in one file by its label", () => {
       await saveEnvValues({ JOB_RETENTION_DAYS: "45" }, { user: "root" });
       await RepoObjects.appUpdated("general", before);
       assert.ok(lines.includes("Repository 'cfg' now holds MCP (written to mcp.yaml, waiting for Push)"), lines.join("\n"));
-      assert.ok(lines.includes("Applied general: of cfg/general.yaml: the app follows git for General from now on"), lines.join("\n"));
+      assert.ok(lines.includes("Applied controller_general: of cfg/general.yaml: the app follows git for General from now on"), lines.join("\n"));
       assert.ok(lines.includes("Saved General into cfg/general.yaml"), lines.join("\n"));
-      assert.deepEqual(none.notes, ["No file of the repository gives chat_assistant: - the app keeps Chat assistant as it is"]);
+      assert.deepEqual(none.notes, ["No file of the repository gives controller_chat_assistant: - the app keeps Chat assistant as it is"]);
       assert.ok(!lines.some((l) => /holds the general|The \w+ follow /.test(l)), lines.join("\n"));
     } finally {
       for (const spy of spies) spy.mockRestore();
@@ -1013,7 +1014,7 @@ describe("the disclaimer versions", () => {
   });
 
   test("a text ending on a line break (a YAML block) with ask_again : asked again once, never on each pull", async () => {
-    const text = "disclaimer:\n  - version: 1\n    title: Terms\n    text: |\n      Line one.\n      Line two.\n    checkbox_label: I agree\n    enabled: true\n    ask_again: true\n";
+    const text = "controller_disclaimer:\n  - version: 1\n    title: Terms\n    text: |\n      Line one.\n      Line two.\n    checkbox_label: I agree\n    enabled: true\n    ask_again: true\n";
     fx.writeEntry("news", "disclaimer/1.yaml", "disclaimer", text);
     await RepoObjects.syncRepository(await desc("disclaimer"), "news");
     assert.equal(fx.state.tables.disclaimer_versions[0].text, "Line one.\nLine two.");
