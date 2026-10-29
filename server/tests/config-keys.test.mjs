@@ -132,7 +132,7 @@ describe("written back to the file it was read from", () => {
     const roles = sources.find((s) => s.key === "roles");
     assert.equal(roles.missing, true);
     // never read on this node : closed, never the base's
-    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), sources, read)).roles, [{ name: "admin", groups: ["local/admins"] }]);
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), sources, read)).roles, [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }]);
     await assert.rejects(keys.writeConfigKeys({ roles: [{ name: "admin" }], categories: [] }, sources, { claim: false }), {
       status: 409,
       message: /The roles are held by repository 'access', which is not cloned/,
@@ -368,7 +368,7 @@ describe("a key file with anchors, or one that is not read", () => {
     assert.deepEqual(await keys.repositoryKeyProblems("design"), [{ key: "constants", file: "constants.yaml", reason: "it does not give its constants (a top-level 'constants:' key)" }]);
     // a typo in the roles' key : the roles last read (else closed), never the base's
     writeRaw("access", "roles.yaml", { role: [{ name: "everyone", groups: ["local/users"] }] });
-    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles.map((r) => r.name), ["admin"]);
+    assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).roles.map((r) => r.name), ["admin", "default"]);
     assert.match(await keys.deprecationLines("access"), /\nNot read: roles\.yaml: it does not give its roles/);
     // config.yaml of before giving the roles only : read, the categories the base's
     fs.rmSync(path.join(fx.ROOT, "access", "roles.yaml"));
@@ -532,7 +532,7 @@ describe("a roles file never read on this node, broken", () => {
     fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "admin", groups: ["corp/everyone"] }, { name: "default", groups: [] }], categories: [{ name: "Base" }] }));
     writeRaw("fresh-roles", "roles.yaml", "roles:\n  admin: {}\n");
     const doc = YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read));
-    assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }]);
+    assert.deepEqual(doc.roles, [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }]);
     assert.deepEqual(doc.categories, [{ name: "Base" }], "the other keys untouched");
     assert.match(await keys.deprecationLines("fresh-roles"), /the roles last read from it \(else only the admin role of local\/admins\) are used/);
     // the users : a member of corp/everyone is no admin, a local admin still is
@@ -541,6 +541,35 @@ describe("a roles file never read on this node, broken", () => {
     assert.ok(!everyone.roles.includes("admin"));
     const local = await User.getRolesAndOptions(["local/admins"], { username: "admin", type: "local" });
     assert.ok(local.roles.includes("admin"));
+  });
+
+  test("the closed roles pass the base schema : the default role without groups, no option granting anything", async () => {
+    const { default: Form } = await import("../src/models/form.model.js");
+    const closed = keys.CONFIG_KEYS.find((k) => k.key === "roles").closed;
+    // the set alone, laid over a base giving the other keys : valid
+    const doc = { roles: JSON.parse(JSON.stringify(closed)), categories: [{ name: "Default", icon: "bars" }], constants: {} };
+    assert.doesNotThrow(() => Form.validateConfig(doc));
+    // the default role : no groups, no users, no options (nothing more than the app's defaults)
+    const everyone = closed.find((r) => r.name === "default");
+    assert.deepEqual(everyone.groups, []);
+    assert.equal(everyone.options, undefined);
+    assert.equal(everyone.users, undefined);
+  });
+
+  test("the whole configuration loads with the roles closed : the forms list and the configuration served, admin included", async () => {
+    fx.rowNamed("repositories", "access").use_for_roles = 0;
+    fx.state.tables.repositories.push({ id: 3, name: "fresh-roles", use_for_roles: 1 });
+    fs.writeFileSync(BASE, YAML.stringify({ roles: [{ name: "admin", groups: ["corp/everyone"] }, { name: "default", groups: [] }], categories: [{ name: "Default", icon: "bars" }], constants: {} }));
+    // broken in git, never read on this node (a restart) : closed
+    writeRaw("fresh-roles", "roles.yaml", "roles:\n  - name: admin\n    groups: [local/admins\n");
+    const { default: Form } = await import("../src/models/form.model.js");
+    const config = await Form.load(["admin"], "", false, true);
+    assert.deepEqual(config.roles.map((r) => r.name), ["admin", "default"]);
+    assert.deepEqual(config.roles.find((r) => r.name === "admin").groups, ["local/admins"]);
+    // its repository not cloned either : the same
+    keys.resetKeyReadsForTests();
+    fs.rmSync(path.join(fx.ROOT, "fresh-roles"), { recursive: true });
+    assert.deepEqual((await Form.load(["admin"], "", false, true)).roles.map((r) => r.name), ["admin", "default"]);
   });
 });
 
@@ -573,7 +602,7 @@ describe("a key file not there to read : gone from its repository, or its reposi
   test("the roles repository not cloned (a clone failing, a reset re-cloning it) : the roles last read, else closed", async () => {
     // never read on this node : closed, never the base's
     holding("uncloned-roles");
-    assert.deepEqual((await served()).roles, [{ name: "admin", groups: ["local/admins"] }]);
+    assert.deepEqual((await served()).roles, [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }]);
     assert.deepEqual(await keys.repositoryKeyProblems("uncloned-roles"), [{ key: "roles", file: "roles.yaml", reason: "its repository is not cloned" }]);
     assert.match(await keys.deprecationLines("uncloned-roles"), /\nNot read: roles\.yaml: its repository is not cloned - the roles last read from it \(else only the admin role of local\/admins\)/);
     // read once, then its working copy gone while it is cloned again : the roles last read

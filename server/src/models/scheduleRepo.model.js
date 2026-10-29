@@ -99,7 +99,9 @@ async function checkValues(values, id) {
   if (values.form !== undefined) {
     if (!values.form) throw new Errors.BadRequestError("A schedule needs a form.");
     const forms = await formNames();
-    if (forms && !forms.has(values.form)) throw new Errors.BadRequestError(`The form '${values.form}' does not exist.`);
+    // the forms not readable (the configuration not valid) : refused, never taken unchecked
+    if (forms === null) throw new Errors.ConflictError(`The forms could not be read to check the form '${values.form}': fix the configuration first (see the server log).`);
+    if (!forms.has(values.form)) throw new Errors.BadRequestError(`The form '${values.form}' does not exist.`);
   }
   if (values.rrule !== undefined) {
     const errors = await validateRruleAsync(values.rrule);

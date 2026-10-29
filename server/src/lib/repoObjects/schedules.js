@@ -52,7 +52,9 @@ export function launchOptionsText(options) {
 
 /**
  * The names of the forms there are, to check the form a schedule runs ; null when they cannot be
- * read (the schedule is then taken, its launch says so if the form is missing).
+ * read (the configuration not valid, a key file broken) : fail closed, a schedule is then never
+ * taken unchecked - a file is refused (kept as it was, read again by the next pull : schedules.parse),
+ * a save of the app refused (models/scheduleRepo.model.js checkValues).
  *
  * Returns:
  *   Promise<Set<string>|null>: the names.
@@ -110,11 +112,13 @@ const schedules = {
   context: () => formNames(),
 
   /**
-   * Reads a schedule file ; its form must exist (when the forms could be read).
+   * Reads a schedule file ; its form must exist. The forms not readable (null, formNames) : refused,
+   * never taken unchecked - a schedule of it the app has is kept as it was.
    *
    * Args:
    *   text (string): the file's text.
-   *   forms (Set<string>|null|undefined): the forms there are ; none : not checked.
+   *   forms (Set<string>|null|undefined): the forms there are ; null : they could not be read (the
+   *     file refused) ; undefined : not checked (a preview counting the files).
    *
    * Returns:
    *   object: { errors, absent, object (the schedule, null when refused), raw (the name a refused
@@ -124,6 +128,9 @@ const schedules = {
     const parsed = parseScheduleFile(text);
     // a refused one's name kept, whatever it is refused for : no schedule of the app is written
     // beside it under that name (lib/repoObjects/engine.js declaredName)
+    if (parsed.schedule && forms === null) {
+      return { errors: [`the forms could not be read to check its form '${parsed.schedule.form}': kept as it was until they can be (see the server log)`], absent: false, object: null, raw: { name: parsed.schedule.name } };
+    }
     if (parsed.schedule && forms && !forms.has(parsed.schedule.form)) {
       return { errors: [`the form '${parsed.schedule.form}' (unified_job_template.name) does not exist`], absent: false, object: null, raw: { name: parsed.schedule.name } };
     }

@@ -115,7 +115,15 @@ vi.mock("../src/models/repository.model.js", () => ({
 
 // the forms there are
 let forms;
-vi.mock("../src/models/form.model.js", () => ({ default: { load: async () => ({ forms: forms.map((name) => ({ name })) }) } }));
+// ... null : the configuration not readable (its roles not valid), the load throws
+vi.mock("../src/models/form.model.js", () => ({
+  default: {
+    load: async () => {
+      if (forms === null) throw new Error("Role 'admin', .groups must be equal to constant");
+      return { forms: forms.map((name) => ({ name })) };
+    },
+  },
+}));
 const changed = [];
 vi.mock("../src/models/crud.model.js", () => ({ default: { changed: (m) => changed.push(m) } }));
 
@@ -218,6 +226,28 @@ describe("a pull reads the schedules folder into the schedule table", () => {
     const text = ScheduleRepo.summaryText(summary);
     assert.ok(text.includes("Schedules: 2 created"));
     assert.ok(text.includes("Refused schedules/bad-rrule.yaml:"));
+  });
+
+  test("the forms not readable (the configuration not valid) : every file refused, never imported unchecked ; its schedule kept as it was", async () => {
+    writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
+    await ScheduleRepo.syncRepository("ops");
+    forms = null;
+    writeFile("ops", "a.yaml", scheduleYaml("Rotate all logs"));
+    writeFile("ops", "ghost.yaml", YAML.stringify({ name: "Ghost", unified_job_template: { name: "Does not exist" }, rrule: RRULE }));
+    const summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.created, 0);
+    assert.equal(summary.deleted, 0);
+    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/a.yaml", "schedules/ghost.yaml"]);
+    assert.match(summary.refused[1].reasons[0], /the forms could not be read/);
+    assert.deepEqual(own("ops").map((r) => r.name), ["Rotate logs"]);
+    // a save of the app : refused too
+    await assert.rejects(ScheduleRepo.create("ops", { name: "x", form: "Report", rrule: RRULE }), { name: "ConflictError" });
+    // readable again : the next pull takes the files
+    forms = ["Nightly", "Report"];
+    const after = await ScheduleRepo.syncRepository("ops");
+    assert.equal(after.updated, 1);
+    assert.deepEqual(after.refused.map((r) => r.file), ["schedules/ghost.yaml"]);
+    assert.match(after.refused[0].reasons[0], /the form 'Does not exist'/);
   });
 
   test("a file that becomes bad keeps its schedule as it was", async () => {

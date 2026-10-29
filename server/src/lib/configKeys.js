@@ -28,9 +28,16 @@ import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js
 // ... and what its value is : a list (roles, categories) or a dictionary (constants)
 // ... and, for the roles, what is served when its file is not read (broken, or its repository not
 // cloned) and was never read on this node (closed) : the local admins' admin role only - never the base configuration's roles, which the
-// repository's replaced and may grant more than they do (composeConfig)
+// repository's replaced and may grant more than they do (composeConfig). The default role every
+// user has goes with it, without groups and without options (nothing more than the app's defaults) :
+// the base schema (schema/base_schema.json) requires it, a set without it fails the validation of
+// the whole configuration (every forms list and configuration load refused, the admins' included)
+export const CLOSED_ROLES = Object.freeze([
+  Object.freeze({ name: "admin", groups: Object.freeze(["local/admins"]) }),
+  Object.freeze({ name: "default", groups: Object.freeze([]) }),
+]);
 export const CONFIG_KEYS = [
-  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: [{ name: "admin", groups: ["local/admins"] }] },
+  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: CLOSED_ROLES },
   { key: "categories", flag: "use_for_categories", file: "categories.yaml", list: true },
   { key: "constants", flag: "use_for_constants", file: "constants.yaml", list: false },
 ];
