@@ -604,6 +604,33 @@ describe("a file that renames its credential", () => {
     assert.equal((await RepoObjects.syncRepository(credentials, "creds")).updated, 1);
     assert.ok(fx.rowNamed("credentials", "git-bot"));
   });
+
+  test("renamed in one commit with the runner that names it : taken, the runner following it in the same pull", async () => {
+    fx.writeFile("creds", "credentials", "rte.yaml", { ...rteCredential });
+    fx.writeFile("ops", "runners", "edge.yaml", rteRunner("edge"));
+    await RepoObjects.afterGit("creds", fx.rowNamed("repositories", "creds"));
+    await RepoObjects.afterGit("ops", fx.rowNamed("repositories", "ops"));
+    assert.equal(fx.rowNamed("runners", "edge").credential, "rte-cred");
+    fx.writeFile("creds", "credentials", "rte.yaml", { ...rteCredential, name: "rte-cred-v2" });
+    fx.writeFile("ops", "runners", "edge.yaml", rteRunner("edge", { credential: "rte-cred-v2" }));
+    CrudModel.flushAllLocal();
+    const out = await RepoObjects.afterGit("creds", fx.rowNamed("repositories", "creds"));
+    assert.doesNotMatch(out, /Refused/);
+    assert.ok(fx.rowNamed("credentials", "rte-cred-v2"));
+    assert.equal(fx.rowNamed("runners", "edge").credential, "rte-cred-v2");
+  });
+
+  test("a user whose file still names the old name : refused, the pull output says what to do", async () => {
+    fx.writeFile("creds", "credentials", "rte.yaml", { ...rteCredential });
+    fx.writeFile("ops", "runners", "edge.yaml", rteRunner("edge"));
+    await RepoObjects.afterGit("creds", fx.rowNamed("repositories", "creds"));
+    await RepoObjects.afterGit("ops", fx.rowNamed("repositories", "ops"));
+    fx.writeFile("creds", "credentials", "rte.yaml", { ...rteCredential, name: "rte-cred-v2" });
+    CrudModel.flushAllLocal();
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.match(summary.refused[0].reasons[0], /still uses 'rte-cred': kept as it was until nothing uses it - name 'rte-cred-v2' in the files of what uses it in the same commit/);
+    assert.equal(fx.rowNamed("runners", "edge").credential, "rte-cred");
+  });
 });
 
 describe("a new file naming an object a linked file still names", () => {

@@ -6667,7 +6667,8 @@
       said in the pull output, and is read again when the credentials are next pulled. Removing a credential's file
       while a runner, a repository, a secret store, a channel or a sign-in still uses it is refused: the credential
       stays, the pull output says what uses it; renaming it in its file while something uses it is refused the same
-      way. At the worker's start the types are read in a fixed order:
+      way, unless every one of them is a repository object whose own file names the new name in the same commit
+      (the credential renamed, the runner following it). At the worker's start the types are read in a fixed order:
       credentials, secret stores, what signs in with them (runners ...), then the others.
 
       **Turning it on** shows what it will do first: the app's objects written to the repository (those whose

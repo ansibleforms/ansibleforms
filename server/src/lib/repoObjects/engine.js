@@ -456,6 +456,61 @@ async function waitingOf(desc, object, cache = new Map()) {
 }
 
 /**
+ * What an object of a repository declares in its own file as the working copy has it now (an entry
+ * of a list file, or its file), read or not : its raw keys, before any check.
+ *
+ * Args:
+ *   desc (object): the object's type's descriptor.
+ *   row (object): the object (its repository, repo_file and name).
+ *
+ * Returns:
+ *   object|null: the keys its file gives ; null when its file is gone or cannot be read.
+ */
+function declaredOf(desc, row) {
+  try {
+    if (desc.listFile) return (readListFile(desc, row.repository) || []).find((f) => f.file === linkKeyOf(desc, row))?.raw || null;
+    return desc.parse(fs.readFileSync(fileOf(desc, row.repository, row.repo_file), "utf8")).raw || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether every object that uses an object by its name follows its rename : each one is an object
+ * of a repository, of a type that names this one (descriptor.references), whose own file - as the
+ * working copy has it now : the same commit - names it by its new name. The rename is then taken,
+ * and each user follows when its file is read in : at once in the same repository (the types read
+ * in their order), else when the types that name it are read again (retryDependents). One that is
+ * no repository object, a single-file type's, or a file that still names the old name : not.
+ *
+ * Args:
+ *   desc (object): the renamed object's type's descriptor.
+ *   row (object): the object, by its name now.
+ *   to (string): its new name.
+ *   users (string[]): what uses it (descriptor.usersOf), one per record that names it.
+ *
+ * Returns:
+ *   Promise<boolean>: whether every user follows it.
+ */
+async function followsRename(desc, row, to, users) {
+  let following = 0;
+  for (const key of dependentsOf([desc.key])) {
+    const other = await descriptorOf(key);
+    if (other.file) continue;
+    const fields = (other.references || []).filter((r) => r.type === desc.key).map((r) => r.field);
+    for (const user of (await other.store.rows()) || []) {
+      for (const field of fields) {
+        if (nameKey(user[field]) !== nameKey(row.name)) continue;
+        if (!user.repository || !user.repo_file || nameKey(declaredOf(other, user)?.[field]) !== nameKey(to)) return false;
+        following++;
+      }
+    }
+  }
+  // as many as use it : none left that is not a repository object following it
+  return following === users.length;
+}
+
+/**
  * Reads a type's files of a repository into its table : a new file makes an object, a changed one
  * changes it, a removed one (or one saying state: absent) removes it - unless something uses it
  * (descriptor.usersOf) or it can never be deleted (descriptor.undeletable), then it is kept and
@@ -526,8 +581,11 @@ export async function syncRepository(desc, name, opts = {}) {
     if (desc.renameRefused) f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${desc.renameRefused}`];
     else {
       const users = await desc.usersOf(row);
-      if (!users.length) continue;
-      f.errors = [`it renames '${row.name}' to '${f.object.name}', but ${users.join(", ")} still uses '${row.name}': kept as it was until nothing uses it`];
+      // nothing uses it, or every user follows it in the same commit (followsRename) : taken
+      if (!users.length || (await followsRename(desc, row, f.object.name, users))) continue;
+      f.errors = [
+        `it renames '${row.name}' to '${f.object.name}', but ${users.join(", ")} still uses '${row.name}': kept as it was until nothing uses it - name '${f.object.name}' in the files of what uses it in the same commit, or change what uses it in the app first`,
+      ];
     }
     f.object = null;
     kept.add(f.file);
