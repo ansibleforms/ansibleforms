@@ -310,6 +310,24 @@ describe("an entry written back where the file uses anchors and aliases", () => 
   });
 });
 
+describe("a secret its entry gives as an environment variable", () => {
+  test("typed in the app : refused before anything is saved ; one the entry does not give, saved", async () => {
+    const { default: Credential } = await import("../src/models/credential.model.v2.js");
+    write("ops", "x.yaml", { controller_credentials: [git("env"), { name: "db", credential_type: "git", user: "bot" }] });
+    await sync(credentials);
+    const env = { ...fx.rowNamed("credentials", "env") };
+    await assert.rejects(Credential.update({ password: "typed-in-app" }, env.id), (e) => e.status === 409 && /password: \$\{GIT_PW\}/.test(e.message));
+    assert.equal(fx.rowNamed("credentials", "env").password, env.password, "nothing written");
+    // the mask sent back, or nothing : no change, saved
+    await Credential.update({ password: "**********", description: "d" }, env.id);
+    assert.equal(fx.rowNamed("credentials", "env").description, "d");
+    // a secret its entry does not give : the database's, typed in the app
+    const db = { ...fx.rowNamed("credentials", "db") };
+    await Credential.update({ password: "typed" }, db.id);
+    assert.notEqual(fx.rowNamed("credentials", "db").password, db.password);
+  });
+});
+
 describe("turning a type on says what its files hold", () => {
   test("the preview lists the objects each file gives, the turn-on how many it read in", async () => {
     write("ops", "a/creds.yaml", { controller_credentials: [git("a1"), git("a2")] });

@@ -294,6 +294,12 @@ class CrudModel {
     // data = await this.preProcess(modelName, data, 'update');
     this.stripManaged(data, opts);
     this.stripRepoLink(modelName, data, opts);
+    // a secret typed in the app that its repository entry gives as an ${ENV} reference : refused
+    // before anything is written, the next pull would put the variable's value back
+    if (!opts.fromRepo && !opts.fromSeed && !opts.fromRte) {
+      const { assertSecretsEditable } = await import('../lib/repoObjects/engine.js');
+      await assertSecretsEditable(modelName, id, data);
+    }
     const config = this.getConfig(modelName);
     const cache = this.getCache(modelName);
     const key = config.fields.find(f => f.isKey)?.name || 'id';

@@ -51,6 +51,7 @@ import Repository from "../../models/repository.model.js";
 import { fileBeside, fileInRepository, appendListEntries, editListEntry, removeListEntry, editMapEntry, applyEdits, hasListEntry, sortedByOrder } from "./yamlFile.js";
 import { scanRepository } from "./repoFiles.js";
 import { given } from "./secrets.js";
+import { isMasked } from "../secretMask.js";
 import { canonicalJson } from "../seedCompare.js";
 import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf, fileKeyOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
@@ -339,6 +340,39 @@ export async function assertLinkedReadable(before) {
     const rows = (await desc.store.rows().catch(() => [])) || [];
     const its = rows.some((r) => String(r.id) === String(before.id) && nameKey(r.name) === nameKey(before.name) && r.repository === repository);
     if (its) assertTypeReadable(desc, repository, scan);
+  }
+}
+
+/**
+ * Refuses a secret typed in the app for an object of a repository whose entry gives that secret as
+ * an ${ENV} reference : the app never writes a secret to git, and the next pull would put the
+ * variable's value back, the one typed lost without a word. A secret left as it is (the mask sent
+ * back, nothing, the same value) is no change.
+ *
+ * Args:
+ *   model (string): the crud model saving (credential, runner ...).
+ *   id (number|string): the object.
+ *   data (object): the fields the save writes.
+ *
+ * Raises:
+ *   Errors.ConflictError: such a secret, the variable its entry names said.
+ */
+export async function assertSecretsEditable(model, id, data) {
+  if (!data || typeof data !== "object") return;
+  for (const key of BUILT_OBJECT_TYPES) {
+    const desc = await descriptorOf(key);
+    if (desc.single || desc.model !== model || !desc.secrets?.length) continue;
+    const typed = desc.secrets.filter((s) => given(data[s]) && !isMasked(data[s]));
+    if (!typed.length) return;
+    const row = await desc.store.byId(id).catch(() => null);
+    if (!row?.repository || !row.repo_file) return;
+    const entry = declaredOf(desc, row) || {};
+    const fromEnv = typed.filter((s) => String(data[s]) !== String(row[s] ?? "") && typeof entry[s] === "string" && /\$\{[^}]+\}/.test(entry[s]));
+    if (fromEnv.length) {
+      const refs = fromEnv.map((s) => `${s}: ${entry[s]}`).join(", ");
+      throw new Errors.ConflictError(`The ${fromEnv.join(" and ")} of ${desc.noun} '${row.name}' comes from the environment variable its entry in ${row.repository}/${row.repo_file} names (${refs}): change it there, not in the app - nothing was saved`);
+    }
+    return;
   }
 }
 
@@ -2715,6 +2749,7 @@ export default {
   targetFileOf,
   assertTypeReadable,
   assertLinkedReadable,
+  assertSecretsEditable,
   filesNow,
   writeEntries,
   entryFileOf,
