@@ -71,6 +71,7 @@ const roles = vi.hoisted(() => [
   { name: "operators", groups: ["azuread/SG-Operators"] },
   { name: "netops", groups: ["ldap/netops"] },
   { name: "builders", groups: ["local/builders"] },
+  { name: "admin", groups: ["local/admins"] },
 ]);
 vi.mock("../src/models/form.model.js", () => ({
   default: { load: async (_roles, name) => (name ? { forms: [{ name }] } : { roles }) },
@@ -80,7 +81,7 @@ const { signHandoff } = await import("../src/lib/ssoHandoff.js");
 const controller = (await import("../src/controllers/v2/login.controller.js")).default;
 const tokenController = (await import("../src/controllers/v2/token.controller.js")).default;
 const authConfig = (await import("../config/auth.config.js")).default;
-const { groupsOf, clearGroupsCache } = await import("../src/lib/userGroups.js");
+const { groupsOf, clearGroupsCache, forgetGroups } = await import("../src/lib/userGroups.js");
 const Helpers = (await import("../src/lib/common.js")).default;
 const { default: Schedule } = await import("../src/models/schedule.model.js");
 const { default: CrudModel } = await import("../src/models/crud.model.js");
@@ -210,6 +211,81 @@ describe("the server puts the groups back", () => {
       name: "later", one_time_run: true, form: "Demo Form", extra_vars: "", run_at: "2030-01-01 10:00:00",
     });
     expect(JSON.parse(created.owner).groups).toContain("azuread/SG-Operators");
+  });
+});
+
+// An api token has no refresh : it lives up to API_TOKEN_MAX_DAYS, or for ever. The roles and
+// options it was signed with used to be trusted on every request, so a user taken out of the
+// admin role kept admin through its api token until someone revoked it by hand. The jwt strategy
+// now resolves them again from the user's groups as they are now, cached as the groups are.
+describe("an api token follows the roles of its user as they are now", () => {
+  /**
+   * An api token of bob, signed as the login signs one : the roles and options of its sign-in.
+   *
+   * Args:
+   *   roles (string[]): the roles the token was signed with.
+   *   api (boolean): an api token (true) or a session's access token (false).
+   *
+   * Returns:
+   *   string: the token.
+   */
+  function bobToken(roles, api = true) {
+    const user = { username: "bob", type: "local", roles, options: { allowLogin: true, showSettings: true, signed: true } };
+    return jwt.sign(api ? { user, access: true, sid: "s", api: true } : { user, access: true, sid: "s" }, authConfig.secret);
+  }
+
+  test("a user taken out of the admin role loses it, its options too", async () => {
+    db.local.set("bob", "admins,builders");
+    const token = bobToken(["admin", "builders", "default"]);
+    expect((await authenticate(token)).user.roles).toContain("admin");
+    // an admin takes bob out of the admins group ; the cache forgets it (a minute later at most)
+    db.local.set("bob", "builders");
+    forgetGroups("local", "bob");
+    const req = await authenticate(token);
+    expect(req.user.roles).not.toContain("admin");
+    expect(req.user.roles).toContain("builders");
+    // the options are resolved again, not the ones signed in the token
+    expect(req.user.options.signed).toBeUndefined();
+    expect(req.user.options.showSettings).toBe(false);
+    expect(req.user.groups).toEqual(["local/builders"]);
+  });
+
+  test("a role granted since is there too", async () => {
+    db.local.set("bob", "builders,admins");
+    expect((await authenticate(bobToken(["builders", "default"]))).user.roles).toContain("admin");
+  });
+
+  test("resolved once per user and cached : a request then costs no query", async () => {
+    db.local.set("bob", "builders");
+    const token = bobToken(["builders", "default"]);
+    await authenticate(token);
+    const before = db.queries;
+    await authenticate(token);
+    await authenticate(token);
+    // ApiToken.touch writes at most once a minute, and only the first request above did
+    expect(db.queries - before).toBe(0);
+  });
+
+  test("the cache does not outlive a change by more than its 30 seconds", async () => {
+    db.local.set("bob", "admins");
+    const token = bobToken(["admin", "default"]);
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      expect((await authenticate(token)).user.roles).toContain("admin");
+      db.local.set("bob", "builders");
+      clock.mockReturnValue(now + 31 * 1000);
+      expect((await authenticate(token)).user.roles).not.toContain("admin");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("a session's access token keeps the roles it carries (short-lived, a refresh resolves them)", async () => {
+    db.local.set("bob", "builders");
+    const req = await authenticate(bobToken(["admin", "builders", "default"], false));
+    expect(req.user.roles).toContain("admin");
+    expect(req.user.options.signed).toBe(true);
   });
 });
 
