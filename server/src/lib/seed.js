@@ -335,7 +335,7 @@ async function applyLdap(cfg, summary) {
     summary.adopted.push("ldap");
   }
   record.managed = 1;
-  await Ldap.update(record);
+  await Ldap.update(record, seedOpts);
   summary.updated.push("ldap");
 }
 

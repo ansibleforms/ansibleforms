@@ -15,7 +15,7 @@ import { seedType } from "./seedType.js";
 // converted (Ldap.declared)
 const LdapModel = {
   create: (d, opts) => Ldap.create({ ...Ldap.declared(d), managed: 0 }, opts),
-  update: (d, id) => Ldap.updateById(id, Ldap.declared(d)),
+  update: (d, id, opts) => Ldap.updateById(id, Ldap.declared(d), opts),
   delete: (id) => Ldap.deleteById(id),
 };
 

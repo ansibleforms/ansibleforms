@@ -258,6 +258,26 @@ describe("what the new types bring to the engine", () => {
     assert.equal(fx.rowNamed("ldap", "main").repository, repoOf("ldap"));
   });
 
+  test("an LDAP directory edited in the app : a bind password git takes from the environment, or an entry gone from git, refused", async () => {
+    const { default: Ldap } = await import("../src/models/ldap.model.js");
+    process.env.LDAP_BIND = "from-env";
+    fx.writeEntry(repoOf("ldap"), "ldap/emea.yaml", "ldap", { name: "emea", server: "ldap.emea", bind_user_dn: "cn=bind", bind_user_pw: "${LDAP_BIND}", search_base: "dc=emea" });
+    await RepoObjects.syncRepository(await RepoObjects.descriptorOf("ldap"), repoOf("ldap"));
+    const emea = { ...fx.rowNamed("ldap", "emea") };
+    await assert.rejects(Ldap.updateById(emea.id, { bind_user_pw: fx.crypto.encrypt("typed") }), (e) => e.status === 409 && /bind_user_pw: \$\{LDAP_BIND\}/.test(e.message));
+    assert.equal(fx.rowNamed("ldap", "emea").bind_user_pw, emea.bind_user_pw, "nothing written");
+    // the main directory's entry removed in git (kept, never deleted) : an edit refused
+    fx.writeEntry(repoOf("ldap"), "ldap/main.yaml", "ldap", { name: "main", search_base: "dc=git" });
+    await RepoObjects.syncRepository(await RepoObjects.descriptorOf("ldap"), repoOf("ldap"));
+    fx.removeFile(repoOf("ldap"), "ldap", "main.yaml");
+    await RepoObjects.syncRepository(await RepoObjects.descriptorOf("ldap"), repoOf("ldap"));
+    await assert.rejects(Ldap.updateById(MAIN.id, { search_base: "dc=app" }), (e) => e.status === 409 && /no entry in repository/.test(e.message));
+    assert.equal(fx.rowNamed("ldap", "main").search_base, "dc=git");
+    // a pull's own update is never refused
+    await Ldap.updateById(MAIN.id, { search_base: "dc=pulled" }, { fromRepo: true });
+    assert.equal(fx.rowNamed("ldap", "main").search_base, "dc=pulled");
+  });
+
   test("the labels keep their places : written in their order, a move rewrites the places in their entries", async () => {
     fx.state.tables.labels.push(
       { id: 41, name: "Second", color: "blue", enabled: 1, position: 2 },

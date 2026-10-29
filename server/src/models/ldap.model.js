@@ -213,10 +213,11 @@ Ldap.find = async function () {
  *
  * Args:
  *   record (object): the fields to write, converted (new Ldap).
+ *   opts (object): as updateById's ({ fromSeed : the config seed's }).
  */
-Ldap.update = async function (record) {
+Ldap.update = async function (record, opts = {}) {
   const current = await Ldap.find();
-  return Ldap.updateById(current.id, record);
+  return Ldap.updateById(current.id, record, opts);
 };
 
 /**
@@ -225,14 +226,25 @@ Ldap.update = async function (record) {
  * Args:
  *   id (number|string): the directory.
  *   record (object): the fields to write, converted (new Ldap).
+ *   opts (object): { fromRepo (its repository's pull), fromSeed (the config seed's) } ; none : an
+ *     edit in the app, refused when git would undo it (lib/repoObjects/engine.js assertAppEdit).
  *
  * Raises:
  *   Errors.NotFoundError: no such directory.
  *   Errors.BadRequestError: its new name or its credential is not valid.
+ *   Errors.ConflictError: an edit in the app git would undo (its bind password taken from an
+ *     environment variable, its entry gone or renamed in git).
  */
-Ldap.updateById = async function (id, record) {
+Ldap.updateById = async function (id, record, opts = {}) {
   const current = await Ldap.findById(id);
   if (!current) throw new Errors.NotFoundError(`No ldap directory ${id}`);
+  // an edit in the app of a repository's directory that git would undo : refused before anything is
+  // written, its bind password compared as the rows hold it (decrypted)
+  if (!opts.fromRepo && !opts.fromSeed) {
+    const { assertAppEdit } = await import("../lib/repoObjects/engine.js");
+    const plain = record.bind_user_pw ? { ...record, bind_user_pw: crypto.decrypt(record.bind_user_pw) } : record;
+    await assertAppEdit("ldap", id, plain);
+  }
   // the test fields and the id are never columns to write
   delete record.testuser;
   delete record.testpassword;
