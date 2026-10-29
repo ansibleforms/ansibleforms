@@ -15,6 +15,10 @@
 // The jwt strategy (auth/auth_jwt.js) puts them back on req.user.user, so every reader (the
 // job's ansibleforms_user, a planned job's owner, __user__ in a form, the profile) sees the
 // user as before. A token issued before this change still carries its groups, and keeps them.
+//
+// An api token has no refresh to resolve its roles again (controllers/v2/token.controller.js) :
+// the jwt strategy resolves them here on each request (rolesOf), from the groups as they are
+// now, cached with them.
 import { DIRECTORY_TYPES } from './directoryTypes.js';
 import logger from './logger.js';
 import helpers from './common.js';
@@ -30,10 +34,13 @@ const models = async () => ({
 // ─── cache ────────────────────────────────────────────────────────────────────
 // Every authenticated request asks for the groups ; a short cache keeps that from becoming a
 // query per request. A sign-in on this instance forgets the entry (forgetGroups), another
-// instance sees the new groups within the TTL.
+// instance sees the new groups within the TTL. The roles and options an api token's user
+// resolves to (rolesOf) are kept on the same entry, and go with it : a change of the groups or
+// of the roles in the config reaches an api token within the TTL, sooner than a session's
+// access token sees it (its refresh, ACCESS_TOKEN_EXPIRATION).
 const TTL_MS = 30 * 1000;
 const MAX_ENTRIES = 1000;
-const cache = new Map(); // "<type>/<username>" -> { groups, at }
+const cache = new Map(); // "<type>/<username>" -> { stored, at, resolved? }
 
 /**
  * The cache key of a user.
@@ -104,6 +111,34 @@ export async function storedGroups(user) {
 }
 
 /**
+ * The cache entry of a user : its stored groups (storedGroups), read again when the entry is
+ * older than the TTL or not wanted.
+ *
+ * Args:
+ *   user (object): the user, { type, username }.
+ *   cached (boolean): false to read the groups again whatever the cache holds.
+ *
+ * Returns:
+ *   Promise<object>: { stored (string[]|null, as storedGroups), at, resolved? (rolesOf) }.
+ *
+ * Raises:
+ *   Error: the database could not be read.
+ */
+async function entryOf(user, cached = true) {
+  const key = keyOf(user.type, user.username);
+  if (cached) {
+    const hit = cache.get(key);
+    if (hit && Date.now() - hit.at < TTL_MS) return hit;
+  }
+  const entry = { stored: await storedGroups(user), at: Date.now() };
+  // bounded : the oldest entry goes first (a Map keeps the order of insertion)
+  cache.delete(key);
+  if (cache.size >= MAX_ENTRIES) cache.delete(cache.keys().next().value);
+  cache.set(key, entry);
+  return entry;
+}
+
+/**
  * The groups of a user : the ones its token carries (a token issued before #1036), else the
  * stored ones (storedGroups), else none. A lookup that fails gives none, logged : groups only
  * ever add, so none is the safe answer.
@@ -118,23 +153,50 @@ export async function storedGroups(user) {
 export async function groupsOf(user, { cached = true } = {}) {
   if (Array.isArray(user?.groups)) return user.groups;
   if (!user?.username || !user?.type) return [];
-  const key = keyOf(user.type, user.username);
-  if (cached) {
-    const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < TTL_MS) return hit.groups;
-  }
-  let groups;
   try {
-    groups = (await storedGroups(user)) || [];
+    return (await entryOf(user, cached)).stored || [];
   } catch (err) {
     logger.error(`The groups of ${user.type}/${user.username} could not be read: ${helpers.getError(err)}`);
     return [];
   }
-  // bounded : the oldest entry goes first (a Map keeps the order of insertion)
-  cache.delete(key);
-  if (cache.size >= MAX_ENTRIES) cache.delete(cache.keys().next().value);
-  cache.set(key, { groups, at: Date.now() });
-  return groups;
+}
+
+/**
+ * The roles and options of a user as they are now, for an api token : it lives for days (or for
+ * ever) and has no refresh, so the ones it was signed with are not trusted. Resolved as the
+ * token refresh does (User.getRolesAndOptions) : from the stored groups, else the ones an older
+ * token carries ; cached with the groups (one entry, one TTL), so a request then costs no query.
+ * A lookup of the groups that fails resolves from none, logged and not cached : groups only ever
+ * add, so none is the safe answer.
+ *
+ * Args:
+ *   user (object): the user of a token, { type, username, groups? }.
+ *
+ * Returns:
+ *   Promise<object>: { roles (string[]), options (object) }, copies the caller may change.
+ */
+export async function rolesOf(user) {
+  const body = tokenUser(user);
+  // step 1 : the cache entry, with the stored groups
+  let entry = null;
+  if (body.username && body.type) {
+    try {
+      entry = await entryOf(body);
+    } catch (err) {
+      logger.error(`The groups of ${body.type}/${body.username} could not be read: ${helpers.getError(err)}`);
+    }
+  }
+  // step 2 : resolved already within the TTL
+  if (!entry?.resolved) {
+    // step 3 : from the stored groups, else the ones an older token carries (as the refresh)
+    const groups = entry?.stored ?? (Array.isArray(user?.groups) ? user.groups : []);
+    const { User } = await models();
+    const ro = await User.getRolesAndOptions(groups, body);
+    const resolved = { roles: ro.roles || [], options: ro.options || {} };
+    if (!entry) return resolved;
+    entry.resolved = resolved;
+  }
+  return { roles: [...entry.resolved.roles], options: { ...entry.resolved.options } };
 }
 
 /**

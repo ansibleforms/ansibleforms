@@ -982,9 +982,10 @@
       which must have signed in at most 10 minutes before (the page sends them through the sign-in
       again otherwise). An API token cannot make another. Each token is listed on the profile and
       on the user's page in Settings > Users (made, expires, last used), where the user or an admin
-      revokes it. Blocking a user ends their tokens too. An SSO user's token carries the roles of
-      their last sign-in: a group change in the identity provider reaches it only when they sign
-      in again and make a new one.
+      revokes it. Blocking a user ends their tokens too. A token follows the roles of its user as
+      they are now, within 30 seconds: the roles in the config, a local user's groups as an admin
+      sets them, an LDAP or SSO user's groups as their last sign-in recorded them (a group change
+      in the directory or identity provider reaches the token when they sign in again).
   - name: PASSWORD_MIN_LENGTH
     version: 7.0.0
     type: number
