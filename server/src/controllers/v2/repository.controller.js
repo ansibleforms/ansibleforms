@@ -8,6 +8,7 @@ import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
+import { designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 
 /**
  * Whether a credential carries what git signs in with : a user, and a password (stored, or read
@@ -129,7 +130,8 @@ function assertRepositoryAdminFields(req, existing) {
 const find = async function(req, res) {
   try {
     const repositories = await Repository.withUnpushed(await Repository.findAll());
-    res.json(RestResult.list(repositories));
+    // their pull and push outputs as the user reads them (lib/designerForms.js)
+    res.json(RestResult.list(designerRepositories(repositories, req.user?.user)));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepositories'), err.message || String(err)));
   }
@@ -159,7 +161,8 @@ const create = async function(req, res) {
 
 const findByName = async function(req, res) {
   try {
-    const [repository] = await Repository.withUnpushed([await Repository.findByName(req.params.name)]);
+    // its pull and push outputs as the user reads them (lib/designerForms.js)
+    const [repository] = designerRepositories(await Repository.withUnpushed([await Repository.findByName(req.params.name)]), req.user?.user);
     repository.password = SECRET_MASK; // mask the password for api
     res.json(RestResult.single(repository));
   } catch(err) {
@@ -248,7 +251,8 @@ const pull = async function(req, res) {
 const sync = async function(req, res) {
   try {
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    res.json(RestResult.single({ output }));
+    // without the lines naming files, to a user some are hidden from
+    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -273,7 +277,8 @@ const formsRepoSync = async function(req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.noFormsRepositories')));
     }
     const output = await Repository.sync(req.params.name, req.user?.user?.username);
-    res.json(RestResult.single({ output }));
+    // without the lines naming files, to a user some are hidden from
+    res.json(RestResult.single({ output: designerGitOutput(output, req.user?.user) }));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedSyncRepository'), err.message || String(err)));
   }
@@ -291,7 +296,7 @@ const formsRepoSyncAll = async function(req, res) {
     for (const repo of repositories) {
       try {
         const output = await Repository.sync(repo.name, req.user?.user?.username);
-        results.push({ name: repo.name, status: "success", output });
+        results.push({ name: repo.name, status: "success", output: designerGitOutput(output, req.user?.user) });
       } catch (e) {
         failed = true;
         results.push({ name: repo.name, status: "failed", output: e.message });

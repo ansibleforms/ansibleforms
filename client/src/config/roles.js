@@ -43,8 +43,11 @@ export const roleOptionGroups = [
     keys: [
       'showDesigner',
       'allowFormDesign',
+      'designAllForms',
       'allowPlaybookDesign',
+      'designAllPlaybooks',
       'allowWorkflowDesign',
+      'designAllWorkflows',
       'allowInventoryDesign',
       'allowVarsFileDesign',
     ],
@@ -107,6 +110,9 @@ export const roleOptionIncludedIn = {
 // and greyed out (their own value kept), as the role gets them
 export const roleOptionNeeds = {
   allowFormDesign: 'showDesigner',
+  designAllForms: 'showDesigner',
+  designAllPlaybooks: 'showDesigner',
+  designAllWorkflows: 'showDesigner',
   allowPlaybookDesign: 'showDesigner',
   allowWorkflowDesign: 'showDesigner',
   allowInventoryDesign: 'showDesigner',
@@ -149,8 +155,11 @@ export const roleOptionKeys = [
   'allowBackupOps',
   'showDesigner',
   'allowFormDesign',
+  'designAllForms',
   'allowPlaybookDesign',
+  'designAllPlaybooks',
   'allowWorkflowDesign',
+  'designAllWorkflows',
   'allowInventoryDesign',
   'allowVarsFileDesign',
   'showJobs',
@@ -184,8 +193,11 @@ export const roleOptionKeys = [
 // found in hand-written yaml are preserved verbatim by serializeRole).
 const trueByDefaultOptions = [
   'allowFormDesign',
+  'designAllForms',
   'allowPlaybookDesign',
+  'designAllPlaybooks',
   'allowWorkflowDesign',
+  'designAllWorkflows',
   'allowInventoryDesign',
   'allowVarsFileDesign',
   'allowVerboseMode',

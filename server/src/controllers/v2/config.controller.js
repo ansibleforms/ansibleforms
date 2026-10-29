@@ -25,6 +25,7 @@ import yaml from 'yaml';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
+import { designsAllForms, designsEverything, designerConfig, designerWarnings, designerForms, designerWorkflowFiles, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
 
 /**
  * Refuses to a non-admin a configuration whose roles differ from the active ones. The roles
@@ -61,6 +62,10 @@ const findList = async function(req,res){
     // remove roles and remove constants
     delete formConfig.roles
     delete formConfig.constants
+    // the forms are the user's roles' already ; the loader's warning of a name defined twice is
+    // not, so without designAllForms the ones naming a form hidden from them are left out
+    // (lib/designerForms.js)
+    formConfig.warnings = await designerWarnings(formConfig.warnings, req?.user?.user)
     // this is sufficient for frontend to display the forms
     res.json(RestResult.single(formConfig))
   }catch(err){
@@ -101,7 +106,8 @@ const findAll = async function(req,res){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.onlyAdminsOrDesigners')))
     }
     var forms = await Form.load(undefined,undefined,true) // true means load all forms, not just the ones for the user
-    res.json(RestResult.single(forms))
+    // without designAllForms : the forms of the user's roles, the subforms they use read only (lib/designerForms.js)
+    res.json(RestResult.single(designsAllForms(user) ? forms : await designerConfig(forms, user, await Form.unloaded())))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }
@@ -344,6 +350,10 @@ const env = async function(req,res){
 const restore = async function(req,res){
   var lock
   var user=req.user.user
+  // a backup replaces every form : not for a designer limited to the forms of their roles
+  if(!designsAllForms(user)){
+    return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedRestoreForms'), "Restoring a backup replaces every form: it needs the role option designAllForms"))
+  }
   // whether THIS request took the lock. A restore replaces the whole config, so it
   // must not run next to a designer session ; but when the caller is not already in
   // the designer the lock is ours only for the duration of the write and has to be
@@ -443,6 +453,29 @@ const save = async function(req,res){
         if (err instanceof Errors.AccessDeniedError) return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         throw err
       }
+      // without designAllForms : what the user sent laid over the forms they do not see, kept as
+      // they are ; a hidden form's name, a changed read-only subform, a form without one of their
+      // roles refused (lib/designerForms.js)
+      // and without designAllPlaybooks or designAllWorkflows : a form naming a playbook or a workflow
+      // hidden from the user refused, by the forms as they are before this save ; and without any of
+      // the three, a new or changed expression or query the server runs (lib/designerForms.js)
+      try {
+        let sent = null
+        let unread = null
+        try { sent = Form.parse(newConfig) || {} } catch (e) { sent = null; unread = e }
+        if(!designsEverything(user)){
+          // not read : refused as Form.save would refuse it (a 400), nothing laid over
+          if(sent === null) throw new Errors.BadRequestError(helpers.getError(unread))
+          const stored = await Form.load(undefined,undefined,true)
+          // no expression nor query the forms do not have already (it would read the hidden files)
+          assertServerCodeKept(sent.forms, stored.forms, user)
+          if(!designsAllForms(user)) newConfig.forms = yaml.stringify({ ...sent, forms: designerSave(sent.forms, stored.forms, user, await Form.unloaded()) })
+        }
+        if(sent) await assertFilesShown(sent.forms, user)
+      } catch (err) {
+        if (err instanceof Errors.ApiError) return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
+        throw err
+      }
       // the designer writes the whole document, so the previous one has to be read
       // before the save to get a role delta out of it
       var previousConfig = await Settings.getActiveConfig().catch(() => '')
@@ -509,6 +542,10 @@ const validate = function(req,res){
   }
 }
 
+// every form's name, for the datasources' and the schedules' form dropdown : reached only with
+// showSettings or allowScheduledJobs, the rights over every form's datasources and schedules (the
+// schedules list names every schedule's form), so the designer's role options designAllForms,
+// designAllPlaybooks and designAllWorkflows do not narrow it
 const formNames = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
@@ -530,7 +567,9 @@ const formNames = async function(req,res){
 const formsLinked = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    res.json(RestResult.list(formLinks(formConfig.forms)))
+    // reached with a part of the settings only, and designAllForms off : the forms their designer
+    // shows, never the hidden ones (lib/designerForms.js)
+    res.json(RestResult.list(formLinks(designerForms(formConfig.forms, req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -541,7 +580,9 @@ const formsLinked = async function(req,res){
 const formsCredentials = async function(req,res){
   try{
     var formConfig = await Form.load(undefined,undefined,true)
-    res.json(RestResult.list(formCredentials(formConfig.forms)))
+    // with the connections settings only, and designAllForms off : the forms their designer shows
+    // (lib/designerForms.js)
+    res.json(RestResult.list(formCredentials(designerForms(formConfig.forms, req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }
@@ -551,7 +592,9 @@ const formsCredentials = async function(req,res){
 // credential's Used by tab
 const workflowsCredentials = async function(req,res){
   try{
-    res.json(RestResult.list(await workflowCredentials()))
+    // with the connections settings only, and designAllWorkflows off : the workflow files their
+    // designer shows (lib/designerForms.js)
+    res.json(RestResult.list(await workflowCredentials(await designerWorkflowFiles(req?.user?.user))))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsList'), helpers.getError(err)))
   }

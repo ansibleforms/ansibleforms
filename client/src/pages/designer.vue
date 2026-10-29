@@ -2255,9 +2255,12 @@ async function loadForms() {
     }
     formConfig.forms.forEach((f, i) => {
       const id = `form_${i}`;
-      formMeta.value[id] = { source: f.source, repository: f.repository };
+      // readOnly : a subform a form of the user's uses, none of their roles in its own (the role
+      // option designAllForms off) - shown, not saved (the server refuses it)
+      formMeta.value[id] = { source: f.source, repository: f.repository, readOnly: !!f.readOnly };
       delete f.source;
       delete f.repository;
+      delete f.readOnly;
       forms.value[id] = YAML.stringify(f);
     });
     selectDefaultForm();
@@ -2453,7 +2456,34 @@ watch([currentTab, currentFormName, editorView, addressApplied], ([tab, formName
       .catch(() => (designerAddress = null));
   }
 });
+// ─── read-only subforms ─────────────────────────────────────────────────────────
+// a subform a form of the user's uses, none of their roles in its own (the role option
+// designAllForms off) : shown, never deleted nor moved - the server keeps it as stored, so the
+// designer would say saved while it is back on the next load
+const readOnlyForm = (id) => !!formMeta.value[id]?.readOnly;
+// a file holding one : not renamed, moved nor deleted (its read-only subform would stay behind)
+const fileHoldsReadOnly = (source) =>
+  Object.keys(forms.value).some((id) => formMeta.value[id]?.source === source && readOnlyForm(id));
+// a folder holding such a file : not deleted
+const folderHoldsReadOnly = (folder) =>
+  files.value.some((s) => s && s.startsWith(folder + '/') && fileHoldsReadOnly(s));
+
+/**
+ * Refuses a change to a read-only subform (or a file or folder holding one), said in a toast.
+ *
+ * Args:
+ *   held (boolean): whether the target is or holds a read-only subform.
+ *
+ * Returns:
+ *   boolean: true when it is refused.
+ */
+function refusedReadOnly(held) {
+  if (held) toast.warning(t('designer.subformReadOnly'));
+  return held;
+}
+
 function deleteForm(id) {
+  if (refusedReadOnly(readOnlyForm(id))) return;
   selectForm(id);
   action.value = 'delete';
 }
@@ -2575,6 +2605,11 @@ const formOrderMap = ref({});
 const dropTargetId = ref(null);
 
 function onDragStart(id, event) {
+  // a read-only subform stays in its file
+  if (readOnlyForm(id)) {
+    event.preventDefault();
+    return;
+  }
   dragFormId.value = id;
   event.dataTransfer.effectAllowed = 'move';
 }
@@ -2659,7 +2694,7 @@ function ctxRenameFile() {
   closeContextMenu();
   // the base file is not a file on disk (see confirmDeleteFile) : renaming it
   // would move every base form into a named file, which is not a rename
-  if (!source) return;
+  if (!source || refusedReadOnly(fileHoldsReadOnly(source))) return;
   renameSource.value = source;
   renameValue.value = source;
   showRenameModal.value = true;
@@ -2796,6 +2831,10 @@ function ctxDuplicateFile() {
 }
 
 function ctxMoveToFile() {
+  if (refusedReadOnly(readOnlyForm(ctxMenu.value.target.id))) {
+    closeContextMenu();
+    return;
+  }
   moveFormId.value = ctxMenu.value.target.id;
   const currentSource = idmapping.value.find((x) => x.id === moveFormId.value)?.source;
   moveTarget.value = files.value.find((f) => f !== currentSource) || '';
@@ -2830,7 +2869,7 @@ function confirmDeleteFile(source) {
   // the base file is not a file on disk (the forms without a `source` live in
   // the main config) : there is nothing to delete, so don't open a modal whose
   // Delete button would do nothing
-  if (!source) return;
+  if (!source || refusedReadOnly(fileHoldsReadOnly(source))) return;
   fileToDelete.value = source;
   action.value = 'deleteFile';
 }
@@ -2880,7 +2919,7 @@ function ctxMoveFileToFolder() {
   const source = ctxMenu.value.target.source;
   closeContextMenu();
   // the base file has no file to move (see confirmDeleteFile)
-  if (!source) return;
+  if (!source || refusedReadOnly(fileHoldsReadOnly(source))) return;
   moveFileSource.value = source;
   const currentFolder = source.includes('/') ? source.substring(0, source.lastIndexOf('/')) : '';
   moveFileTarget.value = folders.value.find((f) => f !== currentFolder) || '';
@@ -2913,7 +2952,7 @@ function openNewFileInFolder(folder) {
 
 function confirmDeleteFolder(folder) {
   const sources = files.value.filter((s) => s && s.startsWith(folder + '/'));
-  if (!sources.length) return;
+  if (!sources.length || refusedReadOnly(folderHoldsReadOnly(folder))) return;
   fileToDelete.value = folder;
   action.value = 'deleteFolder';
 }
@@ -3281,6 +3320,8 @@ const busy = computed(() => syncing.value || loadingRepos.value || saving.value)
 // the categories, the constants and the forms are changed only with the role option allowFormDesign
 const canDesignForms = computed(() => store.profile?.options?.allowFormDesign !== false);
 const busyOrTemplated = computed(() => busy.value || configTemplated.value || !canDesignForms.value);
+// the form shown is a subform the user only uses (designAllForms off) : read only
+const formReadOnly = computed(() => !!formMeta.value[currentForm.value]?.readOnly);
 
 async function loadFormsRepos() {
   try {
@@ -4796,7 +4837,11 @@ onBeforeUnmount(() => {
               <FaIcon icon="plus" class="me-2" size="sm" />{{ t('designer.addForm') }}
             </div>
             <hr class="ctx-divider" />
-            <div class="ctx-item" :class="{ 'ctx-item-disabled': !ctxMenu.target?.source }" @click="ctxRenameFile()">
+            <div
+              class="ctx-item"
+              :class="{ 'ctx-item-disabled': !ctxMenu.target?.source || fileHoldsReadOnly(ctxMenu.target?.source) }"
+              @click="ctxRenameFile()"
+            >
               <FaIcon icon="pen" class="me-2" size="sm" />{{ t('designer.renameFile') }}
             </div>
             <!-- the base file is not a file on disk : it can't be duplicated -->
@@ -4809,7 +4854,10 @@ onBeforeUnmount(() => {
             <!-- the base file is not a file on disk : it can't be moved or deleted -->
             <div
               class="ctx-item"
-              :class="{ 'ctx-item-disabled': folders.length === 0 || !ctxMenu.target?.source }"
+              :class="{
+                'ctx-item-disabled':
+                  folders.length === 0 || !ctxMenu.target?.source || fileHoldsReadOnly(ctxMenu.target?.source),
+              }"
               @click="ctxMoveFileToFolder()"
             >
               <FaIcon icon="arrow-right" class="me-2" size="sm" />{{ t('designer.moveFileToFolder') }}
@@ -4817,7 +4865,7 @@ onBeforeUnmount(() => {
             <hr class="ctx-divider" />
             <div
               class="ctx-item ctx-item-danger"
-              :class="{ 'ctx-item-disabled': !ctxMenu.target?.source }"
+              :class="{ 'ctx-item-disabled': !ctxMenu.target?.source || fileHoldsReadOnly(ctxMenu.target?.source) }"
               @click="ctxDeleteFile()"
             >
               <FaIcon icon="trash" class="me-2" size="sm" />{{ t('designer.deleteFile') }}
@@ -4828,7 +4876,11 @@ onBeforeUnmount(() => {
               <FaIcon icon="plus" class="me-2" size="sm" />{{ t('designer.newFile') }}
             </div>
             <hr class="ctx-divider" />
-            <div class="ctx-item ctx-item-danger" @click="ctxDeleteFolder()">
+            <div
+              class="ctx-item ctx-item-danger"
+              :class="{ 'ctx-item-disabled': folderHoldsReadOnly(ctxMenu.target?.path) }"
+              @click="ctxDeleteFolder()"
+            >
               <FaIcon icon="trash" class="me-2" size="sm" />{{ t('designer.deleteFolder') }}
             </div>
           </template>
@@ -4836,11 +4888,19 @@ onBeforeUnmount(() => {
             <div class="ctx-item" @click="ctxDuplicateForm()">
               <FaIcon icon="copy" class="me-2" size="sm" />{{ t('designer.duplicateForm') }}
             </div>
-            <div class="ctx-item" @click="ctxMoveToFile()">
+            <div
+              class="ctx-item"
+              :class="{ 'ctx-item-disabled': readOnlyForm(ctxMenu.target?.id) }"
+              @click="ctxMoveToFile()"
+            >
               <FaIcon icon="arrow-right" class="me-2" size="sm" />{{ t('designer.moveToFile') }}
             </div>
             <hr class="ctx-divider" />
-            <div class="ctx-item ctx-item-danger" @click="ctxDeleteFormFromMenu()">
+            <div
+              class="ctx-item ctx-item-danger"
+              :class="{ 'ctx-item-disabled': readOnlyForm(ctxMenu.target?.id) }"
+              @click="ctxDeleteFormFromMenu()"
+            >
               <FaIcon icon="trash" class="me-2" size="sm" />{{ t('designer.deleteForm') }}
             </div>
           </template>
@@ -5249,20 +5309,28 @@ onBeforeUnmount(() => {
                     <!-- the Visual tab : what the form is, and its fields as an outline, on the same
                          YAML (saved with Save) -->
                     <div v-else-if="editorTarget && editorView === 'visual'" class="designer-visual">
+                      <!-- a subform the user only uses : read only, said as on the YAML tab -->
+                      <div v-if="formReadOnly" class="alert alert-secondary py-2 mb-2">
+                        <FaIcon icon="lock" class="me-2" />{{ t('designer.subformReadOnly') }}
+                      </div>
                       <AppFormVisualEditor
                         :key="'formvisual-' + currentForm"
                         ref="visualEditor"
                         v-model="forms[currentForm]"
-                        :readOnly="!(lock && lock.match) || configTemplated || !canDesignForms"
+                        :readOnly="!(lock && lock.match) || configTemplated || !canDesignForms || formReadOnly"
                         :categoryOptions="visualCategoryOptions"
                         :roleOptions="visualRoleOptions"
                         :otherForms="visualOtherForms"
                       />
                     </div>
                     <div v-else-if="editorTarget" :key="'formeditor-' + currentForm">
+                      <!-- a subform the user only uses : read only, said -->
+                      <div v-if="formReadOnly" class="alert alert-secondary py-2 mb-2">
+                        <FaIcon icon="lock" class="me-2" />{{ t('designer.subformReadOnly') }}
+                      </div>
                       <BsInput
                         type="editor"
-                        :readonly="!lock?.match || configTemplated || !canDesignForms"
+                        :readonly="!lock?.match || configTemplated || !canDesignForms || formReadOnly"
                         :isFloating="false"
                         v-model="forms[currentForm]"
                         @save="saveForms()"
@@ -5441,7 +5509,7 @@ onBeforeUnmount(() => {
                             }"
                             :style="{ paddingLeft: (item.depth + 1) * 1.25 + 'rem' }"
                             role="button"
-                            draggable="true"
+                            :draggable="!readOnlyForm(n.id)"
                             @click="selectForm(n.id)"
                             @contextmenu="openContextMenu($event, { type: 'form', id: n.id, name: n.name })"
                             @dragstart="onDragStart(n.id, $event)"
@@ -5457,7 +5525,12 @@ onBeforeUnmount(() => {
                               <FaIcon v-if="n.icon" :icon="n.icon" class="me-2 flex-shrink-0" />
                               <span class="text-truncate" :title="n.name">{{ n.name }}</span>
                             </span>
-                            <span role="button" class="tree-del-btn flex-shrink-0 ms-2" @click.stop="deleteForm(n.id)">
+                            <span
+                              v-if="!readOnlyForm(n.id)"
+                              role="button"
+                              class="tree-del-btn flex-shrink-0 ms-2"
+                              @click.stop="deleteForm(n.id)"
+                            >
                               <FaIcon icon="times" />
                             </span>
                           </div>

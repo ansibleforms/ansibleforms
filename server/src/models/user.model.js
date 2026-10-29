@@ -27,6 +27,13 @@ function applyOptionDefaults(options, isAdmin) {
   if (options.allowPlaybookDesign === undefined) options.allowPlaybookDesign = true;
   // the forms config in the designer (categories, constants, forms) : as the files, on unless a role says otherwise
   if (options.allowFormDesign === undefined) options.allowFormDesign = true;
+  // every form in the designer, or only those of the user's roles (lib/designerForms.js) : on
+  // unless a role turns it off, always on for an admin
+  if (options.designAllForms === undefined || isAdmin) options.designAllForms = true;
+  // every playbook and every workflow file in the designer, or only those the forms the user sees
+  // use and those no form uses (lib/designerForms.js) : as designAllForms
+  if (options.designAllPlaybooks === undefined || isAdmin) options.designAllPlaybooks = true;
+  if (options.designAllWorkflows === undefined || isAdmin) options.designAllWorkflows = true;
   // api tokens (lib/tokenLifetime.js) : off unless a role turns them on - a role from before this
   // option, with only extendedTokenExpiration (then the token permission), keeps them ;
   // extendedTokenExpiration (with them, one that never expires) off as well

@@ -52,8 +52,11 @@
             "properties": {
               "showDesigner": { "type": "boolean"},
               "allowFormDesign": { "type": "boolean" },
+              "designAllForms": { "type": "boolean" },
               "allowPlaybookDesign": { "type": "boolean" },
+              "designAllPlaybooks": { "type": "boolean" },
               "allowWorkflowDesign": { "type": "boolean" },
+              "designAllWorkflows": { "type": "boolean" },
               "allowInventoryDesign": { "type": "boolean" },
               "allowVarsFileDesign": { "type": "boolean" },
               "showLogs": { "type": "boolean" },
@@ -116,8 +119,11 @@
             "properties": {
               "showDesigner": { "type": "boolean"},
               "allowFormDesign": { "type": "boolean" },
+              "designAllForms": { "type": "boolean" },
               "allowPlaybookDesign": { "type": "boolean" },
+              "designAllPlaybooks": { "type": "boolean" },
               "allowWorkflowDesign": { "type": "boolean" },
+              "designAllWorkflows": { "type": "boolean" },
               "allowInventoryDesign": { "type": "boolean" },
               "allowVarsFileDesign": { "type": "boolean" },
               "showLogs": { "type": "boolean" },

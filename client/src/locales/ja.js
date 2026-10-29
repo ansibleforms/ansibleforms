@@ -360,8 +360,14 @@ export default {
       showSettings: 'すべての設定ページを表示・変更します。サーバーログとバックアップには専用の切り替えがあります。',
       showDesigner: 'デザイナーを表示して使用します。',
       allowFormDesign: 'デザイナーでフォームを編集する：カテゴリ、定数、フォーム（なしの場合：読み取り専用）。',
+      designAllForms:
+        'デザイナーですべてのフォームを表示・編集する。なしの場合、ユーザーのロールのフォームのみ（それらが使うサブフォームは読み取り専用）。制限するのはフォームのみです（playbook とワークフローには専用のオプションがあります）。インベントリ、変数ファイル、カテゴリ、定数はすべてのデザイナーに表示されたままです。',
       allowPlaybookDesign: 'デザイナーで playbook を編集する（なしの場合：読み取り専用）。',
+      designAllPlaybooks:
+        'デザイナーですべての playbook を表示・編集する。なしの場合、ユーザーが見られるフォームが使う playbook と、まだどのフォームも使っていない playbook のみ。',
       allowWorkflowDesign: 'デザイナーでワークフローを編集する（なしの場合：読み取り専用）。',
+      designAllWorkflows:
+        'デザイナーですべてのワークフローを表示・編集する。なしの場合、ユーザーが見られるフォームが使うワークフローと、まだどのフォームも使っていないワークフローのみ。',
       allowInventoryDesign: 'デザイナーでインベントリを編集する（なしの場合：読み取り専用）。',
       allowVarsFileDesign: 'デザイナーで変数ファイルを編集する（なしの場合：読み取り専用）。',
       showLogs: 'サーバーログを表示します。',
@@ -2109,8 +2115,11 @@ export default {
       noConstants: '定数が設定されていません',
       roleOptionShowDesigner: 'デザイナーを表示',
       roleOptionAllowFormDesign: 'フォームを編集',
+      roleOptionDesignAllForms: 'すべてのフォームを編集',
       roleOptionAllowPlaybookDesign: 'playbook を編集',
+      roleOptionDesignAllPlaybooks: 'すべての playbook を編集',
       roleOptionAllowWorkflowDesign: 'ワークフローを編集',
+      roleOptionDesignAllWorkflows: 'すべてのワークフローを編集',
       roleOptionAllowInventoryDesign: 'インベントリを編集',
       roleOptionAllowVarsFileDesign: '変数ファイルを編集',
       roleOptionShowLogs: 'サーバーログを表示',
@@ -2710,6 +2719,8 @@ export default {
     selectBackupFirst: '先にバックアップを選択してください',
     warnFormDuplicate: "フォーム '{name}' が重複しています",
     warnUniqueFormName: '各フォームには一意の名前が必要です',
+    subformReadOnly:
+      '読み取り専用：あなたのフォームが使うサブフォームですが、そのロールにあなたのロールが含まれていません。',
     warnEmptyFormName: 'フォーム名が空です',
     warnBadFormYaml: "フォーム '{name}' の YAML が正しくないため、解析できません",
     warnBadSource: "フォーム '{name}' の 'source' プロパティが正しくありません",
