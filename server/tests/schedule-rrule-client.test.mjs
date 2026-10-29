@@ -66,6 +66,11 @@ const RRULES = [
   `${D} RRULE:FREQ=DAILY;INTERVAL=1 NONSENSE`,
   "DTSTART;TZID=America/New_York:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1",
   "DTSTART;TZID=Not/AZone:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1",
+  // an IANA zone or a fixed offset UTC+5 / GMT-3 (capitals, UTC-12 to UTC+14) : not luxon's names
+  // for the server's zone
+  ...["local", "system", "default", "UTC+5", "GMT-3", "UTC+05", "UTC+14", "UTC-12", "UTC+15", "UTC-13", "utc+5", "GMT", "Etc/GMT+5"].map(
+    (zone) => `DTSTART;TZID=${zone}:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1`,
+  ),
   `${D} RRULE:FREQ=DAILY;INTERVAL=1 EXRULE:FREQ=WEEKLY;INTERVAL=-2`,
   // each BYxxx number in its range, a WKST that is a weekday
   ...[

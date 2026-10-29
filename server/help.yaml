@@ -6509,8 +6509,9 @@
       are checked and kept in the file, AnsibleForms has nothing to give them to. Any other key
       (`natural_key`, `related`, `organization`, your own) is kept as it is when the app writes the file.
 
-      **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (or a UTC time
-      ending in `Z`), one or more `RRULE`, and `EXRULE`. Refused: no or several `DTSTART`, a
+      **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (an IANA zone such as
+      `Europe/Brussels`, or a fixed offset from `UTC-12` to `UTC+14` written `UTC+5` or `GMT-3`) or a UTC time
+      ending in `Z`, one or more `RRULE`, and `EXRULE`. Refused: no or several `DTSTART`, a
       naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL` or with one under 1, `SECONDLY`, `BYDAY` with a number
       (`5MO`), `COUNT` with `UNTIL`, `COUNT` above 999 (in any case, `count=5000` too), a `BYxxx` number out of its
       range (`BYHOUR` 0 to 23, `BYSETPOS` 1 to 366 or -366 to -1, `BYEASTER` -80 to 250 ...), a `WKST` that is no

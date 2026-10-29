@@ -55,6 +55,23 @@ const NUMBER_PARTS = {
 };
 
 /**
+ * The zone a DTSTART's TZID names, as the browser (Intl) knows it : a fixed offset written UTC+5
+ * or GMT-3 (in capitals, as the server and dateutil read it) is the Etc/GMT zone of that offset
+ * (Etc/GMT-5, the Etc/GMT zones counting the other way : from UTC-12 to UTC+14), any other TZID
+ * is itself (an IANA zone, or none).
+ *
+ * Args:
+ *   tzid (string): the TZID.
+ *
+ * Returns:
+ *   string: the zone to give Intl.
+ */
+export function intlZone(tzid) {
+  const offset = String(tzid ?? '').match(/^(?:UTC|GMT)([+-])(\d{1,2})$/);
+  return offset ? `Etc/GMT${offset[1] === '+' ? '-' : '+'}${Number(offset[2])}` : String(tzid ?? '');
+}
+
+/**
  * A number of a rule's part as the server reads it : an integer, a sign allowed ; NaN when it is
  * none (1.5, abc).
  *
@@ -151,7 +168,7 @@ function ruleProblem(kind, text) {
  * EXDATE or an RDATE, a rule without INTERVAL or with INTERVAL under 1, SECONDLY, BYDAY with a
  * numeric prefix, COUNT with UNTIL, a COUNT under 1 or above 999, a part that is not a rule's, a
  * BYxxx number out of its range (BYSETPOS=0), a WKST that is no weekday, a TZID that is no time
- * zone - the server's reasons, in its order.
+ * zone (an IANA zone, or a fixed offset UTC+5 or GMT-3) - the server's reasons, in its order.
  *
  * Args:
  *   value (string): the rrule.
@@ -195,7 +212,7 @@ export function rruleProblem(value, validZone = () => true) {
     if (dt) {
       if (dt[1] && dt[3]) return `rrule parsing failed validation: a DTSTART with a TZID cannot end in Z: ${token}`;
       if (!dt[1] && !dt[3]) return `A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`;
-      if (dt[1] && !validZone(dt[1]))
+      if (dt[1] && !validZone(intlZone(dt[1])))
         return `A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`;
       continue;
     }

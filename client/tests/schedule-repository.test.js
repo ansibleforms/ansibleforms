@@ -35,6 +35,7 @@ import {
   scheduleRepository,
   loadScheduleRepository,
 } from '../src/config/rrule.js';
+import { intlZone } from '../src/lib/rruleRules.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
 import {
   usageType,
@@ -285,6 +286,18 @@ describe('a rrule is checked on its text', () => {
   ])('refuses %s', (rrule, reason) => {
     expect(rruleProblem(rrule)).toContain(reason);
     expect(rruleValidationMessage(t, rrule)).toContain('settings.schedules.rruleInvalid');
+  });
+
+  it('takes a fixed offset UTC+5 or GMT-3, not the names of the server zone', () => {
+    const rrule = (zone) => `DTSTART;TZID=${zone}:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1`;
+    for (const zone of ['UTC+5', 'GMT-3', 'UTC+14', 'UTC-12']) expect(rruleProblem(rrule(zone))).toBe('');
+    for (const zone of ['local', 'system', 'utc+5', 'UTC+15', 'UTC-13']) {
+      expect(rruleProblem(rrule(zone))).toContain('A valid TZID');
+    }
+    // the runs shown in the Etc/GMT zone of the offset, which counts the other way
+    expect(intlZone('UTC+5')).toBe('Etc/GMT-5');
+    expect(intlZone('GMT-03')).toBe('Etc/GMT+3');
+    expect(intlZone('Europe/Brussels')).toBe('Europe/Brussels');
   });
 
   it('reads its zone', () => {

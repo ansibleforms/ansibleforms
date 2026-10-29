@@ -21,6 +21,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useI18n } from 'vue-i18n';
 import { rruleProblem } from '@/config/rrule';
+import { intlZone } from '@/lib/rruleRules';
 
 const { t, locale } = useI18n();
 const emit = defineEmits(['update:modelValue']);
@@ -104,7 +105,7 @@ function formatDate(d) {
     hourCycle: 'h23',
   };
   try {
-    return new Intl.DateTimeFormat(locale.value, { ...options, timeZone: zone.value || 'UTC' }).format(d);
+    return new Intl.DateTimeFormat(locale.value, { ...options, timeZone: intlZone(zone.value || 'UTC') }).format(d);
   } catch {
     return new Intl.DateTimeFormat(locale.value, options).format(d);
   }

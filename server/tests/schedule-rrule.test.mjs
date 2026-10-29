@@ -46,6 +46,12 @@ describe("a refused rrule is refused, with the reason", () => {
     ],
     ["DTSTART:NONSENSE RRULE:NONSENSE RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=3,4", "Valid DTSTART required in rrule"],
     ["DTSTART;TZID=US-Eastern:19961105T090000 RRULE:FREQ=MINUTELY;INTERVAL=10;COUNT=5", "A valid TZID must be provided"],
+    // luxon's own names for the server's zone, which dateutil and the browser do not know ; a fixed
+    // offset in small letters (a POSIX zone to dateutil, the other way) or with no Etc/GMT zone
+    ...["local", "system", "default", "utc+5", "UTC+15", "UTC-13", "UTC+5:30"].map((zone) => [
+      `DTSTART;TZID=${zone}:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1`,
+      zone === "UTC+5:30" ? "Valid DTSTART required in rrule" : "A valid TZID must be provided",
+    ]),
     ["DTSTART:20300308T050000Z RRULE:FREQ=REGULARLY;INTERVAL=1", "rrule parsing failed validation: invalid 'FREQ': REGULARLY"],
     ["DTSTART;TZID=America/New_York:20300308T050000Z RRULE:FREQ=DAILY;INTERVAL=1", "rrule parsing failed validation"],
     // a BYEASTER past a day of Easter's own year : its range said, not that it never fires
@@ -94,6 +100,15 @@ describe("its runs, in its own time zone", () => {
       "2030-03-11T05:00:00.000Z",
       "2030-03-12T05:00:00.000Z",
     ]);
+  });
+
+  test("a fixed offset UTC+5 or GMT-3 : as dateutil reads it (UTC+5 five hours ahead)", () => {
+    assert.deepEqual(validateRrule("DTSTART;TZID=UTC+5:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1"), []);
+    assert.deepEqual(runs("DTSTART;TZID=UTC+5:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2"), ["2030-03-08T00:00:00.000Z", "2030-03-09T00:00:00.000Z"]);
+    assert.deepEqual(runs("DTSTART;TZID=GMT-3:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2"), ["2030-03-08T08:00:00.000Z", "2030-03-09T08:00:00.000Z"]);
+    assert.deepEqual(runs("DTSTART;TZID=UTC+14:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=1"), ["2030-03-07T15:00:00.000Z"]);
+    assert.deepEqual(runs("DTSTART;TZID=UTC-12:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1;COUNT=1"), ["2030-03-08T17:00:00.000Z"]);
+    assert.equal(zoneOf("DTSTART;TZID=GMT-03:20300308T050000 RRULE:FREQ=DAILY;INTERVAL=1"), "UTC-3");
   });
 
   test("New York keeps 05:00 local across the DST change", () => {

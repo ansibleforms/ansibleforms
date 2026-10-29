@@ -4,7 +4,8 @@
 // models/schedule.model.js and services/cron.service.js time the schedules by them.
 //
 // The rules :
-//   a rrule needs one DTSTART, with a TZID or in UTC (ending in Z), and at least one RRULE ;
+//   a rrule needs one DTSTART, with a TZID (an IANA zone, or a fixed offset UTC+5 or GMT-3) or
+//     in UTC (ending in Z), and at least one RRULE ;
 //     EXRULE takes runs out, EXDATE and RDATE are refused ; each rule needs an INTERVAL of 1 or
 //     more, no SECONDLY, no BYDAY with a number (5MO), not COUNT and UNTIL together, COUNT 999
 //     at most ; each BYxxx number in its range (BYHOUR 0 to 23, BYSETPOS 1 to 366 or -366 to
@@ -39,7 +40,7 @@
 // the moment it is in that zone.
 import { Worker, MessageChannel, receiveMessageOnPort } from "node:worker_threads";
 import rrulePkg from "rrule";
-import { DateTime } from "luxon";
+import { DateTime, IANAZone } from "luxon";
 
 const { RRule } = rrulePkg;
 
@@ -252,10 +253,8 @@ export function compileRrule(value) {
       // a TZID with a Z : dateutil refuses it
       if (tzid && utc) throw fail(`a DTSTART with a TZID cannot end in Z: ${token}`);
       if (!tzid && !utc) throw new Error(`A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`);
-      zone = tzid || "UTC";
-      if (!DateTime.local().setZone(zone).isValid) {
-        throw new Error(`A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`);
-      }
+      zone = tzid ? zoneOfTzid(tzid) : "UTC";
+      if (!zone) throw new Error(`A valid TZID must be provided (e.g., America/New_York). Invalid: ['${token}']`);
       start = floatingOfStamp(stamp);
       if (Number.isNaN(start)) throw fail(`invalid DTSTART: ${token}`);
       continue;
@@ -274,6 +273,29 @@ export function compileRrule(value) {
     start,
     rules: rules.map((r) => ({ kind: r.kind, options: ruleOptions(r.text, zone, fail, `${r.kind.toUpperCase()}:${r.text}`) })),
   };
+}
+
+/**
+ * The zone a DTSTART's TZID names, as luxon reads it : an IANA zone (Europe/Brussels), or a fixed
+ * offset written UTC+5 or GMT-3 (in capitals, as dateutil reads it : utc+5 is a POSIX zone to
+ * dateutil, five hours behind) from UTC-12 to UTC+14, the offsets there is an Etc/GMT zone for.
+ * Nothing else : luxon's own names (local, system, default) are the server's zone, which dateutil
+ * and the browser do not know.
+ *
+ * Args:
+ *   tzid (string): the TZID.
+ *
+ * Returns:
+ *   string|null: the zone (UTC+5 for GMT+5), null when the TZID names none.
+ */
+function zoneOfTzid(tzid) {
+  const offset = tzid.match(/^(?:UTC|GMT)([+-])(\d{1,2})$/);
+  if (offset) {
+    const [, sign, hours] = offset;
+    // the Etc/GMT zones count the other way : Etc/GMT-5 is five hours ahead
+    return IANAZone.isValidZone(`Etc/GMT${sign === "+" ? "-" : "+"}${Number(hours)}`) ? `UTC${sign}${Number(hours)}` : null;
+  }
+  return IANAZone.isValidZone(tzid) ? tzid : null;
 }
 
 /**
