@@ -1,13 +1,14 @@
 'use strict';
 // The appearance types of the repository-backed objects (lib/repoObjects/engine.js, its
-// single-file mode) : what Settings > Appearance's pages save, in one file of a repository - the
-// branding (branding.yaml : the name, the defaults, the language, the logo and the icon, the images
-// as files beside it) and the header's links (links.yaml : the links and the Designer's). One way
-// for both, written once : a file applied as the pages save (the settings row's fields through
-// lib/appearance.js, the environment settings through lib/envSave.js, the images through
-// lib/brandImages.js), the images read and written as binary and checked as an upload is. The
-// config seed's branding and links sections are read the same way, its images relative to the seed
-// file.
+// single-file mode) : what Settings > Appearance's pages save, one file of a repository per page,
+// each holding what its page saves and nothing else - the defaults (defaults.yaml : the theme, its
+// colour, the forms view, the time zone, the date format, the language), the logo (logo.yaml, the
+// image a file beside it), the website icon (icon.yaml, the same), the name (name.yaml) and the
+// header's links (links.yaml : the links and the Designer's). One way for all, written once : a
+// file applied as the pages save (the settings row's fields through lib/appearance.js, the
+// environment settings through lib/envSave.js, the images through lib/brandImages.js), the images
+// read and written as binary and checked as an upload is. The config seed's sections of the same
+// names are read the same way, its images relative to the seed file.
 //
 // The seed and a repository never own the same field : a field the seed declares stays the seed's
 // (lib/repoObjects/seedHold.js, shared with the MCP settings). The repository holds the others.
@@ -69,7 +70,7 @@ function readImage(dir, name) {
  * YAML names it - its own file rewritten (images/logo.png stays images/logo.png), beside it with the
  * new type's extension when the type changed (images/logo.svg), and the YAML naming it so ; an image
  * the YAML does not name yet written as <kind>.<extension> at its side (imageFile). A file the YAML
- * does not name is never the branding's : one there already with other bytes is refused, never
+ * does not name is never the type's : one there already with other bytes is refused, never
  * overwritten (lib/repoObjects/engine.js writeSingle). An image the edit left as it is keeps its file
  * and its name : nothing is written for it, and nothing removed.
  *
@@ -90,7 +91,7 @@ function imageEdits(images, seeded, declared, after, before) {
   const out = { base: {}, names: {}, extraFiles: [], gone: [] };
   for (const kind of images) {
     if (seeded.includes(kind) || same(comparable(after?.[kind]), comparable(before?.[kind]))) continue;
-    // the name the YAML gives it, the branding's own file
+    // the name the YAML gives it, the type's own file
     const named = typeof declared[kind] === "string" && declared[kind] ? declared[kind] : undefined;
     const file = imageFile(kind, after?.[kind]);
     let target;

@@ -136,12 +136,12 @@ const saveEnv = async function(req,res){
     if(outside.length){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`))
     }
-    // the general, branding, links and MCP repositories' files, before (the language is the
-    // branding's, the Designer's link the links', the MCP switches the MCP's) : their changed
-    // variables written into them after
+    // the general, defaults, links and MCP repositories' files, before (the language is the
+    // defaults', the Designer's link the links', the MCP switches the MCP's) : their changed
+    // variables written into them after, each into its own page's file only,
     // under their repositories' write claims, taken first (RepoObjects.holding)
-    const restart = await RepoObjects.holding(['general', 'branding', 'links', 'mcp'], async () => {
-      const before = await RepoObjects.snapshots(['general', 'branding', 'links', 'mcp'])
+    const restart = await RepoObjects.holding(['general', 'defaults', 'links', 'mcp'], async () => {
+      const before = await RepoObjects.snapshots(['general', 'defaults', 'links', 'mcp'])
       // checked, written, applied, audited : as a General repository's pull (lib/envSave.js)
       const { restartRequired } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
       await RepoObjects.appUpdatedAll(before)

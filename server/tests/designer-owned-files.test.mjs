@@ -58,7 +58,7 @@ beforeEach(() => {
   appConfig.repoPath = fx.ROOT;
   fx.reset({
     repositories: [
-      { id: 1, name: "ops", use_for_workflows: 1, use_for_inventories: 1, use_for_playbooks: 1, use_for_roles: 1, use_for_constants: 1, use_for_credentials: 1, use_for_general: 1, use_for_branding: 1, use_for_repositories: 1 },
+      { id: 1, name: "ops", use_for_workflows: 1, use_for_inventories: 1, use_for_playbooks: 1, use_for_roles: 1, use_for_constants: 1, use_for_credentials: 1, use_for_general: 1, use_for_logo: 1, use_for_name: 1, use_for_repositories: 1 },
     ],
   });
   fs.mkdirSync(path.join(fx.ROOT, "local"), { recursive: true });
@@ -67,7 +67,8 @@ beforeEach(() => {
   write("credentials/git.yaml", YAML.stringify({ name: "git", password: "${GIT_PASSWORD}" }));
   write("general.yaml", "LOG_LEVEL: info\n");
   write("repositories.yaml", "repositories: []\n");
-  write("branding.yaml", YAML.stringify({ app_name: "Ops", logo: "images/logo.png" }));
+  write("logo.yaml", YAML.stringify({ logo: "images/logo.png" }));
+  write("name.yaml", YAML.stringify({ app_name: "Ops" }));
   write("images/logo.png", PNG);
   write("deploy.yml", "workflow_job_templates: []\n");
 });
@@ -85,12 +86,14 @@ describe("a file a usage type of the repository owns", () => {
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "credentials", "new.yaml")), false);
   });
 
-  test("is never read, nor deleted : credentials, general.yaml, the branding's logo", async () => {
+  test("is never read, nor deleted : credentials, general.yaml, name.yaml, the logo named in logo.yaml", async () => {
     await assert.rejects(ProjectFiles.read("workflows", "ops/credentials/git.yaml"), denied);
     await assert.rejects(ProjectFiles.read("playbooks", "general.yaml"), denied);
     await assert.rejects(ProjectFiles.read("inventories", "ops/images/logo.png"), denied);
-    await assert.rejects(ProjectFiles.remove("workflows", "ops/branding.yaml"), denied);
-    assert.ok(fs.existsSync(path.join(fx.ROOT, "ops", "branding.yaml")));
+    await assert.rejects(ProjectFiles.remove("workflows", "ops/logo.yaml"), denied);
+    await assert.rejects(ProjectFiles.remove("workflows", "ops/name.yaml"), denied);
+    assert.ok(fs.existsSync(path.join(fx.ROOT, "ops", "logo.yaml")));
+    assert.ok(fs.existsSync(path.join(fx.ROOT, "ops", "name.yaml")));
   });
 
   test("is never listed ; the explorer's own files are", async () => {

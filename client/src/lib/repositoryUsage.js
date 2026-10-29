@@ -79,13 +79,43 @@ export const USAGE_TYPES = [
     oneOnly: true,
     file: 'general.yaml',
   },
+  // the Appearance pages, one file each holding what its page saves, in the menu's order, each
+  // named as its menu item names it (Defaults, Logo, Icon, Name)
   {
-    key: 'branding',
-    flag: 'use_for_branding',
+    key: 'defaults',
+    flag: 'use_for_defaults',
     category: 'appearance',
+    labelKey: 'sidebar.defaults',
     objects: true,
     oneOnly: true,
-    file: 'branding.yaml',
+    file: 'defaults.yaml',
+  },
+  {
+    key: 'logo',
+    flag: 'use_for_logo',
+    category: 'appearance',
+    labelKey: 'sidebar.logo',
+    objects: true,
+    oneOnly: true,
+    file: 'logo.yaml',
+  },
+  {
+    key: 'icon',
+    flag: 'use_for_icon',
+    category: 'appearance',
+    labelKey: 'sidebar.icon',
+    objects: true,
+    oneOnly: true,
+    file: 'icon.yaml',
+  },
+  {
+    key: 'name',
+    flag: 'use_for_name',
+    category: 'appearance',
+    labelKey: 'sidebar.name',
+    objects: true,
+    oneOnly: true,
+    file: 'name.yaml',
   },
   // named as its menu item names it (Links)
   {
@@ -228,7 +258,10 @@ export const APPLY_ORDER = [
   'chat_assistant',
   'schedules',
   'disclaimer',
-  'branding',
+  'defaults',
+  'logo',
+  'icon',
+  'name',
   'links',
   'labels',
   'announcements',
@@ -844,7 +877,7 @@ export function repositorySourceFields(t, row) {
 }
 
 /**
- * Where a type kept in one file is (the chat's, the settings', the branding's) : the repository
+ * Where a type kept in one file is (the chat's, the settings', the defaults') : the repository
  * used for it and its file, as a record of a repository says it ; none when no repository holds it.
  * Read with the settings (source_<type>), so a page of a part of the settings on its own shows it
  * without reading the repositories.

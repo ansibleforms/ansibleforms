@@ -1,6 +1,6 @@
 // The last object types on the engine (lib/repoObjects) : the ones kept in ONE file of their
 // repository - the chat assistant (chat-assistant.yaml), the System > General settings (general.yaml), the
-// branding (branding.yaml and its images) - and the announcements and the disclaimer versions, one
+// Appearance pages (defaults.yaml, logo.yaml, icon.yaml, name.yaml, links.yaml) - and the announcements and the disclaimer versions, one
 // file each. On the shared fixture :
 //   single-file mode  a pull applies the file (git wins), turning the type on writes the app's
 //                     values when there is no file, an edit in the app rewrites only what changed,
@@ -9,10 +9,13 @@
 //                     the deployment owns refused, a secret only as ${ENV}, a restart said
 //   mcp               the MCP page's switches the same way (mcp.yaml), applied at once, never a
 //                     variable of the settings' ; the seed's mcp section holding them per variable
-//   branding          its images beside it, read and written as binary, checked as an upload
+//   appearance        one file per page, holding what that page saves and nothing else, a page's
+//                     save writing its own file only ; the logo's and the icon's images beside
+//                     their file, read and written as binary, checked as an upload
 //   announcements     named, their moments compared in UTC, one made in the app named on its way
 //   disclaimer        a changed text a correction, or everyone asked again when the file says so
-//   the seed          the branding section read through the same descriptor, its image relative to it
+//   the seed          the defaults, logo, icon and name sections read through the same descriptors,
+//                     the images relative to it
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "fs";
@@ -102,7 +105,7 @@ beforeEach(() => {
   acceptances = { 1: 5 };
   fx.reset({
     repositories: [
-      { id: 1, name: "cfg", use_for_chat_assistant: 1, use_for_general: 1, use_for_branding: 1, use_for_links: 1, use_for_mcp: 1 },
+      { id: 1, name: "cfg", use_for_chat_assistant: 1, use_for_general: 1, use_for_defaults: 1, use_for_logo: 1, use_for_icon: 1, use_for_name: 1, use_for_links: 1, use_for_mcp: 1 },
       { id: 2, name: "news", use_for_announcements: 1, use_for_disclaimer: 1 },
     ],
     credentials: [{ id: 1, name: "chat-key", credential_type: "api", password: "enc:k" }],
@@ -392,13 +395,13 @@ describe("the MCP settings, in their mcp.yaml", () => {
   });
 
   test("the seed's mcp section holds its switches : refused in the app, kept out of the repository's file", async () => {
-    const { setSeedManagedBranding, seedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { setSeedManagedFields, seedManagedFields } = await import("../src/lib/seedManaged.js");
     const { saveEnvValues } = await import("../src/lib/envSave.js");
     const { validateSeed } = await import("../src/lib/seed-schema.js");
     assert.equal(validateSeed({ mcp: { ENABLE_MCP: true, MCP_READ_ONLY: 1 } }), true);
     assert.throws(() => validateSeed({ mcp: { JOB_RETENTION_DAYS: 30 } }), /validation failed/);
-    await setSeedManagedBranding(["MCP_READ_ONLY"]);
-    assert.deepEqual(await seedManagedBranding(), ["MCP_READ_ONLY"]);
+    await setSeedManagedFields(["MCP_READ_ONLY"]);
+    assert.deepEqual(await seedManagedFields(), ["MCP_READ_ONLY"]);
     await assert.rejects(saveEnvValues({ MCP_READ_ONLY: "1" }, {}), { status: 403, message: /MCP_READ_ONLY/ });
     // turned on : listed as staying in the app, never written to the file
     fx.cloneEmpty("cfg");
@@ -417,35 +420,155 @@ describe("the MCP settings, in their mcp.yaml", () => {
     assert.deepEqual(done.updated, ["mcp"]);
     assert.equal(process.env.MCP_READ_ONLY, "1");
     // released when the seed stops declaring it
-    assert.deepEqual(await setSeedManagedBranding([]), ["MCP_READ_ONLY"]);
+    assert.deepEqual(await setSeedManagedFields([]), ["MCP_READ_ONLY"]);
     await saveEnvValues({ MCP_READ_ONLY: "0" }, {});
   });
 });
 
-// ─── the branding ──────────────────────────────────────────────────────────────
-describe("the branding and its images", () => {
-  test("a pull applies its fields and reads its logo as binary, checked as an upload", async () => {
-    writeRaw("cfg", "branding.yaml", "app_name: ACME\ndefault_theme: dark\nlogo: logo.png\n");
+// ─── the Appearance pages : one file each ─────────────────────────────────────
+// the fields each Settings > Appearance page saves (client/src/pages/admin/defaults.vue : the
+// settings row's lookOf and DEFAULT_LANGUAGE ; logo.vue and favicon.vue : their image ; name.vue :
+// nameOf), as its file holds them
+const PAGE_FIELDS = {
+  defaults: ["default_theme", "default_theme_color", "forms_view", "default_timezone", "default_date_format", "default_language"],
+  logo: ["logo"],
+  icon: ["icon"],
+  name: ["app_name"],
+  links: ["header_links", "show_designer"],
+};
+
+describe("each Appearance page in its own file, holding what that page saves and nothing else", () => {
+  test("its file's schema, the seed's section and the fields the seed holds are its page's fields", async () => {
+    const { APPEARANCE_SECTIONS } = await import("../src/lib/seed-schema.js");
+    const { APPEARANCE_FIELDS, sectionOfField } = await import("../src/lib/seedManaged.js");
+    for (const [key, fields] of Object.entries(PAGE_FIELDS)) {
+      const d = await desc(key);
+      assert.equal(d.file, `${key}.yaml`);
+      assert.deepEqual([...d.keyOrder].sort(), [...fields].sort(), key);
+      assert.deepEqual(Object.keys(APPEARANCE_SECTIONS[key].properties).sort(), [...fields].sort(), key);
+      for (const field of fields) assert.equal(sectionOfField(field), key, field);
+    }
+    assert.deepEqual([...APPEARANCE_FIELDS].sort(), Object.values(PAGE_FIELDS).flat().sort());
+  });
+
+  test("turned on : each file written with its page's values only", async () => {
+    fx.cloneEmpty("cfg");
+    Object.assign(fx.state.tables.settings[0], {
+      app_name: "Mine",
+      default_theme: "dark",
+      default_theme_color: "#198754",
+      forms_view: "list",
+      default_timezone: "Europe/Brussels",
+      default_date_format: "DD/MM/YYYY",
+      logo: dataUrl(PNG),
+      favicon: dataUrl(PNG),
+    });
+    // the language as its page saves it (the managed environment file)
+    const { saveEnvValues } = await import("../src/lib/envSave.js");
+    await saveEnvValues({ DEFAULT_LANGUAGE: "fr" }, { user: "root" });
+    for (const key of ["defaults", "logo", "icon", "name"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+    assert.deepEqual(fx.readObject("cfg", ".", "defaults.yaml"), {
+      default_theme: "dark",
+      default_theme_color: "#198754",
+      forms_view: "list",
+      default_timezone: "Europe/Brussels",
+      default_date_format: "DD/MM/YYYY",
+      default_language: "fr",
+    });
+    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
+    assert.deepEqual(fx.readObject("cfg", ".", "icon.yaml"), { icon: "icon.png" });
+    assert.deepEqual(fx.readObject("cfg", ".", "name.yaml"), { app_name: "Mine" });
+    assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), PNG), 0);
+    assert.equal(Buffer.compare(readRaw("cfg", "icon.png"), PNG), 0);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "branding.yaml")), false);
+  });
+
+  test("a file declaring another page's field is refused, never applied", async () => {
+    for (const [file, key, field] of [
+      ["name.yaml", "name", "default_theme: dark"],
+      ["defaults.yaml", "defaults", "app_name: Other"],
+      ["logo.yaml", "logo", "icon: icon.png"],
+      ["icon.yaml", "icon", "logo: logo.png"],
+    ]) {
+      writeRaw("cfg", file, `${field}\n`);
+      const summary = await RepoObjects.syncRepository(await desc(key), "cfg");
+      assert.equal(summary.refused.length, 1, `${file}: ${JSON.stringify(summary)}`);
+    }
+    assert.equal(fx.state.tables.settings[0].app_name, "Old name");
+    assert.equal(fx.state.tables.settings[0].default_theme, "system");
+  });
+
+  test("a pull applies each file : the name, the defaults, the logo read as binary, checked as an upload", async () => {
+    writeRaw("cfg", "name.yaml", "app_name: ACME\n");
+    writeRaw("cfg", "defaults.yaml", "default_theme: dark\n");
+    writeRaw("cfg", "logo.yaml", "logo: logo.png\n");
     writeRaw("cfg", "logo.png", PNG);
-    const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
-    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    for (const key of ["name", "defaults", "logo"]) {
+      const summary = await RepoObjects.syncRepository(await desc(key), "cfg");
+      assert.equal(summary.updated, 1, `${key}: ${JSON.stringify(summary)}`);
+    }
     const row = fx.state.tables.settings[0];
     assert.equal(row.app_name, "ACME");
     assert.equal(row.default_theme, "dark");
     assert.equal(row.logo, dataUrl(PNG));
     CrudModel.flushAllLocal();
-    assert.equal((await RepoObjects.syncRepository(await desc("branding"), "cfg")).unchanged, 1);
+    for (const key of ["name", "defaults", "logo"]) assert.equal((await RepoObjects.syncRepository(await desc(key), "cfg")).unchanged, 1, key);
+  });
+});
+
+// ─── a page's save writes its own file ─────────────────────────────────────────
+describe("a save from an Appearance page writes its own page's file only", () => {
+  const settingsController = async () => (await import("../src/controllers/v2/settings.controller.js")).default;
+  const put = async (body) => {
+    const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+    await (await settingsController()).update({ body, user: { user: { username: "root", options: { showSettings: true } } } }, res);
+    return res;
+  };
+
+  test("the Defaults page's save : defaults.yaml rewritten, name.yaml and links.yaml left as they are, a removed one not written again", async () => {
+    fx.cloneEmpty("cfg");
+    for (const key of ["defaults", "name", "links"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+    const name = readRaw("cfg", "name.yaml").toString();
+    fs.rmSync(path.join(fx.ROOT, "cfg", "links.yaml"));
+    const res = await put({ default_theme: "dark", default_theme_color: "#008cba", forms_view: "tiles", default_timezone: "UTC", default_date_format: "YYYY-MM-DD" });
+    assert.equal(res.code, 200, JSON.stringify(res.body));
+    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_theme, "dark");
+    assert.equal(readRaw("cfg", "name.yaml").toString(), name);
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "links.yaml")), false, "the Links page's file is not the Defaults page's to write");
   });
 
+  test("the Name page's save : name.yaml rewritten, defaults.yaml left as it is", async () => {
+    fx.cloneEmpty("cfg");
+    for (const key of ["defaults", "name"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+    fs.rmSync(path.join(fx.ROOT, "cfg", "defaults.yaml"));
+    assert.equal((await put({ app_name: "Renamed" })).code, 200);
+    assert.deepEqual(fx.readObject("cfg", ".", "name.yaml"), { app_name: "Renamed" });
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "defaults.yaml")), false);
+  });
+
+  test("a new logo : logo.yaml and its image, never the icon's file", async () => {
+    fx.cloneEmpty("cfg");
+    for (const key of ["logo", "icon"]) await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+    fs.rmSync(path.join(fx.ROOT, "cfg", "icon.yaml"));
+    const before = await RepoObjects.snapshots(["logo", "icon"]);
+    fx.state.tables.settings[0].logo = dataUrl(PNG);
+    await RepoObjects.appUpdatedAll(before);
+    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "icon.yaml")), false);
+  });
+});
+
+// ─── the logo and the icon ─────────────────────────────────────────────────────
+describe("the logo and the icon, their images beside their file", () => {
   test("an image that is no image, too large, or outside the repository is refused", async () => {
     writeRaw("cfg", "logo.png", Buffer.from("not an image"));
-    writeRaw("cfg", "branding.yaml", "logo: logo.png\n");
-    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /not an image the app takes/);
+    writeRaw("cfg", "logo.yaml", "logo: logo.png\n");
+    assert.match((await RepoObjects.syncRepository(await desc("logo"), "cfg")).refused[0].reasons[0], /not an image the app takes/);
     writeRaw("cfg", "icon.png", Buffer.concat([PNG, Buffer.alloc(300 * 1024)]));
-    writeRaw("cfg", "branding.yaml", "icon: icon.png\n");
-    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /larger than 256 KB/);
-    writeRaw("cfg", "branding.yaml", "logo: ../elsewhere.png\n");
-    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /not a file beside it/);
+    writeRaw("cfg", "icon.yaml", "icon: icon.png\n");
+    assert.match((await RepoObjects.syncRepository(await desc("icon"), "cfg")).refused[0].reasons[0], /larger than 256 KB/);
+    writeRaw("cfg", "logo.yaml", "logo: ../elsewhere.png\n");
+    assert.match((await RepoObjects.syncRepository(await desc("logo"), "cfg")).refused[0].reasons[0], /not a file beside it/);
   });
 
   test("an image linked to a file outside the repository is never read", async () => {
@@ -453,113 +576,116 @@ describe("the branding and its images", () => {
     fs.writeFileSync(path.join(outside, "secret.png"), PNG);
     fx.cloneEmpty("cfg");
     fs.symlinkSync(path.join(outside, "secret.png"), path.join(fx.ROOT, "cfg", "logo.png"));
-    writeRaw("cfg", "branding.yaml", "logo: logo.png\n");
-    const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    writeRaw("cfg", "logo.yaml", "logo: logo.png\n");
+    const summary = await RepoObjects.syncRepository(await desc("logo"), "cfg");
     assert.match(summary.refused[0]?.reasons[0] || "", /not a file beside it/, JSON.stringify(summary));
     assert.equal(fx.state.tables.settings[0].logo, null);
   });
 
-  test("turned on : the app's branding written, its logo beside it as binary ; a new logo rewrites it", async () => {
+  test("turned on : the app's logo written beside logo.yaml as binary ; a new logo rewrites it", async () => {
     fx.cloneEmpty("cfg");
     Object.assign(fx.state.tables.settings[0], { app_name: "Mine", logo: dataUrl(PNG) });
-    await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
-    const file = fx.readObject("cfg", ".", "branding.yaml");
-    assert.equal(file.app_name, "Mine");
-    assert.equal(file.logo, "logo.png");
+    await RepoObjects.activate(await desc("logo"), "cfg", { pull: false });
+    assert.deepEqual(fx.readObject("cfg", ".", "logo.yaml"), { logo: "logo.png" });
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), PNG), 0);
     // a new logo in the app : the image rewritten, the YAML as it was
-    const before = await RepoObjects.snapshot("branding");
+    const before = await RepoObjects.snapshot("logo");
     const other = Buffer.concat([PNG, Buffer.from("v2")]);
     fx.state.tables.settings[0].logo = dataUrl(other);
-    await RepoObjects.appUpdated("branding", before);
+    await RepoObjects.appUpdated("logo", before);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), other), 0);
-    assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "logo.png");
+    assert.equal(fx.readObject("cfg", ".", "logo.yaml").logo, "logo.png");
   });
 
   test("a new logo in the app while the file names it elsewhere : written where it names it, an unrelated logo.png untouched", async () => {
     fx.cloneEmpty("cfg");
-    writeRaw("cfg", "branding.yaml", "app_name: ACME\nlogo: images/logo.png # the team's layout\n");
+    writeRaw("cfg", "logo.yaml", "logo: images/logo.png # the team's layout\n");
     fs.mkdirSync(path.join(fx.ROOT, "cfg", "images"), { recursive: true });
     writeRaw("cfg", "images/logo.png", PNG);
-    // a logo.png at the root that is not the branding's (the README's)
+    // a logo.png at the root that is not the Logo type's (the README's)
     const readme = Buffer.concat([PNG, Buffer.from("readme")]);
     writeRaw("cfg", "logo.png", readme);
-    await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    await RepoObjects.syncRepository(await desc("logo"), "cfg");
     CrudModel.flushAllLocal();
-    const before = await RepoObjects.snapshot("branding");
+    const before = await RepoObjects.snapshot("logo");
     const other = Buffer.concat([PNG, Buffer.from("v2")]);
     fx.state.tables.settings[0].logo = dataUrl(other);
-    assert.equal(await RepoObjects.appUpdated("branding", before), true);
+    assert.equal(await RepoObjects.appUpdated("logo", before), true);
     // the YAML still names its own file, which holds the new logo : a pull of it gives the new one
-    assert.equal(readRaw("cfg", "branding.yaml").toString(), "app_name: ACME\nlogo: images/logo.png # the team's layout\n");
+    assert.equal(readRaw("cfg", "logo.yaml").toString(), "logo: images/logo.png # the team's layout\n");
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), other), 0);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0, "the README's logo untouched");
-    // another type : beside it with its extension, the YAML naming it, the old file the branding's gone
-    const before2 = await RepoObjects.snapshot("branding");
+    // another type : beside it with its extension, the YAML naming it, the old file the logo's gone
+    const before2 = await RepoObjects.snapshot("logo");
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
     fx.state.tables.settings[0].logo = `data:image/svg+xml;base64,${svg.toString("base64")}`;
-    await RepoObjects.appUpdated("branding", before2);
-    assert.equal(fx.readObject("cfg", ".", "branding.yaml").logo, "images/logo.svg");
+    await RepoObjects.appUpdated("logo", before2);
+    assert.equal(fx.readObject("cfg", ".", "logo.yaml").logo, "images/logo.svg");
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.svg"), svg), 0);
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "images", "logo.png")), false);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
   });
 
-  test("a file of the name an image would be written as, not the branding's : refused, never overwritten", async () => {
+  test("a file of the name an image would be written as, not the Logo type's : refused, never overwritten", async () => {
     fx.cloneEmpty("cfg");
     const readme = Buffer.concat([PNG, Buffer.from("readme")]);
     writeRaw("cfg", "logo.png", readme);
     Object.assign(fx.state.tables.settings[0], { app_name: "Mine", logo: dataUrl(PNG) });
-    // turned on : branding.yaml would name the app's logo logo.png
-    await assert.rejects(RepoObjects.activate(await desc("branding"), "cfg", { pull: false }), /'logo.png' is in repository 'cfg' already and is not the one branding.yaml names/);
+    // turned on : logo.yaml would name the app's logo logo.png
+    await assert.rejects(RepoObjects.activate(await desc("logo"), "cfg", { pull: false }), /'logo.png' is in repository 'cfg' already and is not the one logo.yaml names/);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
-    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "branding.yaml")), false, "nothing written");
-    // an edit of a branding.yaml that names no logo : the same
-    writeRaw("cfg", "branding.yaml", "app_name: Mine\n");
-    const before = await RepoObjects.snapshot("branding");
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "logo.yaml")), false, "nothing written");
+    // an edit of a logo.yaml that names no logo : the same
+    writeRaw("cfg", "logo.yaml", "# no logo yet\n{}\n");
+    const before = await RepoObjects.snapshot("logo");
     fx.state.tables.settings[0].logo = dataUrl(Buffer.concat([PNG, Buffer.from("v3")]));
-    assert.equal(await RepoObjects.appUpdated("branding", before), null);
+    assert.equal(await RepoObjects.appUpdated("logo", before), null);
     assert.equal(Buffer.compare(readRaw("cfg", "logo.png"), readme), 0);
-    assert.equal(readRaw("cfg", "branding.yaml").toString(), "app_name: Mine\n");
+    assert.equal(readRaw("cfg", "logo.yaml").toString(), "# no logo yet\n{}\n");
   });
 
-  test("an edit that leaves the logo as it is writes no image : none beside the YAML, none removed", async () => {
+  test("a save that leaves the logo as it is writes nothing : no image beside the YAML, none removed", async () => {
     fx.cloneEmpty("cfg");
-    writeRaw("cfg", "branding.yaml", "app_name: ACME\nlogo: images/logo.png\n");
+    writeRaw("cfg", "logo.yaml", "logo: images/logo.png\n");
     fs.mkdirSync(path.join(fx.ROOT, "cfg", "images"), { recursive: true });
     writeRaw("cfg", "images/logo.png", PNG);
-    await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    await RepoObjects.syncRepository(await desc("logo"), "cfg");
     CrudModel.flushAllLocal();
-    const before = await RepoObjects.snapshot("branding");
+    const before = await RepoObjects.snapshot("logo");
     fx.state.tables.settings[0].app_name = "Renamed";
-    await RepoObjects.appUpdated("branding", before);
-    const file = fx.readObject("cfg", ".", "branding.yaml");
-    assert.equal(file.app_name, "Renamed");
-    assert.equal(file.logo, "images/logo.png");
+    assert.equal(await RepoObjects.appUpdated("logo", before), false);
+    assert.equal(readRaw("cfg", "logo.yaml").toString(), "logo: images/logo.png\n");
     assert.equal(fs.existsSync(path.join(fx.ROOT, "cfg", "logo.png")), false);
     assert.equal(Buffer.compare(readRaw("cfg", "images/logo.png"), PNG), 0);
   });
 
-  test("the seed's branding section : read the same way, its image relative to the seed file", async () => {
+  test("the seed's logo, icon and name sections : read the same way, the images relative to the seed file", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-seed-"));
     fs.mkdirSync(path.join(dir, "img"));
     fs.writeFileSync(path.join(dir, "img", "logo.png"), PNG);
-    const done = await RepoObjects.applyDeclared(await desc("branding"), { app_name: "Seeded", logo: "img/logo.png" }, { dir });
-    assert.deepEqual(done.updated, ["branding"]);
+    fs.writeFileSync(path.join(dir, "img", "icon.png"), PNG);
+    assert.deepEqual((await RepoObjects.applyDeclared(await desc("logo"), { logo: "img/logo.png" }, { dir })).updated, ["logo"]);
+    assert.deepEqual((await RepoObjects.applyDeclared(await desc("icon"), { icon: "img/icon.png" }, { dir })).updated, ["icon"]);
+    assert.deepEqual((await RepoObjects.applyDeclared(await desc("name"), { app_name: "Seeded" }, { dir })).updated, ["name"]);
     assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
     assert.equal(fx.state.tables.settings[0].logo, dataUrl(PNG));
+    assert.equal(fx.state.tables.settings[0].favicon, dataUrl(PNG));
   });
 });
 
 // ─── the log lines of a type kept in one file ───────────────────────────────────
 describe("a file whose values the app keeps otherwise : the next pull changes nothing", () => {
-  test("the branding's name with spaces around it and an unknown forms view", async () => {
-    writeRaw("cfg", "branding.yaml", "app_name: '  ACME  '\nforms_view: nonsense\n");
-    assert.equal((await RepoObjects.syncRepository(await desc("branding"), "cfg")).updated, 1);
+  test("the name with spaces around it, an unknown forms view", async () => {
+    writeRaw("cfg", "name.yaml", "app_name: '  ACME  '\n");
+    writeRaw("cfg", "defaults.yaml", "forms_view: nonsense\n");
+    assert.equal((await RepoObjects.syncRepository(await desc("name"), "cfg")).updated, 1);
+    assert.deepEqual((await RepoObjects.syncRepository(await desc("defaults"), "cfg")).refused, []);
     assert.equal(fx.state.tables.settings[0].app_name, "ACME");
-    const second = await RepoObjects.syncRepository(await desc("branding"), "cfg");
-    assert.equal(second.updated, 0, JSON.stringify(second));
-    assert.equal(second.unchanged, 1);
+    for (const key of ["name", "defaults"]) {
+      const second = await RepoObjects.syncRepository(await desc(key), "cfg");
+      assert.equal(second.updated, 0, JSON.stringify(second));
+      assert.equal(second.unchanged, 1);
+    }
   });
 
   test("the chat's number of turns above its limit", async () => {
@@ -576,20 +702,20 @@ describe("a file whose values the app keeps otherwise : the next pull changes no
   });
 });
 
-describe("the branding's language, an environment setting", () => {
+describe("the default language, an environment setting in defaults.yaml", () => {
   test("set in the real environment : never written to the repository, a file's not applied (said), its other fields applied", async () => {
     process.env.DEFAULT_LANGUAGE = "fr";
     try {
       fx.cloneEmpty("cfg");
-      await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
-      assert.equal(fx.readObject("cfg", ".", "branding.yaml").default_language, undefined, "the deployment's value is not the repository's");
-      writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_language: de\n");
-      const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+      await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
+      assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_language, undefined, "the deployment's value is not the repository's");
+      writeRaw("cfg", "defaults.yaml", "default_theme: dark\ndefault_language: de\n");
+      const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
       assert.deepEqual(summary.refused, []);
-      assert.equal(fx.state.tables.settings[0].app_name, "From git");
+      assert.equal(fx.state.tables.settings[0].default_theme, "dark");
       assert.equal(process.env.DEFAULT_LANGUAGE, "fr");
-      assert.match(RepoObjects.summaryText(await desc("branding"), summary), /Set in the environment, not applied: DEFAULT_LANGUAGE/);
-      assert.equal((await RepoObjects.syncRepository(await desc("branding"), "cfg")).unchanged, 1);
+      assert.match(RepoObjects.summaryText(await desc("defaults"), summary), /Set in the environment, not applied: DEFAULT_LANGUAGE/);
+      assert.equal((await RepoObjects.syncRepository(await desc("defaults"), "cfg")).unchanged, 1);
     } finally {
       delete process.env.DEFAULT_LANGUAGE;
     }
@@ -599,10 +725,10 @@ describe("the branding's language, an environment setting", () => {
     const { default: appConfig } = await import("./__mocks__/app.config.js");
     appConfig.allowEnvEdit = false;
     try {
-      writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_language: de\n");
-      const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+      writeRaw("cfg", "defaults.yaml", "default_theme: dark\ndefault_language: de\n");
+      const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
       assert.equal(summary.refused.length, 1, JSON.stringify(summary));
-      assert.equal(fx.state.tables.settings[0].app_name, "Old name", "never applied by halves");
+      assert.equal(fx.state.tables.settings[0].default_theme, "system", "never applied by halves");
     } finally {
       appConfig.allowEnvEdit = true;
     }
@@ -639,7 +765,7 @@ describe("the log names a type kept in one file by its label", () => {
 describe("the header's links, in their own links.yaml", () => {
   const LINK = { id: "a", label: "Docs", url: "https://docs.example.com", icon: "book", newTab: true, parent: null };
 
-  test("turned on : written to links.yaml, never to branding.yaml ; a pull applies it ; an edit rewrites it", async () => {
+  test("turned on : written to links.yaml, never to another page's file ; a pull applies it ; an edit rewrites it", async () => {
     fx.cloneEmpty("cfg");
     fx.state.tables.settings[0].header_links = JSON.stringify([LINK]);
     const report = await RepoObjects.activate(await desc("links"), "cfg", { pull: false });
@@ -647,13 +773,15 @@ describe("the header's links, in their own links.yaml", () => {
     const file = fx.readObject("cfg", ".", "links.yaml");
     assert.equal(file.header_links[0].label, "Docs");
     assert.equal(file.show_designer, true);
-    // the branding holds no link any more
-    await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
-    const branding = fx.readObject("cfg", ".", "branding.yaml");
-    assert.equal(branding.header_links, undefined);
-    assert.equal(branding.show_designer, undefined);
-    writeRaw("cfg", "branding.yaml", "header_links: []\n");
-    assert.match((await RepoObjects.syncRepository(await desc("branding"), "cfg")).refused[0].reasons[0], /'header_links'/);
+    // the other Appearance pages' files hold no link
+    for (const key of ["defaults", "name"]) {
+      await RepoObjects.activate(await desc(key), "cfg", { pull: false });
+      const other = fx.readObject("cfg", ".", `${key}.yaml`);
+      assert.equal(other.header_links, undefined);
+      assert.equal(other.show_designer, undefined);
+    }
+    writeRaw("cfg", "defaults.yaml", "header_links: []\n");
+    assert.match((await RepoObjects.syncRepository(await desc("defaults"), "cfg")).refused[0].reasons[0], /'header_links'/);
     // a pull of links.yaml : the links follow it
     writeRaw("cfg", "links.yaml", "header_links:\n  - { id: b, label: Wiki, url: 'https://wiki' }\n");
     const summary = await RepoObjects.syncRepository(await desc("links"), "cfg");
@@ -670,9 +798,9 @@ describe("the header's links, in their own links.yaml", () => {
   });
 
   test("the seed's links are its own : refused in the app, kept out of the repository's file", async () => {
-    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { setSeedManagedFields } = await import("../src/lib/seedManaged.js");
     const { saveSettingsFields } = await import("../src/lib/appearance.js");
-    await setSeedManagedBranding(["header_links"]);
+    await setSeedManagedFields(["header_links"]);
     await assert.rejects(saveSettingsFields({ header_links: [LINK] }), { status: 403 });
     writeRaw("cfg", "links.yaml", "header_links: []\n");
     const summary = await RepoObjects.syncRepository(await desc("links"), "cfg");
@@ -685,14 +813,14 @@ describe("the header's links, in their own links.yaml", () => {
   });
 });
 
-// ─── the branding the config seed manages ─────────────────────────────────────
-describe("the branding fields the config seed declares are its own", () => {
+// ─── the appearance fields the config seed manages ─────────────────────────────
+describe("the appearance fields the config seed declares are its own", () => {
   test("refused through the save helpers ; the others, and one sent back as it is, still saved", async () => {
-    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
+    const { setSeedManagedFields } = await import("../src/lib/seedManaged.js");
     const { saveSettingsFields } = await import("../src/lib/appearance.js");
     const { saveEnvValues } = await import("../src/lib/envSave.js");
     const { BRAND_IMAGES } = await import("../src/lib/brandImages.js");
-    await setSeedManagedBranding(["app_name", "logo", "default_language"]);
+    await setSeedManagedFields(["app_name", "logo", "default_language"]);
     await assert.rejects(saveSettingsFields({ app_name: "Mine" }), { status: 403, message: /Managed by the config seed and read only here: app_name/ });
     await assert.rejects(BRAND_IMAGES.logo.set(dataUrl(PNG)), { status: 403 });
     await assert.rejects(saveEnvValues({ DEFAULT_LANGUAGE: "fr" }, {}), { status: 403 });
@@ -706,32 +834,32 @@ describe("the branding fields the config seed declares are its own", () => {
   });
 
   test("a field the seed stops declaring is released", async () => {
-    const { setSeedManagedBranding, seedManagedBranding } = await import("../src/lib/brandingManaged.js");
-    await setSeedManagedBranding(["app_name", "logo"]);
-    assert.deepEqual(await setSeedManagedBranding(["app_name"]), ["logo"]);
-    assert.deepEqual(await seedManagedBranding(), ["app_name"]);
+    const { setSeedManagedFields, seedManagedFields } = await import("../src/lib/seedManaged.js");
+    await setSeedManagedFields(["app_name", "logo"]);
+    assert.deepEqual(await setSeedManagedFields(["app_name"]), ["logo"]);
+    assert.deepEqual(await seedManagedFields(), ["app_name"]);
     const { BRAND_IMAGES } = await import("../src/lib/brandImages.js");
     await BRAND_IMAGES.logo.set(dataUrl(PNG));
   });
 
-  test("with a branding repository : the seed's fields stay the seed's, the repository holds the rest", async () => {
-    const { setSeedManagedBranding } = await import("../src/lib/brandingManaged.js");
-    await setSeedManagedBranding(["app_name"]);
-    Object.assign(fx.state.tables.settings[0], { app_name: "Seeded", default_theme: "light" });
+  test("with a Defaults repository : the seed's fields stay the seed's, the repository holds the rest", async () => {
+    const { setSeedManagedFields } = await import("../src/lib/seedManaged.js");
+    await setSeedManagedFields(["default_theme"]);
+    Object.assign(fx.state.tables.settings[0], { default_theme: "light", default_timezone: "UTC" });
     fx.cloneEmpty("cfg");
     // turned on : the seed's field listed as staying in the app, never written to the file
-    const p = await RepoObjects.preview(await desc("branding"), "cfg");
-    assert.deepEqual(p.kept, [{ name: "app_name", code: "seed", reason: "managed by the config seed" }]);
-    await RepoObjects.activate(await desc("branding"), "cfg", { pull: false });
-    assert.equal(fx.readObject("cfg", ".", "branding.yaml").app_name, undefined);
-    assert.equal(fx.readObject("cfg", ".", "branding.yaml").default_theme, "light");
+    const p = await RepoObjects.preview(await desc("defaults"), "cfg");
+    assert.deepEqual(p.kept, [{ name: "default_theme", code: "seed", reason: "managed by the config seed" }]);
+    await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
+    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_theme, undefined);
+    assert.equal(fx.readObject("cfg", ".", "defaults.yaml").default_timezone, "UTC");
     // a file declaring it : not applied, said ; the other fields applied
-    writeRaw("cfg", "branding.yaml", "app_name: From git\ndefault_theme: dark\n");
-    const summary = await RepoObjects.syncRepository(await desc("branding"), "cfg");
+    writeRaw("cfg", "defaults.yaml", "default_theme: dark\ndefault_timezone: Europe/Brussels\n");
+    const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
     assert.deepEqual(summary.refused, []);
-    assert.equal(fx.state.tables.settings[0].app_name, "Seeded");
-    assert.equal(fx.state.tables.settings[0].default_theme, "dark");
-    assert.match(RepoObjects.summaryText(await desc("branding"), summary), /Kept by the config seed, not applied: app_name/);
+    assert.equal(fx.state.tables.settings[0].default_theme, "light");
+    assert.equal(fx.state.tables.settings[0].default_timezone, "Europe/Brussels");
+    assert.match(RepoObjects.summaryText(await desc("defaults"), summary), /Kept by the config seed, not applied: default_theme/);
   });
 });
 

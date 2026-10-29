@@ -22,8 +22,8 @@ export const SETTINGS_SECTIONS = {
       'default_theme_color', 'default_timezone', 'forms_view', 'header_links',
     ],
     // what the config seed manages of them (read only on their pages), and the repository
-    // holding the branding and the links (the Repository line of their pages)
-    readFields: ['branding_managed', 'source_branding', 'source_links'],
+    // holding each page's file (the Repository line of their pages)
+    readFields: ['seed_managed_fields', 'source_defaults', 'source_logo', 'source_icon', 'source_name', 'source_links'],
     envVars: ['DEFAULT_LANGUAGE', 'SHOW_DESIGNER'],
   },
   connections: {
@@ -32,7 +32,7 @@ export const SETTINGS_SECTIONS = {
     // switches the config seed manages (read only there), and the repository holding the MCP
     // settings and the chat assistant (the Repository line of their pages)
     settingsFields: [],
-    readFields: ['url', 'branding_managed', 'source_mcp', 'source_chat_assistant'],
+    readFields: ['url', 'seed_managed_fields', 'source_mcp', 'source_chat_assistant'],
     envVars: ['ENABLE_CHAT', 'ENABLE_MCP', 'MCP_READ_ONLY', 'MCP_CHAT_FORMS_ONLY'],
   },
 };

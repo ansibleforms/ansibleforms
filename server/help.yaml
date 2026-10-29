@@ -287,7 +287,7 @@
       save is silently lost at the next restart, or durable, so it drifts away from the manifest
       that is meant to be authoritative. With 0 every variable is shown with its value in force
       but cannot be changed, and the save endpoint refuses. The config seed's own `mcp:` section and the
-      language and Designer link of its `branding:` and `links:` sections are still applied: the seed is the
+      language and Designer link of its `defaults:` and `links:` sections are still applied: the seed is the
       declaration this setting stands for.
   - name: FORMS_FOLDER_PATH
     version: 6.1.0
@@ -6569,7 +6569,7 @@
       | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
       | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
       | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notifications`), Chat assistant (`use_for_chat_assistant`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
-      | Appearance | Branding (`use_for_branding`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
+      | Appearance | Defaults (`use_for_defaults`), Logo (`use_for_logo`), Icon (`use_for_icon`), Name (`use_for_name`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | General (`use_for_general`) |
 
       Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
@@ -6614,8 +6614,9 @@
       Every other type is an object type, one repository at most per type: one object
       per YAML file in a folder named after the type (`schedules/`, `credentials/`, `runners/`, `secret-stores/`,
       `notifications/`, `sso/`, `ldap/`, `syslog/`, `labels/`, `announcements/`, `disclaimer/`), or, for
-      what the app has one of, one file at the repository's root (`chat-assistant.yaml`, `general.yaml`, `branding.yaml`
-      and its images, `links.yaml`). The repositories are a list in one file, `repositories.yaml`.
+      what the app has one of, one file at the repository's root (`chat-assistant.yaml`, `general.yaml`, `mcp.yaml`,
+      and one per Appearance page: `defaults.yaml`, `logo.yaml` and its image, `icon.yaml` and its image,
+      `name.yaml`, `links.yaml`). The repositories are a list in one file, `repositories.yaml`.
 
       **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
       do, one Cancel and one confirm. A single change shows only its own section.
@@ -6773,14 +6774,15 @@
       nothing either: the repositories it listed stay in the app, no longer linked to it (said in the pull
       output), so an entry the app writes next makes a file that never deletes the others.
 
-  - name: Settings, chat, branding, links, announcements and the disclaimer kept in a git repository
-    short: The last usage types, four of them one file each
+  - name: Settings, chat, appearance, announcements and the disclaimer kept in a git repository
+    short: The last usage types, eight of them one file each
     version: v7.5.0
     description: |
-      The last six usage types work as the others (two ways, the same question before turning them on or off,
+      The last ten usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
-      Five are things the app has one of (chat, general settings, MCP, branding, links): each is **one file** at
-      the repository's root. Turning the type on
+      Eight are things the app has one of (chat, general settings, MCP, and the Appearance pages Defaults, Logo,
+      Icon, Name and Links): each is **one file** at the repository's root, holding what its menu item's page
+      saves and nothing else, so a save on a page writes its own file only. Turning the type on
       writes the app's values to that file when the repository has none, or applies the file when it has one (git
       wins); a pull applies it; a save in the app rewrites only the fields it changed; turning it off reads it once
       more and the app keeps its values. A file removed from git changes nothing in the app.
@@ -6820,7 +6822,7 @@
       never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
       General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
-      section in the same format, and it locks what it declares, variable by variable, as its `branding:` does.
+      section in the same format, and it locks what it declares, variable by variable, as its `defaults:` does.
       A variable it declares that is set in the real environment keeps the environment's value: said in the
       server log, the seed's value not applied, and the start goes on.
       ```yaml
@@ -6829,21 +6831,40 @@
       MCP_CHAT_FORMS_ONLY: false
       ```
 
-      **Branding** (`branding.yaml` and its images): the name and the defaults (`default_theme`,
-      `default_theme_color`, `forms_view`, `default_timezone`, `default_date_format`, `default_language`) and the
-      logo and the website icon as image files beside it, named by their path. The images are read and written as
-      binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
-      256 KB); an empty value restores the bundled one. An image changed in the app is written to the file
-      `branding.yaml` names (beside it with the new extension when its type changed), or as `logo.<ext>` /
-      `icon.<ext>` when it names none; a file of that name already there that `branding.yaml` does not name is never
-      overwritten: the write is refused, said in the server log. The config seed has a `branding:` section in the
-      same format, its images relative to the seed file.
+      **Defaults** (`defaults.yaml`): what Settings > Appearance > Defaults saves, the theme and its colour, the
+      forms view, the time zone, the date format and the language (`default_theme`, `default_theme_color`,
+      `forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed has a
+      `defaults:` section in the same format.
+      ```yaml
+      default_theme: dark
+      default_theme_color: "#198754"
+      forms_view: tiles
+      default_timezone: Europe/Brussels
+      default_date_format: DD/MM/YYYY
+      default_language: fr
+      ```
+
+      **Logo** (`logo.yaml` and its image) and **Icon** (`icon.yaml` and its image): the logo and the website icon,
+      each an image file beside its YAML named by its path. The images are read and written as binary and checked
+      as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon 256 KB); an empty
+      value restores the bundled one. An image changed in the app is written to the file its YAML names (beside it
+      with the new extension when its type changed), or as `logo.<ext>` / `icon.<ext>` when it names none; a file
+      of that name already there that the YAML does not name is never overwritten: the write is refused, said in
+      the server log. The config seed has `logo:` and `icon:` sections in the same format, the images relative to
+      the seed file.
+      ```yaml
+      # logo.yaml, logo.png beside it
+      logo: logo.png
+      ```
+      ```yaml
+      # icon.yaml, icon.svg beside it
+      icon: icon.svg
+      ```
+
+      **Name** (`name.yaml`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
+      `name:` section in the same format.
       ```yaml
       app_name: ACME Automation
-      default_theme: dark
-      default_language: fr
-      logo: logo.png
-      icon: icon.svg
       ```
 
       **Links** (`links.yaml`): Settings > Appearance > Links, its own usage type: the header's links
@@ -6855,12 +6876,12 @@
         - { id: docs, label: Docs, url: https://docs.example.com, icon: book, newTab: true }
       ```
 
-      As every seed section, the seed's `branding:` and `links:` lock what they declare, field by field: those
-      fields are read only on the Appearance pages (a notice says so, a seeded logo or icon cannot be uploaded nor
-      removed) and the API refuses their change (403); a field no longer declared is released, and all are when the
-      seed is turned off. The seed's `mcp:` does the same on the MCP page, variable by variable. A Branding, Links or
-      MCP repository and the seed never own the same field: the seed keeps the
-      fields it declares (listed as staying in the app when the repository is made the type's, never written to its
+      As every seed section, the seed's `defaults:`, `logo:`, `icon:`, `name:` and `links:` lock what they declare,
+      field by field: those fields are read only on the Appearance pages (a notice says so, a seeded logo or icon
+      cannot be uploaded nor removed) and the API refuses their change (403); a field no longer declared is
+      released, and all are when the seed is turned off. The seed's `mcp:` does the same on the MCP page, variable
+      by variable. A Defaults, Logo, Icon, Name, Links or MCP repository and the seed never own the same field: the
+      seed keeps the fields it declares (listed as staying in the app when the repository is made the type's, never written to its
       file, and not applied from it, said in the pull output); the repository holds the others.
 
       **Announcements** (`announcements/`, one file each): named (what a pull finds them by), with their

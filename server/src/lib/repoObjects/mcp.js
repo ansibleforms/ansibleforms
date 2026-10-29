@@ -4,7 +4,7 @@
 // MCP_CHAT_FORMS_ONLY ...) - in a repository's mcp.yaml, keyed by their environment variable
 // names, each with its value (its documented default when never saved). Applied as the page saves
 // them (the switch at once, without a restart). The config seed's mcp section holds its variables
-// per field, as its branding section does.
+// per field, as its Appearance sections (defaults, links ...) do.
 import { envType } from "./envType.js";
 
 export default envType({

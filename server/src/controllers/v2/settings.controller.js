@@ -45,7 +45,10 @@ const refuseWhileDesignerLocked = async function(req, res) {
 const configHash = auditConfigHash;
 
 // the types kept in one file of a repository, whose page says which (source_<type> in the settings)
-const SINGLE_FILE_TYPES = ['general', 'branding', 'links', 'mcp', 'chat_assistant'];
+const SINGLE_FILE_TYPES = ['general', 'defaults', 'logo', 'icon', 'name', 'links', 'mcp', 'chat_assistant'];
+// the types holding fields of the settings row this endpoint saves, one per Appearance page : a
+// save writes the file of the page whose fields it changed, never another's
+const ROW_TYPES = ['defaults', 'name', 'links'];
 
 const find = async function(req, res) {
     try {
@@ -54,7 +57,7 @@ const find = async function(req, res) {
       // knows whether the active config lives in the database.
       if (settings) {
         settings.enableConfigInDatabase = appConfig.enableConfigInDatabase;
-        // where each type kept in one file is (source_branding : { repository, repo_file }, or
+        // where each type kept in one file is (source_defaults : { repository, repo_file }, or
         // null) : the Repository line of its page, read by whoever reads that page's settings
         const sources = await Promise.all(SINGLE_FILE_TYPES.map((key) => RepoObjects.singleSource(key)));
         SINGLE_FILE_TYPES.forEach((key, i) => (settings[`source_${key}`] = sources[i]));
@@ -226,10 +229,11 @@ const update = async function(req, res) {
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
           }
-          // the branding and links repositories' files, before : their changed fields written after
-          // under their repositories' write claims, taken first (RepoObjects.holding)
-          const saved = await RepoObjects.holding(['branding', 'links'], async () => {
-            const before = await RepoObjects.snapshots(['branding', 'links']);
+          // the Defaults, Name and Links repositories' files, before : the changed fields written
+          // after into their page's file, under their repositories' write claims, taken first
+          // (RepoObjects.holding)
+          const saved = await RepoObjects.holding(ROW_TYPES, async () => {
+            const before = await RepoObjects.snapshots(ROW_TYPES);
             // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
             // with no field the model knows is refused
             if (!(await saveSettingsFields(body))) return false;
@@ -241,7 +245,7 @@ const update = async function(req, res) {
           }
           res.json(RestResult.single(null));
         } catch(err) {
-          // a branding field the config seed manages : 403, as every seeded object
+          // an appearance field the config seed manages : 403, as every seeded object
           res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
         }
     }

@@ -1,13 +1,13 @@
 'use strict';
-// The branding's images : the logo (Settings > Appearance > Logo) and the website icon (Icon), each
+// The app's images : the logo (Settings > Appearance > Logo) and the website icon (Icon), each
 // kept as a data url in the settings row. One set of rules for an upload from the app
-// (controllers/v2/logo.controller.js, favicon.controller.js) and for an image file a branding
-// repository or the config seed names (lib/repoObjects/branding.js) : its size within the limit,
+// (controllers/v2/logo.controller.js, favicon.controller.js) and for an image file a Logo or Icon
+// repository or the config seed names (lib/repoObjects/logo.js, icon.js) : its size within the limit,
 // its type sniffed from its bytes, never taken from a name or a declared content type.
 import Settings from "../models/settings.model.js";
 import { sniffImageMime } from "./imagetype.js";
 import { DEFAULT_LOGO } from "./defaultlogo.js";
-import { assertBrandingFree } from "./brandingManaged.js";
+import { assertSeedFree } from "./seedManaged.js";
 
 // the image types a file of the repository is written as, by the type sniffed
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/svg+xml": "svg", "image/webp": "webp", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico" };
@@ -23,7 +23,7 @@ export const BRAND_IMAGES = {
       return logo && logo !== DEFAULT_LOGO ? logo : null;
     },
     set: async (dataUrl, opts = {}) => {
-      await assertBrandingFree(["logo"], opts);
+      await assertSeedFree(["logo"], opts);
       await Settings.setLogo(dataUrl || DEFAULT_LOGO);
     },
   },
@@ -32,7 +32,7 @@ export const BRAND_IMAGES = {
     maxBytes: 256 * 1024,
     get: async () => (await Settings.getFavicon()) || null,
     set: async (dataUrl, opts = {}) => {
-      await assertBrandingFree(["icon"], opts);
+      await assertSeedFree(["icon"], opts);
       await Settings.setFavicon(dataUrl || null);
     },
   },

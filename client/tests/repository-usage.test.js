@@ -47,6 +47,7 @@ import {
   activationLines,
   singleTypeSource,
   usageLabel,
+  APPLY_ORDER,
 } from '../src/lib/repositoryUsage.js';
 import * as server from '../../server/src/lib/repoObjects/types.js';
 
@@ -65,7 +66,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 24 types of the server, in six groups, each flag once', () => {
+  it('are the 27 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -77,7 +78,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(24);
+    expect(new Set(USAGE_FLAGS).size).toBe(27);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -517,13 +518,13 @@ describe("a schedule's launch options no field of its file gives", () => {
   });
 });
 
-describe('the types kept in one file : the chat, the settings, the branding', () => {
+describe('the types kept in one file : the chat, the settings, the Appearance pages', () => {
   it('say their file : the app written to it, or the one in git applied', () => {
     expect(activationLines(t, 'chat_assistant', 'cfg', { written: ['Chat assistant'] })[0]).toBe(
       'settings.repositories.usageOnWrittenFile {"type":"sidebar.chat","name":"cfg","file":"chat-assistant.yaml"}',
     );
-    expect(activationLines(t, 'branding', 'cfg', { written: [], clashes: ['Branding'] })[0]).toBe(
-      'settings.repositories.usageOnReadFile {"type":"settings.repositories.usageTypes.branding","name":"cfg","file":"branding.yaml"}',
+    expect(activationLines(t, 'defaults', 'cfg', { written: [], clashes: ['Defaults'] })[0]).toBe(
+      'settings.repositories.usageOnReadFile {"type":"sidebar.defaults","name":"cfg","file":"defaults.yaml"}',
     );
   });
 
@@ -545,9 +546,9 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
     // read with the settings (source_<type>), never from the repositories a part of the settings
     // on its own cannot read
     axios.get.mockImplementationOnce(async (url) => ({
-      data: url === '/api/v2/settings/' ? { source_branding: { repository: 'cfg', repo_file: 'branding.yaml' } } : {},
+      data: url === '/api/v2/settings/' ? { source_logo: { repository: 'cfg', repo_file: 'logo.yaml' } } : {},
     }));
-    expect(await singleTypeSource('branding')).toEqual({ repository: 'cfg', repo_file: 'branding.yaml' });
+    expect(await singleTypeSource('logo')).toEqual({ repository: 'cfg', repo_file: 'logo.yaml' });
     axios.get.mockImplementationOnce(async () => ({ data: { source_mcp: null } }));
     expect(await singleTypeSource('mcp')).toBeNull();
     expect(await singleTypeSource('forms')).toBeNull();
@@ -555,11 +556,11 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
       ['pages/admin/chat.vue', 'chat_assistant'],
       ['pages/admin/settings.vue', 'general'],
       ['pages/admin/mcp.vue', 'mcp'],
-      ['pages/admin/name.vue', 'branding'],
+      ['pages/admin/name.vue', 'name'],
       ['pages/admin/links.vue', 'links'],
-      ['pages/admin/defaults.vue', 'branding'],
-      ['pages/admin/logo.vue', 'branding'],
-      ['pages/admin/favicon.vue', 'branding'],
+      ['pages/admin/defaults.vue', 'defaults'],
+      ['pages/admin/logo.vue', 'logo'],
+      ['pages/admin/favicon.vue', 'icon'],
     ]) {
       expect(read(page), page).toMatch(new RegExp(`<AppRepositorySource [^>]*type="${type}" />`));
     }
@@ -575,13 +576,13 @@ describe('the types kept in one file : the chat, the settings, the branding', ()
   });
 });
 
-describe('the branding the config seed manages : read only on the Appearance pages', () => {
+describe('the fields the config seed manages : read only on the Appearance pages', () => {
   it('reads the fields the seed manages, and says which a page has', async () => {
     const axios = (await import('axios')).default;
-    axios.get.mockImplementationOnce(async () => ({ data: { branding_managed: '["app_name","logo"]' } }));
-    const { useBrandingSeed } = await import('../src/composables/useBrandingSeed.js');
-    const { seeded, loadBrandingSeed } = useBrandingSeed();
-    await loadBrandingSeed();
+    axios.get.mockImplementationOnce(async () => ({ data: { seed_managed_fields: '["app_name","logo"]' } }));
+    const { useSeedManaged } = await import('../src/composables/useSeedManaged.js');
+    const { seeded, loadSeedManaged } = useSeedManaged();
+    await loadSeedManaged();
     expect(seeded('app_name')).toBe(true);
     expect(seeded('default_theme', 'logo')).toBe(true);
     expect(seeded('icon')).toBe(false);
@@ -606,17 +607,49 @@ describe('the branding the config seed manages : read only on the Appearance pag
   });
 });
 
-describe('the header links : their own type, after Branding', () => {
-  it('Links is a one-file type of Appearance, after Branding, in both lists and the apply order', () => {
+describe('the Appearance pages : one type and one file each, in the menu order', () => {
+  it('Defaults, Logo, Icon, Name each a one-only type with its own file, named as the sidebar names it', () => {
+    for (const [key, label] of [
+      ['defaults', 'sidebar.defaults'],
+      ['logo', 'sidebar.logo'],
+      ['icon', 'sidebar.icon'],
+      ['name', 'sidebar.name'],
+    ]) {
+      expect(USAGE_TYPES.find((u) => u.key === key)).toMatchObject({
+        flag: `use_for_${key}`,
+        file: `${key}.yaml`,
+        labelKey: label,
+        oneOnly: true,
+        objects: true,
+      });
+      expect(server.typeOf(key)).toMatchObject({ flag: `use_for_${key}`, oneOnly: true, objects: true });
+    }
+    expect(USAGE_TYPES.some((u) => u.key === 'branding')).toBe(false);
+  });
+
+  it('the Appearance types follow the sidebar order, every one of its menu items a type', () => {
+    const page = read('config/searchPages.js');
+    const order = ['defaults', 'logo', 'icon', 'name', 'links', 'labels', 'announcements'];
+    const at = order.map((k) => page.indexOf(`'/settings/${k}'`));
+    expect(at.every((i) => i >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(typesOf('appearance').map((u) => u.key)).toEqual(order);
+    expect(server.APPLY_ORDER.filter((k) => order.includes(k))).toEqual(order);
+    expect(APPLY_ORDER.filter((k) => order.includes(k))).toEqual(order);
+  });
+});
+
+describe('the header links : their own type, after Name', () => {
+  it('Links is a one-file type of Appearance, after Name, in both lists and the apply order', () => {
     const appearance = typesOf('appearance').map((u) => u.key);
-    expect(appearance).toEqual(['branding', 'links', 'labels', 'announcements']);
+    expect(appearance).toEqual(['defaults', 'logo', 'icon', 'name', 'links', 'labels', 'announcements']);
     expect(server.USAGE_TYPES.filter((u) => u.category === 'appearance').map((u) => u.key)).toEqual(appearance);
     expect(USAGE_TYPES.find((u) => u.key === 'links')).toMatchObject({
       file: 'links.yaml',
       oneOnly: true,
       objects: true,
     });
-    expect(server.APPLY_ORDER.indexOf('links')).toBe(server.APPLY_ORDER.indexOf('branding') + 1);
+    expect(server.APPLY_ORDER.indexOf('links')).toBe(server.APPLY_ORDER.indexOf('name') + 1);
     expect(read('pages/admin/links.vue')).toContain('<AppRepositorySource v-show="!searching" type="links" />');
   });
 

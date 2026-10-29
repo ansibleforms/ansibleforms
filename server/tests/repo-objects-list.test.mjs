@@ -335,7 +335,7 @@ describe("the app's repositories to repositories.yaml", () => {
       "mcp",
       "syslog",
     ]);
-    assert.equal(types.USAGE_FLAGS.length, 24);
+    assert.equal(types.USAGE_FLAGS.length, 27);
     // the files follow the labels ; the seed's sections keep their names, one format for both
     const chat = await RepoObjects.descriptorOf("chat_assistant");
     const notifications = await RepoObjects.descriptorOf("notifications");

@@ -16,7 +16,7 @@ import { fileURLToPath } from "url";
 const src = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
 const read = (f) => readFileSync(path.join(src, f), "utf8");
 
-// not part of the API a caller scripts : the docs themselves, the branding images the login
+// not part of the API a caller scripts : the docs themselves, the logo and icon images the login
 // page loads, and MCP (a protocol with its own tool list, see /api/v2/mcp)
 const NOT_DOCUMENTED = new Set(["docs", "favicon", "logo", "mcp"]);
 

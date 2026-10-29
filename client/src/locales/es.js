@@ -1331,7 +1331,6 @@ export default {
         secret_stores: 'Almacenes de secretos',
         runners: 'Runners',
         syslog: 'Syslog',
-        branding: 'Marca',
         labels: 'Etiquetas',
         announcements: 'Anuncios',
       },
@@ -1353,8 +1352,11 @@ export default {
         syslog: 'Servidores syslog en YAML, uno por archivo en su carpeta syslog',
         chat_assistant: 'El asistente de chat en su chat-assistant.yaml, la clave solo como referencia de entorno',
         mcp: 'Los ajustes de MCP por su nombre de entorno, en su mcp.yaml',
-        branding:
-          'El nombre, los valores por defecto, el idioma, el logo y el icono en su branding.yaml y las imágenes junto a él',
+        defaults:
+          'El tema, el color, la vista de los formularios, la zona horaria, el formato de fecha y el idioma, en su defaults.yaml',
+        logo: 'El logo, indicado en su logo.yaml, la imagen junto a él',
+        icon: 'El icono del sitio web, indicado en su icon.yaml, la imagen junto a él',
+        name: 'El nombre de la aplicación, en su name.yaml',
         links: 'Los enlaces del encabezado y el del diseñador, en su links.yaml',
         labels: 'Las etiquetas junto al logo en YAML, una por archivo en su carpeta labels, en su orden',
         announcements: 'Anuncios en YAML, uno por archivo en su carpeta announcements',

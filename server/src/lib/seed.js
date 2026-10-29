@@ -28,7 +28,7 @@ import yaml from "yaml";
 import logger from "./logger.js";
 import appConfig from "../../config/app.config.js";
 import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
-import { foldConfigFlag } from "./seed-schema.js";
+import { foldConfigFlag, APPEARANCE_SECTIONS } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -46,10 +46,11 @@ import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
 import { canonicalJson, differs } from "./seedCompare.js";
-import { MCP_ENV, setSeedManagedBranding } from "./brandingManaged.js";
+import { sectionOfField, setSeedManagedFields } from "./seedManaged.js";
 
-// a field the seed held per field, as a release names it : an MCP setting, or a branding field
-const heldName = (field) => (MCP_ENV.test(field) ? `mcp:${field}` : `branding:${field}`);
+// a field the seed held per field, as a release names it : by its section (defaults:default_theme,
+// links:header_links, mcp:MCP_READ_ONLY)
+const heldName = (field) => `${sectionOfField(field)}:${field}`;
 
 // The one thing that distinguishes the seed from an API caller. Everything the seed
 // writes goes through the normal models, so encryption, the is_default handling and
@@ -723,14 +724,12 @@ async function releaseWhenOff() {
     }
   }
 
-  // Step 2b : the fields its branding, links and mcp sections declared (kept per field in the
-  // settings row, lib/brandingManaged.js)
-  const branding = await setSeedManagedBranding([]);
-  released.push(...branding.map(heldName));
-  for (const [label, fields] of [
-    ["branding", branding.filter((f) => !MCP_ENV.test(f))],
-    ["mcp", branding.filter((f) => MCP_ENV.test(f))],
-  ]) {
+  // Step 2b : the fields its Appearance and mcp sections declared (kept per field in the settings
+  // row, lib/seedManaged.js), said by their section
+  const heldFields = await setSeedManagedFields([]);
+  released.push(...heldFields.map(heldName));
+  for (const label of [...Object.keys(APPEARANCE_SECTIONS), "mcp"]) {
+    const fields = heldFields.filter((f) => sectionOfField(f) === label);
     if (fields.length) groups.push(`${label}: ${fields.join(", ")}`);
   }
 
@@ -890,20 +889,19 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("chat");
   }
 
-  // the branding, the links, the MCP settings, the announcements and the disclaimer versions : read
-  // through the descriptors a repository holding them uses (lib/repoObjects), made or changed,
-  // never managed nor deleted
+  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements
+  // and the disclaimer versions : read through the descriptors a repository holding them uses
+  // (lib/repoObjects), made or changed, never managed nor deleted
   const sections = [
-    ["branding", "branding", "branding"],
-    ["links", "links", "links"],
+    ...Object.keys(APPEARANCE_SECTIONS).map((key) => [key, key, key]),
     ["mcp", "mcp", "MCP"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
   ];
-  // the fields its branding, links and mcp sections declare are its own from now on (read only in
-  // the app) ; one it no longer declares, or a section gone, released (lib/brandingManaged.js)
-  const brandingReleased = await setSeedManagedBranding([...Object.keys(doc.branding || {}), ...Object.keys(doc.links || {}), ...Object.keys(doc.mcp || {})]);
-  summary.released.push(...brandingReleased.map(heldName));
+  // the fields its Appearance and mcp sections declare are its own from now on (read only in the
+  // app) ; one it no longer declares, or a section gone, released (lib/seedManaged.js)
+  const heldReleased = await setSeedManagedFields([...Object.keys(APPEARANCE_SECTIONS), "mcp"].flatMap((key) => Object.keys(doc[key] || {})));
+  summary.released.push(...heldReleased.map(heldName));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");
     for (const [key, type, label] of sections) {

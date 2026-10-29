@@ -1330,7 +1330,6 @@ export default {
         secret_stores: 'Magatzems de secrets',
         runners: 'Runners',
         syslog: 'Syslog',
-        branding: 'Marca',
         labels: 'Etiquetes',
         announcements: 'Anuncis',
       },
@@ -1352,8 +1351,11 @@ export default {
         syslog: 'Servidors syslog en YAML, un per fitxer a la seva carpeta syslog',
         chat_assistant: "L'assistent de xat al seu chat-assistant.yaml, la clau només com a referència d'entorn",
         mcp: "Els ajustos de MCP pel seu nom d'entorn, al seu mcp.yaml",
-        branding:
-          "El nom, els valors per defecte, l'idioma, el logotip i la icona al seu branding.yaml i les imatges al costat",
+        defaults:
+          "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, al seu defaults.yaml",
+        logo: 'El logotip, indicat al seu logo.yaml, la imatge al costat',
+        icon: 'La icona del lloc web, indicada al seu icon.yaml, la imatge al costat',
+        name: "El nom de l'aplicació, al seu name.yaml",
         links: 'Els enllaços de la capçalera i el del dissenyador, al seu links.yaml',
         labels: 'Les etiquetes al costat del logotip en YAML, una per fitxer a la seva carpeta labels, en el seu ordre',
         announcements: 'Anuncis en YAML, un per fitxer a la seva carpeta announcements',

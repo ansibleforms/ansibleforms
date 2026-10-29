@@ -56,10 +56,10 @@ vi.mock("../src/models/db.model.js", () => ({
         audits.push(vars);
         return { insertId: audits.length };
       }
-      // the branding fields the seed manages (lib/brandingManaged.js), kept in the settings row
-      if (/^SELECT branding_managed FROM/.test(sql)) return (tables.settings || []).slice(0, 1);
-      if (/^UPDATE AnsibleForms\.`settings` SET branding_managed = \?/.test(sql)) {
-        for (const r of tables.settings || []) r.branding_managed = vars[0];
+      // the fields the seed manages per field (lib/seedManaged.js), kept in the settings row
+      if (/^SELECT seed_managed_fields FROM/.test(sql)) return (tables.settings || []).slice(0, 1);
+      if (/^UPDATE AnsibleForms\.`settings` SET seed_managed_fields = \?/.test(sql)) {
+        for (const r of tables.settings || []) r.seed_managed_fields = vars[0];
         return { affectedRows: 1 };
       }
       if (/^SELECT name FROM .* WHERE managed=1$/.test(sql)) {
@@ -113,13 +113,15 @@ afterEach(() => {
 });
 
 describe("CONFIG_SEED_PATH unset releases what the seed managed", () => {
-  test("the branding fields its branding section declared are released too", async () => {
+  test("the fields its Appearance and mcp sections declared are released too, each named by its section", async () => {
     appConfig.configSeedPath = "";
-    tables.settings[0].branding_managed = JSON.stringify(["app_name", "logo"]);
+    tables.settings[0].seed_managed_fields = JSON.stringify(["app_name", "logo", "icon", "default_theme", "header_links", "MCP_READ_ONLY"]);
     await applyConfigSeed();
-    assert.equal(tables.settings[0].branding_managed, null);
+    assert.equal(tables.settings[0].seed_managed_fields, null);
     const detail = JSON.parse(audits[0][7]);
-    assert.ok(detail.released.includes("branding:app_name") && detail.released.includes("branding:logo"), JSON.stringify(detail));
+    for (const name of ["name:app_name", "logo:logo", "icon:icon", "defaults:default_theme", "links:header_links", "mcp:MCP_READ_ONLY"]) {
+      assert.ok(detail.released.includes(name), `${name} in ${JSON.stringify(detail)}`);
+    }
   });
 
   test("every managed row becomes editable, with its values kept", async () => {

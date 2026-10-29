@@ -207,7 +207,7 @@ describe("the usage preview", () => {
       asked.push(keys);
       return Object.fromEntries(keys.map((k) => [k, {}]));
     });
-    const types = "credentials,runners,sso,ldap,syslog,disclaimer,schedules,general,branding,labels";
+    const types = "credentials,runners,sso,ldap,syslog,disclaimer,schedules,general,defaults,logo,icon,name,labels";
     // the request's query : the helper above sends none, so the request is made here
     const callWith = (user) =>
       new Promise((resolve) => {
@@ -219,7 +219,7 @@ describe("the usage preview", () => {
     await callWith(admin);
     expect(asked).toEqual([
       ["credentials", "runners"],
-      ["credentials", "runners", "schedules", "branding", "labels"],
+      ["credentials", "runners", "schedules", "defaults", "logo", "icon", "name", "labels"],
       types.split(","),
     ]);
     spy.mockRestore();

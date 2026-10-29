@@ -8,7 +8,7 @@
 /*                                                                */
 /*  Props                                                         */
 /*    record  the object ({ repository, repo_file })              */
-/*    type    a type kept in one file (chat, settings, branding) :*/
+/*    type    a type kept in one file (chat, settings, defaults) :*/
 /*            the repository that holds it, read here             */
 /*                                                                */
 /******************************************************************/

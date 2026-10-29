@@ -51,7 +51,7 @@ export function typedValue(value, type) {
  *     page (string): the page, as a refusal names it (Settings > System > General).
  *     all (boolean): its file holds every variable the page owns, the saved value or the
  *       documented default (a few switches) ; otherwise only the saved ones (many settings).
- *     seedHeld (boolean): the config seed holds its variables per field (lib/brandingManaged.js).
+ *     seedHeld (boolean): the config seed holds its variables per field (lib/seedManaged.js).
  *
  * Returns:
  *   object: the descriptor.

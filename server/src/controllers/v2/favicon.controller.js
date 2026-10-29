@@ -58,11 +58,11 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), i18n.t(req, 'resources.faviconInvalidImage')));
     }
     try {
-      // the branding repository's file, before : its icon written into it after
-      await RepoObjects.holding('branding', async () => {
-        const before = await RepoObjects.snapshot('branding');
+      // the Icon repository's icon.yaml, before : its icon written beside it after
+      await RepoObjects.holding('icon', async () => {
+        const before = await RepoObjects.snapshot('icon');
         await BRAND_IMAGES.icon.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
-        await RepoObjects.appUpdated('branding', before);
+        await RepoObjects.appUpdated('icon', before);
       });
       logger.notice(`Website icon updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
@@ -81,10 +81,10 @@ const update = function (req, res) {
  */
 const remove = async function (req, res) {
   try {
-    await RepoObjects.holding('branding', async () => {
-      const before = await RepoObjects.snapshot('branding');
+    await RepoObjects.holding('icon', async () => {
+      const before = await RepoObjects.snapshot('icon');
       await BRAND_IMAGES.icon.set(null);
-      await RepoObjects.appUpdated('branding', before);
+      await RepoObjects.appUpdated('icon', before);
     });
     logger.notice(`Website icon removed, the default one restored`)
     res.json(RestResult.single(null));

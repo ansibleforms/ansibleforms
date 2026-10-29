@@ -76,7 +76,7 @@ describe("the file's own form kept, whatever it is", () => {
 
   test("an empty map ({}) written into : its keys one below the other, never on one line", () => {
     assert.equal(updateMapFile("{}\n", { app_name: "X", theme: "dark" }), "app_name: X\ntheme: dark\n");
-    assert.equal(updateMapFile("# the branding\n{}\n", { app_name: "X" }), "# the branding\napp_name: X\n");
+    assert.equal(updateMapFile("# the name\n{}\n", { app_name: "X" }), "# the name\napp_name: X\n");
   });
 });
 

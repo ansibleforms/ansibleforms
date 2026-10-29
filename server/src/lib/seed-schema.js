@@ -656,47 +656,50 @@ export const ldapDirectoryItem = {
 // when the app's stays in the database
 export const chatFileItem = (({ required: _all, ...section }) => section)(chatSection);
 
-// The branding (Settings > Appearance : Defaults, Name, Logo, Icon) : the app's name, the defaults
-// (theme, colour, forms view, time zone, date format, language), and the logo and the website icon
-// as image files named by their
-// path, relative to the seed file (or the repository's branding.yaml), read as binary and checked
-// as an upload is. Every field optional : what is not declared is left alone. What the seed declares
-// is its own, field by field : read only in the app (lib/brandingManaged.js), released when it is no
+// The Settings > Appearance pages a repository holds one file each of (lib/repoObjects/defaults.js,
+// logo.js, icon.js, name.js) and the config seed one section each of : what each page saves, and
+// nothing else. Every field optional : what is not declared is left alone. What the seed declares
+// is its own, field by field : read only in the app (lib/seedManaged.js), released when it is no
 // longer declared or the seed is turned off.
-export const brandingSection = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    app_name: str,
-    default_theme: { type: "string", enum: ["system", "light", "dark"] },
-    default_theme_color: str,
-    forms_view: str,
-    default_timezone: str,
-    default_date_format: str,
-    default_language: str,
-    // an image file's path ; empty : the default (the bundled logo, the bundled icon)
-    logo: str,
-    icon: str,
-  },
-};
+const appearanceSection = (properties) => ({ type: "object", additionalProperties: false, properties });
+
+// Settings > Appearance > Defaults : the theme and its colour, the forms view, the time zone, the
+// date format, the language (defaults.yaml, the seed's defaults section)
+export const defaultsSection = appearanceSection({
+  default_theme: { type: "string", enum: ["system", "light", "dark"] },
+  default_theme_color: str,
+  forms_view: str,
+  default_timezone: str,
+  default_date_format: str,
+  default_language: str,
+});
+
+// Settings > Appearance > Logo and Icon : an image file's path, relative to the seed file (or the
+// repository's logo.yaml, icon.yaml), read as binary and checked as an upload is ; empty : the
+// bundled one
+export const logoSection = appearanceSection({ logo: str });
+export const iconSection = appearanceSection({ icon: str });
+
+// Settings > Appearance > Name : the app's name (name.yaml, the seed's name section)
+export const nameSection = appearanceSection({ app_name: str });
 
 // The header's links (Settings > Appearance > Links) : its own links and whether the Designer's
-// shows. Every field optional ; what the seed declares is its own, field by field, as the branding's
-// (lib/brandingManaged.js).
-export const linksSection = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
-    header_links: { type: ["array", "string"] },
-    show_designer: bool,
-  },
-};
+// shows. Every field optional ; what the seed declares is its own, field by field, as the other
+// Appearance pages' (lib/seedManaged.js).
+export const linksSection = appearanceSection({
+  // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
+  header_links: { type: ["array", "string"] },
+  show_designer: bool,
+});
+
+// the seed's sections held field by field, one per Settings > Appearance page, in the menu's
+// order (lib/seedManaged.js) : the seed key of each, its schema
+export const APPEARANCE_SECTIONS = { defaults: defaultsSection, logo: logoSection, icon: iconSection, name: nameSection, links: linksSection };
 
 // The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
 // their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as an mcp.yaml holds them.
-// What the seed declares is its own, variable by variable, as the branding's fields
-// (lib/brandingManaged.js) ; each checked as the page's Save checks it when applied.
+// What the seed declares is its own, variable by variable, as the Appearance pages' fields
+// (lib/seedManaged.js) ; each checked as the page's Save checks it when applied.
 export const mcpSection = {
   type: "object",
   propertyNames: { pattern: "^(ENABLE_MCP|MCP_[A-Z0-9_]+)$" },
@@ -816,7 +819,10 @@ export const seedSchema = {
     ldap: ldapSection,
     settings: settingsSection,
     chat: chatSection,
-    branding: brandingSection,
+    defaults: defaultsSection,
+    logo: logoSection,
+    icon: iconSection,
+    name: nameSection,
     links: linksSection,
     mcp: mcpSection,
     announcements: itemsSection(announcementItem),

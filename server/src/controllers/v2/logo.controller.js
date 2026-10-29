@@ -10,7 +10,7 @@ import { DEFAULT_LOGO } from '../../lib/defaultlogo.js';
 import { BRAND_IMAGES } from '../../lib/brandImages.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
 
-// a logo is small : the upload capped as a branding repository's logo is (lib/brandImages.js)
+// a logo is small : the upload capped as a Logo repository's logo is (lib/brandImages.js)
 const MAX_LOGO_BYTES = BRAND_IMAGES.logo.maxBytes;
 
 // keep the upload in memory, it is validated and stored in the database as a data url,
@@ -45,11 +45,11 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), i18n.t(req, 'resources.logoInvalidImage')));
     }
     try {
-      // the branding repository's file, before : its logo written into it after
-      await RepoObjects.holding('branding', async () => {
-        const before = await RepoObjects.snapshot('branding');
+      // the Logo repository's logo.yaml, before : its logo written beside it after
+      await RepoObjects.holding('logo', async () => {
+        const before = await RepoObjects.snapshot('logo');
         await BRAND_IMAGES.logo.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
-        await RepoObjects.appUpdated('branding', before);
+        await RepoObjects.appUpdated('logo', before);
       });
       logger.notice(`Custom logo updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
@@ -61,10 +61,10 @@ const update = function (req, res) {
 
 const remove = async function (req, res) {
   try {
-    await RepoObjects.holding('branding', async () => {
-      const before = await RepoObjects.snapshot('branding');
+    await RepoObjects.holding('logo', async () => {
+      const before = await RepoObjects.snapshot('logo');
       await BRAND_IMAGES.logo.set(null);
-      await RepoObjects.appUpdated('branding', before);
+      await RepoObjects.appUpdated('logo', before);
     });
     logger.notice(`Custom logo removed, default logo restored`)
     res.json(RestResult.single(null));

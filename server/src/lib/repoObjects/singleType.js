@@ -1,14 +1,14 @@
 'use strict';
 // The descriptor of an object type kept in ONE file of its repository instead of a folder : the
 // chat assistant's settings (chat-assistant.yaml), the System > General settings (general.yaml), the
-// branding (branding.yaml and its images). The app has one such object ; the file holds it, in
+// logo (logo.yaml and its image). The app has one such object ; the file holds it, in
 // the config seed's format, checked, its secrets ${ENV} references only (lib/repoObjects/fields.js).
 // The engine's single-file mode (lib/repoObjects/engine.js) reads it in, writes the app's values to
 // it when the repository is made the type's, and writes an app edit into it, field by field.
 //
 // A type says what is its own : its file and schema, how the app's object is read (current), how a
 // file's object is applied (apply : the same rules as the app's own save), and, for a type with
-// files beside its YAML (the branding's images), how they are read and written.
+// files beside its YAML (the logo's image), how they are read and written.
 import { differs } from "../seedCompare.js";
 import { fieldSet } from "./fields.js";
 import { typeOf } from "./types.js";
@@ -31,16 +31,16 @@ import { typeOf } from "./types.js";
  *     changed (function): (declared, current, opts) => whether applying it changes anything ; as
  *       the seed compares when not given.
  *     kept (function): (current) => [{ name, code, reason }] - the parts that stay in the app (the
- *       branding fields the config seed manages), said before the type is turned on.
+ *       appearance fields the config seed manages), said before the type is turned on.
  *     heldBySeed (function): (current) => whether the config seed manages the whole object (the
  *       chat assistant's settings) : it stays with the seed, as a seed-managed object of a folder
  *       type does - never written to the repository's file, its file never applied (said).
  *     notesOf (function): (declared, current) => lines for the pull output about a file, whether it
  *       changes anything or not (the fields of it the config seed keeps).
  *     fromFile (function): async (object, { dir, fromSeed }) => the object as the app reads it, the files
- *       beside the YAML read (the branding's images) ; as it is when not given.
+ *       beside the YAML read (the logo's image) ; as it is when not given.
  *     extraFiles (function): (current) => [{ name, buffer }] - the files beside the YAML the app's
- *       object writes (the branding's images), its YAML naming them.
+ *       object writes (the logo's image), its YAML naming them.
  *     editFiles (function): (text, after, before) => { base, names, extraFiles, gone } - an app
  *       edit's files beside the YAML, from the file as it is : the files written (those the edit
  *       changed, own when the YAML names them), the ones it no longer names (removed), and the
@@ -48,8 +48,8 @@ import { typeOf } from "./types.js";
  *       and as the edit names them (names, over the object after it) ; extraFiles(after), all of
  *       them, when not given.
  *     toFile (function): (current) => the object as its YAML gives it, before fields.js takes its
- *       seed fields (the branding's image names) ; as it is when not given.
- *     besides (string[]): the fields of its YAML naming a file beside it (the branding's images) :
+ *       seed fields (the logo's image name) ; as it is when not given.
+ *     besides (string[]): the fields of its YAML naming a file beside it (the logo's image) :
  *       those files are the type's, as its YAML is (lib/repoObjects/ownedPaths.js).
  *     fields (object): its own fields when they are no schema's (lib/repoObjects/fields.js
  *       mapFieldSet : the settings by their environment names).
@@ -134,7 +134,7 @@ export function singleType(spec) {
      *     longer named, when the type says them ; undefined : those the object named before) }.
      */
     fileEdits(text, after, before) {
-      // the files beside it as the file names them now (the branding's images) : only the ones
+      // the files beside it as the file names them now (the logo's image) : only the ones
       // the edit changed written, and its YAML naming them where it names another file
       const files = spec.editFiles ? spec.editFiles(text, after, before || {}) : null;
       if (files) {

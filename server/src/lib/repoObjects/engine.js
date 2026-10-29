@@ -38,6 +38,7 @@ import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
 import { filesIn, fileIn, fileBeside, fileNameFor, parseMapFile, parseListFile, appendListEntries, updateListEntry, removeListEntry } from "./yamlFile.js";
 import { given } from "./secrets.js";
+import { canonicalJson } from "../seedCompare.js";
 import { APPLY_ORDER, ONE_ONLY_FLAGS, typeOf, typeOfFlag, flagOn, objectTypesOf } from "./types.js";
 import { descriptorOf, BUILT_OBJECT_TYPES } from "./descriptors.js";
 
@@ -87,7 +88,7 @@ const titleOf = (desc) => desc.title || desc.key;
 
 /**
  * How the log and the pull output name what a type holds, one way per mode : a type kept in one
- * file by its label, as a name (General, Branding, MCP, Chat assistant, Links), a folder or a list
+ * file by its label, as a name (General, Defaults, MCP, Chat assistant, Links), a folder or a list
  * type by its objects (the credentials). The sentences built on it never make a verb agree with
  * it, so they read the same for both.
  *
@@ -1937,9 +1938,9 @@ function fileNaming(desc, repository, before) {
 // ===========================================================================
 // THE TYPES KEPT IN ONE FILE
 // ===========================================================================
-// The chat assistant's settings, the System > General settings, the branding : the app has one
+// The chat assistant's settings, the System > General settings, the Appearance pages' : the app has one
 // object of each, its repository one file of it (desc.file, at its root : chat-assistant.yaml), and the
-// files the YAML names beside it (the branding's images). The same rules as the folder types :
+// files the YAML names beside it (the logo's, the icon's image). The same rules as the folder types :
 // a pull applies the file (git wins), turning the type on writes the app's values to it when it
 // has none (and applies it when it has one), an app edit writes only the changed fields, the
 // secrets are ${ENV} references only, turning it off reads it once more and the app keeps its
@@ -2107,7 +2108,7 @@ async function previewSingle(desc, name) {
     active,
     written: writes ? [desc.title] : [],
     withoutSecret: writes && withoutSecret ? [desc.title] : [],
-    // what stays in the app (the branding fields the config seed manages)
+    // what stays in the app (the appearance fields the config seed manages)
     kept: desc.kept(current),
     clashes: exists ? [desc.title] : [],
     files: exists ? 1 : 0,
@@ -2176,6 +2177,10 @@ async function appUpdatedSingle(desc, before) {
   const after = await desc.current();
   // the config seed's whole object : never written to the repository
   if (desc.heldBySeed(after)) return false;
+  // a save that left this type's object as it was (one endpoint saving several pages' fields : the
+  // Defaults page's save is not the Name page's) : its file is not touched, not even written again
+  // when it is gone - a page's save writes its own file only
+  if (canonicalJson(after) === canonicalJson(before)) return false;
   return withWriteClaim(repository, async () => {
     const abs = singleFileOf(desc, repository);
     const out = fs.existsSync(abs) ? desc.fileEdits(fs.readFileSync(abs, "utf8"), after, before) : desc.fileOf(after);
@@ -2194,7 +2199,7 @@ async function appUpdatedSingle(desc, before) {
 // ===========================================================================
 
 /**
- * Applies what the config seed declares of a type (the branding, the announcements, the
+ * Applies what the config seed declares of a type (the Appearance pages', the announcements, the
  * disclaimer : sections the seed reads through the same descriptors as a repository) : checked
  * as a file is (its references resolved by the seed already), then a single-file type applied,
  * a folder type's objects made or changed by name - never one a repository holds. Nothing is linked

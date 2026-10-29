@@ -1328,7 +1328,6 @@ export default {
         secret_stores: 'Secret stores',
         runners: 'Runners',
         syslog: 'Syslog',
-        branding: 'Huisstijl',
         labels: 'Labels',
         announcements: 'Aankondigingen',
       },
@@ -1349,8 +1348,11 @@ export default {
         syslog: 'Syslog-servers in YAML, één per bestand in zijn map syslog',
         chat_assistant: 'De chat-assistent in zijn chat-assistant.yaml, de sleutel alleen als omgevingsverwijzing',
         mcp: 'De MCP-instellingen op hun omgevingsnaam, in zijn mcp.yaml',
-        branding:
-          'De naam, standaardwaarden, taal, het logo en het pictogram in zijn branding.yaml en de afbeeldingen ernaast',
+        defaults:
+          'Het thema, de kleur, de formulierweergave, de tijdzone, de datumnotatie en de taal, in zijn defaults.yaml',
+        logo: 'Het logo, genoemd in zijn logo.yaml, de afbeelding ernaast',
+        icon: 'Het websitepictogram, genoemd in zijn icon.yaml, de afbeelding ernaast',
+        name: 'De naam van de app, in zijn name.yaml',
         links: 'De links in de kop en die naar de ontwerper, in zijn links.yaml',
         labels: 'De labels naast het logo in YAML, één per bestand in zijn map labels, in hun volgorde',
         announcements: 'Aankondigingen in YAML, één per bestand in zijn map announcements',

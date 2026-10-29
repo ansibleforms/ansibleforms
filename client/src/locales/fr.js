@@ -1332,7 +1332,6 @@ export default {
         secret_stores: 'Coffres de secrets',
         runners: 'Runners',
         syslog: 'Syslog',
-        branding: 'Image de marque',
         labels: 'Étiquettes',
         announcements: 'Annonces',
       },
@@ -1355,8 +1354,11 @@ export default {
         chat_assistant:
           "L'assistant de chat dans son chat-assistant.yaml, la clé uniquement en référence d'environnement",
         mcp: "Les paramètres MCP par leur nom d'environnement, dans son mcp.yaml",
-        branding:
-          "Le nom, les valeurs par défaut, la langue, le logo et l'icône dans son branding.yaml et les images à côté",
+        defaults:
+          'Le thème, la couleur, la vue des formulaires, le fuseau horaire, le format de date et la langue, dans son defaults.yaml',
+        logo: "Le logo, nommé dans son logo.yaml, l'image à côté",
+        icon: "L'icône du site web, nommée dans son icon.yaml, l'image à côté",
+        name: "Le nom de l'application, dans son name.yaml",
         links: "Les liens de l'en-tête et celui du concepteur, dans son links.yaml",
         labels: 'Les étiquettes à côté du logo en YAML, une par fichier dans son dossier labels, dans leur ordre',
         announcements: 'Annonces en YAML, une par fichier dans son dossier announcements',

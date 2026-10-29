@@ -1,11 +1,12 @@
 'use strict';
-// The config seed's hold on a single-file type's fields (lib/brandingManaged.js) : the seed and a
+// The config seed's hold on a single-file type's fields (lib/seedManaged.js) : the seed and a
 // repository never own the same field. A field the seed declares stays the seed's - read only in
 // the app, never written to the repository's file, never applied from it (said in the pull
 // output), listed as staying in the app when the repository is made the type's ; the repository
-// holds the other fields. Written once for the types the seed holds per field : the branding, the
-// links (lib/repoObjects/appearanceType.js) and the MCP settings (lib/repoObjects/envType.js).
-import { seedManagedBranding } from "../brandingManaged.js";
+// holds the other fields. Written once for the types the seed holds per field : the Appearance
+// pages' (defaults, logo, icon, name, links : lib/repoObjects/appearanceType.js) and the MCP
+// settings (lib/repoObjects/envType.js).
+import { seedManagedFields } from "../seedManaged.js";
 
 /**
  * The seed's hold on a type's fields.
@@ -25,7 +26,7 @@ import { seedManagedBranding } from "../brandingManaged.js";
 export function seedHold(isField) {
   const seededOf = (current) => (current?._seedManaged || []).filter(isField);
   return {
-    managed: () => seedManagedBranding(),
+    managed: () => seedManagedFields(),
     seededOf,
     without(obj, current) {
       const out = { ...obj };

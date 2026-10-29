@@ -13,7 +13,7 @@ import EnvSettings from "./envSettings.js";
 import appConfig from "../../config/app.config.js";
 import { bump } from "./epochs.js";
 import { publish } from "./liveEvents.js";
-import { BRANDING_ENV, MCP_ENV, assertBrandingFree } from "./brandingManaged.js";
+import { APPEARANCE_ENV, MCP_ENV, assertSeedFree } from "./seedManaged.js";
 
 // the mask the page shows a secret as : sent back, it means unchanged, never a value to store
 export const ENV_MASK = "*** NOT REVEALED ***";
@@ -137,7 +137,7 @@ export function onSettingsPage(name, docs) {
  *
  * Raises:
  *   EnvSaveError: nothing given, the page writes nothing (ALLOW_ENV_EDIT=0, the seed's own write
- *     apart), a value refused, or a branding or MCP setting the config seed manages changed (403).
+ *     apart), a value refused, or an appearance or MCP setting the config seed manages changed (403).
  *     The seed's variable set in the real environment is said in the log and left out, not refused.
  */
 export async function saveEnvValues(updates, who = {}, opts = {}) {
@@ -156,12 +156,12 @@ export async function saveEnvValues(updates, who = {}, opts = {}) {
     names = names.filter((name) => !overridden.includes(name));
     if (!names.length) return { changed: [], restartRequired: [] };
   }
-  // the branding's language and Designer's link, the MCP settings : the config seed's when its
-  // branding or mcp section declares them (an MCP setting held by its variable)
-  const seedFieldOf = (name) => BRANDING_ENV[name] || (MCP_ENV.test(name) ? name : null);
+  // the default language and the Designer's link, the MCP settings : the config seed's when its
+  // defaults, links or mcp section declares them (an MCP setting held by its variable)
+  const seedFieldOf = (name) => APPEARANCE_ENV[name] || (MCP_ENV.test(name) ? name : null);
   const held = names.filter((name) => seedFieldOf(name) && String(updates[name] ?? "") !== String(process.env[name] ?? "")).map(seedFieldOf);
   try {
-    await assertBrandingFree(held, opts);
+    await assertSeedFree(held, opts);
   } catch (e) {
     throw new EnvSaveError(403, e.message);
   }

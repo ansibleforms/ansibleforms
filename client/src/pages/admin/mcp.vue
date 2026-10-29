@@ -8,7 +8,7 @@ import BaseUrl from '@/lib/BaseUrl';
 import { useEnvVars } from '@/composables/useEnvVars';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { useBrandingSeed } from '@/composables/useBrandingSeed';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 /******************************************************************/
 /*                                                                */
@@ -49,7 +49,7 @@ const { envItems, envEdits, envDirty, envRestartPending, loadEnvironmentVariable
   useEnvVars(['ENABLE_MCP', 'MCP_READ_ONLY', 'MCP_CHAT_FORMS_ONLY']);
 
 // the switches the config seed's mcp section manages : read only here (the server refuses them)
-const { seeded, loadBrandingSeed } = useBrandingSeed();
+const { seeded, loadSeedManaged } = useSeedManaged();
 
 // the MCP server switched on, as the page shows it (before Save too) : its options follow
 const mcpOn = computed(() => String(envEdits.value.ENABLE_MCP ?? '0') === '1');
@@ -151,7 +151,7 @@ async function copy(text) {
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
-  await Promise.all([loadEnvironmentVariables(), loadBrandingSeed()]);
+  await Promise.all([loadEnvironmentVariables(), loadSeedManaged()]);
   try {
     publicUrl.value = (await axios.get('/api/v2/settings/')).data?.url || '';
   } catch {

@@ -442,9 +442,9 @@ CREATE TABLE `settings` (
   `disclaimer_enabled` tinyint(4) NOT NULL DEFAULT 0,
   -- the disclaimer version users accept, Restore's choice ; none : the latest
   `disclaimer_version` int(11) DEFAULT NULL,
-  -- the branding fields the config seed's branding section declares (JSON list) : read only in the
-  -- app (lib/brandingManaged.js)
-  `branding_managed` text DEFAULT NULL,
+  -- the fields the config seed's defaults, logo, icon, name, links and mcp sections declare (JSON
+  -- list) : read only in the app (lib/seedManaged.js)
+  `seed_managed_fields` text DEFAULT NULL,
   `forms_view` varchar(10) DEFAULT NULL,
   `default_timezone` varchar(64) DEFAULT NULL,
   `default_date_format` varchar(20) DEFAULT NULL,
@@ -528,7 +528,10 @@ CREATE TABLE `repositories` (
   `use_for_chat_assistant` tinyint(4) DEFAULT 0,
   `use_for_mcp` tinyint(4) DEFAULT 0,
   `use_for_disclaimer` tinyint(4) DEFAULT 0,
-  `use_for_branding` tinyint(4) DEFAULT 0,
+  `use_for_defaults` tinyint(4) DEFAULT 0,
+  `use_for_logo` tinyint(4) DEFAULT 0,
+  `use_for_icon` tinyint(4) DEFAULT 0,
+  `use_for_name` tinyint(4) DEFAULT 0,
   `use_for_links` tinyint(4) DEFAULT 0,
   `use_for_labels` tinyint(4) DEFAULT 0,
   `use_for_announcements` tinyint(4) DEFAULT 0,

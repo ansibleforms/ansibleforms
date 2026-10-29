@@ -22,7 +22,7 @@ import { useEnvVars } from '@/composables/useEnvVars';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { useBrandingSeed } from '@/composables/useBrandingSeed';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 
@@ -208,13 +208,13 @@ const searchHeads = computed(() => Object.keys(GROUPS).filter((g) => groupShown(
 
 // a color still hovered when the page goes : the user's own theme again (Theme.previewColor)
 onBeforeUnmount(() => Theme.endPreview());
-// the branding fields the config seed manages : read only here
-const { seeded, loadBrandingSeed } = useBrandingSeed();
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
 
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
-  await Promise.all([loadTheme(), loadEnvironmentVariables(), loadBrandingSeed()]);
+  await Promise.all([loadTheme(), loadEnvironmentVariables(), loadSeedManaged()]);
   loaded.value = true;
 });
 </script>
@@ -253,8 +253,8 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
-          <!-- kept in a repository's branding.yaml : which one -->
-          <AppRepositorySource v-show="!searching" type="branding" />
+          <!-- kept in a repository's defaults.yaml : which one -->
+          <AppRepositorySource v-show="!searching" type="defaults" />
           <AppSeedNotice
             v-if="
               seeded(

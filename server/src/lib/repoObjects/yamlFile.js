@@ -449,7 +449,7 @@ export function filesIn(repoDir, folder, pattern = YAML_FILE, refused = null) {
 }
 
 /**
- * The absolute path of a file a file names beside it (a branding image : logo.png,
+ * The absolute path of a file a file names beside it (a logo or icon image : logo.png,
  * images/logo.png), checked to be inside the folder it is named from, and to stay in it once its
  * links are followed (staysIn) : a link in a repository never reads nor writes the server's files.
  *

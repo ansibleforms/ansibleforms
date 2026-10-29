@@ -113,7 +113,7 @@ const RepoObjects = {
 
   /**
    * A single-file type's object as the app holds it now (the chat's, the settings', the
-   * branding's), before an edit : what appUpdated compares the saved one with. Null when the type
+   * defaults'), before an edit : what appUpdated compares the saved one with. Null when the type
    * has no repository (nothing to write then).
    *
    * Args:
@@ -164,13 +164,13 @@ const RepoObjects = {
   },
 
   /**
-   * Where a type kept in one file is (the branding's, the settings', the chat assistant's ...) :
+   * Where a type kept in one file is (the defaults', the settings', the chat assistant's ...) :
    * the repository holding it and its file, for the Repository line of its page - read with the
    * settings (controllers/v2/settings.controller.js), so a page shows it without reading the
    * repositories.
    *
    * Args:
-   *   key (string): the type (branding).
+   *   key (string): the type (defaults).
    *
    * Returns:
    *   Promise<object|null>: { repository, repo_file }, null when no repository holds it (or it

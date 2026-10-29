@@ -2,7 +2,7 @@
 // The paths of a repository its usage types own (lib/repoObjects/types.js) : the roles', the
 // categories' and the constants' files (lib/configKeys.js, config.yaml included), and each object
 // type's folder (credentials/, runners/ ...), its list file (repositories.yaml) or its single file
-// (general.yaml, branding.yaml) with the files beside it that file names (the branding's images) ;
+// (general.yaml, logo.yaml) with the files beside it that file names (the logo's, the icon's image) ;
 // and the file the whole base configuration may be served from, roles included, when no repository
 // holds those keys (a forms repository's config.yaml, Repository.getConfigCandidates).
 // The app reads them as configuration, objects and secrets : the designer's file explorers

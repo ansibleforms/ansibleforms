@@ -7,7 +7,7 @@ import Profile from '@/lib/Profile';
 import { useAppStore } from '@/stores/app';
 import { useI18n } from 'vue-i18n';
 import { useSingleTab } from '@/composables/useSingleTab';
-import { useBrandingSeed } from '@/composables/useBrandingSeed';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 
@@ -115,13 +115,13 @@ async function removeLogo() {
   }
 }
 
-// the branding fields the config seed manages : read only here
-const { seeded, loadBrandingSeed } = useBrandingSeed();
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
 
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   await measureHeaderLogo();
-  await loadBrandingSeed();
+  await loadSeedManaged();
 });
 </script>
 <template>
@@ -166,8 +166,8 @@ onMounted(async () => {
       </template>
       <template #default>
         <AppSeedNotice v-if="seeded('logo')" />
-        <!-- kept in a repository's branding.yaml, the image beside it : which one -->
-        <AppRepositorySource type="branding" />
+        <!-- kept in a repository's logo.yaml, the image beside it : which one -->
+        <AppRepositorySource type="logo" />
         <div class="row">
           <div class="col-md-6">
             <label class="form-label fw-bold mb-2">{{ t('logo.current') }}</label>

@@ -27,7 +27,7 @@ import { useSettingsRow } from '@/composables/useSettingsRow';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { useBrandingSeed } from '@/composables/useBrandingSeed';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 const authenticated = ref(false);
@@ -359,12 +359,12 @@ async function save() {
   await Promise.all([State.loadAppConfig(), State.loadHeaderLinks()]);
 }
 
-// the branding fields the config seed manages : read only here
-const { seeded, loadBrandingSeed } = useBrandingSeed();
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
 
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
-  if (authenticated.value) await Promise.all([loadEnvironmentVariables(), loadOwn(), loadBrandingSeed()]);
+  if (authenticated.value) await Promise.all([loadEnvironmentVariables(), loadOwn(), loadSeedManaged()]);
   loaded.value = true;
 });
 </script>
@@ -412,7 +412,7 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
-          <!-- kept in a repository's branding.yaml : which one -->
+          <!-- kept in a repository's links.yaml : which one -->
           <AppRepositorySource v-show="!searching" type="links" />
           <AppSeedNotice v-if="seeded('header_links', 'show_designer')" />
           <div v-if="envRestartPending.length" class="alert alert-warning py-2">
