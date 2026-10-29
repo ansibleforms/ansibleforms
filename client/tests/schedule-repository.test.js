@@ -248,7 +248,7 @@ describe('the question before the Schedules usage changes', () => {
   it('says what the server did', () => {
     usageToast(t, { schedules: { activated: { pull: 'pulled', written: ['a', 'b'], matched: ['c'], kept: [] } } });
     expect(toasts[0][1]).toBe(
-      'settings.repositories.usageOnDone {"type":"settings.repositories.usageTypes.schedules","written":2,"matched":1,"kept":0}',
+      'settings.repositories.usageOnDone {"type":"settings.repositories.usageTypes.schedules","created":0,"written":2,"matched":1,"kept":0}',
     );
     usageToast(t, { schedules: { deactivated: { pull: 'not pulled: offline', unlinked: 4 } } });
     expect(toasts[1][1]).toContain(
