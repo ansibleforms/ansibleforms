@@ -897,6 +897,7 @@
                           "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "code": { "type": "string", "description": "Why, as a code the client translates: seed, registered, pending, holder, noSchedule, cron, notWritten" }, "error": { "type": "string", "description": "With notWritten: the error" }, "whole": { "type": "boolean", "description": "The type's one object stays whole (the chat assistant's settings the config seed manages)" }, "cron": { "type": "string" } } } },
                           "clashes": { "type": "array", "items": { "type": "string" } },
                           "files": { "type": "integer", "description": "The entries there are (1 or 0 for a type the app has one of)" },
+                          "readIn": { "type": "array", "description": "A list type : the objects its files give, by file, read in by the turn-on", "items": { "type": "object", "properties": { "file": { "type": "string" }, "names": { "type": "array", "items": { "type": "string" } } } } },
                           "file": { "type": "string", "description": "The file the app's objects would be written to : the first giving the type's key, else <key>.yaml" },
                           "linked": { "type": "integer" },
                           "recurring": { "type": "integer", "description": "Schedules : the app's recurring schedules" },

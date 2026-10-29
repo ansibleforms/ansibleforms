@@ -1631,14 +1631,16 @@ const keptOf = (desc, c) => ({ name: c.row.name, ...(desc.keptExtra ? desc.keptE
  *
  * Returns:
  *   Promise<object>: { files (the entries giving an object), skipped (counts), names (Set of
- *     nameKey), refused: [{ file, reasons }], file (where a new object goes ; null when not cloned) }.
+ *     nameKey), refused: [{ file, reasons }], readIn ([{ file, names }] : the objects each file
+ *     gives, what a turn-on reads in), file (where a new object goes ; null when not cloned) }.
  */
 export async function filesNow(desc, name) {
   const names = new Set();
+  const readIn = [];
   let files = 0;
   let skipped = 0;
   const refused = [];
-  if (!cloned(name)) return { files, skipped, names, refused, file: null };
+  if (!cloned(name)) return { files, skipped, names, refused, readIn, file: null };
   const ctx = await desc.previewContext?.();
   const scan = scanOf(name);
   refused.push(...scan.refused.map((r) => ({ file: r.file, reasons: [r.reason] })));
@@ -1663,13 +1665,17 @@ export async function filesNow(desc, name) {
       else if (parsed.object) {
         files++;
         names.add(nameKey(parsed.object.name));
+        // what a turn-on reads in, by file
+        const at = readIn.find((r) => r.file === file);
+        if (at) at.names.push(String(parsed.object.name));
+        else readIn.push({ file, names: [String(parsed.object.name)] });
       } else if (!parsed.absent && declaredName(desc, parsed)) {
         // an entry refused declaring a name : the app's object of that name is not written beside it
         names.add(nameKey(declaredName(desc, parsed)));
       }
     }
   }
-  return { files, skipped, names, refused, file: targetFileOf(desc, name, scan) };
+  return { files, skipped, names, refused, readIn, file: targetFileOf(desc, name, scan) };
 }
 
 /**
@@ -1692,7 +1698,7 @@ export async function preview(desc, name) {
   if (desc.single) return previewSingle(desc, name);
   const list = await candidates(desc, name);
   // the entries there are now, by name (a pull before the activation may bring more)
-  const { files, skipped, names: fileNames, refused, file } = await filesNow(desc, name);
+  const { files, skipped, names: fileNames, refused, readIn, file } = await filesNow(desc, name);
   const clashes = list.filter((c) => fileNames.has(nameKey(c.row.name))).map((c) => c.row.name);
   const clash = new Set(clashes);
   const written = list.filter((c) => !c.reason && !clash.has(c.row.name));
@@ -1704,6 +1710,8 @@ export async function preview(desc, name) {
     kept: list.filter((c) => c.reason).map((c) => keptOf(desc, c)),
     clashes,
     files,
+    // the objects its files give, by file : read in by the turn-on
+    readIn,
     skipped,
     file: file || `${desc.key}.yaml`,
     ...(refused.length ? { refused } : {}),

@@ -513,6 +513,24 @@ describe('why an object stays in the app', () => {
   });
 });
 
+describe('what the files of a repository give, read in by the turn-on', () => {
+  it('the question lists each file with its objects ; the toast says how many were read in', () => {
+    const lines = activationLines(t, 'syslog', 'ops', {
+      written: [],
+      readIn: [
+        { file: 'playbooks/sub/syslog.yml', names: ['s'] },
+        { file: 'objects/syslog.yaml', names: ['central', 'backup'] },
+      ],
+    });
+    expect(lines).toContain(
+      'settings.repositories.usageOnReadIn {"files":"playbooks/sub/syslog.yml (s); objects/syslog.yaml (central, backup)"}',
+    );
+    expect(activationLines(t, 'syslog', 'ops', { written: [] }).join(' ')).not.toContain('usageOnReadIn');
+    usageToast(t, { syslog: { activated: { pull: 'pulled', created: 3, written: [], matched: [], kept: [] } } });
+    expect(toasts.at(-1)[1]).toContain('"created":3');
+  });
+});
+
 describe("a schedule's launch options no field of its file gives", () => {
   it('are said kept in the app only, before the Schedules usage is turned on', () => {
     const lines = activationLines(t, 'schedules', 'ops', { written: ['Nightly'], appOnly: ['Nightly (__custom__)'] });

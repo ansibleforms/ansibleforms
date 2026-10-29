@@ -25,7 +25,7 @@ import Repo from "../models/repo.model.js";
 import _ from "lodash";
 import { updateMapFile, newMapFile, editedText } from "./repoObjects/yamlFile.js";
 import { scanRepository } from "./repoObjects/repoFiles.js";
-import { fileKeyOf } from "./repoObjects/types.js";
+import { fileKeyOf, typeKeyOf } from "./repoObjects/types.js";
 
 // ===========================================================================
 // THE KEYS
@@ -603,8 +603,13 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
  *
  * Raises:
  *   Errors.ConflictError: a key changed while the base configuration is a ytt template.
+ *   Errors.AccessDeniedError: a key of a usage type (controller_credentials ...) the save gives :
+ *     written to a repository's base configuration, it would be read in as that type's objects.
  */
 export function mergeIntoBase(baseText, rest, served, opts = {}) {
+  // the app's repository objects are never written by a configuration save (the designer's)
+  const typeKey = Object.keys(rest || {}).find((key) => typeKeyOf(key));
+  if (typeKey) throw new Errors.AccessDeniedError(`The configuration gives ${typeKey}:, a key of the objects the app keeps in a repository: it is not written from the configuration`);
   const base = String(baseText ?? "");
   // the keys taken out : served now, no longer given, none a repository holds
   const known = served !== undefined && served !== null && Array.isArray(opts.held);

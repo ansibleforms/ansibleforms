@@ -310,6 +310,20 @@ describe("an entry written back where the file uses anchors and aliases", () => 
   });
 });
 
+describe("turning a type on says what its files hold", () => {
+  test("the preview lists the objects each file gives, the turn-on how many it read in", async () => {
+    write("ops", "a/creds.yaml", { controller_credentials: [git("a1"), git("a2")] });
+    write("ops", "b.yml", { controller_credentials: [git("b1")] });
+    const preview = await RepoObjects.preview(credentials, "ops");
+    assert.deepEqual(preview.readIn, [
+      { file: "a/creds.yaml", names: ["a1", "a2"] },
+      { file: "b.yml", names: ["b1"] },
+    ]);
+    const report = await RepoObjects.activate(credentials, "ops", { pull: false });
+    assert.equal(report.created, 3);
+  });
+});
+
 // ─── a file not read ───────────────────────────────────────────────────────────
 describe("what a file not read held stays as it is", () => {
   test("a file that cannot be read : its objects kept and still linked, the file refused when its lines give the key", async () => {

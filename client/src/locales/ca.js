@@ -1386,6 +1386,7 @@ export default {
       usageOffHeading: '{type}: desactivat',
       usageOnWrittenFile: "{type} d'aquesta aplicació escrits a {name}, a {file}, a l'espera del Push.",
       usageOnWrittenList: "{type} d'aquesta aplicació escrits a {name}, a {file}: {count}.",
+      usageOnReadIn: 'El que donen els seus fitxers, llegit en activar-lo: {files}.',
       usageOnReadFile: "{name} ja té {file}: guanya la versió de git i substitueix {type} d'aquesta aplicació.",
       usageOnGitWins:
         "Quan el mateix nom és a git i en aquesta aplicació, guanya la versió de git i substitueix la de l'aplicació.",
@@ -1410,7 +1411,7 @@ export default {
       usageOnAfter:
         "A partir d'aleshores, un pull porta els canvis fets a git, i els canvis fets aquí van a git amb el Push del repositori.",
       usageOnDone:
-        "{type}: {written} escrits al repositori (a l'espera del Push), {matched} substituïts per git, {kept} conservats en aquesta aplicació.",
+        "{type}: {created} llegits dels seus fitxers, {written} escrits al repositori (a l'espera del Push), {matched} substituïts per git, {kept} conservats en aquesta aplicació.",
       usageOffKept: '{type}: {count} es queden en aquesta aplicació tal com són, ja no vinculats a git.',
       usageOffPull:
         "Abans se'n fa un últim pull, perquè coincideixin amb els seus fitxers més recents. Els fitxers de git es queden com estan.",

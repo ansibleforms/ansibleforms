@@ -1372,6 +1372,7 @@ export default {
       usageOffHeading: '{type}：オフ',
       usageOnWrittenFile: 'このアプリの {type} を {name} の {file} に書き込みました（Push 待ち）。',
       usageOnWrittenList: 'このアプリの {type} を {name} の {file} に書き込み：{count}。',
+      usageOnReadIn: 'ファイルにあるもの（オンにすると読み込まれます）：{files}。',
       usageOnReadFile:
         '{name} にはすでに {file} があります：git のバージョンが優先され、このアプリの {type} を置き換えます。',
       usageOnGitWins:
@@ -1396,7 +1397,7 @@ export default {
         '{name} はまだクローンされていません。リモートにこれらのファイルが既にある場合は git のバージョンが優先され、このアプリのものを置き換えます。クローン後、何を取り込んだかはプル出力に表示されます。',
       usageOnAfter: '以後、プルで git の変更が取り込まれ、ここでの変更はリポジトリのプッシュで git に送られます。',
       usageOnDone:
-        '{type}：{written} 件をリポジトリに書き込み（Push 待ち）、{matched} 件を git で置き換え、{kept} 件をこのアプリに残しました。',
+        '{type}：{created} 件をファイルから読み込み、{written} 件をリポジトリに書き込み（Push 待ち）、{matched} 件を git で置き換え、{kept} 件をこのアプリに残しました。',
       usageOffKept: '{type}：{count} 件はそのままこのアプリに残り、git とのリンクは解除されます。',
       usageOffPull: '最新のファイルに合わせるため、先にもう一度プルします。git のファイルはそのまま残ります。',
       usageOffUnpushed: '注意: まだプッシュされていない変更があります。それらは git に送られません。',

@@ -6675,7 +6675,8 @@
       relative to the file naming them, inside the repository.
 
       **The designer** never lists, reads, writes nor deletes a file giving the key of a type its repository holds
-      (nor the images such a file names), and refuses to write a file whose content would give one; its forms load
+      (nor the images such a file names), and refuses to write a file whose content would give the key of any type,
+      whether its repository holds that type or not (turned on later, it would read the file in); its forms load
       never reads a file giving a type's key as forms.
 
       A repository holding the credentials, the runners and its look, for example (any names would do):
@@ -6775,7 +6776,8 @@
       version wins, the secret in the database kept when the entry gives none), and what stays in the app: objects
       the config seed manages, runners an RTE registered itself or waiting for approval, and an object named as an
       entry of the repository that is refused or waits (it follows that entry once it is read in, never a second
-      entry of its name).
+      entry of its name). It also lists what the repository's files hold, each file with the names of its objects,
+      all read in when the usage is turned on; the result then says how many were read in from its files.
       What the pull before it took is said in its report too. A repository a pull or a push holds for the whole
       wait is not turned on: the usage is turned off again, nothing written, said in its report - save it again in
       a moment. **The app: back to git.** Editing a linked object

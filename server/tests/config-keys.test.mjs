@@ -194,6 +194,11 @@ describe("as it is written : its comments, a ytt template", () => {
     const base = "#@ load(\"@ytt:data\", \"data\")\nextra: #@ data.values.extra\n";
     assert.equal(keys.mergeIntoBase(base, { extra: "x" }, { extra: "x" }), null);
     assert.throws(() => keys.mergeIntoBase(base, { extra: "y" }, { extra: "x" }), { status: 409, message: /The base configuration is a ytt template/ });
+    // a key of a usage type (controller_syslog) : never written into a base configuration
+    assert.throws(() => keys.mergeIntoBase("extra: 1\n", { extra: 1, controller_syslog: [{ name: "s" }] }, { extra: 1 }), {
+      status: 403,
+      message: /controller_syslog:, a key of the objects the app keeps in a repository/,
+    });
     // a plain base : its comments kept, only the key changed written
     assert.equal(keys.mergeIntoBase("# ours\nextra: 1\nother: 2\n", { extra: 3, other: 2 }, { extra: 1, other: 2 }), "# ours\nextra: 3\nother: 2\n");
     fs.writeFileSync(BASE, base);

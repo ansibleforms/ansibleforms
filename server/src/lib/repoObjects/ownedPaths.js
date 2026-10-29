@@ -169,11 +169,7 @@ async function ownersTest() {
     }
     trees.push({ repository: row.name, dir, realDir, owned, held });
   }
-  if (!trees.length) {
-    const none = () => null;
-    none.treesOf = () => [];
-    return none;
-  }
+  if (!trees.length) return () => null;
   const match = (tree, rel) => tree.owned.find((o) => rel !== null && rel === o.rel)?.label || null;
   const test = (abs) => {
     const real = realPathOf(abs);
@@ -183,11 +179,6 @@ async function ownersTest() {
       if (label) return { repository: tree.repository, label };
     }
     return null;
-  };
-  // the repositories a path is in, each with the type keys it holds (assertContentNotOwned)
-  test.treesOf = (abs) => {
-    const real = realPathOf(abs);
-    return trees.filter((tree) => relativeTo(tree.dir, path.resolve(abs)) !== null || relativeTo(tree.realDir, real) !== null);
   };
   return test;
 }
@@ -262,11 +253,13 @@ export async function assertNotOwned(repository, abs, name) {
 }
 
 /**
- * Refuses a file a designer writes whose content gives at its top level the key of a type a
- * repository it lands in holds (credentials:, roles: ... : lib/repoObjects/repoFiles.js) : written,
- * it would be that type's, read in by the next pull - a designer never writes the app's objects,
+ * Refuses a file a designer writes whose content gives at its top level the key of any usage
+ * type (controller_credentials:, controller_roles: ... : lib/repoObjects/repoFiles.js), whether a
+ * repository it lands in holds that type or not : written, it would be that type's - read in by the
+ * next pull, or the day the type is turned on there - a designer never writes the app's objects,
  * its roles nor its secrets. A form (a map with a type) never gives one ; a text that cannot be read
- * is refused when its lines seem to give one.
+ * is refused when its lines seem to give one ; a key whose value has not its type's shape is refused
+ * too (fixed, it would be the type's).
  *
  * Args:
  *   abs (string): the path written.
@@ -279,12 +272,9 @@ export async function assertNotOwned(repository, abs, name) {
 export async function assertContentNotOwned(abs, content, name) {
   if (!/\.(yaml|yml)$/i.test(String(abs))) return;
   const found = contentOf(content);
-  const keys = found.errors.length ? found.hints : found.keys;
+  const keys = found.errors.length ? found.hints : [...found.keys, ...(found.misfits || [])];
   if (!keys.length) return;
-  for (const tree of (await ownersTest()).treesOf(abs)) {
-    const key = keys.find((k) => tree.held.has(k));
-    if (key) throw new Errors.AccessDeniedError(`'${name}' gives ${fileKeyOf(key)}:, the ${tree.held.get(key)} of repository '${tree.repository}': it is not written in the designer`);
-  }
+  throw new Errors.AccessDeniedError(`'${name}' gives ${fileKeyOf(keys[0])}:, a key of the ${typeOf(keys[0])?.label || keys[0]} the app keeps in a repository: it is not written in the designer`);
 }
 
 export default { realPathOf, ownerTest, formsSkipTest, findOwner, ownerOf, assertNotOwned, assertContentNotOwned };

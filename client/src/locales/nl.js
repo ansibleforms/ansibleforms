@@ -1383,6 +1383,7 @@ export default {
       usageOffHeading: '{type}: uitgeschakeld',
       usageOnWrittenFile: '{type} van deze app naar {name} geschreven in {file}, wachtend op Push.',
       usageOnWrittenList: '{type} van deze app naar {name} geschreven, in {file}: {count}.',
+      usageOnReadIn: 'Wat de bestanden bevatten, gelezen bij het inschakelen: {files}.',
       usageOnReadFile: '{name} heeft al {file}: de versie in git wint en vervangt {type} van deze app.',
       usageOnGitWins:
         'Staat dezelfde naam in git en in deze app, dan wint de versie in git en vervangt die van de app.',
@@ -1407,7 +1408,7 @@ export default {
       usageOnAfter:
         'Vanaf dan brengt een pull de wijzigingen uit git binnen, en gaan de wijzigingen die hier gemaakt worden naar git met de Push van de repository.',
       usageOnDone:
-        '{type}: {written} naar de repository geschreven (wachtend op Push), {matched} vervangen door git, {kept} behouden in deze app.',
+        '{type}: {created} uit de bestanden gelezen, {written} naar de repository geschreven (wachtend op Push), {matched} vervangen door git, {kept} behouden in deze app.',
       usageOffKept: '{type}: {count} blijven ongewijzigd in deze app, niet meer gekoppeld aan git.',
       usageOffPull:
         'Eerst wordt er nog één keer gepulld, zodat ze overeenkomen met de nieuwste bestanden. De bestanden in git blijven zoals ze zijn.',

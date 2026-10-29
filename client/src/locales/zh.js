@@ -1343,6 +1343,7 @@ export default {
       usageOffHeading: '{type}：已关闭',
       usageOnWrittenFile: '本应用的 {type} 已写入 {name} 的 {file}，等待 Push。',
       usageOnWrittenList: '本应用的 {type} 已写入 {name} 的 {file}：{count}。',
+      usageOnReadIn: '其文件中的内容，开启时读入：{files}。',
       usageOnReadFile: '{name} 中已有 {file}：以 git 中的版本为准，替换本应用的 {type}。',
       usageOnGitWins: '当 git 和本应用中有相同名称时，以 git 中的版本为准，并替换应用中的版本。',
       usageOnClashes: 'git 和本应用中同名,git 中的版本替换应用中的:{names}。',
@@ -1361,7 +1362,8 @@ export default {
       usageOnNewRepository:
         '{name} 尚未克隆：如果远程仓库已有这些文件，git 中的版本优先，并替换本应用中的版本。克隆后，其拉取输出会说明取用了什么。',
       usageOnAfter: '此后,拉取会带来 git 中的更改,而在这里所做的更改通过仓库的推送发送到 git。',
-      usageOnDone: '{type}：{written} 个已写入仓库（等待 Push），{matched} 个被 git 替换，{kept} 个保留在本应用中。',
+      usageOnDone:
+        '{type}：{created} 个从其文件读入，{written} 个已写入仓库（等待 Push），{matched} 个被 git 替换，{kept} 个保留在本应用中。',
       usageOffKept: '{type}：{count} 个保持原样留在本应用中，不再与 git 关联。',
       usageOffPull: '会先再拉取一次,使它们与最新文件一致。git 中的文件保持原样。',
       usageOffUnpushed: '注意:它有尚未推送的更改。这些更改不会发送到 git。',

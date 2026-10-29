@@ -593,6 +593,11 @@ export function activationLines(t, key, name, p) {
   else if (single)
     lines = [t(`settings.repositories.${count ? 'usageOnWrittenFile' : 'usageOnReadFile'}`, { type, name, file })];
   else lines = [t('settings.repositories.usageOnWrittenList', { type, name, file, count })];
+  // what its files give, read in by the turn-on : each file with its objects' names
+  if (!single && (p.readIn || []).length) {
+    const files = p.readIn.map((f) => `${f.file} (${(f.names || []).join(', ')})`).join('; ');
+    lines.push(t('settings.repositories.usageOnReadIn', { files }));
+  }
   lines.push(
     (p.clashes || []).length
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })
@@ -780,6 +785,8 @@ export function usageToast(t, data) {
       parts.push(
         t('settings.repositories.usageOnDone', {
           type,
+          // read in from its files
+          created: a.created ?? 0,
           written: (a.written || []).length,
           matched: (a.matched || []).length,
           kept: (a.kept || []).length,

@@ -1387,6 +1387,7 @@ export default {
       usageOffHeading: '{type} : désactivé',
       usageOnWrittenFile: '{type} de cette application écrits dans {name}, dans {file}, en attente du Push.',
       usageOnWrittenList: '{type} de cette application écrits dans {name}, dans {file} : {count}.',
+      usageOnReadIn: 'Ce que ses fichiers contiennent, lu à l’activation : {files}.',
       usageOnReadFile: "{name} a déjà {file} : la version de git l'emporte et remplace {type} de cette application.",
       usageOnGitWins:
         "Quand le même nom est dans git et dans cette application, la version de git l'emporte et remplace celle de l'application.",
@@ -1413,7 +1414,7 @@ export default {
       usageOnAfter:
         'Dès lors, un pull apporte les changements faits dans git, et les changements faits ici vont dans git avec le Push du dépôt.',
       usageOnDone:
-        '{type} : {written} écrits dans le dépôt (en attente du Push), {matched} remplacés par git, {kept} gardés dans cette application.',
+        '{type} : {created} lus depuis ses fichiers, {written} écrits dans le dépôt (en attente du Push), {matched} remplacés par git, {kept} gardés dans cette application.',
       usageOffKept: '{type} : {count} restent dans cette application tels quels, plus liés à git.',
       usageOffPull:
         "Il est d'abord tiré une dernière fois, pour qu'elles correspondent à ses derniers fichiers. Les fichiers dans git restent tels quels.",

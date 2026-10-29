@@ -164,3 +164,13 @@ test("the forms load of a repository serving its forms from its root never reads
   fs.writeFileSync(ops("broken.yaml"), YAML.stringify({ name: "broken", description: "no type" }));
   assert.match((await Form.load(["admin"], "", true)).errors.join("\n"), /no name|Failed to validate form/);
 });
+
+test("a configuration saved with a key of a usage type (controller_syslog:) : refused, nothing written", async () => {
+  const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+  const planted = { categories: [{ name: "Default", icon: "bars" }], roles: ROLES, constants: {}, controller_syslog: [{ name: "s", host: "1.2.3.4" }], forms: [form("Deploy", "deploy.yaml")] };
+  await configController.save({ user: { user: admin }, body: { forms: YAML.stringify(planted) }, ip: "::1" }, res);
+  // the base configuration's schema refuses it first ; written past it, the configuration keys refuse it (config-keys)
+  assert.ok([400, 403].includes(res.code), JSON.stringify(res.body));
+  assert.match(JSON.stringify(res.body), /controller_syslog/);
+  assert.equal(fs.existsSync(appConfig.configPath), false);
+});

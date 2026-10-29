@@ -75,7 +75,7 @@ beforeEach(() => {
   write("deploy.yml", "workflow_job_templates: []\n");
 });
 
-const denied = { status: 403, message: /(holds|gives) .+ of repository 'ops': it is not (read nor )?written in the designer/ };
+const denied = { status: 403, message: /((holds|gives) .+ of repository 'ops'|gives controller_[a-z_]+:, a key of the .+ the app keeps in a repository): it is not (read nor )?written in the designer/ };
 
 describe("a file a usage type of the repository owns", () => {
   test("is never written : roles.yaml through the workflows explorer leaves the roles as they are", async () => {
@@ -119,7 +119,7 @@ describe("a file a usage type of the repository owns", () => {
     // any name, any depth
     await assert.rejects(ProjectFiles.write("workflows", "ops/a/b/c/anything.yml", ESCALATE, true), {
       status: 403,
-      message: "'ops/a/b/c/anything.yml' gives controller_roles:, the roles of repository 'ops': it is not written in the designer",
+      message: "'ops/a/b/c/anything.yml' gives controller_roles:, a key of the roles the app keeps in a repository: it is not written in the designer",
     });
     assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "a")), false);
     // a file of the explorer's turned into one : refused, left as it was
@@ -129,8 +129,16 @@ describe("a file a usage type of the repository owns", () => {
     write("team/extra.yaml", YAML.stringify({ notes: "kept", controller_labels: [] , controller_credentials: [{ name: "x" }] }));
     assert.equal((await ProjectFiles.list("workflows")).files.some((f) => f.path === "ops/team/extra.yaml"), false);
     await assert.rejects(ProjectFiles.read("workflows", "ops/team/extra.yaml"), denied);
-    // a key the repository does not hold, a form, a file named as a type's : the designer's
-    await ProjectFiles.write("workflows", "ops/labels.yaml", "controller_labels:\n  - name: PROD\n");
+    // a type the repository does not hold (yet) : refused all the same, never planted for the day
+    // it is turned on ; a plain key (a vars file's labels:), a form, a file named as a type's : the
+    // designer's
+    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/syslog.yml", "controller_syslog:\n  - name: s\n    host: 1.2.3.4\n", true), {
+      status: 403,
+      message: "'ops/sub/syslog.yml' gives controller_syslog:, a key of the syslog servers the app keeps in a repository: it is not written in the designer",
+    });
+    await assert.rejects(ProjectFiles.write("workflows", "ops/sub/runner.yml", "controller_runners:\n  - name: r\n    is_default: true\n", true), { status: 403 });
+    assert.equal(fs.existsSync(path.join(fx.ROOT, "ops", "sub")), false);
+    await ProjectFiles.write("workflows", "ops/labels.yaml", "labels:\n  - name: PROD\n");
     await ProjectFiles.write("workflows", "ops/credentials-notes.yaml", "notes: about the credentials\n");
     await ProjectFiles.write("workflows", "ops/form.yaml", YAML.stringify({ name: "a form", type: "ansible", roles: ["public"], icon: "x" }));
     const listed = (await ProjectFiles.list("workflows")).files.map((f) => f.path);
@@ -141,7 +149,10 @@ describe("a file a usage type of the repository owns", () => {
     fx.reset({ repositories: [{ id: 1, name: "ops", use_for_workflows: 1 }] });
     await ProjectFiles.write("workflows", "ops/roles.yaml", "# notes\n");
     assert.equal((await ProjectFiles.read("workflows", "ops/roles.yaml")).content, "# notes\n");
-    await ProjectFiles.write("workflows", "ops/roles.yaml", ROLES);
+    // given in git, it is read ; written by the designer, refused all the same (a key of a type)
+    write("roles.yaml", ROLES);
+    assert.equal((await ProjectFiles.read("workflows", "ops/roles.yaml")).content, ROLES);
+    await assert.rejects(ProjectFiles.write("workflows", "ops/roles.yaml", ESCALATE), { status: 403 });
     assert.equal((await ProjectFiles.read("workflows", "ops/roles.yaml")).content, ROLES);
   });
 });
