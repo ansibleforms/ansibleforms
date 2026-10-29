@@ -375,8 +375,10 @@ describe("the forms walk and the delete pass see the same files", () => {
   test("both walks skip .git, being the same walk", () => {
     assert.match(walk, /entry\.name === "\.git"/);
     const lister = src.slice(src.indexOf("function listYamlFiles"), src.indexOf("function listYamlFiles") + 200);
-    assert.match(lister, /return walkYamlFiles\(dir\)/);
-    assert.match(src, /files = walkYamlFiles\(formsdirpath, warn\)/);
+    assert.match(lister, /return walkYamlFiles\(dir, undefined, skip\)/);
+    assert.match(src, /files = walkYamlFiles\(formsdirpath, warn, owned\)/);
+    // the files a usage type owns left out of both the same way
+    assert.match(src, /listYamlFiles\(dirEntry\.path, owned\)/);
   });
 });
 

@@ -378,9 +378,10 @@ function walkYamlFiles(root, onWarn = (m) => logger.warning(m), skip = null) {
 }
 
 // recursively list the yaml files of a forms folder, relative to it ; used to
-// remove forms that were deleted in the designer (same walk as the loader)
-function listYamlFiles(dir) {
-  return walkYamlFiles(dir)
+// remove forms that were deleted in the designer (same walk as the loader, the files a
+// usage type owns left out the same way : skip, ownerTest's)
+function listYamlFiles(dir, skip = null) {
+  return walkYamlFiles(dir, undefined, skip)
 }
 
 function copyConfigTemplate(to) {
@@ -2022,6 +2023,8 @@ Form.save = async function(data, options = {}){
     // the copies the loader skipped (a form name another forms folder defines first) : never in
     // the payload, so a file holding one with other forms would lose it when written again ; kept
     const skipped = await skippedCopies(formsDirs)
+    // what the usage types own : never a candidate for removal, as the loader never reads it
+    const owned = await ownerTest()
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)
@@ -2074,7 +2077,7 @@ Form.save = async function(data, options = {}){
       // ending in /forms, which the old test could not tell from a dedicated subfolder.
       const managed = !repoMode || dirEntry.staging || dirEntry.dedicated === true
       if (managed && fs.existsSync(dirEntry.path)) {
-        for (const existing of listYamlFiles(dirEntry.path)) {
+        for (const existing of listYamlFiles(dirEntry.path, owned)) {
           if (!dirFiles.includes(existing)) {
             // "absent from the payload" is NOT the same as "the user deleted it".
             // Form.load silently drops a file it cannot parse, a form failing validation,
