@@ -1343,7 +1343,7 @@ export default {
       lastPushOutput: 'Ausgabe des letzten Pushs',
       showPullOutput: 'Ausgabe des letzten Pulls anzeigen',
       showPushOutput: 'Ausgabe des letzten Pushs anzeigen',
-      notFound: "Es gibt kein Repository mit dem Namen '{name}'.",
+      notFound: "Es gibt kein Repository mit der ID '{id}'.",
       ownUser: 'Es hat noch einen eigenen Benutzer ({user}): wählen Sie eine Anmeldeinformation, um ihn zu ersetzen.',
       pull: 'Pull',
       pullAll: 'Alle pullen',

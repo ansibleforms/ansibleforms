@@ -1344,7 +1344,7 @@ export default {
       lastPushOutput: 'Sortie du dernier push',
       showPullOutput: 'Afficher la sortie du dernier pull',
       showPushOutput: 'Afficher la sortie du dernier push',
-      notFound: "Aucun dépôt nommé '{name}'.",
+      notFound: "Aucun dépôt avec l'id '{id}'.",
       ownUser: 'Il a encore son propre utilisateur ({user}) : choisissez un identifiant pour le remplacer.',
       pull: 'Pull',
       pullAll: 'Tout puller',

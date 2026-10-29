@@ -1341,7 +1341,7 @@ export default {
       lastPushOutput: 'Saída do último push',
       showPullOutput: 'Mostrar saída do último pull',
       showPushOutput: 'Mostrar saída do último push',
-      notFound: "Não existe nenhum repositório chamado '{name}'.",
+      notFound: "Não existe nenhum repositório com o id '{id}'.",
       ownUser: 'Ainda tem o seu próprio utilizador ({user}): escolha uma credencial para o substituir.',
       pull: 'Pull',
       pullAll: 'Pull de todos',
