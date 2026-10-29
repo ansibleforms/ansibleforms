@@ -120,6 +120,16 @@ const logoTheme = computed(() => store.themePreview || props.currentTheme);
   width: auto;
 }
 
+// the labels beside the logo (AppLabels) : on a phone the logo, they and the toggler share one
+// line, so the labels take the room between the logo and the toggler, centred in it as before,
+// and give way inside it rather than push the toggler onto a line of its own
+.af-header-inner > .af-labels {
+  @media (max-width: 767.98px) {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+
 .af-toggler {
   border: 0;
   padding: 0.25rem 0.5rem;

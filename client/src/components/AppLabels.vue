@@ -4,8 +4,10 @@
 /*  The labels beside the logo (PRODUCTION, EU...) : Settings >   */
 /*  Appearance > Labels, each a pill in its colour, in their      */
 /*  order. The header has room for three : the others are a +N    */
-/*  pill, their names in its tooltip ; on a phone the first and   */
-/*  a +N. Nothing without any.                                    */
+/*  pill, their names in its tooltip ; below the lg breakpoint    */
+/*  (a phone, a tablet : the links leave little room) the first   */
+/*  and a +N. A pill narrower than its name when the room is      */
+/*  short, cut with an ellipsis. Nothing without any.             */
 /*                                                                */
 /******************************************************************/
 import { computed } from 'vue';
@@ -27,26 +29,27 @@ const namesAfter = (n) =>
 </script>
 <template>
   <span v-if="labels.length" class="af-labels">
-    <!-- the first always ; the second and third from the md breakpoint up -->
+    <!-- the first always ; the second and third from the lg breakpoint up -->
     <span
       v-for="(l, i) in labels.slice(0, ROOM)"
       :key="i"
       class="badge rounded-pill fw-semibold af-pill af-label"
-      :class="[tone(l.color), { 'd-none d-md-inline-flex': i > 0 }]"
+      :class="[tone(l.color), { 'd-none d-lg-inline-flex': i > 0 }]"
+      :title="l.name"
     >
       <span class="af-pill-label">{{ l.name }}</span>
     </span>
-    <!-- the rest : on a phone all but the first, from md up all past the third -->
+    <!-- the rest : below lg all but the first, from lg up all past the third -->
     <span
       v-if="labels.length > 1"
-      class="badge rounded-pill fw-semibold af-pill af-label af-label-more d-md-none"
+      class="badge rounded-pill fw-semibold af-pill af-label af-label-more d-lg-none"
       :class="PILL.grey"
       :title="namesAfter(1)"
       >+{{ labels.length - 1 }}</span
     >
     <span
       v-if="labels.length > ROOM"
-      class="badge rounded-pill fw-semibold af-pill af-label af-label-more d-none d-md-inline-flex"
+      class="badge rounded-pill fw-semibold af-pill af-label af-label-more d-none d-lg-inline-flex"
       :class="PILL.grey"
       :title="namesAfter(ROOM)"
       >+{{ labels.length - ROOM }}</span
@@ -63,16 +66,29 @@ const namesAfter = (n) =>
   margin-left: -1rem;
   margin-right: 1rem;
   align-self: center;
+  /* narrower than their names when the room is short, never over what follows them : what
+     even then has no room is cut off at their right edge */
+  min-width: 0;
+  overflow-x: clip;
 }
-/* 12px wherever they show (the header's smaller font would make them 10.5px) */
+/* 12px wherever they show (the header's smaller font would make them 10.5px) ; a pill gives
+   way when the room is short, its name then cut short with an ellipsis (whole in its tooltip) */
 .af-label {
   font-size: 12px;
+  min-width: 0;
 }
-/* their letters a little apart : a word in capitals, read at a glance */
+/* their letters a little apart : a word in capitals, read at a glance. Cut on the right only :
+   the descenders of a name in small letters stay whole */
 .af-label .af-pill-label {
   letter-spacing: 0.06em;
+  min-width: 0;
+  white-space: nowrap;
+  overflow-x: clip;
+  text-overflow: ellipsis;
 }
+/* the +N pill : always whole, the count it shows is short */
 .af-label-more {
   cursor: default;
+  flex-shrink: 0;
 }
 </style>
