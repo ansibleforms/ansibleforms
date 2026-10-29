@@ -58,3 +58,18 @@ servers:
     expect(() => renameVar(vars, ['users', 0], 'x')).toThrow('notAMap');
   });
 });
+
+describe('a vars file, its flow lists and maps', () => {
+  const FLOW = 'ports: [80, 443]\nowner: { name: ops, mail: ops@example.com }\nkeep: [a, b]\n';
+
+  it('writes a list or a map it changes one item per line, the rest as written', () => {
+    const added = addVar(FLOW, ['ports'], null, 8080);
+    expect(added).toContain('ports:\n  - 80\n  - 443\n  - 8080\n');
+    expect(added).toContain('owner: { name: ops, mail: ops@example.com }');
+    expect(added).toContain('keep: [ a, b ]');
+    expect(deleteVar(FLOW, ['owner', 'mail'])).toContain('owner:\n  name: ops\n');
+    expect(setVar(FLOW, ['owner', 'team'], 'web')).toContain(
+      'owner:\n  name: ops\n  mail: ops@example.com\n  team: web\n',
+    );
+  });
+});

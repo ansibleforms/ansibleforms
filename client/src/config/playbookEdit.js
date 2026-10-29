@@ -2,11 +2,13 @@
 // plays (name, hosts, become, gather_facts, roles) and the tasks of their sections (pre_tasks,
 // tasks, post_tasks, handlers : name, module and its arguments, when, register, tags, notify,
 // become, ignore_errors), a task added, removed or moved. Every edit changes only the keys it
-// touches, in the YAML document itself, so comments and the rest stay as written. A block, and
+// touches, in the YAML document itself, so comments and the rest stay as written ; a list or a
+// map an edit changes or creates is written one item per line (lib/yamlBlock.js). A block, and
 // an argument that is itself a map or a list, are shown, edited in the YAML. Pure :
 // AppPlaybookEditor uses it.
 import YAML from 'yaml';
 import { PLAY_SECTIONS } from '@/config/playbookOutline';
+import { toBlock, putKey, dropKey, yamlText } from '@/lib/yamlBlock';
 
 export { PLAY_SECTIONS };
 
@@ -236,7 +238,7 @@ function docOf(text) {
   return doc;
 }
 /** The document as text. */
-const textOfDoc = (doc) => doc.toString({ lineWidth: 0 });
+const textOfDoc = (doc) => yamlText(doc, { lineWidth: 0 });
 
 /**
  * A play, by its place.
@@ -265,7 +267,7 @@ function sectionSeq(doc, play, section) {
   let seq = play.get(section, true);
   if (!YAML.isSeq(seq)) {
     seq = doc.createNode([]);
-    play.set(section, seq);
+    putKey(play, section, seq);
   }
   return seq;
 }
@@ -294,7 +296,7 @@ function taskAt(doc, pi, section, ti) {
  */
 export function editAddPlay(text) {
   const doc = docOf(text);
-  doc.contents.items.push(doc.createNode({ name: 'New play', hosts: 'all', gather_facts: false, tasks: [] }));
+  toBlock(doc.contents).items.push(doc.createNode({ name: 'New play', hosts: 'all', gather_facts: false, tasks: [] }));
   return textOfDoc(doc);
 }
 
@@ -310,7 +312,7 @@ export function editAddPlay(text) {
  */
 export function editRemovePlay(text, pi) {
   const doc = docOf(text);
-  doc.contents.items.splice(pi, 1);
+  toBlock(doc.contents).items.splice(pi, 1);
   return textOfDoc(doc);
 }
 
@@ -331,15 +333,15 @@ export function editPlay(text, pi, key, value) {
   const doc = docOf(text);
   const play = playAt(doc, pi);
   if (key === 'become') {
-    if (value) play.set('become', true);
-    else play.delete('become');
+    if (value) putKey(play, 'become', true);
+    else dropKey(play, 'become');
   } else if (key === 'gather_facts') {
-    if (value) play.delete('gather_facts');
-    else play.set('gather_facts', false);
+    if (value) dropKey(play, 'gather_facts');
+    else putKey(play, 'gather_facts', false);
   } else if (value === '' && key === 'name') {
-    play.delete('name');
+    dropKey(play, 'name');
   } else {
-    play.set(key, value);
+    putKey(play, key, value);
   }
   return textOfDoc(doc);
 }
@@ -358,8 +360,8 @@ export function editPlay(text, pi, key, value) {
 export function editRoles(text, pi, roles) {
   const doc = docOf(text);
   const play = playAt(doc, pi);
-  if (roles.length) play.set('roles', doc.createNode(roles));
-  else play.delete('roles');
+  if (roles.length) putKey(play, 'roles', doc.createNode(roles));
+  else dropKey(play, 'roles');
   return textOfDoc(doc);
 }
 
@@ -377,7 +379,7 @@ export function editRoles(text, pi, roles) {
 export function editAddTask(text, pi, section) {
   const doc = docOf(text);
   const seq = sectionSeq(doc, playAt(doc, pi), section);
-  seq.items.push(doc.createNode({ name: 'New task', 'ansible.builtin.debug': { msg: '' } }));
+  toBlock(seq).items.push(doc.createNode({ name: 'New task', 'ansible.builtin.debug': { msg: '' } }));
   return { text: textOfDoc(doc), index: seq.items.filter(YAML.isMap).length - 1 };
 }
 
@@ -398,8 +400,8 @@ export function editRemoveTask(text, pi, section, ti) {
   const play = playAt(doc, pi);
   const seq = sectionSeq(doc, play, section);
   const task = taskAt(doc, pi, section, ti);
-  seq.items.splice(seq.items.indexOf(task), 1);
-  if (!seq.items.length && section !== 'tasks') play.delete(section);
+  toBlock(seq).items.splice(seq.items.indexOf(task), 1);
+  if (!seq.items.length && section !== 'tasks') dropKey(play, section);
   return textOfDoc(doc);
 }
 
@@ -424,7 +426,7 @@ export function editMoveTask(text, pi, section, ti, by) {
   const to = at + by;
   if (to < 0 || to >= seq.items.length) return text;
   seq.items.splice(at, 1);
-  seq.items.splice(to, 0, task);
+  toBlock(seq).items.splice(to, 0, task);
   return textOfDoc(doc);
 }
 
@@ -447,22 +449,22 @@ export function editTask(text, pi, section, ti, key, value) {
   const doc = docOf(text);
   const task = taskAt(doc, pi, section, ti);
   if (TASK_SWITCHES.includes(key)) {
-    if (value) task.set(key, true);
-    else task.delete(key);
+    if (value) putKey(task, key, true);
+    else dropKey(task, key);
   } else if (value === '' || value === null || value === undefined) {
-    task.delete(key);
+    dropKey(task, key);
   } else if (key === 'tags' || key === 'notify') {
     const items = String(value)
       .split(',')
       .map((v) => v.trim())
       .filter(Boolean);
-    task.set(key, items.length === 1 && key === 'notify' ? items[0] : doc.createNode(items));
+    putKey(task, key, items.length === 1 && key === 'notify' ? items[0] : doc.createNode(items));
   } else if (key === 'name') {
     // the name first, as a task is read
     task.delete('name');
-    task.items.unshift(doc.createPair('name', value));
+    toBlock(task).items.unshift(doc.createPair('name', value));
   } else {
-    task.set(key, value);
+    putKey(task, key, value);
   }
   return textOfDoc(doc);
 }
@@ -486,8 +488,10 @@ export function editModule(text, pi, section, ti, module) {
   const old = moduleKey(task);
   if (!module || old === module) return text;
   const pair = old ? task.items.find((p) => textOf(p.key) === old) : null;
-  if (pair) pair.key = doc.createNode(module);
-  else task.set(module, doc.createNode({}));
+  if (pair) {
+    pair.key = doc.createNode(module);
+    toBlock(task);
+  } else putKey(task, module, doc.createNode({}));
   return textOfDoc(doc);
 }
 
@@ -513,9 +517,9 @@ export function editArg(text, pi, section, ti, arg, value) {
   let args = task.get(module, true);
   if (!YAML.isMap(args)) {
     args = doc.createNode({});
-    task.set(module, args);
+    putKey(task, module, args);
   }
-  args.set(arg, typed(value));
+  putKey(args, arg, typed(value));
   return textOfDoc(doc);
 }
 
@@ -540,7 +544,10 @@ export function editRenameArg(text, pi, section, ti, from, to) {
   if (!YAML.isMap(args) || !to || from === to) return text;
   if (args.has(to)) throw new Error(`'${to}' is set already`);
   const pair = args.items.find((p) => textOf(p.key) === from);
-  if (pair) pair.key = doc.createNode(to);
+  if (pair) {
+    pair.key = doc.createNode(to);
+    toBlock(args);
+  }
   return textOfDoc(doc);
 }
 
@@ -561,7 +568,7 @@ export function editRemoveArg(text, pi, section, ti, arg) {
   const doc = docOf(text);
   const task = taskAt(doc, pi, section, ti);
   const args = task.get(moduleKey(task), true);
-  if (YAML.isMap(args)) args.delete(arg);
+  if (YAML.isMap(args)) dropKey(args, arg);
   return textOfDoc(doc);
 }
 
@@ -583,6 +590,6 @@ export function editArgsText(text, pi, section, ti, value) {
   const task = taskAt(doc, pi, section, ti);
   const module = moduleKey(task);
   if (!module) throw new Error('This task has no module');
-  task.set(module, value === '' ? null : value);
+  putKey(task, module, value === '' ? null : value);
   return textOfDoc(doc);
 }

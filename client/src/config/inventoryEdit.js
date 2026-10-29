@@ -2,9 +2,11 @@
 // field by field - its groups and their child groups, their hosts, the variables a group or a
 // host sets in it. A group is found by its path from the top (all, web : all's child web). Every
 // edit changes only the keys it touches, in the YAML document itself, so comments and the rest
-// stay as written. Pure : AppInventoryEditor uses it ; config/inventoryTree.js reads the tree.
+// stay as written ; a map an edit changes or creates is written one key per line (lib/yamlBlock.js),
+// even when it was written { a: 1 }. Pure : AppInventoryEditor uses it ; config/inventoryTree.js reads the tree.
 import YAML from 'yaml';
 import { typed } from '@/config/playbookEdit';
+import { toBlock, putKey, dropKey, yamlText } from '@/lib/yamlBlock';
 
 /** The text of a scalar node, '' when it is something else. */
 function textOf(node) {
@@ -21,7 +23,7 @@ function docOf(text) {
 /** The document as text. */
 // a host without variables, new or emptied, written `web1:` as people write it, not `web1: null` ;
 // a null the file spells out (null, ~) keeps its spelling
-const textOfDoc = (doc) => doc.toString({ lineWidth: 0, nullStr: '' });
+const textOfDoc = (doc) => yamlText(doc, { lineWidth: 0, nullStr: '' });
 
 /**
  * A map under a key of a map, made when missing (a null value too : `web:`).
@@ -38,7 +40,7 @@ function mapUnder(doc, map, key) {
   let child = map.get(key, true);
   if (!YAML.isMap(child)) {
     child = doc.createNode({});
-    map.set(key, child);
+    putKey(map, key, child);
   }
   return child;
 }
@@ -97,7 +99,10 @@ function renameKey(doc, map, from, to) {
   if (from === to) return;
   if (map.has(to)) throw new Error(`'${to}' is there already`);
   const pair = map.items.find((p) => textOf(p.key) === from);
-  if (pair) pair.key = doc.createNode(to);
+  if (pair) {
+    pair.key = doc.createNode(to);
+    toBlock(map);
+  }
 }
 
 // ─── reading ──────────────────────────────────────────────────────────────────
@@ -151,7 +156,7 @@ export function editAddGroup(text, parent, name) {
   const doc = docOf(text);
   const holder = parent ? mapUnder(doc, groupAt(doc, parent, true).group, 'children') : doc.contents;
   if (holder.has(name)) throw new Error(`'${name}' is there already`);
-  holder.set(name, doc.createNode({ hosts: {} }));
+  putKey(holder, name, doc.createNode({ hosts: {} }));
   return textOfDoc(doc);
 }
 
@@ -184,7 +189,7 @@ export function editRenameGroup(text, path, name) {
  */
 export function editRemoveGroup(text, path) {
   const doc = docOf(text);
-  groupAt(doc, path).holder.delete(path[path.length - 1]);
+  dropKey(groupAt(doc, path).holder, path[path.length - 1]);
   return textOfDoc(doc);
 }
 
@@ -206,7 +211,7 @@ export function editAddHost(text, path, host) {
   const doc = docOf(text);
   const hosts = mapUnder(doc, groupAt(doc, path, true).group, 'hosts');
   if (hosts.has(host)) throw new Error(`'${host}' is there already`);
-  hosts.set(host, null);
+  putKey(hosts, host, null);
   return textOfDoc(doc);
 }
 
@@ -243,7 +248,7 @@ export function editRemoveHost(text, path, host) {
   const doc = docOf(text);
   const { group } = groupAt(doc, path);
   const hosts = group?.get('hosts', true);
-  if (YAML.isMap(hosts)) hosts.delete(host);
+  if (YAML.isMap(hosts)) dropKey(hosts, host);
   return textOfDoc(doc);
 }
 
@@ -261,7 +266,7 @@ export function editRemoveHost(text, path, host) {
  */
 export function editSetVar(text, target, key, value) {
   const doc = docOf(text);
-  varsMap(doc, target).set(key, typed(value));
+  putKey(varsMap(doc, target), key, typed(value));
   return textOfDoc(doc);
 }
 
@@ -297,7 +302,7 @@ export function editRenameVar(text, target, from, to) {
 export function editRemoveVar(text, target, key) {
   const doc = docOf(text);
   const map = varsMap(doc, target);
-  map.delete(key);
+  dropKey(map, key);
   if (!map.items.length) {
     const { group } = groupAt(doc, target.path, true);
     if (target.host) {
@@ -306,7 +311,8 @@ export function editRemoveVar(text, target, key) {
       const hosts = group.get('hosts', true);
       const i = hosts.items.findIndex((pair) => String(pair.key?.value ?? pair.key) === target.host);
       hosts.items[i] = doc.createPair(target.host, null);
-    } else group.delete('vars');
+      toBlock(hosts);
+    } else dropKey(group, 'vars');
   }
   return textOfDoc(doc);
 }

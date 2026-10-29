@@ -12,6 +12,7 @@ import { useLiveEvent } from '@/composables/useLiveEvent';
 import Backup from '@/lib/Backup';
 import Profile from '@/lib/Profile';
 import YAML from 'yaml';
+import { toBlock, putKey, dropKey, yamlText } from '@/lib/yamlBlock';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import Helpers from '@/lib/Helpers';
@@ -418,7 +419,8 @@ const diffCurrent = ref('');
 // so comments and formatting survive an edit made in one of the modals (a plain
 // parse + stringify strips every comment the author typed). Same contract as
 // the raw section helpers : a buffer that can't be parsed as a mapping aborts
-// with a warning instead of being silently replaced.
+// with a warning instead of being silently replaced. A list or a map the edit
+// changes or creates is written one item per line (lib/yamlBlock.js).
 function editCurrentFormDoc(mutate) {
   if (!currentForm.value || !forms.value[currentForm.value]) return false;
   try {
@@ -426,7 +428,7 @@ function editCurrentFormDoc(mutate) {
     if (doc.errors.length > 0) throw new Error(doc.errors[0].message);
     if (!YAML.isMap(doc.contents)) throw new Error('form is not a mapping');
     mutate(doc);
-    forms.value[currentForm.value] = doc.toString();
+    forms.value[currentForm.value] = yamlText(doc);
     return true;
   } catch {
     toast.error(t('designer.badYamlUpdate'));
@@ -435,10 +437,12 @@ function editCurrentFormDoc(mutate) {
 }
 
 // Set or remove a key on a yaml map/document node, keeping the position (and
-// any trailing comment) of a key that is already there.
+// any trailing comment) of a key that is already there. The map, changed, is
+// written one key per line.
 function setDocValue(node, key, value) {
-  if (value === undefined) node.delete(key);
-  else node.set(key, value);
+  const map = YAML.isDocument(node) ? node.contents : node;
+  if (value === undefined) dropKey(map, key);
+  else putKey(map, key, value);
 }
 
 // Same, but a value that did not change is left alone : node.set() REPLACES the
@@ -586,22 +590,21 @@ function applyIconForm() {
     for (const p of props) {
       const v = iconForm.value[p];
       if (v === '' || v === undefined || v === null) {
-        doc.delete(p);
+        setDocValue(doc, p, undefined);
       } else if (p === 'overlayIconCircle') {
-        if (v === true) doc.delete(p);
-        else doc.set(p, v);
+        setDocValue(doc, p, v === true ? undefined : v);
       } else if (defaults[p] && v === defaults[p] && !doc.get('overlayIcon') && !doc.get('overlayIconText')) {
-        doc.delete(p);
+        setDocValue(doc, p, undefined);
       } else {
-        doc.set(p, v);
+        setDocValueIfChanged(doc, p, v);
       }
     }
     if (!doc.get('overlayIcon') && !doc.get('overlayIconText')) {
-      doc.delete('overlayIconColor');
-      doc.delete('overlayIconCircle');
-      doc.delete('overlayIconTransform');
-      doc.delete('overlayIconTextPosition');
-      doc.delete('overlayIconTextColor');
+      setDocValue(doc, 'overlayIconColor', undefined);
+      setDocValue(doc, 'overlayIconCircle', undefined);
+      setDocValue(doc, 'overlayIconTransform', undefined);
+      setDocValue(doc, 'overlayIconTextPosition', undefined);
+      setDocValue(doc, 'overlayIconTextColor', undefined);
     }
   });
   showIconPicker.value = false;
@@ -848,9 +851,10 @@ function buildCleanCatNodes(doc, cats) {
       if (YAML.isSeq(sub)) {
         hoistSeqComment(sub);
         sub.items = children;
-      } else node.set('items', doc.createNode(children));
+        toBlock(sub);
+      } else putKey(node, 'items', doc.createNode(children));
     } else {
-      node.delete('items');
+      dropKey(node, 'items');
     }
     nodes.push(node);
   }
@@ -871,9 +875,9 @@ function applyEditCategories() {
   }
   hoistSeqComment(doc.contents);
   const nodes = buildCleanCatNodes(doc, editCats.value);
-  if (YAML.isSeq(doc.contents)) doc.contents.items = nodes;
+  if (YAML.isSeq(doc.contents)) toBlock(doc.contents).items = nodes;
   else doc.contents = doc.createNode(nodes);
-  categories.value = doc.toString();
+  categories.value = yamlText(doc);
   showEditCategories.value = false;
 }
 
@@ -907,8 +911,8 @@ function parseDocOrNull(raw) {
 function appendToSeqYaml(raw, item) {
   if (!raw || !raw.trim()) return YAML.stringify([item]);
   const doc = YAML.parseDocument(raw);
-  doc.contents.add(doc.createNode(item));
-  return doc.toString();
+  toBlock(doc.contents).add(doc.createNode(item));
+  return yamlText(doc);
 }
 
 // the edit modals only make sense when the raw yaml actually holds content ;

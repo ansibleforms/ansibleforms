@@ -138,3 +138,14 @@ describe('its edits', () => {
     expect([typed('true'), typed('3'), typed('0644'), typed('a')]).toEqual([true, 3, '0644', 'a']);
   });
 });
+
+describe('a playbook written short', () => {
+  const FLOW =
+    '- name: Deploy\n  hosts: web\n  tasks:\n    - name: Say\n      ansible.builtin.debug: { msg: hi }\n      tags: [a]\n';
+
+  it('writes a map an edit changes one key per line, the rest as written', () => {
+    const out = editArg(FLOW, 0, 'tasks', 0, 'verbosity', '1');
+    expect(out).toContain('ansible.builtin.debug:\n        msg: hi\n        verbosity: 1\n');
+    expect(out).toContain('tags: [ a ]');
+  });
+});
