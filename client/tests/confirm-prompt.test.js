@@ -45,6 +45,62 @@ describe('askConfirm', () => {
   });
 });
 
+// AppConfirmDialog says Escape turns the question down, but BsModal is not a Bootstrap JS
+// instance : its data-bs-keyboard did nothing, the question stayed open and askConfirm never
+// answered. The question listens for Escape itself while it is open.
+describe('askConfirm and Escape', () => {
+  // a press of a key, as the browser sends it to the page
+  const press = (key, target = document) =>
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+
+  it('answers false and closes on Escape', async () => {
+    const answer = askConfirm('Delete it?');
+    press('Escape');
+    expect(confirmPrompt.open).toBe(false);
+    expect(await answer).toBe(false);
+  });
+
+  it('answers false on Escape pressed in the dialog itself', async () => {
+    const modal = document.createElement('div');
+    document.body.appendChild(modal);
+    const answer = askConfirm('Delete it?');
+    press('Escape', modal);
+    expect(await answer).toBe(false);
+    modal.remove();
+  });
+
+  it('keeps the question open for any other key', async () => {
+    const answer = askConfirm('Delete it?');
+    press('Enter');
+    press('a');
+    expect(confirmPrompt.open).toBe(true);
+    answerConfirm(true);
+    expect(await answer).toBe(true);
+  });
+
+  it('keeps Escape from what lies under the question', () => {
+    let heard = 0;
+    const under = (e) => e.key === 'Escape' && heard++;
+    window.addEventListener('keydown', under);
+    askConfirm('Delete it?');
+    press('Escape');
+    expect(heard).toBe(0);
+    // answered : Escape is the page's again
+    press('Escape');
+    expect(heard).toBe(1);
+    window.removeEventListener('keydown', under);
+  });
+
+  it('stops listening once answered by its buttons', async () => {
+    const answer = askConfirm('Delete it?');
+    answerConfirm(true);
+    expect(await answer).toBe(true);
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+});
+
 describe('confirmLines', () => {
   it('puts what follows the question on a line of its own', () => {
     expect(confirmLines('Reject rte? It is removed with its credential.')).toEqual([
