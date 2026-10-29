@@ -11,6 +11,8 @@
 /******************************************************************/
 import mysql from "../models/db.model.js";
 import Errors from "./errors.js";
+import yaml from "yaml";
+import { memberRefs } from "./directoryTypes.js";
 
 /**
  * The local groups and users the admin role names.
@@ -115,4 +117,63 @@ export async function assertMayTouchAdmin(req, { userId, username, groupIds, gro
   if (groupName && grants.groups.has(String(groupName))) refuse("create a group that grants admin");
 }
 
-export default { adminGrantsFromRoles, adminGrants, isAdminRequest, assertMayTouchAdmin };
+/**
+ * Who the admin role makes an admin : every group and user the roles named admin list, as a
+ * sorted list without duplicates, so two configurations compare whatever their order or layout.
+ * The names are compared as the sign-in matches them (memberRefs, user.model.js) : entraid/x is
+ * azuread/x, anything else as written.
+ *
+ * Args:
+ *   configRoles (object[]): the roles of a configuration (config.yaml).
+ *
+ * Returns:
+ *   string: the canonical form of the admin role's members.
+ */
+function adminMembers(configRoles = []) {
+  const members = new Set();
+  for (const role of Array.isArray(configRoles) ? configRoles : []) {
+    if (role?.name !== "admin") continue;
+    // groups and users kept apart : the same name means another account in each
+    for (const g of memberRefs(role.groups)) members.add(`group:${g}`);
+    for (const u of memberRefs(role.users)) members.add(`user:${u}`);
+  }
+  return JSON.stringify([...members].sort());
+}
+
+/**
+ * Refuses to a non-admin a configuration that changes who the admin role makes an admin. A
+ * user with settings access edits the other roles (Settings > Roles), but adding a group or
+ * a user to the admin role - their own - would make them admin.
+ *
+ * Args:
+ *   req (object): the request (the signed-in user).
+ *   roles (object[]|null): the roles of the configuration about to be written ; null when they
+ *     cannot be read (a ytt template, not plain YAML until ytt renders it).
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: the request is not an admin's and the admin role's groups or
+ *     users differ from the active configuration's, or cannot be read.
+ */
+export async function assertAdminRoleUnchanged(req, roles) {
+  if (isAdminRequest(req)) return;
+  // a configuration whose roles cannot be read could grant anything
+  if (roles === null || roles === undefined) {
+    throw new Errors.AccessDeniedError("Only an admin can load a configuration whose roles cannot be read");
+  }
+  // imported lazily, like Form in adminGrants() : the settings model is not needed to load this one
+  const { default: Settings } = await import("../models/settings.model.js");
+  // Step 1 : the admin role as it is now ; an active configuration that does not parse names
+  // nobody, so any admin member in the new one is a change
+  let active;
+  try {
+    active = yaml.parse((await Settings.getActiveConfig().catch(() => "")) || "")?.roles || [];
+  } catch {
+    active = [];
+  }
+  // Step 2 : the same groups and users, or refused
+  if (adminMembers(active) !== adminMembers(roles)) {
+    throw new Errors.AccessDeniedError("Only an admin can change who is an admin");
+  }
+}
+
+export default { adminGrantsFromRoles, adminGrants, isAdminRequest, assertMayTouchAdmin, assertAdminRoleUnchanged };

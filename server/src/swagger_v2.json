@@ -374,7 +374,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Save the active form configuration",
-        "description": "Validates the supplied yaml against the base schema and writes it to the active config source (database, use_for_config repository or local file). Refused while the designer holds the config lock.",
+        "description": "Validates the supplied yaml against the base schema and writes it to the active config source (database, use_for_config repository or local file). Refused while the designer holds the config lock, and to a user without the admin role when it changes the groups or users of the admin role.",
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,
@@ -394,6 +394,7 @@
         "responses": {
           "200": { "description": "Config saved" },
           "400": { "description": "Missing forms_yaml, invalid yaml, or config that fails the base schema validation" },
+          "403": { "description": "Only an admin can change who is an admin (the groups and users of the admin role)" },
           "409": { "description": "The active config changed elsewhere (stale baseHash)" },
           "423": { "description": "Configuration is locked by the designer" },
           "500": { "description": "Failed to update settings" }
@@ -404,7 +405,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Import configuration from config.yaml",
-        "description": "Loads the config.yaml (or the deprecated forms.yaml) file into the database, replacing the database copy. A restore point of that database copy is written to the backups first. Refused while the designer holds the config lock.",
+        "description": "Loads the config.yaml (or the deprecated forms.yaml) file into the database, replacing the database copy. A restore point of that database copy is written to the backups first. Refused while the designer holds the config lock, and to a user without the admin role when the file changes the groups or users of the admin role or is a ytt template.",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {
@@ -420,6 +421,7 @@
               }
             }
           },
+          "403": { "description": "Only an admin can import a file that changes who is an admin, or whose roles cannot be read (a ytt template)" },
           "423": { "description": "Configuration is locked by the designer" },
           "500": { "description": "Failed to import config" }
         }
