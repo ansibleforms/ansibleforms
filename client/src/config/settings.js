@@ -1045,6 +1045,8 @@ export default function getSettings(t) {
       selectable: false,
       // a row opens the repository's page
       openPage: (item) => `/settings/repositories/${item.id}`,
+      // its New dialog wider : the usage step's categories and their descriptions
+      dialogSize: 'xl',
       // Scheduled pull off : no schedule ; the switch itself is not stored, nor the Usage column
       beforeSave: ({ pull_scheduled, usage: _usage, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
       // its object usages (schedules, credentials, runners ...) turned on or off ask first, one

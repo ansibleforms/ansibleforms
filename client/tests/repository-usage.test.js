@@ -790,3 +790,14 @@ describe('a form name defined in two forms repositories', () => {
     expect(loop.slice(0, loop.indexOf('>'))).toContain(':key="`${d.name}|${d.skipped.place}`"');
   });
 });
+
+describe('the New repository dialog', () => {
+  // its usage step lists every category with each type's description : the default dialog
+  // width wrapped them, so the repositories ask for the extra large one
+  it('is the extra large dialog, and only the types that ask for it are', () => {
+    expect(settings.repositories.dialogSize).toBe('xl');
+    expect(settings.credentials.dialogSize).toBeUndefined();
+    const multi = readFileSync(join(import.meta.dirname, '../src/components/AppAdminMulti.vue'), 'utf8');
+    expect(multi).toMatch(/:size="settings\.dialogSize \|\| 'lg'"/);
+  });
+});

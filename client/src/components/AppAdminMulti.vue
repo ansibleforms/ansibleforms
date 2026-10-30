@@ -115,6 +115,8 @@
 /*  settings.openPage: (item) => path - a record has its own page */
 /*      (a user's) : its row and its Edit open that page instead  */
 /*      of the record dialog ; New still opens the dialog         */
+/*  settings.dialogSize: 'xl' - the record dialog's width (lg     */
+/*      by default, BsOffCanvas's sizes)                          */
 /*  a cell's [data-af-popover] : its text in a popover on hover   */
 /*      (a cron's meaning in words, lib/cronCell.js)              */
 /*                                                                */
@@ -1835,6 +1837,7 @@ defineExpose({
     :show="['select', 'edit', 'new', 'change_password'].includes(action) && !usesPasswordDialog"
     :icon="objectIcon"
     :title="title"
+    :size="settings.dialogSize || 'lg'"
     @close="unselectItem"
   >
     <template #actions>
