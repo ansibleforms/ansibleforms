@@ -6967,13 +6967,13 @@
 
       **Defaults** (`controller_defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the
       forms view, the time zone, the date format and the language (`default_theme`, `default_theme_color`,
-      `forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed has a
-      `defaults:` section in the same format.
+      `default_forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed
+      has a `defaults:` section in the same format.
       ```yaml
       controller_defaults:
         default_theme: dark
         default_theme_color: "#198754"
-        forms_view: tiles
+        default_forms_view: tiles
         default_timezone: Europe/Brussels
         default_date_format: DD/MM/YYYY
         default_language: fr

@@ -12,6 +12,7 @@
 import { differs } from "../seedCompare.js";
 import { fieldSet } from "./fields.js";
 import { typeOf } from "./types.js";
+import { yamlKeys } from "./yamlKeys.js";
 
 /**
  * The descriptor of an object type the app has one of.
@@ -20,6 +21,10 @@ import { typeOf } from "./types.js";
  *   spec (object):
  *     key (string): the type (chat_assistant), its key in a file.
  *     section (string|object): the schema of its map (lib/seed-schema.js).
+ *     keys (object): { key in its map: field } - the keys of its map named otherwise than the
+ *       field they set (lib/repoObjects/yamlKeys.js : default_forms_view, forms_view) ; the
+ *       object every other part of the descriptor reads and gives (current, apply, changed,
+ *       notesOf, kept, fromFile, toFile ...) has the fields, its file the keys.
  *     title, noun (string): how the pull output names it.
  *     secrets, skip, keepFalse, canonical : as lib/repoObjects/fields.js reads them.
  *     references (object[]): what it names : [{ field, type }] ; it waits when one is missing.
@@ -64,6 +69,8 @@ export function singleType(spec) {
   const fields = spec.fields || fieldSet(spec);
   const toYaml = spec.toFile || ((o) => o);
   const fromFile = spec.fromFile || (async (o) => o);
+  // its map's keys and the fields they set
+  const { toFields, toKeys } = yamlKeys(spec.keys);
 
   return {
     key: spec.key,
@@ -89,13 +96,14 @@ export function singleType(spec) {
      *     : its references resolved already), fromSeed (the config seed's declaration) }.
      *
      * Returns:
-     *   Promise<object>: { errors, object (as the app reads it, null when refused) }.
+     *   Promise<object>: { errors (naming its keys as the file has them), object (as the app
+     *     reads it, by its fields ; null when refused) }.
      */
     async check(raw, opts = {}) {
       const checked = fields.check(raw, opts);
       if (checked.errors.length) return checked;
       try {
-        return { errors: [], object: await fromFile(checked.object, opts) };
+        return { errors: [], object: await fromFile(toFields(checked.object), opts) };
       } catch (e) {
         return { errors: [e.message || String(e)], object: null };
       }
@@ -118,7 +126,7 @@ export function singleType(spec) {
      *   object: { object (the map), withoutSecret, extraFiles: [{ name, buffer }] }.
      */
     fileOf(current) {
-      const { object, withoutSecret } = fields.toFile(toYaml(current));
+      const { object, withoutSecret } = fields.toFile(toKeys(toYaml(current)));
       return { object, withoutSecret, extraFiles: spec.extraFiles ? spec.extraFiles(current) : [] };
     },
 
@@ -140,8 +148,8 @@ export function singleType(spec) {
       // the files beside it as the file names them now (the logo's image) : only the ones the edit
       // changed written, and its YAML naming them where it names another file
       const files = spec.editFiles ? spec.editFiles(declared || {}, after, before || {}) : null;
-      const next = files ? { ...toYaml(after), ...files.names } : toYaml(after);
-      const prev = files ? { ...toYaml(before || {}), ...files.base } : toYaml(before || {});
+      const next = toKeys(files ? { ...toYaml(after), ...files.names } : toYaml(after));
+      const prev = toKeys(files ? { ...toYaml(before || {}), ...files.base } : toYaml(before || {}));
       return {
         edits: fields.editsOf(next, prev),
         keyOrder: fields.keyOrderOf(next, prev),

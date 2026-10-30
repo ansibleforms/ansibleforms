@@ -9,11 +9,19 @@
 // turned off (lib/seed.js).
 import mysql from "../models/db.model.js";
 import Errors from "./errors.js";
-import { APPEARANCE_SECTIONS } from "./seed-schema.js";
+import { APPEARANCE_SECTIONS, APPEARANCE_KEYS } from "./seed-schema.js";
+import { yamlKeys } from "./repoObjects/yamlKeys.js";
+
+// each appearance section's keys and the fields they set (the forms view : default_forms_view in
+// the seed and a repository's file, forms_view in the settings row)
+const KEYS = Object.fromEntries(Object.keys(APPEARANCE_SECTIONS).map((key) => [key, yamlKeys(APPEARANCE_KEYS[key])]));
+
+// the fields of each appearance section, by the names the seed holds them (the settings row's)
+const SECTION_FIELDS = Object.fromEntries(Object.entries(APPEARANCE_SECTIONS).map(([key, section]) => [key, Object.keys(section.properties).map(KEYS[key].fieldOf)]));
 
 // the appearance fields : the Settings > Appearance pages', one seed section and one repository
 // file each (lib/repoObjects/defaults.js, logo.js, icon.js, name.js, links.js)
-export const APPEARANCE_FIELDS = Object.values(APPEARANCE_SECTIONS).flatMap((section) => Object.keys(section.properties));
+export const APPEARANCE_FIELDS = Object.values(SECTION_FIELDS).flat();
 
 // the two that are environment settings, by their variable
 export const APPEARANCE_ENV = { DEFAULT_LANGUAGE: "default_language", SHOW_DESIGNER: "show_designer" };
@@ -33,7 +41,37 @@ export const MCP_ENV = /^(ENABLE_MCP|MCP_[A-Z0-9_]+)$/;
  *   string|undefined: the section ; none for a field the seed never holds.
  */
 export const sectionOfField = (field) =>
-  MCP_ENV.test(String(field)) ? "mcp" : Object.keys(APPEARANCE_SECTIONS).find((key) => field in APPEARANCE_SECTIONS[key].properties);
+  MCP_ENV.test(String(field)) ? "mcp" : Object.keys(SECTION_FIELDS).find((key) => SECTION_FIELDS[key].includes(field));
+
+/**
+ * The key the seed's section names a field it holds by (default_forms_view for forms_view) : what
+ * is said of it to the one who wrote the seed.
+ *
+ * Args:
+ *   field (string): the field (an MCP setting's variable).
+ *
+ * Returns:
+ *   string: its key in the seed ; the field itself for one named alike.
+ */
+export const seedKeyOf = (field) => {
+  const section = sectionOfField(field);
+  return KEYS[section] ? KEYS[section].keyOf(field) : field;
+};
+
+/**
+ * The fields a seed's Appearance and mcp sections declare, by the names the seed holds them
+ * (seed_managed_fields : the settings row's, an MCP setting's variable).
+ *
+ * Args:
+ *   doc (object): the seed.
+ *
+ * Returns:
+ *   string[]: the fields.
+ */
+export const seedFieldsOf = (doc) => [
+  ...Object.keys(APPEARANCE_SECTIONS).flatMap((key) => Object.keys(doc?.[key] || {}).map(KEYS[key].fieldOf)),
+  ...Object.keys(doc?.mcp || {}),
+];
 
 /**
  * Whether the seed can hold a field : an appearance field or an MCP setting.

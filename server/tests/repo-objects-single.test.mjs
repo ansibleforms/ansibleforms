@@ -543,9 +543,9 @@ describe("the MCP settings, in their mcp.yaml", () => {
 // ─── the Appearance pages : one file each ─────────────────────────────────────
 // the fields each Settings > Appearance page saves (client/src/pages/admin/defaults.vue : the
 // settings row's lookOf and DEFAULT_LANGUAGE ; logo.vue and favicon.vue : their image ; name.vue :
-// nameOf), as its file holds them
+// nameOf), as its file holds them : the forms view by default_forms_view, as its siblings
 const PAGE_FIELDS = {
-  defaults: ["default_theme", "default_theme_color", "forms_view", "default_timezone", "default_date_format", "default_language"],
+  defaults: ["default_theme", "default_theme_color", "default_forms_view", "default_timezone", "default_date_format", "default_language"],
   logo: ["logo"],
   icon: ["icon"],
   name: ["app_name"],
@@ -555,15 +555,20 @@ const PAGE_FIELDS = {
 describe("each Appearance page in its own file, holding what that page saves and nothing else", () => {
   test("its file's schema, the seed's section and the fields the seed holds are its page's fields", async () => {
     const { APPEARANCE_SECTIONS } = await import("../src/lib/seed-schema.js");
-    const { APPEARANCE_FIELDS, sectionOfField } = await import("../src/lib/seedManaged.js");
+    const { APPEARANCE_FIELDS, sectionOfField, seedKeyOf } = await import("../src/lib/seedManaged.js");
+    // the settings row's field of a key (the forms view's : forms_view, the seed holding it so)
+    const fieldOf = (k) => (k === "default_forms_view" ? "forms_view" : k);
     for (const [key, fields] of Object.entries(PAGE_FIELDS)) {
       const d = await desc(key);
       assert.equal(d.single, true);
       assert.deepEqual([...d.keyOrder].sort(), [...fields].sort(), key);
       assert.deepEqual(Object.keys(APPEARANCE_SECTIONS[key].properties).sort(), [...fields].sort(), key);
-      for (const field of fields) assert.equal(sectionOfField(field), key, field);
+      for (const field of fields) {
+        assert.equal(sectionOfField(fieldOf(field)), key, field);
+        assert.equal(seedKeyOf(fieldOf(field)), field, field);
+      }
     }
-    assert.deepEqual([...APPEARANCE_FIELDS].sort(), Object.values(PAGE_FIELDS).flat().sort());
+    assert.deepEqual([...APPEARANCE_FIELDS].sort(), Object.values(PAGE_FIELDS).flat().map(fieldOf).sort());
   });
 
   test("turned on : each file written with its page's values only", async () => {
@@ -585,7 +590,7 @@ describe("each Appearance page in its own file, holding what that page saves and
     assert.deepEqual(readMapOf("cfg", "defaults.yaml"), {
       default_theme: "dark",
       default_theme_color: "#198754",
-      forms_view: "list",
+      default_forms_view: "list",
       default_timezone: "Europe/Brussels",
       default_date_format: "DD/MM/YYYY",
       default_language: "fr",
@@ -628,6 +633,65 @@ describe("each Appearance page in its own file, holding what that page saves and
     assert.equal(row.logo, dataUrl(PNG));
     CrudModel.flushAllLocal();
     for (const key of ["name", "defaults", "logo"]) assert.equal((await RepoObjects.syncRepository(await desc(key), "cfg")).unchanged, 1, key);
+  });
+});
+
+// ─── the forms view : default_forms_view in a file, forms_view in the app ──────────
+describe("the Defaults page's forms view, named default_forms_view in a file as its siblings", () => {
+  test("a pull reads default_forms_view into the settings row's forms_view ; forms_view is a key the map does not have", async () => {
+    writeRaw("cfg", "defaults.yaml", "default_forms_view: list\n");
+    const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
+    assert.equal(summary.updated, 1, JSON.stringify(summary));
+    assert.equal(fx.state.tables.settings[0].forms_view, "list");
+    CrudModel.flushAllLocal();
+    assert.equal((await RepoObjects.syncRepository(await desc("defaults"), "cfg")).unchanged, 1);
+    // the row's name in a file : refused as any key the map does not have, named as written
+    writeRaw("cfg", "defaults.yaml", "forms_view: tiles\n");
+    const refused = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
+    assert.equal(refused.refused.length, 1, JSON.stringify(refused));
+    assert.match(refused.refused[0].reasons.join("; "), /forms_view/);
+    assert.doesNotMatch(refused.refused[0].reasons.join("; "), /default_forms_view/);
+    assert.equal(fx.state.tables.settings[0].forms_view, "list");
+  });
+
+  test("an app edit writes default_forms_view back, the file's other keys and comments as they are", async () => {
+    fx.cloneEmpty("cfg");
+    writeRaw("cfg", "defaults.yaml", "default_theme: dark # the house style\ndefault_forms_view: tiles\n");
+    await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
+    CrudModel.flushAllLocal();
+    const before = await RepoObjects.snapshot("defaults");
+    fx.state.tables.settings[0].forms_view = "list";
+    assert.equal(await RepoObjects.appUpdated("defaults", before), true);
+    assert.equal(readFlat("cfg", "defaults.yaml"), "default_theme: dark # the house style\ndefault_forms_view: list\n");
+  });
+
+  test("the seed's defaults section : default_forms_view applied and held as the forms_view field, said by its key", async () => {
+    const { validateSeed } = await import("../src/lib/seed-schema.js");
+    const { seedFieldsOf, setSeedManagedFields, seedManagedFields } = await import("../src/lib/seedManaged.js");
+    const { saveSettingsFields } = await import("../src/lib/appearance.js");
+    assert.equal(validateSeed({ defaults: { default_forms_view: "list" } }), true);
+    assert.throws(() => validateSeed({ defaults: { forms_view: "list" } }), /validation failed/);
+    // applied as the seed applies it, held by the row's name (the page's seeded('forms_view'))
+    assert.deepEqual((await RepoObjects.applyDeclared(await desc("defaults"), { default_forms_view: "list" }, { fromSeed: true })).updated, ["defaults"]);
+    assert.equal(fx.state.tables.settings[0].forms_view, "list");
+    assert.deepEqual(seedFieldsOf({ defaults: { default_theme: "dark", default_forms_view: "list" }, mcp: { MCP_READ_ONLY: true } }), ["default_theme", "forms_view", "MCP_READ_ONLY"]);
+    await setSeedManagedFields(seedFieldsOf({ defaults: { default_forms_view: "list" } }));
+    assert.deepEqual(await seedManagedFields(), ["forms_view"]);
+    await assert.rejects(saveSettingsFields({ forms_view: "tiles" }), { status: 403, message: /read only here: forms_view/ });
+    // a Defaults repository : kept in the app and out of its file, a file declaring it not applied,
+    // each said by the key the file has
+    fx.cloneEmpty("cfg");
+    const p = await RepoObjects.preview(await desc("defaults"), "cfg");
+    assert.deepEqual(p.kept, [{ name: "default_forms_view", code: "seed", reason: "managed by the config seed" }]);
+    await RepoObjects.activate(await desc("defaults"), "cfg", { pull: false });
+    assert.equal(readMapOf("cfg", "defaults.yaml").default_forms_view, undefined);
+    assert.equal(readMapOf("cfg", "defaults.yaml").forms_view, undefined);
+    writeRaw("cfg", "defaults.yaml", "default_forms_view: tiles\n");
+    const summary = await RepoObjects.syncRepository(await desc("defaults"), "cfg");
+    assert.deepEqual(summary.refused, []);
+    assert.equal(fx.state.tables.settings[0].forms_view, "list");
+    assert.match(RepoObjects.summaryText(await desc("defaults"), summary), /Kept by the config seed, not applied: default_forms_view/);
+    assert.deepEqual(await setSeedManagedFields([]), ["forms_view"]);
   });
 });
 
@@ -792,7 +856,7 @@ describe("the logo and the icon, their images beside their file", () => {
 describe("a file whose values the app keeps otherwise : the next pull changes nothing", () => {
   test("the name with spaces around it, an unknown forms view", async () => {
     writeRaw("cfg", "name.yaml", "app_name: '  ACME  '\n");
-    writeRaw("cfg", "defaults.yaml", "forms_view: nonsense\n");
+    writeRaw("cfg", "defaults.yaml", "default_forms_view: nonsense\n");
     assert.equal((await RepoObjects.syncRepository(await desc("name"), "cfg")).updated, 1);
     assert.deepEqual((await RepoObjects.syncRepository(await desc("defaults"), "cfg")).refused, []);
     assert.equal(fx.state.tables.settings[0].app_name, "ACME");

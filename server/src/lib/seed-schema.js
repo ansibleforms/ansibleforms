@@ -671,7 +671,7 @@ const appearanceSection = (properties) => ({ type: "object", additionalPropertie
 export const defaultsSection = appearanceSection({
   default_theme: { type: "string", enum: ["system", "light", "dark"] },
   default_theme_color: str,
-  forms_view: str,
+  default_forms_view: str,
   default_timezone: str,
   default_date_format: str,
   default_language: str,
@@ -698,6 +698,11 @@ export const linksSection = appearanceSection({
 // the seed's sections held field by field, one per Settings > Appearance page, in the menu's
 // order (lib/seedManaged.js) : the seed key of each, its schema
 export const APPEARANCE_SECTIONS = { defaults: defaultsSection, logo: logoSection, icon: iconSection, name: nameSection, links: linksSection };
+
+// the keys of those sections named otherwise than the field they set (lib/repoObjects/yamlKeys.js),
+// { key: field } per section : the forms view is default_forms_view in a file, as its siblings,
+// and forms_view in the settings row, the API and the page (the fields the seed holds by that name)
+export const APPEARANCE_KEYS = { defaults: { default_forms_view: "forms_view" } };
 
 // The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
 // their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as a repository's mcp: map holds them.

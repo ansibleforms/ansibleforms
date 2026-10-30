@@ -13,17 +13,20 @@ import { seedManagedFields } from "../seedManaged.js";
  *
  * Args:
  *   isField (function): (name) => whether a field is the type's.
+ *   keyOf (function): (field) => the key its file names it by (lib/repoObjects/yamlKeys.js), how
+ *     the fields kept are said ; the field itself when not given.
  *
  * Returns:
  *   object: {
  *     managed (() => Promise<string[]> : the fields the seed manages, put in current as _seedManaged),
  *     seededOf ((current) => the type's fields the seed manages),
  *     without ((obj, current) => the object without them, nor _seedManaged),
- *     kept ((current) => them, as staying in the app),
- *     notesOf ((declared, current) => a file declaring one of them : not applied, said),
+ *     kept ((current) => them, as staying in the app, named by their key),
+ *     notesOf ((declared, current) => a file declaring one of them (declared by the fields) : not
+ *       applied, said by their key),
  *   }
  */
-export function seedHold(isField) {
+export function seedHold(isField, keyOf = (field) => field) {
   const seededOf = (current) => (current?._seedManaged || []).filter(isField);
   return {
     managed: () => seedManagedFields(),
@@ -34,10 +37,10 @@ export function seedHold(isField) {
       for (const field of seededOf(current)) delete out[field];
       return out;
     },
-    kept: (current) => seededOf(current).map((field) => ({ name: field, code: "seed", reason: "managed by the config seed" })),
+    kept: (current) => seededOf(current).map((field) => ({ name: keyOf(field), code: "seed", reason: "managed by the config seed" })),
     notesOf: (declared, current) => {
       const seeded = Object.keys(declared).filter((k) => seededOf(current).includes(k));
-      return seeded.length ? [`Kept by the config seed, not applied: ${seeded.join(", ")}`] : [];
+      return seeded.length ? [`Kept by the config seed, not applied: ${seeded.map(keyOf).join(", ")}`] : [];
     },
   };
 }

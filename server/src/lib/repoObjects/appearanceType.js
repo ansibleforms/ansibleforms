@@ -21,6 +21,7 @@ import { seedHold } from "./seedHold.js";
 import { envFieldSet } from "./envFields.js";
 import { same, fileBeside } from "./yamlFile.js";
 import { singleType } from "./singleType.js";
+import { yamlKeys } from "./yamlKeys.js";
 
 /**
  * A field's value as two are compared : a list as its JSON (an empty one as none), a yes or no as
@@ -112,6 +113,9 @@ function imageEdits(images, seeded, declared, after, before) {
  *     envFields (string[]): its environment settings, by field (default_language, show_designer).
  *     images (string[]): its images (logo, icon), files beside its YAML.
  *     keepFalse (string[]): its yes or no fields written when off.
+ *     keys (object): { key in its file: field } - its keys named otherwise than the field they set
+ *       (lib/repoObjects/yamlKeys.js : the defaults' default_forms_view, the forms_view field) ;
+ *       the fields above, the seed's hold and the app's object by the fields, its file by the keys.
  *
  * Returns:
  *   object: the descriptor.
@@ -119,8 +123,8 @@ function imageEdits(images, seeded, declared, after, before) {
 export function appearanceType(spec) {
   const { rowFields = [], envFields = [], images = [] } = spec;
   const fields = [...rowFields, ...envFields, ...images];
-  // the config seed's hold on this type's fields
-  const hold = seedHold((f) => fields.includes(f));
+  // the config seed's hold on this type's fields, said by the keys its file names them by
+  const hold = seedHold((f) => fields.includes(f), yamlKeys(spec.keys).keyOf);
   const { seededOf } = hold;
   // its environment settings, read and saved as their page does
   const env = envFieldSet(envFields);
@@ -163,6 +167,7 @@ export function appearanceType(spec) {
     section: spec.section,
     title: spec.title,
     noun: spec.noun,
+    keys: spec.keys,
     keepFalse: spec.keepFalse || [],
     // its images are files beside its YAML, named in it
     besides: images,

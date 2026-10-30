@@ -46,11 +46,11 @@ import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
 import { canonicalJson, differs } from "./seedCompare.js";
-import { sectionOfField, setSeedManagedFields } from "./seedManaged.js";
+import { sectionOfField, seedKeyOf, seedFieldsOf, setSeedManagedFields } from "./seedManaged.js";
 
-// a field the seed held per field, as a release names it : by its section (defaults:default_theme,
-// links:header_links, mcp:MCP_READ_ONLY)
-const heldName = (field) => `${sectionOfField(field)}:${field}`;
+// a field the seed held per field, as a release names it : by its section and the key the seed
+// names it by (defaults:default_theme, defaults:default_forms_view, mcp:MCP_READ_ONLY)
+const heldName = (field) => `${sectionOfField(field)}:${seedKeyOf(field)}`;
 
 // The one thing that distinguishes the seed from an API caller. Everything the seed
 // writes goes through the normal models, so encryption, the is_default handling and
@@ -730,7 +730,7 @@ async function releaseWhenOff() {
   released.push(...heldFields.map(heldName));
   for (const label of [...Object.keys(APPEARANCE_SECTIONS), "mcp"]) {
     const fields = heldFields.filter((f) => sectionOfField(f) === label);
-    if (fields.length) groups.push(`${label}: ${fields.join(", ")}`);
+    if (fields.length) groups.push(`${label}: ${fields.map(seedKeyOf).join(", ")}`);
   }
 
   // Step 3 : say so, once. Nothing released (every start after the first) is silent.
@@ -900,7 +900,7 @@ async function applySections(doc, summary, opts = {}) {
   ];
   // the fields its Appearance and mcp sections declare are its own from now on (read only in the
   // app) ; one it no longer declares, or a section gone, released (lib/seedManaged.js)
-  const heldReleased = await setSeedManagedFields([...Object.keys(APPEARANCE_SECTIONS), "mcp"].flatMap((key) => Object.keys(doc[key] || {})));
+  const heldReleased = await setSeedManagedFields(seedFieldsOf(doc));
   summary.released.push(...heldReleased.map(heldName));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");

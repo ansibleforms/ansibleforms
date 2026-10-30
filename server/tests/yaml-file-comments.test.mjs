@@ -54,9 +54,9 @@ describe("the other writers keep untouched lines too", () => {
   });
 
   test("a type's map among other keys : only its changed field, the other keys as they were", () => {
-    const text = "# the platform's settings\n# shown beside the logo\nlabels:\n  - name: PROD\ndefaults:\n  # the house style\n  default_theme: dark     # always\n  forms_view: grid\nnotes: kept\n";
-    const out = editMapEntry(text, "defaults", (doc, map) => applyEdits(doc, map, { forms_view: "list" }));
-    assert.equal(out, text.replace("forms_view: grid", "forms_view: list"));
+    const text = "# the platform's settings\n# shown beside the logo\nlabels:\n  - name: PROD\ndefaults:\n  # the house style\n  default_theme: dark     # always\n  default_forms_view: grid\nnotes: kept\n";
+    const out = editMapEntry(text, "defaults", (doc, map) => applyEdits(doc, map, { default_forms_view: "list" }));
+    assert.equal(out, text.replace("default_forms_view: grid", "default_forms_view: list"));
     // a key the file does not give yet : made at its end
     const made = editMapEntry("labels: []\n", "name", (doc, map) => applyEdits(doc, map, { app_name: "X" }));
     assert.deepEqual(YAML.parse(made), { labels: [], name: { app_name: "X" } });
