@@ -50,7 +50,7 @@
     "mongodb": "~7.7.0",
     "mssql": "~12.7.11",
     "multer": "~2.5.0",
-    "mysql2": "~3.24.5",
+    "mysql2": "~3.24.6",
     "node-cache": "~5.1.2",
     "node-jq": "~6.3.1",
     "nodemailer": "~10.2.1",
