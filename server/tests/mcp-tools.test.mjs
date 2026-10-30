@@ -474,9 +474,9 @@ describe("MCP schedules", () => {
   let rows;
   beforeEach(() => {
     rows = new Map([
-      [1, { id: 1, name: "bob's run", form: "Create volume", one_time_run: 1, run_at: "2030-01-01T00:00:00.000Z", owner: JSON.stringify({ username: "bob", type: "local" }), extra_vars: "volume:\n  name: v1\npassword: pw\n", output: "" }],
-      [2, { id: 2, name: "nightly", form: "Create volume", one_time_run: 0, cron: "0 22 * * *", owner: null, extra_vars: "size: 5\n", next_run: "2030-01-01T22:00:00.000Z" }],
-      [3, { id: 3, name: "eve's run", form: "Create volume", one_time_run: 1, run_at: "2030-01-01T00:00:00.000Z", owner: JSON.stringify({ username: "eve", type: "local" }), extra_vars: "" }],
+      [1, { id: 1, name: "bob's run", form: "Create volume", one_time_run: "2030-01-01T00:00:00.000Z", owner: JSON.stringify({ username: "bob", type: "local" }), extra_vars: "volume:\n  name: v1\npassword: pw\n", output: "" }],
+      [2, { id: 2, name: "nightly", form: "Create volume", one_time_run: null, cron: "0 22 * * *", owner: null, extra_vars: "size: 5\n", next_run: "2030-01-01T22:00:00.000Z" }],
+      [3, { id: 3, name: "eve's run", form: "Create volume", one_time_run: "2030-01-01T00:00:00.000Z", owner: JSON.stringify({ username: "eve", type: "local" }), extra_vars: "" }],
     ]);
     let next = 10;
     deps.Schedule = {
@@ -486,14 +486,14 @@ describe("MCP schedules", () => {
       findById: vi.fn(async (id) => { if (!rows.has(Number(id))) { const e = new Error(`No schedule ${id}`); e.name = "NotFoundError"; throw e; } return rows.get(Number(id)); }),
       delete: vi.fn(async (id) => rows.delete(Number(id))),
       // the model's own next run, for a row read alone (the scheduler's zone : not the point here)
-      withNextRun: vi.fn((row) => ({ ...row, next_run: row.cron ? "2031-01-01T22:00:00.000Z" : row.run_at && new Date(row.run_at) > new Date() ? row.run_at : null })),
+      withNextRun: vi.fn((row) => ({ ...row, next_run: row.cron ? "2031-01-01T22:00:00.000Z" : row.one_time_run && new Date(row.one_time_run) > new Date() ? row.one_time_run : null })),
     };
     // the cron service's own addScheduleRow : every timing of the row, its rrule too
     deps.cron = {
       addSchedule: vi.fn(),
       removeSchedule: vi.fn(),
       addScheduleRow(row) {
-        return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.run_at, row.rrule);
+        return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.rrule);
       },
     };
     deps.appTimezone = vi.fn(async () => "Europe/Madrid");
@@ -521,12 +521,13 @@ describe("MCP schedules", () => {
     expect(r.isError).toBe(false);
     const [u, data] = deps.Schedule.plan.mock.calls[0];
     expect(u.username).toBe("bob");
-    expect(data).toMatchObject({ name: "tonight", form: "Create volume", one_time_run: true, run_at: later.toISOString() });
+    expect(data).toMatchObject({ name: "tonight", form: "Create volume", one_time_run: later.toISOString() });
+    expect("run_at" in data).toBe(false);
     expect(data.extra_vars).toContain("name: v1");
     // the raw values for the launch validation when it fires : never the password
     expect(data.raw_form_data).toMatchObject({ cluster: "c1", name: "v1" });
     expect(data.raw_form_data.secret).toBeUndefined();
-    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "tonight", undefined, true, later.toISOString(), undefined);
+    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "tonight", undefined, later.toISOString(), undefined);
     expect(r.data).toMatchObject({ runAt: later.toISOString(), timezone: "Europe/Madrid" });
     expect(r.data.runAtLocal).toMatch(/ Europe\/Madrid$/);
     expect(r.data.payloadHash).toMatch(/^sha256:[0-9a-f]{64}$/);
@@ -556,16 +557,21 @@ describe("MCP schedules", () => {
     const client = await connect(manager);
     const r = await call(client, "create_schedule", { form: "Create volume", name: "weekdays", cron: "0 22 * * 1-5", extraVars: { size: 5 } });
     expect(r.isError).toBe(false);
-    expect(deps.Schedule.create).toHaveBeenCalledWith({ name: "weekdays", form: "Create volume", extra_vars: "size: 5\n", cron: "0 22 * * 1-5", one_time_run: false });
+    expect(deps.Schedule.create).toHaveBeenCalledWith({ name: "weekdays", form: "Create volume", extra_vars: "size: 5\n", cron: "0 22 * * 1-5" });
     expect(r.data).toMatchObject({ name: "weekdays", planned: false, runsAs: "Schedule Service", cron: "0 22 * * 1-5" });
     expect(r.data.nextRun).toBe("2031-01-01T22:00:00.000Z");
     expect(deps.Schedule.withNextRun).toHaveBeenCalled();
     expect(deps.cron.addSchedule).toHaveBeenCalled();
-    const once = await call(client, "create_schedule", { form: "Create volume", name: "once", run_at: later.toISOString() });
-    expect(once.data).toMatchObject({ oneTimeRun: true, runAt: later.toISOString() });
+    const once = await call(client, "create_schedule", { form: "Create volume", name: "once", one_time_run: later.toISOString() });
+    expect(once.data).toMatchObject({ oneTimeRun: later.toISOString() });
+    expect(once.data.runAt).toBeUndefined();
+    expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "once", form: "Create volume", extra_vars: "{}\n", one_time_run: later.toISOString() });
+    // run_at, its name before 7.5.0 : still read, deprecated
+    const legacy = await call(client, "create_schedule", { form: "Create volume", name: "legacy", run_at: later.toISOString() });
+    expect(legacy.data).toMatchObject({ oneTimeRun: later.toISOString() });
     expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "bad", cron: "99 * * * *" } })).structuredContent.code).toBe("invalid_request");
-    expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "both", cron: "0 1 * * *", run_at: later.toISOString() } })).structuredContent.code).toBe("invalid_request");
-    // a blank cron is none : with no run_at either, refused rather than a schedule that never runs
+    expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "both", cron: "0 1 * * *", one_time_run: later.toISOString() } })).structuredContent.code).toBe("invalid_request");
+    // a blank cron is none : with no one_time_run either, refused rather than a schedule that never runs
     expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "blank", cron: "   " } })).structuredContent.code).toBe("invalid_request");
     await expect(createHandlers({ user: planner, deps }).createSchedule({ form: "Create volume", name: "x", cron: "0 1 * * *" })).rejects.toMatchObject({ code: "access_denied" });
   });
@@ -574,13 +580,13 @@ describe("MCP schedules", () => {
     const rrule = "DTSTART;TZID=Europe/Madrid:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;BYHOUR=22;BYMINUTE=0";
     const client = await connect(manager);
     const byRrule = await call(client, "create_schedule", { form: "Create volume", name: "by rrule", rrule });
-    expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "by rrule", form: "Create volume", extra_vars: "{}\n", rrule, one_time_run: false });
+    expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "by rrule", form: "Create volume", extra_vars: "{}\n", rrule });
     expect(byRrule.data.rrule).toBe(rrule);
-    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byRrule.data.id, "by rrule", undefined, false, undefined, rrule);
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byRrule.data.id, "by rrule", undefined, undefined, rrule);
     const byCron = await call(client, "create_schedule", { form: "Create volume", name: "by cron", cron: "0 22 * * 1-5" });
-    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byCron.data.id, "by cron", "0 22 * * 1-5", false, undefined, undefined);
-    const once = await call(client, "create_schedule", { form: "Create volume", name: "by moment", run_at: later.toISOString() });
-    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(once.data.id, "by moment", undefined, true, later.toISOString(), undefined);
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byCron.data.id, "by cron", "0 22 * * 1-5", undefined, undefined);
+    const once = await call(client, "create_schedule", { form: "Create volume", name: "by moment", one_time_run: later.toISOString() });
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(once.data.id, "by moment", undefined, later.toISOString(), undefined);
     // two timings : refused before the model
     const both = await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "both", cron: "0 1 * * *", rrule } });
     expect(both.structuredContent.code).toBe("invalid_request");
@@ -637,7 +643,7 @@ describe("MCP schedules", () => {
   });
 
   test("a run planned by an ldap bob is not the local bob's", async () => {
-    rows.set(4, { id: 4, name: "ldap bob", form: "Create volume", one_time_run: 1, owner: JSON.stringify({ username: "bob", type: "ldap" }), extra_vars: "" });
+    rows.set(4, { id: 4, name: "ldap bob", form: "Create volume", one_time_run: "2030-01-01T00:00:00.000Z", owner: JSON.stringify({ username: "bob", type: "ldap" }), extra_vars: "" });
     const h = createHandlers({ user: planner, deps });
     expect((await h.listSchedules({})).schedules.map((x) => x.id)).toEqual([1]);
     await expect(h.getSchedule({ id: 4 })).rejects.toMatchObject({ code: "not_found" });

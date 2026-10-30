@@ -70,7 +70,7 @@ beforeEach(() => {
   queued = 0;
   held = true;
   row = { id: 7, name: "Nightly", enabled: 1, state: "idle" };
-  schedules = [{ id: 7, name: "Nightly", one_time_run: 0, cron: null, run_at: null, rrule: RRULE }];
+  schedules = [{ id: 7, name: "Nightly", one_time_run: null, cron: null, rrule: RRULE }];
   cronService.active = true;
 });
 afterEach(async () => {
@@ -143,7 +143,7 @@ describe("a rrule schedule is registered at its next run", () => {
   test("a rule rrule.js would walk for ever registers nothing, and the resync goes on", { timeout: 10000 }, async () => {
     schedules = [
       { ...schedules[0], rrule: "DTSTART;TZID=UTC:20260101T000000 RRULE:FREQ=HOURLY;INTERVAL=2;BYHOUR=1" },
-      { id: 8, name: "Daily", one_time_run: 0, cron: null, run_at: null, rrule: "DTSTART;TZID=UTC:20200101T060000 RRULE:FREQ=DAILY;INTERVAL=1" },
+      { id: 8, name: "Daily", one_time_run: null, cron: null, rrule: "DTSTART;TZID=UTC:20200101T060000 RRULE:FREQ=DAILY;INTERVAL=1" },
     ];
     const started = Date.now();
     await cronService.resync();
@@ -237,7 +237,7 @@ describe("a rrule schedule is registered at its next run", () => {
   });
 
   test("a schedule removed while its next run is worked out is not registered", async () => {
-    const pending = cronService.addSchedule(7, "Nightly", null, 0, null, RRULE);
+    const pending = cronService.addSchedule(7, "Nightly", null, null, RRULE);
     cronService.removeSchedule(7);
     await pending;
     assert.equal(live().length, 0);

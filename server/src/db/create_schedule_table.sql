@@ -2,9 +2,9 @@ USE `AnsibleForms`;
 CREATE TABLE `schedule` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
-  `one_time_run` TINYINT(4) DEFAULT 0,
+  -- a schedule is timed by one of cron, rrule and one_time_run (the moment of its one run)
+  `one_time_run` DATETIME DEFAULT NULL,
   `cron` VARCHAR(50) DEFAULT NULL,
-  `run_at` DATETIME DEFAULT NULL,
   `form` VARCHAR(255) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT NULL,
   `last_run` DATETIME DEFAULT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE `schedule` (
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- what it is for, in a few words
   `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  -- a schedule of a schedules repository is timed by its iCal rrule, not a cron
+  -- timed by an iCal rrule instead of a cron or a one time run
   `rrule` TEXT DEFAULT NULL,
   -- the schedules repository and the file (schedules/<file>.yaml) it comes from ; NULL for one
   -- kept in the app only

@@ -115,26 +115,29 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
     // a new schedule starts on a cron, as before ; a record shows its own
     expect(timing.initial({})).toBe('cron');
     expect(timing.initial({ rrule: 'R' })).toBe('rrule');
-    expect(timing.initial({ one_time_run: 1, run_at: '2030-01-01' })).toBe('once');
+    expect(timing.initial({ one_time_run: '2030-01-01T00:00:00.000Z' })).toBe('once');
+    expect(timing.initial({ one_time_run: null, cron: '0 1 * * *' })).toBe('cron');
     // each field shown for its timing only, never by the repositories there are
     const shown = (key, item) => field('schedules', key).showWhen(item);
     expect([
       shown('cron', { timing: 'cron' }),
       shown('rrule', { timing: 'cron' }),
-      shown('run_at', { timing: 'cron' }),
+      shown('one_time_run', { timing: 'cron' }),
     ]).toEqual([true, false, false]);
     expect([
       shown('cron', { timing: 'rrule' }),
       shown('rrule', { timing: 'rrule' }),
-      shown('run_at', { timing: 'rrule' }),
+      shown('one_time_run', { timing: 'rrule' }),
     ]).toEqual([false, true, false]);
     expect([
       shown('cron', { timing: 'once' }),
       shown('rrule', { timing: 'once' }),
-      shown('run_at', { timing: 'once' }),
+      shown('one_time_run', { timing: 'once' }),
     ]).toEqual([false, false, true]);
-    // the toggle it replaces : no input of its own any more
-    expect(field('schedules', 'one_time_run').noInput).toBe(true);
+    // one_time_run is the moment itself, picked as a date and time ; no run_at beside it
+    expect(field('schedules', 'one_time_run').type).toBe('datetime');
+    expect(field('schedules', 'one_time_run').convertToUtc).toBe(true);
+    expect(settings.schedules.fields.some((f) => f.key === 'run_at')).toBe(false);
     // the rrule a schedule given one starts with
     expect(field('schedules', 'rrule').type).toBe('rrule');
     expect(field('schedules', 'rrule').initial({})).toMatch(
@@ -143,30 +146,27 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
   });
 
   it('saves the timing chosen, the other two emptied, the dialog-only choice left out', () => {
-    const item = { name: 'a', cron: '0 2 * * *', rrule: ' R ', run_at: '2030-01-01T00:00:00.000Z' };
+    const item = { name: 'a', cron: '0 2 * * *', rrule: ' R ', one_time_run: '2030-01-01T00:00:00.000Z' };
     expect(settings.schedules.beforeSave({ ...item, timing: 'cron' })).toEqual({
       name: 'a',
       cron: '0 2 * * *',
       rrule: '',
-      run_at: null,
-      one_time_run: 0,
+      one_time_run: null,
     });
     expect(settings.schedules.beforeSave({ ...item, timing: 'rrule' })).toEqual({
       name: 'a',
       cron: '',
       rrule: 'R',
-      run_at: null,
-      one_time_run: 0,
+      one_time_run: null,
     });
     expect(settings.schedules.beforeSave({ ...item, timing: 'once' })).toEqual({
       name: 'a',
       cron: '',
       rrule: '',
-      run_at: '2030-01-01T00:00:00.000Z',
-      one_time_run: 1,
+      one_time_run: '2030-01-01T00:00:00.000Z',
     });
     expect(scheduleTiming('cron', item)).toEqual(settings.schedules.beforeSave({ ...item, timing: 'cron' }));
-    expect(timingKind({ one_time_run: 0, cron: '* * * * *' })).toBe('cron');
+    expect(timingKind({ one_time_run: null, cron: '* * * * *' })).toBe('cron');
   });
 
   it('a new schedule given a rrule starts daily at midnight, in a zone, on one line', () => {

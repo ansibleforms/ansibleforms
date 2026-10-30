@@ -35,7 +35,7 @@
     { "name": "directory", "description": "LDAP and SSO users and groups seen at sign-in or named by a role" },
     { "name": "designer", "description": "Designer lock, forms repositories and the designer's playbooks, vars files, inventories and workflows" },
     { "name": "announcement", "description": "The announcements under the header (Settings > Appearance > Announcements)" },
-    { "name": "schedule", "description": "Scheduled and planned (Run later) jobs: kept in the app or in a schedules repository (controller_schedules: entries of its YAML files), each timed by a cron, an iCal rrule or one run at run_at" },
+    { "name": "schedule", "description": "Scheduled and planned (Run later) jobs: kept in the app or in a schedules repository (controller_schedules: entries of its YAML files), each timed by exactly one of a cron, an iCal rrule or one_time_run (the moment of its one run): its kind is the field that is set" },
     { "name": "storedjob", "description": "Stored jobs: saved form values per user" }
   ],
   "servers": [
@@ -901,7 +901,7 @@
                           "file": { "type": "string", "description": "The file the app's objects would be written to : the first giving the type's key, else <key>.yaml" },
                           "linked": { "type": "integer" },
                           "recurring": { "type": "integer", "description": "Schedules : the app's recurring schedules" },
-                          "planned": { "type": "integer", "description": "Schedules : the one-time jobs, which stay in the app" }
+                          "planned": { "type": "integer", "description": "Schedules : the jobs users planned (Run later), which stay in the app" }
                         }
                       }
                     }
@@ -6800,16 +6800,14 @@
                             "type": "boolean"
                           },
                           "one_time_run": {
-                            "type": "boolean",
-                            "description": "Runs once, at run_at (a one-time schedule, deleted after its run)"
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true,
+                            "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
                           },
                           "cron": {
                             "type": "string",
                             "description": "Its cron, in the scheduler's time zone"
-                          },
-                          "run_at": {
-                            "type": "string",
-                            "format": "date-time"
                           },
                           "rrule": {
                             "type": "string",
@@ -6873,7 +6871,7 @@
           "schedule"
         ],
         "summary": "Create a schedule, or plan a one-time run",
-        "description": "With allowScheduledJobs and no planned flag an admin-level schedule is created. While a schedules repository is used, it is saved and written to it as a new entry (waiting for the repository's Push), with its own timing: a cron, a rrule or a one-time run (run_at, an ISO 8601 time with its offset or Z); otherwise it is kept in the app, timed the same ways. Otherwise (allowPlannedJobs, or planned: true) it plans a one-time run of a form the caller may run, as the caller, and needs name, form, one_time_run and run_at, with no cron.",
+        "description": "With allowScheduledJobs and no planned flag an admin-level schedule is created. While a schedules repository is used, it is saved and written to it as a new entry (waiting for the repository's Push), with its own timing: a cron, a rrule or a one-time run (one_time_run, the moment: an ISO 8601 time with its offset or Z); otherwise it is kept in the app, timed the same ways. Exactly one timing is kept. Otherwise (allowPlannedJobs, or planned: true) it plans a one-time run of a form the caller may run, as the caller, and needs name, form and one_time_run, with no cron nor rrule. Deprecated since 7.5.0 (removed in 8, a warning in the server log): one_time_run true with run_at, or run_at alone, is read as one_time_run at run_at; one_time_run false is no one-time run.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6889,7 +6887,7 @@
             "description": "Schedule created; data is the new schedule"
           },
           "400": {
-            "description": "Missing name or run_at, invalid cron, a refused rrule (or a rrule with a one-time run), or extra_vars / raw_form_data not a dictionary"
+            "description": "Missing name or moment (one_time_run), invalid cron, a refused rrule or moment (or a rrule with a one-time run), or extra_vars / raw_form_data not a dictionary"
           },
           "403": {
             "description": "No allowScheduledJobs or allowPlannedJobs, a recurring plan, a form the caller may not run, or verbose mode without allowVerboseMode"
@@ -7051,16 +7049,14 @@
                       "type": "boolean"
                     },
                     "one_time_run": {
-                      "type": "boolean",
-                      "description": "Runs once, at run_at (a one-time schedule, deleted after its run)"
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
                     },
                     "cron": {
                       "type": "string",
                       "description": "Its cron, in the scheduler's time zone"
-                    },
-                    "run_at": {
-                      "type": "string",
-                      "format": "date-time"
                     },
                     "rrule": {
                       "type": "string",
@@ -7124,7 +7120,7 @@
           "schedule"
         ],
         "summary": "Update a schedule by ID",
-        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed, nor where it comes from (repository, repo_file). A repository's schedule is saved into its entry, where it is (only the fields changed; the rest of the file kept) for the repository's Push; it may be timed by a cron, a rrule or a one-time run, and a change of kind rewrites the entry's timing key (cron:, rrule: or run_at:, the other two removed). A pull that removed it meanwhile answers 404, one that changed it 409. Either way, a cron or a one-time run sent without a rrule drops the rrule it had, a rrule wins over a cron sent with it, and a rrule with a one-time run is refused (400).",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed, nor where it comes from (repository, repo_file). A repository's schedule is saved into its entry, where it is (only the fields changed; the rest of the file kept) for the repository's Push; it may be timed by a cron, a rrule or a one-time run, and a change of kind rewrites the entry's timing key (cron:, rrule: or one_time_run:, the other two removed). A pull that removed it meanwhile answers 404, one that changed it 409. Either way, a cron or a one-time run sent without a rrule drops the rrule it had, a rrule wins over a cron sent with it, and a rrule with a one-time run is refused (400).",
         "parameters": [
           {
             "name": "id",
@@ -7170,16 +7166,14 @@
                       "type": "boolean"
                     },
                     "one_time_run": {
-                      "type": "boolean",
-                      "description": "Runs once, at run_at (a one-time schedule, deleted after its run)"
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
                     },
                     "cron": {
                       "type": "string",
                       "description": "Its cron, in the scheduler's time zone"
-                    },
-                    "run_at": {
-                      "type": "string",
-                      "format": "date-time"
                     },
                     "rrule": {
                       "type": "string",
@@ -7226,7 +7220,7 @@
             }
           },
           "400": {
-            "description": "Invalid cron expression, a refused rrule or run_at, or a rrule with a one-time run"
+            "description": "Invalid cron expression, a refused rrule or moment, a rrule with a one-time run, or a one-time run taken off with no cron or rrule in its place"
           },
           "403": {
             "description": "No allowScheduledJobs"
@@ -11188,8 +11182,11 @@
             "description": "Form to launch"
           },
           "one_time_run": {
-            "type": "boolean",
-            "description": "Run once at run_at instead of on a cron or a rrule"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Run once, at this moment, instead of on a cron or a rrule: ISO 8601 with its offset or Z (a schedules repository's refuses one without a zone, 400); null takes it off. Exactly one of one_time_run, cron and rrule is kept",
+            "example": "2026-11-15T22:00:00+01:00"
           },
           "cron": {
             "type": "string",
@@ -11203,7 +11200,8 @@
           "run_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When a one-time run fires: ISO 8601 with its offset or Z (a schedules repository's refuses one without a zone, 400)"
+            "deprecated": true,
+            "description": "Deprecated since 7.5.0, removed in 8: the moment before one_time_run held it (with one_time_run true, or alone). Read as one_time_run"
           },
           "extra_vars": {
             "type": "string",

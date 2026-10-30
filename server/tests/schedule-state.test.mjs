@@ -64,7 +64,7 @@ let removedFromCron = [];
 beforeEach(() => {
   launched = null;
   launchImpl = async () => ({ id: 42 });
-  row = { id: 1, name: "nightly", form: "myform", extra_vars: "a: 1", one_time_run: 0, state: "queued" };
+  row = { id: 1, name: "nightly", form: "myform", extra_vars: "a: 1", one_time_run: null, state: "queued" };
   writes = [];
   CrudModel.findById = async () => ({ ...row });
   CrudModel.findAll = async () => [{ ...row }];
@@ -141,10 +141,10 @@ describe("a schedule that cannot even be parsed fails once", () => {
 
 describe("a one-time schedule runs once", () => {
   // It was set idle, THEN deleted : a delete that failed left it idle, enabled and past its
-  // run_at - what the cron's every-minute check queues - so it launched again, every minute.
+  // moment - what the cron's every-minute check queues - so it launched again, every minute.
   let deleted;
   beforeEach(() => {
-    row.one_time_run = 1;
+    row.one_time_run = new Date("2020-01-01T00:00:00Z");
     deleted = [];
     removedFromCron = [];
     CrudModel.delete = async (model, id) => { deleted.push(id); return { affectedRows: 1 }; };

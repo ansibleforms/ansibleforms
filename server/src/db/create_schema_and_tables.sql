@@ -581,15 +581,15 @@ CREATE TABLE `schedule` (
   `extra_vars` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `output` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- added by a patch on an existing install ; keep both paths in sync (schema.model.js)
-  `one_time_run` tinyint(4) DEFAULT 0,
-  `run_at` datetime DEFAULT NULL,
+  -- the moment of its one run ; NULL for one timed by its cron or rrule
+  `one_time_run` datetime DEFAULT NULL,
   -- the user a planned job ("Run later") runs as ; NULL for an admin-level schedule
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- what it is for, in a few words
   `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  -- a schedule of a schedules repository is timed by its iCal rrule, not a cron
+  -- timed by an iCal rrule instead of a cron or a one time run
   `rrule` TEXT DEFAULT NULL,
   -- the schedules repository and the file (schedules/<file>.yaml) it comes from ; NULL for one
   -- kept in the app only

@@ -239,13 +239,14 @@ export function schedulePill(t, state) {
  * app and one of a schedules repository.
  *
  * Args:
- *   item (object): the schedule ({ one_time_run, rrule }), or none for a new one.
+ *   item (object): the schedule ({ one_time_run (the moment of its one run), rrule }), or none
+ *     for a new one.
  *
  * Returns:
  *   string: cron, rrule or once.
  */
 export function timingKind(item) {
-  if (item?.one_time_run && Number(item.one_time_run) !== 0) return 'once';
+  if (String(item?.one_time_run ?? '').trim()) return 'once';
   if (String(item?.rrule ?? '').trim()) return 'rrule';
   return 'cron';
 }
@@ -257,18 +258,17 @@ export function timingKind(item) {
  *
  * Args:
  *   kind (string): cron, rrule or once (timingKind).
- *   item (object): the schedule's values ({ cron, rrule, run_at, ... }).
+ *   item (object): the schedule's values ({ cron, rrule, one_time_run (its moment), ... }).
  *
  * Returns:
- *   object: the values, with one_time_run, cron, rrule and run_at set for that kind.
+ *   object: the values, with one_time_run, cron and rrule set for that kind.
  */
 export function scheduleTiming(kind, item) {
   return {
     ...item,
-    one_time_run: kind === 'once' ? 1 : 0,
+    one_time_run: kind === 'once' ? item.one_time_run || null : null,
     cron: kind === 'cron' ? item.cron || '' : '',
     rrule: kind === 'rrule' ? String(item.rrule || '').trim() : '',
-    run_at: kind === 'once' ? item.run_at || null : null,
   };
 }
 
@@ -1586,14 +1586,6 @@ export default function getSettings(t) {
           noTable: true,
         },
         {
-          // a one time run or not : set by the timing chosen ; a column to pick in Columns
-          key: 'one_time_run',
-          label: t('settings.schedules.oneTimeRun'),
-          type: 'checkbox',
-          noInput: true,
-          hidden: true,
-        },
-        {
           key: 'cron',
           // the column : how it runs, its cron or once ; the dialog keeps the full title
           columnLabel: t('settings.schedules.stepSchedule'),
@@ -1630,10 +1622,11 @@ export default function getSettings(t) {
           showWhen: (item) => item.timing === 'rrule',
         },
         {
-          key: 'run_at',
+          // its one run : the moment it runs at
+          key: 'one_time_run',
           step: 'when',
           icon: 'calendar',
-          label: t('settings.schedules.runAt'),
+          label: t('settings.schedules.oneTimeRun'),
           type: 'datetime',
           convertToUtc: true,
           help: t('settings.schedules.runAtHelp'),

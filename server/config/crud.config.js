@@ -418,9 +418,9 @@ const crudConfigs = {
     fields: [
       { name: 'id', isKey: true },
       { name: 'name', isNaturalKey: true, required: true },
-      { name: 'one_time_run', isBoolean: true },
+      // its timing, one of three : the moment of its one run, a cron, or an iCal rrule (below)
+      { name: 'one_time_run', isDatetime: true },
       { name: 'cron' },
-      { name: 'run_at', isDatetime: true },
       { name: 'extra_vars' },
       { name: 'form' },
       { name: 'output' },
@@ -439,7 +439,7 @@ const crudConfigs = {
       { name: 'raw_form_data' },
       // what it is for, in a few words
       { name: 'description' },
-      // a schedule of a schedules repository : timed by its iCal rrule, not a cron
+      // timed by an iCal rrule, instead of a cron or a one time run
       { name: 'rrule' },
       // the schedules repository and the file it comes from : set by models/scheduleRepo.model.js
       // alone, never from a request body (Schedule.create and update drop them)

@@ -477,7 +477,7 @@ describe('why an object stays in the app', () => {
     const lines = activationLines(t, 'schedules', 'ops', {
       written: [],
       kept: [
-        { name: 'Empty', code: 'noSchedule', reason: 'it has no valid cron, rrule or run_at' },
+        { name: 'Empty', code: 'noSchedule', reason: 'it has no valid cron, rrule or one_time_run' },
         { name: 'Broken', code: 'notWritten', error: 'disk full', reason: 'not written: disk full' },
       ],
     });

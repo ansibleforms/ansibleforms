@@ -62,8 +62,8 @@ class Cron extends Croner {
   }
 }
 
-const scheduleSignature = (oneTimeRun, cron, runAt, rrule) =>
-  `${oneTimeRun}|${cron || ''}|${runAt ? new Date(runAt).getTime() : ''}|${rrule || ''}`;
+const scheduleSignature = (oneTimeRun, cron, rrule) =>
+  `${oneTimeRun ? new Date(oneTimeRun).getTime() : ''}|${cron || ''}|${rrule || ''}`;
 
 /**
  * Centralized Cron Service
@@ -243,7 +243,7 @@ class CronService {
     // this registration's turn, and its rrule taken now : a resync meanwhile leaves it to it
     const turn = {};
     this.rruleTurns.set(id, turn);
-    this.signatures.schedules.set(id, scheduleSignature(0, null, null, rrule));
+    this.signatures.schedules.set(id, scheduleSignature(null, null, rrule));
     const current = () => this.rruleTurns.get(id) === turn && this.active;
     // a task in the registry : the one a removeSchedule stops
     const register = (task) => {
@@ -306,18 +306,29 @@ class CronService {
   }
 
   /**
-   * Add or update a schedule cron job
+   * Add or update a schedule's task, by its one timing : the moment of its one run, its iCal rrule
+   * or its cron.
+   *
+   * Args:
+   *   id (number): the schedule.
+   *   name (string): its name, for the log.
+   *   cronExpression (string|null): its cron.
+   *   oneTimeRun (Date|string|null): the moment of its one run.
+   *   rrule (string|null): its iCal rrule.
+   *
+   * Returns:
+   *   Promise<void>|undefined: what addRruleSchedule returns for a rrule.
    */
-  addSchedule(id, name, cronExpression, oneTimeRun, runAt, rrule = null) {
+  addSchedule(id, name, cronExpression, oneTimeRun, rrule = null) {
     if (!this.active) return;
     try {
       // Remove existing job if any
       this.removeSchedule(id);
 
-      if (Number(oneTimeRun) !== 1 && rrule && String(rrule).trim() !== '') {
-        // a repository schedule : timed by its rrule, registered once its next run is known
+      if (!oneTimeRun && rrule && String(rrule).trim() !== '') {
+        // timed by its rrule, registered once its next run is known
         return this.addRruleSchedule(id, name, rrule);
-      } else if (oneTimeRun === 1 && runAt) {
+      } else if (oneTimeRun) {
         // One-time schedule: check every minute if it's time to run
         const task = new Cron('* * * * *', {
           timezone: this.timezone,
@@ -328,14 +339,14 @@ class CronService {
           try {
             const schedules = await mysql.do(
               // turned off (enabled 0) : it waits, Run now still runs it
-              "SELECT id, run_at FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
+              "SELECT id, one_time_run FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
               [id],
               true
             );
             
             if (schedules.length > 0) {
               const schedule = schedules[0];
-              const runAtTime = dayjs(schedule.run_at);
+              const runAtTime = dayjs(schedule.one_time_run);
               const now = dayjs();
               
               if (runAtTime.isBefore(now) || runAtTime.isSame(now, 'minute')) {
@@ -350,9 +361,9 @@ class CronService {
 
         task.resume();
         this.jobs.schedules.set(id, task);
-        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, runAt, rrule));
-        logger.info(`Added one-time schedule job for: ${name} (ID: ${id}) to run at: ${runAt}`);
-      } else if (oneTimeRun === 0 && cronExpression && cronExpression.trim() !== '') {
+        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, rrule));
+        logger.info(`Added one-time schedule job for: ${name} (ID: ${id}) to run at: ${oneTimeRun instanceof Date ? oneTimeRun.toISOString() : oneTimeRun}`);
+      } else if (cronExpression && cronExpression.trim() !== '') {
         // Recurring cron schedule
         // Validate cron expression
         if (!this.validateCronExpression(cronExpression)) {
@@ -376,7 +387,7 @@ class CronService {
 
         task.resume();
         this.jobs.schedules.set(id, task);
-        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, runAt, rrule));
+        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, rrule));
         logger.info(`Added cron job for schedule: ${name} (ID: ${id}) with schedule: ${cronExpression}`);
       }
     } catch (err) {
@@ -390,13 +401,13 @@ class CronService {
    * schedule routes, the MCP tools, the resync).
    *
    * Args:
-   *   row (object): the schedule's row ({ id, name, cron, one_time_run, run_at, rrule }).
+   *   row (object): the schedule's row ({ id, name, cron, one_time_run, rrule }).
    *
    * Returns:
    *   Promise<void>|undefined: what addSchedule returns (settled once a rrule's task is registered).
    */
   addScheduleRow(row) {
-    return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.run_at, row.rrule);
+    return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.rrule);
   }
 
   /**
@@ -456,7 +467,7 @@ class CronService {
 
     try {
       const schedules = await mysql.do(
-        "SELECT id, name, one_time_run, cron, run_at, rrule FROM AnsibleForms.`schedule` WHERE (one_time_run=0 AND (cron<>'' OR rrule<>'')) OR (one_time_run=1 AND run_at IS NOT NULL)",
+        "SELECT id, name, one_time_run, cron, rrule FROM AnsibleForms.`schedule` WHERE one_time_run IS NOT NULL OR cron<>'' OR rrule<>''",
         undefined,
         true
       );
@@ -467,7 +478,7 @@ class CronService {
       // a rrule schedule is registered once its next run is worked out : awaited, all together
       const registering = [];
       for (const [id, r] of wanted) {
-        if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.run_at, r.rrule)) {
+        if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.rrule)) {
           registering.push(this.addScheduleRow(r));
         }
       }

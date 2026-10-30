@@ -6547,6 +6547,12 @@
       A schedule sent a cron or a one time run without a rrule drops the rrule it had, and a rrule with a one time
       run is refused, wherever it is kept.
 
+      **In the app and its API** a schedule has the same three fields, exactly one of them set: `cron`, `rrule`
+      or `one_time_run`, the moment of its one run (`2026-11-15T22:00:00+01:00`); its kind is the one that is
+      set. A "Run later" job a user plans is a one-time run too. The pair the API took before 7.5.0,
+      `one_time_run: true` with `run_at`, is still read as `one_time_run` at that moment (deprecated, removed in 8,
+      a warning in the server log), and `one_time_run: false` with a cron as that cron.
+
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
       entries are read in; an entry named as a schedule of the app replaces that schedule's definition (git wins,
       its runs and history stay). Every other schedule of the app is written to the repository as a new entry, at

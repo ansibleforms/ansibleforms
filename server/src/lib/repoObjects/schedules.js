@@ -74,18 +74,18 @@ export async function formNames() {
 /**
  * The one-time schedules the app still waits to run (no run yet : the app deletes one after its
  * run, or turns it off with its last run when it cannot), as nameKey keys their names : an entry of
- * that name whose run_at is past is still read in, the run it waits for kept.
+ * that name whose one_time_run is past is still read in, the run it waits for kept.
  *
  * Returns:
- *   Promise<Set<string>|null>: the names ; null when they cannot be read (an entry whose run_at is
+ *   Promise<Set<string>|null>: the names ; null when they cannot be read (an entry whose one_time_run is
  *     past is then refused, kept as it was : schedules.parseEntry).
  */
 export async function pendingNames() {
   try {
-    const rows = await mysql.do("SELECT name FROM AnsibleForms.`schedule` WHERE one_time_run = 1 AND last_run IS NULL");
+    const rows = await mysql.do("SELECT name FROM AnsibleForms.`schedule` WHERE one_time_run IS NOT NULL AND last_run IS NULL");
     return new Set((rows || []).map((r) => nameKey(r.name)));
   } catch (e) {
-    logger.warning(`The one-time schedules could not be read to check the entries whose run_at is past: ${e.message || e}`);
+    logger.warning(`The one-time schedules could not be read to check the entries whose one_time_run is past: ${e.message || e}`);
     return null;
   }
 }
@@ -98,17 +98,17 @@ export async function pendingNames() {
  *   s (object): { rrule, cron, oneTimeRun }.
  *
  * Returns:
- *   object: { rrule, cron, one_time_run, run_at } (the others null, one_time_run 0 or 1).
+ *   object: { rrule, cron, one_time_run (its moment, in UTC) } : the one it has, the others null.
  */
 export function timingColumns(s) {
-  if (s.oneTimeRun) return { rrule: null, cron: null, one_time_run: 1, run_at: dbMoment(s.oneTimeRun) };
-  if (s.cron) return { rrule: null, cron: s.cron, one_time_run: 0, run_at: null };
-  return { rrule: s.rrule || null, cron: null, one_time_run: 0, run_at: null };
+  if (s.oneTimeRun) return { rrule: null, cron: null, one_time_run: dbMoment(s.oneTimeRun) };
+  if (s.cron) return { rrule: null, cron: s.cron, one_time_run: null };
+  return { rrule: s.rrule || null, cron: null, one_time_run: null };
 }
 
 /**
- * A schedule's timing as a row has it, the app's own rule : a one-time run by its run_at, else its
- * rrule, else its cron ; { rrule, cron, oneTimeRun } the one it has, the others null.
+ * A schedule's timing as a row has it : the moment of its one run, else its rrule, else its cron ;
+ * { rrule, cron, oneTimeRun } the one it has, the others null.
  *
  * Args:
  *   row (object): the schedule.
@@ -117,7 +117,7 @@ export function timingColumns(s) {
  *   object: { rrule, cron, oneTimeRun }.
  */
 export function timingOfRow(row) {
-  if (Number(row.one_time_run) === 1 || row.one_time_run === true) return { rrule: null, cron: null, oneTimeRun: isoMoment(row.run_at) || row.run_at || null };
+  if (row.one_time_run) return { rrule: null, cron: null, oneTimeRun: isoMoment(row.one_time_run) || String(row.one_time_run) };
   if (row.rrule && String(row.rrule).trim()) return { rrule: row.rrule, cron: null, oneTimeRun: null };
   return { rrule: null, cron: row.cron && String(row.cron).trim() ? row.cron : null, oneTimeRun: null };
 }
@@ -131,7 +131,7 @@ export function timingOfRow(row) {
  *   row (object): its row as it is, if any.
  *
  * Returns:
- *   object: { name, description, form, rrule, cron, one_time_run, run_at, enabled, extra_vars,
+ *   object: { name, description, form, rrule, cron, one_time_run, enabled, extra_vars,
  *     launch_options }.
  */
 export function valuesOf(s, row = null) {
@@ -215,37 +215,37 @@ const schedules = {
     ...links,
     rows: () =>
       mysql.do(
-        "SELECT id, name, description, form, rrule, cron, run_at, enabled, extra_vars, launch_options, repository, repo_file, owner, one_time_run, last_run FROM AnsibleForms.`schedule`",
+        "SELECT id, name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, owner, last_run FROM AnsibleForms.`schedule`",
       ),
     names: async () => ((await mysql.do("SELECT name FROM AnsibleForms.`schedule`")) || []).map((r) => r.name),
     // the app's schedules (no repository, not a job a user planned) can be taken over
     classify: (row, name) => classifyRow(row, name, row.owner ? "a one-time job of this app" : null),
     changed: (row, s) => {
       const values = valuesOf(s, row);
-      // a run_at as the table gives it (a Date, or its text) compared in UTC to the second
-      const now = { ...row, run_at: dbMoment(row.run_at), one_time_run: Number(row.one_time_run ?? 0) };
+      // a moment as the table gives it (a Date, or its text) compared in UTC to the second
+      const now = { ...row, one_time_run: dbMoment(row.one_time_run) };
       return Object.keys(values).some((k) => String(now[k] ?? "") !== String(values[k] ?? ""));
     },
     insert: (s, name, file) => {
       const v = valuesOf(s);
       return mysql.do(
-        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, run_at, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'idle')",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, name, file],
+        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,'idle')",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file],
       );
     },
     update: (row, s) => {
       const v = valuesOf(s, row);
       return mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, run_at=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, row.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, row.id],
       );
     },
     // git's version replaces the app's definition ; its runs, state and history stay
     adopt: (row, s, name, file) => {
       const v = valuesOf(s, row);
       return mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, run_at=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, name, file, row.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file, row.id],
       );
     },
     // its past jobs stay
@@ -254,13 +254,13 @@ const schedules = {
     // planned (owner : that user's job, run as them, never a schedule of a repository)
     appRows: () =>
       mysql.do(
-        "SELECT id, name, description, form, cron, rrule, one_time_run, run_at, enabled, extra_vars, launch_options FROM AnsibleForms.`schedule` WHERE repository IS NULL AND owner IS NULL ORDER BY name",
+        "SELECT id, name, description, form, cron, rrule, one_time_run, enabled, extra_vars, launch_options FROM AnsibleForms.`schedule` WHERE repository IS NULL AND owner IS NULL ORDER BY name",
       ),
   },
 
   /**
    * An app's schedule as a repository would take it : with its own timing (its cron, its rrule or
-   * its one-time run_at), written as it is, never converted - or why it stays in the app (no valid
+   * its one_time_run), written as it is, never converted - or why it stays in the app (no valid
    * timing).
    *
    * Args:
@@ -324,8 +324,8 @@ const schedules = {
   linkCandidate: (c, name, file) => {
     const v = valuesOf(parseSchedule(structuredClone(schedules.entryOf(c))).schedule, c.row);
     return mysql.do(
-      "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, run_at=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
-      [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],
+      "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
+      [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],
     );
   },
 

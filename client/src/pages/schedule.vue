@@ -51,7 +51,7 @@ const scheduleId = computed(() => String(route.params.id || ''));
 const schedule = ref(null); // as saved
 const edit = ref(null); // as edited
 const formNames = ref([]); // the forms it can run
-const EDITED = ['name', 'description', 'form', 'enabled', 'timing', 'cron', 'run_at', 'rrule', 'extra_vars'];
+const EDITED = ['name', 'description', 'form', 'enabled', 'timing', 'cron', 'one_time_run', 'rrule', 'extra_vars'];
 // how a schedule may be timed, wherever it is kept : the choice of its Schedule tab
 const TIMINGS = ['cron', 'rrule', 'once'];
 
@@ -74,7 +74,8 @@ function editable(record) {
     // cron, rrule or once
     timing: timingKind(record),
     cron: record.cron ?? '',
-    run_at: record.run_at ?? '',
+    // the moment of its one run
+    one_time_run: record.one_time_run ?? '',
     rrule: record.rrule ?? '',
     extra_vars: record.extra_vars ?? '',
   };
@@ -292,7 +293,7 @@ const tabFields = computed(() => {
       edit.value?.timing === 'rrule'
         ? ['rrule', t('settings.schedules.rrule'), t('settings.schedules.rruleHelp'), edit.value?.rrule]
         : edit.value?.timing === 'once'
-          ? ['run_at', t('settings.schedules.runAt'), t('settings.schedules.runAtHelp')]
+          ? ['one_time_run', t('settings.schedules.oneTimeRun'), t('settings.schedules.runAtHelp')]
           : [
               'cron',
               t('settings.cron.minute'),
@@ -374,7 +375,7 @@ async function save() {
     enabled: e.enabled ? 1 : 0,
     extra_vars: e.extra_vars,
   };
-  const data = scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, run_at: e.run_at });
+  const data = scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, one_time_run: e.one_time_run });
   try {
     await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -606,9 +607,19 @@ onMounted(async () => {
                 <BsRrule v-model="edit.rrule" :hasError="!!rruleError" />
                 <div class="form-text">{{ t('settings.schedules.rruleHelp') }}</div>
               </div>
-              <div v-else-if="edit.timing === 'once'" v-show="fieldShown('run_at')" class="af-schedule-field mb-0">
-                <label class="form-label">{{ t('settings.schedules.runAt') }}</label>
-                <BsDateTime v-model="edit.run_at" icon="calendar" dateType="datetime" :convertToUtc="true" teleport />
+              <div
+                v-else-if="edit.timing === 'once'"
+                v-show="fieldShown('one_time_run')"
+                class="af-schedule-field mb-0"
+              >
+                <label class="form-label">{{ t('settings.schedules.oneTimeRun') }}</label>
+                <BsDateTime
+                  v-model="edit.one_time_run"
+                  icon="calendar"
+                  dateType="datetime"
+                  :convertToUtc="true"
+                  teleport
+                />
                 <div class="form-text">{{ t('settings.schedules.runAtHelp') }}</div>
               </div>
               <div v-else v-show="fieldShown('cron')" class="af-schedule-cron mb-0">

@@ -25,6 +25,7 @@ Removed in 8.0.0. Each logs a warning when it is used.
 | a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.5.0 |
 | `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.5.0 |
 | `provider: azuread` on an SSO provider of the config seed's `oauth2:` items or of a repository's `controller_sso:` entries (still read as Microsoft Entra ID, with a warning in the server log and the repository's pull output) | `provider: entraid` | 7.5.0 |
+| a schedule's `one_time_run: true` with `run_at` (or `run_at` alone) through the API, and `run_at` in the MCP tool `create_schedule` (still read as a one-time run at that moment, with a warning in the server log once per caller ; `one_time_run: false` is no one-time run) | `one_time_run` holding the moment of the run (an ISO 8601 time with its offset or Z) | 7.5.0 |
 
 ## Upgrading from 6.5 to 7.0.0 - read first
 

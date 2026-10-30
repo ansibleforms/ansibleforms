@@ -1,9 +1,13 @@
 'use strict';
-// The moment of a one-time run (a schedule's one_time_run, a planned job's run_at), read the one
-// way the app takes it : an ISO 8601 time with its offset or Z, so the run never depends on the
-// zone of a server or a browser (#1064), on a day that exists. Pure : the MCP tools (plan_job,
-// create_schedule) and the schedules repository's entries (lib/scheduleFiles.js) read it with it ;
-// whether it may be in the past is the caller's to say.
+// The moment of a one-time run (a schedule's one_time_run, a planned job's too), read the one way
+// the app takes it : an ISO 8601 time with its offset or Z, so the run never depends on the zone of
+// a server or a browser (#1064), on a day that exists. The MCP tools (plan_job, create_schedule),
+// the schedule model and the schedules repository's entries (lib/scheduleFiles.js) read it with
+// it ; whether it may be in the past is the caller's to say. The pair a request sent before 7.5.0
+// (one_time_run true with run_at) is still read here, deprecated (oneTimeRunOf).
+
+import logger from './logger.js';
+import Errors from './errors.js';
 
 // an ISO 8601 time with its offset or Z : 2026-10-15T22:00:00+02:00, 2026-10-15T20:00:00Z
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i;
@@ -71,4 +75,84 @@ export function dbMoment(value) {
   return iso ? iso.slice(0, 19).replace('T', ' ') : null;
 }
 
-export default { parseMoment, isoMoment, dbMoment };
+// the callers already told of the deprecated pair (one_time_run true + run_at), once each
+const warned = new Set();
+
+/**
+ * Whether a value is the old flag of a one-time run (6.2.0 to 7.4 : true / 1, false / 0) rather
+ * than its moment.
+ *
+ * Args:
+ *   value (any): a request's one_time_run.
+ *
+ * Returns:
+ *   boolean|null: true or false for the flag ; null when it is no flag (a moment, or none).
+ */
+function flagOf(value) {
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return null;
+}
+
+/**
+ * A request's one-time run in the shape 7.5.0 takes it : one_time_run, the moment of the run (or
+ * null : not one). The pair before it is still read, deprecated since 7.5.0 and removed in 8, said
+ * once in the server log per caller : one_time_run true (or 1) with run_at is a one-time run at
+ * run_at, run_at alone too ; one_time_run false (or 0) is none (its run_at ignored : a cron or a
+ * rrule times it). The request is changed in place, run_at removed.
+ *
+ * Args:
+ *   data (object): the request body.
+ *   caller (string): who sent it (the API, the MCP tools), for the warning.
+ *
+ * Returns:
+ *   object: the request.
+ *
+ * Raises:
+ *   Errors.BadRequestError: one_time_run true without its moment.
+ */
+export function oneTimeRunOf(data, caller = "api") {
+  if (!data || typeof data !== "object") return data;
+  const flag = flagOf(data.one_time_run);
+  const hasRunAt = Object.prototype.hasOwnProperty.call(data, "run_at");
+  const runAt = hasRunAt && data.run_at !== null && data.run_at !== undefined && String(data.run_at).trim() !== "" ? data.run_at : null;
+  if (flag === null && !hasRunAt) return data;
+  if (flag !== null || runAt) {
+    if (!warned.has(caller)) {
+      warned.add(caller);
+      logger.warning(`A schedule was sent one_time_run as a yes or no${runAt ? " with run_at" : ""} (${caller}), deprecated since 7.5.0 and removed in 8: send one_time_run with the moment of the run instead (an ISO 8601 time with its offset or Z)`);
+    }
+  }
+  if (flag === true) {
+    if (!runAt) throw new Errors.BadRequestError("A one time run needs its moment: send one_time_run with the time of the run (an ISO 8601 time with its offset or Z).");
+    data.one_time_run = runAt;
+  } else if (flag === false) data.one_time_run = null;
+  else if (runAt && (data.one_time_run === undefined || data.one_time_run === null || data.one_time_run === "")) data.one_time_run = runAt;
+  delete data.run_at;
+  return data;
+}
+
+/**
+ * A one-time run's moment as the schedule table keeps it, from what the app is sent : an ISO 8601
+ * time with its offset or Z, a Date, or a time without a zone taken as UTC (as the table took one
+ * before 7.5.0).
+ *
+ * Args:
+ *   value (any): the moment.
+ *
+ * Returns:
+ *   string|null: YYYY-MM-DD HH:MM:SS in UTC ; null for none.
+ *
+ * Raises:
+ *   Errors.BadRequestError: a value that is no time.
+ */
+export function tableMoment(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const { when } = parseMoment(value, "one_time_run");
+  if (when) return dbMoment(when);
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(text) && dbMoment(text)) return dbMoment(text.length === 16 ? `${text}:00` : text);
+  throw new Errors.BadRequestError(`one_time_run '${text}' is not a time: send an ISO 8601 time with its offset or Z`);
+}
+
+export default { parseMoment, isoMoment, dbMoment, oneTimeRunOf, tableMoment };

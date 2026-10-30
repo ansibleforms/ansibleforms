@@ -38,20 +38,20 @@ describe("an app schedule linked to the entry written for it", () => {
   });
 
   test.each([
-    ["a rrule", { rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1" }, { rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1", cron: null, one_time_run: 0, run_at: null }],
-    ["a one time run", { one_time_run: 1, run_at: new Date("2030-02-03T04:05:00Z") }, { rrule: null, cron: null, one_time_run: 1, run_at: "2030-02-03 04:05:00" }],
+    ["a rrule", { rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1" }, { rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1", cron: null, one_time_run: null }],
+    ["a one time run", { one_time_run: new Date("2030-02-03T04:05:00Z") }, { rrule: null, cron: null, one_time_run: "2030-02-03 04:05:00" }],
   ])("%s handed over as it is, its row unchanged by the next pull", async (_label, timing, columns) => {
-    const row = { id: 8, name: "Other", description: "", form: "Nightly", cron: null, rrule: null, one_time_run: 0, run_at: null, enabled: 1, extra_vars: "", launch_options: null, ...timing };
+    const row = { id: 8, name: "Other", description: "", form: "Nightly", cron: null, rrule: null, one_time_run: null, enabled: 1, extra_vars: "", launch_options: null, ...timing };
     const c = schedules.candidateOf(row);
     statements.length = 0;
     await schedules.linkCandidate(c, "ops", "schedules.yaml");
     const { sql, vars } = statements[0];
     const set = sql.match(/SET (.*) WHERE/)[1].split(",").map((part) => part.trim().split("=")[0]);
     const stored = { ...row, ...Object.fromEntries(set.map((col, i) => [col, vars[i]])) };
-    assert.deepEqual({ rrule: stored.rrule, cron: stored.cron, one_time_run: stored.one_time_run, run_at: stored.run_at }, columns);
+    assert.deepEqual({ rrule: stored.rrule, cron: stored.cron, one_time_run: stored.one_time_run }, columns);
     const fromFile = parseSchedule(structuredClone(schedules.entryOf(c))).schedule;
     assert.equal(schedules.store.changed(stored, fromFile), false);
     // the row as the table reads it back : its moment a Date
-    if (row.run_at) assert.equal(schedules.store.changed({ ...stored, run_at: row.run_at }, fromFile), false);
+    if (row.one_time_run) assert.equal(schedules.store.changed({ ...stored, one_time_run: row.one_time_run }, fromFile), false);
   });
 });

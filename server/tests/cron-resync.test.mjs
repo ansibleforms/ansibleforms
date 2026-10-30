@@ -26,7 +26,7 @@ const { default: cronService } = await import("../src/services/cron.service.js")
 
 beforeEach(() => {
   repositories = [{ name: "forms", cron: "0 * * * *" }];
-  schedules = [{ id: 1, name: "nightly", one_time_run: 0, cron: "0 2 * * *", run_at: null }];
+  schedules = [{ id: 1, name: "nightly", one_time_run: null, cron: "0 2 * * *" }];
 });
 afterEach(() => {
   cronService.stopAll();
@@ -37,7 +37,7 @@ afterEach(() => {
 
 describe("only the worker registers anything", () => {
   test("before the worker starts it, add is a no-op (an app node's controllers call it)", () => {
-    cronService.addSchedule(9, "x", "0 1 * * *", 0, null);
+    cronService.addSchedule(9, "x", "0 1 * * *", null);
     cronService.addRepository("r", "0 1 * * *");
     assert.equal(cronService.jobs.schedules.size, 0);
     assert.equal(cronService.jobs.repositories.size, 0);
@@ -63,7 +63,7 @@ describe("the registry follows the database", () => {
   test("a new row is added and a removed one dropped", async () => {
     await cronService.initializeAll();
     repositories = [{ name: "playbooks", cron: "*/5 * * * *" }];
-    schedules = [...schedules, { id: 2, name: "once", one_time_run: 1, cron: "", run_at: new Date("2030-01-01T00:00:00Z") }];
+    schedules = [...schedules, { id: 2, name: "once", one_time_run: new Date("2030-01-01T00:00:00Z"), cron: "" }];
     await cronService.resync();
     assert.deepEqual([...cronService.jobs.repositories.keys()], ["playbooks"]);
     assert.deepEqual([...cronService.jobs.schedules.keys()].sort(), [1, 2]);

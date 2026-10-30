@@ -1,7 +1,7 @@
 'use strict';
 // The schedules of the schedules repository (use_for_schedules) : the entries of the schedules:
 // lists of its YAML files, any name, any folder (lib/scheduleFiles.js), each timed as an app
-// schedule is - its iCal rrule (lib/scheduleRrule.js), its cron, or once at its run_at - and run as
+// schedule is - its iCal rrule (lib/scheduleRrule.js), its cron, or once (one_time_run) - and run as
 // the Schedule Service as the app's schedule of that timing.
 //
 // The Schedules type of the repository-backed objects : the engine (lib/repoObjects/engine.js)
@@ -9,7 +9,7 @@
 // its own timing) when a repository is made the schedules repository and lets them go, unlinked,
 // when it is no longer one ; the type's descriptor (lib/repoObjects/schedules.js) says how a file
 // reads and a row is stored. What is the schedules' own stays here : a schedule made, edited or
-// deleted in the app is checked as a schedule (its form, its timing : rrule, cron or run_at) and
+// deleted in the app is checked as a schedule (its form, its timing : rrule, cron or one_time_run) and
 // saved into its entry under the repository's write claim, the file put back when the database
 // refuses it.
 //
@@ -25,7 +25,7 @@ import Errors from "../lib/errors.js";
 import { parseSchedule, updateScheduleText, newScheduleEntry, scheduleEntryOf, extraDataOf } from "../lib/scheduleFiles.js";
 import { validateRruleAsync, normalizeRrule } from "../lib/scheduleRrule.js";
 import { cronError } from "../lib/cronValidate.js";
-import { parseMoment } from "../lib/oneTimeRun.js";
+import { parseMoment, oneTimeRunOf } from "../lib/oneTimeRun.js";
 import Engine, { withWriteClaim, fileOf, writeEntries, entryFileOf, removeEntry, nameKey, filesNow, assertTypeReadable } from "../lib/repoObjects/engine.js";
 import schedules, { extraVarsText, formNames, valuesOf, timingOfRow } from "../lib/repoObjects/schedules.js";
 
@@ -78,7 +78,7 @@ ScheduleRepo.renameRepository = async function (from, to) {
 
 /**
  * Checks what a schedule of a repository is given in the app : a name no other schedule has, a
- * form that exists, a valid timing (a rrule, a cron as the app checks one, or a run_at as the app
+ * form that exists, a valid timing (a rrule, a cron as the app checks one, or a moment as the app
  * reads one), extra vars that are a dictionary.
  *
  * Args:
@@ -130,38 +130,35 @@ async function checkValues(values, id) {
 
 /**
  * The timing a request gives a schedule of a repository, as the app takes it for its own
- * (models/schedule.model.js checkAppRrule) : a one time run by its run_at, else a rrule, which wins
- * over a cron sent with it, else a cron ; a rrule sent with a one time run is refused. Nothing given
- * (an edit of its other fields) : undefined, its timing stays.
+ * (models/schedule.model.js checkAppTiming) : a one time run by its moment (one_time_run ; the pair
+ * before 7.5.0 read already, lib/oneTimeRun.js), else a rrule, which wins over a cron sent with
+ * it, else a cron ; a rrule sent with a one time run is refused. Nothing given (an edit of its
+ * other fields) : undefined, its timing stays.
  *
  * Args:
- *   data (object): the request body ({ one_time_run, run_at, rrule, cron }, those given).
+ *   data (object): the request body ({ one_time_run, rrule, cron }, those given).
  *   current (object|null): the schedule as it is (an edit), null for a new one.
  *
  * Returns:
- *   object|undefined: { rrule, cron, oneTimeRun } (the one given, the others null) ; undefined when
- *     the request gives none.
+ *   object|undefined: { rrule, cron, oneTimeRun } (the one given, the others null) ; undefined
+ *     when the request gives none.
  *
  * Raises:
- *   Errors.BadRequestError: a rrule with a one time run, a one time run without its run_at, or a
- *     new schedule (or one no longer run once) without a timing.
+ *   Errors.BadRequestError: a rrule with a one time run, or a new schedule (or one no longer run
+ *     once) without a timing.
  */
 function timingOfRequest(data, current = null) {
-  const text = (v) => (v === undefined || v === null ? "" : String(v).trim());
-  const onceGiven = data.one_time_run !== undefined && data.one_time_run !== null;
-  const once = onceGiven ? data.one_time_run === true || Number(data.one_time_run) === 1 : null;
+  const text = (v) => (v === undefined || v === null ? "" : v instanceof Date ? v.toISOString() : String(v).trim());
   const was = current ? timingOfRow(current) : null;
-  // run once : asked for, or a one time run given a new run_at
-  if (once || (once === null && was?.oneTimeRun && text(data.run_at))) {
+  if (text(data.one_time_run)) {
     if (text(data.rrule)) throw new Errors.BadRequestError("A one time run has no rrule: send either, not both.");
-    const oneTimeRun = text(data.run_at) || was?.oneTimeRun;
-    if (!oneTimeRun) throw new Errors.BadRequestError("A one time run needs its run_at.");
-    return { rrule: null, cron: null, oneTimeRun };
+    return { rrule: null, cron: null, oneTimeRun: text(data.one_time_run) };
   }
   if (text(data.rrule)) return { rrule: normalizeRrule(data.rrule), cron: null, oneTimeRun: null };
   if (text(data.cron)) return { rrule: null, cron: text(data.cron), oneTimeRun: null };
   // a new one, or one no longer run once, without what else it runs on : refused
-  if (!current || (once === false && was?.oneTimeRun)) throw new Errors.BadRequestError("A schedule needs a cron, a rrule or a one time run (run_at).");
+  const offOnce = data.one_time_run !== undefined && was?.oneTimeRun;
+  if (!current || offOnce) throw new Errors.BadRequestError("A schedule needs a cron, a rrule or a one time run.");
   // nothing said of its timing : it stays
   return undefined;
 }
@@ -173,8 +170,8 @@ function timingOfRequest(data, current = null) {
  *
  * Args:
  *   repository (string): the repository.
- *   data (object): { name, description, form, its timing (rrule, cron, or one_time_run with
- *     run_at : timingOfRequest), enabled, extra_vars }.
+ *   data (object): { name, description, form, its timing (rrule, cron or one_time_run :
+ *     timingOfRequest), enabled, extra_vars }.
  *
  * Returns:
  *   Promise<number>: the new schedule's id.
@@ -194,8 +191,9 @@ ScheduleRepo.create = async function (repository, data) {
     name: String(data.name ?? "").trim(),
     description: String(data.description ?? ""),
     form: data.form || "",
-    // its timing, written as it is given : a rrule, a cron, or one run at its run_at
-    ...timingOfRequest(data),
+    // its timing, written as it is given : a rrule, a cron, or one run at its moment (the pair
+    // before 7.5.0, one_time_run true with run_at, read as that moment)
+    ...timingOfRequest(oneTimeRunOf(data, "api")),
     enabled: data.enabled === undefined || data.enabled === null ? true : data.enabled === true || Number(data.enabled) === 1,
     extra_vars: data.extra_vars ?? "",
   };
@@ -215,11 +213,11 @@ ScheduleRepo.create = async function (repository, data) {
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     writeEntries(schedules, repository, file, [entry]);
     try {
-      // stored as a pull reads its entry back : its timing's columns, its run_at in UTC
+      // stored as a pull reads its entry back : its timing's columns, its moment in UTC
       const v = valuesOf(parsed.schedule);
       const res = await mysql.do(
-        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, run_at, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'idle')",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, extraVarsText(extraData), v.launch_options, repository, file],
+        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,'idle')",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, extraVarsText(extraData), v.launch_options, repository, file],
       );
       CrudModel.changed(MODEL);
       logger.info(`Created schedule '${values.name}' in ${repository}/${file}`);
@@ -241,8 +239,8 @@ ScheduleRepo.create = async function (repository, data) {
  *
  * Args:
  *   row (object): the schedule as it is.
- *   data (object): any of { name, description, form, its timing (rrule, cron, or one_time_run
- *     with run_at : timingOfRequest ; a change of kind rewrites the entry's timing key), enabled,
+ *   data (object): any of { name, description, form, its timing (rrule, cron or one_time_run :
+ *     timingOfRequest ; a change of kind rewrites the entry's timing key), enabled,
  *     extra_vars, launch_options
  *     (an object, or its JSON : written as the prompts that give them, those no prompt gives kept
  *     in the app only) }.
@@ -260,7 +258,7 @@ ScheduleRepo.update = async function (row, data) {
   if (data.description !== undefined) values.description = String(data.description ?? "");
   if (data.form !== undefined) values.form = data.form;
   // its timing, when the edit gives one : the one given written, the entry's other two keys removed
-  const timing = timingOfRequest(data, row);
+  const timing = timingOfRequest(oneTimeRunOf(data, "api"), row);
   if (timing) Object.assign(values, timing);
   if (data.enabled !== undefined) values.enabled = data.enabled === true || Number(data.enabled) === 1;
   if (data.extra_vars !== undefined) values.extra_vars = data.extra_vars ?? "";
@@ -298,8 +296,8 @@ ScheduleRepo.update = async function (row, data) {
     const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, run_at=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same

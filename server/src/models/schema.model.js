@@ -644,7 +644,8 @@ const SCHEMA_MANIFEST = {
                               'audit', 'chat_settings'],
                      columns: ['oauth2_providers.tenant_id', 'jobs.raw_form_data', 'repositories.use_for_config',
                                'jobs.pid', 'jobs.host', 'schedule.one_time_run',
-                               'schedule.run_at', 'credentials.vault_path', 'jobs.awx_workflow', 'settings.logo',
+                               // not schedule.run_at : 7.5.0 drops it, one_time_run holds the moment
+                               'credentials.vault_path', 'jobs.awx_workflow', 'settings.logo',
                                'settings.config_source', 'settings.default_language',
                                'settings.default_theme', 'settings.default_theme_color',
                                'credentials.managed', 'oauth2_providers.managed',
@@ -868,11 +869,14 @@ async function patchVersion6(messages, success, failed) {
   
   // Add one_time_run column to schedule table (6.2.0)
   // This allows schedules to be either recurring (false) or one-time (true)
-  await checkPromise(addColumn("schedule", "one_time_run", "tinyint(4)", true, "0"), messages, success, failed);
-  
   // Add run_at column to schedule table (6.2.0)
   // This stores the datetime for one-time scheduled jobs
-  await checkPromise(addColumn("schedule", "run_at", "datetime", true, "NULL"), messages, success, failed);
+  // 7.5.0 turns them into one column, one_time_run holding the moment (oneTimeRunMoment, patch 7) :
+  // added as 6.2.0 had them only on a database that has neither yet, never again after that
+  if (!(await oneTimeRunIsMoment())) {
+    await checkPromise(addColumn("schedule", "one_time_run", "tinyint(4)", true, "0"), messages, success, failed);
+    await checkPromise(addColumn("schedule", "run_at", "datetime", true, "NULL"), messages, success, failed);
+  }
   
   // Create stored_jobs table (6.2.0)
   // This allows users to save and load form data
@@ -1259,6 +1263,9 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("schedule", "repository", "varchar(250)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("schedule", "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("schedule", "launch_options", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  // a schedule is timed by one of cron, rrule or one_time_run : one_time_run holds the moment of
+  // its one run, instead of a flag and run_at beside it
+  await checkPromise(oneTimeRunMoment(), messages, success, failed);
   // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
   // YAML file per object in the type's folder ; the objects of the types built say where they come
   // from (repository, repo_file), the other types' tables will in the version that brings them
@@ -1352,6 +1359,89 @@ export async function addDatabasesForCredentials() {
   if (!made.length) return null;
   const message = `Made a database of Connections > Databases for each database credential (${made.join(", ")})`;
   logger.notice(message);
+  return message;
+}
+
+/**
+ * Whether a schedule's one_time_run already holds the moment of its run (7.5.0 : a datetime column,
+ * no run_at beside it) rather than the flag 6.2.0 added.
+ *
+ * Args:
+ *   query (function): (sql, params) => rows ; the database by default.
+ *
+ * Returns:
+ *   Promise<boolean>: true once the schedule table has its one_time_run as a moment.
+ */
+export async function oneTimeRunIsMoment(query = (sql, params) => mysql.do(sql, params)) {
+  const columns = (await query("SHOW COLUMNS FROM AnsibleForms.`schedule`")) || [];
+  const flag = columns.find((c) => c.Field === "one_time_run");
+  return !!flag && /^(datetime|timestamp)/i.test(String(flag.Type)) && !columns.some((c) => c.Field === "run_at");
+}
+
+/**
+ * Turns a schedule's one-time run into one column holding its moment (7.5.0) : a schedule is
+ * timed by exactly one of cron, rrule and one_time_run. Each step checks what is there first, so a
+ * start that stopped halfway finishes it, and a second run does nothing :
+ *   1. a column one_time_moment (datetime) is added ;
+ *   2. while the 6.2.0 flag is there : a one-time row (flag 1 with its run_at) gets its run_at as
+ *      its moment, its cron and rrule cleared ; a recurring one (flag 0) no moment (its stale run_at
+ *      dropped) ; a row flagged one-time without a run_at is kept as it is, without a moment, and
+ *      logged ;
+ *   3. the flag and run_at are dropped ;
+ *   4. one_time_moment is renamed one_time_run.
+ * The jobs users planned ("Run later") are one-time rows : they keep their moment and their owner.
+ *
+ * Args:
+ *   query (function): (sql, params) => rows ; the database by default.
+ *
+ * Returns:
+ *   Promise<string>: what was done, for the patch's messages.
+ */
+export async function oneTimeRunMoment(query = (sql, params) => mysql.do(sql, params)) {
+  const columnsNow = async () => new Map(((await query("SHOW COLUMNS FROM AnsibleForms.`schedule`")) || []).map((c) => [c.Field, String(c.Type)]));
+  let columns = await columnsNow();
+  const isMoment = (type) => /^(datetime|timestamp)/i.test(type || "");
+  if (isMoment(columns.get("one_time_run")) && !columns.has("run_at") && !columns.has("one_time_moment")) {
+    return "The one-time runs of the schedules hold their moment already";
+  }
+  const done = [];
+  // step 1 : the new column, unless the old flag is gone and it was renamed already
+  if (!columns.has("one_time_moment") && !isMoment(columns.get("one_time_run"))) {
+    await query("ALTER TABLE AnsibleForms.`schedule` ADD COLUMN `one_time_moment` datetime NULL DEFAULT NULL");
+    done.push("added one_time_moment");
+  }
+  columns = await columnsNow();
+  // step 2 : the moments, while the flag and run_at are both there to read them from
+  const flag = columns.has("one_time_run") && !isMoment(columns.get("one_time_run"));
+  if (flag && columns.has("run_at") && columns.has("one_time_moment")) {
+    const once = await query(
+      "UPDATE AnsibleForms.`schedule` SET one_time_moment = run_at, cron = NULL, rrule = NULL WHERE COALESCE(one_time_run,0) = 1 AND run_at IS NOT NULL",
+    );
+    const recurring = await query("UPDATE AnsibleForms.`schedule` SET one_time_moment = NULL WHERE COALESCE(one_time_run,0) <> 1");
+    const odd = (await query("SELECT id, name FROM AnsibleForms.`schedule` WHERE COALESCE(one_time_run,0) = 1 AND run_at IS NULL")) || [];
+    for (const r of odd) {
+      logger.warning(`Schedule '${r.name}' (${r.id}) was a one-time run without its time: kept as it is, without a one-time run (give it one, or a cron or a rrule)`);
+    }
+    done.push(`${once?.affectedRows || 0} one-time and ${recurring?.affectedRows || 0} recurring schedules given their timing`);
+  }
+  // step 3 : the flag and run_at go
+  if (flag) {
+    await query("ALTER TABLE AnsibleForms.`schedule` DROP COLUMN `one_time_run`");
+    done.push("dropped the one_time_run flag");
+  }
+  columns = await columnsNow();
+  if (columns.has("run_at") && columns.has("one_time_moment")) {
+    await query("ALTER TABLE AnsibleForms.`schedule` DROP COLUMN `run_at`");
+    done.push("dropped run_at");
+  }
+  // step 4 : the moment under its name
+  columns = await columnsNow();
+  if (columns.has("one_time_moment") && !columns.has("one_time_run")) {
+    await query("ALTER TABLE AnsibleForms.`schedule` CHANGE COLUMN `one_time_moment` `one_time_run` datetime NULL DEFAULT NULL");
+    done.push("renamed one_time_moment to one_time_run");
+  }
+  const message = `The one-time runs of the schedules now hold their moment in one_time_run: ${done.join(", ") || "nothing left to do"}`;
+  logger.warning(message);
   return message;
 }
 
