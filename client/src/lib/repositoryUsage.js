@@ -403,7 +403,7 @@ export function setCategory(category, record, others, on) {
 }
 
 // ===========================================================================
-// WHAT A REPOSITORY IS USED FOR, AND THE ORDER PULL ALL PULLS IN
+// WHAT A REPOSITORY IS USED FOR, PULL ALL'S ORDER AND WHAT PUSH ALL PUSHES
 // ===========================================================================
 
 /**
@@ -436,6 +436,19 @@ export function pullOrder(repos) {
   const ordered = repos.filter((r) => rank(r) !== Infinity).sort((a, b) => rank(a) - rank(b));
   return [ordered, repos.filter((r) => rank(r) === Infinity)];
 }
+
+/**
+ * The repositories Push all pushes : the ones the app writes to (a usage on) with changes not
+ * pushed yet, as a row's own Push is enabled for. None : the button stays greyed.
+ *
+ * Args:
+ *   repos (object[]): the repositories, as the list shows them.
+ *
+ * Returns:
+ *   object[]: the repositories to push.
+ */
+export const toPush = (repos) =>
+  (Array.isArray(repos) ? repos : []).filter((r) => !!r?.unpushed && usedFor(r).length > 0);
 
 // ===========================================================================
 // THE QUESTION BEFORE A SAVE
@@ -832,19 +845,3 @@ export async function singleTypeSource(key) {
     return null;
   }
 }
-
-// ===========================================================================
-// WHAT PUSH ALL PUSHES
-// ===========================================================================
-
-/**
- * The repositories Push all pushes : the ones with changes not pushed yet, as a row's own Push is
- * enabled for (config/settings.js). None : the button stays greyed.
- *
- * Args:
- *   repos (object[]): the repositories, as the list shows them.
- *
- * Returns:
- *   object[]: the repositories to push.
- */
-export const toPush = (repos) => (Array.isArray(repos) ? repos : []).filter((r) => !!r?.unpushed);

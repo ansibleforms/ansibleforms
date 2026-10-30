@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
 import { sortPulls } from '@/lib/pullResults';
 import { useAppStore } from '@/stores/app';
-import { toPush, pullOrder } from '@/lib/repositoryUsage';
+import { pullOrder, toPush } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));

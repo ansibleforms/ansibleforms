@@ -40,6 +40,7 @@ import {
   confirmUsageChange,
   usageToast,
   pullOrder,
+  toPush,
   repositorySourceFields,
   activationLines,
   singleTypeSource,
@@ -375,6 +376,38 @@ describe('Pull all, and a linked object', () => {
     expect(page).toContain('for (const repo of ordered) {');
     expect(page).toContain('await pull(repo).then(');
     expect(page).toContain('sortPulls([...ordered, ...rest], settled)');
+  });
+
+  it('Push all, on the right of Pull all, pushes the repositories with changes, greyed when none has any', () => {
+    const repos = [
+      { name: 'forms', use_for_forms: 1, unpushed: true },
+      { name: 'clean', use_for_forms: 1, unpushed: false },
+      // changes but no usage : its own Push is greyed too
+      { name: 'none', unpushed: true },
+      { name: 'cred', use_for_credentials: 1, unpushed: 1 },
+    ];
+    expect(toPush(repos).map((r) => r.name)).toEqual(['forms', 'cred']);
+    expect(toPush([{ name: 'clean', use_for_forms: 1 }])).toEqual([]);
+    expect(toPush(undefined)).toEqual([]);
+    // the button after Pull all's, disabled with nothing to push, the list as the component holds it
+    const page = read('pages/admin/repositories.vue');
+    expect(page.indexOf("t('settings.repositories.pushAll')")).toBeGreaterThan(
+      page.indexOf("t('settings.repositories.pullAll')\n"),
+    );
+    expect(page).toContain(':disabled="pushingAll || pullingAll || !pushable.length"');
+    expect(page).toContain('const pushable = computed(() => toPush(adminMulti.value?.itemList));');
+    expect(page).toContain('.catch(() => failed.push(repo.name));');
+    expect(read('components/AppAdminMulti.vue')).toMatch(/defineExpose\(\{[^}]*\bitemList,/);
+  });
+
+  it("Push all's words in every language", async () => {
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      for (const key of ['pushAll', 'pushAllDone', 'pushAllFailed', 'pushAllNone'])
+        expect(r[key], `${lang} ${key}`).toBeTruthy();
+      expect(r.pushAllFailed, lang).toContain('{names}');
+      expect(r.pushAllDone, lang).toContain('{n}');
+    }
   });
 
   it('the page of every object kept in a repository shows where it comes from, with one component', () => {
