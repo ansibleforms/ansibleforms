@@ -137,7 +137,7 @@ const { default: ScheduleRepo } = await import("../src/models/scheduleRepo.model
 // ─── helpers ───────────────────────────────────────────────────────────────────
 const RRULE = "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1";
 // a file holding one schedule, as an entry of its schedules: list
-const scheduleYaml = (name, extra = {}) => YAML.stringify({ controller_schedules: [{ name, unified_job_template: { name: "Nightly", type: "job_template" }, rrule: RRULE, ...extra }] });
+const scheduleYaml = (name, extra = {}) => YAML.stringify({ controller_schedules: [{ name, form: "Nightly", rrule: RRULE, ...extra }] });
 // the schedule a file's text holds (its first entry, or the one of a name)
 const entryOf = (text, name) => (YAML.parse(text).controller_schedules || []).find((e) => name === undefined || e.name === name);
 function writeFile(repo, file, text) {
@@ -229,7 +229,7 @@ describe("a pull reads the schedules: entries into the schedule table", () => {
   test("a bad file is refused alone, said with its name ; the others still sync", async () => {
     writeFile("ops", "a.yaml", scheduleYaml("Rotate logs"));
     writeFile("ops", "bad-rrule.yaml", scheduleYaml("Bad", { rrule: "DTSTART:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1" }));
-    writeFile("ops", "no-form.yaml", YAML.stringify({ controller_schedules: [{ name: "No form", unified_job_template: { name: "Missing" }, rrule: RRULE }] }));
+    writeFile("ops", "no-form.yaml", YAML.stringify({ controller_schedules: [{ name: "No form", form: "Missing", rrule: RRULE }] }));
     writeFile("ops", "z.yaml", scheduleYaml("Last one"));
     const summary = await ScheduleRepo.syncRepository("ops");
     assert.equal(summary.created, 2);
@@ -246,7 +246,7 @@ describe("a pull reads the schedules: entries into the schedule table", () => {
     await ScheduleRepo.syncRepository("ops");
     forms = null;
     writeFile("ops", "a.yaml", scheduleYaml("Rotate all logs"));
-    writeFile("ops", "ghost.yaml", YAML.stringify({ controller_schedules: [{ name: "Ghost", unified_job_template: { name: "Does not exist" }, rrule: RRULE }] }));
+    writeFile("ops", "ghost.yaml", YAML.stringify({ controller_schedules: [{ name: "Ghost", form: "Does not exist", rrule: RRULE }] }));
     const summary = await ScheduleRepo.syncRepository("ops");
     assert.equal(summary.created, 0);
     assert.equal(summary.deleted, 0);
@@ -261,6 +261,19 @@ describe("a pull reads the schedules: entries into the schedule table", () => {
     assert.equal(after.updated, 1);
     assert.deepEqual(after.refused.map((r) => r.file), ["schedules/ghost.yaml#Ghost"]);
     assert.match(after.refused[0].reasons[0], /the form 'Does not exist'/);
+  });
+
+  test("the form is the entry's form: key ; an entry naming it by unified_job_template only has no form, refused and said", async () => {
+    writeFile("ops", "a.yaml", YAML.stringify({ controller_schedules: [{ name: "Old shape", unified_job_template: { name: "Nightly", type: "job_template" }, rrule: RRULE }] }));
+    writeFile("ops", "b.yaml", YAML.stringify({ controller_schedules: [{ name: "Both", form: "Report", unified_job_template: { name: "Nightly" }, rrule: RRULE }] }));
+    const summary = await ScheduleRepo.syncRepository("ops");
+    assert.deepEqual(summary.refused.map((r) => r.file), ["schedules/a.yaml#Old shape"]);
+    assert.match(summary.refused[0].reasons[0], /form \(the form it runs\) is required/);
+    // beside a form : a key it does not know, kept in the file, the form the form: key
+    assert.equal(rows.find((r) => r.name === "Both").form, "Report");
+    await ScheduleRepo.update(rows.find((r) => r.name === "Both"), { form: "Nightly" });
+    const e = entryOf(readFile("ops", "b.yaml"));
+    assert.deepEqual([e.form, e.unified_job_template], ["Nightly", { name: "Nightly" }]);
   });
 
   test("a file that becomes bad keeps its schedule as it was", async () => {
@@ -485,7 +498,7 @@ describe("no longer the schedules repository, its schedules stay in the app", ()
 
 // ─── app to git ────────────────────────────────────────────────────────────────
 describe("an edit in the app goes to its entry", () => {
-  test("a new schedule in a repository : a new entry in the export's form, in schedules.yaml made, and its row", async () => {
+  test("a new schedule in a repository : a new entry, its form by name, in schedules.yaml made, and its row", async () => {
     fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
     const id = await ScheduleRepo.create("ops", { name: "Weekly Report", form: "Report", rrule: RRULE, extra_vars: "to: ops\n" });
     const row = rows.find((r) => r.id === id);
@@ -493,7 +506,7 @@ describe("an edit in the app goes to its entry", () => {
     assert.equal(row.repository, "ops");
     const obj = entryOf(fs.readFileSync(path.join(ROOT, "ops", "schedules.yaml"), "utf8"), "Weekly Report");
     assert.equal(obj.name, "Weekly Report");
-    assert.deepEqual(obj.unified_job_template, { name: "Report", type: "job_template" });
+    assert.equal(obj.form, "Report");
     assert.deepEqual(obj.extra_data, { to: "ops" });
     assert.equal(obj.rrule, RRULE);
     assert.deepEqual(claims, [["claim", "ops"], ["release", "ops"]]);
@@ -546,7 +559,7 @@ describe("an edit in the app goes to its entry", () => {
   test("a new schedule named as a refused entry of the repository : refused, nothing written nor made", async () => {
     fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
     // an entry whose form does not exist : refused by the pull, no row
-    const text = YAML.stringify({ controller_schedules: [{ name: "Weekly Report", unified_job_template: { name: "Gone form", type: "job_template" }, rrule: RRULE }] });
+    const text = YAML.stringify({ controller_schedules: [{ name: "Weekly Report", form: "Gone form", rrule: RRULE }] });
     fs.writeFileSync(path.join(ROOT, "ops", "schedules.yaml"), text);
     assert.equal((await ScheduleRepo.syncRepository("ops")).refused.length, 1);
     await assert.rejects(ScheduleRepo.create("ops", { name: "weekly report", form: "Report", rrule: RRULE }), (e) => e.name === "ConflictError" && /is named 'weekly report' already/.test(e.message));

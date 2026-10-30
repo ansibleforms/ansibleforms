@@ -1,9 +1,9 @@
 'use strict';
 // The Schedules type of the repository-backed objects (lib/repoObjects/engine.js) : the entries of
-// the schedules: lists of a repository's files, read by lib/scheduleFiles.js (its own format, the
-// export form of one schedule), timed as an app schedule is - by its iCal rrule
-// (lib/scheduleRrule.js), its cron, or once at its one_time_run - stored and run as the app's schedule of
-// that timing, as the Schedule Service. What is the schedules' own is here : how a file reads (its
+// the controller_schedules: lists of a repository's files, read by lib/scheduleFiles.js (its own
+// format : a name, the form it runs, its prompts), timed as an app schedule is - by its iCal rrule
+// (lib/scheduleRrule.js), its cron, or once at its one_time_run - stored and run as the app's
+// schedule of that timing, as the Schedule Service. What is the schedules' own is here : how a file reads (its
 // form must exist), how a row is stored, which app schedules a repository takes (every one, with
 // its own timing, never converted ; only the "Run later" jobs a user planned stay in the app : they
 // are that user's jobs, not schedules). A one-time entry whose one_time_run is past and that the app no
@@ -201,7 +201,7 @@ const schedules = {
       return { errors: [`the forms could not be read to check its form '${parsed.schedule.form}': kept as it was until they can be (see the server log)`], absent: false, object: null, raw: { name: parsed.schedule.name } };
     }
     if (parsed.schedule && forms && !forms.has(parsed.schedule.form)) {
-      return { errors: [`the form '${parsed.schedule.form}' (unified_job_template.name) does not exist`], absent: false, object: null, raw: { name: parsed.schedule.name } };
+      return { errors: [`the form '${parsed.schedule.form}' does not exist`], absent: false, object: null, raw: { name: parsed.schedule.name } };
     }
     if (!parsed.schedule) return { errors: parsed.errors, absent: parsed.absent, object: null, ignored: [], ...(parsed.name ? { raw: { name: parsed.name } } : {}) };
     return { errors: parsed.errors, absent: parsed.absent, object: parsed.schedule, ignored: parsed.schedule.ignored || [] };
@@ -296,7 +296,7 @@ const schedules = {
       .map(([name, kept]) => `${name} (${kept.join(", ")})`);
   },
 
-  // a new entry in the export form of one schedule, with the schedule's own timing
+  // a new entry (lib/scheduleFiles.js newScheduleEntry), with the schedule's own timing
   entryOf: ({ row, timing }) =>
     newScheduleEntry({
       name: row.name,

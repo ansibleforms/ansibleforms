@@ -6487,29 +6487,26 @@
       file. Without a schedules repository, schedules live in the database only. Either way a schedule is timed the
       same three ways: a cron, an iCal rrule, or one run at a moment (`one_time_run`, its value the moment).
 
-      **An entry** is a single schedule, its template, inventory and credentials named by name or by natural key:
+      **An entry** is a single schedule: its name, the form it runs (`form`, the form's name), its timing, its
+      values and its prompts (inventory and credentials by name or by natural key):
       ```yaml
       controller_schedules:
         - name: Nightly log rotation
           description: ''
           rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
           enabled: true
-          unified_job_template:
-            name: Nightly Workflow          # the AnsibleForms form it runs
-            type: workflow_job_template     # accepted, informational
-            organization:                   # accepted, ignored
-              name: Default
+          form: Nightly Workflow            # the AnsibleForms form it runs
           extra_data:                       # the form's values (its extra vars)
             retention_days: 14
           limit: webservers                 # a prompt, see below
         - name: Weekly report
-          unified_job_template: Weekly Report   # the module's form : a plain name
+          form: Weekly Report
           rrule: DTSTART:20261019T060000Z RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO
         - name: Workday backup
-          unified_job_template: Backup
+          form: Backup
           cron: '30 22 * * 1-5'                 # a cron, quoted (a value starting with * is no YAML text)
         - name: Migrate the database
-          unified_job_template: Migration
+          form: Migration
           one_time_run: '2026-11-14T21:00:00+01:00'   # one run, at that moment
       ```
 
@@ -6533,8 +6530,8 @@
       `job_type: check` (`__check__`), `inventory` (`__inventory__`), `scm_branch` (`__scmBranch__`),
       `execution_environment` (`__executionEnvironment__`), `instance_groups` (`__instanceGroups__`) and
       `credentials` (each by its own name in `__credentials__`). `forks`, `timeout`, `job_slice_count` and `labels`
-      are checked and kept in the entry, AnsibleForms has nothing to give them to. Any other key
-      (`natural_key`, `related`, `organization`, your own) is kept as it is when the app writes the entry.
+      are checked and kept in the entry, AnsibleForms has nothing to give them to. Any other key, your own
+      included, is kept as it is when the app writes the entry, and never read.
 
       **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (an IANA zone such as
       `Europe/Brussels`, or a fixed offset from `UTC-12` to `UTC+14` written `UTC+5` or `GMT-3`) or a UTC time
@@ -6563,13 +6560,13 @@
       **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
       the worker, its entries are read into Jobs > Scheduled: a new name makes a schedule, a changed entry changes
       it, a removed one removes it (its past jobs stay), an entry moved to another file keeps its schedule. An entry
-      with no name, no timing, two timings or a refused one, no `unified_job_template.name`, a form that does not exist, or a name
+      with no name, no timing, two timings or a refused one, no `form`, a form that does not exist, or a name
       another schedule has (or another entry gives too), is refused alone: the repository's pull output and the
       server log name it (`schedules.yaml#Nightly log rotation`) and say why, a schedule it made before stays as it
       was, and the other entries still sync. When and how a schedule ran stays in the database, never in the file.
 
       **The app: back to git.** While the repository is used, every new schedule is saved and written to it as a new
-      entry in the export's form (the first file holding `controller_schedules:`, else `schedules.yaml`), with the
+      entry (the first file holding `controller_schedules:`, else `schedules.yaml`), with the
       timing chosen in its dialog (a cron, a rrule or a one time run); editing a repository schedule (its name,
       description, form, enabled, timing, extra vars) writes its entry where it is, only the fields changed: a
       timing of another kind is written under its own key (`cron:`, `rrule:` or `one_time_run:`), the other two removed.

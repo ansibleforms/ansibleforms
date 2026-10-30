@@ -84,7 +84,7 @@ describe("turning the Schedules usage on", () => {
 
 describe("an app edit of the launch options", () => {
   test("only the prompts that change rewritten, one no longer given removed, the rest byte for byte", () => {
-    const text = "controller_schedules:\n  - name: Nightly        # ours\n    limit: webservers    # the web tier\n    job_tags: deploy\n    verbosity: 1\n    team_owner: platform # our key\n    unified_job_template: Nightly\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n";
+    const text = "controller_schedules:\n  - name: Nightly        # ours\n    limit: webservers    # the web tier\n    job_tags: deploy\n    verbosity: 1\n    team_owner: platform # our key\n    form: Nightly\n    rrule: DTSTART;TZID=UTC:20261021T023000 RRULE:FREQ=DAILY;INTERVAL=1\n";
     const out = updateScheduleText(text, "Nightly", { launchOptions: { __limit__: "dbservers", __verbosity__: 1 } });
     assert.equal(out, text.replace("limit: webservers    # the web tier", "limit: dbservers    # the web tier").replace("    job_tags: deploy\n", ""));
     // the same options : nothing rewritten

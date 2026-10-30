@@ -167,8 +167,8 @@ function timingOfRequest(data, current = null) {
 }
 
 /**
- * Makes a schedule in a schedules repository : a new entry, the export form of one schedule, at the
- * end of the first file holding schedules: (else schedules.yaml, made), and its row ; pushed with
+ * Makes a schedule in a schedules repository : a new entry (newScheduleEntry), at the end of
+ * the first file holding schedules: (else schedules.yaml, made), and its row ; pushed with
  * the repository's Push.
  *
  * Args:

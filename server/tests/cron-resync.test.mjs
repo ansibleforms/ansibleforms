@@ -84,7 +84,7 @@ describe("a schedules repository's entry is registered as the app's schedule of 
     const { valuesOf } = await import("../src/lib/repoObjects/schedules.js");
     const RRULE = "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1";
     // each entry stored as a pull stores it
-    const stored = (id, entry) => ({ id, ...valuesOf(parseSchedule({ name: `s${id}`, unified_job_template: "Report", ...entry }).schedule) });
+    const stored = (id, entry) => ({ id, ...valuesOf(parseSchedule({ name: `s${id}`, form: "Report", ...entry }).schedule) });
     schedules = [stored(1, { cron: "30 2 * * 1-5" }), stored(2, { rrule: RRULE }), stored(3, { one_time_run: "2030-05-06T07:08:00Z" })];
     repositories = [];
     const rrules = [];

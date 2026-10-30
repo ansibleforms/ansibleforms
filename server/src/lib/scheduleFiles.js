@@ -1,10 +1,9 @@
 // A schedule of a schedules repository (use_for_schedules) : an entry of a controller_schedules: list in any
-// YAML file of the repository (lib/repoObjects/repoFiles.js), in one of two shapes - the export
-// form (its template, inventory and credentials as natural keys { name, type, organization }, its
-// credentials under related, its own natural_key) or the module form (the template and inventory
-// as names, credentials as a list of names, organization beside them) - read into what
-// AnsibleForms runs, refused where it is not a valid schedule, and written back with everything
-// its entry says kept. It is timed by exactly one of rrule (checked by lib/scheduleRrule.js), cron
+// YAML file of the repository (lib/repoObjects/repoFiles.js) : its name, the form it runs (form,
+// the form's name), its prompts (inventory and credentials by name or natural key { name, type,
+// organization }, credentials as a list or under related) - read into what AnsibleForms runs,
+// refused where it is not a valid schedule, and written back with everything its entry says kept
+// (any key AnsibleForms does not know too, untouched). It is timed by exactly one of rrule (checked by lib/scheduleRrule.js), cron
 // (checked as the app checks a schedule's cron, lib/cronValidate.js) or one_time_run (one run, its
 // value the moment, read as the app reads one, lib/oneTimeRun.js). Pure :
 // models/scheduleRepo.model.js and the engine (lib/repoObjects/engine.js) read the files and write
@@ -23,9 +22,9 @@ import { fileKeyOf } from "./repoObjects/types.js";
 // the key of the lists the schedules are entries of, in a repository's files (controller_schedules)
 export const SCHEDULES_KEY = fileKeyOf("schedules");
 
-// the keys of a schedule in the export's order (its own fields, its prompts, then
-// unified_job_template, enabled and its timing - rrule, cron or one_time_run - then related and
-// natural_key) : a new file is written in it, a key added to a file goes to its place in it
+// the keys of a schedule in their order (its own fields, its prompts, then the form it runs,
+// enabled and its timing - rrule, cron or one_time_run - then related) : a new entry is written
+// in it, a key added to an entry goes to its place in it
 export const KEY_ORDER = [
   "name",
   "description",
@@ -44,13 +43,12 @@ export const KEY_ORDER = [
   "forks",
   "job_slice_count",
   "timeout",
-  "unified_job_template",
+  "form",
   "enabled",
   "rrule",
   "cron",
   "one_time_run",
   "related",
-  "natural_key",
 ];
 
 // the prompts AnsibleForms has none for : checked, kept in the file, not used
@@ -380,7 +378,7 @@ export function timingOf(obj) {
  * Reads a schedule entry : what AnsibleForms runs, and why it is refused when it is not a valid
  * schedule - no name, a name longer than the schedule table keeps, no timing (rrule, cron or
  * one_time_run), more than one or a refused one, no
- * unified_job_template name, extra_data that are no dictionary, a prompt of the wrong type. Whether
+ * form (the name of the form it runs), extra_data that are no dictionary, a prompt of the wrong type. Whether
  * its form exists is the caller's to check (it knows the forms). An entry with `state: absent`
  * (the module's) holds no schedule.
  *
@@ -404,9 +402,13 @@ export function parseSchedule(obj) {
   // its timing : exactly one of rrule, cron and one_time_run, valid
   const { errors: timingErrors, timing } = timingOf(obj);
   errors.push(...timingErrors);
-  // unified_job_template : the form it runs, by name (the module's) or natural key (the export's)
-  const form = nameOf(obj.unified_job_template).trim();
-  if (!form) errors.push("unified_job_template.name (the form it runs) is required");
+  // form : the name of the form it runs
+  let form = "";
+  if (obj.form !== undefined && obj.form !== null && typeof obj.form === "object") errors.push("form must be the name of a form");
+  else {
+    form = nameOf(obj.form).trim();
+    if (!form) errors.push("form (the form it runs) is required");
+  }
   // enabled : a yes or no, on when not said
   let enabled = true;
   if (obj.enabled !== undefined && obj.enabled !== null) {
@@ -450,8 +452,7 @@ function setKey(doc, map, key, value) {
 /**
  * The fields the app edits written into a schedule's entry, its map changed in place : the rest of
  * it - the prompts, the keys AnsibleForms does not use, the comments, the order - kept as the
- * file has them. unified_job_template keeps its shape (a name, or a natural key whose name
- * changes), and the export's natural_key follows the name and the form.
+ * file has them, the keys AnsibleForms does not know untouched.
  *
  * Args:
  *   doc (YAML.Document): the file's document.
@@ -474,12 +475,7 @@ export function updateScheduleEntry(doc, node, edits) {
     }
     if (!same(before, edits.extraData)) setKey(doc, node, "extra_data", edits.extraData);
   }
-  if (edits.form !== undefined && edits.form !== nameOf(current.unified_job_template)) {
-    const ujt = node.get("unified_job_template", true);
-    if (YAML.isMap(ujt)) setKey(doc, ujt, "name", edits.form);
-    else if (ujt !== undefined && ujt !== null && !YAML.isMap(ujt)) setKey(doc, node, "unified_job_template", edits.form);
-    else setKey(doc, node, "unified_job_template", { name: edits.form, type: "job_template" });
-  }
+  if (edits.form !== undefined && edits.form !== nameOf(current.form)) setKey(doc, node, "form", edits.form);
   if (edits.enabled !== undefined && boolOf(current.enabled ?? true) !== edits.enabled) setKey(doc, node, "enabled", edits.enabled);
   // its timing : the one the edit gives written (compared as timingText says : a file that writes a
   // rrule on several lines keeps them while it does not change), the other two removed
@@ -498,13 +494,6 @@ export function updateScheduleEntry(doc, node, edits) {
       if (next[field] === undefined) node.delete(field);
       else setKey(doc, node, field, next[field]);
     }
-  }
-  // the export's natural key names the schedule and its template : it follows them
-  const natural = node.get("natural_key", true);
-  if (YAML.isMap(natural)) {
-    if (edits.name !== undefined && natural.get("name") !== edits.name) setKey(doc, natural, "name", edits.name);
-    const nujt = natural.get("unified_job_template", true);
-    if (edits.form !== undefined && YAML.isMap(nujt) && nujt.get("name") !== edits.form) setKey(doc, nujt, "name", edits.form);
   }
 }
 
@@ -551,9 +540,8 @@ export function scheduleEntryOf(text, name) {
 }
 
 /**
- * A new schedule entry, in the export form of one schedule : its keys in the export's order, its
- * template as a natural key, and its own natural key (what an import finds it by). No
- * AnsibleForms field in it.
+ * A new schedule entry : its keys in their order (KEY_ORDER), the form it runs by name, its
+ * timing under its own key.
  *
  * Args:
  *   values (object): { name, description, rrule / cron / oneTimeRun (its timing : the one given is
@@ -561,19 +549,17 @@ export function scheduleEntryOf(text, name) {
  *     prompts that give them : promptsOf) }.
  *
  * Returns:
- *   object: the entry, its keys in the export's order.
+ *   object: the entry, its keys in their order.
  */
 export function newScheduleEntry({ name, description = "", rrule, cron, oneTimeRun, enabled = true, form, extraData = {}, launchOptions = {} }) {
-  const ujt = { name: form, type: "job_template" };
   const obj = {
     name,
     description: description || "",
     extra_data: extraData || {},
     ...promptsOf(launchOptions).fields,
-    unified_job_template: ujt,
+    form,
     enabled: enabled !== false,
     ...(oneTimeRun ? { one_time_run: isoMoment(oneTimeRun) } : cron && String(cron).trim() ? { cron: String(cron).trim() } : { rrule: normalizeRrule(rrule) }),
-    natural_key: { name, type: "schedule", unified_job_template: { ...ujt } },
   };
   const rank = (k) => (KEY_ORDER.includes(k) ? KEY_ORDER.indexOf(k) : KEY_ORDER.length);
   return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b)));
