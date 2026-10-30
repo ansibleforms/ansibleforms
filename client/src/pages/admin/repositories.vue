@@ -24,7 +24,25 @@ const adminMulti = ref(null);
 const authenticated = ref(false);
 
 /**
- * Runs a git action of a repository's row (Pull, Push, Reset) : its status shown as running
+ * Shows a repository's row as running a git action until the list is read again : its status
+ * (the lock any git operation takes), and the Push badge for a push (sync), else the Pull badge
+ * (a pull or a reset) - as the server writes them (models/repository.model.js claim).
+ *
+ * Args:
+ *   name (string): the repository's name.
+ *   action (string): the api action ('clone', 'sync', 'reset').
+ */
+function showRunning(name, action) {
+  adminMulti.value.setItemProperty({ id: name, key: 'status', value: 'running' });
+  adminMulti.value.setItemProperty({
+    id: name,
+    key: action === 'sync' ? 'push_status' : 'pull_status',
+    value: 'running',
+  });
+}
+
+/**
+ * Runs a git action of a repository's row (Pull, Push, Reset) : its badge shown as running
  * meanwhile, a refusal said in a toast (the server's own words), and the list read again
  * whatever the answer, so the row never stays on running.
  *
@@ -34,7 +52,7 @@ const authenticated = ref(false);
  *   title (string): what the action is called, said when the server gives no reason.
  */
 async function runGit(repo, action, title) {
-  adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
+  showRunning(repo.name, action);
   try {
     await axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/${action}`, {});
     // wait 1 second to visually see the change
@@ -57,7 +75,7 @@ async function pullAll() {
   try {
     const result = await axios.get('/api/v2/repository/');
     const repos = Array.isArray(result.data.records) ? result.data.records : [];
-    for (const repo of repos) adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
+    for (const repo of repos) showRunning(repo.name, 'clone');
     const pulls = await Promise.allSettled(
       repos.map((repo) => axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/clone`, {})),
     );

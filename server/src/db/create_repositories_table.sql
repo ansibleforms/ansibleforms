@@ -20,7 +20,10 @@ CREATE TABLE `repositories` (
   -- when the last pull (or clone, reset) and the last push ended, worked or not
   `pulled_at` datetime DEFAULT NULL,
   `pushed_at` datetime DEFAULT NULL,
-  -- how the last push ended (success, failed) ; status is the last pull's, and the lock
+  -- how the last pull (or clone, reset) and the last push ended (success, failed), each
+  -- 'running' while it runs ; status is the lock (models/repository.model.js claim), else the
+  -- last pull's
+  `pull_status` varchar(50) DEFAULT NULL,
   `push_status` varchar(50) DEFAULT NULL,
   `head` varchar(50) DEFAULT NULL,    
   `rebase_on_start` tinyint(4) DEFAULT NULL,

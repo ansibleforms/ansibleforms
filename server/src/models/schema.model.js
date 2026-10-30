@@ -658,7 +658,7 @@ const SCHEMA_MANIFEST = {
                                'settings.banner_show', 'settings.disclaimer_enabled',
                                'settings.forms_view', 'settings.default_timezone', 'settings.default_date_format', 'settings.header_links',
                                'tokens.replaced_at', 'repositories.pull_output', 'repositories.push_output',
-                               'repositories.pulled_at', 'repositories.pushed_at', 'repositories.push_status',
+                               'repositories.pulled_at', 'repositories.pushed_at', 'repositories.push_status', 'repositories.pull_status',
                                'ldap.id', 'ldap.name', 'ldap.position', 'ldap.domains', 'ldap.credential',
                                'oauth2_providers.credential', 'credentials.tenant_id', 'credentials.issuer', 'credentials.redirect_uri',
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
@@ -1162,6 +1162,8 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("repositories", "pushed_at", "datetime", true, "NULL"), messages, success, failed);
   // how the last push ended : it wrote the pull's status (a failed push read as a failed pull)
   await checkPromise(addColumn("repositories", "push_status", "varchar(50)", true, "NULL"), messages, success, failed);
+  // how the last pull ended, apart from the lock : a push read as a pull running (status is both)
+  await checkPromise(addRepositoryPullStatus(), messages, success, failed);
   // an api, userpass or cyberark credential carries the address of the one server it logs in to,
   // with its TLS : a secret store's and a runner's (other than an RTE) move into it
   await checkPromise(addColumn("credentials", "url", "varchar(1000)", true, "NULL"), messages, success, failed);
@@ -1476,6 +1478,25 @@ export async function moveMailServersToCredentials() {
  * Returns:
  *   Promise<string|null>: what was done, or null when there was nothing to do.
  */
+/**
+ * The repositories' pull_status : how the last pull (or clone, reset) ended, 'running' while one
+ * runs. status was both that and the lock every git operation takes, so a push read as a pull
+ * running on the Pull badge (models/repository.model.js claim). Added once, and filled from
+ * status then : each repository's last pull, unless an operation held it at that moment.
+ *
+ * Returns:
+ *   Promise<string>: what was done.
+ */
+export async function addRepositoryPullStatus() {
+  const present = await mysql.do("SHOW COLUMNS FROM AnsibleForms.`repositories` WHERE Field = 'pull_status'");
+  const message = await addColumn("repositories", "pull_status", "varchar(50)", true, "NULL");
+  if (present.length) return message;
+  // step 2 : the last pull of each repository, as status says it ; a claim of then ('running')
+  // is left out, its pull_status is set by its next pull
+  const res = await mysql.do("UPDATE AnsibleForms.`repositories` SET pull_status = status WHERE status IN ('success', 'failed')");
+  return `${message}, filled from status on ${res.affectedRows || 0} repositories`;
+}
+
 export async function moveBannerSwitchToAnnouncements() {
   const rows = await mysql.do("SELECT banner_show FROM AnsibleForms.`settings` LIMIT 1");
   if (!rows.length || rows[0].banner_show !== 0) return null;
