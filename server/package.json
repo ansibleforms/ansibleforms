@@ -25,7 +25,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "~1.32.1",
     "ajv": "~8.20.0",
-    "axios": "~1.20.0",
+    "axios": "~1.21.0",
     "bcrypt": "~6.0.0",
     "cert-info": "~1.5.1",
     "connect-history-api-fallback": "~2.0.0",
