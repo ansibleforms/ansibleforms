@@ -28,7 +28,6 @@ vi.mock('vue-sonner', () => ({
 import axios from 'axios';
 import getSettings from '../src/config/settings.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
-import { htmlToText } from '../src/lib/dataTable.js';
 import {
   USAGE_CATEGORIES,
   USAGE_TYPES,
@@ -40,8 +39,6 @@ import {
   usageChanges,
   confirmUsageChange,
   usageToast,
-  usageBadges,
-  usageSortValue,
   pullOrder,
   repositorySourceFields,
   activationLines,
@@ -350,46 +347,17 @@ describe('one question when a save turns several object types on or off', () => 
   });
 });
 
-describe("the repositories list's Usage column", () => {
+describe('the repositories list leaves out the Usage column', () => {
   const field = settings.repositories.fields.find((f) => f.key === 'usage');
 
-  it('one column of badges replaces the column per usage', () => {
+  it('no column per usage, and none for them all : the dialog has its Usage step', () => {
     expect(settings.repositories.fields.filter((f) => /^use_for_/.test(f.key))).toEqual([]);
-    expect(field).toMatchObject({
-      step: 'usage',
-      type: 'usage',
-      label: 'settings.repositories.usageColumn',
-      filterable: true,
-    });
-    expect(field.hidden).toBeUndefined();
+    expect(field).toMatchObject({ step: 'usage', type: 'usage', noTable: true });
+    expect(field.label).toBeUndefined();
+    expect(field.render).toBeUndefined();
+    expect(field.sortValue).toBeUndefined();
     // and the dialog does not send it
     expect(settings.repositories.beforeSave({ name: 'a', usage: 'x', pull_scheduled: true })).toEqual({ name: 'a' });
-  });
-
-  it('a badge per type, in order, escaped, in the shape of the other row badges', () => {
-    const html = field.render(null, { use_for_runners: 1, use_for_forms: 1, use_for_config: 0 });
-    expect(html).toBe(
-      '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.forms</span>' +
-        '<span class="visually-hidden">, </span>' +
-        '<span class="badge af-usage-badge me-1">settings.repositories.usageTypes.runners</span>',
-    );
-    expect(usageBadges((k) => (k.endsWith('forms') ? '<b>' : k), { use_for_forms: 1 })).toContain('&lt;b&gt;');
-    expect(usageBadges(t, {})).toBe('');
-    const css = read('styles/bootstrap-override.scss');
-    expect(css).toMatch(/\.af-required-badge,\s*\.af-usage-badge \{/);
-  });
-
-  it('its plain text (CSV export, column filter, tooltip) keeps the names apart', () => {
-    const tt = (k) => k.split('.').pop();
-    const html = usageBadges(tt, { use_for_forms: 1, use_for_playbooks: 1, use_for_workflows: 1 });
-    expect(htmlToText(html)).toBe('forms, playbooks, workflows');
-    expect(htmlToText(usageBadges(tt, { use_for_forms: 1 }))).toBe('forms');
-  });
-
-  it('sorts by the types, a repository used for nothing last', () => {
-    expect(usageSortValue(t, { use_for_forms: 1 })).toBe('settings.repositories.usageTypes.forms');
-    expect(usageSortValue(t, {}) > usageSortValue(t, { use_for_general: 1 })).toBe(true);
-    expect(field.sortValue({ use_for_forms: 1 })).toBe(usageSortValue(t, { use_for_forms: 1 }));
   });
 });
 
@@ -670,11 +638,8 @@ describe('the header links : their own type, after Name', () => {
 
   it('the Usage step names Notifications and Links as their menu items do', () => {
     const tt = (key) => key;
-    expect(usageBadges(tt, { use_for_notifications: 1, use_for_links: 1 })).toBe(
-      '<span class="badge af-usage-badge me-1">sidebar.links</span>' +
-        '<span class="visually-hidden">, </span>' +
-        '<span class="badge af-usage-badge me-1">sidebar.notifications</span>',
-    );
+    expect(usageLabel(tt, 'notifications')).toBe('sidebar.notifications');
+    expect(usageLabel(tt, 'links')).toBe('sidebar.links');
   });
 });
 
@@ -704,11 +669,7 @@ describe('the MCP settings : one mcp: map, in Connections', () => {
 
   it('its hint in every language ; Settings named General, as its menu item, under its general: key', async () => {
     const tt = (key) => key;
-    expect(usageBadges(tt, { use_for_general: 1, use_for_mcp: 1 })).toBe(
-      '<span class="badge af-usage-badge me-1">sidebar.ansibleForms</span>' +
-        '<span class="visually-hidden">, </span>' +
-        '<span class="badge af-usage-badge me-1">sidebar.mcp</span>',
-    );
+    expect(usageLabel(tt, 'mcp')).toBe('sidebar.mcp');
     expect(usageLabel(tt, 'general')).toBe('sidebar.ansibleForms');
     for (const lang of LANGS) {
       const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;

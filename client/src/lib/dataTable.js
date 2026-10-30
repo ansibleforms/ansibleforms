@@ -66,9 +66,7 @@ export function isSortable(col) {
 /**
  * Two rows in a column's order : by its sortValue(row) when it has one (a date), else by its raw
  * value when both are numbers or yes / no, else by their text, alphabetically - case aside, and
- * "file2" before "file10". A sortValue that is a text sorts by the cell's text (what the reader
- * sees, in their language), unless the column sets sortByValue : then by that text of its own (a
- * repository's usages, one used for nothing last, where its cell shows nothing).
+ * "file2" before "file10".
  *
  * Args:
  *   a (object): a row.
@@ -87,11 +85,7 @@ export function compareRows(a, b, col, dir, textOf) {
   if (typeof ra === 'boolean') ra = Number(ra);
   if (typeof rb === 'boolean') rb = Number(rb);
   if (typeof ra === 'number' && typeof rb === 'number') return (ra - rb) * dir;
-  // a sortValue that is a text : that text, not the cell's, only for a column that asks for it
-  // (sortByValue : its cell may show nothing where the sortValue puts the row last) ; any other
-  // sorts by what its cell shows, a translated label rather than the raw value behind it
-  const both = col.sortByValue && col.sortValue && typeof ra === 'string' && typeof rb === 'string';
-  const ta = both ? ra : String(textOf(a, col) ?? '');
-  const tb = both ? rb : String(textOf(b, col) ?? '');
+  const ta = String(textOf(a, col) ?? '');
+  const tb = String(textOf(b, col) ?? '');
   return ta.localeCompare(tb, undefined, { numeric: true, sensitivity: 'base' }) * dir;
 }

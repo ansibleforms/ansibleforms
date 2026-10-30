@@ -7,14 +7,7 @@ import Helpers from '@/lib/Helpers';
 import { cronCell } from '@/lib/cronCell';
 import { cronValidationMessage } from './cron';
 import { rruleValidationMessage, defaultRrule, rruleCell } from './rrule';
-import {
-  USAGE_FLAGS,
-  confirmUsageChange,
-  confirmUsageDelete,
-  usageToast,
-  usageBadges,
-  usageSortValue,
-} from '@/lib/repositoryUsage';
+import { USAGE_FLAGS, confirmUsageChange, confirmUsageDelete, usageToast } from '@/lib/repositoryUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
@@ -1256,17 +1249,11 @@ export default function getSettings(t) {
         },
         {
           // what the app reads from it : its usage types under their five headings, ticked one by one
-          // or a heading at once (AppRepositoryUsage) ; in the list, one column of badges, a badge per
-          // type it is used for, sorted and filtered by their names
+          // or a heading at once (AppRepositoryUsage) ; no column in the list, its page says it
           key: 'usage',
           step: 'usage',
           type: 'usage',
-          label: t('settings.repositories.usageColumn'),
-          render: (v, row) => usageBadges(t, row),
-          sortValue: (row) => usageSortValue(t, row),
-          // by that text, not the badges' : a repository used for nothing (no badge) sorts last
-          sortByValue: true,
-          filterable: true,
+          noTable: true,
         },
       ],
     },

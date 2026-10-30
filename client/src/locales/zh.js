@@ -1275,7 +1275,6 @@ export default {
       stepRepository: '仓库',
       stepSchedule: '拉取计划',
       stepUsage: '用途',
-      usageColumn: '用途',
       usageCategories: {
         designer: '设计器',
         jobs: '作业',

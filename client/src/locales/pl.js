@@ -1301,7 +1301,6 @@ export default {
       stepRepository: 'Repozytorium',
       stepSchedule: 'Harmonogram pull',
       stepUsage: 'Zastosowanie',
-      usageColumn: 'Użycie',
       usageCategories: {
         designer: 'Projektant',
         jobs: 'Zadania',

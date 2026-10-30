@@ -1296,7 +1296,6 @@ export default {
       stepRepository: 'Repository',
       stepSchedule: 'Pull schedule',
       stepUsage: 'Usage',
-      usageColumn: 'Usage',
       usageCategories: {
         designer: 'Designer',
         jobs: 'Jobs',

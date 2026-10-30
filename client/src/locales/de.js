@@ -1310,7 +1310,6 @@ export default {
       stepRepository: 'Repository',
       stepSchedule: 'Pull-Zeitplan',
       stepUsage: 'Verwendung',
-      usageColumn: 'Verwendung',
       usageCategories: {
         designer: 'Designer',
         jobs: 'Jobs',

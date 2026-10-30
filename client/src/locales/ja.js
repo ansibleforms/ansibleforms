@@ -1298,7 +1298,6 @@ export default {
       stepRepository: 'リポジトリ',
       stepSchedule: 'プルのスケジュール',
       stepUsage: '用途',
-      usageColumn: '用途',
       usageCategories: {
         designer: 'デザイナー',
         jobs: 'ジョブ',

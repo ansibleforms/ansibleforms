@@ -1305,7 +1305,6 @@ export default {
       stepRepository: 'Repository',
       stepSchedule: 'Pianificazione del pull',
       stepUsage: 'Utilizzo',
-      usageColumn: 'Uso',
       usageCategories: {
         designer: 'Designer',
         jobs: 'Job',

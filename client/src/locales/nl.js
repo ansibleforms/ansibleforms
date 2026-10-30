@@ -1305,7 +1305,6 @@ export default {
       stepRepository: 'Repository',
       stepSchedule: 'Pull-schema',
       stepUsage: 'Gebruik',
-      usageColumn: 'Gebruik',
       usageCategories: {
         designer: 'Ontwerper',
         jobs: 'Taken',

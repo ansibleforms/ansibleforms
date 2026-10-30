@@ -7,8 +7,6 @@
  *  items          Array   Full dataset
  *  columns        Array   [{ key, label, filterable?, sortable?, render?(val,row)→string,
  *                           sortValue?(row)→number|string,
- *                           sortByValue?: true - a text sortValue orders the rows (else
- *                             a text column sorts by its cells' text, as shown),
  *                           filterType?: 'number' | 'boolean' | 'gt0',
  *                           align?: 'end' (numbers : header, filter and cells to the right),
  *                           width?: a CSS width for the column, or (tableWidth px) => a CSS

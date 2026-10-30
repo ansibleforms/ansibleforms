@@ -403,7 +403,7 @@ export function setCategory(category, record, others, on) {
 }
 
 // ===========================================================================
-// THE LIST : ITS USAGE COLUMN
+// WHAT A REPOSITORY IS USED FOR, AND THE ORDER PULL ALL PULLS IN
 // ===========================================================================
 
 /**
@@ -416,45 +416,6 @@ export function setCategory(category, record, others, on) {
  *   object[]: the types.
  */
 export const usedFor = (row) => USAGE_TYPES.filter((u) => flagOn(row?.[u.flag]));
-
-// the separator between two Usage badges (usageBadges) : in the cell's text, not on the page
-const USAGE_SEPARATOR = '<span class="visually-hidden">, </span>';
-
-/**
- * A repository's Usage cell : a small badge per type it is used for, labelled with the type's
- * name (escaped), in the shape of the other row badges. Between two badges a visually hidden
- * ", " : unseen on the page, it keeps the names apart in the cell's plain text, which the CSV
- * export, the column filter and a truncated cell's tooltip read ("Forms, Playbooks", not
- * "FormsPlaybooks").
- *
- * Args:
- *   t (function): vue-i18n's t.
- *   row (object): the repository.
- *
- * Returns:
- *   string: the badges' HTML ('' for none : the table shows its en dash).
- */
-export function usageBadges(t, row) {
-  return usedFor(row)
-    .map((u) => `<span class="badge af-usage-badge me-1">${esc(usageLabel(t, u.key))}</span>`)
-    .join(USAGE_SEPARATOR);
-}
-
-/**
- * A repository's Usage, to sort its column : its types' labels in order (one used for nothing
- * last).
- *
- * Args:
- *   t (function): vue-i18n's t.
- *   row (object): the repository.
- *
- * Returns:
- *   string: the sort value.
- */
-export const usageSortValue = (t, row) =>
-  usedFor(row)
-    .map((u) => usageLabel(t, u.key))
-    .join(', ') || '￿';
 
 /**
  * The repositories in the order Pull all pulls them : those that hold objects first, in the

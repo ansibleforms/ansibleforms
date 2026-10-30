@@ -1197,8 +1197,6 @@ const dataTableColumns = computed(() => {
         f.filterType || (f.type === 'checkbox' ? 'boolean' : f.type === 'number' ? 'number' : undefined);
       if (filterType) col.filterType = filterType;
       if (typeof f.sortValue === 'function') col.sortValue = f.sortValue;
-      // and whether a text sortValue orders the column instead of its cells' text
-      if (f.sortByValue) col.sortByValue = true;
       // a field may bring its own cell renderer (see config/settings.js) :
       // without this a `datetime` column shows the raw value it was sent
       if (typeof f.render === 'function') {

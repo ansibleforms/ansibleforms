@@ -1309,7 +1309,6 @@ export default {
       stepRepository: 'Dépôt',
       stepSchedule: 'Planification du pull',
       stepUsage: 'Utilisation',
-      usageColumn: 'Usage',
       usageCategories: {
         designer: 'Concepteur',
         jobs: 'Jobs',

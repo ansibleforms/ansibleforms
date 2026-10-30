@@ -35,22 +35,9 @@ describe('the order of a table', () => {
     ]);
   });
 
-  it('a sortValue that is a text sorts by that text when the column asks (a repository used for nothing last)', () => {
-    const t = (k) => k;
-    const col = { ...getSettings(t).repositories.fields.find((f) => f.key === 'usage') };
-    expect(col.sortByValue).toBe(true);
-    // the cell's text, as the table reads it (BsDataTable cellText : the badges' text)
-    const cell = (row) => col.render(undefined, row).replace(/<[^>]+>/g, '');
-    const rows = [{ name: 'none' }, { name: 'forms', use_for_forms: 1 }, { name: 'creds', use_for_credentials: 1 }];
-    const order = (dir) => [...rows].sort((a, b) => compareRows(a, b, col, dir, cell)).map((r) => r.name);
-    expect(order(1)).toEqual(['creds', 'forms', 'none']);
-    expect(order(-1)).toEqual(['none', 'forms', 'creds']);
-  });
-
-  it('any other text sortValue sorts by what the cell shows, in its language (a runner RTE Mode)', () => {
+  it('a text sortValue sorts by what the cell shows, in its language (a runner RTE Mode)', () => {
     const i18n = createI18n({ legacy: false, locale: 'de', messages: { de } });
     const col = getSettings(i18n.global.t).runners.fields.find((f) => f.key === 'rte_mode_column');
-    expect(col.sortByValue).toBeUndefined();
     const rows = ['outbound', 'inbound', 'database'].map((m) => ({ type: 'rte', rte_mode: m }));
     const cell = (row, c) => htmlToText(c.render(undefined, row));
     const shown = (dir) => [...rows].sort((a, b) => compareRows(a, b, col, dir, cell)).map((r) => cell(r, col));
