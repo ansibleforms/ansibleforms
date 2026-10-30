@@ -16,6 +16,7 @@ import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES, normalizeUsageFlags } from '../lib/repoObjects/types.js';
 import { deprecationLines, CONFIG_KEYS } from '../lib/configKeys.js';
 import { uriCarriesSecret } from '../lib/repoObjects/secrets.js';
+import { releasedOperationsSql } from '../lib/repositoryClaims.js';
 
 // the flags of the object types : a repository's that turn on or off make it take the app's
 // objects, or let them go (lib/repoObjects/engine.js)
@@ -267,7 +268,7 @@ class Repository extends CrudModel {
     const done = Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
       try {
-        await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
+        await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
       } catch (e2) {
         logger.error(`...and the failure could not be recorded on the repository either: ${helpers.getError(e2)}`)
       }
@@ -488,7 +489,7 @@ class Repository extends CrudModel {
       await Repo.delete(name);
     } catch (e) {
       // release the claim, or a failed rm wedges the repo at 'running' for ever
-      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, status = 'failed' where name = ?", [e.message, name], { name })
+      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, status = 'failed', pull_status = 'failed' where name = ?", [e.message, name], { name })
       throw e
     }
     // Deletes with its own SQL, so it must evict what CrudModel.delete would have:
@@ -527,8 +528,9 @@ class Repository extends CrudModel {
   static async reset(name) {
     logger.info(`Resetting repository ${name}`);
     // claim the repo BEFORE deleting the tree : a reset rm's the working tree,
-    // which must not race a pull/sync running git on it (issue #414)
-    const claim = await Repository.claim(name)
+    // which must not race a pull/sync running git on it (issue #414). A reset is a
+    // fresh clone, so its Pull reads running meanwhile.
+    const claim = await Repository.claim(name, "pull")
     if (!claim.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -539,7 +541,7 @@ class Repository extends CrudModel {
       await Repository.clone(name, true, { reset: true });
     } catch (e) {
       // release the claim so a delete failure doesn't wedge the repo at 'running'
-      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed' where name = ?", [e.message, name], { name })
+      await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [e.message, name], { name })
       throw e
     }
   }
@@ -845,8 +847,8 @@ class Repository extends CrudModel {
       // the working tree first and comes in claimed, so it is never refused here.
       await Repository.assertNoLocalChanges(name)
       // atomic check-and-set : a clone must not run git while a pull/sync/reset
-      // is touching the same working tree
-      const claim = await Repository.claim(name)
+      // is touching the same working tree ; a clone is a pull, its Pull reads running
+      const claim = await Repository.claim(name, "pull")
       if (!claim.affectedRows) {
         throw new Error(`Repository '${name}' not found or already running, try again later`)
       }
@@ -875,7 +877,7 @@ class Repository extends CrudModel {
       status = "failed"
     }
     output = Repository.maskSecrets(output, repo) // never expose git credentials
-    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ? where name = ?", [output, status, name], { name })
+    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ?, pull_status = ? where name = ?", [output, status, status, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see
@@ -921,8 +923,8 @@ class Repository extends CrudModel {
     // a working tree with changes not pushed yet is not pulled over, as the scheduled pull does
     await Repository.assertNoLocalChanges(name)
     // atomic check-and-set : a pull and a sync (or another pull) must not run
-    // git on the same working tree at the same time (issue #414)
-    const claimed = await Repository.claim(name)
+    // git on the same working tree at the same time (issue #414) ; its Pull reads running
+    const claimed = await Repository.claim(name, "pull")
     if (!claimed.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -959,7 +961,7 @@ class Repository extends CrudModel {
     } else {
       output = Repository.maskSecrets(output, pullRepo) // never expose git credentials
     }
-    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ? where name = ?", [output, status, name], { name })
+    await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = ?, pull_status = ? where name = ?", [output, status, status, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see
@@ -1116,16 +1118,37 @@ class Repository extends CrudModel {
     await Repository.writeState("update AnsibleForms.`repositories` set status = ?, claim_node = NULL where name = ? and status = 'running' and (claim_node = ? or claim_node IS NULL)", [priorStatus ?? null, name, nodeId], { name })
   }
 
-  // The atomic claim every git operation and designer save takes (status<>'running' -> 'running'),
-  // naming the node that holds it and since when : a claim whose node went away is released by
-  // the worker (releaseStaleClaims) instead of wedging the repository until somebody notices.
-  static async claim(name) {
+  /**
+   * The atomic claim every git operation and designer save takes (status<>'running' -> 'running'),
+   * naming the node that holds it and since when : a claim whose node went away is released by
+   * the worker (releaseStaleClaims) instead of wedging the repository until somebody notices.
+   *
+   * `status` stays the one lock of the repository (one git operation at a time, on every node).
+   * What runs under it is said apart : a pull (or clone, reset) sets pull_status 'running', a
+   * push push_status 'running', in the same statement, so the Pull and the Push badges each
+   * read their own operation. The other one keeps how it last ended : a push no longer reads as
+   * a pull running, nor a pull as a push. A save or a rename names neither, both stay as they are.
+   *
+   * Args:
+   *   name (string): the repository.
+   *   op (string): what takes the claim, "pull" or "push" ; anything else (a save, a rename,
+   *     a delete) sets neither pull_status nor push_status.
+   *
+   * Returns:
+   *   Promise<object>: the update's result ; affectedRows 0 when the repository is unknown or
+   *   already claimed.
+   */
+  static async claim(name, op = undefined) {
+    // the operation's own status column, set with the lock or not at all
+    const opStatus = { pull: ", pull_status = 'running'", push: ", push_status = 'running'" }[op] || ""
     return Repository.writeState(
-      "update AnsibleForms.`repositories` set status = 'running', claim_node = ?, claim_since = NOW() where name = ? and COALESCE(status,'') <> 'running'",
+      "update AnsibleForms.`repositories` set status = 'running'" + opStatus + ", claim_node = ?, claim_since = NOW() where name = ? and COALESCE(status,'') <> 'running'",
       [nodeId, name], { name })
   }
 
-  // Release the claims nobody will release any more, marking those repositories 'failed' :
+  // Release the claims nobody will release any more, marking those repositories 'failed', and
+  // the pull or the push that held it (pull_status, push_status 'running') failed with them, so no
+  // badge stays on running for a node that will never end it :
   //   - the node holding it stopped answering (no heartbeat for NODE_DEAD_SECONDS)
   //   - it is older than CLAIM_MAX_HOURS : no git operation takes that long
   //   - atStart (the worker's start) : its own from before this process started (a process
@@ -1135,7 +1158,7 @@ class Repository extends CrudModel {
   // at its start, letting a second git process into a working tree an app node was writing.
   static async releaseStaleClaims({ atStart = false } = {}) {
     const result = await Repository.writeState(
-      "update AnsibleForms.`repositories` r set r.status = 'failed', r.claim_node = NULL where r.status = 'running' and (" +
+      "update AnsibleForms.`repositories` r set r.status = 'failed', " + releasedOperationsSql("r.") + "r.claim_node = NULL where r.status = 'running' and (" +
         "(r.claim_node IS NOT NULL and NOT EXISTS (SELECT 1 FROM AnsibleForms.`nodes` n WHERE n.id = r.claim_node AND n.last_seen > (NOW() - INTERVAL ? SECOND)))" +
         " or r.claim_since < (NOW() - INTERVAL ? HOUR)" +
         (atStart ? " or (r.claim_node = ? and r.claim_since < (NOW() - INTERVAL ? SECOND)) or r.claim_node IS NULL" : "") + ")",
@@ -1206,14 +1229,10 @@ class Repository extends CrudModel {
   // (use_for_playbooks), with their own message ; its vars files from the forms repository.
   static async sync(name, triggeredBy, message = undefined) {
     var output, status, head, syncRepo = null
-    // the last pull's status, given back when the push ends : a push has its own (push_status),
-    // and must not read as a failed or a fresh pull. Never 'running' : the SELECT and the claim are
-    // separate statements, so it could catch another operation's claim (as claimForWrite)
-    const before = await mysql.do("SELECT status FROM AnsibleForms.`repositories` WHERE name = ?", [name])
-    const pullStatus = before[0]?.status && before[0].status !== "running" ? before[0].status : null
     // atomic check-and-set : refuse concurrent syncs of the same repository
-    // (eg the settings page button while a designer push is in flight)
-    const claimed = await Repository.claim(name)
+    // (eg the settings page button while a designer push is in flight) ; its Push reads running,
+    // its Pull keeps how the last pull ended (pull_status, which a push never writes)
+    const claimed = await Repository.claim(name, "push")
     if (!claimed.affectedRows) {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
@@ -1250,9 +1269,9 @@ class Repository extends CrudModel {
       status = "failed"
     }
     output = Repository.maskSecrets(output, syncRepo) // never expose git credentials
-    // the push's own output, status and time ; the last pull's status back as it was (the claim
-    // released with it)
-    await Repository.writeState("update AnsibleForms.`repositories` set push_output = ?, push_status = ?, pushed_at = NOW(), status = ? where name = ?", [output, status, pullStatus, name], { name })
+    // the push's own output, status and time ; the claim released with it, status given back the
+    // last pull's (pull_status) : a push must not read as a failed or a fresh pull
+    await Repository.writeState("update AnsibleForms.`repositories` set push_output = ?, push_status = ?, pushed_at = NOW(), status = pull_status where name = ?", [output, status, name], { name })
     if (status == "success") {
       // Repo.info runs `git rev-parse --short HEAD`, which exits 128 on a repository
       // whose remote is EMPTY - a case this model explicitly supports (see
