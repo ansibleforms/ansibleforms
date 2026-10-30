@@ -1406,7 +1406,7 @@ export default {
       oneTimeRunPlaceholder: 'Eenmalig uitvoeren in plaats van herhalend',
       runAt: 'Uitvoeren op',
       runAtHelp: 'De datum en tijd om deze taak eenmalig uit te voeren',
-      extraVarsHelp: 'Geen formulier om de extra vars te voorzien, u moet ze hier toevoegen.',
+      extraVarsHelp: 'Geen formuliervelden om de extra vars te voorzien, u moet ze hier toevoegen.',
       state_idle: 'Inactief',
       state_queued: 'In wachtrij',
       state_running: 'Actief',

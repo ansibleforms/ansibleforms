@@ -1360,7 +1360,7 @@ export default {
       oneTimeRunPlaceholder: '只运行一次，不重复',
       runAt: '运行时间',
       runAtHelp: '运行此作业一次的日期和时间',
-      extraVarsHelp: '没有表单提供 extra vars，您必须在此处添加。',
+      extraVarsHelp: '没有表单字段提供 extra vars，您必须在此处添加。',
       state_idle: '空闲',
       state_queued: '排队中',
       state_running: '运行中',

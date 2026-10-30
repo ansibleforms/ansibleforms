@@ -1414,7 +1414,7 @@ export default {
       oneTimeRunPlaceholder: 'Executer une seule fois au lieu de recurremment',
       runAt: 'Executer a',
       runAtHelp: 'Date et heure pour executer ce job une seule fois',
-      extraVarsHelp: 'Aucun formulaire ne permet de fournir les variables supplementaires, vous devez les ajouter ici.',
+      extraVarsHelp: 'Aucun champ de formulaire ne fournit les variables supplémentaires, vous devez les ajouter ici.',
       state_idle: 'Inactif',
       state_queued: 'En file',
       state_running: 'En cours',
