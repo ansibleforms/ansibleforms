@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.0](https://github.com/ansibleforms/ansibleforms/compare/7.4.2...7.5.0) (2026-10-30)
+
+
+### Added
+
+* stored jobs can be shared with other users ([#1270](https://github.com/ansibleforms/ansibleforms/issues/1270)) ([5107289](https://github.com/ansibleforms/ansibleforms/commit/51072893a3d7c479a0f1ffaf754ef3c574c3f241))
+* the Edit All Forms, Edit All Playbooks and Edit All Workflows role options limit what a designer sees ([#1279](https://github.com/ansibleforms/ansibleforms/issues/1279)) ([a8c4fec](https://github.com/ansibleforms/ansibleforms/commit/a8c4fec02c04b10369e2da65c3df417e48854965))
+
+
+### Fixed
+
+* a backup folder is looked up among the backups on disk, never built from the request ([#1272](https://github.com/ansibleforms/ansibleforms/issues/1272)) ([fee18a5](https://github.com/ansibleforms/ansibleforms/commit/fee18a5c5873eef1177a0cec5ff3338eb6105ff8))
+* a designer without connections settings opens the Inventories tab without an error ([#1282](https://github.com/ansibleforms/ansibleforms/issues/1282)) ([f02f4d9](https://github.com/ansibleforms/ansibleforms/commit/f02f4d9577fdb9875f6267d13828925a22eb0a67))
+* a repository being pushed shows running under Push, not under Pull ([#1286](https://github.com/ansibleforms/ansibleforms/issues/1286)) ([c78ada2](https://github.com/ansibleforms/ansibleforms/commit/c78ada2c50f8de7596d968cd2830e85a6be78a30))
+* a repository page for an id that does not exist says so instead of showing the first repository ([#1281](https://github.com/ansibleforms/ansibleforms/issues/1281)) ([08c5a4e](https://github.com/ansibleforms/ansibleforms/commit/08c5a4e43a67db14193211df70d137eed48d69d9))
+* a stored job someone else owns never shows its password values ([#1275](https://github.com/ansibleforms/ansibleforms/issues/1275)) ([de3daf9](https://github.com/ansibleforms/ansibleforms/commit/de3daf98147ffae32ea33e5db314bb7a5a3ded73))
+* an API token follows the roles of its user as they are now ([#1276](https://github.com/ansibleforms/ansibleforms/issues/1276)) ([ce53aaf](https://github.com/ansibleforms/ansibleforms/commit/ce53aaf4daec7c2baa6a061fa06f3324a6ef8a02))
+* an SSO provider updated without its type keeps one provider of each type in use ([#1273](https://github.com/ansibleforms/ansibleforms/issues/1273)) ([3639e96](https://github.com/ansibleforms/ansibleforms/commit/3639e96f45b7c15a717b24ccab73a36d50d3eed1))
+* only an admin may change who is an admin from the settings' roles ([#1274](https://github.com/ansibleforms/ansibleforms/issues/1274)) ([1545b97](https://github.com/ansibleforms/ansibleforms/commit/1545b975b24a81f5323526ba9236c1ce320fe3dc))
+* the Escape key turns a confirm question down, as its header says ([#1277](https://github.com/ansibleforms/ansibleforms/issues/1277)) ([94e156c](https://github.com/ansibleforms/ansibleforms/commit/94e156ca6e7aeae76c22e83bf48f94264de5cd87))
+* the forms designer writes the lists it changes with one item per line ([#1284](https://github.com/ansibleforms/ansibleforms/issues/1284)) ([a3520df](https://github.com/ansibleforms/ansibleforms/commit/a3520df13d0698ee9cafc4359b36374f6425721e))
+* the header's labels never cover its menu links ([#1283](https://github.com/ansibleforms/ansibleforms/issues/1283)) ([0f4263c](https://github.com/ansibleforms/ansibleforms/commit/0f4263cba05a2f87b68788d5d905489ae370c356))
+* the Run later panel speaks the user's language ([#1278](https://github.com/ansibleforms/ansibleforms/issues/1278)) ([536b7ef](https://github.com/ansibleforms/ansibleforms/commit/536b7ef24d9d84a0cc38f326f81aadfd8e519afd))
+* the schedule's extra vars hint says no form fields provide them ([#1285](https://github.com/ansibleforms/ansibleforms/issues/1285)) ([cde8718](https://github.com/ansibleforms/ansibleforms/commit/cde8718e5521aa22bc64cf6f7135017e905bb494))
+* the sign-in, password, setup and API docs pages and the last English labels speak the user's language ([#1280](https://github.com/ansibleforms/ansibleforms/issues/1280)) ([8eb0ce6](https://github.com/ansibleforms/ansibleforms/commit/8eb0ce689ef20808d20469ea03f491ed43a16d31))
+
 ## [7.4.2](https://github.com/ansibleforms/ansibleforms/compare/7.4.1...7.4.2) (2026-10-27)
 
 
