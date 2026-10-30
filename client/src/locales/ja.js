@@ -1513,8 +1513,7 @@ export default {
       startedJob: 'ジョブ #{id}',
       startedJobHelp: '前回の実行で開始されたジョブ：開くと結果を確認できます。',
       rrule: '繰り返しルール (rrule)',
-      rruleHelp:
-        'iCal rrule: タイムゾーン (TZID) 付きの DTSTART、続いて RRULE、実行を除外する EXRULE。rrule 自身のタイムゾーンで実行されます。',
+      rruleHelp: 'TZID 付きの DTSTART、続いて RRULE、除外は EXRULE。その時刻帯で実行。',
       rruleInvalid: 'この rrule は拒否されました: {reason}',
       rruleNoRuns: 'この rrule には今後の実行がありません。',
       timing: 'タイミング',

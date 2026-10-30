@@ -9,8 +9,8 @@ import i18n from "../../lib/i18n.js";
 import ScheduleRepo from "../../models/scheduleRepo.model.js";
 import { validateRruleAsync, nextRunsAsync, zoneOf } from "../../lib/scheduleRrule.js";
 
-// how many runs a rrule's preview shows
-const PREVIEW_RUNS = 10;
+// how many runs a rrule's preview shows : four, on one line in a dialog, as a cron's (BsCron)
+const PREVIEW_RUNS = 4;
 
 const scheduleController = {
   async find(req, res) {
@@ -114,7 +114,7 @@ const scheduleController = {
 
   /**
    * A rrule checked, and its next runs (the preview) : its time zone,
-   * the next ten runs as UTC ISO strings, or why it is refused.
+   * the next four runs as UTC ISO strings, or why it is refused.
    *
    * Args:
    *   req (object): the request, ?rrule=<the rrule>.

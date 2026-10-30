@@ -1474,7 +1474,7 @@ export default {
       startedJob: '作业 #{id}',
       startedJobHelp: '上次运行启动的作业：打开它查看其结束方式。',
       rrule: '重复规则 (rrule)',
-      rruleHelp: 'iCal rrule:带时区 (TZID) 的 DTSTART,然后是 RRULE,以及用于排除运行的 EXRULE。它在自己的时区中运行。',
+      rruleHelp: '带 TZID 的 DTSTART,然后是 RRULE,EXRULE 排除运行。按该时区运行。',
       rruleInvalid: '此 rrule 被拒绝:{reason}',
       rruleNoRuns: '此 rrule 之后没有运行。',
       timing: '时间安排',

@@ -1528,8 +1528,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: 'De job die de laatste uitvoering startte: open hem om te zien hoe hij eindigde.',
       rrule: 'Herhalingsregel (rrule)',
-      rruleHelp:
-        'Een iCal-rrule: DTSTART met zijn tijdzone (TZID), dan RRULE, en EXRULE om runs over te slaan. Hij loopt in zijn eigen tijdzone.',
+      rruleHelp: 'DTSTART met zijn TZID, dan RRULE, en EXRULE om runs over te slaan. In die zone.',
       rruleInvalid: 'Deze rrule wordt geweigerd: {reason}',
       rruleNoRuns: 'Deze rrule heeft geen komende run meer.',
       timing: 'Timing',

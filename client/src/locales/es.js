@@ -1533,8 +1533,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: 'El job que inició la última ejecución: ábrelo para ver cómo terminó.',
       rrule: 'Regla de recurrencia (rrule)',
-      rruleHelp:
-        'Una rrule iCal: DTSTART con su zona horaria (TZID), luego RRULE, y EXRULE para excluir ejecuciones. Se ejecuta en su propia zona horaria.',
+      rruleHelp: 'DTSTART con su TZID, luego RRULE, y EXRULE para excluir. Se ejecuta en esa zona.',
       rruleInvalid: 'Esta rrule se rechaza: {reason}',
       rruleNoRuns: 'Esta rrule no tiene más ejecuciones por delante.',
       timing: 'Programación',

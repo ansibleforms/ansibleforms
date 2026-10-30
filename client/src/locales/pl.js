@@ -1520,8 +1520,7 @@ export default {
       startedJob: 'Zadanie #{id}',
       startedJobHelp: 'Zadanie uruchomione przez ostatni przebieg: otwórz je, aby zobaczyć, jak się zakończyło.',
       rrule: 'Reguła powtarzania (rrule)',
-      rruleHelp:
-        'Reguła iCal rrule: DTSTART ze strefą czasową (TZID), potem RRULE oraz EXRULE, aby pominąć uruchomienia. Działa we własnej strefie czasowej.',
+      rruleHelp: 'DTSTART z TZID, potem RRULE, a EXRULE pomija uruchomienia. Działa w tej strefie.',
       rruleInvalid: 'Ta reguła rrule jest odrzucona: {reason}',
       rruleNoRuns: 'Ta reguła rrule nie ma już żadnego uruchomienia.',
       timing: 'Harmonogram',

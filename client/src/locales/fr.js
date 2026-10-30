@@ -1533,8 +1533,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: "Le job lancé par la dernière exécution : ouvrez-le pour voir comment il s'est terminé.",
       rrule: 'Règle de récurrence (rrule)',
-      rruleHelp:
-        "Une rrule iCal : DTSTART avec son fuseau horaire (TZID), puis RRULE, et EXRULE pour retirer des exécutions. Elle s'exécute dans son propre fuseau horaire.",
+      rruleHelp: 'DTSTART avec son TZID, puis RRULE, et EXRULE pour en retirer. Dans ce fuseau.',
       rruleInvalid: 'Cette rrule est refusée : {reason}',
       rruleNoRuns: "Cette rrule n'a plus d'exécution à venir.",
       timing: 'Planification',

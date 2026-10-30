@@ -1511,8 +1511,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: 'The job the last run started: open it to see how it ended.',
       rrule: 'Recurrence rule (rrule)',
-      rruleHelp:
-        'An iCal rrule: DTSTART with its time zone (TZID), then RRULE, and EXRULE to leave runs out. It runs in its own time zone.',
+      rruleHelp: 'DTSTART with its TZID, then RRULE, and EXRULE to skip runs. Runs in that zone.',
       rruleInvalid: 'This rrule is refused: {reason}',
       rruleNoRuns: 'This rrule has no run ahead.',
       timing: 'Timing',

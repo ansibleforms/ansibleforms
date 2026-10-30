@@ -1537,8 +1537,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: 'Der Job, den der letzte Lauf gestartet hat: öffnen Sie ihn, um zu sehen, wie er endete.',
       rrule: 'Wiederholungsregel (rrule)',
-      rruleHelp:
-        'Eine iCal-rrule: DTSTART mit seiner Zeitzone (TZID), dann RRULE und EXRULE, um Läufe auszulassen. Sie läuft in ihrer eigenen Zeitzone.',
+      rruleHelp: 'DTSTART mit TZID, dann RRULE, EXRULE lässt Läufe aus. Läuft in dieser Zone.',
       rruleInvalid: 'Diese rrule wird abgelehnt: {reason}',
       rruleNoRuns: 'Diese rrule hat keinen kommenden Lauf.',
       timing: 'Zeitsteuerung',

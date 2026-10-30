@@ -1532,8 +1532,7 @@ export default {
       startedJob: 'Tasca #{id}',
       startedJobHelp: "La tasca que va iniciar l'última execució: obre-la per veure com va acabar.",
       rrule: 'Regla de recurrència (rrule)',
-      rruleHelp:
-        "Una rrule iCal: DTSTART amb el seu fus horari (TZID), després RRULE, i EXRULE per excloure execucions. S'executa en el seu propi fus horari.",
+      rruleHelp: "DTSTART amb TZID, després RRULE, i EXRULE per ometre. S'executa en aquest fus.",
       rruleInvalid: 'Aquesta rrule es rebutja: {reason}',
       rruleNoRuns: 'Aquesta rrule no té cap execució per davant.',
       timing: 'Programació',

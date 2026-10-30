@@ -6949,7 +6949,7 @@
           "schedule"
         ],
         "summary": "Check a rrule and preview its next runs",
-        "description": "Checks an iCal rrule and gives its next ten runs, in UTC, worked out in the rrule's own time zone. A rule that never fires (no run in the 50 years after its DTSTART) is refused ; runs that cannot be worked out within a second are said in errors.",
+        "description": "Checks an iCal rrule and gives its next four runs, in UTC, worked out in the rrule's own time zone. A rule that never fires (no run in the 50 years after its DTSTART) is refused ; runs that cannot be worked out within a second are said in errors.",
         "security": [
           {
             "bearerAuth": []

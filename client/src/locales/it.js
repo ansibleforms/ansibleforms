@@ -1527,8 +1527,7 @@ export default {
       startedJob: 'Job #{id}',
       startedJobHelp: "Il job avviato dall'ultima esecuzione: aprilo per vedere come è finito.",
       rrule: 'Regola di ricorrenza (rrule)',
-      rruleHelp:
-        'Una rrule iCal: DTSTART con il suo fuso orario (TZID), poi RRULE, ed EXRULE per escludere delle esecuzioni. Viene eseguita nel suo fuso orario.',
+      rruleHelp: 'DTSTART con il suo TZID, poi RRULE, ed EXRULE per escludere. Gira in quel fuso.',
       rruleInvalid: 'Questa rrule è rifiutata: {reason}',
       rruleNoRuns: 'Questa rrule non ha più esecuzioni in programma.',
       timing: 'Pianificazione',

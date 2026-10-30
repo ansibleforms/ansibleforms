@@ -1532,8 +1532,7 @@ export default {
       startedJob: 'Tarefa #{id}',
       startedJobHelp: 'A tarefa que a última execução iniciou: abra-a para ver como terminou.',
       rrule: 'Regra de recorrência (rrule)',
-      rruleHelp:
-        'Uma rrule iCal: DTSTART com o seu fuso horário (TZID), depois RRULE, e EXRULE para excluir execuções. Corre no seu próprio fuso horário.',
+      rruleHelp: 'DTSTART com o seu TZID, depois RRULE, e EXRULE para excluir. Corre nesse fuso.',
       rruleInvalid: 'Esta rrule é recusada: {reason}',
       rruleNoRuns: 'Esta rrule não tem mais execuções pela frente.',
       timing: 'Agendamento',

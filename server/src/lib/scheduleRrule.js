@@ -32,7 +32,7 @@
 //   a time a DST change skips runs when the clock reaches it (02:30 on the night the clock goes
 //     from 02:00 to 03:00 runs at 03:30, as a cron does), a time the clock shows twice runs at
 //     the first
-//   a preview shows the next ten runs
+//   a preview shows the next four runs
 //
 // rrule.js is a port of python-dateutil's rrule : it reads the rule. The days of a year a rule's
 // BYxxx parts keep are worked out here as dateutil keeps them (keptDaysOfYear), in one pass over
