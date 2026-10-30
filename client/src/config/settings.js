@@ -115,19 +115,20 @@ export function statusPill(t, value) {
 
 /**
  * A repository's last pull as a pill : running blue, success green, failed red ; never pulled
- * (no status yet) an en dash. Its clone, sync and reset write the same status. When it ended
- * follows it, grey.
+ * (no pull_status yet) an en dash. Its clone and reset write the same pull_status ; a push
+ * never does, so a repository being pushed keeps its last pull here (its status, the lock any
+ * git operation takes, says running then). When it ended follows it, grey.
  *
  * Args:
  *   t (function): the translation function.
- *   repo (object): the repository, with status (its last pull) and pulled_at.
+ *   repo (object): the repository, with pull_status (its last pull) and pulled_at.
  *   withDate (boolean): when it ended beside it (the repository's page ; not the list's table).
  *
  * Returns:
  *   string: the pill's markup.
  */
 export function repositoryPullPill(t, repo, withDate = true) {
-  return statusPill(t, repo?.status) + (withDate ? pillDate(repo?.pulled_at) : '');
+  return statusPill(t, repo?.pull_status) + (withDate ? pillDate(repo?.pulled_at) : '');
 }
 
 /**
@@ -166,10 +167,10 @@ export function defaultNote(t, on) {
 }
 
 /**
- * A repository's push as a pill : its last push failed red ; else changes saved here and not
- * pushed yet, pending changes in the designer's push orange (something waits) ; else its last
- * push worked, success green ; never pushed (or a repository the app does not write to) an en
- * dash, as a pull that never ran. When the last push ended follows it, grey.
+ * A repository's push as a pill : a push running blue ; its last push failed red ; else changes
+ * saved here and not pushed yet, pending changes in the designer's push orange (something
+ * waits) ; else its last push worked, success green ; never pushed (or a repository the app does
+ * not write to) an en dash, as a pull that never ran. When the last push ended follows it, grey.
  *
  * Args:
  *   t (function): the translation function.
@@ -181,7 +182,7 @@ export function defaultNote(t, on) {
  */
 export function repositoryPushPill(t, repo, withDate = true) {
   const date = withDate ? pillDate(repo?.pushed_at) : '';
-  if (repo?.push_status === 'failed') return statusPill(t, 'failed') + date;
+  if (repo?.push_status === 'running' || repo?.push_status === 'failed') return statusPill(t, repo.push_status) + date;
   if (repo?.unpushed) {
     return pill(PILL.unpushed, t('settings.repositories.notPushed'), t('settings.repositories.notPushedHint')) + date;
   }
@@ -1044,21 +1045,24 @@ export default function getSettings(t) {
         },
         // a commit's 7 characters
         { key: 'head', label: t('settings.fields.head'), noInput: true, hideBelow: 900 },
-        // its last pull (clone, sync or reset) : running, success or failed
+        // its last pull (clone or reset) : running, success or failed (pull_status ; the column
+        // keeps its key, status, so the columns a user chose stay as they were)
         {
           key: 'status',
           label: t('settings.fields.pull'),
           noInput: true,
           render: (v, row) => repositoryPullPill(t, row, false),
-          sortValue: (r) => ({ failed: 0, running: 1, success: 2 })[r.status] ?? 3,
+          sortValue: (r) => ({ failed: 0, running: 1, success: 2 })[r.pull_status] ?? 3,
         },
-        // its push : changes saved here (the designer's Save) and not pushed yet, or none
+        // its push : running, failed, changes saved here (the designer's Save) and not pushed yet,
+        // pushed, or none
         {
           key: 'unpushed',
           label: t('settings.fields.push'),
           noInput: true,
           render: (v, row) => repositoryPushPill(t, row, false),
-          sortValue: (r) => (r.push_status === 'failed' ? 0 : r.unpushed ? 1 : r.push_status === 'success' ? 2 : 3),
+          sortValue: (r) =>
+            ({ failed: 0, running: 1 })[r.push_status] ?? (r.unpushed ? 2 : r.push_status === 'success' ? 3 : 4),
         },
         {
           // a credential of Connections > Credentials, or a New one : the user and password git

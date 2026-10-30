@@ -16,6 +16,7 @@ import Errors from '../lib/errors.js';
 import logger from '../lib/logger.js';
 import { bump } from '../lib/epochs.js';
 import mysql from './db.model.js';
+import { releasedOperationsSql } from '../lib/repositoryClaims.js';
 
 // The tables that describe the running processes, not the configuration : which nodes are up,
 // what changed between them (lib/epochs.js), who holds the designer, which RTE holds which
@@ -88,9 +89,10 @@ async function releaseRestoredRuntime() {
     "UPDATE AnsibleForms.`jobs` SET status='abandoned', abort_requested=0, host=NULL, pid=NULL " +
     "WHERE status='running' OR (status='approve' AND job_type='workflow')");
   released.jobs = jobs?.changedRows || 0;
-  // step 2 : the repository claims (a pull or a save of then) : failed, as a stale claim is
+  // step 2 : the repository claims (a pull, a push or a save of then) : failed, as a stale claim
+  // is, with the pull or the push it was running (no badge left on running)
   const repos = await mysql.do(
-    "UPDATE AnsibleForms.`repositories` SET status='failed', claim_node=NULL WHERE status='running'");
+    "UPDATE AnsibleForms.`repositories` SET status='failed', " + releasedOperationsSql() + "claim_node=NULL WHERE status='running'");
   released.repositories = repos?.changedRows || 0;
   // step 3 : a schedule launching then : idle again, so the queue goes on
   const schedules = await mysql.do(

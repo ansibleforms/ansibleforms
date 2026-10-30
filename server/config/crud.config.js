@@ -274,7 +274,9 @@ const crudConfigs = {
       // when the last pull and the last push ended
       { name: 'pulled_at' },
       { name: 'pushed_at' },
-      // how the last push ended ; status is the last pull's
+      // how the last pull (or clone, reset) and the last push ended, each 'running' while it
+      // runs ; status is the lock any git operation takes, else the last pull's
+      { name: 'pull_status' },
       { name: 'push_status' },
       { name: 'head' },
       { name: 'managed', isBoolean: true }

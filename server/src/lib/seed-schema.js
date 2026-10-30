@@ -282,8 +282,8 @@ const repositoryItem = {
     use_for_inventories: bool,
     rebase_on_start: bool,
     cron: str,
-    // status, push_status, pull_output, push_output, pulled_at, pushed_at and head are runtime
-    // state written by git, never declared
+    // status, pull_status, push_status, pull_output, push_output, pulled_at, pushed_at and head
+    // are runtime state written by git, never declared
   },
 };
 

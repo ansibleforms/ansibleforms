@@ -417,7 +417,9 @@ async function save() {
  *   what (string): clone, reset or sync.
  */
 async function run(what) {
+  // the lock, and the badge of what runs : the Push one for a push (sync), else the Pull one
   repo.value.status = 'running';
+  repo.value[what === 'sync' ? 'push_status' : 'pull_status'] = 'running';
   try {
     await axios.post(`/api/v2/repository/${encodeURIComponent(repoName.value)}/${what}`, {});
   } catch (err) {

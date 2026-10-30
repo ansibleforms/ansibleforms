@@ -294,7 +294,7 @@ describe("a restore leaves nothing of the backup's time running", () => {
     await BackupModel.restore(folder, false);
     const jobs = statements.find((s) => /UPDATE AnsibleForms.`jobs`/.test(s));
     assert.match(jobs, /SET status='abandoned', abort_requested=0, host=NULL, pid=NULL WHERE status='running' OR \(status='approve' AND job_type='workflow'\)/);
-    assert.ok(statements.some((s) => /UPDATE AnsibleForms.`repositories` SET status='failed', claim_node=NULL WHERE status='running'/.test(s)));
+    assert.ok(statements.some((s) => /UPDATE AnsibleForms.`repositories` SET status='failed', pull_status = IF\(pull_status = 'running', 'failed', pull_status\), push_status = IF\(push_status = 'running', 'failed', push_status\), claim_node=NULL WHERE status='running'/.test(s)));
     assert.ok(statements.some((s) => /UPDATE AnsibleForms.`schedule` SET state='idle', claim_node=NULL WHERE state='running'/.test(s)));
   });
 
