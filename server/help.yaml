@@ -6586,6 +6586,11 @@
       the app with their name, form, timing, values, enabled and job options, and keep running on their timing; the
       files in git are left as they are. Turning it on again goes through the same steps as the first time.
       Repository schedules run as the Schedule Service, as every schedule of the app.
+
+      **The `schedule` extra var.** Every job a schedule launches gets the schedule as the extra var `schedule`:
+      its `id`, `name`, `description`, `form`, `enabled`, `queue_id`, `repository`, `repo_file` and
+      `one_time_run` (the moment of its one run, null for a recurring one). `schedule.run_at` is the same moment
+      under the name it had before 7.5.0, kept for the playbooks that read it: deprecated, removed in 8.
   - name: Repository usage types
     short: What a repository is used for, in five groups
     version: v7.5.0

@@ -517,6 +517,9 @@ class Schedule extends CrudModel {
       delete scheduleInfo.launch_options;
       delete scheduleInfo.extra_vars;
       delete scheduleInfo.raw_form_data;
+      // run_at : the moment of its one run as a playbook read it before 7.5.0 (one_time_run holds
+      // it now) - a copy kept for those playbooks, deprecated, removed in 8
+      scheduleInfo.run_at = schedule.one_time_run ?? null;
       delete scheduleInfo.stored_job_id;
       // a planned job's raw field values, for the launch validation (Schedule.plan)
       let rawFormData = {};

@@ -334,6 +334,20 @@ describe("Schedule.launch", () => {
     assert.equal(launched.extravars.schedule, undefined, "the schedule's record is not form output");
   });
 
+  test("the schedule extra var keeps run_at, a copy of one_time_run's moment as before 7.5.0 (deprecated)", async () => {
+    await Schedule.launch(1);
+    const { schedule } = launched.serverExtravars;
+    // the moment as the table gives it, a Date : sent as before
+    assert.ok(schedule.one_time_run instanceof Date);
+    assert.equal(schedule.run_at, schedule.one_time_run);
+    assert.equal(JSON.parse(JSON.stringify(schedule)).run_at, "2030-01-01T10:00:00.000Z");
+    // a recurring one : none, as before
+    row.one_time_run = null;
+    row.cron = "0 1 * * *";
+    await Schedule.launch(1);
+    assert.equal(launched.serverExtravars.schedule.run_at, null);
+  });
+
   test("a planned job fires with the raw field values it was planned with", async () => {
     row.owner = JSON.stringify({ username: "bob", type: "local", roles: ["users"], groups: [], options: {} });
     row.raw_form_data = JSON.stringify({ host: "prod-1" });
