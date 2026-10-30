@@ -1349,6 +1349,10 @@ export default {
       pullAllSkipped:
         'Pull non eseguito, modifiche non ancora inviate: inviale prima (Push) o reimposta il repository: {names}',
       push: 'Push',
+      pushAll: 'Push di tutti',
+      pushAllDone: '{n} repository inviato | {n} repository inviati',
+      pushAllFailed: 'Push non riuscito per: {names}',
+      pushAllNone: 'Nessun repository ha modifiche da inviare',
       pushHint:
         'Solo un repository in cui scrive il designer (moduli, impostazioni, playbook, workflow) viene rimandato.',
       reset: 'Reimposta',

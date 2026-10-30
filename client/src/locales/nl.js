@@ -1350,6 +1350,10 @@ export default {
       pullAllSkipped:
         'Niet gepulld, wijzigingen nog niet gepusht: push ze eerst (Push), of reset de repository: {names}',
       push: 'Push',
+      pushAll: 'Alles pushen',
+      pushAllDone: '{n} repository gepusht | {n} repository’s gepusht',
+      pushAllFailed: 'Push mislukt voor: {names}',
+      pushAllNone: 'Geen repository heeft wijzigingen om te pushen',
       pushHint:
         'Alleen een repository waarin de designer schrijft (formulieren, instellingen, playbooks, workflows) wordt teruggepusht.',
       reset: 'Resetten',

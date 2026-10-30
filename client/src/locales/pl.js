@@ -1345,6 +1345,10 @@ export default {
       pullAllSkipped:
         'Nie pobrano, zmiany nie zostały jeszcze wypchnięte: najpierw je wypchnij (Push) lub zresetuj repozytorium: {names}',
       push: 'Push',
+      pushAll: 'Push wszystkich',
+      pushAllDone: 'Wypchnięto {n} repozytorium | Wypchnięto {n} repozytoria | Wypchnięto {n} repozytoriów',
+      pushAllFailed: 'Push nie powiódł się dla: {names}',
+      pushAllNone: 'Żadne repozytorium nie ma zmian do wypchnięcia',
       pushHint:
         'Wypychane jest tylko repozytorium, do którego pisze projektant (formularze, ustawienia, playbooki, workflowy).',
       reset: 'Resetuj',

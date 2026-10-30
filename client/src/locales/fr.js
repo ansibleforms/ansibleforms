@@ -1353,6 +1353,10 @@ export default {
       pullAllSkipped:
         'Pas de pull, des modifications ne sont pas encore poussées : poussez-les d’abord (Push), ou réinitialisez le dépôt : {names}',
       push: 'Push',
+      pushAll: 'Tout pousser',
+      pushAllDone: '{n} dépôt poussé | {n} dépôts poussés',
+      pushAllFailed: 'Échec du push pour : {names}',
+      pushAllNone: 'Aucun dépôt n’a de modifications à pousser',
       pushHint: 'Seul un dépôt où écrit le designer (formulaires, paramètres, playbooks, workflows) est renvoyé.',
       reset: 'Réinitialiser',
       changeCredentials: 'Modifier les identifiants',
