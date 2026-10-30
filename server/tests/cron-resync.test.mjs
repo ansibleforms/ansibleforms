@@ -77,3 +77,26 @@ describe("the registry follows the database", () => {
     assert.ok(d.lastResync);
   });
 });
+
+describe("a schedules repository's entry is registered as the app's schedule of its timing", () => {
+  test("a cron with croner on its pattern, a rrule by its next run, a one time run checked every minute", async () => {
+    const { parseSchedule } = await import("../src/lib/scheduleFiles.js");
+    const { valuesOf } = await import("../src/lib/repoObjects/schedules.js");
+    const RRULE = "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1";
+    // each entry stored as a pull stores it
+    const stored = (id, entry) => ({ id, ...valuesOf(parseSchedule({ name: `s${id}`, unified_job_template: "Report", ...entry }).schedule) });
+    schedules = [stored(1, { cron: "30 2 * * 1-5" }), stored(2, { rrule: RRULE }), stored(3, { one_time_run: "2030-05-06T07:08:00Z" })];
+    repositories = [];
+    const rrules = [];
+    const original = cronService.addRruleSchedule;
+    cronService.addRruleSchedule = (id, name, rrule) => rrules.push([id, rrule]);
+    try {
+      await cronService.initializeAll();
+    } finally {
+      cronService.addRruleSchedule = original;
+    }
+    assert.equal(cronService.jobs.schedules.get(1).getPattern(), "30 2 * * 1-5");
+    assert.deepEqual(rrules, [[2, RRULE]]);
+    assert.equal(cronService.jobs.schedules.get(3).getPattern(), "* * * * *");
+  });
+});

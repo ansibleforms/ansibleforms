@@ -168,7 +168,13 @@ describe("an entry that is not a valid schedule is refused, saying why", () => {
   };
   test("no name", () => refused({ ...base, name: "" }, "name is required"));
   test("a name longer than the schedule table keeps", () => refused({ ...base, name: "n".repeat(256) }, "longer than 255"));
-  test("no rrule", () => refused({ ...base, rrule: undefined }, "rrule is required"));
+  test("no timing", () => refused({ ...base, rrule: undefined }, "one of rrule, cron or one_time_run"));
+  test("two timings", () => refused({ ...base, cron: "0 1 * * *" }, "give one of rrule, cron or one_time_run, not rrule and cron"));
+  test("three timings", () => refused({ ...base, cron: "0 1 * * *", one_time_run: "2030-01-01T00:00:00Z" }, "not rrule and cron and one_time_run"));
+  test("a cron the app refuses", () => refused({ ...base, rrule: undefined, cron: "0 0 30 2 *" }, "cron: "));
+  test("a cron that is no text", () => refused({ ...base, rrule: undefined, cron: 5 }, "cron must be text"));
+  test("a one_time_run without its zone", () => refused({ ...base, rrule: undefined, one_time_run: "2030-01-01T00:00:00" }, "without a zone"));
+  test("a one_time_run on a day there is not", () => refused({ ...base, rrule: undefined, one_time_run: "2030-02-30T00:00:00Z" }, "is not a valid time"));
   test("a refused rrule", () => refused({ ...base, rrule: "DTSTART:20300101T000000Z RRULE:FREQ=SECONDLY;INTERVAL=1" }, "SECONDLY is not supported"));
   test("a naive DTSTART", () => refused({ ...base, rrule: "DTSTART:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1" }, "naive"));
   test("no unified_job_template name", () => refused({ ...base, unified_job_template: { type: "job_template" } }, "unified_job_template.name"));

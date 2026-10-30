@@ -473,26 +473,20 @@ describe('what the question can and cannot know', () => {
 });
 
 describe('why an object stays in the app', () => {
-  it("a schedule's cron a rrule cannot express in its own sentence, the other reasons translated in the common one", () => {
+  it('every reason in one sentence, translated by its code ; a schedule is never kept for its cron', () => {
     const lines = activationLines(t, 'schedules', 'ops', {
       written: [],
       kept: [
-        {
-          name: 'Weekly',
-          code: 'cron',
-          cron: '0 0 1 * 1',
-          reason: 'both the day of the month and the day of the week',
-        },
-        { name: 'Empty', code: 'noSchedule', cron: null, reason: 'it has no cron nor rrule' },
-        { name: 'Broken', code: 'notWritten', cron: '0 1 * * *', error: 'disk full', reason: 'not written: disk full' },
+        { name: 'Empty', code: 'noSchedule', reason: 'it has no valid cron, rrule or run_at' },
+        { name: 'Broken', code: 'notWritten', error: 'disk full', reason: 'not written: disk full' },
       ],
     });
-    expect(lines).toContain('settings.repositories.schedulesOnKept {"names":"Weekly (0 0 1 * 1)"}');
     expect(lines).toContain(
       'settings.repositories.usageOnKept {"names":"Empty (settings.repositories.usageKeptWhy.noSchedule), ' +
         'Broken (settings.repositories.usageKeptWhy.notWritten {\\"error\\":\\"disk full\\"})"}',
     );
-    expect(lines.join(' ')).not.toContain('it has no cron');
+    expect(lines.join(' ')).not.toContain('it has no valid');
+    expect(lines.join(' ')).not.toContain('schedulesOnKept');
   });
 
   it('every code the server gives has its words in every language', async () => {
@@ -504,7 +498,7 @@ describe('why an object stays in the app', () => {
       const reasons = text.match(/KEPT_REASONS = \{([^}]*)\}/);
       if (reasons) for (const m of reasons[1].matchAll(/^\s*(\w+):/gm)) codes.add(m[1]);
     }
-    expect([...codes]).toEqual(expect.arrayContaining(['seed', 'holder', 'noSchedule', 'cron', 'notWritten']));
+    expect([...codes]).toEqual(expect.arrayContaining(['seed', 'holder', 'noSchedule', 'notWritten']));
     for (const lang of LANGS) {
       const why = (await import(`../src/locales/${lang}.js`)).default.settings.repositories.usageKeptWhy;
       for (const code of codes) expect(why[code], `${lang}: ${code}`).toBeTruthy();

@@ -1,15 +1,17 @@
 'use strict';
 // The schedules of the schedules repository (use_for_schedules) : the entries of the schedules:
-// lists of its YAML files, any name, any folder (lib/scheduleFiles.js), timed by its iCal rrule
-// (lib/scheduleRrule.js), run as the Schedule Service as every recurring schedule.
+// lists of its YAML files, any name, any folder (lib/scheduleFiles.js), each timed as an app
+// schedule is - its iCal rrule (lib/scheduleRrule.js), its cron, or once at its run_at - and run as
+// the Schedule Service as the app's schedule of that timing.
 //
 // The Schedules type of the repository-backed objects : the engine (lib/repoObjects/engine.js)
-// reads the entries into the schedule table after each pull, takes the app's recurring schedules
-// when a repository is made the schedules repository and lets them go, unlinked, when it is no
-// longer one ; the type's descriptor (lib/repoObjects/schedules.js) says how a file reads and a row
-// is stored. What is the schedules' own stays here : a schedule made, edited or deleted in the app
-// is checked as a schedule (its form, its rrule, a cron written as a rrule) and saved into its entry
-// under the repository's write claim, the file put back when the database refuses it.
+// reads the entries into the schedule table after each pull, takes the app's schedules (each with
+// its own timing) when a repository is made the schedules repository and lets them go, unlinked,
+// when it is no longer one ; the type's descriptor (lib/repoObjects/schedules.js) says how a file
+// reads and a row is stored. What is the schedules' own stays here : a schedule made, edited or
+// deleted in the app is checked as a schedule (its form, its timing : rrule, cron or run_at) and
+// saved into its entry under the repository's write claim, the file put back when the database
+// refuses it.
 //
 // The scheduler always runs from the database ; the repository is a source kept in step with it.
 // What runs a schedule (its state, last run, output, queue) stays in the database, never in the
@@ -22,10 +24,10 @@ import Repo from "./repo.model.js";
 import Errors from "../lib/errors.js";
 import { parseSchedule, updateScheduleText, newScheduleEntry, scheduleEntryOf, extraDataOf } from "../lib/scheduleFiles.js";
 import { validateRruleAsync, normalizeRrule } from "../lib/scheduleRrule.js";
-import { cronToRrule } from "../lib/cronToRrule.js";
-import logConfig from "../../config/log.config.js";
+import { cronError } from "../lib/cronValidate.js";
+import { parseMoment } from "../lib/oneTimeRun.js";
 import Engine, { withWriteClaim, fileOf, writeEntries, entryFileOf, removeEntry, nameKey, filesNow, assertTypeReadable } from "../lib/repoObjects/engine.js";
-import schedules, { extraVarsText, launchOptionsText, formNames, valuesOf } from "../lib/repoObjects/schedules.js";
+import schedules, { extraVarsText, formNames, valuesOf, timingOfRow } from "../lib/repoObjects/schedules.js";
 
 const MODEL = "schedule";
 
@@ -46,7 +48,7 @@ const ScheduleRepo = {
   afterGit: (name) => Engine.syncText(schedules, name),
   // every schedules repository synced (the worker's start), each under its write claim
   syncAll: () => Engine.syncAllOf(schedules),
-  // its schedules unlinked : they stay in the app, on their rrule
+  // its schedules unlinked : they stay in the app, on their own timing
   unlinkRepository: (name) => Engine.unlinkRepository(schedules, name),
   // what making a repository the schedules repository would do, changing nothing
   preview: (name) => Engine.preview(schedules, name),
@@ -76,10 +78,11 @@ ScheduleRepo.renameRepository = async function (from, to) {
 
 /**
  * Checks what a schedule of a repository is given in the app : a name no other schedule has, a
- * form that exists, a valid rrule, extra vars that are a dictionary.
+ * form that exists, a valid timing (a rrule, a cron as the app checks one, or a run_at as the app
+ * reads one), extra vars that are a dictionary.
  *
  * Args:
- *   values (object): { name, form, rrule, extra_vars } (those given).
+ *   values (object): { name, form, rrule, cron, oneTimeRun, extra_vars } (those given).
  *   id (number|null): the schedule itself, null for a new one.
  *
  * Returns:
@@ -103,9 +106,17 @@ async function checkValues(values, id) {
     if (forms === null) throw new Errors.ConflictError(`The forms could not be read to check the form '${values.form}': fix the configuration first (see the server log).`);
     if (!forms.has(values.form)) throw new Errors.BadRequestError(`The form '${values.form}' does not exist.`);
   }
-  if (values.rrule !== undefined) {
+  if (values.rrule) {
     const errors = await validateRruleAsync(values.rrule);
     if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
+  }
+  if (values.cron) {
+    const problem = cronError(values.cron);
+    if (problem) throw new Errors.BadRequestError(`Invalid cron expression: ${problem}`);
+  }
+  if (values.oneTimeRun) {
+    const { error } = parseMoment(values.oneTimeRun, "one_time_run");
+    if (error) throw new Errors.BadRequestError(`The one-time run is refused: ${error}`);
   }
   if (values.extra_vars !== undefined) {
     try {
@@ -118,23 +129,41 @@ async function checkValues(values, id) {
 }
 
 /**
- * A cron as the rrule that fires at the same moments in the scheduler's zone, for a new schedule
- * sent with a cron while a schedules repository is used.
+ * The timing a request gives a schedule of a repository, as the app takes it for its own
+ * (models/schedule.model.js checkAppRrule) : a one time run by its run_at, else a rrule, which wins
+ * over a cron sent with it, else a cron ; a rrule sent with a one time run is refused. Nothing given
+ * (an edit of its other fields) : undefined, its timing stays.
  *
  * Args:
- *   cron (string): the cron.
+ *   data (object): the request body ({ one_time_run, run_at, rrule, cron }, those given).
+ *   current (object|null): the schedule as it is (an edit), null for a new one.
  *
  * Returns:
- *   string: the rrule ('' for no cron).
+ *   object|undefined: { rrule, cron, oneTimeRun } (the one given, the others null) ; undefined when
+ *     the request gives none.
  *
  * Raises:
- *   Errors.BadRequestError: a cron a rrule cannot express.
+ *   Errors.BadRequestError: a rrule with a one time run, a one time run without its run_at, or a
+ *     new schedule (or one no longer run once) without a timing.
  */
-function cronRrule(cron) {
-  if (!cron || !String(cron).trim()) return "";
-  const converted = cronToRrule(cron, logConfig.tz || "UTC");
-  if (!converted.rrule) throw new Errors.BadRequestError(`The cron '${cron}' cannot be written as a rrule: ${converted.reason}. Give a rrule.`);
-  return converted.rrule;
+function timingOfRequest(data, current = null) {
+  const text = (v) => (v === undefined || v === null ? "" : String(v).trim());
+  const onceGiven = data.one_time_run !== undefined && data.one_time_run !== null;
+  const once = onceGiven ? data.one_time_run === true || Number(data.one_time_run) === 1 : null;
+  const was = current ? timingOfRow(current) : null;
+  // run once : asked for, or a one time run given a new run_at
+  if (once || (once === null && was?.oneTimeRun && text(data.run_at))) {
+    if (text(data.rrule)) throw new Errors.BadRequestError("A one time run has no rrule: send either, not both.");
+    const oneTimeRun = text(data.run_at) || was?.oneTimeRun;
+    if (!oneTimeRun) throw new Errors.BadRequestError("A one time run needs its run_at.");
+    return { rrule: null, cron: null, oneTimeRun };
+  }
+  if (text(data.rrule)) return { rrule: normalizeRrule(data.rrule), cron: null, oneTimeRun: null };
+  if (text(data.cron)) return { rrule: null, cron: text(data.cron), oneTimeRun: null };
+  // a new one, or one no longer run once, without what else it runs on : refused
+  if (!current || (once === false && was?.oneTimeRun)) throw new Errors.BadRequestError("A schedule needs a cron, a rrule or a one time run (run_at).");
+  // nothing said of its timing : it stays
+  return undefined;
 }
 
 /**
@@ -144,7 +173,8 @@ function cronRrule(cron) {
  *
  * Args:
  *   repository (string): the repository.
- *   data (object): { name, description, form, rrule, enabled, extra_vars }.
+ *   data (object): { name, description, form, its timing (rrule, cron, or one_time_run with
+ *     run_at : timingOfRequest), enabled, extra_vars }.
  *
  * Returns:
  *   Promise<number>: the new schedule's id.
@@ -164,8 +194,8 @@ ScheduleRepo.create = async function (repository, data) {
     name: String(data.name ?? "").trim(),
     description: String(data.description ?? ""),
     form: data.form || "",
-    // its rrule ; a cron sent instead is written as the rrule that fires at the same moments
-    rrule: normalizeRrule(data.rrule) || cronRrule(data.cron),
+    // its timing, written as it is given : a rrule, a cron, or one run at its run_at
+    ...timingOfRequest(data),
     enabled: data.enabled === undefined || data.enabled === null ? true : data.enabled === true || Number(data.enabled) === 1,
     extra_vars: data.extra_vars ?? "",
   };
@@ -185,9 +215,11 @@ ScheduleRepo.create = async function (repository, data) {
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     writeEntries(schedules, repository, file, [entry]);
     try {
+      // stored as a pull reads its entry back : its timing's columns, its run_at in UTC
+      const v = valuesOf(parsed.schedule);
       const res = await mysql.do(
-        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, enabled, extra_vars, launch_options, repository, repo_file, one_time_run, state) VALUES (?,?,?,?,?,?,?,?,?,0,'idle')",
-        [values.name, values.description, values.form, values.rrule, values.enabled ? 1 : 0, extraVarsText(extraData), launchOptionsText(parsed.schedule?.launchOptions), repository, file],
+        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, run_at, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'idle')",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, extraVarsText(extraData), v.launch_options, repository, file],
       );
       CrudModel.changed(MODEL);
       logger.info(`Created schedule '${values.name}' in ${repository}/${file}`);
@@ -209,7 +241,9 @@ ScheduleRepo.create = async function (repository, data) {
  *
  * Args:
  *   row (object): the schedule as it is.
- *   data (object): any of { name, description, form, rrule, enabled, extra_vars, launch_options
+ *   data (object): any of { name, description, form, its timing (rrule, cron, or one_time_run
+ *     with run_at : timingOfRequest ; a change of kind rewrites the entry's timing key), enabled,
+ *     extra_vars, launch_options
  *     (an object, or its JSON : written as the prompts that give them, those no prompt gives kept
  *     in the app only) }.
  *
@@ -225,7 +259,9 @@ ScheduleRepo.update = async function (row, data) {
   if (data.name !== undefined) values.name = String(data.name).trim();
   if (data.description !== undefined) values.description = String(data.description ?? "");
   if (data.form !== undefined) values.form = data.form;
-  if (data.rrule !== undefined) values.rrule = normalizeRrule(data.rrule);
+  // its timing, when the edit gives one : the one given written, the entry's other two keys removed
+  const timing = timingOfRequest(data, row);
+  if (timing) Object.assign(values, timing);
   if (data.enabled !== undefined) values.enabled = data.enabled === true || Number(data.enabled) === 1;
   if (data.extra_vars !== undefined) values.extra_vars = data.extra_vars ?? "";
   const { extraData } = await checkValues(values, row.id);
@@ -247,7 +283,7 @@ ScheduleRepo.update = async function (row, data) {
     const file = entryFileOf(schedules, fresh.repository, fresh.name, fresh.repo_file) || fresh.repo_file;
     const abs = fileOf(fresh.repository, file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-    const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, rrule: fresh.rrule, enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
+    const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, ...timingOfRow(fresh), enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
     let text;
     try {
       text = updateScheduleText(before ?? "", fresh.name, edits, newScheduleEntry({ ...current, ...edits }));
@@ -262,8 +298,8 @@ ScheduleRepo.update = async function (row, data) {
     const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, run_at=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.run_at, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same

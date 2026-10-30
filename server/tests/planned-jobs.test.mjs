@@ -225,7 +225,7 @@ describe("Schedule.plan", () => {
     assert.equal(created.raw_form_data, undefined);
   });
 
-  test("while a schedules repository is used, a new recurring schedule goes to it ; a one time run stays in the app", async () => {
+  test("while a schedules repository is used, every new schedule goes to it, whatever its timing ; a planned job stays in the app", async () => {
     const { default: ScheduleRepo } = await import("../src/models/scheduleRepo.model.js");
     const original = { active: ScheduleRepo.activeRepository, create: ScheduleRepo.create };
     const sent = [];
@@ -233,9 +233,13 @@ describe("Schedule.plan", () => {
     ScheduleRepo.create = async (repo, data) => { sent.push([repo, data.name]); return 99; };
     try {
       assert.equal(await Schedule.create({ name: "nightly", form: "Demo Form", cron: "0 2 * * *", one_time_run: 0 }), 99);
-      await Schedule.create({ name: "once", form: "Demo Form", one_time_run: 1, run_at: "2030-01-01 00:00:00" });
-      assert.deepEqual(sent, [["ops", "nightly"]]);
-      assert.equal(created.name, "once");
+      await Schedule.create({ name: "once", form: "Demo Form", one_time_run: 1, run_at: "2030-01-01T00:00:00Z" });
+      await Schedule.create({ name: "weekly", form: "Demo Form", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1" });
+      assert.deepEqual(sent, [["ops", "nightly"], ["ops", "once"], ["ops", "weekly"]]);
+      // a "Run later" job a user planned : that user's job, kept in the app
+      await Schedule.plan(planner, planBody());
+      assert.equal(sent.length, 3);
+      assert.ok(created.owner);
     } finally {
       Object.assign(ScheduleRepo, { activeRepository: original.active, create: original.create });
     }

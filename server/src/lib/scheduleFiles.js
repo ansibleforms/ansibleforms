@@ -4,11 +4,15 @@
 // credentials under related, its own natural_key) or the module form (the template and inventory
 // as names, credentials as a list of names, organization beside them) - read into what
 // AnsibleForms runs, refused where it is not a valid schedule, and written back with everything
-// its entry says kept ; its rrule is checked by lib/scheduleRrule.js. Pure :
+// its entry says kept. It is timed by exactly one of rrule (checked by lib/scheduleRrule.js), cron
+// (checked as the app checks a schedule's cron, lib/cronValidate.js) or one_time_run (one run, its
+// value the moment, read as the app reads one, lib/oneTimeRun.js). Pure :
 // models/scheduleRepo.model.js and the engine (lib/repoObjects/engine.js) read the files and write
 // the database.
 import YAML from "yaml";
 import { validateRrule, normalizeRrule } from "./scheduleRrule.js";
+import { cronError } from "./cronValidate.js";
+import { parseMoment, isoMoment } from "./oneTimeRun.js";
 import { setKey as setMapKey, same, editListEntry } from "./repoObjects/yamlFile.js";
 import { fileKeyOf } from "./repoObjects/types.js";
 
@@ -20,8 +24,8 @@ import { fileKeyOf } from "./repoObjects/types.js";
 export const SCHEDULES_KEY = fileKeyOf("schedules");
 
 // the keys of a schedule in the export's order (its own fields, its prompts, then
-// unified_job_template, enabled and rrule, then related and natural_key) : a new file is written in it, a key added to a file goes to its
-// place in it
+// unified_job_template, enabled and its timing - rrule, cron or one_time_run - then related and
+// natural_key) : a new file is written in it, a key added to a file goes to its place in it
 export const KEY_ORDER = [
   "name",
   "description",
@@ -43,6 +47,8 @@ export const KEY_ORDER = [
   "unified_job_template",
   "enabled",
   "rrule",
+  "cron",
+  "one_time_run",
   "related",
   "natural_key",
 ];
@@ -52,6 +58,14 @@ export const UNMAPPED_KEYS = ["forks", "timeout", "job_slice_count", "labels"];
 
 // the longest name the schedule table keeps
 export const MAX_NAME = 255;
+
+// the timings a schedule may have, one each : its key in a file, and the field of the schedule read
+// (parseSchedule) and of the edits written (updateScheduleEntry) that holds it
+export const TIMINGS = [
+  { key: "rrule", field: "rrule" },
+  { key: "cron", field: "cron" },
+  { key: "one_time_run", field: "oneTimeRun" },
+];
 
 // the verbosity levels (0 normal to 5) and the job types a schedule may ask for
 const VERBOSITY = [0, 1, 2, 3, 4, 5];
@@ -305,8 +319,67 @@ export function launchOptionsOf(obj) {
 }
 
 /**
+ * A timing's value as it is compared : a rrule on one line, a cron trimmed, a one_time_run in UTC
+ * to the second ; '' for none.
+ *
+ * Args:
+ *   key (string): the timing's key (rrule, cron, one_time_run).
+ *   value (any): its value.
+ *
+ * Returns:
+ *   string: the value compared.
+ */
+function timingText(key, value) {
+  if (value === null || value === undefined) return "";
+  if (key === "rrule") return normalizeRrule(value);
+  if (key === "one_time_run") return isoMoment(value) || String(value).trim();
+  return String(value).trim();
+}
+
+/**
+ * The timing of a schedule entry : exactly one of rrule (an iCal rrule, checked as a schedule's
+ * rrule), cron (checked as the app checks a schedule's cron : croner itself, 5 or 6 fields) or
+ * one_time_run (one run, at its value : an ISO 8601 time with its offset or Z, as the app reads a
+ * one-time run's moment). None, or
+ * more than one : refused.
+ *
+ * Args:
+ *   obj (object): the entry.
+ *
+ * Returns:
+ *   object: { errors (string[]), timing: { rrule, cron, oneTimeRun } (the one given, the others null ;
+ *     null when refused) }.
+ */
+export function timingOf(obj) {
+  const given = TIMINGS.filter((t) => obj?.[t.key] !== undefined && obj[t.key] !== null && String(obj[t.key]).trim() !== "");
+  if (!given.length) return { errors: ["one of rrule, cron or one_time_run (one run, at the moment it gives) is required"], timing: null };
+  if (given.length > 1) {
+    return { errors: [`give one of rrule, cron or one_time_run, not ${given.map((t) => t.key).join(" and ")}`], timing: null };
+  }
+  const [{ key }] = given;
+  const value = obj[key];
+  const timing = { rrule: null, cron: null, oneTimeRun: null };
+  if (typeof value !== "string") return { errors: [`${key} must be text`], timing: null };
+  if (key === "rrule") {
+    const errors = validateRrule(normalizeRrule(value)).map((e) => `rrule: ${e}`);
+    if (errors.length) return { errors, timing: null };
+    timing.rrule = normalizeRrule(value);
+  } else if (key === "cron") {
+    const problem = cronError(value);
+    if (problem) return { errors: [`cron: ${problem}`], timing: null };
+    timing.cron = value.trim();
+  } else {
+    const { when, error } = parseMoment(value, "one_time_run");
+    if (error) return { errors: [error], timing: null };
+    timing.oneTimeRun = isoMoment(when);
+  }
+  return { errors: [], timing };
+}
+
+/**
  * Reads a schedule entry : what AnsibleForms runs, and why it is refused when it is not a valid
- * schedule - no name, a name longer than the schedule table keeps, no rrule or a refused one, no
+ * schedule - no name, a name longer than the schedule table keeps, no timing (rrule, cron or
+ * one_time_run), more than one or a refused one, no
  * unified_job_template name, extra_data that are no dictionary, a prompt of the wrong type. Whether
  * its form exists is the caller's to check (it knows the forms). An entry with `state: absent`
  * (the module's) holds no schedule.
@@ -315,8 +388,9 @@ export function launchOptionsOf(obj) {
  *   obj (object): the entry, as its file gives it.
  *
  * Returns:
- *   object: { errors (string[]), absent (boolean), schedule: { name, description, rrule,
- *     enabled, form, extraData, launchOptions, ignored }, name (the name a refused one declares,
+ *   object: { errors (string[]), absent (boolean), schedule: { name, description, rrule, cron,
+ *     oneTimeRun (its timing : one of them, the others null), enabled, form, extraData, launchOptions,
+ *     ignored }, name (the name a refused one declares,
  *     null when it gives none) } ; schedule is null when refused.
  */
 export function parseSchedule(obj) {
@@ -327,10 +401,9 @@ export function parseSchedule(obj) {
   const name = nameOf(obj.name).trim();
   if (!name) errors.push("name is required");
   else if (name.length > MAX_NAME) errors.push(`name is longer than ${MAX_NAME} characters`);
-  // rrule : required, and valid
-  const rrule = typeof obj.rrule === "string" ? normalizeRrule(obj.rrule) : "";
-  if (!rrule) errors.push("rrule is required");
-  else for (const e of validateRrule(rrule)) errors.push(`rrule: ${e}`);
+  // its timing : exactly one of rrule, cron and one_time_run, valid
+  const { errors: timingErrors, timing } = timingOf(obj);
+  errors.push(...timingErrors);
   // unified_job_template : the form it runs, by name (the module's) or natural key (the export's)
   const form = nameOf(obj.unified_job_template).trim();
   if (!form) errors.push("unified_job_template.name (the form it runs) is required");
@@ -353,7 +426,7 @@ export function parseSchedule(obj) {
   errors.push(...promptErrors);
   // refused, its name still said : no other schedule is written beside it under that name
   if (errors.length) return { errors, absent: false, schedule: null, name: name || null };
-  return { errors: [], absent: false, schedule: { name, description, rrule, enabled, form, extraData, launchOptions: options, ignored } };
+  return { errors: [], absent: false, schedule: { name, description, ...timing, enabled, form, extraData, launchOptions: options, ignored } };
 }
 
 // ===========================================================================
@@ -383,9 +456,10 @@ function setKey(doc, map, key, value) {
  * Args:
  *   doc (YAML.Document): the file's document.
  *   node (YAMLMap): the schedule's entry.
- *   edits (object): any of { name, description, rrule, enabled, form, extraData, launchOptions
- *     (the launch options : only the prompts whose value changes rewritten, those no longer
- *     given removed) }.
+ *   edits (object): any of { name, description, rrule / cron / oneTimeRun (its timing : the one given
+ *     written, the other two keys removed from the entry), enabled, form, extraData,
+ *     launchOptions (the launch options : only the prompts whose value changes rewritten, those
+ *     no longer given removed) }.
  */
 export function updateScheduleEntry(doc, node, edits) {
   const current = node.toJS(doc) || {};
@@ -407,9 +481,14 @@ export function updateScheduleEntry(doc, node, edits) {
     else setKey(doc, node, "unified_job_template", { name: edits.form, type: "job_template" });
   }
   if (edits.enabled !== undefined && boolOf(current.enabled ?? true) !== edits.enabled) setKey(doc, node, "enabled", edits.enabled);
-  // the rrule compared on one line : a file that writes it on several lines keeps them while it
-  // does not change
-  if (edits.rrule !== undefined && normalizeRrule(edits.rrule) !== normalizeRrule(current.rrule)) setKey(doc, node, "rrule", edits.rrule);
+  // its timing : the one the edit gives written (compared as timingText says : a file that writes a
+  // rrule on several lines keeps them while it does not change), the other two removed
+  const timing = TIMINGS.find((t) => edits[t.field] !== undefined && edits[t.field] !== null && String(edits[t.field]).trim() !== "");
+  if (timing) {
+    const value = timing.key === "one_time_run" ? isoMoment(edits.oneTimeRun) : edits[timing.field];
+    if (timingText(timing.key, value) !== timingText(timing.key, current[timing.key])) setKey(doc, node, timing.key, value);
+    for (const other of TIMINGS) if (other !== timing && node.has(other.key)) node.delete(other.key);
+  }
   // the prompts : compared as the file gives them now, read and written back the same way
   if (edits.launchOptions !== undefined) {
     const now = promptsOf(launchOptionsOf(current).options).fields;
@@ -477,13 +556,14 @@ export function scheduleEntryOf(text, name) {
  * AnsibleForms field in it.
  *
  * Args:
- *   values (object): { name, description, rrule, enabled, form, extraData, launchOptions (the
- *     launch options, written as the prompts that give them : promptsOf) }.
+ *   values (object): { name, description, rrule / cron / oneTimeRun (its timing : the one given is
+ *     written), enabled, form, extraData, launchOptions (the launch options, written as the
+ *     prompts that give them : promptsOf) }.
  *
  * Returns:
  *   object: the entry, its keys in the export's order.
  */
-export function newScheduleEntry({ name, description = "", rrule, enabled = true, form, extraData = {}, launchOptions = {} }) {
+export function newScheduleEntry({ name, description = "", rrule, cron, oneTimeRun, enabled = true, form, extraData = {}, launchOptions = {} }) {
   const ujt = { name: form, type: "job_template" };
   const obj = {
     name,
@@ -492,7 +572,7 @@ export function newScheduleEntry({ name, description = "", rrule, enabled = true
     ...promptsOf(launchOptions).fields,
     unified_job_template: ujt,
     enabled: enabled !== false,
-    rrule: normalizeRrule(rrule),
+    ...(oneTimeRun ? { one_time_run: isoMoment(oneTimeRun) } : cron && String(cron).trim() ? { cron: String(cron).trim() } : { rrule: normalizeRrule(rrule) }),
     natural_key: { name, type: "schedule", unified_job_template: { ...ujt } },
   };
   const rank = (k) => (KEY_ORDER.includes(k) ? KEY_ORDER.indexOf(k) : KEY_ORDER.length);

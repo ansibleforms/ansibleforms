@@ -255,11 +255,8 @@ export const APPLY_ORDER = [
   'mcp',
 ];
 
-// what a type's question adds of its own (the schedules : the one-time jobs stay in the app), and
-// how it says what stays in the app, by why (the schedules : the crons a rrule cannot express) ;
-// the others as every type says them
+// what a type's question adds of its own (the schedules : the jobs users planned stay in the app)
 const TYPE_NOTES = { schedules: ['settings.repositories.schedulesOnPlanned'] };
-const KEPT_KEY = { schedules: { cron: 'settings.repositories.schedulesOnKept' } };
 
 /**
  * A usage type by its key.
@@ -530,37 +527,22 @@ async function preview(name, keys) {
 }
 
 /**
- * The code of why an object stays in the app : the server's, or, for a schedule kept with its cron
- * and no code, the cron a rrule cannot express.
- *
- * Args:
- *   t (function): vue-i18n's t.
- *   k (object): what the server kept ({ name, code, reason, cron, error, whole (the type's one
- *     object : the chat assistant's settings, named by the type) }).
- *   key (string): the type.
- *
- * Returns:
- *   string: the code, '' for none.
- */
-const keptCode = (k) => k.code || (k.cron ? 'cron' : '');
-
-/**
  * Why an object stays in the app, as the question says it : by the code of why, in the app's
  * language (the server's English reason only for one without a code).
  *
  * Args:
  *   t (function): vue-i18n's t.
- *   k (object): what the server kept ({ name, code, reason, cron, error }).
+ *   k (object): what the server kept ({ name, code, reason, error, whole (the type's one object :
+ *     the chat assistant's settings, named by the type) }).
+ *   key (string): the type.
  *
  * Returns:
- *   string: its name and why (a cron a rrule cannot express : that cron).
+ *   string: its name and why.
  */
 function keptText(t, k, key) {
   const name = k.whole ? usageLabel(t, key) : k.name;
-  const code = keptCode(k);
-  if (code === 'cron' && k.cron) return `${name} (${k.cron})`;
-  const why = code
-    ? t(`settings.repositories.usageKeptWhy.${code}`, k.error ? { error: k.error } : undefined)
+  const why = k.code
+    ? t(`settings.repositories.usageKeptWhy.${k.code}`, k.error ? { error: k.error } : undefined)
     : k.reason;
   return why ? `${name} (${why})` : name;
 }
@@ -603,14 +585,10 @@ export function activationLines(t, key, name, p) {
       ? t('settings.repositories.usageOnClashes', { names: p.clashes.join(', ') })
       : t('settings.repositories.usageOnGitWins'),
   );
-  // what stays in the app : a sentence per why the type says apart (a schedule's cron), the rest in
-  // the common one
-  const kept = new Map();
-  for (const k of p.kept || []) {
-    const sentence = KEPT_KEY[key]?.[keptCode(k)] || 'settings.repositories.usageOnKept';
-    kept.set(sentence, [...(kept.get(sentence) || []), keptText(t, k, key)]);
+  // what stays in the app, each with why, in one sentence
+  if ((p.kept || []).length) {
+    lines.push(t('settings.repositories.usageOnKept', { names: p.kept.map((k) => keptText(t, k, key)).join(', ') }));
   }
-  for (const [sentence, names] of kept) lines.push(t(sentence, { names: names.join(', ') }));
   if ((p.withoutSecret || []).length) {
     lines.push(t('settings.repositories.usageOnWithoutSecret', { names: p.withoutSecret.join(', ') }));
   }

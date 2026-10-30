@@ -6,7 +6,7 @@ import axios from 'axios';
 import Helpers from '@/lib/Helpers';
 import { cronCell } from '@/lib/cronCell';
 import { cronValidationMessage } from './cron';
-import { rruleValidationMessage, defaultRrule, rruleCell, scheduleRepository } from './rrule';
+import { rruleValidationMessage, defaultRrule, rruleCell } from './rrule';
 import {
   USAGE_FLAGS,
   confirmUsageChange,
@@ -231,6 +231,45 @@ export function schedulePill(t, state) {
   const known = { running: PILL.blue, queued: PILL.amber, idle: PILL.grey };
   const label = known[state] ? t(`settings.schedules.state_${state}`) : state;
   return pill(known[state], label);
+}
+
+/**
+ * How a schedule is timed, as its dialog and its page offer the choice : once (a one time run), on
+ * an iCal rrule, or on a cron (a new schedule's, as before) - the same three for a schedule of the
+ * app and one of a schedules repository.
+ *
+ * Args:
+ *   item (object): the schedule ({ one_time_run, rrule }), or none for a new one.
+ *
+ * Returns:
+ *   string: cron, rrule or once.
+ */
+export function timingKind(item) {
+  if (item?.one_time_run && Number(item.one_time_run) !== 0) return 'once';
+  if (String(item?.rrule ?? '').trim()) return 'rrule';
+  return 'cron';
+}
+
+/**
+ * The timing fields a schedule is saved with, from the kind chosen : that kind's own value, the
+ * other two emptied (the server keeps the one given, for the app's schedule and in a repository's
+ * entry alike).
+ *
+ * Args:
+ *   kind (string): cron, rrule or once (timingKind).
+ *   item (object): the schedule's values ({ cron, rrule, run_at, ... }).
+ *
+ * Returns:
+ *   object: the values, with one_time_run, cron, rrule and run_at set for that kind.
+ */
+export function scheduleTiming(kind, item) {
+  return {
+    ...item,
+    one_time_run: kind === 'once' ? 1 : 0,
+    cron: kind === 'cron' ? item.cron || '' : '',
+    rrule: kind === 'rrule' ? String(item.rrule || '').trim() : '',
+    run_at: kind === 'once' ? item.run_at || null : null,
+  };
 }
 
 // ─── SSO providers (Access > SSO) ────────────────────────────────────────────
@@ -1455,10 +1494,9 @@ export default function getSettings(t) {
       // a schedule has its own page (pages/schedule.vue) : its row and Edit open it, New the
       // wizard
       openPage: (item) => `/jobs/scheduled/${item.id}`,
-      // a recurring schedule while a schedules repository is used : its rrule (the server writes it
-      // to the repository) ; otherwise its cron, or its one time run
-      beforeSave: ({ rrule, ...item }) =>
-        scheduleRepository.value && !item.one_time_run ? { ...item, rrule, cron: '', run_at: null } : item,
+      // the timing chosen sent, the other two emptied : a cron, a rrule, or a one time run - for a
+      // schedule of the app and one the server writes to the schedules repository alike
+      beforeSave: ({ timing, ...item }) => scheduleTiming(timing, item),
       // the dialog in steps : what runs (its name, the form), when (once at a time, or on a cron
       // schedule), the extra vars it sends to the form
       steps: [
@@ -1532,12 +1570,27 @@ export default function getSettings(t) {
           noTable: true,
         },
         {
-          key: 'one_time_run',
+          // how it is timed (the dialog only : beforeSave sends it as its fields) : a cron, the
+          // default as before, an iCal rrule, or one run ; the same three wherever it is kept
+          key: 'timing',
           step: 'when',
+          label: t('settings.schedules.timing'),
+          type: 'radio',
+          options: [
+            { value: 'cron', label: t('settings.schedules.timingCron'), hint: t('settings.schedules.timingCronHint') },
+            { value: 'rrule', label: t('settings.schedules.rrule'), hint: t('settings.schedules.timingRruleHint') },
+            { value: 'once', label: t('settings.schedules.oneTimeRun'), hint: t('settings.schedules.timingOnceHint') },
+          ],
+          initial: (item) => timingKind(item),
+          hidden: true,
+          noTable: true,
+        },
+        {
+          // a one time run or not : set by the timing chosen ; a column to pick in Columns
+          key: 'one_time_run',
           label: t('settings.schedules.oneTimeRun'),
           type: 'checkbox',
-          placeholder: t('settings.schedules.oneTimeRunPlaceholder'),
-          required: false,
+          noInput: true,
           hidden: true,
         },
         {
@@ -1559,12 +1612,11 @@ export default function getSettings(t) {
                 ? rruleCell(row.rrule)
                 : cronCell(v),
           validator: cronValidator(t),
-          // recurring, without a schedules repository : a cron
-          showWhen: (item) => !scheduleRepository.value && !item.one_time_run,
+          // timed by a cron
+          showWhen: (item) => item.timing === 'cron',
         },
         {
-          // recurring, while a schedules repository is used : its iCal rrule, its next runs under it
-          // (the server writes it to the repository as a new file)
+          // timed by its iCal rrule, its next runs under it
           key: 'rrule',
           step: 'when',
           label: t('settings.schedules.rrule'),
@@ -1575,7 +1627,7 @@ export default function getSettings(t) {
           required: true,
           initial: (item) => item?.rrule || defaultRrule(Intl.DateTimeFormat().resolvedOptions().timeZone),
           validator: rruleValidator(t),
-          showWhen: (item) => !!scheduleRepository.value && !item.one_time_run,
+          showWhen: (item) => item.timing === 'rrule',
         },
         {
           key: 'run_at',
@@ -1589,9 +1641,9 @@ export default function getSettings(t) {
           // there to pick in Columns
           hidden: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
-          // a one time run needs its time ; hidden (a cron schedule), it is not checked
+          // a one time run needs its time ; hidden (a recurring schedule), it is not checked
           required: true,
-          showWhen: (item) => !!item.one_time_run,
+          showWhen: (item) => item.timing === 'once',
         },
         // when it last ran, then when it runs next
         {

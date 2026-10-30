@@ -187,13 +187,11 @@ class Schedule extends CrudModel {
     logger.info(`Creating schedule ${data.name}`);
     // where it comes from is never a request body's
     for (const key of REPOSITORY_FIELDS) delete data[key];
-    // a recurring schedule while a schedules repository is used : saved, and written there as a
-    // new file waiting for its Push, timed by its rrule. A one time run stays in the app
-    const once = data.one_time_run === true || Number(data.one_time_run) === 1;
-    if (!once) {
-      const active = await ScheduleRepo.activeRepository();
-      if (active) return ScheduleRepo.create(active, data);
-    }
+    // a schedule while a schedules repository is used : saved, and written there as a new entry
+    // waiting for its Push, with its own timing (a cron, a rrule or a one time run). A job a user
+    // plans ("Run later") is plan()'s, never written there
+    const active = await ScheduleRepo.activeRepository();
+    if (active) return ScheduleRepo.create(active, data);
     // kept in the app : a cron, a rrule (checked) or a one time run
     await checkAppRrule(data);
     // `owner` is written by plan() alone. A request body that carries one is somebody

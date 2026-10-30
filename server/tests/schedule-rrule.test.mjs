@@ -237,7 +237,7 @@ describe("its runs, in its own time zone", () => {
   });
 
   test("a daily rule from years ago, at many times of the day, is walked from now, at once", () => {
-    // the shape a cron every 7 minutes is written as (lib/cronToRrule.js)
+    // the shape a cron every 7 minutes takes as a rrule : every hour, at many minutes
     const minutes = Array.from({ length: 9 }, (_, i) => i * 7).join(",");
     const hours = Array.from({ length: 24 }, (_, i) => i).join(",");
     const rrule = `DTSTART;TZID=Europe/Brussels:20100101T000000 RRULE:FREQ=DAILY;INTERVAL=1;BYHOUR=${hours};BYMINUTE=${minutes}`;

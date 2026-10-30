@@ -570,18 +570,29 @@ describe("MCP schedules", () => {
     await expect(createHandlers({ user: planner, deps }).createSchedule({ form: "Create volume", name: "x", cron: "0 1 * * *" })).rejects.toMatchObject({ code: "access_denied" });
   });
 
-  test("create_schedule while a schedules repository is used : registered by the rrule it was given", async () => {
-    // the model writes it to the repository, its cron turned into a rrule
+  test("create_schedule : a cron, a rrule or a one time run, given to the model as it is and registered by its row", async () => {
     const rrule = "DTSTART;TZID=Europe/Madrid:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;BYHOUR=22;BYMINUTE=0";
-    const create = deps.Schedule.create;
-    deps.Schedule.create = vi.fn(async (data) => {
-      const id = await create(data);
-      rows.get(id).rrule = rrule;
-      return id;
-    });
     const client = await connect(manager);
-    const r = await call(client, "create_schedule", { form: "Create volume", name: "weekdays", cron: "0 22 * * 1-5" });
-    expect(deps.cron.addSchedule).toHaveBeenCalledWith(r.data.id, "weekdays", "0 22 * * 1-5", false, undefined, rrule);
+    const byRrule = await call(client, "create_schedule", { form: "Create volume", name: "by rrule", rrule });
+    expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "by rrule", form: "Create volume", extra_vars: "{}\n", rrule, one_time_run: false });
+    expect(byRrule.data.rrule).toBe(rrule);
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byRrule.data.id, "by rrule", undefined, false, undefined, rrule);
+    const byCron = await call(client, "create_schedule", { form: "Create volume", name: "by cron", cron: "0 22 * * 1-5" });
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(byCron.data.id, "by cron", "0 22 * * 1-5", false, undefined, undefined);
+    const once = await call(client, "create_schedule", { form: "Create volume", name: "by moment", run_at: later.toISOString() });
+    expect(deps.cron.addSchedule).toHaveBeenLastCalledWith(once.data.id, "by moment", undefined, true, later.toISOString(), undefined);
+    // two timings : refused before the model
+    const both = await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "both", cron: "0 1 * * *", rrule } });
+    expect(both.structuredContent.code).toBe("invalid_request");
+    // a rrule the model refuses : its BadRequestError, said as invalid_request
+    const create = deps.Schedule.create;
+    deps.Schedule.create = vi.fn(async () => { const e = new Error("The rrule is refused: naive"); e.name = "BadRequestError"; throw e; });
+    try {
+      const bad = await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "bad rrule", rrule: "DTSTART:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1" } });
+      expect(bad.structuredContent.code).toBe("invalid_request");
+    } finally {
+      deps.Schedule.create = create;
+    }
   });
 
   test("a planner lists, reads and cancels their own runs only ; a manager sees all", async () => {

@@ -6484,7 +6484,8 @@
       Repositories); a second one is refused, by the API and by the config seed. Its schedules are the entries of
       a top-level `controller_schedules:` list, in any YAML file of the repository, any name, any folder, at any depth (see
       *Repository usage types*, where a repository keeps them). A schedule is found by its name, never by its
-      file. Without a schedules repository, schedules live in the database only and recurring ones run on a cron.
+      file. Without a schedules repository, schedules live in the database only. Either way a schedule is timed the
+      same three ways: a cron, an iCal rrule, or one run at a moment (`one_time_run`, its value the moment).
 
       **An entry** is a single schedule, its template, inventory and credentials named by name or by natural key:
       ```yaml
@@ -6504,7 +6505,28 @@
         - name: Weekly report
           unified_job_template: Weekly Report   # the module's form : a plain name
           rrule: DTSTART:20261019T060000Z RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO
+        - name: Workday backup
+          unified_job_template: Backup
+          cron: '30 22 * * 1-5'                 # a cron, quoted (a value starting with * is no YAML text)
+        - name: Migrate the database
+          unified_job_template: Migration
+          one_time_run: '2026-11-14T21:00:00+01:00'   # one run, at that moment
       ```
+
+      **Its timing** is exactly one of three keys; none, or more than one, refuses the entry (the pull output says
+      why):
+
+      | Key | Runs | Checked as |
+      |---|---|---|
+      | `rrule` | on an iCal rrule, in its own time zone | below |
+      | `cron` | on a cron, in the scheduler's time zone (`LOG_TZ`) | an app schedule's cron: 5 or 6 fields, croner itself |
+      | `one_time_run` | once, at the moment it gives | an ISO 8601 time with its offset or `Z`; a time without a zone is refused |
+
+      Each is stored and run as an app schedule of that timing: a cron stays a cron, a `one_time_run` is a one-time run. A
+      one-time schedule is deleted once it has run, as in the app; its entry stays in git as it is, and the next
+      pulls do not import it again: an entry whose `one_time_run` is past is skipped, said on a `Not imported` line of
+      the pull output, unless the app still waits to run it (its moment passed while the server was down: it runs
+      then, as an app one-time schedule does). Change its `one_time_run` to a moment ahead to run it again.
 
       **The prompts** become the reserved extra vars the job reads: `limit` (`__limit__`), `job_tags`
       (`__tags__`), `skip_tags` (`__skipTags__`), `verbosity` (`__verbosity__`), `diff_mode` (`__diff__`),
@@ -6525,17 +6547,15 @@
       from midnight only meets even hours). A rule whose runs take longer than a second to work out is refused, saying so (one saved
       before is tried again a minute later). A time a DST change skips runs when the clock reaches it (02:30 runs at 03:30 the night
       the clock goes from 02:00 to 03:00), as a cron does; a time the clock shows twice runs once, at the first.
-      Schedules kept in the app keep their cron; one sent a cron or a one time run without a rrule drops the rrule it
-      had, and a rrule with a one time run is refused.
+      A schedule sent a cron or a one time run without a rrule drops the rrule it had, and a rrule with a one time
+      run is refused, wherever it is kept.
 
       **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
-      entries are read in; an entry named as a recurring schedule of the app replaces that schedule's definition
-      (git wins, its runs and history stay). Every other recurring schedule of the app is written to the repository
-      as a new entry, at the end of the first file holding `controller_schedules:` (else of `schedules.yaml` at its root, made),
-      waiting for the repository's Push:
-      its cron becomes the rrule that fires at the same moments, in the scheduler's time zone (`LOG_TZ`). A cron that
-      restricts both the day of the month and the day of the week (a cron fires on either, a rrule only on both), or
-      that uses `L`, `W`, `#` or `?`, stays an app schedule, as do the one-time "Run later" jobs. Its launch
+      entries are read in; an entry named as a schedule of the app replaces that schedule's definition (git wins,
+      its runs and history stay). Every other schedule of the app is written to the repository as a new entry, at
+      the end of the first file holding `controller_schedules:` (else of `schedules.yaml` at its root, made), waiting
+      for the repository's Push, with its own timing as it is: `cron:`, `rrule:` or `one_time_run:`, nothing converted.
+      The "Run later" jobs users planned stay in the app: they are those users' jobs, run as them. Its launch
       options are written as the prompts a pull reads them from (`__limit__` as `limit`, `__check__` as
       `job_type: check`, its credentials by name ...); an option no prompt gives (a credential mapped under
       another name) is kept in the app only, and the question says so. The result is shown and logged.
@@ -6543,24 +6563,26 @@
       **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
       the worker, its entries are read into Jobs > Scheduled: a new name makes a schedule, a changed entry changes
       it, a removed one removes it (its past jobs stay), an entry moved to another file keeps its schedule. An entry
-      with no name, no rrule or a refused one, no `unified_job_template.name`, a form that does not exist, or a name
+      with no name, no timing, two timings or a refused one, no `unified_job_template.name`, a form that does not exist, or a name
       another schedule has (or another entry gives too), is refused alone: the repository's pull output and the
       server log name it (`schedules.yaml#Nightly log rotation`) and say why, a schedule it made before stays as it
       was, and the other entries still sync. When and how a schedule ran stays in the database, never in the file.
 
-      **The app: back to git.** While the repository is used, every new recurring schedule is saved and written to it
-      as a new entry in the export's form (the first file holding `controller_schedules:`, else `schedules.yaml`), edited with
-      the rrule editor; editing a repository schedule (its name, description, form, enabled, rrule, extra vars)
-      writes its entry where it is, only the fields changed; deleting one removes its entry (the file with it when
-      it holds nothing more). One-time "Run later" jobs stay in the database. As for the
+      **The app: back to git.** While the repository is used, every new schedule is saved and written to it as a new
+      entry in the export's form (the first file holding `controller_schedules:`, else `schedules.yaml`), with the
+      timing chosen in its dialog (a cron, a rrule or a one time run); editing a repository schedule (its name,
+      description, form, enabled, timing, extra vars) writes its entry where it is, only the fields changed: a
+      timing of another kind is written under its own key (`cron:`, `rrule:` or `one_time_run:`), the other two removed.
+      Deleting one removes its entry (the file with it when it holds nothing more). "Run later" jobs users planned
+      stay in the database. As for the
       designer's forms, the change waits in the repository's working tree (its Push column says so) until the
       repository is pushed.
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and its
       entries read in (skipped, and said, when it cannot be reached), then its schedules are unlinked. They stay in
-      the app with their name, form, rrule, values, enabled and job options, and keep running on their rrule; the
+      the app with their name, form, timing, values, enabled and job options, and keep running on their timing; the
       files in git are left as they are. Turning it on again goes through the same steps as the first time.
-      Repository schedules run as the Schedule Service, as every recurring schedule.
+      Repository schedules run as the Schedule Service, as every schedule of the app.
   - name: Repository usage types
     short: What a repository is used for, in five groups
     version: v7.5.0

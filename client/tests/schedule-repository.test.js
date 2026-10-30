@@ -1,8 +1,8 @@
 // Schedules kept in a git repository : the repository's Schedules usage (use_for_schedules, one
 // repository at most, a type of the Designer group : lib/repositoryUsage.js), the question asked
-// before it is turned on or off, the Repository badge of a schedule's page, and the rrule editor : for a new recurring schedule while a schedules
-// repository is used, and for every schedule that has a rrule, linked or not. No "where it lives"
-// choice : the server decides.
+// before it is turned on or off, the Repository badge of a schedule's page, and the timing of a
+// schedule : a cron, a rrule or a one time run, the same three choices whatever the repositories.
+// No "where it lives" choice : the server decides.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,15 +26,8 @@ vi.mock('vue-sonner', () => ({
 }));
 
 import getSettings from '../src/config/settings.js';
-import {
-  rruleProblem,
-  rruleValidationMessage,
-  defaultRrule,
-  zoneOf,
-  rruleCell,
-  scheduleRepository,
-  loadScheduleRepository,
-} from '../src/config/rrule.js';
+import { rruleProblem, rruleValidationMessage, defaultRrule, zoneOf, rruleCell } from '../src/config/rrule.js';
+import { timingKind, scheduleTiming } from '../src/config/settings.js';
 import { intlZone } from '../src/lib/rruleRules.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
 import {
@@ -109,47 +102,74 @@ describe('where a schedule comes from', () => {
 });
 
 describe('a new schedule : no "where it lives" choice, the server decides', () => {
-  beforeEach(() => {
-    scheduleRepository.value = null;
-  });
-
   it('has no choice of where it lives', () => {
     const fields = settings.schedules.fields;
     expect(fields.some((f) => f.values === 'schedule/repositories')).toBe(false);
     expect(field('schedules', 'repository').noInput).toBe(true);
   });
 
-  it('without a schedules repository : a cron, or a one time run', () => {
+  it('offers the three timings, whatever the repositories : a cron first, a rrule, a one time run', () => {
+    const timing = field('schedules', 'timing');
+    expect(timing.type).toBe('radio');
+    expect(timing.options.map((o) => o.value)).toEqual(['cron', 'rrule', 'once']);
+    // a new schedule starts on a cron, as before ; a record shows its own
+    expect(timing.initial({})).toBe('cron');
+    expect(timing.initial({ rrule: 'R' })).toBe('rrule');
+    expect(timing.initial({ one_time_run: 1, run_at: '2030-01-01' })).toBe('once');
+    // each field shown for its timing only, never by the repositories there are
     const shown = (key, item) => field('schedules', key).showWhen(item);
-    expect(shown('cron', {})).toBe(true);
-    expect(shown('rrule', {})).toBe(false);
-    expect(shown('run_at', { one_time_run: true })).toBe(true);
-    const app = settings.schedules.beforeSave({ name: 'a', rrule: 'R', cron: '0 2 * * *' });
-    expect(app.rrule).toBeUndefined();
-    expect(app.cron).toBe('0 2 * * *');
-  });
-
-  it('with a schedules repository : the rrule editor for a recurring one, a sensible default', async () => {
-    previewData = { active: 'ops' };
-    await loadScheduleRepository();
-    expect(scheduleRepository.value).toBe('ops');
-    const shown = (key, item) => field('schedules', key).showWhen(item);
-    expect(shown('rrule', {})).toBe(true);
-    expect(shown('cron', {})).toBe(false);
-    // a one time run stays a one time run, in the app
-    expect(shown('rrule', { one_time_run: true })).toBe(false);
+    expect([
+      shown('cron', { timing: 'cron' }),
+      shown('rrule', { timing: 'cron' }),
+      shown('run_at', { timing: 'cron' }),
+    ]).toEqual([true, false, false]);
+    expect([
+      shown('cron', { timing: 'rrule' }),
+      shown('rrule', { timing: 'rrule' }),
+      shown('run_at', { timing: 'rrule' }),
+    ]).toEqual([false, true, false]);
+    expect([
+      shown('cron', { timing: 'once' }),
+      shown('rrule', { timing: 'once' }),
+      shown('run_at', { timing: 'once' }),
+    ]).toEqual([false, false, true]);
+    // the toggle it replaces : no input of its own any more
+    expect(field('schedules', 'one_time_run').noInput).toBe(true);
+    // the rrule a schedule given one starts with
     expect(field('schedules', 'rrule').type).toBe('rrule');
     expect(field('schedules', 'rrule').initial({})).toMatch(
       /^DTSTART;TZID=.+:\d{8}T000000 RRULE:FREQ=DAILY;INTERVAL=1$/,
     );
-    expect(settings.schedules.beforeSave({ name: 'a', rrule: 'R', cron: '* * * * *' })).toMatchObject({
-      rrule: 'R',
-      cron: '',
-    });
-    expect(settings.schedules.beforeSave({ name: 'a', rrule: 'R', one_time_run: true }).rrule).toBeUndefined();
   });
 
-  it('a new repository schedule starts daily at midnight, in a zone, on one line', () => {
+  it('saves the timing chosen, the other two emptied, the dialog-only choice left out', () => {
+    const item = { name: 'a', cron: '0 2 * * *', rrule: ' R ', run_at: '2030-01-01T00:00:00.000Z' };
+    expect(settings.schedules.beforeSave({ ...item, timing: 'cron' })).toEqual({
+      name: 'a',
+      cron: '0 2 * * *',
+      rrule: '',
+      run_at: null,
+      one_time_run: 0,
+    });
+    expect(settings.schedules.beforeSave({ ...item, timing: 'rrule' })).toEqual({
+      name: 'a',
+      cron: '',
+      rrule: 'R',
+      run_at: null,
+      one_time_run: 0,
+    });
+    expect(settings.schedules.beforeSave({ ...item, timing: 'once' })).toEqual({
+      name: 'a',
+      cron: '',
+      rrule: '',
+      run_at: '2030-01-01T00:00:00.000Z',
+      one_time_run: 1,
+    });
+    expect(scheduleTiming('cron', item)).toEqual(settings.schedules.beforeSave({ ...item, timing: 'cron' }));
+    expect(timingKind({ one_time_run: 0, cron: '* * * * *' })).toBe('cron');
+  });
+
+  it('a new schedule given a rrule starts daily at midnight, in a zone, on one line', () => {
     expect(defaultRrule('Europe/Brussels', new Date('2026-10-20T10:00:00Z'))).toBe(
       'DTSTART;TZID=Europe/Brussels:20261020T000000 RRULE:FREQ=DAILY;INTERVAL=1',
     );
@@ -158,11 +178,18 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
     );
   });
 
-  it('a schedule with a rrule and no repository is edited with the rrule editor on its page', () => {
+  it("a schedule's page offers the same three timings, kept in the app or in a repository", () => {
     const page = readFileSync(join(import.meta.dirname, '../src/pages/schedule.vue'), 'utf8');
-    expect(page).toContain('const usesRrule = computed(() => !!schedule.value?.rrule);');
-    expect(page).toMatch(/<div v-if="usesRrule" v-show="fieldShown\('rrule'\)"/);
+    expect(page).not.toContain('usesRrule');
+    expect(page).toContain("const TIMINGS = ['cron', 'rrule', 'once'];");
+    expect(page).toContain('timing: timingKind(record),');
+    expect(page).toMatch(/<input[^>]*v-model="edit\.timing"[^>]*type="radio"/s);
+    expect(page).toMatch(/<div v-if="edit\.timing === 'rrule'" v-show="fieldShown\('rrule'\)"/);
     expect(page).toContain('<BsRrule v-model="edit.rrule"');
+    expect(page).toContain('const data = scheduleTiming(e.timing,');
+    // the list page no longer asks which repository holds the schedules
+    const list = readFileSync(join(import.meta.dirname, '../src/pages/admin/schedules.vue'), 'utf8');
+    expect(list).not.toContain('loadScheduleRepository');
   });
 });
 
@@ -171,7 +198,7 @@ describe('the question before the Schedules usage changes', () => {
     toasts.length = 0;
     previewData = {
       written: ['Nightly', 'Weekdays'],
-      kept: [{ name: 'First or Monday', cron: '0 0 1 * 1', reason: 'both' }],
+      kept: [{ name: 'Broken', code: 'notWritten', error: 'disk full', reason: 'not written: disk full' }],
       clashes: ['Backup'],
       planned: 1,
       linked: 3,
@@ -180,7 +207,7 @@ describe('the question before the Schedules usage changes', () => {
     };
   });
 
-  it('turned on : what it will take, git winning on a name, the crons kept, Cancel / Turn on', async () => {
+  it('turned on : what it will take, git winning on a name, what stays, Cancel / Turn on', async () => {
     const answer = confirmUsageChange(t, 'ops', { use_for_schedules: 0 }, { use_for_schedules: 1 });
     await vi.waitFor(() => expect(confirmPrompt.open).toBe(true));
     expect(confirmPrompt.title).toBe(
@@ -192,7 +219,8 @@ describe('the question before the Schedules usage changes', () => {
       'settings.repositories.usageOnWrittenList {"type":"settings.repositories.usageTypes.schedules","name":"ops","file":"ops/schedules.yml","count":2}',
     );
     expect(text).toContain('settings.repositories.usageOnClashes {"names":"Backup"}');
-    expect(text).toContain('settings.repositories.schedulesOnKept {"names":"First or Monday (0 0 1 * 1)"}');
+    expect(text).toContain('settings.repositories.usageOnKept');
+    expect(text).not.toContain('schedulesOnKept');
     expect(text).toContain('settings.repositories.schedulesOnPlanned');
     expect(text).toContain('settings.repositories.usageOnAfter');
     // one type : its own question, no section heading

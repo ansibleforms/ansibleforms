@@ -9,9 +9,10 @@
 /*                 comes from (this app, or a schedules           */
 /*                 repository's file), its name, description,     */
 /*                 the form it runs and whether it is on          */
-/*    Schedule     once at a time, or on a cron ; a schedule with */
-/*                 a rrule (the schedules repository's, or one it */
-/*                 left) : its iCal rrule, its next runs under it */
+/*    Schedule     how it is timed, the same three choices for a  */
+/*                 schedule of the app and one of a schedules     */
+/*                 repository : on a cron, on an iCal rrule (its  */
+/*                 next runs under it), or once at a time         */
 /*    Extra vars   what it sends the form (YAML), and a           */
 /*                 repository schedule's prompts from its file    */
 /*  A repository's schedule is saved into its file (the           */
@@ -23,17 +24,17 @@
 /*  the title line narrows every tab at once.                     */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
-import { statusPill, schedulePill } from '@/config/settings';
+import { statusPill, schedulePill, timingKind, scheduleTiming } from '@/config/settings';
 import { editorStyle } from '@/config/editorStyle';
 import { cronValidationMessage } from '@/config/cron';
-import { rruleValidationMessage } from '@/config/rrule';
+import { rruleValidationMessage, defaultRrule } from '@/config/rrule';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -50,7 +51,9 @@ const scheduleId = computed(() => String(route.params.id || ''));
 const schedule = ref(null); // as saved
 const edit = ref(null); // as edited
 const formNames = ref([]); // the forms it can run
-const EDITED = ['name', 'description', 'form', 'enabled', 'one_time_run', 'cron', 'run_at', 'rrule', 'extra_vars'];
+const EDITED = ['name', 'description', 'form', 'enabled', 'timing', 'cron', 'run_at', 'rrule', 'extra_vars'];
+// how a schedule may be timed, wherever it is kept : the choice of its Schedule tab
+const TIMINGS = ['cron', 'rrule', 'once'];
 
 /**
  * The fields of a schedule as this page edits them.
@@ -68,7 +71,8 @@ function editable(record) {
     form: record.form ?? '',
     // on unless turned off
     enabled: record.enabled === undefined || record.enabled === null ? true : !!Number(record.enabled),
-    one_time_run: !!record.one_time_run,
+    // cron, rrule or once
+    timing: timingKind(record),
     cron: record.cron ?? '',
     run_at: record.run_at ?? '',
     rrule: record.rrule ?? '',
@@ -90,13 +94,42 @@ useUnsavedGuard(
 const running = computed(() => ['running', 'queued'].includes(schedule.value?.state));
 // kept in the schedules repository : saved into its file
 const inRepository = computed(() => !!schedule.value?.repository);
-// timed by a rrule : one of the repository's, or one a repository left it when it let it go
-const usesRrule = computed(() => !!schedule.value?.rrule);
-const cronError = computed(() =>
-  edit.value && !usesRrule.value && !edit.value.one_time_run ? cronValidationMessage(t, edit.value.cron) : null,
-);
+/**
+ * A timing's choice as its Schedule tab and the New schedule dialog say it.
+ *
+ * Args:
+ *   kind (string): cron, rrule or once.
+ *
+ * Returns:
+ *   string: its label.
+ */
+const timingLabel = (kind) =>
+  ({
+    cron: t('settings.schedules.timingCron'),
+    rrule: t('settings.schedules.rrule'),
+    once: t('settings.schedules.oneTimeRun'),
+  })[kind];
+
+/**
+ * The few grey words after a timing's choice.
+ *
+ * Args:
+ *   kind (string): cron, rrule or once.
+ *
+ * Returns:
+ *   string: its hint.
+ */
+const timingHint = (kind) =>
+  ({
+    cron: t('settings.schedules.timingCronHint'),
+    rrule: t('settings.schedules.timingRruleHint'),
+    once: t('settings.schedules.timingOnceHint'),
+  })[kind];
+
+// the timing chosen : each checked when it is the one
+const cronError = computed(() => (edit.value?.timing === 'cron' ? cronValidationMessage(t, edit.value.cron) : null));
 const rruleError = computed(() =>
-  edit.value && usesRrule.value
+  edit.value?.timing === 'rrule'
     ? edit.value.rrule.trim()
       ? rruleValidationMessage(t, edit.value.rrule)
       : t('settings.common.fieldRequired', { field: t('settings.schedules.rrule') })
@@ -248,22 +281,28 @@ const tabFields = computed(() => {
       ['form', t('settings.fields.form'), edit.value?.form],
       ['enabled', t('settings.schedules.enabled'), t('settings.schedules.enabledHelp')],
     ],
-    schedule: usesRrule.value
-      ? [['rrule', t('settings.schedules.rrule'), t('settings.schedules.rruleHelp'), edit.value?.rrule]]
-      : [
-          ['one_time_run', t('settings.schedules.oneTimeRun')],
-          edit.value?.one_time_run
-            ? ['run_at', t('settings.schedules.runAt'), t('settings.schedules.runAtHelp')]
-            : [
-                'cron',
-                t('settings.cron.minute'),
-                t('settings.cron.hour'),
-                t('settings.cron.dayOfMonth'),
-                t('settings.cron.month'),
-                t('settings.cron.dayOfWeek'),
-                edit.value?.cron,
-              ],
-        ],
+    schedule: [
+      [
+        'timing',
+        t('settings.schedules.timing'),
+        t('settings.schedules.timingCron'),
+        t('settings.schedules.rrule'),
+        t('settings.schedules.oneTimeRun'),
+      ],
+      edit.value?.timing === 'rrule'
+        ? ['rrule', t('settings.schedules.rrule'), t('settings.schedules.rruleHelp'), edit.value?.rrule]
+        : edit.value?.timing === 'once'
+          ? ['run_at', t('settings.schedules.runAt'), t('settings.schedules.runAtHelp')]
+          : [
+              'cron',
+              t('settings.cron.minute'),
+              t('settings.cron.hour'),
+              t('settings.cron.dayOfMonth'),
+              t('settings.cron.month'),
+              t('settings.cron.dayOfWeek'),
+              edit.value?.cron,
+            ],
+    ],
     'extra-vars': [
       ['extra_vars', t('settings.fields.extraVars'), t('settings.schedules.extraVarsHelp'), edit.value?.extra_vars],
       ...(launchOptionsText.value
@@ -303,9 +342,20 @@ const searchHead = (key) => {
 };
 
 // ─── actions ──────────────────────────────────────────────────────────────────
+// a rrule chosen for a schedule that had none : it starts as a new one does (daily at midnight,
+// in the browser's zone)
+watch(
+  () => edit.value?.timing,
+  (timing) => {
+    if (timing === 'rrule' && !String(edit.value.rrule || '').trim()) {
+      edit.value.rrule = defaultRrule(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
+  },
+);
+
 /**
- * Saves the fields of every tab : a one time run keeps its time and no cron, a recurring one
- * its cron ; a repository's schedule its rrule, saved into its file.
+ * Saves the fields of every tab : the timing chosen (a cron, a rrule, or a one time run and its
+ * time), the other two emptied ; a repository's schedule is saved into its file.
  */
 async function save() {
   const e = edit.value;
@@ -324,14 +374,7 @@ async function save() {
     enabled: e.enabled ? 1 : 0,
     extra_vars: e.extra_vars,
   };
-  const data = usesRrule.value
-    ? { ...common, rrule: e.rrule.trim() }
-    : {
-        ...common,
-        one_time_run: e.one_time_run ? 1 : 0,
-        cron: e.one_time_run ? '' : e.cron,
-        run_at: e.one_time_run ? e.run_at : null,
-      };
+  const data = scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, run_at: e.run_at });
   try {
     await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -524,7 +567,7 @@ onMounted(async () => {
                 <div class="form-text">{{ t('settings.schedules.enabledHelp') }}</div>
               </div>
             </template>
-            <!-- Schedule : once at a time, or on a cron schedule -->
+            <!-- Schedule : on a cron, on a rrule, or once at a time -->
             <template v-if="tabShown('schedule')">
               <template v-if="searching && searchHead('schedule')">
                 <hr v-if="!searchHead('schedule').first" class="mt-4 mb-0 af-search-line" />
@@ -535,28 +578,40 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
                 </h6>
               </template>
-              <!-- timed by a rrule (a repository's, or one it left) : its next runs under it -->
-              <div v-if="usesRrule" v-show="fieldShown('rrule')" class="af-schedule-cron mb-0">
+              <!-- how it is timed : the same three choices wherever it is kept -->
+              <div
+                v-show="fieldShown('timing')"
+                class="mb-3 af-radio-group"
+                role="radiogroup"
+                :aria-label="t('settings.schedules.timing')"
+              >
+                <div v-for="kind in TIMINGS" :key="kind" class="form-check af-short-check">
+                  <input
+                    :id="'af-schedule-timing-' + kind"
+                    v-model="edit.timing"
+                    class="form-check-input"
+                    type="radio"
+                    name="af-schedule-timing"
+                    :value="kind"
+                  />
+                  <label class="form-check-label" :for="'af-schedule-timing-' + kind">
+                    <span class="af-short-label">{{ timingLabel(kind) }}</span>
+                    <span class="text-body-secondary small">{{ timingHint(kind) }}</span>
+                  </label>
+                </div>
+              </div>
+              <!-- timed by a rrule : its next runs under it -->
+              <div v-if="edit.timing === 'rrule'" v-show="fieldShown('rrule')" class="af-schedule-cron mb-0">
                 <label class="form-label fw-bold">{{ t('settings.schedules.rrule') }}</label>
                 <BsRrule v-model="edit.rrule" :hasError="!!rruleError" />
                 <div class="form-text">{{ t('settings.schedules.rruleHelp') }}</div>
               </div>
-              <div v-if="!usesRrule" v-show="fieldShown('one_time_run')" class="form-check form-switch mb-3">
-                <input
-                  id="af-schedule-once"
-                  v-model="edit.one_time_run"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                />
-                <label class="form-check-label" for="af-schedule-once">{{ t('settings.schedules.oneTimeRun') }}</label>
-              </div>
-              <div v-if="!usesRrule && edit.one_time_run" v-show="fieldShown('run_at')" class="af-schedule-field mb-0">
+              <div v-else-if="edit.timing === 'once'" v-show="fieldShown('run_at')" class="af-schedule-field mb-0">
                 <label class="form-label">{{ t('settings.schedules.runAt') }}</label>
                 <BsDateTime v-model="edit.run_at" icon="calendar" dateType="datetime" :convertToUtc="true" teleport />
                 <div class="form-text">{{ t('settings.schedules.runAtHelp') }}</div>
               </div>
-              <div v-else-if="!usesRrule" v-show="fieldShown('cron')" class="af-schedule-cron mb-0">
+              <div v-else v-show="fieldShown('cron')" class="af-schedule-cron mb-0">
                 <BsCron v-model="edit.cron" icon="stopwatch" :hasError="!!cronError" />
                 <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
               </div>

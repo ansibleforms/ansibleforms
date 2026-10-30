@@ -30,12 +30,16 @@ const db = {
     }
     if (/^SELECT .* FROM AnsibleForms.`schedule`$/.test(sql)) return rows.map((r) => ({ ...r }));
     if (/^SELECT \* FROM AnsibleForms.`schedule` WHERE id = \?$/.test(sql)) return rows.filter((r) => r.id === params[0]).map((r) => ({ ...r }));
-    // the app's recurring schedules (activation)
-    if (/WHERE repository IS NULL AND owner IS NULL AND COALESCE\(one_time_run,0\) = 0/.test(sql)) {
-      return rows.filter((r) => !r.repository && !r.owner && !Number(r.one_time_run)).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ ...r }));
+    // the app's schedules, whatever their timing, not the jobs users planned (activation)
+    if (/WHERE repository IS NULL AND owner IS NULL ORDER BY name/.test(sql)) {
+      return rows.filter((r) => !r.repository && !r.owner).sort((a, b) => a.name.localeCompare(b.name)).map((r) => ({ ...r }));
     }
-    if (/^SELECT COUNT\(\*\) AS n FROM AnsibleForms.`schedule` WHERE repository IS NULL AND \(owner/.test(sql)) {
-      return [{ n: rows.filter((r) => !r.repository && (r.owner || Number(r.one_time_run))).length }];
+    if (/^SELECT COUNT\(\*\) AS n FROM AnsibleForms.`schedule` WHERE repository IS NULL AND owner IS NOT NULL/.test(sql)) {
+      return [{ n: rows.filter((r) => !r.repository && r.owner).length }];
+    }
+    // the one-time schedules waiting for their run
+    if (/^SELECT name FROM AnsibleForms.`schedule` WHERE one_time_run = 1 AND last_run IS NULL/.test(sql)) {
+      return rows.filter((r) => Number(r.one_time_run) === 1 && !r.last_run).map((r) => ({ name: r.name }));
     }
     if (/^SELECT COUNT\(\*\) AS n FROM AnsibleForms.`schedule` WHERE repository = \?/.test(sql)) return [{ n: rows.filter((r) => r.repository === params[0]).length }];
     if (/^UPDATE AnsibleForms.`schedule` SET repository = NULL, repo_file = NULL WHERE repository = \?/.test(sql)) {
@@ -67,17 +71,18 @@ const db = {
       const id = params[params.length - 1];
       unique(params[0], id);
       const row = rows.find((r) => r.id === id);
-      const [name, description, form, rrule, enabled, extra_vars, launch_options] = params;
-      Object.assign(row, { name, description, form, rrule, enabled, extra_vars, launch_options });
-      // a file taking an app's schedule over : it is linked, its cron gone
-      if (params.length === 10) Object.assign(row, { repository: params[7], repo_file: params[8], cron: null });
+      // the columns it sets, in its order, each with its value
+      const columns = sql.match(/SET (.*) WHERE/)[1].split(",").map((c) => c.trim().replace(/=\?$/, ""));
+      columns.forEach((c, i) => (row[c] = params[i]));
       return { affectedRows: 1 };
     }
     if (/^INSERT INTO AnsibleForms.`schedule`/.test(sql)) {
       unique(params[0], null);
-      const [name, description, form, rrule, enabled, extra_vars, launch_options, repository, repo_file] = params;
+      const columns = sql.match(/\(([^)]*)\) VALUES/)[1].split(",").map((c) => c.trim());
       const id = nextId++;
-      rows.push({ id, name, description, form, rrule, enabled, extra_vars, launch_options, repository, repo_file, state: "idle", last_run: null });
+      const row = { id, last_run: null };
+      columns.forEach((c, i) => (row[c] = i < params.length ? params[i] : "idle"));
+      rows.push(row);
       return { insertId: id, affectedRows: 1 };
     }
     throw new Error(`unexpected statement: ${sql}`);
@@ -141,6 +146,7 @@ function writeFile(repo, file, text) {
   fs.writeFileSync(path.join(dir, file), text);
 }
 const readFile = (repo, file) => fs.readFileSync(path.join(ROOT, repo, "schedules", file), "utf8");
+const readFile_ = (repo, file) => fs.readFileSync(path.join(ROOT, repo, file), "utf8");
 const fileExists = (repo, file) => fs.existsSync(path.join(ROOT, repo, "schedules", file));
 const own = (repo) => rows.filter((r) => r.repository === repo).sort((a, b) => a.repo_file.localeCompare(b.repo_file));
 
@@ -323,27 +329,31 @@ describe("a pull reads the schedules: entries into the schedule table", () => {
 });
 
 // ─── activation and deactivation ───────────────────────────────────────────────
-describe("made the schedules repository, it takes the app's recurring schedules", () => {
+describe("made the schedules repository, it takes the app's schedules, each with its own timing", () => {
   const appRows = () => {
     rows.push(
       { id: 1, name: "Every five", form: "Report", cron: "*/5 * * * *", rrule: null, enabled: 1, extra_vars: "a: 1\n", repository: null, owner: null, one_time_run: 0 },
       { id: 2, name: "Weekdays", form: "Report", cron: "0 8 * * 1-5", rrule: null, enabled: 0, extra_vars: "", repository: null, owner: null, one_time_run: 0 },
+      // a cron no rrule could express : handed over as it is all the same
       { id: 3, name: "First or Monday", form: "Report", cron: "0 0 1 * 1", rrule: null, enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 0 },
-      { id: 4, name: "Run later", form: "Report", cron: null, run_at: "2030-01-01", repository: null, owner: '{"username":"bob"}', one_time_run: 1 },
+      // a job a user planned ("Run later") : that user's, it stays
+      { id: 4, name: "Run later", form: "Report", cron: null, run_at: "2030-01-01 00:00:00", repository: null, owner: '{"username":"bob"}', one_time_run: 1 },
       { id: 5, name: "Clash", form: "Report", cron: "0 4 * * *", rrule: null, enabled: 1, repository: null, owner: null, one_time_run: 0, last_run: "2026-10-19 04:00:00" },
+      { id: 6, name: "Weekly", form: "Report", cron: null, rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1", enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 0 },
+      // a one-time schedule of the app (no owner) : handed over, a one-time run still
+      { id: 7, name: "Once", form: "Report", cron: null, rrule: null, run_at: "2030-02-03 04:05:00", enabled: 1, extra_vars: "", repository: null, owner: null, one_time_run: 1, last_run: null },
     );
     nextId = 10;
     writeFile("ops", "clash.yaml", scheduleYaml("Clash"));
   };
 
-  test("the preview counts what it would do, changing nothing", async () => {
+  test("the preview counts what it would do, changing nothing : every schedule written, none kept for its timing", async () => {
     appRows();
     const before = JSON.stringify(rows);
     const preview = await ScheduleRepo.preview("ops");
-    assert.equal(preview.recurring, 4);
-    assert.deepEqual(preview.written, ["Every five", "Weekdays"]);
-    assert.deepEqual(preview.kept.map((k) => k.name), ["First or Monday"]);
-    assert.ok(preview.kept[0].reason.includes("day of the month and the day of the week"));
+    assert.equal(preview.recurring, 6);
+    assert.deepEqual(preview.written, ["Every five", "First or Monday", "Once", "Weekdays", "Weekly"]);
+    assert.deepEqual(preview.kept, []);
     assert.deepEqual(preview.clashes, ["Clash"]);
     assert.equal(preview.planned, 1);
     assert.equal(preview.files, 1);
@@ -351,46 +361,54 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     assert.deepEqual(pulls, []);
   });
 
-  test("what stays in the app says why with a code, for the question in the app's language", async () => {
+  test("a schedule with no valid timing stays in the app, said with its code", async () => {
     appRows();
-    rows.push({ id: 6, name: "No time", form: "Report", cron: null, rrule: null, enabled: 1, repository: null, owner: null, one_time_run: 0 });
+    rows.push({ id: 8, name: "No time", form: "Report", cron: null, rrule: null, enabled: 1, repository: null, owner: null, one_time_run: 0 });
     const preview = await ScheduleRepo.preview("ops");
-    assert.deepEqual(
-      preview.kept.map((k) => [k.name, k.code, k.cron]),
-      [["First or Monday", "cron", "0 0 1 * 1"], ["No time", "noSchedule", null]],
-    );
+    assert.deepEqual(preview.kept.map((k) => [k.name, k.code]), [["No time", "noSchedule"]]);
+    assert.equal(preview.kept[0].cron, undefined);
   });
 
-  test("activation : pulled, git wins on a clash, convertible crons written to the first file holding schedules:, the rest kept in the app", async () => {
+  test("activation : pulled, git wins on a clash, every app schedule handed over with its own timing, unchanged", async () => {
     appRows();
     const report = await ScheduleRepo.activate("ops");
     assert.deepEqual(pulls, ["ops"]);
     assert.equal(report.pull, "pulled");
     assert.deepEqual(report.matched, ["Clash"]);
-    assert.deepEqual(report.written, ["Every five", "Weekdays"]);
-    assert.deepEqual(report.kept.map((k) => k.name), ["First or Monday"]);
+    assert.deepEqual(report.written, ["Every five", "First or Monday", "Once", "Weekdays", "Weekly"]);
+    assert.deepEqual(report.kept, []);
     assert.equal(report.planned, 1);
     // the clash : the file's definition, its history kept
     const clash = rows.find((r) => r.id === 5);
     assert.equal(clash.repo_file, "schedules/clash.yaml");
     assert.equal(clash.last_run, "2026-10-19 04:00:00");
-    // the written ones : entries after the one there, each row linked, on its rrule
-    const five = rows.find((r) => r.id === 1);
-    assert.equal(five.repository, "ops");
-    assert.equal(five.repo_file, "schedules/clash.yaml");
-    assert.equal(five.cron, null);
-    assert.match(five.rrule, /RRULE:FREQ=MINUTELY;INTERVAL=5$/);
+    // each entry with its own timing key, the other two absent
     const text = readFile("ops", "clash.yaml");
-    assert.deepEqual(YAML.parse(text).controller_schedules.map((e) => e.name), ["Clash", "Every five", "Weekdays"]);
-    const file = entryOf(text, "Every five");
-    assert.equal(file.rrule, five.rrule);
-    assert.deepEqual(file.extra_data, { a: 1 });
+    assert.deepEqual(YAML.parse(text).controller_schedules.map((e) => e.name), ["Clash", "Every five", "First or Monday", "Once", "Weekdays", "Weekly"]);
+    const timing = (name) => {
+      const e = entryOf(text, name);
+      return { rrule: e.rrule, cron: e.cron, one_time_run: e.one_time_run };
+    };
+    assert.deepEqual(timing("Every five"), { rrule: undefined, cron: "*/5 * * * *", one_time_run: undefined });
+    assert.deepEqual(timing("First or Monday"), { rrule: undefined, cron: "0 0 1 * 1", one_time_run: undefined });
+    assert.deepEqual(timing("Weekly"), { rrule: "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1", cron: undefined, one_time_run: undefined });
+    assert.deepEqual(timing("Once"), { rrule: undefined, cron: undefined, one_time_run: "2030-02-03T04:05:00Z" });
+    assert.deepEqual(entryOf(text, "Every five").extra_data, { a: 1 });
     assert.equal(entryOf(text, "Weekdays").enabled, false);
-    // the inconvertible cron and the planned job stay in the app, never written
-    assert.equal(rows.find((r) => r.id === 3).repository, null);
-    assert.equal(rows.find((r) => r.id === 3).cron, "0 0 1 * 1");
-    assert.equal(rows.find((r) => r.id === 4).repository, null);
+    // each row linked, its timing as it was
+    const row = (id) => rows.find((r) => r.id === id);
+    assert.deepEqual([row(1).repository, row(1).cron, row(1).rrule, row(1).one_time_run], ["ops", "*/5 * * * *", null, 0]);
+    assert.deepEqual([row(3).repository, row(3).cron], ["ops", "0 0 1 * 1"]);
+    assert.deepEqual([row(6).cron, row(6).rrule], [null, "DTSTART;TZID=UTC:20300101T080000 RRULE:FREQ=WEEKLY;INTERVAL=1"]);
+    assert.deepEqual([row(7).repository, row(7).one_time_run, row(7).run_at, row(7).cron, row(7).rrule], ["ops", 1, "2030-02-03 04:05:00", null, null]);
+    // the planned job stays in the app, never written
+    assert.equal(row(4).repository, null);
     assert.deepEqual(fs.readdirSync(path.join(ROOT, "ops", "schedules")).sort(), ["clash.yaml"]);
+    // and the next pull finds them all unchanged
+    const summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.updated, 0);
+    assert.equal(summary.created, 0);
+    assert.equal(summary.unchanged, 6);
   });
 
   test("a pull that fails is said, the working copy used as it is", async () => {
@@ -398,7 +416,7 @@ describe("made the schedules repository, it takes the app's recurring schedules"
     pullFails = true;
     const report = await ScheduleRepo.activate("ops");
     assert.match(report.pull, /^not pulled: remote unreachable/);
-    assert.deepEqual(report.written, ["Every five", "Weekdays"]);
+    assert.deepEqual(report.written, ["Every five", "First or Monday", "Once", "Weekdays", "Weekly"]);
   });
 
   test("no file holding schedules: : written to schedules.yaml at the root, never over a file of that name that is not theirs", async () => {
@@ -484,11 +502,33 @@ describe("an edit in the app goes to its entry", () => {
     assert.equal(summary.unchanged, 1);
   });
 
-  test("a new schedule sent with a cron is written with the rrule that fires at the same moments", async () => {
+  test("a new schedule of each timing is written and stored with it, as given : a cron stays a cron, a one time run one", async () => {
     fs.mkdirSync(path.join(ROOT, "ops"), { recursive: true });
-    const id = await ScheduleRepo.create("ops", { name: "Hourly", form: "Report", cron: "0 * * * *" });
-    assert.match(rows.find((r) => r.id === id).rrule, /RRULE:FREQ=HOURLY;INTERVAL=1$/);
-    await assert.rejects(ScheduleRepo.create("ops", { name: "Odd", form: "Report", cron: "0 0 1 * 1" }), /cannot be written as a rrule/);
+    const hourly = await ScheduleRepo.create("ops", { name: "Hourly", form: "Report", cron: "0 * * * *" });
+    const odd = await ScheduleRepo.create("ops", { name: "Odd", form: "Report", cron: "0 0 1 * 1", one_time_run: 0 });
+    const weekly = await ScheduleRepo.create("ops", { name: "Weekly", form: "Report", rrule: RRULE });
+    const once = await ScheduleRepo.create("ops", { name: "Once", form: "Report", one_time_run: 1, run_at: "2030-01-02T03:04:00.000Z" });
+    const row = (id) => rows.find((r) => r.id === id);
+    assert.deepEqual([row(hourly).cron, row(hourly).rrule, row(hourly).one_time_run, row(hourly).run_at], ["0 * * * *", null, 0, null]);
+    assert.equal(row(odd).cron, "0 0 1 * 1");
+    assert.deepEqual([row(weekly).cron, row(weekly).rrule], [null, RRULE]);
+    assert.deepEqual([row(once).cron, row(once).rrule, row(once).one_time_run, row(once).run_at], [null, null, 1, "2030-01-02 03:04:00"]);
+    const text = readFile_("ops", "schedules.yaml");
+    assert.equal(entryOf(text, "Hourly").cron, "0 * * * *");
+    assert.equal(entryOf(text, "Weekly").rrule, RRULE);
+    assert.equal(entryOf(text, "Once").one_time_run, "2030-01-02T03:04:00Z");
+    for (const name of ["Hourly", "Odd", "Weekly", "Once"]) {
+      const keys = Object.keys(entryOf(text, name)).filter((k) => ["cron", "rrule", "one_time_run", "run_at"].includes(k));
+      assert.equal(keys.length, 1, `${name}: one timing key`);
+    }
+    // a pull reads them back unchanged
+    assert.equal((await ScheduleRepo.syncRepository("ops")).unchanged, 4);
+    // refused : a cron the app refuses, no timing, a one time run without its moment or one with a rrule
+    await assert.rejects(ScheduleRepo.create("ops", { name: "Bad", form: "Report", cron: "99 * * * *" }), /Invalid cron expression/);
+    await assert.rejects(ScheduleRepo.create("ops", { name: "None", form: "Report" }), /needs a cron, a rrule or a one time run/);
+    await assert.rejects(ScheduleRepo.create("ops", { name: "No time", form: "Report", one_time_run: 1 }), { name: "BadRequestError" });
+    await assert.rejects(ScheduleRepo.create("ops", { name: "Both", form: "Report", one_time_run: 1, run_at: "2030-01-02T03:04:00Z", rrule: RRULE }), /either, not both/);
+    await assert.rejects(ScheduleRepo.create("ops", { name: "No zone", form: "Report", one_time_run: 1, run_at: "2030-01-02T03:04:00" }), /without a zone/);
   });
 
   test("a new schedule is refused : not a schedules repository, a refused rrule, a taken name, an unknown form", async () => {
@@ -575,5 +615,94 @@ describe("an edit in the app goes to its entry", () => {
     await ScheduleRepo.delete(rows[0]);
     assert.equal(fileExists("ops", "a.yaml"), false);
     assert.deepEqual(rows, []);
+  });
+});
+
+// ─── the timing of an entry : cron, rrule or one_time_run ─────────────────────
+describe("an entry is timed by exactly one of cron, rrule and one_time_run, as an app schedule", () => {
+  test("each kind read, stored as the app stores it ; none or two refused, said in the pull output", async () => {
+    writeFile("ops", "a.yaml", scheduleYaml("Cron one", { rrule: undefined, cron: "30 2 * * 1-5" }));
+    writeFile("ops", "b.yaml", scheduleYaml("Rrule one"));
+    writeFile("ops", "c.yaml", scheduleYaml("Once", { rrule: undefined, one_time_run: "2030-05-06T07:08:00+02:00" }));
+    writeFile("ops", "d.yaml", scheduleYaml("Seconds", { rrule: undefined, cron: "0 30 2 * * *" }));
+    writeFile("ops", "e.yaml", scheduleYaml("No timing", { rrule: undefined }));
+    writeFile("ops", "f.yaml", scheduleYaml("Two", { cron: "0 1 * * *" }));
+    writeFile("ops", "g.yaml", scheduleYaml("Bad cron", { rrule: undefined, cron: "61 * * * *" }));
+    writeFile("ops", "h.yaml", scheduleYaml("No zone", { rrule: undefined, one_time_run: "2030-05-06T07:08:00" }));
+    const summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.created, 4);
+    const row = (name) => rows.find((r) => r.name === name);
+    assert.deepEqual([row("Cron one").cron, row("Cron one").rrule, row("Cron one").one_time_run, row("Cron one").run_at], ["30 2 * * 1-5", null, 0, null]);
+    assert.equal(row("Seconds").cron, "0 30 2 * * *");
+    assert.deepEqual([row("Rrule one").cron, row("Rrule one").rrule, row("Rrule one").one_time_run], [null, RRULE, 0]);
+    // its moment in UTC, as the app stores a one time run
+    assert.deepEqual([row("Once").cron, row("Once").rrule, row("Once").one_time_run, row("Once").run_at], [null, null, 1, "2030-05-06 05:08:00"]);
+    const refused = Object.fromEntries(summary.refused.map((r) => [r.file.split("#")[1], r.reasons.join(" ")]));
+    assert.deepEqual(Object.keys(refused).sort(), ["Bad cron", "No timing", "No zone", "Two"]);
+    assert.match(refused["No timing"], /one of rrule, cron or one_time_run/);
+    assert.match(refused.Two, /give one of rrule, cron or one_time_run, not rrule and cron/);
+    assert.match(refused["Bad cron"], /^cron: /);
+    assert.match(refused["No zone"], /without a zone is ambiguous/);
+    assert.ok(ScheduleRepo.summaryText(summary).includes("Refused schedules/f.yaml#Two"));
+    // read again : nothing changes
+    assert.equal((await ScheduleRepo.syncRepository("ops")).unchanged, 4);
+  });
+
+  test("an edit writes the timing the row has, the other two keys removed ; a change of kind rewrites the entry", async () => {
+    writeFile("ops", "a.yaml", `# kept\n${scheduleYaml("Rotate logs", { forks: 5 })}`);
+    await ScheduleRepo.syncRepository("ops");
+    // to a cron
+    await ScheduleRepo.update(rows[0], { cron: "0 3 * * *", rrule: "", one_time_run: 0, run_at: null });
+    let e = entryOf(readFile("ops", "a.yaml"));
+    assert.deepEqual([e.cron, e.rrule, e.one_time_run, e.forks], ["0 3 * * *", undefined, undefined, 5]);
+    assert.deepEqual([rows[0].cron, rows[0].rrule, rows[0].one_time_run], ["0 3 * * *", null, 0]);
+    assert.equal((await ScheduleRepo.syncRepository("ops")).unchanged, 1);
+    // to a one time run
+    await ScheduleRepo.update(rows[0], { one_time_run: 1, run_at: "2030-01-01T10:00:00.000Z", cron: "" });
+    e = entryOf(readFile("ops", "a.yaml"));
+    assert.deepEqual([e.cron, e.rrule, e.one_time_run], [undefined, undefined, "2030-01-01T10:00:00Z"]);
+    assert.deepEqual([rows[0].cron, rows[0].one_time_run, rows[0].run_at], [null, 1, "2030-01-01 10:00:00"]);
+    assert.equal((await ScheduleRepo.syncRepository("ops")).unchanged, 1);
+    // its moment only
+    await ScheduleRepo.update(rows[0], { run_at: "2030-01-01T11:00:00.000Z" });
+    assert.equal(entryOf(readFile("ops", "a.yaml")).one_time_run, "2030-01-01T11:00:00Z");
+    // back to a rrule
+    await ScheduleRepo.update(rows[0], { rrule: RRULE, one_time_run: 0 });
+    e = entryOf(readFile("ops", "a.yaml"));
+    assert.deepEqual([e.cron, e.rrule, e.one_time_run], [undefined, RRULE, undefined]);
+    assert.deepEqual([rows[0].rrule, rows[0].one_time_run, rows[0].run_at], [RRULE, 0, null]);
+    assert.ok(readFile("ops", "a.yaml").startsWith("# kept\n"));
+    // an edit of another field leaves the timing as it is
+    await ScheduleRepo.update(rows[0], { description: "x" });
+    assert.equal(entryOf(readFile("ops", "a.yaml")).rrule, RRULE);
+    // no longer run once without what else to run on : refused
+    await ScheduleRepo.update(rows[0], { one_time_run: 1, run_at: "2030-01-01T10:00:00Z" });
+    await assert.rejects(ScheduleRepo.update(rows[0], { one_time_run: 0 }), /needs a cron, a rrule or a one time run/);
+  });
+
+  test("a one-time entry whose run is past : not imported once the app ran it, never brought back ; still read while the app waits to run it", async () => {
+    const PAST = "2020-01-01T00:00:00Z";
+    // the app still waits to run it (its moment passed while the server was down) : read in, kept
+    writeFile("ops", "a.yaml", scheduleYaml("Late", { rrule: undefined, one_time_run: "2030-01-01T00:00:00Z" }));
+    await ScheduleRepo.syncRepository("ops");
+    writeFile("ops", "a.yaml", scheduleYaml("Late", { rrule: undefined, one_time_run: PAST }));
+    let summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.updated, 1);
+    assert.equal(rows[0].run_at, "2020-01-01 00:00:00");
+    // it ran : the app deleted it (Schedule.endOneTime) ; the entry stays in git
+    rows.length = 0;
+    summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.created, 0);
+    assert.deepEqual(rows, []);
+    assert.deepEqual(summary.skipped, [{ file: "schedules/a.yaml#Late", name: "Late", reason: "its one_time_run is past (already run)" }]);
+    assert.ok(ScheduleRepo.summaryText(summary).includes("Not imported, its one_time_run is past (already run): Late (schedules/a.yaml#Late)"));
+    // turned off instead of deleted (its delete failed) : it ran, it goes
+    rows.push({ id: 30, name: "Late", form: "Nightly", one_time_run: 1, run_at: "2020-01-01 00:00:00", last_run: "2020-01-01 00:00:05", enabled: 0, repository: "ops", repo_file: "schedules/a.yaml" });
+    summary = await ScheduleRepo.syncRepository("ops");
+    assert.equal(summary.deleted, 1);
+    assert.deepEqual(rows, []);
+    // a new moment ahead : read in again
+    writeFile("ops", "a.yaml", scheduleYaml("Late", { rrule: undefined, one_time_run: "2031-01-01T00:00:00Z" }));
+    assert.equal((await ScheduleRepo.syncRepository("ops")).created, 1);
   });
 });

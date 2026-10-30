@@ -1,32 +1,10 @@
-// A schedule of a schedules repository is timed by an iCal rrule, in its own time zone
-// (server/src/lib/scheduleRrule.js). This is the early answer the dialog and the schedule page
-// give while it is typed - what is refused on the text itself - and the rrule a new schedule
-// starts with. The server applies the real check and works out the runs (GET
-// /api/v2/schedule/rrule, the preview of BsRrule).
+// A schedule may be timed by an iCal rrule, in its own time zone (server/src/lib/scheduleRrule.js),
+// wherever it is kept : in the app or in a schedules repository. This is the early answer the
+// dialog and the schedule page give while it is typed - what is refused on the text itself - and
+// the rrule a schedule given one starts with. The server applies the real check and works out the
+// runs (GET /api/v2/schedule/rrule, the preview of BsRrule).
 
-import { ref } from 'vue';
-import axios from 'axios';
 import { rruleProblem as textProblem } from '@/lib/rruleRules';
-
-// the schedules repository, when there is one : a new recurring schedule goes to it, edited as a
-// rrule (read by loadScheduleRepository, on the schedules list)
-export const scheduleRepository = ref(null);
-
-/**
- * Reads which repository holds the schedules (none, or one), for the schedules list's dialog.
- *
- * Returns:
- *   Promise<string|null>: its name.
- */
-export async function loadScheduleRepository() {
-  try {
-    const res = await axios.get('/api/v2/schedule/repositories');
-    scheduleRepository.value = res.data?.records?.[0]?.name || null;
-  } catch {
-    scheduleRepository.value = null;
-  }
-  return scheduleRepository.value;
-}
 
 /**
  * Why a rrule is refused, on its text alone : the server's rules and reasons
