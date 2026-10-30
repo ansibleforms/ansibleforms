@@ -466,6 +466,100 @@ const oauth2Item = {
 // a new provider has its client : OAuth2.assertClient)
 export const ssoProviderItem = (({ anyOf: _client, ...item }) => item)(oauth2Item);
 
+// ---------------------------------------------------------------------------------
+// Values a file says otherwise than they are stored.
+//
+// A field's value as the config seed and a repository's files say it, when the database stores
+// it under another (older) name : { field: { stored: { file, deprecated } } } - file the value a
+// file says (and the app writes), deprecated the version since which the stored value said in a
+// file is deprecated (still read, the same meaning ; said where it is read). The one map for the
+// seed (lib/seed.js) and a repository's entries (lib/repoObjects/fields.js values).
+// ---------------------------------------------------------------------------------
+
+// an SSO provider's type : Microsoft Entra ID is entraid in a file ; the database, the sign-in and
+// the API keep azuread, its name of before (a role's members say entraid/ the same way)
+export const OAUTH2_VALUES = { provider: { azuread: { file: "entraid", deprecated: "7.5.0" } } };
+
+/**
+ * An object's values as a file says them : each stored value of a field the map names given its
+ * file value (the app writes it so).
+ *
+ * Args:
+ *   obj (object): the object, its values as stored.
+ *   values (object): the map ({ field: { stored: { file } } }) ; none : the object as it is.
+ *
+ * Returns:
+ *   object: a copy with the file values ; the object itself when the map changes nothing.
+ */
+export function fileValuesOf(obj, values = {}) {
+  let out = obj;
+  for (const [field, map] of Object.entries(values)) {
+    const to = map[obj?.[field]]?.file;
+    if (to !== undefined) out = { ...out, [field]: to };
+  }
+  return out;
+}
+
+/**
+ * An object's values as they are stored : each file value of a field the map names given its
+ * stored value ; a stored value a file still says (deprecated) kept, said once per field and value.
+ *
+ * Args:
+ *   obj (object): the object, as a file (or the seed) gives it.
+ *   values (object): the map ({ field: { stored: { file, deprecated } } }) ; none : the object as it
+ *     is.
+ *
+ * Returns:
+ *   object: { object (a copy with the stored values ; the object itself when the map changes
+ *     nothing), deprecated ([{ field, value, use, since }] : the deprecated values it says) }.
+ */
+export function storedValuesOf(obj, values = {}) {
+  let object = obj;
+  const deprecated = [];
+  for (const [field, map] of Object.entries(values)) {
+    const value = obj?.[field];
+    for (const [stored, { file, deprecated: since }] of Object.entries(map)) {
+      if (value === file) object = { ...object, [field]: stored };
+      else if (value === stored && since) deprecated.push({ field, value, use: file, since });
+    }
+  }
+  return { object, deprecated };
+}
+
+/**
+ * What a deprecated value says (storedValuesOf), the pull output's and the server log's words.
+ *
+ * Args:
+ *   d (object): { field, value, use, since }.
+ *
+ * Returns:
+ *   string: the notice.
+ */
+export const deprecatedValueNotice = (d) => `${d.field}: ${d.value} is deprecated since ${d.since} and removed in 8: read as ${d.field}: ${d.use}, declare that instead`;
+
+/**
+ * The config seed's oauth2 items with their values as stored (storedValuesOf, OAUTH2_VALUES) :
+ * provider: entraid applied as azuread, provider: azuread still read, listed as deprecated (warned
+ * by the caller). Returns a new document.
+ *
+ * Args:
+ *   doc (object): the seed document.
+ *
+ * Returns:
+ *   { doc: object, deprecated: { name, notice }[] }: the document, and each item's deprecated value
+ *     with what it says.
+ */
+export function foldOauth2Values(doc) {
+  if (!Array.isArray(doc?.oauth2?.items)) return { doc, deprecated: [] };
+  const deprecated = [];
+  const items = doc.oauth2.items.map((item) => {
+    const stored = storedValuesOf(item, OAUTH2_VALUES);
+    deprecated.push(...stored.deprecated.map((d) => ({ name: item?.name, notice: deprecatedValueNotice(d) })));
+    return stored.object;
+  });
+  return { doc: { ...doc, oauth2: { ...doc.oauth2, items } }, deprecated };
+}
+
 const repositoryItem = {
   type: "object",
   additionalProperties: false,
@@ -880,9 +974,11 @@ function assertSingletonFlags(doc) {
     }
   }
   const byProvider = {};
+  // by the provider's type as stored (entraid and azuread are one), named as a file says it
   for (const item of doc.oauth2?.items || []) {
     if (!item.enable) continue;
-    (byProvider[item.provider] = byProvider[item.provider] || []).push(item.name);
+    const provider = fileValuesOf(storedValuesOf(item, OAUTH2_VALUES).object, OAUTH2_VALUES).provider;
+    (byProvider[provider] = byProvider[provider] || []).push(item.name);
   }
   for (const [provider, names] of Object.entries(byProvider)) {
     if (names.length > 1) {

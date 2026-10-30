@@ -1071,6 +1071,13 @@ export async function syncRepository(desc, name, opts = {}) {
       continue;
     }
     if (f.ignored?.length) summary.ignored.push({ file: f.place, keys: f.ignored });
+    // a deprecated value it says (an SSO provider's provider: azuread) : read the same, said once
+    for (const notice of f.deprecated || []) {
+      const line = `Deprecated: ${notice}`;
+      if (summary.notes.includes(line)) continue;
+      summary.notes.push(line);
+      logger.warning(`${titleOf(desc)} of repository '${name}': ${line}`);
+    }
     // what the entry may not set taken out, each said (a usage another repository holds)
     if (desc.adjust) {
       const adjusted = await desc.adjust(f.object, name);

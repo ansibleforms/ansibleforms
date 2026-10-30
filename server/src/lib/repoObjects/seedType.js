@@ -90,6 +90,9 @@ export const KEPT_REASONS = {
  *       (string) the column its rows are found by ('id' when not said : a disclaimer's version).
  *     canonical (function): (object) => the object as it is compared and written (a moment as an
  *       ISO text), the file's and the app's alike.
+ *     values (object): the fields whose value a file says otherwise than it is stored (an SSO
+ *       provider's entraid, stored azuread : lib/seed-schema.js OAUTH2_VALUES), read and written
+ *       so (lib/repoObjects/fields.js) ; a deprecated one said once in the pull output.
  *     nameFor (function): (row) => the name an object of the app without one is written with (an
  *       announcement : the start of its message) ; it keeps that name from then on.
  *     nameColumn (string): the column its name is in ('name' when not said : a disclaimer's is its

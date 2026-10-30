@@ -6832,10 +6832,13 @@
           position: 1
       controller_sso:
         - name: corp
-          provider: azuread
+          provider: entraid
           credential: corp-client
           enable: true
       ```
+
+      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `oauth2:`
+      items. `azuread`, its name before, is still read the same (deprecated, removed in 8.0, said in the pull output).
 
       An entry may leave a secret out: the one in the database stays (an object of the app is written to git without
       its secrets, and the pull output says so). An SSO provider's entry may therefore give neither its client

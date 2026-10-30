@@ -8,7 +8,10 @@
 //             secrets left out
 //   editsOf   an app edit as the edits of its entry : only the fields it changed
 //   removedOf the fields a file no longer declares, given back the value a new object gets
-import { itemValidator } from "../seed-schema.js";
+//   values    a field whose value a file says otherwise than it is stored (an SSO provider's
+//             entraid, stored azuread) : read as stored, written as a file says it, a stored value
+//             a file still says (deprecated) read the same and said
+import { itemValidator, fileValuesOf, storedValuesOf, deprecatedValueNotice } from "../seed-schema.js";
 import { same } from "./yamlFile.js";
 import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
 
@@ -23,12 +26,14 @@ import { resolveSecrets, withoutSecrets, given } from "./secrets.js";
  *     keepFalse (string[]): the yes or no fields written when off ; the others only when on.
  *     canonical (function): (object) => the object as it is compared and written (a moment as an
  *       ISO text, ...), the file's and the app's alike ; none : as it is.
+ *     values (object): the fields whose value a file says otherwise than it is stored ({ field:
+ *       { stored: { file, deprecated } } }, lib/seed-schema.js OAUTH2_VALUES) ; none : as they are.
  *
  * Returns:
  *   object: { keys, booleans, strings, check, read, toFile, editsOf, removedOf, keyOrderOf }.
  */
 export function fieldSet(spec) {
-  const { secrets = [], skip = [], keepFalse = [], canonical = (o) => o } = spec;
+  const { secrets = [], skip = [], keepFalse = [], canonical = (o) => o, values = {} } = spec;
   const { validate, keys, schema } = itemValidator(spec.section);
   const booleans = new Set(keys.filter((k) => schema.properties[k].type === "boolean"));
   const strings = new Set(keys.filter((k) => schema.properties[k].type === "string"));
@@ -45,7 +50,8 @@ export function fieldSet(spec) {
    *   object: { object, withoutSecret }.
    */
   function toFile(row) {
-    const source = canonical({ ...(row || {}) });
+    // its values as a file says them (an SSO provider's entraid)
+    const source = fileValuesOf(canonical({ ...(row || {}) }), values);
     const obj = {};
     for (const k of fileKeys) {
       const v = source[k];
@@ -71,14 +77,17 @@ export function fieldSet(spec) {
    *     seed's) }.
    *
    * Returns:
-   *   object: { errors, object (resolved, canonical, null when refused) }.
+   *   object: { errors, object (resolved, canonical, its values as stored, null when refused),
+   *     deprecated (string[] : what each deprecated value it says is, the pull output's words) }.
    */
   function check(raw, opts = {}) {
     const resolved = opts.resolved ? { errors: [], object: raw } : resolveSecrets(raw, secrets);
     if (resolved.errors.length) return { errors: resolved.errors, object: null };
     const invalid = validate(resolved.object);
     if (invalid.length) return { errors: invalid, object: null };
-    return { errors: [], object: canonical(resolved.object) };
+    // its values as stored (an SSO provider's entraid is azuread), a deprecated one said
+    const stored = storedValuesOf(resolved.object, values);
+    return { errors: [], object: canonical(stored.object), deprecated: stored.deprecated.map(deprecatedValueNotice) };
   }
 
   /**
@@ -89,7 +98,7 @@ export function fieldSet(spec) {
    *   raw (object): the entry, as the file gives it.
    *
    * Returns:
-   *   object: { errors, absent, object, raw (as the file gives it) }.
+   *   object: { errors, absent, object, raw (as the file gives it), deprecated (check's) }.
    */
   function read(raw) {
     if (raw?.state === "absent") return { errors: [], absent: true, object: null, raw };

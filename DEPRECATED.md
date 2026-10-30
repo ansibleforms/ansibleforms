@@ -24,6 +24,7 @@ Removed in 8.0.0. Each logs a warning when it is used.
 | `forms_yaml` in `GET` and `PUT /api/v2/settings/config` (a `PUT` with it logs a warning) | `config_yaml` | 7.6.0 |
 | a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.5.0 |
 | `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.5.0 |
+| `provider: azuread` on an SSO provider of the config seed's `oauth2:` items or of a repository's `controller_sso:` entries (still read as Microsoft Entra ID, with a warning in the server log and the repository's pull output) | `provider: entraid` | 7.5.0 |
 
 ## Upgrading from 6.5 to 7.0.0 - read first
 

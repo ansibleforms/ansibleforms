@@ -93,8 +93,9 @@ const TYPES = [
     key: "sso",
     folder: "sso",
     table: "oauth2_providers",
-    file: { name: "corp", provider: "azuread", credential: "corp-client", enable: false },
-    check: (r) => assert.equal(r.credential, "corp-client"),
+    file: { name: "corp", provider: "entraid", credential: "corp-client", enable: false },
+    // Microsoft Entra ID : entraid in its file, azuread stored
+    check: (r) => assert.deepEqual([r.credential, r.provider], ["corp-client", "azuread"]),
     secret: "client_secret",
     app: { id: 30, name: "google", provider: "oidc", issuer: "https://accounts.google.com", client_id: "id", client_secret: "enc:sec", enable: 0 },
     edit: ["scope", "openid email"],
@@ -326,6 +327,51 @@ describe("a value as the database gives it", () => {
   });
 });
 
+describe("an SSO provider's type : entraid in a file, azuread stored", () => {
+  const repo = repoOf("sso");
+  const desc = () => RepoObjects.descriptorOf("sso");
+  const entra = (name, provider) => ({ name, provider, credential: "corp-client", enable: false });
+
+  test("provider: entraid is read as azuread, the next pull unchanged, nothing said", async () => {
+    fx.writeEntry(repo, "sso/corp.yaml", "sso", entra("corp", "entraid"));
+    const first = await RepoObjects.syncRepository(await desc(), repo);
+    assert.deepEqual(first.refused, []);
+    assert.equal(fx.rowNamed("oauth2_providers", "corp").provider, "azuread");
+    assert.deepEqual(first.notes, []);
+    CrudModel.flushAllLocal();
+    const second = await RepoObjects.syncRepository(await desc(), repo);
+    assert.equal(second.unchanged, 1, JSON.stringify(second));
+  });
+
+  test("provider: azuread is still read the same, the pull saying once that it is deprecated", async () => {
+    fx.writeEntry(repo, "sso/corp.yaml", "sso", entra("corp", "azuread"));
+    fx.writeEntry(repo, "sso/emea.yaml", "sso", entra("emea", "azuread"));
+    const summary = await RepoObjects.syncRepository(await desc(), repo);
+    assert.equal(summary.created, 2);
+    assert.deepEqual(["corp", "emea"].map((n) => fx.rowNamed("oauth2_providers", n).provider), ["azuread", "azuread"]);
+    const said = summary.notes.filter((n) => /provider: azuread is deprecated/.test(n));
+    assert.deepEqual(said, ["Deprecated: provider: azuread is deprecated since 7.5.0 and removed in 8: read as provider: entraid, declare that instead"]);
+    const { summaryText } = await import("../src/lib/repoObjects/engine.js");
+    assert.match(summaryText(await desc(), summary), /Deprecated: provider: azuread is deprecated/);
+  });
+
+  test("the app writes entraid : a provider of the app activated, and one turned to Entra ID in the app", async () => {
+    fx.state.tables.oauth2_providers.push({ id: 30, name: "corp", provider: "azuread", tenant_id: "contoso.com", client_id: "id", client_secret: "enc:s", enable: 0 });
+    await RepoObjects.activate(await desc(), repo);
+    assert.equal(fx.readEntry(repo, "sso.yaml", "sso", "corp").provider, "entraid");
+    // an Open ID provider of a file, made an Entra ID one in the app : its entry says entraid
+    process.env.SSO_SECRET = "s";
+    fx.writeEntry(repo, "sso/google.yaml", "sso", { name: "google", provider: "oidc", issuer: "https://idp", client_id: "id", client_secret: "${SSO_SECRET}", enable: false });
+    assert.deepEqual((await RepoObjects.syncRepository(await desc(), repo)).refused, []);
+    const row = fx.rowNamed("oauth2_providers", "google");
+    const before = { ...row };
+    Object.assign(row, { provider: "azuread", tenant_id: "contoso.com" });
+    CrudModel.flushAllLocal();
+    assert.equal(await RepoObjects.appUpdated("sso", before, row.id), true);
+    assert.equal(fx.readEntry(repo, "sso/google.yaml", "sso")[0].provider, "entraid");
+  });
+});
+
 describe("a yes or no whose default is on", () => {
   test("a webhook channel's certificate not checked : written off, a new app made from the file keeps it off", async () => {
     fx.state.tables.notification_channels.push({ id: 30, name: "hook", type: "webhook", url: "https://hook.example.com", method: "POST", verify_tls: 0, enabled: 1, description: "" });
@@ -459,10 +505,11 @@ describe("a change in the app that changes other objects of the type too", () =>
   });
 });
 
-// an SSO provider of its own type by its name : b an Entra ID one, the others OpenID Connect
-const SSO_OF = (name) =>
+// an SSO provider of its own type by its name : b an Entra ID one (entraid in its file, azuread
+// stored), the others OpenID Connect
+const SSO_OF = (name, entra = "entraid") =>
   name === "b"
-    ? { name, provider: "azuread", issuer: "https://idp", tenant_id: "contoso.com", client_id: "id" }
+    ? { name, provider: entra, issuer: "https://idp", tenant_id: "contoso.com", client_id: "id" }
     : { name, provider: "oidc", issuer: "https://idp", client_id: "id" };
 
 describe("a flag one object at most has, that two files give", () => {
@@ -503,7 +550,7 @@ describe("a flag one object at most has, that two files give", () => {
       folder: "sso",
       table: "oauth2_providers",
       field: "auto_login",
-      row: (id, name, on) => ({ ...SSO_OF(name), id, client_secret: "enc:s", enable: 0, auto_login: on, managed: 0 }),
+      row: (id, name, on) => ({ ...SSO_OF(name, "azuread"), id, client_secret: "enc:s", enable: 0, auto_login: on, managed: 0 }),
       file: (name) => ({ ...SSO_OF(name), enable: false, auto_login: true }),
     },
   ];

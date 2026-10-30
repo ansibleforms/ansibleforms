@@ -1356,7 +1356,7 @@
           "authentication"
         ],
         "summary": "Sign in with Microsoft Entra ID : redirects to Microsoft's sign-in page",
-        "description": "The enabled Entra ID provider's client (its credential's client id, secret, tenant and redirect URL). The paths of before 7.3, /auth/azureadoauth2..., answer the same (deprecated, removed in 8.0); 'azuread' stays the provider's name in the database and the config seed.",
+        "description": "The enabled Entra ID provider's client (its credential's client id, secret, tenant and redirect URL). The paths of before 7.3, /auth/azureadoauth2..., answer the same (deprecated, removed in 8.0); 'azuread' stays the provider's name in the database and this API; the config seed and a repository's controller_sso: entries say provider: entraid ('azuread' still read there, deprecated, removed in 8.0).",
         "responses": {
           "302": {
             "description": "To Microsoft's sign-in page"

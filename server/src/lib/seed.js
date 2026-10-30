@@ -28,7 +28,7 @@ import yaml from "yaml";
 import logger from "./logger.js";
 import appConfig from "../../config/app.config.js";
 import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
-import { foldConfigFlag, APPEARANCE_SECTIONS } from "./seed-schema.js";
+import { foldConfigFlag, APPEARANCE_SECTIONS, foldOauth2Values } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -613,6 +613,11 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     const credential = doc.runners.items.find((r) => r.name === name).credential;
     logger.warning(`The config seed's runner '${name}' carries its own token or user and password, deprecated since 7.3 and removed in 8: declare a credential of its kind with its url and name it with credential: (applied now as the credential '${credential}')`);
   }
+  // an oauth2 provider's type as a file says it (provider: entraid) : applied as it is stored
+  // (azuread) ; provider: azuread still read, deprecated since 7.5.0 (lib/seed-schema.js OAUTH2_VALUES)
+  const oauth2Values = foldOauth2Values(doc);
+  doc = oauth2Values.doc;
+  for (const d of oauth2Values.deprecated) logger.warning(`The config seed's oauth2 provider '${d.name}' says ${d.notice}`);
 
   // the settings' mail keys : deprecated since 7.6 (the settings row has no mail columns), removed
   // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). Every
