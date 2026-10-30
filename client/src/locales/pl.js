@@ -1404,7 +1404,7 @@ export default {
       oneTimeRunPlaceholder: 'Uruchom raz zamiast cyklicznie',
       runAt: 'Uruchom o',
       runAtHelp: 'Data i godzina jednorazowego uruchomienia tego zadania',
-      extraVarsHelp: 'Brak formularza, który dostarczy extra vars, musisz dodać je tutaj.',
+      extraVarsHelp: 'Brak pól formularza, które dostarczą extra vars, musisz dodać je tutaj.',
       state_idle: 'Bezczynny',
       state_queued: 'W kolejce',
       state_running: 'Uruchomiony',

@@ -1413,7 +1413,7 @@ export default {
       oneTimeRunPlaceholder: 'Executa una sola vegada en lloc de forma recurrent',
       runAt: 'Executa el',
       runAtHelp: "La data i l'hora per executar aquesta tasca una vegada",
-      extraVarsHelp: "No hi ha cap formulari que proporcioni les extra vars, les has d'afegir aquí.",
+      extraVarsHelp: "No hi ha cap camp de formulari que proporcioni les extra vars, les has d'afegir aquí.",
       state_idle: 'Inactiu',
       state_queued: 'En cua',
       state_running: 'En execució',

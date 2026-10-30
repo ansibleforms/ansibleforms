@@ -1397,7 +1397,7 @@ export default {
       oneTimeRunPlaceholder: '定期実行ではなく 1 回だけ実行',
       runAt: '実行日時',
       runAtHelp: 'このジョブを 1 回だけ実行する日時',
-      extraVarsHelp: 'extra vars を指定するフォームがないため、ここで追加する必要があります。',
+      extraVarsHelp: 'extra vars を指定するフォームの項目がないため、ここで追加する必要があります。',
       state_idle: '待機中',
       state_queued: 'キュー済み',
       state_running: '実行中',

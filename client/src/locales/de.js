@@ -1413,7 +1413,7 @@ export default {
       oneTimeRunPlaceholder: 'Einmal statt wiederkehrend ausfuehren',
       runAt: 'Ausfuehren um',
       runAtHelp: 'Datum und Uhrzeit fuer die einmalige Ausfuehrung dieses Jobs',
-      extraVarsHelp: 'Es gibt kein Formular fuer die Extra-Variablen, Sie muessen sie hier hinzufuegen.',
+      extraVarsHelp: 'Es gibt keine Formularfelder für die Extra-Variablen, Sie müssen sie hier hinzufügen.',
       state_idle: 'Bereit',
       state_queued: 'In Warteschlange',
       state_running: 'Läuft',
