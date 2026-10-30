@@ -793,11 +793,15 @@ describe('a form name defined in two forms repositories', () => {
 
 describe('the New repository dialog', () => {
   // its usage step lists every category with each type's description : the default dialog
-  // width wrapped them, so the repositories ask for the extra large one
-  it('is the extra large dialog, and only the types that ask for it are', () => {
-    expect(settings.repositories.dialogSize).toBe('xl');
-    expect(settings.credentials.dialogSize).toBeUndefined();
+  // width wrapped them, so that step widens it ; the other steps keep the default width
+  it('is the large dialog, the extra large one on its usage step only', () => {
+    expect(settings.repositories.dialogSize).toBeUndefined();
+    const sizes = Object.fromEntries(settings.repositories.steps.map((s) => [s.key, s.dialogSize]));
+    expect(sizes).toEqual({ repository: undefined, credentials: undefined, usage: 'xl', schedule: undefined });
     const multi = readFileSync(join(import.meta.dirname, '../src/components/AppAdminMulti.vue'), 'utf8');
-    expect(multi).toMatch(/:size="settings\.dialogSize \|\| 'lg'"/);
+    expect(multi).toMatch(
+      /steps\.value\[stepIndex\.value\]\?\.dialogSize\) \|\| props\.settings\.dialogSize \|\| 'lg'/,
+    );
+    expect(multi).toMatch(/:size="dialogSize"/);
   });
 });

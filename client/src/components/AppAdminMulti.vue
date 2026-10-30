@@ -14,10 +14,11 @@
 /*      preview: Object                                           */
 /*      trigger: Object                                           */
 /*                                                                */
-/*  settings.steps: [{ key, label, when }] - the record dialog in */
-/*      steps (a wizard) : a field names its step (field.step,    */
-/*      the first one when it names none) ; when(item) keeps a    */
-/*      step to the records it applies to. Creating walks the     */
+/*  settings.steps: [{ key, label, when, dialogSize }] - the      */
+/*      record dialog in steps (a wizard) : a field names its     */
+/*      step (field.step, the first one when it names none) ;     */
+/*      when(item) keeps a step to the records it applies to ;    */
+/*      dialogSize widens the dialog on it. Creating walks the    */
 /*      steps with Previous / Next and saves on the last ;        */
 /*      editing may jump to any step and save from any            */
 /*      ; notes(item) gives a step its help, shown above its      */
@@ -116,7 +117,8 @@
 /*      (a user's) : its row and its Edit open that page instead  */
 /*      of the record dialog ; New still opens the dialog         */
 /*  settings.dialogSize: 'xl' - the record dialog's width (lg     */
-/*      by default, BsOffCanvas's sizes)                          */
+/*      by default, BsOffCanvas's sizes) ; a step's dialogSize    */
+/*      widens it while that step is shown                        */
 /*  a cell's [data-af-popover] : its text in a popover on hover   */
 /*      (a cron's meaning in words, lib/cronCell.js)              */
 /*                                                                */
@@ -1012,6 +1014,11 @@ function savePasswordFromDialog(secret) {
   updateItem(true);
 }
 const isLastStep = computed(() => stepIndex.value === steps.value.length - 1);
+// the record dialog's width : the shown step's own (a wide step, as the repositories' usages),
+// else the object's, else lg
+const dialogSize = computed(
+  () => (wizardActive.value && steps.value[stepIndex.value]?.dialogSize) || props.settings.dialogSize || 'lg',
+);
 // the help of the step shown (a step's notes(item)) : what to know before filling it in, as
 // the permissions a provider needs
 const stepNotes = computed(() => {
@@ -1837,7 +1844,7 @@ defineExpose({
     :show="['select', 'edit', 'new', 'change_password'].includes(action) && !usesPasswordDialog"
     :icon="objectIcon"
     :title="title"
-    :size="settings.dialogSize || 'lg'"
+    :size="dialogSize"
     @close="unselectItem"
   >
     <template #actions>
