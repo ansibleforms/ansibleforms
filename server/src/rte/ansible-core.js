@@ -110,21 +110,19 @@ function configCallbackPaths(directory, env) {
  *   env (object): the playbook's environment.
  *   directory (string): the folder the playbook runs from.
  *   artifactsFile (string): the file the plugin writes.
+ *   eventsFile (string): the file the events plugin writes a host's results to (its summary and
+ *     its whole result, whatever the job's verbosity) ; none when empty.
  *
  * Returns:
  *   object: the environment.
  */
-export function artifactsEnv(env, directory, artifactsFile, eventsFile = "", eventsFull = false) {
+export function artifactsEnv(env, directory, artifactsFile, eventsFile = "") {
   const named = env.ANSIBLE_CALLBACK_PLUGINS ? env.ANSIBLE_CALLBACK_PLUGINS.split(path.delimiter).filter(Boolean) : configCallbackPaths(directory, env);
   const paths = [CALLBACK_DIR, ...(named.length ? named : DEFAULT_CALLBACK_PATHS)];
   const out = { ...env, ANSIBLE_CALLBACK_PLUGINS: [...new Set(paths)].join(path.delimiter), AF_ARTIFACTS_FILE: artifactsFile };
   // the structured events (callback_plugins/af_events.py, loaded without enabling, as the
   // artifacts one) : one JSON line per play, task and host result, next to the usual text output
   if (eventsFile) out.AF_EVENTS_FILE = eventsFile;
-  // a host's whole result (a task's details) only when the job runs verbose : its output carries
-  // it then too. Never taken from the RTE's own environment : set here, or not at all
-  delete out.AF_EVENTS_FULL;
-  if (eventsFile && eventsFull) out.AF_EVENTS_FULL = "1";
   // and the keys whose values a stored result masks : the app's own pattern, the plugin adds it to
   // its built-in one when Python reads it
   if (eventsFile && appConfig.maskExtravarsRegex) out.AF_EVENTS_MASK_REGEX = String(appConfig.maskExtravarsRegex);
@@ -464,9 +462,9 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
     // (a private folder made when the playbook starts : makeArtifactsFile)
     artifactsFile: path.join(os.tmpdir(), `af_artifacts_${jobid}.json`),
     // and the structured events (af_events) : one JSON line each, sent on as they come, in a
-    // private folder made when the playbook starts (makeEventsFile) ; a host's whole result only
-    // when the playbook runs verbose (a -v flag : the job's verbose, or a workflow node's verbosity)
-    events: { full: args.some((a) => /^-v+$/.test(a)) },
+    // private folder made when the playbook starts (makeEventsFile) ; a host's whole result with
+    // them, whatever the playbook's verbosity, as on AWX
+    events: true,
   };
 
   logger.notice("Running from directory: " + cmdObj.directory);
@@ -505,7 +503,6 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
   // the structured events : asked for by a playbook (cmd.events), their file made in a private
   // folder just before ansible-playbook starts (makeEventsFile)
   var eventsWanted = !!cmd.events;
-  var eventsFull = !!cmd.events?.full;
   var eventsFile = "";
   var eventsDir = "";
   // the structured events, read from their file as the playbook writes them
@@ -578,7 +575,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         // the RTE's environment without AnsibleForms' own variables : a playbook never reads
         // ENCRYPTION_SECRET, the database password or a token through lookup('env')
         // and, for a playbook, the artifacts plugin that writes what set_stats gathered
-        env: artifactsFile ? artifactsEnv(playbookEnv(), directory, artifactsFile, eventsFile, eventsFull) : playbookEnv(),
+        env: artifactsFile ? artifactsEnv(playbookEnv(), directory, artifactsFile, eventsFile) : playbookEnv(),
       });
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");

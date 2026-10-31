@@ -115,7 +115,7 @@ const JobEvent = {
         [["item", e.item], ["status", e.status], ["action", e.action], ["start", num(e.start)]].filter(([, v]) => v !== undefined && v !== null),
       );
       const data = e.data === undefined && !Object.keys(extra).length ? null : JSON.stringify({ ...(e.data || {}), ...extra });
-      // its whole result (sent only for a job that runs verbose) : its invocation left out, its
+      // its whole result (sent whatever the job's verbosity) : its invocation left out, its
       // secret keys masked, then masked as the output
       const result = e.result === undefined || e.result === null ? null : JSON.stringify(redactResult(e.result, pattern));
       rows.push([

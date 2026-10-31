@@ -1,10 +1,10 @@
 // A playbook's structured events (rte/callback_plugins/af_events.py) are stored on the job and read
-// back by everyone who may see it. They kept a host's whole result (its invocation, the module's
-// arguments, a response's body and headers) even when the job did not run verbose, wrote it to a
-// file of the shared temporary folder under a name anyone could guess, and escaped its non-ASCII
-// texts so the app's mask missed a secret with an accent. These pin the rules : the whole result
-// only for a job that runs verbose, never its invocation, its secret keys masked (by the plugin
-// and again when stored), non-ASCII kept, and the file in a private folder of its own.
+// back by everyone who may see it. They kept a host's whole result with its invocation (the
+// module's arguments), wrote it to a file of the shared temporary folder under a name anyone could
+// guess, and escaped its non-ASCII texts so the app's mask missed a secret with an accent. These pin
+// the rules : the whole result whatever the job's verbosity (as on AWX, a host's line always opens
+// its details), never its invocation, its secret keys masked (by the plugin and again when stored),
+// its size capped, non-ASCII kept, and the file in a private folder of its own.
 import { describe, test, expect, vi } from "vitest";
 import fs from "fs";
 import os from "os";
@@ -74,7 +74,7 @@ describe("the events file", () => {
     const script = "const fs=require('fs');fs.appendFileSync(process.env.AF_EVENTS_FILE,'{\"type\":\"play\"}\\n');" +
       "process.stdout.write(String(fs.statSync(process.env.AF_EVENTS_FILE).mode & 0o777))";
     try {
-      await executeCommand({ directory: cwd, file: process.execPath, args: ["-e", script], task: "t", artifactsFile: path.join(cwd, "a.json"), events: { full: false } }, jobid, 0, io);
+      await executeCommand({ directory: cwd, file: process.execPath, args: ["-e", script], task: "t", artifactsFile: path.join(cwd, "a.json"), events: true }, jobid, 0, io);
       expect(left()).toEqual([]);
       // the file the plugin opened was there already, readable by this user only (0600 : 384)
       if (process.platform !== "win32") expect(output.join("")).toContain("384");
@@ -101,13 +101,10 @@ describe("the events file", () => {
 describe("the playbook's environment", () => {
   const tmp = os.tmpdir();
 
-  test("asks for the whole result only when the job runs verbose", () => {
-    expect(artifactsEnv({}, tmp, "/x/a.json", "/x/e.jsonl", true).AF_EVENTS_FULL).toBe("1");
-    expect(artifactsEnv({}, tmp, "/x/a.json", "/x/e.jsonl", false).AF_EVENTS_FULL).toBeUndefined();
-  });
-
-  test("never takes it from the RTE's own environment", () => {
-    expect(artifactsEnv({ AF_EVENTS_FULL: "1" }, tmp, "/x/a.json", "/x/e.jsonl", false).AF_EVENTS_FULL).toBeUndefined();
+  test("no longer asks for the whole result apart, even for a verbose job : the plugin always keeps it", () => {
+    // a caller that still says the job runs verbose (the former fifth argument) changes nothing
+    expect(artifactsEnv({}, tmp, "/x/a.json", "/x/e.jsonl", true).AF_EVENTS_FULL).toBeUndefined();
+    expect(artifactsEnv({}, tmp, "/x/a.json", "/x/e.jsonl").AF_EVENTS_FULL).toBeUndefined();
   });
 
   test("passes the app's secret keys pattern with the events file", () => {
@@ -156,53 +153,85 @@ describe("a stored result", () => {
 // The plugin itself (when ansible is installed where the tests run)
 // ---------------------------------------------------------------------------------------------
 
-// a host's result, as ansible hands it to the plugin : what its _fields keeps of it, as JSON
+// a host's result, as ansible hands it to the plugin (on its standard input, as JSON) : what its _fields keeps of
+// it, as JSON. Where ansible is not installed (the tests' CI), its CallbackBase is a stub : the
+// plugin's own code runs all the same
 const PROBE = `
-import importlib.util, json, sys
+import importlib.util, json, sys, types
+try:
+    import ansible.plugins.callback
+except ImportError:
+    stub = types.ModuleType("ansible.plugins.callback")
+    stub.CallbackBase = type("CallbackBase", (), {})
+    for name in ("ansible", "ansible.plugins"):
+        sys.modules[name] = types.ModuleType(name)
+    sys.modules["ansible.plugins.callback"] = stub
 spec = importlib.util.spec_from_file_location("af_events", sys.argv[1])
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 class R: pass
 r = R()
 r._task = None
-data = {"msg": "café", "changed": True, "invocation": {"module_args": {"password": "p"}},
-        "json": {"token": "t", "name": "n"}, "item": {"user": "zoë", "password": "pw"}}
-fields = mod.CallbackModule._fields(None, r, data)
+fields = mod.CallbackModule._fields(None, r, json.load(sys.stdin))
 print(json.dumps(fields, ensure_ascii=False))
 `;
-const hasAnsible = spawnSync("python3", ["-c", "import ansible"]).status === 0;
+const hasPython = spawnSync("python3", ["--version"]).status === 0;
+
+// a result as a module returns it : its message, its invocation, a response with a secret, a loop item
+const RESULT = {
+  msg: "café",
+  changed: true,
+  invocation: { module_args: { password: "p" } },
+  json: { token: "t", name: "n" },
+  item: { user: "zoë", password: "pw" },
+  _ansible_no_log: false,
+};
 
 /**
- * Runs the probe on the plugin with the given environment.
+ * Runs the probe on the plugin, as a job that does not run verbose : no -v flag, and nothing in
+ * the environment that would ask for the whole result.
  *
  * Args:
- *   env (object): the variables added (AF_EVENTS_FULL).
+ *   data (object): the host's result, as ansible hands it to the plugin.
  *
  * Returns:
  *   object: what the plugin keeps of the result.
  */
-function probe(env) {
-  const run = spawnSync("python3", ["-c", PROBE, PLUGIN], { env: { ...process.env, AF_EVENTS_FULL: "", ...env }, encoding: "utf8" });
+function probe(data = RESULT) {
+  const run = spawnSync("python3", ["-c", PROBE, PLUGIN], { input: JSON.stringify(data), encoding: "utf8" });
   if (run.status !== 0) throw new Error(run.stderr);
   return JSON.parse(run.stdout);
 }
 
-describe.skipIf(!hasAnsible)("the af_events plugin", () => {
-  test("keeps only the summary when the job does not run verbose", () => {
-    const fields = probe({});
-    expect(fields.result).toBeNull();
+describe.skipIf(!hasPython)("the af_events plugin", () => {
+  test("keeps the summary and the whole result whatever the job's verbosity, as on AWX", () => {
+    const fields = probe();
     expect(fields.data).toEqual({ msg: "café", changed: true });
+    expect(fields.result).toEqual({ msg: "café", changed: true, json: { token: "********", name: "n" }, item: { user: "zoë", password: "********" } });
   });
 
-  test("keeps the whole result when it does, without its invocation, its secrets masked", () => {
-    const fields = probe({ AF_EVENTS_FULL: "1" });
+  test("leaves out its invocation and Ansible's own keys, its secrets masked", () => {
+    const fields = probe();
     expect(fields.result.invocation).toBeUndefined();
+    expect(fields.result._ansible_no_log).toBeUndefined();
     expect(fields.result.json).toEqual({ token: "********", name: "n" });
   });
 
+  test("cuts a result too large to keep", () => {
+    // 300 lines of 9000 characters : past MAX_RESULT, its list and its texts are cut
+    const fields = probe({ changed: false, stdout_lines: Array.from({ length: 300 }, () => "x".repeat(9000)) });
+    expect(JSON.stringify(fields.result).length).toBeLessThanOrEqual(65536);
+    expect(fields.result).toEqual({ msg: "The result is too large to keep", keys: ["changed", "stdout_lines"] });
+    // a smaller one only has its long texts and its long list cut
+    const cut = probe({ stdout_lines: Array.from({ length: 250 }, () => "y".repeat(100)), stdout: "z".repeat(70000) }).result;
+    expect(cut.stdout.length).toBe(8003);
+    expect(cut.stdout_lines).toHaveLength(201);
+    expect(cut.stdout_lines[200]).toBe("... 50 more");
+  });
+
   test("a dictionary item is JSON with its non-ASCII kept and its secrets masked", () => {
-    const item = JSON.parse(probe({}).item);
-    expect(item).toEqual({ user: "zoë", password: "********" });
-    expect(probe({}).item).toContain("zoë");
+    const fields = probe();
+    expect(JSON.parse(fields.item)).toEqual({ user: "zoë", password: "********" });
+    expect(fields.item).toContain("zoë");
   });
 });

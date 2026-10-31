@@ -6,11 +6,12 @@
 #
 # Loaded without being enabled (CALLBACK_NEEDS_ENABLED False), as af_artifacts : the RTE puts its
 # folder first in the callback plugins path, and it writes nothing when AF_EVENTS_FILE is not set.
-# A result carries its message and a few fields (its summary). The module's whole return (a task's
-# details) is kept only when the job runs verbose (AF_EVENTS_FULL=1, the RTE sets it when it passes
-# ansible-playbook a -v flag) : then the job's output carries it too. Even then its invocation (the
-# module's arguments, as the task passed them) is left out, and the values of keys that look like a
-# secret (password, secret, token, key...) are masked.
+# A result carries its message and a few fields (its summary), and the module's whole return (a
+# task's details, what a click on a host's line of the output opens), whatever the job's verbosity,
+# as on AWX. Its invocation (the module's arguments, as the task passed them) and Ansible's own keys
+# (_ansible_*) are left out, the values of keys that look like a secret (password, secret, token,
+# key...) are masked, and it is cut when it is too large. A task with no_log has its result censored
+# by Ansible before it comes here, and the app masks the job's own secret values when it stores it.
 from __future__ import annotations
 
 import json
@@ -38,8 +39,6 @@ MAX_TEXT = 2000
 MAX_RESULT = 65536
 MAX_RESULT_TEXT = 8000
 MAX_RESULT_ITEMS = 200
-# the whole result is kept only when the job runs verbose : else the summary alone
-FULL = os.environ.get("AF_EVENTS_FULL") == "1"
 # the keys a result never keeps, at any depth : the module's arguments as the task passed them
 # (a password, a token, a request's body and headers)
 DROPPED_KEYS = ("invocation",)
@@ -133,17 +132,15 @@ def _redact(value):
 def _full(data):
     """A host's whole result, as its details show it : Ansible's own keys (_ansible_*) and its
     invocation left out, the values of its secret keys masked, cut when its JSON is longer than
-    MAX_RESULT. Kept only when the job runs verbose (FULL) : else None, its summary alone is
-    stored. A task with no_log has its result censored by Ansible before it comes here.
+    MAX_RESULT. Kept whatever the job's verbosity, as on AWX : a task with no_log has its result
+    censored by Ansible before it comes here.
 
     Args:
         data: the result's dictionary.
 
     Returns:
-        The result to keep, or None when there is none or the job does not run verbose.
+        The result to keep, or None when there is none.
     """
-    if not FULL:
-        return None
     kept = _redact({k: v for k, v in (data or {}).items() if not str(k).startswith("_ansible")})
     if not kept:
         return None
