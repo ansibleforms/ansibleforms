@@ -27,7 +27,7 @@
     "@vuelidate/validators": "^2.0.4",
     "@vuepic/vue-datepicker": "^12.1.0",
     "ace-builds": "^1.45.2",
-    "axios": "^1.20.0",
+    "axios": "^1.21.0",
     "bootstrap": "^5.3.8",
     "cronstrue": "^2.59.0",
     "dayjs": "^1.11.23",
