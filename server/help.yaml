@@ -2724,6 +2724,16 @@
           Semaphore template (its name or id), a Rundeck or Jenkins job. `job:` says the same
           and reads better for a Rundeck or Jenkins form ; a form has one of the two. A playbook
           form (type ansible) uses `playbook` instead.
+
+          **Job events**: while AnsibleForms follows a job on AWX, AAP or Ascender (type awx, aap,
+          ascender), it reads the job's events from the runner (`jobs/<id>/job_events/` under its
+          API prefix, with its credentials and certificate settings) and stores them as the events
+          of a playbook run on an RTE: the job page's Hosts and tasks panel and its recap show
+          them, and a host's result line in the output opens its details when the job template
+          runs verbose (verbosity 1 and up), as a playbook run verbose on an RTE. A workflow adds
+          the events of each node's job. They are masked as the output and deleted with the job
+          (JOB_RETENTION_DAYS). A job whose events cannot be read runs and ends as before, without
+          them. (Added in 7.5.0)
             
           **Note**: You can also dynamically set the template by using a field called `__template__`.  It must be sent as extravar.  If this extravar is found it will overwrite the static template name.  
           **Note**: If you use multistep and you want to dynamically set every step, use the `key` property and `model` property to create separate extravars per step.                    

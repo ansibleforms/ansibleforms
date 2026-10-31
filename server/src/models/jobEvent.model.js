@@ -140,6 +140,36 @@ const JobEvent = {
   },
 
   /**
+   * The order of a job's last event : the next events stored go on from it (an AWX workflow's
+   * nodes, each its own job with its own events, one after the other).
+   *
+   * Args:
+   *   jobId (number): the job.
+   *
+   * Returns:
+   *   Promise<number>: the last order, 0 when the job has none.
+   */
+  async lastOrder(jobId) {
+    const rows = await mysql.do("SELECT MAX(`order`) AS last FROM AnsibleForms.`job_events` WHERE job_id=?", [jobId]);
+    return Number(rows?.[0]?.last) || 0;
+  },
+
+  /**
+   * Removes a job's events : they are read again in full (an AWX job followed again after a
+   * restart, as its output).
+   *
+   * Args:
+   *   jobId (number): the job.
+   *
+   * Returns:
+   *   Promise<number>: the events removed.
+   */
+  async removeByJob(jobId) {
+    const res = await mysql.do("DELETE FROM AnsibleForms.`job_events` WHERE job_id=?", [jobId]);
+    return res?.affectedRows || 0;
+  },
+
+  /**
    * A job's events, in order.
    *
    * Args:

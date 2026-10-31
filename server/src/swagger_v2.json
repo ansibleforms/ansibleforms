@@ -2119,7 +2119,7 @@
         "tags": [
           "job"
         ],
-        "summary": "A playbook job's structured events : the host-by-task grid, the timeline and the recap",
+        "summary": "A job's structured events (a playbook on an RTE, a job on AWX, AAP or Ascender) : the host-by-task grid, the timeline and the recap",
         "parameters": [
           {
             "name": "id",

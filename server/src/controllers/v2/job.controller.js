@@ -57,8 +57,9 @@ const getJob = async function(req, res) {
     }
   }
 };
-// a playbook job's structured events (the af_events callback plugin) : the job page's host-by-task
-// grid, timeline and recap ; only who may see the job (as getJob) sees them
+// a job's structured events (the af_events callback plugin on an RTE, AWX's job events for a job on
+// AWX, AAP or Ascender) : the job page's host-by-task grid, timeline and recap ; only who may see
+// the job (as getJob) sees them
 const getJobEvents = async function(req, res) {
   try {
     // who may see the job (Job.assertReadable : findById's rule, without reading its output)
