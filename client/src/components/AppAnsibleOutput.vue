@@ -3,6 +3,7 @@ import { computed, ref, watch, nextTick, onMounted, onUpdated, onBeforeUnmount }
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores/app';
 import { jobLogLines } from '@/lib/jobLog';
+import { lineLevel, pairResultLines } from '@/lib/resultLines';
 import axios from 'axios';
 
 /******************************************************************/
@@ -139,15 +140,7 @@ function plain(html) {
  *   number: its level.
  */
 function headLevel(html) {
-  const text = plain(html);
-  // a workflow's banners (a node's output, the summary at the end) carry a row of stars ; the
-  // summary's own line per node does not, and stays a plain line
-  // a workflow's node or summary : its banner (its node's id after its status, #42, since the
-  // graph opens a node by it)
-  if (/^WORKFLOW( NODE)? \[.*\] \([^)]*\)( #\d+)? \*{5,}/.test(text)) return 1;
-  if (/^(PLAY \[|PLAY RECAP)/.test(text)) return 2;
-  if (/^(TASK|RUNNING HANDLER) \[/.test(text)) return 3;
-  return 0;
+  return lineLevel(plain(html));
 }
 
 // the lines : their HTML (each one well formed), their level, and the end of their section
@@ -244,70 +237,13 @@ watch(
 // gone : a pending read of the events with it
 onBeforeUnmount(stopEventsTimer);
 
-const RESULT_TYPES = new Set(['ok', 'changed', 'failed', 'skipped', 'unreachable']);
-// a host's result line : its status word, then its host (and where it delegates : host -> other)
-const RESULT_LINE = /^(ok|changed|failed|fatal|skipping|unreachable):\s+\[([^\]]+)\]/;
-
 // line index -> the order of its event, for the lines that pair with one that has details
-const resultOf = computed(() => {
-  const map = new Map();
-  if (!events.value.length) return map;
-  // the tasks in order : each its hosts' results and loop items, in order
-  const tasks = [];
-  for (const e of events.value) {
-    if (e.type === 'task') tasks.push({ name: e.task, results: {}, items: {} });
-    else if (tasks.length && e.host && (RESULT_TYPES.has(e.type) || e.type === 'item')) {
-      const bucket = e.type === 'item' ? tasks[tasks.length - 1].items : tasks[tasks.length - 1].results;
-      (bucket[e.host] ||= []).push(e);
-    }
-  }
-  let next = 0;
-  let task = null;
-  let seen = {};
-  // a result printed with its body (ok: [host] => { ... }) : its lines up to the closing brace
-  let body = null;
-  // the error ansible prints before a failed result ([ERROR]: Task failed ..., its origin and
-  // the playbook's lines) : the lines from it to the result, the same failure
-  let preamble = null;
-  lines.value.forEach((line, index) => {
-    const text = plain(line.html);
-    if (body !== null && !line.level && !RESULT_LINE.test(text)) {
-      map.set(index, body);
-      if (text.trimEnd() === '}') body = null;
-      return;
-    }
-    body = null;
-    if (!line.level && task && !RESULT_LINE.test(text)) {
-      if (text.startsWith('[ERROR]:')) preamble = [];
-      if (preamble) preamble.push(index);
-      return;
-    }
-    const before = preamble || [];
-    preamble = null;
-    if (line.level === 3) {
-      // TASK [name] or RUNNING HANDLER [name] : the next task of that name
-      const name = text.replace(/^(TASK|RUNNING HANDLER) \[/, '').replace(/\]\s*\**\s*$/, '');
-      const at = tasks.findIndex((x, i) => i >= next && x.name === name);
-      task = at >= 0 ? tasks[at] : null;
-      if (at >= 0) next = at + 1;
-      seen = {};
-      return;
-    }
-    if (line.level || !task) return;
-    const m = RESULT_LINE.exec(text);
-    if (!m) return;
-    const host = m[2].split(' -> ')[0].trim();
-    const item = /\(item=/.test(text);
-    const key = `${item ? 'i' : 'r'}:${host}`;
-    const k = (seen[key] = (seen[key] ?? -1) + 1);
-    const event = (item ? task.items : task.results)[host]?.[k];
-    if (!event?.detailed) return;
-    map.set(index, event.order);
-    if (m[1] === 'failed' || m[1] === 'fatal') for (const i of before) map.set(i, event.order);
-    if (text.trimEnd().endsWith('{')) body = event.order;
-  });
-  return map;
-});
+const resultOf = computed(() =>
+  pairResultLines(
+    lines.value.map((line) => ({ text: plain(line.html), level: line.level })),
+    events.value,
+  ),
+);
 
 /**
  * Opens a host's result's details, when the line clicked is one (and no text is being selected).

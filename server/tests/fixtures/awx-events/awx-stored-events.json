@@ -1,0 +1,653 @@
+[
+ {
+  "order": 1,
+  "type": "play",
+  "play": "Configure web",
+  "task": null,
+  "host": null,
+  "duration": null,
+  "time": 1793483891.476,
+  "data": null,
+  "detailed": false
+ },
+ {
+  "order": 2,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Say hello",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.482,
+  "data": {
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": false
+ },
+ {
+  "order": 3,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Say hello",
+  "host": "h1",
+  "duration": 0.018,
+  "time": 1793483891.501,
+  "data": {
+   "msg": "hello h1",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.482
+  },
+  "detailed": true
+ },
+ {
+  "order": 4,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Say hello",
+  "host": "h2",
+  "duration": 0.017,
+  "time": 1793483891.506,
+  "data": {
+   "msg": "hello h2",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.488
+  },
+  "detailed": true
+ },
+ {
+  "order": 5,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Say hello",
+  "host": "h3",
+  "duration": 0.017,
+  "time": 1793483891.511,
+  "data": {
+   "msg": "hello h3",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.494
+  },
+  "detailed": true
+ },
+ {
+  "order": 6,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Change something",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.513,
+  "data": {
+   "action": "ansible.builtin.command"
+  },
+  "detailed": false
+ },
+ {
+  "order": 7,
+  "type": "unreachable",
+  "play": "Configure web",
+  "task": "Change something",
+  "host": "h3",
+  "duration": 0.023,
+  "time": 1793483891.548,
+  "data": {
+   "msg": "Task failed: Failed to connect to the host via ssh: ssh: connect to host 127.0.0.1 port 1: Connection refused",
+   "changed": false,
+   "action": "ansible.builtin.command",
+   "start": 1793483891.524
+  },
+  "detailed": true
+ },
+ {
+  "order": 8,
+  "type": "changed",
+  "play": "Configure web",
+  "task": "Change something",
+  "host": "h1",
+  "duration": 0.366,
+  "time": 1793483891.88,
+  "data": {
+   "msg": "",
+   "rc": 0,
+   "stderr": "",
+   "changed": true,
+   "action": "ansible.builtin.command",
+   "start": 1793483891.513
+  },
+  "detailed": true
+ },
+ {
+  "order": 9,
+  "type": "changed",
+  "play": "Configure web",
+  "task": "Change something",
+  "host": "h2",
+  "duration": 0.363,
+  "time": 1793483891.881,
+  "data": {
+   "msg": "",
+   "rc": 0,
+   "stderr": "",
+   "changed": true,
+   "action": "ansible.builtin.command",
+   "start": 1793483891.518
+  },
+  "detailed": true
+ },
+ {
+  "order": 10,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Return a secret",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.883,
+  "data": {
+   "action": "ansible.builtin.set_fact"
+  },
+  "detailed": false
+ },
+ {
+  "order": 11,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Return a secret",
+  "host": "h1",
+  "duration": 0.016,
+  "time": 1793483891.9,
+  "data": {
+   "changed": false,
+   "action": "ansible.builtin.set_fact",
+   "start": 1793483891.883
+  },
+  "detailed": true
+ },
+ {
+  "order": 12,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Return a secret",
+  "host": "h2",
+  "duration": 0.017,
+  "time": 1793483891.906,
+  "data": {
+   "changed": false,
+   "action": "ansible.builtin.set_fact",
+   "start": 1793483891.888
+  },
+  "detailed": true
+ },
+ {
+  "order": 13,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Skip on h2",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.907,
+  "data": {
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": false
+ },
+ {
+  "order": 14,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Skip on h2",
+  "host": "h1",
+  "duration": 0.016,
+  "time": 1793483891.924,
+  "data": {
+   "msg": "only h1",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.908
+  },
+  "detailed": true
+ },
+ {
+  "order": 15,
+  "type": "skipped",
+  "play": "Configure web",
+  "task": "Skip on h2",
+  "host": "h2",
+  "duration": 0.013,
+  "time": 1793483891.926,
+  "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.913
+  },
+  "detailed": true
+ },
+ {
+  "order": 16,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.928,
+  "data": {
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": false
+ },
+ {
+  "order": 17,
+  "type": "item",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h1",
+  "duration": null,
+  "time": 1793483891.947,
+  "data": {
+   "msg": "item a",
+   "changed": false,
+   "item": "{\"name\": \"a\", \"token\": \"********\"}",
+   "status": "ok",
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": true
+ },
+ {
+  "order": 18,
+  "type": "item",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h1",
+  "duration": null,
+  "time": 1793483891.95,
+  "data": {
+   "msg": "item b",
+   "changed": false,
+   "item": "{\"name\": \"b\", \"token\": \"********\"}",
+   "status": "ok",
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": true
+ },
+ {
+  "order": 19,
+  "type": "item",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h2",
+  "duration": null,
+  "time": 1793483891.953,
+  "data": {
+   "msg": "item a",
+   "changed": false,
+   "item": "{\"name\": \"a\", \"token\": \"********\"}",
+   "status": "ok",
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": true
+ },
+ {
+  "order": 20,
+  "type": "item",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h2",
+  "duration": null,
+  "time": 1793483891.955,
+  "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
+   "item": "{\"name\": \"b\", \"token\": \"********\"}",
+   "status": "skipped",
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": true
+ },
+ {
+  "order": 21,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h1",
+  "duration": 0.027,
+  "time": 1793483891.956,
+  "data": {
+   "msg": "All items completed",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.928
+  },
+  "detailed": true
+ },
+ {
+  "order": 22,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Loop items",
+  "host": "h2",
+  "duration": 0.023,
+  "time": 1793483891.957,
+  "data": {
+   "msg": "All items completed",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483891.934
+  },
+  "detailed": true
+ },
+ {
+  "order": 23,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Fail but ignore",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.958,
+  "data": {
+   "action": "ansible.builtin.fail"
+  },
+  "detailed": false
+ },
+ {
+  "order": 24,
+  "type": "failed",
+  "play": "Configure web",
+  "task": "Fail but ignore",
+  "host": "h1",
+  "duration": 0.014,
+  "time": 1793483891.973,
+  "data": {
+   "msg": "ignored failure",
+   "changed": false,
+   "action": "ansible.builtin.fail",
+   "start": 1793483891.959
+  },
+  "detailed": true
+ },
+ {
+  "order": 25,
+  "type": "ignored",
+  "play": "Configure web",
+  "task": "Fail but ignore",
+  "host": "h1",
+  "duration": null,
+  "time": 1793483891.973,
+  "data": null,
+  "detailed": false
+ },
+ {
+  "order": 26,
+  "type": "failed",
+  "play": "Configure web",
+  "task": "Fail but ignore",
+  "host": "h2",
+  "duration": 0.015,
+  "time": 1793483891.98,
+  "data": {
+   "msg": "ignored failure",
+   "changed": false,
+   "action": "ansible.builtin.fail",
+   "start": 1793483891.965
+  },
+  "detailed": true
+ },
+ {
+  "order": 27,
+  "type": "ignored",
+  "play": "Configure web",
+  "task": "Fail but ignore",
+  "host": "h2",
+  "duration": null,
+  "time": 1793483891.98,
+  "data": null,
+  "detailed": false
+ },
+ {
+  "order": 28,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Ping unreachable",
+  "host": null,
+  "duration": null,
+  "time": 1793483891.982,
+  "data": {
+   "action": "ansible.builtin.ping"
+  },
+  "detailed": false
+ },
+ {
+  "order": 29,
+  "type": "skipped",
+  "play": "Configure web",
+  "task": "Ping unreachable",
+  "host": "h1",
+  "duration": 0.012,
+  "time": 1793483891.994,
+  "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
+   "action": "ansible.builtin.ping",
+   "start": 1793483891.982
+  },
+  "detailed": true
+ },
+ {
+  "order": 30,
+  "type": "skipped",
+  "play": "Configure web",
+  "task": "Ping unreachable",
+  "host": "h2",
+  "duration": 0.012,
+  "time": 1793483891.999,
+  "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
+   "action": "ansible.builtin.ping",
+   "start": 1793483891.987
+  },
+  "detailed": true
+ },
+ {
+  "order": 31,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Use role",
+  "host": null,
+  "duration": null,
+  "time": 1793483892.002,
+  "data": {
+   "action": "ansible.builtin.include_role"
+  },
+  "detailed": false
+ },
+ {
+  "order": 32,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Use role",
+  "host": "h1",
+  "duration": 0.015,
+  "time": 1793483892.018,
+  "data": {
+   "changed": false,
+   "action": "ansible.builtin.include_role",
+   "start": 1793483892.003
+  },
+  "detailed": true
+ },
+ {
+  "order": 33,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Use role",
+  "host": "h2",
+  "duration": 0.015,
+  "time": 1793483892.025,
+  "data": {
+   "changed": false,
+   "action": "ansible.builtin.include_role",
+   "start": 1793483892.01
+  },
+  "detailed": true
+ },
+ {
+  "order": 34,
+  "type": "task",
+  "play": "Configure web",
+  "task": "web : Role task",
+  "host": null,
+  "duration": null,
+  "time": 1793483892.037,
+  "data": {
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": false
+ },
+ {
+  "order": 35,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "web : Role task",
+  "host": "h1",
+  "duration": 0.016,
+  "time": 1793483892.053,
+  "data": {
+   "msg": "from role",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483892.037
+  },
+  "detailed": true
+ },
+ {
+  "order": 36,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "web : Role task",
+  "host": "h2",
+  "duration": 0.016,
+  "time": 1793483892.061,
+  "data": {
+   "msg": "from role",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483892.045
+  },
+  "detailed": true
+ },
+ {
+  "order": 37,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Fail on h2",
+  "host": null,
+  "duration": null,
+  "time": 1793483892.066,
+  "data": {
+   "action": "ansible.builtin.fail"
+  },
+  "detailed": false
+ },
+ {
+  "order": 38,
+  "type": "skipped",
+  "play": "Configure web",
+  "task": "Fail on h2",
+  "host": "h1",
+  "duration": 0.011,
+  "time": 1793483892.079,
+  "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
+   "action": "ansible.builtin.fail",
+   "start": 1793483892.067
+  },
+  "detailed": true
+ },
+ {
+  "order": 39,
+  "type": "failed",
+  "play": "Configure web",
+  "task": "Fail on h2",
+  "host": "h2",
+  "duration": 0.018,
+  "time": 1793483892.09,
+  "data": {
+   "msg": "h2 broke",
+   "changed": false,
+   "action": "ansible.builtin.fail",
+   "start": 1793483892.072
+  },
+  "detailed": true
+ },
+ {
+  "order": 40,
+  "type": "task",
+  "play": "Configure web",
+  "task": "Restart web",
+  "host": null,
+  "duration": null,
+  "time": 1793483892.093,
+  "data": {
+   "action": "ansible.builtin.debug"
+  },
+  "detailed": false
+ },
+ {
+  "order": 41,
+  "type": "ok",
+  "play": "Configure web",
+  "task": "Restart web",
+  "host": "h1",
+  "duration": 0.013,
+  "time": 1793483892.107,
+  "data": {
+   "msg": "restarted",
+   "changed": false,
+   "action": "ansible.builtin.debug",
+   "start": 1793483892.094
+  },
+  "detailed": true
+ },
+ {
+  "order": 42,
+  "type": "stats",
+  "play": "Configure web",
+  "task": null,
+  "host": null,
+  "duration": null,
+  "time": 1793483892.108,
+  "data": {
+   "h1": {
+    "ok": 9,
+    "changed": 1,
+    "unreachable": 0,
+    "failures": 0,
+    "skipped": 2,
+    "rescued": 0,
+    "ignored": 1
+   },
+   "h2": {
+    "ok": 7,
+    "changed": 1,
+    "unreachable": 0,
+    "failures": 1,
+    "skipped": 2,
+    "rescued": 0,
+    "ignored": 1
+   },
+   "h3": {
+    "ok": 1,
+    "changed": 0,
+    "unreachable": 1,
+    "failures": 0,
+    "skipped": 0,
+    "rescued": 0,
+    "ignored": 0
+   }
+  },
+  "detailed": false
+ }
+]

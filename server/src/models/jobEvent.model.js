@@ -115,7 +115,7 @@ const JobEvent = {
         [["item", e.item], ["status", e.status], ["action", e.action], ["start", num(e.start)]].filter(([, v]) => v !== undefined && v !== null),
       );
       const data = e.data === undefined && !Object.keys(extra).length ? null : JSON.stringify({ ...(e.data || {}), ...extra });
-      // its whole result (sent whatever the job's verbosity) : its invocation left out, its
+      // its whole result (an RTE's and AWX's, whatever the job's verbosity) : its invocation left out, its
       // secret keys masked, then masked as the output
       const result = e.result === undefined || e.result === null ? null : JSON.stringify(redactResult(e.result, pattern));
       rows.push([
@@ -136,6 +136,36 @@ const JobEvent = {
       "INSERT IGNORE INTO AnsibleForms.`job_events` (job_id, `order`, type, play, task, host, duration, time, data, result) VALUES ?",
       [rows]
     );
+    return res?.affectedRows || 0;
+  },
+
+  /**
+   * The order of a job's last event : the next events stored go on from it (an AWX workflow's
+   * nodes, each its own job with its own events, one after the other).
+   *
+   * Args:
+   *   jobId (number): the job.
+   *
+   * Returns:
+   *   Promise<number>: the last order, 0 when the job has none.
+   */
+  async lastOrder(jobId) {
+    const rows = await mysql.do("SELECT MAX(`order`) AS last FROM AnsibleForms.`job_events` WHERE job_id=?", [jobId]);
+    return Number(rows?.[0]?.last) || 0;
+  },
+
+  /**
+   * Removes a job's events : they are read again in full (an AWX job followed again after a
+   * restart, as its output).
+   *
+   * Args:
+   *   jobId (number): the job.
+   *
+   * Returns:
+   *   Promise<number>: the events removed.
+   */
+  async removeByJob(jobId) {
+    const res = await mysql.do("DELETE FROM AnsibleForms.`job_events` WHERE job_id=?", [jobId]);
     return res?.affectedRows || 0;
   },
 

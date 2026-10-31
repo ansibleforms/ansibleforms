@@ -13,6 +13,8 @@ import { delay, getHttpsAgent, contactTolerance, jobEnded, lostContact as endLos
 import Job from "../../models/job.model.js";
 import { rememberRunnerJobUrl } from "../../lib/runnerJobLinks.js";
 import { workflowSummaryLines } from "../../lib/workflowSummary.js";
+import JobEvent from "../../models/jobEvent.model.js";
+import { createAwxEventReader, waitForEventProcessing } from "./events.js";
 
 /**
  * The API path a runner's uri lacks : none when the uri carries it
@@ -485,15 +487,28 @@ Awx.trackJob = async function (
   var toldTooLarge = false;
   // AWX failing to answer, in a row (contactTolerance)
   const contact = contactTolerance();
+  // the job's events (AWX's job events, as an RTE's af_events plugin writes them) : read in the
+  // background while the job runs, the rest once it has ended ; never a reason to fail the job
+  let followed = job;
+  const events = createAwxEventReader({
+    jobid,
+    fetchPage: (after, size) => Awx.getJobEvents(awx, followed, after, size),
+  });
   for (;;) {
   // taken over by another node (this one's heartbeat lapsed) : that node follows it now
-  if (await takenOver(jobid)) return TAKEN_OVER;
+  if (await takenOver(jobid)) {
+    events.stop();
+    return TAKEN_OVER;
+  }
   logger.info(`searching for job with id ${job.id}`);
   try {
     // get job info
     const axiosResult = await axios.get(serverOf(awxConfig) + job.url, axiosConfig);
     var j = axiosResult.data;
     if (j) {
+      // its new events, in the background
+      followed = j;
+      events.poll();
       // logger.debug(inspect(j))
       logger.debug(`awx job status: ` + j.status);
       try {
@@ -548,6 +563,7 @@ Awx.trackJob = async function (
             // we try to abort the job
             await Awx.abortJob(awx, j.id);
             await Job.resetAbortRequested(jobid);
+            await events.finish();
             await Job.endJobStatus(
               jobid,
               ++counter,
@@ -561,6 +577,7 @@ Awx.trackJob = async function (
             // 405 : AWX is cancelling already (the abort sent the cancel straight away)
             if (error instanceof Errors.ConflictError) {
               await Job.resetAbortRequested(jobid);
+              await events.finish();
               await Job.endJobStatus(jobid, ++counter, "stderr", "aborted", "Aborted job", j.artifacts);
               return "Aborted job";
             }
@@ -585,13 +602,18 @@ Awx.trackJob = async function (
           }
         } else {
           if (j.finished && lastrun) {
-            // the job has ended, so its stdout is final. AWX assembles a running job's
-            // stdout from its events, which land slightly out of order, so the chunks cut
-            // from it while it ran can miss or repeat a line (issue #735) : store the final
-            // stdout once, in their place - never the too-large placeholder
-            if (o && !isStdoutTooLarge(o)) {
-              await Job.replaceTrackedOutput(jobid, firstOrder, o);
+            // the job has ended : once AWX has saved all its events, its stdout and its events
+            // are final (AWX reports the end a moment before it has saved the last ones)
+            const final = await Awx.finalJobRead(awx, jobid, j, o);
+            j = final.job;
+            // AWX assembles a running job's stdout from its events, which land slightly out of
+            // order, so the chunks cut from it while it ran can miss or repeat a line (issue
+            // #735) : store the final stdout once, in their place - never the too-large placeholder
+            if (final.output && !isStdoutTooLarge(final.output)) {
+              await Job.replaceTrackedOutput(jobid, firstOrder, final.output);
             }
+            // and its last events, before it ends : the job page has them all once it has ended
+            await events.finish();
             if (j.status === "successful") {
               await Job.endJobStatus(
                 jobid,
@@ -647,7 +669,10 @@ Awx.trackJob = async function (
         message = err.toString();
         logger.error(message);
         const r = contact.failed();
-        if (r.giveUp) return lostContact(jobid, counter + 1, job, message);
+        if (r.giveUp) {
+          events.stop();
+          return lostContact(jobid, counter + 1, job, message);
+        }
         logger.warning(`Retrying jobid ${jobid} [${r.failures}] in ${r.waitMs / 1000}s`);
         await delay(r.waitMs);
         // retry the SAME poll : job, counter and both outputs stay as they were
@@ -657,7 +682,10 @@ Awx.trackJob = async function (
       message = `could not find job with id ${job.id}`;
       logger.error(message);
       const r = contact.failed();
-      if (r.giveUp) return lostContact(jobid, counter + 1, job, message);
+      if (r.giveUp) {
+        events.stop();
+        return lostContact(jobid, counter + 1, job, message);
+      }
       logger.warning(`Retrying jobid ${jobid} [${r.failures}] in ${r.waitMs / 1000}s`);
       await delay(r.waitMs);
       // retry the SAME poll, as above
@@ -668,7 +696,10 @@ Awx.trackJob = async function (
     // job that was running fine in AWX
     logger.error("Failed to track job: ", e);
     const r = contact.failed();
-    if (r.giveUp) return lostContact(jobid, counter + 1, job, e.message);
+    if (r.giveUp) {
+      events.stop();
+      return lostContact(jobid, counter + 1, job, e.message);
+    }
     logger.warning(`AWX did not answer for jobid ${jobid} [${r.failures}], retrying in ${r.waitMs / 1000}s`);
     await delay(r.waitMs);
     continue;
@@ -824,14 +855,19 @@ Awx.trackWorkflowJob = async function (
       );
       for (const node of finishedNodes) {
         var nodeOutput = "";
+        // the node's job, once read : its events are stored after its output
+        var child = null;
         try {
           // get the child job (job, project_update, workflow_approval, ...) and grab its output
           const childResult = await axios.get(
             serverOf(awxConfig) + node.job_url,
             axiosConfig
           );
-          nodeOutput =
-            (await Awx.getJobTextOutput(awx, childResult.data)) || "";
+          // its output and (below) its events : once AWX has saved all of them (it reports
+          // the node as ended a moment before it has saved its last events)
+          const final = await Awx.finalJobRead(awx, jobid, childResult.data);
+          child = final.job;
+          nodeOutput = final.output || "";
         } catch (e) {
           logger.warning(
             `Failed to get output of workflow node ${node.name}: ${e.message}`
@@ -851,6 +887,9 @@ Awx.trackWorkflowJob = async function (
           ++counter
         );
         printedNodeIds.push(node.id);
+        // its events, after the nodes' before it : in the order of the output, so its lines
+        // pair with them
+        await Awx.storeNodeEvents(awx, jobid, child);
       }
       // check for abort request
       const abort_requested = await Job.isAbortRequested(jobid);
@@ -1015,6 +1054,10 @@ Awx.resume = async function (awx, row) {
   const workflow = isWorkflow || remote.type === "workflow_job" || !!remote.related?.workflow_nodes;
   // the stdout tracked before the restart : replaced by AWX's full stdout, read again below
   if (!workflow) await Job.dropTrackedStdout(jobid, rows);
+  // and its events, read again in full with it (a workflow's nodes keep theirs)
+  if (!workflow) {
+    await JobEvent.removeByJob(jobid).catch((e) => logger.warning(`Job ${jobid}: its events could not be cleared (${e.message})`));
+  }
   let counter = await Job.lastOrder(jobid);
   await Job.printJobOutput(
     `ok: [Following ${workflow ? "workflow job" : "job"} ${remote.id} again, after the server restarted]`,
@@ -1026,6 +1069,94 @@ Awx.resume = async function (awx, row) {
     return Awx.trackWorkflowJob(awx, remote, jobid, counter + 1, printedWorkflowNodeIds(rows), row.awx_workflow || "");
   }
   return Awx.trackJob(awx, remote, jobid, counter + 1);
+};
+/**
+ * A page of an AWX job's events, in order : those after a counter. The request is built as
+ * every other one to AWX : the job's own link (related.job_events) on the runner's server, else
+ * the runner's uri and API prefix (AWX_API_PREFIX, or the path the uri carries : AAP 2.5's
+ * /api/controller/v2), its credentials, its certificate settings and its timeout.
+ *
+ * Args:
+ *   awx (object): the runner.
+ *   job (object): the AWX job ({ id, related }).
+ *   afterCounter (number): the last counter read (0 for the first page).
+ *   pageSize (number): the events asked for at once.
+ *
+ * Returns:
+ *   Promise<object>: AWX's answer, { count, next, results }.
+ *
+ * Raises:
+ *   Error: AWX did not answer, or answered an error.
+ */
+Awx.getJobEvents = async function (awx, job, afterCounter = 0, pageSize = 200) {
+  if (!awx) throw new Errors.ApiError("No AWX runner given");
+  const url = job?.related?.job_events
+    ? serverOf(awx) + job.related.job_events
+    : awx.uri + apiPrefix(awx) + "/jobs/" + job?.id + "/job_events/";
+  const { data } = await axios.get(url, {
+    ...getAuthorization(awx),
+    params: { counter__gt: afterCounter, order_by: "counter", page_size: pageSize },
+  });
+  return data;
+};
+
+/**
+ * Stores the events of a workflow node's job, once it has ended : after the events stored
+ * already (the nodes before it). A node that is no playbook job (an approval, a project update,
+ * a nested workflow) has none. Never throws : the workflow goes on without them.
+ *
+ * Args:
+ *   awx (object): the runner.
+ *   jobid (number): the workflow's job in AnsibleForms.
+ *   child (object|null): the node's AWX job, as AWX returned it.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+Awx.storeNodeEvents = async function (awx, jobid, child) {
+  if (!child?.related?.job_events) return;
+  try {
+    const reader = createAwxEventReader({
+      jobid,
+      fetchPage: (after, size) => Awx.getJobEvents(awx, child, after, size),
+      startOrder: await JobEvent.lastOrder(jobid),
+    });
+    await reader.finish();
+  } catch (e) {
+    logger.warning(`Job ${jobid}: the events of AWX job ${child.id} could not be stored (${e.message})`);
+  }
+};
+/**
+ * An ended job as AWX has it once it has saved all its events : waits for that
+ * (waitForEventProcessing), then gives its output. AWX reports a job as ended a moment before
+ * it has saved its last events, and assembles the output from them : read at once, both can
+ * lack their end. The one place a single job's and a workflow node's final read go through.
+ *
+ * Args:
+ *   awx (object): the runner.
+ *   jobid (number): the job in AnsibleForms.
+ *   job (object): the AWX job, as last read (it has ended).
+ *   output (string|undefined): its output, read right after the job was : kept when AWX had
+ *     saved all its events already ; else (or when not given) read again.
+ *
+ * Returns:
+ *   Promise<{job: object, output: string|undefined}>: the job as last read, and its output.
+ *
+ * Raises:
+ *   Error: the output could not be read from AWX.
+ */
+Awx.finalJobRead = async function (awx, jobid, job, output = undefined) {
+  if (!awx) throw new Errors.ApiError("No AWX runner given");
+  // step 1 : wait until AWX has saved all its events (at once when it has, or does not say)
+  const url = job?.url ? serverOf(awx) + job.url : awx.uri + apiPrefix(awx) + "/jobs/" + job?.id + "/";
+  const settled = await waitForEventProcessing({
+    jobid,
+    job,
+    fetchJob: async () => (await axios.get(url, getAuthorization(awx))).data,
+  });
+  // step 2 : its output, as AWX has it now
+  if (!settled.waited && output !== undefined) return { job: settled.job, output };
+  return { job: settled.job, output: await Awx.getJobTextOutput(awx, settled.job) };
 };
 Awx.getJobTextOutput = async function (awx, job) {
   if (!job) return undefined;
