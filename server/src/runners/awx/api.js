@@ -14,7 +14,7 @@ import Job from "../../models/job.model.js";
 import { rememberRunnerJobUrl } from "../../lib/runnerJobLinks.js";
 import { workflowSummaryLines } from "../../lib/workflowSummary.js";
 import JobEvent from "../../models/jobEvent.model.js";
-import { createAwxEventReader, runsVerbose, waitForEventProcessing } from "./events.js";
+import { createAwxEventReader, waitForEventProcessing } from "./events.js";
 
 /**
  * The API path a runner's uri lacks : none when the uri carries it
@@ -493,7 +493,6 @@ Awx.trackJob = async function (
   const events = createAwxEventReader({
     jobid,
     fetchPage: (after, size) => Awx.getJobEvents(awx, followed, after, size),
-    full: runsVerbose(job),
   });
   for (;;) {
   // taken over by another node (this one's heartbeat lapsed) : that node follows it now
@@ -509,7 +508,6 @@ Awx.trackJob = async function (
     if (j) {
       // its new events, in the background
       followed = j;
-      events.full = runsVerbose(j);
       events.poll();
       // logger.debug(inspect(j))
       logger.debug(`awx job status: ` + j.status);
@@ -1121,7 +1119,6 @@ Awx.storeNodeEvents = async function (awx, jobid, child) {
     const reader = createAwxEventReader({
       jobid,
       fetchPage: (after, size) => Awx.getJobEvents(awx, child, after, size),
-      full: runsVerbose(child),
       startOrder: await JobEvent.lastOrder(jobid),
     });
     await reader.finish();

@@ -288,7 +288,7 @@ function groups(list) {
 // --------------------------------------------------------------------------------------
 test("AWX's events of a run map to the events af_events writes for the same playbook", () => {
   const state = { play: "", task: "" };
-  const mapped = AWX_EVENTS.flatMap((e) => mapAwxEvent(e, state, true));
+  const mapped = AWX_EVENTS.flatMap((e) => mapAwxEvent(e, state));
   assert.equal(mapped.length, AF_EVENTS.length);
   assert.deepEqual(groups(mapped), groups(AF_EVENTS));
   // the times too : a host's result has when it started and how long it took
@@ -301,7 +301,7 @@ test("AWX's events of a run map to the events af_events writes for the same play
 
 test("a skipped host's result comes from its line of the output : AWX's event has none of its own", () => {
   const state = { play: "", task: "" };
-  const mapped = AWX_EVENTS.flatMap((e) => mapAwxEvent(e, state, true)).filter((e) => e.type === "skipped");
+  const mapped = AWX_EVENTS.flatMap((e) => mapAwxEvent(e, state)).filter((e) => e.type === "skipped");
   const af = AF_EVENTS.filter((e) => e.type === "skipped");
   assert.equal(mapped.length, af.length);
   for (const e of mapped) {
@@ -312,17 +312,17 @@ test("a skipped host's result comes from its line of the output : AWX's event ha
 });
 
 test("a skipped host whose line says little has the result af_events stores for a skipped host", () => {
-  const skip = (stdout, full) => mapAwxEvent({ counter: 1, event: "runner_on_skipped", event_data: { host: "h1" }, stdout }, { play: "", task: "" }, full)[0];
+  const skip = (stdout) => mapAwxEvent({ counter: 1, event: "runner_on_skipped", event_data: { host: "h1" }, stdout }, { play: "", task: "" })[0];
   const AF_SKIP = { changed: false, skip_reason: "Conditional result was False" };
   // the job not verbose : the line has no result
-  assert.deepEqual(skip("skipping: [h1]", false).data, AF_SKIP);
-  assert.deepEqual(skip("skipping: [h1]", true).result, AF_SKIP);
+  assert.deepEqual(skip("skipping: [h1]").data, AF_SKIP);
+  assert.deepEqual(skip("skipping: [h1]").result, AF_SKIP);
   // a debug task's line : its condition only, the rest as af_events stores it
-  const debug = skip('skipping: [h1] => {"false_condition": "x == 1"}', true);
+  const debug = skip('skipping: [h1] => {"false_condition": "x == 1"}');
   assert.deepEqual(debug.data, AF_SKIP);
   assert.deepEqual(debug.result, { ...AF_SKIP, false_condition: "x == 1" });
   // a line that says why : kept as it is
-  assert.equal(skip('skipping: [h1] => {"changed": false, "skip_reason": "No items in the list"}', true).data.skip_reason, "No items in the list");
+  assert.equal(skip('skipping: [h1] => {"changed": false, "skip_reason": "No items in the list"}').data.skip_reason, "No items in the list");
   // as af_events stores it for the same playbook
   assert.deepEqual(AF_EVENTS.find((e) => e.type === "skipped").data, AF_SKIP);
 });
@@ -330,7 +330,7 @@ test("a skipped host whose line says little has the result af_events stores for 
 test("each event type maps to its type, its task named as the output names it", () => {
   const state = { play: "", task: "" };
   const at = "2026-01-01T10:00:00.250000+00:00";
-  const map = (event, event_data = {}, extra = {}) => mapAwxEvent({ counter: 1, event, event_data, created: at, ...extra }, state, false);
+  const map = (event, event_data = {}, extra = {}) => mapAwxEvent({ counter: 1, event, event_data, created: at, ...extra }, state);
   assert.deepEqual(map("playbook_on_play_start", { name: "Site" }, { stdout: "\r\nPLAY [Site] ****" }), [{ type: "play", time: 1767261600.25, play: "Site", task: "" }]);
   // a role's task : the output's head line says role : name, AWX's own task has the name only
   assert.deepEqual(map("playbook_on_task_start", { task: "Install", role: "web", task_action: "ansible.builtin.package" }, { stdout: "TASK [web : Install] ***" }), [
@@ -344,7 +344,7 @@ test("each event type maps to its type, its task named as the output names it", 
   assert.equal(map("runner_on_ok", res({ changed: false }))[0].type, "ok");
   const changed = map("runner_on_ok", res({ changed: true, rc: 0, stdout: "x" }))[0];
   // a time without its zone is UTC ; the event's time is its end
-  assert.deepEqual(changed, { type: "changed", time: 1767261601.5, play: "Site", task: "Restart", host: "h1", duration: 1.5, start: 1767261600, data: { rc: 0, changed: true }, action: "ansible.builtin.command" });
+  assert.deepEqual(changed, { type: "changed", time: 1767261601.5, play: "Site", task: "Restart", host: "h1", duration: 1.5, start: 1767261600, data: { rc: 0, changed: true }, action: "ansible.builtin.command", result: { changed: true, rc: 0, stdout: "x" } });
   assert.deepEqual(map("runner_on_failed", { ...res({ msg: "boom" }), ignore_errors: true }).map((e) => [e.type, e.host]), [["failed", "h1"], ["ignored", "h1"]]);
   assert.deepEqual(map("runner_on_failed", res({ msg: "boom" })).map((e) => e.type), ["failed"]);
   assert.equal(map("runner_on_unreachable", res({ msg: "gone", unreachable: true }))[0].type, "unreachable");
@@ -365,10 +365,9 @@ test("each event type maps to its type, its task named as the output names it", 
   for (const kind of ["verbose", "runner_on_start", "playbook_on_start", "playbook_on_include", "playbook_on_notify", "runner_retry"]) assert.deepEqual(map(kind, { host: "h1" }), []);
 });
 
-test("a host's whole result is kept only when the job runs verbose, as on an RTE", () => {
+test("a host's whole result is always kept, whatever the job's verbosity, as AWX itself shows it", () => {
   const ev = { counter: 1, event: "runner_on_ok", event_data: { host: "h1", res: { changed: false, msg: "hi", stdout: "x" } } };
-  assert.equal(mapAwxEvent(ev, { play: "", task: "" }, false)[0].result, undefined);
-  assert.deepEqual(mapAwxEvent(ev, { play: "", task: "" }, true)[0].result, { changed: false, msg: "hi", stdout: "x" });
+  assert.deepEqual(mapAwxEvent(ev, { play: "", task: "" })[0].result, { changed: false, msg: "hi", stdout: "x" });
 });
 
 test("secrets are masked : a secret key's value, a loop item's, the module's arguments, the job's own secrets", async () => {
@@ -388,7 +387,7 @@ test("secrets are masked : a secret key's value, a loop item's, the module's arg
       },
     },
   };
-  const [e] = mapAwxEvent(ev, state, true);
+  const [e] = mapAwxEvent(ev, state);
   assert.equal(e.item, '{"name": "a", "password": "********"}');
   assert.equal(e.result.api_token, "********");
   assert.equal(e.result.nested.password, "********");
@@ -410,7 +409,7 @@ test("secrets are masked : a secret key's value, a loop item's, the module's arg
 
 test("a result is capped as af_events caps it : long texts cut, then too large to keep", () => {
   const state = { play: "", task: "" };
-  const big = (res) => mapAwxEvent({ counter: 1, event: "runner_on_ok", event_data: { host: "h1", res } }, state, true)[0];
+  const big = (res) => mapAwxEvent({ counter: 1, event: "runner_on_ok", event_data: { host: "h1", res } }, state)[0];
   // a message over 2000 characters is cut on the summary
   assert.equal(big({ msg: "m".repeat(2500) }).data.msg, "m".repeat(2000) + "...");
   // past 64 KB of JSON : its texts cut at 8000 characters, its lists at 200 items
@@ -431,7 +430,6 @@ test("the events are read a page at a time, in order, each stored once", async (
   const all = AWX_EVENTS;
   const reader = createAwxEventReader({
     jobid: 40,
-    full: true,
     fetchPage: async (after) => {
       pages.push(after);
       const left = all.filter((e) => e.counter > after);
@@ -455,7 +453,7 @@ test("while the job runs a counter missing is waited for ; the read when it has 
   // the background read : counters 1 to 4, stopped before the missing 5
   await new Promise((r) => setTimeout(r, 50));
   const first = storedOf(41).length;
-  const expected = (upTo) => AWX_EVENTS.filter((e) => e.counter <= upTo).flatMap((e) => mapAwxEvent(e, { play: "", task: "" }, false)).length;
+  const expected = (upTo) => AWX_EVENTS.filter((e) => e.counter <= upTo).flatMap((e) => mapAwxEvent(e, { play: "", task: "" })).length;
   assert.equal(first, expected(4));
   // 5 comes, the job ends
   shown.push(AWX_EVENTS.find((e) => e.counter === 5));
@@ -520,13 +518,13 @@ test("a job whose events cannot be read ends as it would without them", { timeou
   assert.ok(Date.now() - started < 8000);
 });
 
-test("a job that is not verbose stores its events without their whole results", { timeout: 30000 }, async () => {
+test("a job that is not verbose stores its events with their whole results, its lines open their details", { timeout: 30000 }, async () => {
   awx.verbosity = 0;
   awx.polls = 2;
   await Awx.trackJob(runner(), job77(), 77, 0);
-  const stored = await JobEvent.findByJob(77);
-  assert.equal(stored.length, STORED.length);
-  assert.ok(stored.every((e) => !e.detailed));
+  // the same as a verbose run's : every host's result and loop item has its details
+  assert.deepEqual(await JobEvent.findByJob(77), STORED);
+  assert.ok(STORED.filter((e) => !["play", "task", "stats", "ignored"].includes(e.type)).every((e) => e.detailed));
 });
 
 test("a job followed again after a restart has its events read again, none twice", { timeout: 30000 }, async () => {
@@ -689,7 +687,7 @@ test("a job whose events AWX never finishes saving stores what there is, with on
   }
   assert.equal(jobRow.status, "success");
   // the events AWX had saved : all up to counter 60
-  const upTo60 = AWX_EVENTS.filter((e) => e.counter <= 60).flatMap((e) => mapAwxEvent(e, { play: "", task: "" }, true)).length;
+  const upTo60 = AWX_EVENTS.filter((e) => e.counter <= 60).flatMap((e) => mapAwxEvent(e, { play: "", task: "" })).length;
   assert.equal(storedOf(77).length, upTo60);
   assert.equal(warnings.filter((w) => /event_processing_finished|saving its events/.test(w)).length, 1);
   // the wait is bounded

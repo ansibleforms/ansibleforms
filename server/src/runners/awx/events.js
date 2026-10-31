@@ -110,18 +110,17 @@ function trim(value) {
 /**
  * A host's whole result, as its details show it (af_events.py _full) : Ansible's own keys
  * (_ansible_*) and its invocation left out, the values of its secret keys masked, cut when its
- * JSON is longer than MAX_RESULT. Kept only when the job runs verbose : else null, its summary
- * alone is stored. A task with no_log has its result censored by Ansible before AWX gets it.
+ * JSON is longer than MAX_RESULT. Always kept, whatever the job's verbosity : AWX itself
+ * always shows a task's details. A task with no_log has its result censored by Ansible before
+ * AWX gets it.
  *
  * Args:
  *   res (object): the result (AWX's event_data.res).
- *   full (boolean): the job runs verbose.
  *
  * Returns:
- *   object|null: the result to keep, or null.
+ *   object|null: the result to keep, or null when it has nothing left to show.
  */
-function fullResult(res, full) {
-  if (!full) return null;
+function fullResult(res) {
   const own = Object.fromEntries(Object.entries(res || {}).filter(([k]) => !k.startsWith("_ansible")));
   let kept = redactResult(own);
   if (!Object.keys(kept).length) return null;
@@ -222,12 +221,11 @@ function stdoutResult(stdout) {
  *   ev (object): AWX's job event ({ counter, event, event_data, stdout, created, ... }).
  *   state (object): the play and the task the events so far are in ({ play, task }), carried
  *     from one call to the next.
- *   full (boolean): the job runs verbose : a host's whole result is kept.
  *
  * Returns:
- *   object[]: the events, without their order.
+ *   object[]: the events, without their order (a host's whole result always kept on them).
  */
-export function mapAwxEvent(ev, state, full = false) {
+export function mapAwxEvent(ev, state) {
   const kind = ev?.event;
   const raw = ev?.event_data || {};
   // a skipped host's result : from its text, AWX's event has none
@@ -249,7 +247,7 @@ export function mapAwxEvent(ev, state, full = false) {
       item: item === null || item === undefined ? null : short(item),
       data: Object.keys(data).length ? data : null,
       action: ed.task_action || null,
-      result: fullResult(res, full),
+      result: fullResult(res),
     };
   };
   const host = ed.host || ev?.host_name || null;
@@ -331,14 +329,12 @@ export function mapAwxEvent(ev, state, full = false) {
  *   jobid (number): the job (its events, masked as its output : JobEvent.create).
  *   fetchPage (function): (afterCounter, pageSize) => Promise<{ results, next }> : AWX's events
  *     after that counter, in order (Awx.getJobEvents).
- *   full (boolean): the job runs verbose : a host's whole result is kept (as on an RTE).
  *   startOrder (number): the order the stored events go on from (0 for a job of its own).
  *
  * Returns:
- *   {poll: function, finish: function, stop: function, full: boolean}: full may be set later
- *     (the job's verbosity, once known).
+ *   {poll: function, finish: function, stop: function}
  */
-export function createAwxEventReader({ jobid, fetchPage, full = false, startOrder = 0 }) {
+export function createAwxEventReader({ jobid, fetchPage, startOrder = 0 }) {
   const state = { play: "", task: "" };
   let lastCounter = 0;
   let order = Number(startOrder) || 0;
@@ -347,7 +343,7 @@ export function createAwxEventReader({ jobid, fetchPage, full = false, startOrde
   let gapSince = 0;
   let stopped = false;
   let warned = false;
-  const reader = { full };
+  const reader = {};
 
   /**
    * Stores events, in batches of at most MAX_BATCH_BYTES.
@@ -398,7 +394,7 @@ export function createAwxEventReader({ jobid, fetchPage, full = false, startOrde
         }
         gapSince = 0;
         lastCounter = counter;
-        mapped.push(...mapAwxEvent(ev, state, reader.full));
+        mapped.push(...mapAwxEvent(ev, state));
       }
       // stopped meanwhile (another node follows the job now) : nothing more is stored
       if (stopped) return;
@@ -500,18 +496,4 @@ export async function waitForEventProcessing({ jobid, job, fetchJob }) {
   return { job: last, waited: true };
 }
 
-/**
- * Whether an AWX job runs verbose (its verbosity, 1 and up) : a host's whole result is kept on
- * its events then, as an RTE keeps it for a playbook run with -v.
- *
- * Args:
- *   job (object): the AWX job.
- *
- * Returns:
- *   boolean
- */
-export function runsVerbose(job) {
-  return Number(job?.verbosity) > 0;
-}
-
-export default { mapAwxEvent, createAwxEventReader, waitForEventProcessing, runsVerbose, pyJson, PAGE_SIZE };
+export default { mapAwxEvent, createAwxEventReader, waitForEventProcessing, pyJson, PAGE_SIZE };
