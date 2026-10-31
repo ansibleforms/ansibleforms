@@ -217,6 +217,8 @@
   "duration": 0.013,
   "time": 1793483891.926,
   "data": {
+   "changed": false,
+   "skip_reason": "Conditional result was False",
    "action": "ansible.builtin.debug",
    "start": 1793483891.913
   },

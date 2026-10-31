@@ -179,28 +179,39 @@ function headName(stdout, heads) {
   return m ? m[1].trim() : null;
 }
 
+// what Ansible's result says of a host skipped by its condition, as af_events.py stores it : a
+// skipped host's line (a debug task's, a job that is not verbose) may say less
+const SKIPPED_RESULT = { changed: false, skip_reason: "Conditional result was False" };
+
 /**
  * A skipped host's result, as its line of the output shows it (skipping: [host] => {...}) : AWX's
  * event of a skipped host carries no result of its own (ansible-runner leaves it out), its text
- * does when the job runs verbose.
+ * does when the job runs verbose. What the line does not say (a debug task's line has its
+ * condition only, a job that is not verbose prints none) is what af_events.py stores for a host
+ * skipped by its condition (SKIPPED_RESULT).
  *
  * Args:
  *   stdout (string): the event's text.
  *
  * Returns:
- *   object: the result, {} when the text has none (or it is cut, as AWX cuts a long one).
+ *   object: the result : SKIPPED_RESULT, with what the line says over it.
  */
 function stdoutResult(stdout) {
+  // step 1 : the result the line prints, if any
   // eslint-disable-next-line no-control-regex
   const text = String(stdout || "").replace(/\x1b\[[0-9;]*m/g, "");
   const m = /=>\s*(\{[\s\S]*\})\s*$/.exec(text);
-  if (!m) return {};
-  try {
-    const value = JSON.parse(m[1]);
-    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  } catch {
-    return {};
+  let printed = {};
+  if (m) {
+    try {
+      const value = JSON.parse(m[1]);
+      if (value && typeof value === "object" && !Array.isArray(value)) printed = value;
+    } catch {
+      // cut, as AWX cuts a long one : none
+    }
   }
+  // step 2 : over what a skipped host's result says (its keys first, in af_events' order)
+  return { ...SKIPPED_RESULT, ...printed };
 }
 
 /**

@@ -311,6 +311,22 @@ test("a skipped host's result comes from its line of the output : AWX's event ha
   }
 });
 
+test("a skipped host whose line says little has the result af_events stores for a skipped host", () => {
+  const skip = (stdout, full) => mapAwxEvent({ counter: 1, event: "runner_on_skipped", event_data: { host: "h1" }, stdout }, { play: "", task: "" }, full)[0];
+  const AF_SKIP = { changed: false, skip_reason: "Conditional result was False" };
+  // the job not verbose : the line has no result
+  assert.deepEqual(skip("skipping: [h1]", false).data, AF_SKIP);
+  assert.deepEqual(skip("skipping: [h1]", true).result, AF_SKIP);
+  // a debug task's line : its condition only, the rest as af_events stores it
+  const debug = skip('skipping: [h1] => {"false_condition": "x == 1"}', true);
+  assert.deepEqual(debug.data, AF_SKIP);
+  assert.deepEqual(debug.result, { ...AF_SKIP, false_condition: "x == 1" });
+  // a line that says why : kept as it is
+  assert.equal(skip('skipping: [h1] => {"changed": false, "skip_reason": "No items in the list"}', true).data.skip_reason, "No items in the list");
+  // as af_events stores it for the same playbook
+  assert.deepEqual(AF_EVENTS.find((e) => e.type === "skipped").data, AF_SKIP);
+});
+
 test("each event type maps to its type, its task named as the output names it", () => {
   const state = { play: "", task: "" };
   const at = "2026-01-01T10:00:00.250000+00:00";
