@@ -46,6 +46,11 @@ const GAP_WAIT_MS = 10000;
 // the events stored at once at most, in characters of JSON (a host's whole result is up to
 // 64 KB) : as the RTE sends them (rte/events.js)
 const MAX_BATCH_BYTES = 2 * 1024 * 1024;
+// AWX reports a job as ended before it has saved all its events (and the output it assembles
+// from them) : the last ones can come a second or more later. The final read waits until the
+// job says so (its event_processing_finished), asking at most every pollMs and at most waitMs
+// in all ; past that, what AWX has saved is read. Kept in an object : a test shortens them
+export const EVENT_PROCESSING_WAIT = { waitMs: 60000, pollMs: 1000 };
 
 /**
  * A value as JSON the way Python's json.dumps writes it (", " and ": " between the parts, non
@@ -443,6 +448,48 @@ export function createAwxEventReader({ jobid, fetchPage, full = false, startOrde
 }
 
 /**
+ * Waits until AWX has saved all of an ended job's events (its event_processing_finished is
+ * true), so the final read of its events and its output finds them all : AWX reports a job as
+ * ended a moment before it has saved its last events. The job is asked for again every
+ * EVENT_PROCESSING_WAIT.pollMs, for at most EVENT_PROCESSING_WAIT.waitMs ; past that (or when
+ * AWX stops answering), a warning is logged once and the job as last read is returned : what
+ * AWX has saved is read. A job that does not say (an older or another API, the field absent)
+ * is returned at once, as before.
+ *
+ * Args:
+ *   jobid (number): the job in AnsibleForms (the warning names it).
+ *   job (object): the AWX job, as last read.
+ *   fetchJob (function): () => Promise<object> : the AWX job, read again.
+ *
+ * Returns:
+ *   Promise<{job: object, waited: boolean}>: the AWX job as last read, and whether it was read
+ *     again (anything read before from it, its output, may lack its end then). Never rejected.
+ */
+export async function waitForEventProcessing({ jobid, job, fetchJob }) {
+  // step 1 : nothing to wait for, the job does not say or has all its events saved
+  if (typeof job?.event_processing_finished !== "boolean" || job.event_processing_finished) return { job, waited: false };
+  // step 2 : ask again, until it says so or the time is up
+  const { waitMs, pollMs } = EVENT_PROCESSING_WAIT;
+  const deadline = Date.now() + waitMs;
+  let last = job;
+  try {
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(pollMs, Math.max(0, deadline - Date.now()))));
+      const again = await fetchJob();
+      if (again && typeof again === "object") last = again;
+      if (last.event_processing_finished !== false) return { job: last, waited: true };
+    }
+    // step 3 : the time is up, read what there is
+    logger.warning(
+      `Job ${jobid}: AWX job ${job.id} was still saving its events after ${waitMs / 1000}s (event_processing_finished is false) ; its events and output are read as they are`,
+    );
+  } catch (e) {
+    logger.warning(`Job ${jobid}: AWX job ${job.id} could not be read again while saving its events (${e?.message || e}) ; its events and output are read as they are`);
+  }
+  return { job: last, waited: true };
+}
+
+/**
  * Whether an AWX job runs verbose (its verbosity, 1 and up) : a host's whole result is kept on
  * its events then, as an RTE keeps it for a playbook run with -v.
  *
@@ -456,4 +503,4 @@ export function runsVerbose(job) {
   return Number(job?.verbosity) > 0;
 }
 
-export default { mapAwxEvent, createAwxEventReader, runsVerbose, pyJson, PAGE_SIZE };
+export default { mapAwxEvent, createAwxEventReader, waitForEventProcessing, runsVerbose, pyJson, PAGE_SIZE };

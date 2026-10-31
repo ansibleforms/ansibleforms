@@ -14,7 +14,7 @@ import Job from "../../models/job.model.js";
 import { rememberRunnerJobUrl } from "../../lib/runnerJobLinks.js";
 import { workflowSummaryLines } from "../../lib/workflowSummary.js";
 import JobEvent from "../../models/jobEvent.model.js";
-import { createAwxEventReader, runsVerbose } from "./events.js";
+import { createAwxEventReader, runsVerbose, waitForEventProcessing } from "./events.js";
 
 /**
  * The API path a runner's uri lacks : none when the uri carries it
@@ -604,12 +604,15 @@ Awx.trackJob = async function (
           }
         } else {
           if (j.finished && lastrun) {
-            // the job has ended, so its stdout is final. AWX assembles a running job's
-            // stdout from its events, which land slightly out of order, so the chunks cut
-            // from it while it ran can miss or repeat a line (issue #735) : store the final
-            // stdout once, in their place - never the too-large placeholder
-            if (o && !isStdoutTooLarge(o)) {
-              await Job.replaceTrackedOutput(jobid, firstOrder, o);
+            // the job has ended : once AWX has saved all its events, its stdout and its events
+            // are final (AWX reports the end a moment before it has saved the last ones)
+            const final = await Awx.finalJobRead(awx, jobid, j, o);
+            j = final.job;
+            // AWX assembles a running job's stdout from its events, which land slightly out of
+            // order, so the chunks cut from it while it ran can miss or repeat a line (issue
+            // #735) : store the final stdout once, in their place - never the too-large placeholder
+            if (final.output && !isStdoutTooLarge(final.output)) {
+              await Job.replaceTrackedOutput(jobid, firstOrder, final.output);
             }
             // and its last events, before it ends : the job page has them all once it has ended
             await events.finish();
@@ -862,9 +865,11 @@ Awx.trackWorkflowJob = async function (
             serverOf(awxConfig) + node.job_url,
             axiosConfig
           );
-          child = childResult.data;
-          nodeOutput =
-            (await Awx.getJobTextOutput(awx, childResult.data)) || "";
+          // its output and (below) its events : once AWX has saved all of them (it reports
+          // the node as ended a moment before it has saved its last events)
+          const final = await Awx.finalJobRead(awx, jobid, childResult.data);
+          child = final.job;
+          nodeOutput = final.output || "";
         } catch (e) {
           logger.warning(
             `Failed to get output of workflow node ${node.name}: ${e.message}`
@@ -1123,6 +1128,38 @@ Awx.storeNodeEvents = async function (awx, jobid, child) {
   } catch (e) {
     logger.warning(`Job ${jobid}: the events of AWX job ${child.id} could not be stored (${e.message})`);
   }
+};
+/**
+ * An ended job as AWX has it once it has saved all its events : waits for that
+ * (waitForEventProcessing), then gives its output. AWX reports a job as ended a moment before
+ * it has saved its last events, and assembles the output from them : read at once, both can
+ * lack their end. The one place a single job's and a workflow node's final read go through.
+ *
+ * Args:
+ *   awx (object): the runner.
+ *   jobid (number): the job in AnsibleForms.
+ *   job (object): the AWX job, as last read (it has ended).
+ *   output (string|undefined): its output, read right after the job was : kept when AWX had
+ *     saved all its events already ; else (or when not given) read again.
+ *
+ * Returns:
+ *   Promise<{job: object, output: string|undefined}>: the job as last read, and its output.
+ *
+ * Raises:
+ *   Error: the output could not be read from AWX.
+ */
+Awx.finalJobRead = async function (awx, jobid, job, output = undefined) {
+  if (!awx) throw new Errors.ApiError("No AWX runner given");
+  // step 1 : wait until AWX has saved all its events (at once when it has, or does not say)
+  const url = job?.url ? serverOf(awx) + job.url : awx.uri + apiPrefix(awx) + "/jobs/" + job?.id + "/";
+  const settled = await waitForEventProcessing({
+    jobid,
+    job,
+    fetchJob: async () => (await axios.get(url, getAuthorization(awx))).data,
+  });
+  // step 2 : its output, as AWX has it now
+  if (!settled.waited && output !== undefined) return { job: settled.job, output };
+  return { job: settled.job, output: await Awx.getJobTextOutput(awx, settled.job) };
 };
 Awx.getJobTextOutput = async function (awx, job) {
   if (!job) return undefined;

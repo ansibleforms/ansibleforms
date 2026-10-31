@@ -23,7 +23,8 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || "test";
 const { default: Job } = await import("../src/models/job.model.js");
 const { default: JobEvent } = await import("../src/models/jobEvent.model.js");
 const { Awx } = await import("../src/runners/awx/api.js");
-const { mapAwxEvent, createAwxEventReader } = await import("../src/runners/awx/events.js");
+const { mapAwxEvent, createAwxEventReader, EVENT_PROCESSING_WAIT } = await import("../src/runners/awx/events.js");
+const { default: logger } = await import("../src/lib/logger.js");
 const { default: mysql } = await import("../src/models/db.model.js");
 const { default: appConfig } = await import("../config/app.config.js");
 const { registerJobSecrets, forgetJobSecrets } = await import("../src/lib/outputMask.js");
@@ -118,7 +119,28 @@ var requests = [];
 function visibleEvents() {
   const share = Math.min(1, awx.poll / awx.polls);
   const upTo = Math.ceil(share * awx.events.length);
-  return awx.events.filter((e) => e.counter <= upTo && awx.poll >= (awx.late[e.counter] ?? 0));
+  return awx.events.filter((e) => e.counter <= upTo && awx.poll >= (awx.late[e.counter] ?? 0) && (settled(77) || e.counter <= awx.heldAfter));
+}
+
+/**
+ * Whether AWX has saved all of a job's events (its event_processing_finished) : job 77 `settle`
+ * polls after it has finished, a node's job on its `settle`th read ; undefined when the job
+ * does not say (an older API, the field absent), as AWX said nothing before.
+ */
+function settled(id) {
+  if (id == 77) return awx.settle === undefined ? undefined : awx.poll >= awx.polls + awx.settle;
+  const node = awx.nodes[id];
+  return node?.settle === undefined ? undefined : node.gets >= node.settle;
+}
+
+/**
+ * A job's output as AWX serves it : its last lines missing until AWX has saved all its events
+ * (AWX assembles the output from them).
+ */
+function servedStdout(id, full) {
+  if (settled(id) !== false) return full;
+  const lines = full.split("\n");
+  return lines.slice(0, Math.max(1, lines.length - 3)).join("\n");
 }
 
 function send(res, status, body) {
@@ -141,15 +163,18 @@ function handleRequest(req, res) {
   if (m) {
     const id = Number(m[1]);
     if (id == 77) awx.poll++;
+    else if (awx.nodes[id]) awx.nodes[id].gets = (awx.nodes[id].gets || 0) + 1;
     return send(res, 200, awxJob(id));
   }
   m = /^\/jobs\/(\d+)\/stdout\/$/.exec(path);
-  if (m) return send(res, 200, Number(m[1]) == 77 ? AWX_STDOUT : awx.nodes[m[1]]?.stdout || "");
+  if (m) return send(res, 200, servedStdout(m[1], Number(m[1]) == 77 ? AWX_STDOUT : awx.nodes[m[1]]?.stdout || ""));
   m = /^\/jobs\/(\d+)\/job_events\/$/.exec(path);
   if (m) {
     if (awx.eventsStatus) return send(res, awx.eventsStatus, { detail: "events are down" });
     const id = Number(m[1]);
-    const all = id == 77 ? visibleEvents() : awx.nodes[id]?.events || [];
+    const node = awx.nodes[id];
+    // a node's job : its events after `heldAfter` saved only once AWX has saved them all
+    const all = id == 77 ? visibleEvents() : (node?.events || []).filter((e) => settled(id) !== false || e.counter <= node.heldAfter);
     const after = Number(url.searchParams.get("counter__gt") || 0);
     const size = Number(url.searchParams.get("page_size") || 25);
     const left = all.filter((e) => e.counter > after).sort((a, b) => a.counter - b.counter);
@@ -205,6 +230,8 @@ function awxJob(id) {
     verbosity: awx.verbosity,
     artifacts: {},
     related,
+    // AWX's flag, when the test sets it : all the job's events saved
+    ...(settled(id) === undefined ? {} : { event_processing_finished: settled(id) }),
   };
 }
 
@@ -223,7 +250,7 @@ beforeEach(() => {
   nextId = 1;
   requests = [];
   failEventWrites = false;
-  awx = { prefix: "/api/v2", poll: 0, polls: 7, events: AWX_EVENTS, late: {}, verbosity: 1, relatedEvents: true, eventsStatus: 0, wfPoll: 0, nodes: {} };
+  awx = { prefix: "/api/v2", poll: 0, polls: 7, events: AWX_EVENTS, late: {}, verbosity: 1, relatedEvents: true, eventsStatus: 0, wfPoll: 0, nodes: {}, settle: undefined, heldAfter: Infinity };
 });
 
 const runner = () => ({ uri: base, token: "test-token", ignore_certs: true });
@@ -577,4 +604,78 @@ test("a workflow stores each node's job's events after the node's output, one af
   );
   // the approval has no events : never asked for
   assert.ok(!eventRequests().some((r) => r.pathname.includes("/95/")));
+});
+
+// --------------------------------------------------------------------------------------
+// AWX saves a job's last events a moment after it reports the job ended : the final read waits
+// for its event_processing_finished
+// --------------------------------------------------------------------------------------
+test("a job's last events, saved by AWX after the job ended, are all stored, its output whole", { timeout: 30000 }, async () => {
+  // the events after counter 60 and the output's last lines : saved 4 polls after the job ended
+  awx.polls = 2;
+  awx.settle = 4;
+  awx.heldAfter = 60;
+  await Awx.trackJob(runner(), job77(), 77, 0);
+  assert.equal(jobRow.status, "success");
+  assert.deepEqual(await JobEvent.findByJob(77), STORED);
+  // the output : AWX's whole stdout, its recap included
+  const stdout = rows.filter((r) => r.output_type == "stdout").map((r) => r.output).join("\n");
+  assert.match(stdout, /h3 +: ok=1 +changed=0 +unreachable=1/);
+});
+
+test("a workflow node's last events and output, saved by AWX after the node ended, are all stored", { timeout: 30000 }, async () => {
+  const play = (counter, name) => ({ counter, event: "playbook_on_play_start", event_data: { name }, stdout: `PLAY [${name}] ***` });
+  const task = (counter, name) => ({ counter, event: "playbook_on_task_start", event_data: { task: name, task_action: "debug" }, stdout: `TASK [${name}] ***` });
+  const ok = (counter, host) => ({ counter, event: "runner_on_ok", event_data: { host, res: { changed: false, msg: "hi" } } });
+  // each node's host result : saved on the third read of its job
+  awx.nodes = {
+    91: { stdout: "PLAY [one] ***\nTASK [a] ***\nok: [h1]", events: [play(1, "one"), task(2, "a"), ok(3, "h1")], settle: 3, heldAfter: 2 },
+    92: { stdout: "PLAY [two] ***\nTASK [b] ***\nok: [h2]", events: [play(1, "two"), task(2, "b"), ok(3, "h2")], settle: 3, heldAfter: 2 },
+  };
+  const wf = { id: 90, type: "workflow_job", url: "/api/v2/workflow_jobs/90/", related: { workflow_nodes: "/api/v2/workflow_jobs/90/workflow_nodes/" } };
+  await Awx.trackWorkflowJob(runner(), wf, 90, 0);
+  assert.equal(jobRow.status, "success");
+  const stored = await JobEvent.findByJob(90);
+  assert.deepEqual(
+    stored.map((e) => [e.type, e.play, e.host]),
+    [
+      ["play", "one", null],
+      ["task", "one", null],
+      ["ok", "one", "h1"],
+      ["play", "two", null],
+      ["task", "two", null],
+      ["ok", "two", "h2"],
+    ],
+  );
+  const output = rows.map((r) => r.output).join("\n");
+  assert.match(output, /ok: \[h1\]/);
+  assert.match(output, /ok: \[h2\]/);
+});
+
+test("a job whose events AWX never finishes saving stores what there is, with one warning", { timeout: 30000 }, async () => {
+  awx.polls = 2;
+  awx.settle = 1000;
+  awx.heldAfter = 60;
+  const limits = { ...EVENT_PROCESSING_WAIT };
+  Object.assign(EVENT_PROCESSING_WAIT, { waitMs: 1500, pollMs: 200 });
+  const warnings = [];
+  const warning = logger.warning;
+  logger.warning = (message, ...rest) => {
+    warnings.push(String(message));
+    return warning.call(logger, message, ...rest);
+  };
+  const started = Date.now();
+  try {
+    await Awx.trackJob(runner(), job77(), 77, 0);
+  } finally {
+    Object.assign(EVENT_PROCESSING_WAIT, limits);
+    logger.warning = warning;
+  }
+  assert.equal(jobRow.status, "success");
+  // the events AWX had saved : all up to counter 60
+  const upTo60 = AWX_EVENTS.filter((e) => e.counter <= 60).flatMap((e) => mapAwxEvent(e, { play: "", task: "" }, true)).length;
+  assert.equal(storedOf(77).length, upTo60);
+  assert.equal(warnings.filter((w) => /event_processing_finished|saving its events/.test(w)).length, 1);
+  // the wait is bounded
+  assert.ok(Date.now() - started < 10000);
 });
