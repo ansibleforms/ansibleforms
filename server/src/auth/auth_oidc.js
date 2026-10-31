@@ -2,7 +2,8 @@ import passport from 'passport';
 import OIDC from '../models/oidc.model.js';
 import logger from "../lib/logger.js";
 import * as openidClient from 'openid-client';
-import { Strategy as OpenIdClientStrategy } from 'openid-client/passport';
+// the library's strategy, with a state on every sign-in (#1296)
+import { StatefulStrategy } from './statefulStrategy.js';
 
 
 let oidcConfigCache = null;
@@ -88,7 +89,7 @@ const initialize = async () => {
     };
 
     logger.debug('Registering OIDC passport strategy');
-    passport.use('oidc', new OpenIdClientStrategy(strategyOptions, verify));
+    passport.use('oidc', new StatefulStrategy(strategyOptions, verify));
 
     logger.info('OIDC strategy initialized successfully');
     return true;

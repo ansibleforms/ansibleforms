@@ -1,5 +1,5 @@
 // Microsoft Entra ID (formerly Azure AD) login, on openid-client : the authorization code flow with
-// PKCE, state and nonce, the ID token checked by the library (signature, issuer, audience,
+// PKCE and a state, the ID token checked by the library (signature, issuer, audience,
 // expiry) - and the tenant pinned. The login is against the configured tenant's own v2.0
 // issuer, never the common endpoint, and the token's `tid` must be that tenant : a user of
 // another Microsoft tenant is refused, not let in as `default`.
@@ -8,7 +8,8 @@
 // GroupMember.Read.All) : the login step reads the user's groups with it (lib/entraGraph.js).
 import passport from 'passport';
 import * as openidClient from 'openid-client';
-import { Strategy as OpenIdClientStrategy } from 'openid-client/passport';
+// the library's strategy, with a state on every sign-in (#1296)
+import { StatefulStrategy } from './statefulStrategy.js';
 import EntraId from '../models/entraId.model.js';
 import logger from '../lib/logger.js';
 import authConfig from '../../config/auth.config.js';
@@ -109,7 +110,7 @@ const initialize = async () => {
         return done(err);
       }
     };
-    passport.use('entraid', new OpenIdClientStrategy({
+    passport.use('entraid', new StatefulStrategy({
       config,
       scope: ENTRA_SCOPES,
       callbackURL: new URL(entraConfig.redirect_uri),
