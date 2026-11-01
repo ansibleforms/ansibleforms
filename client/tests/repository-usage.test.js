@@ -428,7 +428,7 @@ describe('Pull all, and a linked object', () => {
     const ldap = read('pages/admin/ldap-directory.vue');
     expect(ldap).toContain('<template #tab-top-details="{ record, searching, matches }">');
     expect(ldap).toContain(':record="record"');
-    expect(read('components/AppAdminSingle.vue')).toContain(':matches="matches" :record="item"');
+    expect(read('components/AppAdminSingle.vue')).toMatch(/:matches="matches"\s+:record="item"/);
     expect(repositorySourceFields(t, { repository: null })).toEqual([]);
     expect(repositorySourceFields(t, { repository: 'ops', repo_file: 'runners/a.yaml' })[0]).toEqual([
       'source',
