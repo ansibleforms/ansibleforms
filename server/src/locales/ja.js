@@ -126,6 +126,8 @@ export default {
     joinTokenDeleted: "参加トークンを削除しました",
     joinTokenNotFound: "参加トークンが見つかりません",
     runnerNotFound: "ランナーが見つかりません",
+    databaseAdded: "データベースを追加しました",
+    databaseNotFound: "データベースが見つかりません",
     runnerAdminOnly:
       "ランナーを追加、変更、削除できるのは admin だけです：ランナーは実行するジョブの認証情報を受け取ります",
     repositoryAdminOnly:

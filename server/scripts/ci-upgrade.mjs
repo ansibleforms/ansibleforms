@@ -46,6 +46,7 @@ const SECRETS = {
   rte: "rte-token",
   aap: "aap-token",
   vault: "vault-token",
+  cmdb: "cmdb-password",
 };
 
 /**
@@ -75,8 +76,10 @@ function connect(options = {}) {
  * The 7.2.0 schema and the rows the 7.3 patches move : an LDAP directory with its servers and
  * bind password, an Entra ID and an Open ID provider with their client, the mail settings with
  * their login, an RTE and an AAP runner with their own token and address, a Vault with its
- * address and token, an environment label, a schedule, a repository with its pull output, and
- * the schema_migrations rows 7.2.0 recorded.
+ * address and token, an environment label, a schedule, a repository with its pull output, two
+ * database credentials (one of type database, one with its database flag only, as before the
+ * types) that 7.5 makes a database of Connections > Databases each, and the schema_migrations
+ * rows 7.2.0 recorded.
  *
  * Returns:
  *   Promise<void>
@@ -123,6 +126,15 @@ async function seed() {
     await db.query("INSERT INTO AnsibleForms.`schedule` (name, cron, form, status, state) VALUES ('nightly', '0 2 * * *', 'Demo', 'idle', 'idle')");
     await db.query(
       "INSERT INTO AnsibleForms.`repositories` (name, uri, use_for_forms, branch, status, output) VALUES ('forms', 'https://git.example.com/forms.git', 0, 'main', 'success', 'Already up to date.')",
+    );
+    // the database credentials forms query : each becomes a database of its name (7.5)
+    await db.query(
+      "INSERT INTO AnsibleForms.`credentials` (name, user, password, host, port, description, secure, db_type, db_name, is_database, credential_type) VALUES ('cmdb', 'reader', ?, 'db.example.com', 3306, 'The CMDB', 0, 'mysql', 'cmdb', 1, 'database')",
+      [enc(SECRETS.cmdb)],
+    );
+    await db.query(
+      "INSERT INTO AnsibleForms.`credentials` (name, user, password, host, port, description, db_type, db_name, is_database) VALUES ('inventory', 'reader', ?, 'pg.example.com', 5432, '', 'postgres', 'inventory', 1)",
+      [enc(SECRETS.cmdb)],
     );
     // step 3 : what 7.2.0 recorded after its patch run
     for (const name of ["patchVersion4", "patchVersion5", "patchVersion6", "patchVersion7"]) {
@@ -202,6 +214,14 @@ async function check() {
     expect("first label", label?.name, "PRODUCTION");
     expect("first label color", label?.color, "red");
     expect("schedule nightly enabled", (await one("SELECT enabled FROM AnsibleForms.`schedule` WHERE name = 'nightly'"))?.enabled, 1);
+
+    // the database credentials : a database each, by their name and naming them, the credentials
+    // as they were (their connection and login, their type)
+    await credential("cmdb", "database", SECRETS.cmdb, { host: "db.example.com", port: 3306, db_type: "mysql", db_name: "cmdb", user: "reader" });
+    await credential("inventory", "database", SECRETS.cmdb, { host: "pg.example.com", port: 5432, db_type: "postgres", db_name: "inventory" });
+    const databases = (await db.query("SELECT name, description, credential FROM AnsibleForms.`databases` ORDER BY name"))[0];
+    expect("databases", JSON.stringify(databases.map((d) => [d.name, d.credential, d.description]).filter((d) => ["cmdb", "inventory"].includes(d[0]))), JSON.stringify([["cmdb", "cmdb", "The CMDB"], ["inventory", "inventory", null]]));
+    expect("databases made once", !!(await one("SELECT 1 AS x FROM AnsibleForms.`schema_migrations` WHERE name = 'databases_from_credentials'")), true);
 
     // step 4 : what the upgrade recorded
     expect("schema recorded", (await one("SELECT version FROM AnsibleForms.`schema_migrations` WHERE name = 'schema'"))?.version, appVersion);

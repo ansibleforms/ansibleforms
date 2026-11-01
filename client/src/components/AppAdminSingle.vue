@@ -12,10 +12,13 @@
 /*            ; a field's disabledWhen (item, saved) and an       */
 /*            action's showWhen (item) decide from the record ;   */
 /*            togglesLast puts a tab's switches under its fields  */
-/*      tabs: Array of { key, label, icon } - the form in tabs :  */
+/*      tabs: Array of { key, label, icon, count } - the form in  */
+/*            tabs (count : a badge after the label) :            */
 /*            each field names its tab (field.tab, the first tab  */
 /*            when it names none) ; a slot tab-top-<key> above a  */
-/*            tab's fields. The tab is kept in the address        */
+/*            tab's fields (searching, matches and active : that  */
+/*            tab is the one shown). The tab is kept in the       */
+/*            address                                             */
 /*      locked: Boolean - every field read only (the feature the  */
 /*            form configures is switched off)                    */
 /*      extraDirty: Boolean - more to save with the form (the     */
@@ -35,6 +38,8 @@
 /*      test: Function                                            */
 /*      import: Function                                          */
 /*      saved: Function (after a successful update)               */
+/*      loaded: the record, each time it is read (its page lists  */
+/*            what uses it : a database's Used by)                */
 /*      saveExtra: Save was pressed with extraDirty               */
 /*      delete: the record's Delete action (its page deletes it)  */
 /*                                                                */
@@ -86,7 +91,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['test', 'import', 'saved', 'saveExtra', 'delete']);
+const emit = defineEmits(['test', 'import', 'saved', 'saveExtra', 'delete', 'loaded']);
 
 // the tab shown, kept in the address (/settings/ldap/server, composables/useRouteTab.js)
 const firstTab = computed(() => props.tabs[0]?.key || '');
@@ -209,6 +214,7 @@ async function loadItem() {
       }
     }
     originalItem.value = JSON.parse(JSON.stringify(item.value));
+    emit('loaded', originalItem.value);
   } catch (err) {
     console.log(objectTitle('Error loading'));
     toast.error(Helpers.parseAxiosResponseError(err, 'Failed to load item'));
@@ -430,6 +436,8 @@ defineExpose({
           <a class="nav-link" :class="{ active: activeTab === tab.key }" href="#" @click.prevent="activeTab = tab.key">
             <FaIcon :icon="tab.icon" class="me-1" />
             {{ tab.label }}
+            <!-- what the tab lists, as the record pages count theirs (a credential's Used by) -->
+            <span v-if="tab.count !== undefined" class="badge af-tab-count ms-1">{{ tab.count }}</span>
           </a>
         </li>
       </ul>
@@ -486,7 +494,14 @@ defineExpose({
           <FaIcon icon="lock" class="me-2" />
           {{ t('settings.common.seedManagedNotice') }}
         </div>
-        <slot :name="'tab-top-' + tab.key" :searching="searching" :matches="matches"></slot>
+        <!-- active : the tab is the one shown (the tabs stay mounted, hidden) ; content that puts its
+             controls elsewhere (a linked table's toolbar and pager) shows only while it is -->
+        <slot
+          :name="'tab-top-' + tab.key"
+          :searching="searching"
+          :matches="matches"
+          :active="activeTab === tab.key"
+        ></slot>
         <!-- a toggle as the switches of the MCP and chat pages : its title, the switch, its help ; above
              the tab's fields, or under them (settings.togglesLast : a record's Enabled under its name,
              as an SSO provider's Active) -->
@@ -649,6 +664,12 @@ defineExpose({
   </AppSettings>
 </template>
 <style scoped>
+/* the count of a tab : small and grey, as the record pages' */
+.af-tab-count {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
+}
 /* every field one width, as on the other settings pages : across the whole card, its value sat
    far from its label, and two or three to a row they were each another width. 20rem fits the
    narrowest column (three to a row), so the fields of a tab line up */

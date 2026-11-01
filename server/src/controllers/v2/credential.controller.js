@@ -3,11 +3,7 @@ import RestResult from '../../models/restResult.model.v2.js';
 import Errors from '../../lib/errors.js';
 import i18n from '../../lib/i18n.js';
 import { publicError } from './publicError.js';
-import mysql from '../../lib/mysql.js';
-import postgres from '../../lib/postgres.js';
-import mssql from '../../lib/mssql.js';
-import oracle from '../../lib/oracle.js';
-import mongodb from '../../lib/mongodb.js';
+import Query from '../../models/query.model.js';
 import auth_entraid from '../../auth/auth_entraid.js';
 import auth_oidc from '../../auth/auth_oidc.js';
 import logger from '../../lib/logger.js';
@@ -164,6 +160,32 @@ function dropSecretOnRetarget(req, before) {
   }
 }
 
+/**
+ * Tests a database connection : its engine's least query on the credential (Query.testConnection),
+ * a credential of type database's own Test connection and a database's of Connections > Databases
+ * (controllers/v2/database.controller.js).
+ *
+ * Args:
+ *   req (object): the request (its language for the answer).
+ *   credential (string): the credential's name, found by that exact name.
+ *   dbType (string): its database type.
+ *
+ * Returns:
+ *   Promise<void>: settles once it answered.
+ *
+ * Raises:
+ *   Errors.BadRequestError: the credential has no database type.
+ *   Error: the connection's or the query's error.
+ */
+export async function testDatabase(req, credential, dbType) {
+  try {
+    await Query.testConnection(CredentialModel.exactPattern(credential), dbType);
+  } catch (err) {
+    if (err?.code === 'NO_DB_TYPE') throw new Errors.BadRequestError(i18n.t(req, 'resources.dbTypeNotSet'));
+    throw err;
+  }
+}
+
 const credentialController = {
   async find(req, res) {
     try {
@@ -269,20 +291,7 @@ const credentialController = {
   async testDb(req, res) {
     try {
       const credential = await CredentialModel.findById(req.params.id);
-      const db_type = credential.db_type;
-      if (db_type === 'mysql') {
-        await mysql.query(credential.name, 'select 1');
-      } else if (db_type === 'mssql') {
-        await mssql.query(credential.name, 'select 1');
-      } else if (db_type === 'postgres') {
-        await postgres.query(credential.name, 'select 1');
-      } else if (db_type === 'oracle') {
-        await oracle.query(credential.name, 'select 1');
-      } else if (db_type === 'mongodb') {
-        await mongodb.query(credential.name, 'admin~system.version~{}');
-      } else {
-        throw new Errors.BadRequestError(i18n.t(req, 'resources.dbTypeNotSet'));
-      }
+      await testDatabase(req, credential.name, credential.db_type);
       res.json(RestResult.single({ message: i18n.t(req, 'success.connectionOk', { resource: 'Database' }) }));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));

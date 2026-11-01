@@ -484,6 +484,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Anmeldedaten',
+    databases: 'Datenbanken',
     ssh: 'SSH',
     knownHosts: 'Bekannte Hosts',
     secretStores: 'Secret Stores',
@@ -525,6 +526,10 @@ export default {
       runner_jointoken_delete: 'Beitritts-Token gelöscht',
       runner_jointoken_revoke_create: 'Beitritts-Token widerrufen',
       runner_check_create: 'Runner-Verbindung getestet',
+      database_create: 'Datenbank erstellt',
+      database_update: 'Datenbank aktualisiert',
+      database_delete: 'Datenbank gelöscht',
+      database_check_create: 'Datenbankverbindung getestet',
       announcement_create: 'Ankündigung erstellt',
       announcement_update: 'Ankündigung aktualisiert',
       announcement_delete: 'Ankündigung gelöscht',
@@ -936,6 +941,17 @@ export default {
     relaunch: 'Erneut starten',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Feld',
+      label: 'Datenbank',
+      description:
+        'Die Datenbanken, die Formulare abfragen: Das dbConfig eines Feldes nennt eine davon. Jede verbindet sich mit Anmeldedaten vom Typ Datenbank, die ihren Server und ihre Anmeldung enthalten.',
+      nameHelp: 'Der Name, den das dbConfig eines Feldes angibt, um diese Datenbank abzufragen.',
+      credential: 'Anmeldedaten',
+      credentialHelp: 'Anmeldedaten vom Typ Datenbank: ihr Datenbanktyp, Server, Datenbank und Anmeldung.',
+      noUse: 'Kein Formular fragt diese Datenbank ab.',
+    },
     cron: {
       second: 'Sekunde',
       minute: 'Minute',
@@ -1141,6 +1157,7 @@ export default {
       repository: 'Repository',
       ldapDirectory: 'LDAP-Verzeichnis',
       ssoProvider: 'SSO-Anbieter',
+      database: 'Datenbank',
       chat: 'Chat-Assistent',
       noFormRole: 'Kein Formular nennt diese Rolle.',
       noFormGroup: 'Keine Rolle der Gruppe öffnet ein Formular.',

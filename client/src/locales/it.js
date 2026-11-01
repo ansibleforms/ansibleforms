@@ -482,6 +482,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Credenziali',
+    databases: 'Database',
     ssh: 'SSH',
     knownHosts: 'Host conosciuti',
     secretStores: 'Archivi di segreti',
@@ -523,6 +524,10 @@ export default {
       runner_jointoken_delete: 'Token di adesione eliminato',
       runner_jointoken_revoke_create: 'Token di adesione revocato',
       runner_check_create: 'Connessione al runner testata',
+      database_create: 'Database creato',
+      database_update: 'Database aggiornato',
+      database_delete: 'Database eliminato',
+      database_check_create: 'Connessione al database testata',
       announcement_create: 'Annuncio creato',
       announcement_update: 'Annuncio aggiornato',
       announcement_delete: 'Annuncio eliminato',
@@ -933,6 +938,17 @@ export default {
     relaunch: 'Riavvia',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Campo',
+      label: 'Database',
+      description:
+        'I database che i formulari interrogano: il dbConfig di un campo ne nomina uno. Ognuno si connette con una credenziale di tipo Database, che contiene il suo server e il suo accesso.',
+      nameHelp: 'Il nome che il dbConfig di un campo indica per interrogare questo database.',
+      credential: 'Credenziale',
+      credentialHelp: "Una credenziale di tipo Database: il tipo di database, il server, il database e l'accesso.",
+      noUse: 'Nessun formulario interroga questo database.',
+    },
     cron: {
       second: 'Secondo',
       minute: 'Minuto',
@@ -1136,6 +1152,7 @@ export default {
       repository: 'Repository',
       ldapDirectory: 'Directory LDAP',
       ssoProvider: 'Provider SSO',
+      database: 'Database',
       chat: 'Assistente chat',
       noFormRole: 'Nessun modulo nomina questo ruolo.',
       noFormGroup: 'Nessun ruolo del gruppo apre un modulo.',

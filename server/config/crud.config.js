@@ -121,6 +121,23 @@ const crudConfigs = {
     allowCache: true,
     cacheTTL: 3600
   },
+  // The databases forms query (Connections > Databases) : a field's dbConfig names one. A name of
+  // its own and the credential of type database it connects with, as a runner names the credential
+  // it signs in with : its engine, server, database and login are the credential's
+  // (models/database.model.js)
+  database: {
+    table: 'AnsibleForms.databases',
+    fields: [
+      { name: 'id', isKey: true },
+      { name: 'name', isNaturalKey: true, required: true },
+      { name: 'description' },
+      // a credential of Connections > Credentials, of type database
+      { name: 'credential', required: true },
+      { name: 'managed', isBoolean: true }
+    ],
+    allowCache: true,
+    cacheTTL: 3600
+  },
   // Where notifications go (Connections > Notifications) : SMTP servers (one active, the one the
   // app sends its mail with), Slack, Teams, Telegram and webhooks (models/notificationChannel)
   notificationchannel: {

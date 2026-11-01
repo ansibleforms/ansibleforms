@@ -2,7 +2,7 @@
 // Declarative config seed : config as code for the admin objects.
 //
 // When CONFIG_SEED_PATH is set, that file is read at startup and the objects it
-// declares (awx, credentials, oauth2 providers, repositories, ldap, mail/url) are
+// declares (awx, credentials, databases, oauth2 providers, repositories, ldap, mail/url) are
 // upserted into the database. This is the piece that lets a whole instance be
 // rebuilt from git on an empty database - see https://ansibleforms.com/seed.
 //
@@ -33,6 +33,7 @@ import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
 import SecretStore from "../models/secretStore.model.js";
 import Runner from "../models/runner.model.js";
+import Database from "../models/database.model.js";
 import Repository from "../models/repository.model.js";
 import SyslogServer from "../models/syslogServer.model.js";
 import Label from "../models/label.model.js";
@@ -72,6 +73,17 @@ const listSections = [
     create: (d) => Credential.create(d, seedOpts),
     update: (d, row) => Credential.update(d, row.id, seedOpts),
     remove: (row) => Credential.delete(row.id, seedOpts),
+  },
+  {
+    // the databases forms query (Connections > Databases) : after the credentials they name, which
+    // they check (one of type database)
+    key: "databases",
+    modelName: "database",
+    label: "database",
+    defaults: { description: "" },
+    create: (d) => Database.create(d, seedOpts),
+    update: (d, row) => Database.update(d, row.id, seedOpts),
+    remove: (row) => Database.delete(row.id, seedOpts),
   },
   {
     key: "runners",

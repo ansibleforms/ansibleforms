@@ -141,10 +141,10 @@ const shownDetails = computed(() => {
 
 // ─── title ────────────────────────────────────────────────────────────────────
 const pageCrumbs = computed(() => [
-  { title: t('sidebar.backups'), icon: 'database', to: '/settings/backups' },
+  { title: t('sidebar.backups'), icon: 'box-archive', to: '/settings/backups' },
   {
     title: record.value || loaded.value ? folder.value : null,
-    icon: 'database',
+    icon: 'box-archive',
     to: `/settings/backups/${folder.value}`,
   },
 ]);
@@ -179,7 +179,7 @@ onMounted(async () => {
   <AppSettingsPage>
     <AppSettings
       v-if="authenticated"
-      icon="database"
+      icon="box-archive"
       :title="folder"
       :crumbs="crumbs"
       :description="t('settings.backups.description')"
@@ -209,7 +209,7 @@ onMounted(async () => {
       </template>
       <template #default>
         <div v-if="loaded && !record" class="empty-state">
-          <FaIcon icon="database" class="empty-state-icon" />
+          <FaIcon icon="box-archive" class="empty-state-icon" />
           <span>{{ t('admin.backups.pageNotFound', { folder }) }}</span>
         </div>
         <AppSkeleton v-else-if="!loaded" shape="form" :count="7" />

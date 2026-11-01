@@ -482,6 +482,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Inloggegevens',
+    databases: 'Databases',
     ssh: 'SSH',
     knownHosts: 'Known hosts',
     secretStores: 'Secret stores',
@@ -523,6 +524,10 @@ export default {
       runner_jointoken_delete: 'Jointoken verwijderd',
       runner_jointoken_revoke_create: 'Jointoken ingetrokken',
       runner_check_create: 'Runner verbinding getest',
+      database_create: 'Database aangemaakt',
+      database_update: 'Database bijgewerkt',
+      database_delete: 'Database verwijderd',
+      database_check_create: 'Databaseverbinding getest',
       announcement_create: 'Aankondiging aangemaakt',
       announcement_update: 'Aankondiging bijgewerkt',
       announcement_delete: 'Aankondiging verwijderd',
@@ -933,6 +938,17 @@ export default {
     relaunch: 'Opnieuw starten',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Veld',
+      label: 'Database',
+      description:
+        'De databases die formulieren bevragen: de dbConfig van een veld noemt er een. Elke database verbindt met inloggegevens van het type Database, die de server en de login bevatten.',
+      nameHelp: 'De naam die de dbConfig van een veld opgeeft om deze database te bevragen.',
+      credential: 'Inloggegevens',
+      credentialHelp: 'Inloggegevens van het type Database: het databasetype, de server, de database en de login.',
+      noUse: 'Geen formulier bevraagt deze database.',
+    },
     cron: {
       second: 'Seconde',
       minute: 'Minuut',
@@ -1137,6 +1153,7 @@ export default {
       repository: 'Repository',
       ldapDirectory: 'LDAP-directory',
       ssoProvider: 'SSO-provider',
+      database: 'Database',
       chat: 'Chatassistent',
       noFormRole: 'Geen formulier noemt deze rol.',
       noFormGroup: 'Geen rol van de groep opent een formulier.',

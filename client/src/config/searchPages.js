@@ -69,7 +69,7 @@ export function searchPages(t, options) {
     {
       title: t('sidebar.backups'),
       section: settings,
-      icon: 'database',
+      icon: 'box-archive',
       link: '/settings/backups',
     },
     // edited in the designer (its Visual tab), no longer a settings page
@@ -134,6 +134,12 @@ export function searchPages(t, options) {
       section: settings,
       icon: 'vault',
       link: '/settings/secret-stores',
+    },
+    {
+      title: t('sidebar.databases'),
+      section: settings,
+      icon: 'database',
+      link: '/settings/databases',
     },
     {
       title: t('sidebar.runners'),

@@ -20,6 +20,9 @@ vi.mock("../src/models/credential.model.v2.js", () => ({
   default: { resolveCredential: async (name) => ({ db_type: credTypes[name] }) },
 }));
 
+// no database of Connections > Databases : each name is a credential's, as before databases
+vi.mock("../src/models/database.model.js", () => ({ default: { credentialFor: async (name) => name } }));
+
 // every driver records the sql it was handed
 const seen = [];
 const driver = (engine) => ({ default: { query: async (name, sql) => { seen.push({ engine, name, sql }); return []; } } });

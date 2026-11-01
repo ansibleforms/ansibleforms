@@ -1901,13 +1901,7 @@ export default function getSettings(t) {
           hidden: true,
           required: true,
           parent: 'databases',
-          values: [
-            { value: 'mysql', label: 'MySQL' },
-            { value: 'mssql', label: 'MSSQL' },
-            { value: 'postgres', label: 'PostgreSQL' },
-            { value: 'oracle', label: 'Oracle' },
-            { value: 'mongodb', label: 'MongoDB' },
-          ],
+          values: DATABASE_TYPES,
           labelKey: 'label',
           valueKey: 'value',
           filterable: true,
@@ -3808,7 +3802,7 @@ export default function getSettings(t) {
     },
 
     backups: {
-      icon: 'database',
+      icon: 'box-archive',
       type: 'backup',
       label: t('settings.backups.label'),
       labelPlural: t('settings.backups.labelPlural'),
@@ -3850,6 +3844,8 @@ export default function getSettings(t) {
   // the LDAP directories' list : a directory's own fields (all.ldap), its tabs the New dialog's
   // steps
   all.ldapDirectories = ldapDirectories(t, all.ldap);
+  // the databases forms query (Connections > Databases)
+  all.databases = databaseSettings(t);
   return all;
 }
 
@@ -3926,6 +3922,187 @@ function ldapDirectories(t, ldap) {
           // a new one binds with a credential (one from before credentials may have its own account)
           ...(f.key === 'credential' ? { required: true } : {}),
         })),
+    ],
+  };
+}
+
+// ─── databases (Connections > Databases) ─────────────────────────────────────
+// the databases forms query : their list, and each one's page (pages/admin/database.vue)
+export const DATABASES_PATH = '/settings/databases';
+
+// the database types a credential of type database connects to, as its Database type dropdown
+// lists them (credentials) and a database's column shows its credential's (databases)
+export const DATABASE_TYPES = [
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'mssql', label: 'MSSQL' },
+  { value: 'postgres', label: 'PostgreSQL' },
+  { value: 'oracle', label: 'Oracle' },
+  { value: 'mongodb', label: 'MongoDB' },
+];
+
+/**
+ * Whether a credential is one a database connects with : of type database, or one from before the
+ * types with its database flag (as the server reads it, models/database.model.js).
+ *
+ * Args:
+ *   credential (object): the credential, as the api lists it.
+ *
+ * Returns:
+ *   boolean: true for a database credential.
+ */
+export function isDatabaseCredential(credential) {
+  const type = String(credential?.credential_type || '').trim();
+  return type ? type === 'database' : !!Number(credential?.is_database);
+}
+
+/**
+ * Settings > Connections > Databases : the databases forms query (a field's dbConfig names one).
+ * A database is its name, what it is and the credential of type database it connects with, chosen
+ * as a runner chooses its credential (New credential beside it, of type database) ; its database
+ * type, database, host and port are its credential's, shown as columns and never written here.
+ * No login and no password on a database : they are its credential's.
+ *
+ * Args:
+ *   t (function): the translation function.
+ *
+ * Returns:
+ *   object: the list's settings (AppAdminMulti), the page's fields too (AppAdminSingle).
+ */
+function databaseSettings(t) {
+  return {
+    // the page title is the menu entry's label (AppSidebar), so the two always match
+    pageTitle: t('sidebar.databases'),
+    type: 'database',
+    label: t('settings.databases.label'),
+    labelPlural: t('sidebar.databases'),
+    description: t('settings.databases.description'),
+    icon: 'database',
+    selectable: false,
+    // a database has its own page (pages/admin/database.vue) : its row and Edit open it, New the
+    // dialog
+    openPage: (item) => `${DATABASES_PATH}/${item.id}`,
+    // the dialog in steps, as a runner's : what the database is, then the credential it connects
+    // with (its credential's step, named as the runners' own)
+    steps: [
+      { key: 'database', label: t('settings.databases.label') },
+      { key: 'credentials', label: t('settings.runners.stepAuth') },
+    ],
+    // what the api adds from its credential and its forms is never sent
+    beforeSave: ({ db_type: _t, db_name: _n, host: _h, port: _p, secure: _s, used_by_count: _u, ...item }) => item,
+    // in the row menu, as the runners' : editing, the test, then Delete last, each apart
+    actions: [
+      { name: 'edit', title: t('common.edit'), icon: 'pencil', color: 'edit' },
+      {
+        name: 'test',
+        title: t('settings.common.testConnection'),
+        icon: 'plug',
+        color: 'test',
+        dividerBefore: true,
+      },
+      { name: 'delete', title: t('common.delete'), icon: 'trash', color: 'delete', dividerBefore: true },
+    ],
+    fields: [
+      {
+        key: 'id',
+        label: t('settings.fields.id'),
+        sortable: false,
+        required: false,
+        filterable: false,
+        noInput: true,
+        hidden: true,
+        icon: 'key',
+      },
+      {
+        // the name a field's dbConfig gives
+        key: 'name',
+        tab: 'details',
+        line: 0,
+        label: t('settings.fields.name'),
+        help: t('settings.databases.nameHelp'),
+        sortable: true,
+        required: true,
+        filterable: true,
+        icon: 'database',
+        isKey: true,
+      },
+      {
+        key: 'description',
+        tab: 'details',
+        line: 1,
+        label: t('settings.fields.description'),
+        sortable: true,
+        required: false,
+        filterable: true,
+        icon: 'info-circle',
+      },
+      {
+        // what it connects with : a credential of Connections > Credentials of type database (its
+        // database type, server, database and login), or a New one of that type
+        key: 'credential',
+        tab: 'credential',
+        step: 'credentials',
+        line: 0,
+        icon: 'key',
+        label: t('settings.databases.credential'),
+        help: t('settings.databases.credentialHelp'),
+        type: 'select',
+        // the list's dialog (AppAdminMulti) : the credentials, those of type database offered
+        parent: 'credentials',
+        values: 'credential',
+        valueKey: 'name',
+        labelKey: 'name',
+        required: true,
+        choicesWhen: (c) => !c?.name || isDatabaseCredential(c),
+        // its page's dropdown (AppAdminSingle) : the same ones
+        valuesFrom: { url: '/api/v2/credential/', filter: isDatabaseCredential },
+        createWith: 'credentials',
+        createLabel: t('settings.repositories.newCredential'),
+        createDefaults: { credential_type: 'database' },
+        // no column : the page shows it
+        noTable: true,
+      },
+      {
+        // its credential's database type : MySQL, PostgreSQL ...
+        key: 'db_type',
+        label: t('settings.credentials.databaseType'),
+        noInput: true,
+        sortable: true,
+        filterable: true,
+        render: (v) => esc(DATABASE_TYPES.find((d) => d.value === v)?.label || v || ''),
+      },
+      {
+        // the database its credential opens
+        key: 'db_name',
+        label: t('settings.credentials.database'),
+        noInput: true,
+        sortable: true,
+        filterable: true,
+        render: (v) => esc(v || ''),
+      },
+      {
+        // where its credential connects : its host, and its port when it has one ; in the column
+        // picker only
+        key: 'host',
+        label: t('settings.fields.host'),
+        noInput: true,
+        hidden: true,
+        sortable: true,
+        filterable: true,
+        render: (v, r) => esc(v ? (r?.port ? `${v}:${r.port}` : v) : ''),
+      },
+      {
+        // how many forms name it, or its credential, in a field's dbConfig (the server counts them,
+        // as its Used by tab lists them) : in the column picker
+        key: 'used_by_count',
+        label: t('settings.linked.usedBy'),
+        noInput: true,
+        hidden: true,
+        align: 'end',
+        filterable: false,
+        filterType: 'number',
+        // none : an en dash, as the other empty cells
+        render: (v) => (v ? String(v) : '–'),
+      },
     ],
   };
 }

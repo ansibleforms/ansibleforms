@@ -483,6 +483,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Credenciales',
+    databases: 'Bases de datos',
     ssh: 'SSH',
     knownHosts: 'Hosts conocidos',
     secretStores: 'Almacenes de secretos',
@@ -524,6 +525,10 @@ export default {
       runner_jointoken_delete: 'Token de unión eliminado',
       runner_jointoken_revoke_create: 'Token de unión revocado',
       runner_check_create: 'Conexión con el runner probada',
+      database_create: 'Base de datos creada',
+      database_update: 'Base de datos actualizada',
+      database_delete: 'Base de datos eliminada',
+      database_check_create: 'Conexión con la base de datos probada',
       announcement_create: 'Anuncio creado',
       announcement_update: 'Anuncio actualizado',
       announcement_delete: 'Anuncio eliminado',
@@ -934,6 +939,18 @@ export default {
     relaunch: 'Relanzar',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Campo',
+      label: 'Base de datos',
+      description:
+        'Las bases de datos que consultan los formularios: el dbConfig de un campo nombra una. Cada una se conecta con una credencial de tipo Base de datos, que contiene su servidor y su inicio de sesión.',
+      nameHelp: 'El nombre que da el dbConfig de un campo para consultar esta base de datos.',
+      credential: 'Credencial',
+      credentialHelp:
+        'Una credencial de tipo Base de datos: su tipo de base de datos, servidor, base de datos e inicio de sesión.',
+      noUse: 'Ningún formulario consulta esta base de datos.',
+    },
     cron: {
       second: 'Segundo',
       minute: 'Minuto',
@@ -1138,6 +1155,7 @@ export default {
       repository: 'Repositorio',
       ldapDirectory: 'Directorio LDAP',
       ssoProvider: 'Proveedor SSO',
+      database: 'Base de datos',
       chat: 'Asistente de chat',
       noFormRole: 'Ningún formulario nombra este rol.',
       noFormGroup: 'Ningún rol del grupo abre un formulario.',

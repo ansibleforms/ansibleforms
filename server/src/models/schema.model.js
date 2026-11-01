@@ -605,7 +605,7 @@ const SCHEMA_MANIFEST = {
              'settings', 'repositories', 'schedule', 'audit', 'chat_settings', 'secret_stores', 'runners',
              'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
              'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-             'runner_leases', 'runner_join_tokens', 'job_events'],
+             'runner_leases', 'runner_join_tokens', 'job_events', 'databases'],
   },
   patches: {
     patchVersion4: { columns: ['ldap.groups_search_base', 'ldap.groups_attribute', 'ldap.group_class',
@@ -644,7 +644,7 @@ const SCHEMA_MANIFEST = {
     // between them, the designer lock, and the node that follows a job
     patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
                               'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-                              'runner_leases', 'runner_join_tokens', 'job_events'],
+                              'runner_leases', 'runner_join_tokens', 'job_events', 'databases'],
                      columns: ['job_events.result', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
@@ -1209,6 +1209,54 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("job_events", "result", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
   // a stored job private to its owner or shared with other users (lib/storedJobScope.js)
   await checkPromise(addColumn("stored_jobs", "visibility", "varchar(10)", false, "'private'"), messages, success, failed);
+  // the databases forms query (Connections > Databases), each naming the credential of type
+  // database it connects with ; once, one for each database credential there is, by its name
+  const databases = fs.readFileSync(`${__dirname}/../db/create_databases_table.sql`);
+  await checkPromise(addTable("databases", databases.toString()), messages, success, failed);
+  await checkPromise(addDatabasesForCredentials(), messages, success, failed);
+}
+
+// the schema_migrations row that says the databases were made from the database credentials
+// (addDatabasesForCredentials) : once, so a database deleted later never comes back
+const DATABASES_MARKER = "databases_from_credentials";
+
+/**
+ * Fills Connections > Databases once : a database for each credential of type database (or one
+ * from before the types with its database flag), with the credential's name and naming it, so the
+ * section lists what forms already query. A name a database has already is left as it is. Nothing
+ * else changes : the credentials keep their fields, and a form's dbConfig that names one finds the
+ * database of that name first, which connects with that same credential. Recorded in
+ * schema_migrations (DATABASES_MARKER) in the same transaction, also when there is nothing to make
+ * (a fresh install) : a database deleted later, or a database credential added later, is the
+ * admin's, never filled in again.
+ *
+ * Returns:
+ *   Promise<string|null>: what was done, or null when it ran before or made none.
+ */
+export async function addDatabasesForCredentials() {
+  // step 1 : once only
+  const marker = await mysql.do("SELECT 1 FROM AnsibleForms.`schema_migrations` WHERE name = ?", [DATABASES_MARKER]);
+  if (marker.length) return null;
+  const made = [];
+  await mysql.transaction(async (query) => {
+    // step 2 : the database credentials that no database has the name of yet
+    const creds = await query(
+      "SELECT c.name, c.description FROM AnsibleForms.`credentials` c " +
+        "WHERE (c.credential_type = 'database' OR (COALESCE(c.credential_type, '') = '' AND c.is_database = 1)) " +
+        "AND NOT EXISTS (SELECT 1 FROM AnsibleForms.`databases` d WHERE d.name = c.name) ORDER BY c.name",
+    );
+    // step 3 : a database each, with its name and its description, naming it
+    for (const c of creds) {
+      await query("INSERT INTO AnsibleForms.`databases` (name, description, credential) VALUES (?, ?, ?)", [c.name, c.description || null, c.name]);
+      made.push(c.name);
+    }
+    // step 4 : recorded with them
+    await query("INSERT IGNORE INTO AnsibleForms.`schema_migrations` (name, version, applied_at) VALUES (?, ?, NOW())", [DATABASES_MARKER, appVersion]);
+  });
+  if (!made.length) return null;
+  const message = `Made a database of Connections > Databases for each database credential (${made.join(", ")})`;
+  logger.notice(message);
+  return message;
 }
 
 /**

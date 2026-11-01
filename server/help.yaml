@@ -246,7 +246,7 @@
     type: string
     allowed: a valid file path
     short: Config seed file
-    hint: A file declaring runners, credentials, SSO, repositories and settings, instead of clicking them together.
+    hint: A file declaring runners, credentials, databases, SSO, repositories and settings, instead of clicking them together.
     default: ""
     description: |
       Path to a declarative config seed. When set, the yaml file it points to is applied at
@@ -5178,10 +5178,12 @@
             short: A database connection 
             description: |
               When you want to query data from a database, you will need the proper connection information.  
-              We use a credential name to lookup the connection details.  Legacy was to pass an object (name and type).  
-              Since version 5.0.2 you can just specify the name of the credential.  The type is fetched from the credential itself (mysql, mssql, postgres, oracle or mongodb). 
+              Name a database of Connections > Databases : it connects with the credential of type database it names (the database type, server, database and login).  
+              **Since 7.5.0** : a name that is no database is looked up as a credential of type database, as older forms do, so they keep working unchanged.  
+              Legacy was to pass an object (name and type) ; it still works, its name a database or a credential.  
+              Since version 5.0.2 you can just specify the name.  The type is fetched from the credential (mysql, mssql, postgres, oracle or mongodb). 
               In case of no type set, mysql is assumed.   
-              Additionally you can set an array of credential names, to use multiple databases with a single query.  The result will be a join of the results.  
+              Additionally you can set an array of names, to use multiple databases with a single query.  The result will be a join of the results.  
               Doubles will not be removed automatically.  
             examples:
             - name: get information from a mysql database (legacy example - deprecated)
@@ -5193,7 +5195,7 @@
                     name: CMDB_CONN
                     type: mysql
                   query: select name, country from cities
-                # New style - just use the credential name:
+                # New style - just use the name of the database (or of the credential):
                 - name: cities
                   type: enum
                   dbConfig: CMDB_CONN
@@ -5202,7 +5204,7 @@
               code: |
                 - name: cities
                   type: enum
-                  dbConfig: CMDB_CONN # type is derived from the credential
+                  dbConfig: CMDB_CONN # a database of Connections > Databases ; the type is its credential's
                   query: select name, country from cities     
             - name: get information from a mysql database (array example)
               code: |
