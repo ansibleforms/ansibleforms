@@ -69,7 +69,7 @@ describe("the seed schema refuses anything it does not understand", () => {
   });
 
   test("an unknown top level section is rejected", () => {
-    assert.throws(() => validateSeed({ users: { items: [] } }), /validation failed/);
+    assert.throws(() => validateSeed({ widgets: { items: [] } }), /validation failed/);
   });
 
   test("a missing required field is rejected", () => {

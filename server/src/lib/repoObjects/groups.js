@@ -149,13 +149,17 @@ export async function setMembers(groupId, names) {
  *   Promise<string[]>: the group names, sorted ; none when no repository holds the groups.
  */
 export async function declaredGroupsOf(username) {
+  const key = String(username ?? "").trim().toLowerCase();
+  const names = new Set();
+  // the config seed's groups being applied (declareSeedGroups) : their members too
+  for (const entry of seedGroups) {
+    if ((Array.isArray(entry?.users) ? entry.users : []).some((u) => String(u ?? "").trim().toLowerCase() === key)) names.add(String(entry.name));
+  }
   const Engine = await import("./engine.js");
   const { descriptorOf } = await import("./descriptors.js");
   const desc = await descriptorOf("groups");
   const repository = await Engine.activeRepository(desc);
-  if (!repository || !Engine.cloned(repository)) return [];
-  const key = String(username ?? "").trim().toLowerCase();
-  const names = new Set();
+  if (!repository || !Engine.cloned(repository)) return [...names].sort((a, b) => a.localeCompare(b));
   for (const file of Engine.scanOf(repository).holding("groups")) {
     for (const entry of Array.isArray(file.value) ? file.value : []) {
       if (!entry || typeof entry !== "object" || entry.state === "absent" || !entry.name) continue;
@@ -163,6 +167,21 @@ export async function declaredGroupsOf(username) {
     }
   }
   return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+// the groups of the config seed being applied (lib/seed.js) : a user the seed declares takes the
+// groups whose seed items list it, as one of a repository takes those whose entries do
+let seedGroups = [];
+
+/**
+ * The groups the config seed declares, while it applies its users : their members give a new local
+ * user its groups (declaredGroupsOf). Called with none once it is done.
+ *
+ * Args:
+ *   items (object[]): the seed's groups items ({ name, users }) ; none : forgotten.
+ */
+export function declareSeedGroups(items) {
+  seedGroups = Array.isArray(items) ? items : [];
 }
 
 // ===========================================================================

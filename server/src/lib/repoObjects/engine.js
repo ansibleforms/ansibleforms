@@ -2655,7 +2655,7 @@ export async function applyDeclared(desc, declared, opts = {}) {
   }
   for (const item of declared || []) {
     const checked = desc.check(item, { resolved: true, fromSeed: true });
-    if (checked.errors.length) throw new Error(`${desc.noun} '${item?.name ?? ""}': ${checked.errors.join("; ")}`);
+    if (checked.errors.length) throw new Error(`${desc.noun} '${item?.name ?? item?.username ?? ""}': ${checked.errors.join("; ")}`);
     // one the type does not import (an announcement already ended) : left out, as a pull leaves it
     if (desc.notImported?.(checked.object)) continue;
     const row = ((await desc.store.rows()) || []).find((r) => nameKey(r.name) === nameKey(checked.object.name));

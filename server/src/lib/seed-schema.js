@@ -944,6 +944,10 @@ export const seedSchema = {
     runners: listSection(runnerItem),
     credentials: listSection(credentialItem),
     databases: listSection(databaseItem),
+    // the local groups (their members) and the users, local and of a directory : applied through
+    // the repository types' descriptors (lib/repoObjects/groups.js, users.js), made or changed
+    groups: listSection(groupItem),
+    users: listSection(userItem),
     oauth2: listSection(oauth2Item),
     repositories: listSection(repositoryItem),
     syslog_servers: listSection(syslogServerItem),

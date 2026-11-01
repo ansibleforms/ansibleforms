@@ -270,3 +270,35 @@ describe("saves in the app, written back", () => {
     assert.deepEqual(fx.readEntry(REPO, "groups.yaml", "groups", "vmware"), { name: "vmware", users: ["alice"] });
   });
 });
+
+describe("the config seed's groups and users", () => {
+  test("its sections pass the seed's schema", async () => {
+    const { validateSeed } = await import("../src/lib/seed-schema.js");
+    assert.doesNotThrow(() =>
+      validateSeed({
+        version: 1,
+        groups: { items: [{ name: "seeded", description: "From the seed", users: ["sam"] }] },
+        users: { items: [{ username: "sam", email: "s@x", password: "resolved" }, { username: "jdoe", type: "ldap", blocked: true }] },
+      }),
+    );
+    assert.throws(() => validateSeed({ users: { items: [{ username: "x", type: "ad" }] } }), /Seed file validation failed/);
+  });
+
+  test("applied : the group made, a new local user put in the groups the seed lists it in", async () => {
+    const { declareSeedGroups } = await import("../src/lib/repoObjects/groups.js");
+    const groups = [{ name: "seeded", users: ["sam"] }];
+    declareSeedGroups(groups);
+    try {
+      await RepoObjects.applyDeclared(await groupsDesc(), groups);
+      // the seed resolved the password's reference already
+      const done = await RepoObjects.applyDeclared(await usersDesc(), [{ username: "sam", email: "s@x", password: "from-the-env" }]);
+      assert.deepEqual(done.created, ["sam"]);
+    } finally {
+      declareSeedGroups([]);
+    }
+    assert.deepEqual(groupsOf("sam"), ["seeded"]);
+    const sam = fx.state.tables.users.find((u) => u.username === "sam");
+    assert.ok(bcrypt.compareSync("from-the-env", sam.password));
+    assert.equal(sam.repository ?? null, null, "the seed's : linked to no repository");
+  });
+});

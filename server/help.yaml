@@ -246,7 +246,7 @@
     type: string
     allowed: a valid file path
     short: Config seed file
-    hint: A file declaring runners, credentials, databases, SSO, repositories and settings, instead of clicking them together.
+    hint: A file declaring runners, credentials, databases, users, groups, SSO, repositories and settings, instead of clicking them together.
     default: ""
     description: |
       Path to a declarative config seed. When set, the yaml file it points to is applied at
@@ -6603,7 +6603,7 @@
       | Group | Types (flag) |
       | --- | --- |
       | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
-      | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
+      | Access | Disclaimer (`use_for_disclaimer`), Users (`use_for_users`), Groups (`use_for_groups`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
       | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Databases (`use_for_databases`), Runners (`use_for_runners`), Notifications (`use_for_notifications`), Chat assistant (`use_for_chat_assistant`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
       | Appearance | Defaults (`use_for_defaults`), Logo (`use_for_logo`), Icon (`use_for_icon`), Name (`use_for_name`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | General (`use_for_general`) |
@@ -6622,8 +6622,9 @@
       **Roles, Categories and Constants** (the Config usage of before, split) each read only their own key of the
       base configuration, one repository at most each: `controller_roles:`, `controller_categories:` and
       `controller_constants:` from the file of the repository that gives that key at its top level, any name, any
-      folder (one file may give all three). Two
-      files giving the same key are not read, both named on the repository's page and in its pull output. When no
+      folder (one file may give all three). The roles may be spread over several files (see *Users, groups and
+      roles kept in a git repository*); two files giving the categories, or the constants, are not read, both
+      named on the repository's page and in its pull output. When no
       file gives it, its own file at the root (`roles.yaml`, `categories.yaml`, `constants.yaml`) is read when it is
       there, and refused when it does not give the key (a typo, `role:`): its key is never served from the base
       configuration in its place. Else the key is read from the repository's `config.yaml` (its plain `roles:`,
@@ -6666,6 +6667,8 @@
       | --- | --- | --- |
       | `controller_schedules:` | a list of schedules | `- name: Nightly` |
       | `controller_credentials:`, `controller_secret_stores:`, `controller_databases:`, `controller_runners:`, `controller_notifications:`, `controller_sso:`, `controller_ldap:`, `controller_syslog:`, `controller_labels:`, `controller_announcements:`, `controller_repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
+      | `controller_groups:` | a list of local groups, each found by its `name`, listing its members | `- name: ops` |
+      | `controller_users:` | a list of users, each found by its `type` (local when not said) and `username` | `- username: alice` |
       | `controller_disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
       | `controller_general:`, `controller_mcp:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
       | `controller_roles:`, `controller_categories:`, `controller_constants:` | the base configuration's key, as before | |
@@ -7102,6 +7105,76 @@
           enabled: true
           ask_again: true
       ```
+  - name: Users, groups and roles kept in a git repository
+    short: Who is in what and may do what, reviewed in git
+    version: v7.6.0
+    description: |
+      Settings > Access can live in git: the **Users** (`use_for_users`), the **Groups** (`use_for_groups`) and the
+      **Roles** (`use_for_roles`), one repository at most each (one repository may hold all three). Users and groups
+      work as the other object types (see *Credentials and runners kept in a git repository*): entries of a list
+      under their key, in any YAML file, both ways, and **Repository: <name>** on their pages.
+
+      **A group holds its members.** A `controller_groups:` entry gives the group's `name`, its `description` and
+      the usernames of the local users in it (`users:`); a user's entry says nothing of its groups, so who is in a
+      group is read and reviewed in one place. A user left out of a group's list leaves the group, never its only
+      one (a user keeps at least one group, said in the server log). Adding a user to a group in the app, or
+      removing it, rewrites that group's entry.
+      ```yaml
+      controller_groups:
+        - name: admins
+          description: Platform administrators
+          users:
+            - alice
+        - name: operators
+          users:
+            - alice
+            - bob
+      ```
+
+      **Users, local and of a directory, in one list.** A user is found by its `type` and its `username`, so a
+      local `jdoe` and an LDAP `jdoe` are two users:
+
+      | Type | What its entry gives |
+      | --- | --- |
+      | `local` (the default, not written) | `email`, `description`, `blocked`, and `password` as an `${ENV}` reference only (hashed when read, never written back). Without a password, set one in the app: the user signs in once it is set. |
+      | `ldap`, `entraid`, `oidc` | only what the app owns of it: `description` and `blocked`. Its email, name, groups and roles come from its directory at each sign-in; an email or a password in its entry is refused. |
+
+      A new local user takes the groups whose entries list it, the first of them by name its first group; one
+      no group lists is refused until a group does. A directory user's entry makes its record before it ever
+      signs in, so a leaver is blocked before they try (its page says its repository entry declares it); its
+      entry removed, its record goes, made again (unblocked) at its next sign-in. Turning the usage on writes
+      the app's local users without their password, and a directory user only when the app holds something of it
+      (blocked, a description), never one merely seen at a sign-in.
+      ```yaml
+      controller_users:
+        - username: alice
+          email: alice@example.com
+        - username: bob
+          email: bob@example.com
+          password: ${BOB_PASSWORD}
+        - username: jdoe
+          type: ldap
+          blocked: true
+          description: Left on 2026-10-31
+      ```
+
+      **The built-in admin** is never read from nor written to git, and its groups never change from git: it
+      stays the way back in. An entry for it is refused. The `admins` group is never renamed nor deleted.
+
+      **Roles, each read on its own.** `controller_roles:` keeps its format (see *Roles*), and each role is
+      checked on its own: a role that is not valid, or whose name is given twice, is refused alone (said on
+      the repository's page and in its pull output), its last version served meanwhile, else it is left out;
+      the others are served, never the whole configuration lost with it. The `admin` and the `default` role are
+      always there: one a pull no longer gives keeps the version last read, else the closed one. The roles may
+      be spread over several files of the repository, served as one list in the order of their files; a save
+      of the roles writes each role where it is (only those that changed, a new one at the end of the first
+      file). What a role names that is not there - a local group or user, a runner, a secret store - is said
+      too: it grants nothing until there is one. A save of the roles is refused while git has a role the app
+      refuses: fix it in git first.
+
+      The config seed takes `groups:` and `users:` sections with the same items (the password resolved from the
+      environment as every secret of the seed); a new local user of the seed takes the groups whose seed items
+      list it. They are made or changed, never managed nor deleted.
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
     version: v6.0.3

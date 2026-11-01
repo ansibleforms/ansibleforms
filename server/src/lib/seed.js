@@ -894,14 +894,17 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("chat");
   }
 
-  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements
-  // and the disclaimer versions : read through the descriptors a repository holding them uses
-  // (lib/repoObjects), made or changed, never managed nor deleted
+  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements,
+  // the disclaimer versions, the local groups and the users : read through the descriptors a
+  // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted ;
+  // the groups before the users, whose new local ones take the groups listing them
   const sections = [
     ...Object.keys(APPEARANCE_SECTIONS).map((key) => [key, key, key]),
     ["mcp", "mcp", "MCP"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
+    ["groups", "groups", "group"],
+    ["users", "users", "user"],
   ];
   // the fields its Appearance and mcp sections declare are its own from now on (read only in the
   // app) ; one it no longer declares, or a section gone, released (lib/seedManaged.js)
@@ -909,12 +912,19 @@ async function applySections(doc, summary, opts = {}) {
   summary.released.push(...heldReleased.map(heldName));
   if (sections.some(([key]) => doc[key])) {
     const { default: RepoObjects } = await import("./repoObjects/index.js");
-    for (const [key, type, label] of sections) {
-      if (!doc[key]) continue;
-      const done = await RepoObjects.applyDeclared(await RepoObjects.descriptorOf(type), doc[key].items || doc[key], opts);
-      summary.created.push(...done.created.map((n) => `${label}:${n}`));
-      summary.updated.push(...done.updated.map((n) => (n === type ? label : `${label}:${n}`)));
-      summary.unchanged += done.unchanged;
+    const { declareSeedGroups } = await import("./repoObjects/groups.js");
+    // the seed's groups' members : a new local user of its users takes the groups listing it
+    declareSeedGroups(doc.groups?.items || []);
+    try {
+      for (const [key, type, label] of sections) {
+        if (!doc[key]) continue;
+        const done = await RepoObjects.applyDeclared(await RepoObjects.descriptorOf(type), doc[key].items || doc[key], opts);
+        summary.created.push(...done.created.map((n) => `${label}:${n}`));
+        summary.updated.push(...done.updated.map((n) => (n === type ? label : `${label}:${n}`)));
+        summary.unchanged += done.unchanged;
+      }
+    } finally {
+      declareSeedGroups([]);
     }
   }
 
