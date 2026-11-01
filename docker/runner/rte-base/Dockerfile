@@ -35,8 +35,11 @@ LABEL org.opencontainers.image.source="https://github.com/ansibleforms/ansiblefo
       org.opencontainers.image.version="${VERSION}"
 
 # tini as PID 1 : it hands SIGTERM to node and reaps the ansible workers a playbook leaves
-# behind ; git and ssh for playbooks that clone or reach hosts, sshpass for password logins
+# behind ; git and ssh for playbooks that clone or reach hosts, sshpass for password logins.
+# upgrade : the pinned base is as old as its pin, and the weekly refresh (refresh-images.yml)
+# rebuilds a release to pick up Debian's security fixes
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends tini git openssh-client sshpass ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 

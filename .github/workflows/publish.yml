@@ -34,6 +34,10 @@ on:
         description: 'release (x.y.z + latest) or rc (x.y.z-rc.n + latest-rc)'
         type: string
         required: true
+      refresh:
+        description: 'A weekly rebuild of a published release (refresh-images.yml) : no layer cache, latest-rc left alone'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       tag:
@@ -57,6 +61,7 @@ jobs:
       VERSION: ${{ inputs.version || inputs.tag }}
       REF: ${{ inputs.ref || inputs.tag }}
       CHANNEL: ${{ inputs.channel || 'release' }}
+      REFRESH: ${{ inputs.refresh == true }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -106,7 +111,12 @@ jobs:
             names="$VERSION"
             [ "$(highest "$minor\.")" = "$VERSION" ] && names="$names $minor"
             [ "$(highest "$major\.")" = "$VERSION" ] && names="$names $major"
-            [ "$(highest "")" = "$VERSION" ] && names="$names latest latest-rc"
+            # a refresh rebuilds a release that is already out : latest-rc may name a newer
+            # candidate by now, and stays where it is
+            if [ "$(highest "")" = "$VERSION" ]; then
+              names="$names latest"
+              [ "$REFRESH" = "true" ] || names="$names latest-rc"
+            fi
           fi
 
           tags=""
@@ -128,6 +138,21 @@ jobs:
             echo "$list" | tr ',' '\n'
           done
 
+      # Releases up to 7.5.0 keep their Dockerfiles at the root (Dockerfile, Dockerfile.rte-*) ;
+      # later ones in docker/controller and docker/runner/rte-*. A re-publish or a refresh of an
+      # older tag builds from the layout that tag has.
+      - name: Find the Dockerfiles
+        id: files
+        run: |
+          if [ -f docker/controller/Dockerfile ]; then
+            echo "controller=docker/controller/Dockerfile" >> "$GITHUB_OUTPUT"
+            for l in base core full; do echo "rte_$l=docker/runner/rte-$l/Dockerfile" >> "$GITHUB_OUTPUT"; done
+          else
+            echo "controller=Dockerfile" >> "$GITHUB_OUTPUT"
+            for l in base core full; do echo "rte_$l=Dockerfile.rte-$l" >> "$GITHUB_OUTPUT"; done
+          fi
+          cat "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
@@ -143,7 +168,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/controller/Dockerfile
+          file: ${{ steps.files.outputs.controller }}
           push: true
           tags: ${{ steps.tags.outputs.list }}
           build-args: |
@@ -151,6 +176,8 @@ jobs:
             BUILD_TIME=${{ steps.v.outputs.build_time }}
             VERSION=${{ env.VERSION }}
           cache-from: type=gha,scope=app
+          # a refresh builds every layer again : the apt packages and collections are the point
+          no-cache: ${{ inputs.refresh == true }}
           cache-to: type=gha,mode=max,scope=app
 
       # The RTE in three layers, each FROM the one before, by the digest this run just pushed :
@@ -160,7 +187,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/runner/rte-base/Dockerfile
+          file: ${{ steps.files.outputs.rte_base }}
           push: true
           tags: ${{ steps.tags.outputs.rte_base }}
           build-args: |
@@ -168,6 +195,8 @@ jobs:
             BUILD_TIME=${{ steps.v.outputs.build_time }}
             VERSION=${{ env.VERSION }}
           cache-from: type=gha,scope=rte-base
+          # a refresh builds every layer again : the apt packages and collections are the point
+          no-cache: ${{ inputs.refresh == true }}
           cache-to: type=gha,mode=max,scope=rte-base
 
       - name: Build and push the RTE
@@ -175,32 +204,36 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/runner/rte-core/Dockerfile
+          file: ${{ steps.files.outputs.rte_core }}
           push: true
           tags: ${{ steps.tags.outputs.rte_core }}
           build-args: |
             BASE_IMAGE=${{ steps.tags.outputs.ghcr }}-rte-base@${{ steps.rte_base.outputs.digest }}
             VERSION=${{ env.VERSION }}
           cache-from: type=gha,scope=rte-core
+          # a refresh builds every layer again : the apt packages and collections are the point
+          no-cache: ${{ inputs.refresh == true }}
           cache-to: type=gha,mode=max,scope=rte-core
 
       - name: Build and push the RTE (full)
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/runner/rte-full/Dockerfile
+          file: ${{ steps.files.outputs.rte_full }}
           push: true
           tags: ${{ steps.tags.outputs.rte_full }}
           build-args: |
             BASE_IMAGE=${{ steps.tags.outputs.ghcr }}-rte-core@${{ steps.rte.outputs.digest }}
             VERSION=${{ env.VERSION }}
           cache-from: type=gha,scope=rte-full
+          # a refresh builds every layer again : the apt packages and collections are the point
+          no-cache: ${{ inputs.refresh == true }}
           cache-to: type=gha,mode=max,scope=rte-full
 
       - name: Summary
         run: |
           {
-            echo "### Published $VERSION ($CHANNEL)"
+            echo "### Published $VERSION ($CHANNEL$([ "$REFRESH" = "true" ] && echo ", refresh"))"
             echo ""
             echo '```'
             echo "${{ steps.tags.outputs.list }}" | tr ',' '\n'

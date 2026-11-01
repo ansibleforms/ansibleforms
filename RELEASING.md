@@ -100,6 +100,15 @@ the registry credentials.
 Actions → **Publish** → Run workflow → enter the tag (for example `6.3.1`). The workflow
 refuses when `server/package.json` at that tag names another version.
 
+## The weekly refresh
+
+`refresh-images.yml` rebuilds the latest 7.x release every Monday and pushes it again under
+its own tags, so the images take Debian's security fixes and `rte-full` takes the newest
+collections between releases. It builds from the release tag, so the code, the npm and pip
+pins and the base image digests stay those of the release (Dependabot's newer pins ship with
+the next release). It builds without the layer cache and leaves `latest-rc` alone. Run it by
+hand from Actions → **Refresh images**.
+
 ## The RTE images
 
 The RTE is published in three layers, each built FROM the one before, in the same publish run
