@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0](https://github.com/ansibleforms/ansibleforms/compare/7.5.0...7.6.0) (2026-11-01)
+
+
+### Added
+
+* the images of the latest release are rebuilt every week, with Debian's security fixes and the newest collections ([#1311](https://github.com/ansibleforms/ansibleforms/issues/1311)) ([826896b](https://github.com/ansibleforms/ansibleforms/commit/826896b1e128cc278b0f5d3c33168dcfd14fc212))
+
+
+### Changed
+
+* move the Dockerfiles into docker/, one folder per image ([#1302](https://github.com/ansibleforms/ansibleforms/issues/1302)) ([bd674ab](https://github.com/ansibleforms/ansibleforms/commit/bd674ab4721bf41e3f544aad1d92250ab1d77897))
+
 ## [7.5.0](https://github.com/ansibleforms/ansibleforms/compare/7.4.2...7.5.0) (2026-11-01)
 
 
