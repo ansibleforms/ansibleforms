@@ -1,5 +1,5 @@
-// The app's side of the RTE sockets (RTE_MODE=outbound or inbound on the RTE) : one WebSocket
-// per RTE, held by one app node at a time (runner_leases). That node sends the RTE its jobs,
+// The controller's side of the RTE sockets (RTE_MODE=outbound or inbound on the RTE) : one WebSocket
+// per RTE, held by one controller node at a time (runner_leases). That node sends the RTE its jobs,
 // writes what the RTE sends back - output, events, log, start, end - and acks it, sends the end
 // notifications, and writes the RTE's heartbeat in `nodes` on its behalf, so the Status page,
 // the Runners page and the worker's sweeps see a socket-mode RTE as they see any other.
@@ -243,7 +243,7 @@ async function rteHeartbeat(entry) {
   if (!entry.rteId || isPending(entry)) return;
   const info = JSON.stringify({ mode: entry.hello?.mode, runner: entry.runner.name, socket: nodeId, capacity: entry.health?.capacity || entry.hello?.capacity });
   try {
-    // step 1 : its row, renewed - only the row of an RTE : an app or a worker node's row is
+    // step 1 : its row, renewed - only the row of an RTE : a controller or a worker node's row is
     // never written over, whatever id the RTE said it has
     const res = await mysql.tryDo(
       "UPDATE AnsibleForms.`nodes` SET version=?, last_seen=NOW(), is_worker=0, info=? WHERE id=? AND role='rte'",
@@ -293,7 +293,7 @@ function canRun(entry) {
 /**
  * Why an RTE may not go by the id it said in its hello, if it may not : the id is what its jobs
  * are claimed with (jobs.host) and the name of its row in `nodes`, so one runner's RTE must not
- * take the id of an app node, nor of another runner's RTE.
+ * take the id of a controller node, nor of another runner's RTE.
  *
  * Args:
  *   name (string): the runner the socket signed in as.
@@ -303,7 +303,7 @@ function canRun(entry) {
  *   Promise<string|null>: why it is taken, null when it is free (or this runner's already).
  */
 async function rteIdTaken(name, rteId) {
-  // step 1 : a node by that id : an app or a worker node, or a live RTE of another runner (a
+  // step 1 : a node by that id : a controller or a worker node, or a live RTE of another runner (a
   // database-mode RTE writes no runner in its row : taken while it lives)
   const nodes = await mysql.do(
     "SELECT role, info, last_seen > (NOW() - INTERVAL ? SECOND) AS alive FROM AnsibleForms.`nodes` WHERE id=?",
@@ -313,7 +313,7 @@ async function rteIdTaken(name, rteId) {
   const node = nodes?.[0];
   if (node && node.role !== "rte") return `it is the id of a node of role ${node.role}`;
   if (node && Number(node.alive) && safeParse(node.info, {}, `nodes.info ${rteId}`)?.runner !== name) return "a live RTE of another runner goes by it";
-  // step 2 : the socket of another approved runner's RTE, held now by any app node (a runner
+  // step 2 : the socket of another approved runner's RTE, held now by any controller node (a runner
   // waiting for approval holds nothing : it cannot keep an id from its RTE)
   const leases = await mysql.do(
     "SELECT l.runner FROM AnsibleForms.`runner_leases` l JOIN AnsibleForms.`runners` r ON r.name = l.runner " +
@@ -366,7 +366,7 @@ function adopt(session, runner, direction) {
       session.close(CLOSE.CONTRACT, `this app speaks contract ${SOCKET_CONTRACT}`);
       return;
     }
-    // step 1 : its id, checked : never an app node's, nor another runner's RTE's
+    // step 1 : its id, checked : never a controller node's, nor another runner's RTE's
     const rteId = String(msg.id || `rte-${name}`).slice(0, 250);
     let taken;
     try {
@@ -523,7 +523,7 @@ async function abandonLost(entry, hello) {
  * waiting for approval : an approved runner is never taken over with one (whoever holds a join
  * token could otherwise point an approved runner, and its jobs and secrets, at a host of their
  * own) ; its RTE signs in with its current token, or an admin changes the token. The runner
- * takes the mode the RTE runs in, and an inbound one the address the app dials it on.
+ * takes the mode the RTE runs in, and an inbound one the address the controller dials it on.
  *
  * A runner of 7.2 (database mode) moves to the socket the same way, at once and without an
  * approval : its own RTE, upgraded, signs in with the runner's token (compared in constant
@@ -532,7 +532,7 @@ async function abandonLost(entry, hello) {
  * in database mode (the seed says how to change it) and for one waiting for approval.
  *
  * An inbound RTE with an https address sends its certificate (cert, PEM) : it becomes the
- * ca_bundle of the runner's credential, ignore_certs off, and the app dials it pinned to it
+ * ca_bundle of the runner's credential, ignore_certs off, and the controller dials it pinned to it
  * (getHttpsAgent, pin). A runner signed in with its own token takes a new certificate the same
  * way (the RTE's certificate was renewed) ; with a join token, or asking to join, the first one.
  *
@@ -553,7 +553,7 @@ export async function authenticate(headers, opts = {}) {
   const url = String(opts.url || headers["x-af-rte-url"] || "").trim();
   if (token.length < 16) return { status: 401, error: "the RTE's token (RTE_TOKEN) is missing or shorter than 16 characters" };
   if (!name || !/^[A-Za-z0-9_.:@-]{1,250}$/.test(name)) return { status: 400, error: "the RTE's name (RTE_NAME) is missing or not a valid runner name" };
-  if (mode === "inbound" && !/^https?:\/\//i.test(url)) return { status: 400, error: "an inbound RTE registers with its address (RTE_URL), which the app dials" };
+  if (mode === "inbound" && !/^https?:\/\//i.test(url)) return { status: 400, error: "an inbound RTE registers with its address (RTE_URL), which the controller dials" };
   // an inbound RTE's certificate : only with an https address, certificates only
   let cert = null;
   if (opts.cert) {
@@ -579,7 +579,7 @@ export async function authenticate(headers, opts = {}) {
     // a seeded runner keeps the mode its seed declares : the seed is changed first, then the
     // RTE ; one the seed already declares in this mode is not moved, so it gets here unrefused
     if (moved && runner.managed && fromDatabase) {
-      return { status: 409, error: `runner '${name}' is managed by the config seed in database mode: set rte_mode: ${mode} for it in the seed (and its credential${mode === "inbound" ? " with the address the app dials, RTE_URL" : ""}), then restart this RTE` };
+      return { status: 409, error: `runner '${name}' is managed by the config seed in database mode: set rte_mode: ${mode} for it in the seed (and its credential${mode === "inbound" ? " with the address the controller dials, RTE_URL" : ""}), then restart this RTE` };
     }
     if (moved && runner.managed) return { status: 409, error: `runner '${name}' is managed by the config seed: its mode and address are set there` };
     // a database-mode runner is always approved (pending ones only ever came over the socket) :
@@ -631,7 +631,7 @@ export async function authenticate(headers, opts = {}) {
       } else if (moved) {
         logger.notice(`Runner '${name}' is ${mode} now${mode === "inbound" ? ` at ${url}` : ""}`);
       }
-      if (repinned) logger.notice(`Runner '${name}': the app dials it pinned to its new certificate (fingerprint ${certFingerprint(cert)})`);
+      if (repinned) logger.notice(`Runner '${name}': the controller dials it pinned to its new certificate (fingerprint ${certFingerprint(cert)})`);
       // the Runners page shows the new mode (and address) at once, whichever way it came in
       publish("runners");
       return { runner: { ...runner, ...fields, ...registered, ...(repinned ? { ca_bundle: cert, ignore_certs: 0 } : {}) } };
@@ -658,7 +658,7 @@ export async function authenticate(headers, opts = {}) {
   // the token goes in a credential of type rte, as every runner signs in (Connections >
   // Credentials) : the runner names it, and an inbound one's address is the credential's
   const { name: credential, pinned } = await storeToken(name, token, mode === "inbound" ? url : "", runner?.credential, cert);
-  if (pinned) logger.notice(`Runner '${name}': the app dials it pinned to its certificate (fingerprint ${certFingerprint(cert)})`);
+  if (pinned) logger.notice(`Runner '${name}': the controller dials it pinned to its certificate (fingerprint ${certFingerprint(cert)})`);
   if (runner) {
     // a runner still waiting for approval (an approved one was refused above) : a new token,
     // still waiting for an admin
@@ -724,7 +724,7 @@ async function addPending({ name, token, mode, url, fields, headers, ip, cert = 
     mode,
     url: mode === "inbound" ? url : null,
     fingerprint: fingerprint(token),
-    // the certificate the app will dial it pinned to (an inbound RTE over https), as the token's
+    // the certificate the controller will dial it pinned to (an inbound RTE over https), as the token's
     cert_fingerprint: cert ? certFingerprint(cert) : null,
   };
   const { name: credential } = await storeToken(name, token, mode === "inbound" ? url : "", null, cert);
@@ -788,12 +788,12 @@ async function updateHeld(key, row, data) {
  * Keeps an RTE's token in a credential of type rte : the one its runner names already, else a
  * new one named after the runner (<runner>-rte, a number added when that name is taken). An
  * inbound RTE's certificate, when it sent one, goes with it : the credential's ca_bundle, its
- * ignore_certs off, so the app dials it pinned to that certificate.
+ * ignore_certs off, so the controller dials it pinned to that certificate.
  *
  * Args:
  *   runnerName (string): the runner.
  *   token (string): its RTE_TOKEN.
- *   url (string): the address the app dials it on (inbound), "" for none (outbound).
+ *   url (string): the address the controller dials it on (inbound), "" for none (outbound).
  *   current (string|null): the credential the runner names already.
  *   cert (string|null): its certificate (PEM, parseCertBundle), null to keep what is stored.
  *
@@ -879,7 +879,7 @@ function rteMayPin(bundle, pinnedDigest) {
 
 /**
  * An RTE's one registration call (POST /api/v2/rte/register) : before an inbound RTE listens, so
- * the app knows its address and dials it ; an outbound one registers when it dials anyway. No
+ * the controller knows its address and dials it ; an outbound one registers when it dials anyway. No
  * user signs in : the RTE's token, or a join token, is the proof.
  *
  * Args:
@@ -1085,7 +1085,7 @@ export function isLoopback(host) {
 }
 
 /**
- * Says once per runner that the app dials an inbound RTE over plain http on another host : its
+ * Says once per runner that the controller dials an inbound RTE over plain http on another host : its
  * token (Authorization: Bearer, which also seals the job's secrets) crosses the network in
  * clear. HTTPS=1 on the RTE and an https RTE_URL pin its certificate instead.
  *
@@ -1102,7 +1102,7 @@ function warnPlain(name, uri) {
   }
   if (url.protocol !== "http:" || isLoopback(url.hostname) || plainWarned.has(name)) return;
   plainWarned.add(name);
-  logger.warning(`[SECURITY] Runner '${name}': the app dials its RTE over plain http (${url.origin}): its token crosses the network in clear. Run the RTE with HTTPS=1 and an https RTE_URL, so the app pins its certificate`);
+  logger.warning(`[SECURITY] Runner '${name}': the controller dials its RTE over plain http (${url.origin}): its token crosses the network in clear. Run the RTE with HTTPS=1 and an https RTE_URL, so the controller pins its certificate`);
 }
 
 /**
@@ -1223,7 +1223,7 @@ async function runMessage(jobId, entry) {
   // the output is masked here, where it is stored : the credentials, the ansible and vault
   // passwords, and the form's password fields
   await registerMask(jobId, rows[0].form, extravars, secrets);
-  // the playbooks of the repository the app takes them from (the one added first), the inventories
+  // the playbooks of the repository the controller takes them from (the one added first), the inventories
   // of each by name
   const { default: Repository } = await import("../models/repository.model.js");
   const playbookRepo = (await Repository.playbooksRepositories())[0]?.name || null;
@@ -1735,7 +1735,7 @@ function onFetch(entry, msg) {
 async function sendFiles(entry, hash) {
   const b = bundleByHash(hash);
   if (!b) {
-    entry.session.send({ t: "file", hash, error: "this app node does not have these files (they changed since): the job is sent again" });
+    entry.session.send({ t: "file", hash, error: "this controller node does not have these files (they changed since): the job is sent again" });
     return;
   }
   logger.info(`RTE '${entry.runner.name}': sending the job files ${hash.slice(0, 12)} (${Math.round(b.size / 1024)} KB)`);
@@ -1749,11 +1749,11 @@ async function sendFiles(entry, hash) {
 // ─── start and stop ───────────────────────────────────────────────────────────
 
 /**
- * Starts the app's side of the RTE sockets on an app node : takes the upgrades of the HTTP
+ * Starts the controller's side of the RTE sockets on a controller node : takes the upgrades of the HTTP
  * server, dials the inbound RTEs whose lease it gets, and sends the jobs waiting.
  *
  * Args:
- *   httpServer (Server): the app's HTTP(S) server.
+ *   httpServer (Server): the controller's HTTP(S) server.
  *
  * Returns:
  *   { stop: function }: closes every socket (the process stops).
@@ -1779,7 +1779,7 @@ export function startRteHub(httpServer) {
       clearInterval(dispatchTimer);
       clearInterval(dialTimer);
       clearInterval(pruneTimer);
-      for (const e of sessions.values()) e.session.close(CLOSE.GOING_AWAY, "the app node stops");
+      for (const e of sessions.values()) e.session.close(CLOSE.GOING_AWAY, "the controller node stops");
     },
   };
 }

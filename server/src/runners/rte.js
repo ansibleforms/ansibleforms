@@ -2,7 +2,7 @@
 // In database mode (deprecated) the RTE reads the job and writes the output and the final
 // status to the database itself : this side resolves the job's secrets, hands them over sealed
 // for that RTE with the job over HTTP (lib/sealedSecrets.js), and waits for it to end.
-// In the socket modes (outbound, inbound) the app node holding the RTE's socket sends it the job
+// In the socket modes (outbound, inbound) the controller node holding the RTE's socket sends it the job
 // and writes what comes back (runners/rteHub.js) : this side launches and follows it the same way.
 // The RTE's address, token and mode come from its row in the runners table.
 import { RTE_CONTRACT } from "../rte/contract.js";
@@ -150,7 +150,7 @@ async function check(runner) {
 }
 
 /**
- * A socket-mode RTE's state, as any app node sees it : who holds its socket and what it said.
+ * A socket-mode RTE's state, as any controller node sees it : who holds its socket and what it said.
  *
  * Args:
  *   runner (object): the runner.
@@ -159,14 +159,14 @@ async function check(runner) {
  *   Promise<object>: its details, as check() returns them.
  *
  * Raises:
- *   BadRequestError: no app node holds its socket.
+ *   BadRequestError: no controller node holds its socket.
  */
 async function checkSocket(runner) {
   const state = await (await hub()).socketState(runner.name);
   if (!state?.alive) {
     const how = runner.rte_mode === "outbound"
-      ? "it has not dialed the app: check its APP_URL, its token and the network from the RTE to the app"
-      : `no app node could dial it at ${runner.uri}: check its RTE_URL, its token and the network from the app to the RTE`;
+      ? "it has not dialed the controller: check its CONTROLLER_URL, its token and the network from the RTE to the controller"
+      : `no controller node could dial it at ${runner.uri}: check its RTE_URL, its token and the network from the controller to the RTE`;
     throw new Errors.BadRequestError(`the RTE '${runner.name}' (${runner.rte_mode}) is not connected: ${how}`);
   }
   const info = state.info || {};
@@ -200,7 +200,7 @@ async function trackSocket(jobId, runner) {
     if (!queueMinutes() || Date.now() - since < queueMinutes() * 60000 + 60000) continue;
     // never claimed : no connected RTE took it (the holder fails a busy one itself)
     if (!(await claimedBy(jobId).catch(() => "?"))) {
-      return failJob(jobId, `no app node holds a socket to RTE '${runner.name}' and it took no job for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES): is it connected?`);
+      return failJob(jobId, `no controller node holds a socket to RTE '${runner.name}' and it took no job for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES): is it connected?`);
     }
   }
 }

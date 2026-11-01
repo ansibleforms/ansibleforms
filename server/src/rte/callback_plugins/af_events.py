@@ -1,7 +1,7 @@
 # AnsibleForms : a playbook's structured events, one JSON line each in the file AF_EVENTS_FILE
 # names, next to the usual text output : a play starts, a task starts, a host's result (ok,
 # changed, failed, skipped, unreachable), and the recap. The RTE reads the file as the playbook
-# runs and the app stores the events (job_events) : the job page draws its host-by-task grid,
+# runs and the controller stores the events (job_events) : the job page draws its host-by-task grid,
 # its timeline and its recap from them.
 #
 # Loaded without being enabled (CALLBACK_NEEDS_ENABLED False), as af_artifacts : the RTE puts its
@@ -11,7 +11,7 @@
 # as on AWX. Its invocation (the module's arguments, as the task passed them) and Ansible's own keys
 # (_ansible_*) are left out, the values of keys that look like a secret (password, secret, token,
 # key...) are masked, and it is cut when it is too large. A task with no_log has its result censored
-# by Ansible before it comes here, and the app masks the job's own secret values when it stores it.
+# by Ansible before it comes here, and the controller masks the job's own secret values when it stores it.
 from __future__ import annotations
 
 import json
@@ -42,16 +42,16 @@ MAX_RESULT_ITEMS = 200
 # the keys a result never keeps, at any depth : the module's arguments as the task passed them
 # (a password, a token, a request's body and headers)
 DROPPED_KEYS = ("invocation",)
-# the keys whose values are masked, at any depth : those that look like a secret, as the app's
+# the keys whose values are masked, at any depth : those that look like a secret, as the controller's
 # MASK_EXTRAVARS_REGEX (password|secret|token by default), with a request's own (authorization,
-# cookie) and keys ; the app's own pattern added when the RTE passes it (AF_EVENTS_MASK_REGEX)
+# cookie) and keys ; the controller's own pattern added when the RTE passes it (AF_EVENTS_MASK_REGEX)
 SECRET_KEYS = "password|passwd|secret|token|key|authorization|cookie|credential"
 MASK = "********"
 
 
 def _secret_pattern():
-    """The pattern a secret's key matches : the built-in one, and the app's own when it is set and
-    compiles (a JavaScript pattern the app takes may not be one Python reads : then left out).
+    """The pattern a secret's key matches : the built-in one, and the controller's own when it is set and
+    compiles (a JavaScript pattern the controller takes may not be one Python reads : then left out).
 
     Returns:
         A compiled regular expression, matched case-insensitively anywhere in a key.
@@ -186,7 +186,7 @@ class CallbackModule(CallbackBase):
         event.update({k: v for k, v in fields.items() if v is not None})
         try:
             # non-ASCII kept as it is (ensure_ascii False) : escaped as \uXXXX, a secret with an
-            # accent would no longer match its value when the app masks the output
+            # accent would no longer match its value when the controller masks the output
             line = json.dumps(event, default=str, ensure_ascii=False)
             try:
                 line.encode("utf-8")
@@ -264,7 +264,7 @@ class CallbackModule(CallbackBase):
         item = data.get("item") if "item" in data else None
         task = getattr(result, "_task", None)
         # a loop's item that is a dictionary or a list : as JSON, its secret keys masked, non-ASCII
-        # kept as it is so the app's mask still finds a secret's value in it
+        # kept as it is so the controller's mask still finds a secret's value in it
         if item is not None and not isinstance(item, (str, int, float, bool)):
             item = json.dumps(_redact(item), default=str, ensure_ascii=False)
         return {

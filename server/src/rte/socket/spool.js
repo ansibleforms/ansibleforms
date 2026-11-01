@@ -1,11 +1,11 @@
 /******************************************************************/
 /*                                                                */
-/*  A job's items on the RTE's disk until the app stored them :   */
+/*  A job's items on the RTE's disk until the controller stored them :   */
 /*  every output batch, event batch, log, start, exit and end is  */
 /*  numbered and written to the job's spool file before it is     */
-/*  sent. The app acks what it stored ; after a reconnect - to    */
-/*  the same app node or another - the RTE sends again what was   */
-/*  not acked, and the app skips what it had stored already :     */
+/*  sent. The controller acks what it stored ; after a reconnect - to    */
+/*  the same controller node or another - the RTE sends again what was   */
+/*  not acked, and the controller skips what it had stored already :     */
 /*  each item exactly once. Once the end is acked the file goes.  */
 /*                                                                */
 /*  As Receptor keeps a work unit's results on the execution      */
@@ -33,7 +33,7 @@ export class JobSpool {
   constructor(dir, jobId) {
     this.jobId = jobId;
     this.file = path.join(dir, `job-${jobId}.jsonl`);
-    // the last item numbered, the last one the app acked, the next one to send
+    // the last item numbered, the last one the controller acked, the next one to send
     this.seq = 0;
     this.acked = 0;
     this.next = 1;
@@ -115,7 +115,7 @@ export class JobSpool {
   }
 
   /**
-   * The app stored the items up to a number.
+   * The controller stored the items up to a number.
    *
    * Args:
    *   seq (number): the last item stored.

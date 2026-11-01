@@ -3,7 +3,7 @@
 // or said so itself (an abandon item, rteHub.js storeItem). One statement for all of them, so
 // they leave the job alike : abandoned, its abort answered, no process and no RTE on it.
 //
-// A database module : the app and a database-mode RTE load it, never a socket-mode RTE.
+// A database module : the controller and a database-mode RTE load it, never a socket-mode RTE.
 import mysql from "../models/db.model.js";
 
 /**

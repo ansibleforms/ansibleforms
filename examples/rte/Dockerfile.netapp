@@ -1,5 +1,5 @@
 # An RTE for NetApp playbooks : the AnsibleForms RTE + the ONTAP collection and its python
-# library. Keep the tag on the app's release (7, or the exact 7.x.y the app runs).
+# library. Keep the tag on the controller's release (7, or the exact 7.x.y the controller runs).
 #
 #   docker build -f examples/rte/Dockerfile.netapp -t my-rte-netapp .
 FROM ghcr.io/ansibleforms/ansibleforms-rte-core:7

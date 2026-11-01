@@ -113,7 +113,7 @@ hand from Actions → **Refresh images**.
 ## The RTE images
 
 The RTE is published in three layers, each built FROM the one before, in the same publish run
-and with the same tags as the app :
+and with the same tags as the controller :
 
 | Image | Dockerfile | Adds |
 |---|---|---|

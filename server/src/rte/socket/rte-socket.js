@@ -1,10 +1,10 @@
-// The RTE in a socket mode (RTE_MODE=outbound or inbound) : it talks only to the app, over one
-// WebSocket, and holds no database credentials. Outbound it dials the app (APP_URL) and keeps
-// the socket, redialing when it drops ; inbound it listens and the app dials it (RTE_URL, as the
+// The RTE in a socket mode (RTE_MODE=outbound or inbound) : it talks only to the controller, over one
+// WebSocket, and holds no database credentials. Outbound it dials the controller (CONTROLLER_URL) and keeps
+// the socket, redialing when it drops ; inbound it listens and the controller dials it (RTE_URL, as the
 // network of a database-mode RTE). Either way the same messages go both ways (protocol.js) :
-// the app sends "run job N" with everything the RTE used to read in the database, the RTE runs
+// the controller sends "run job N" with everything the RTE used to read in the database, the RTE runs
 // it (rte/ansible-core.js) and sends its output, events, log and end back as numbered items,
-// kept on its disk until the app acks them (spool.js).
+// kept on its disk until the controller acks them (spool.js).
 //
 // It imports no database module : rte/ansible-core.js reads and writes through the socket's
 // job I/O below.
@@ -45,10 +45,11 @@ import {
   CONTRACT_REDIAL_MS,
   socketUrl, fingerprint, certFingerprint, listenHost, parseCertBundle,
 } from "./protocol.js";
+import { controllerUrl, controllerTlsVerify } from "../../lib/controllerEnv.js";
 
 // ─── settings ─────────────────────────────────────────────────────────────────
 
-// what the app sent from the runner's page (a settings message) : it wins over the same variable
+// what the controller sent from the runner's page (a settings message) : it wins over the same variable
 // set on this RTE, which is the fallback of an empty field
 let fromRunner = {};
 // the settings in effect : { maxJobs, cacheMb, files, drainSeconds } (rte/socket/settings.js)
@@ -57,10 +58,10 @@ const maxJobs = () => settings().maxJobs;
 const drainSeconds = () => settings().drainSeconds;
 // the persistent folder (server/persistent, /app/dist/persistent in the image)
 const PERSISTENT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../persistent");
-// where the items wait for the app's ack, and where the job files the app sent are kept
+// where the items wait for the controller's ack, and where the job files the controller sent are kept
 const spoolDir = () => process.env.RTE_SPOOL_PATH || path.join(PERSISTENT, "rte-spool");
 const cacheDir = () => process.env.RTE_CACHE_PATH || path.join(PERSISTENT, "rte-files");
-// transfer : the app sends the job's files ; local : the RTE runs from its own folders (mounts)
+// transfer : the controller sends the job's files ; local : the RTE runs from its own folders (mounts)
 const filesMode = () => settings().files;
 // the name the RTE joins as (its runner under Connections > Runners) : RTE_NAME, else its node id
 const rteName = () => String(process.env.RTE_NAME || "").trim() || nodeId;
@@ -70,18 +71,18 @@ const TEMPLATE_CERT = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 
 /**
  * The certificate an inbound RTE sends when it registers (field cert of the registration call),
- * so the app dials it pinned to it : its HTTPS_CERT, when it serves HTTPS (HTTPS=1) and the
- * address the app dials (RTE_URL) is https. Behind a proxy that ends TLS for it, the RTE runs
- * without HTTPS=1 and sends none : the app checks the proxy's certificate as any other.
+ * so the controller dials it pinned to it : its HTTPS_CERT, when it serves HTTPS (HTTPS=1) and the
+ * address the controller dials (RTE_URL) is https. Behind a proxy that ends TLS for it, the RTE runs
+ * without HTTPS=1 and sends none : the controller checks the proxy's certificate as any other.
  *
  * Args:
  *   env (object): the environment (process.env ; the tests set it).
  *   tls (object): { https, httpsCert } (config/https.config.js ; the tests set it).
  *
- * A certificate file the app would refuse (parseCertBundle : too large, too many certificates,
- * one that cannot be read) is not sent : the app answers such a registration with a 400, which
+ * A certificate file the controller would refuse (parseCertBundle : too large, too many certificates,
+ * one that cannot be read) is not sent : the controller answers such a registration with a 400, which
  * the RTE takes as final, so the RTE never registered at all. Without it the RTE registers, a
- * warning says why nothing is pinned, and the app checks the certificate as any other.
+ * warning says why nothing is pinned, and the controller checks the certificate as any other.
  *
  * Returns:
  *   string|null: the certificate (PEM, certificates only), null when none is sent.
@@ -96,7 +97,7 @@ export function certToSend(env = process.env, tls = httpsConfig) {
     // said once : certToSend runs on every registration attempt
     if (!certWarned) {
       certWarned = true;
-      logger.warning(`RTE '${rteName()}': HTTPS_CERT is not sent to the app (${e.message}): the app does not pin it and checks this RTE's certificate as any other`);
+      logger.warning(`RTE '${rteName()}': HTTPS_CERT is not sent to the controller (${e.message}): the controller does not pin it and checks this RTE's certificate as any other`);
     }
     return null;
   }
@@ -126,13 +127,13 @@ function isTemplateCert(pem) {
 
 // jobId -> { spool, job, paths, files, dirs, folder, abort, pid, running }
 const jobs = new Map();
-// the socket to the app, once welcomed
+// the socket to the controller, once welcomed
 let session = null;
 let welcomed = false;
 let cache = null;
 let mode = "outbound";
 let ansible = null;
-// the cancels of jobs this RTE does not run (yet) : jobId -> until when it is kept. The app may
+// the cancels of jobs this RTE does not run (yet) : jobId -> until when it is kept. The controller may
 // ask to stop a job before its run message arrives (it claims the job in its database first) :
 // the cancel is kept a minute and applied when the run comes, never dropped
 const earlyCancels = new Map();
@@ -140,7 +141,7 @@ const EARLY_CANCEL_MS = 60000;
 const EARLY_CANCEL_MAX = 1000;
 
 /**
- * This RTE's capacity, in its hello and health : the app sends no job to a full RTE.
+ * This RTE's capacity, in its hello and health : the controller sends no job to a full RTE.
  *
  * Returns:
  *   object: { maxJobs, running, free, cpus, memoryMb, freeMemoryMb, load }.
@@ -174,7 +175,7 @@ function settingsReport() {
 }
 
 /**
- * Takes the settings the app sends from the runner's page (settings) : the valid ones kept, the
+ * Takes the settings the controller sends from the runner's page (settings) : the valid ones kept, the
  * cache size and the stop's wait applied at once, and the health sent so the page shows them.
  *
  * Args:
@@ -196,7 +197,7 @@ function onSettings(msg) {
   sendHealth();
 }
 
-/** the health to the app : what it runs, its free slots and its settings */
+/** the health to the controller : what it runs, its free slots and its settings */
 function sendHealth() {
   if (welcomed) session?.send({ t: "health", capacity: capacity(), running: [...jobs.entries()].filter(([, e]) => e.running).map(([id]) => id), stopping: isStopping(), ...settingsReport() });
 }
@@ -217,7 +218,7 @@ function ansibleVersion() {
   });
 }
 
-// ─── items to the app ─────────────────────────────────────────────────────────
+// ─── items to the controller ─────────────────────────────────────────────────────────
 
 /**
  * Sends a job's items not sent yet, within the window of items not acked.
@@ -260,7 +261,7 @@ function emit(jobId, item) {
  * folder when it has one, else its root ; ANSIBLE_PATH without a repository.
  *
  * Args:
- *   repo (string|null): the repository used for playbooks, as the app said.
+ *   repo (string|null): the repository used for playbooks, as the controller said.
  *
  * Returns:
  *   string: the folder.
@@ -299,7 +300,7 @@ const socketJobIO = {
     if (!entry) return null;
     return { form: entry.job?.form || "", extravars: entry.job?.extravars ?? {}, lastOrder: Number(entry.job?.lastOrder) || 0 };
   },
-  // the app masks what it stores ; this keeps the credentials' secrets out of the spool too
+  // the controller masks what it stores ; this keeps the credentials' secrets out of the spool too
   async registerOutputSecrets(jobId, { credentials = {} } = {}) {
     registerJobSecrets(jobId, collectSecrets(credentials));
   },
@@ -346,10 +347,10 @@ const socketJobIO = {
   },
 };
 
-// ─── messages from the app ────────────────────────────────────────────────────
+// ─── messages from the controller ────────────────────────────────────────────────────
 
 /**
- * The files a job runs from, sent by the app : fetched when not cached, unpacked in a private
+ * The files a job runs from, sent by the controller : fetched when not cached, unpacked in a private
  * folder of the job's own (entry.folder, removed when it ends), and their folders set on the job.
  *
  * Args:
@@ -377,7 +378,7 @@ async function ensureFiles(jobId, entry) {
 }
 
 /**
- * Takes a job from the app (run) : refused when busy, stopping or of another contract, else
+ * Takes a job from the controller (run) : refused when busy, stopping or of another contract, else
  * claimed and run in the background.
  *
  * Args:
@@ -387,7 +388,7 @@ async function onRun(msg) {
   const jobId = parseInt(msg.jobId, 10);
   const refuse = (error, busy = false) => session?.send({ t: "refused", jobId, error, busy });
   if (!Number.isInteger(jobId) || jobId <= 0) return refuse("jobId is required");
-  if (msg.contract !== SOCKET_CONTRACT) return refuse(`this RTE speaks contract ${SOCKET_CONTRACT}, the app sent contract ${msg.contract}`);
+  if (msg.contract !== SOCKET_CONTRACT) return refuse(`this RTE speaks contract ${SOCKET_CONTRACT}, the controller sent contract ${msg.contract}`);
   if (jobs.get(jobId)?.running) return session?.send({ t: "claimed", jobId });
   if (isStopping()) return refuse("this RTE is stopping", true);
   const cap = capacity();
@@ -495,7 +496,7 @@ function onCancel(msg) {
 }
 
 /**
- * The app stored a job's items (ack) : the spool goes once its end is stored.
+ * The controller stored a job's items (ack) : the spool goes once its end is stored.
  *
  * Args:
  *   msg (object): { jobId, seq }.
@@ -513,7 +514,7 @@ function onAck(msg) {
 }
 
 /**
- * Takes a socket to the app : says hello, and once welcomed sends what is not acked yet.
+ * Takes a socket to the controller : says hello, and once welcomed sends what is not acked yet.
  *
  * Args:
  *   sess (Session): the socket.
@@ -525,7 +526,7 @@ function attach(sess) {
   sess.on("m:welcome", (msg) => {
     welcomed = true;
     sess.peer = msg;
-    logger.notice(`RTE '${rteName()}': connected to the app (node ${msg.node || "?"})`);
+    logger.notice(`RTE '${rteName()}': connected to the controller (node ${msg.node || "?"})`);
     if (msg.pending) logger.warning(`RTE '${rteName()}': waiting for an admin to approve it under Connections > Runners (fingerprint ${fingerprint(process.env.RTE_TOKEN || "")})`);
     for (const [jobId, entry] of jobs) {
       entry.spool.rewind();
@@ -542,9 +543,9 @@ function attach(sess) {
       session = null;
       welcomed = false;
       // no cache before startSocketRte() made it (a socket opened by the tests alone)
-      cache?.failAll(new Error("the socket to the app closed while the job's files came"));
+      cache?.failAll(new Error("the socket to the controller closed while the job's files came"));
     }
-    logger.warning(`RTE '${rteName()}': socket to the app closed (${code}${reason ? `: ${reason}` : ""})`);
+    logger.warning(`RTE '${rteName()}': socket to the controller closed (${code}${reason ? `: ${reason}` : ""})`);
   });
   sess.send({
     t: "hello",
@@ -563,11 +564,11 @@ function attach(sess) {
   });
 }
 
-// ─── outbound : the RTE dials the app ─────────────────────────────────────────
+// ─── outbound : the RTE dials the controller ─────────────────────────────────────────
 
 /**
- * What this RTE says of itself when it calls the app : its token, its id and name, and for an
- * RTE the app does not know yet (it then waits for approval) its host and version ; a join
+ * What this RTE says of itself when it calls the controller : its token, its id and name, and for an
+ * RTE the controller does not know yet (it then waits for approval) its host and version ; a join
  * token, when it has one, approves it at once.
  *
  * Args:
@@ -589,11 +590,11 @@ function rteHeaders(token) {
 }
 
 /**
- * How long an outbound RTE waits before it dials the app again. A socket that dropped, or an
+ * How long an outbound RTE waits before it dials the controller again. A socket that dropped, or an
  * app that did not answer : a little longer each time (1 s up to 30 s, with some jitter so a
  * fleet does not dial at once). Refused (the runner rejected or removed, the token, the join
  * token refused, a runner of that name approved already) : REFUSED_REDIAL_MS, since dialing
- * again sooner would be refused the same way until an admin acts. Another contract : the app
+ * again sooner would be refused the same way until an admin acts. Another contract : the controller
  * or this RTE is being upgraded, CONTRACT_REDIAL_MS (a minute), so it is back soon after the
  * other side follows.
  *
@@ -604,7 +605,7 @@ function rteHeaders(token) {
  *
  * Returns:
  *   object: { wait : ms before the next dial, delay : the backoff from then on, refused :
- *     true when the app refused this RTE }.
+ *     true when the controller refused this RTE }.
  */
 export function redialWait({ code, status, delay, random = Math.random() }) {
   if (REFUSED_CLOSES.includes(code) || REFUSED_STATUSES.includes(status)) {
@@ -616,7 +617,7 @@ export function redialWait({ code, status, delay, random = Math.random() }) {
 }
 
 /**
- * Keeps a socket to the app open : dials APP_URL, and when it drops dials again, after
+ * Keeps a socket to the controller open : dials CONTROLLER_URL, and when it drops dials again, after
  * redialWait().
  *
  * Args:
@@ -627,7 +628,7 @@ export function redialWait({ code, status, delay, random = Math.random() }) {
  *     onShutdown).
  */
 export function dialOut(token) {
-  const url = socketUrl(process.env.APP_URL);
+  const url = socketUrl(controllerUrl());
   let delay = 1000;
   const headers = rteHeaders(token);
   if (process.env.RTE_URL) headers["X-AF-RTE-Url"] = process.env.RTE_URL;
@@ -636,9 +637,9 @@ export function dialOut(token) {
     headers,
     maxPayload: MAX_PAYLOAD,
     handshakeTimeout: 15000,
-    // a self-signed app inside the same network (compose, a pod) : APP_TLS_VERIFY=0 ; else
+    // a self-signed app inside the same network (compose, a pod) : CONTROLLER_TLS_VERIFY=0 ; else
     // NODE_EXTRA_CA_CERTS names the CA
-    rejectUnauthorized: String(process.env.APP_TLS_VERIFY ?? "1") !== "0",
+    rejectUnauthorized: controllerTlsVerify(),
   };
   if (proxy && !noProxy(new URL(url).hostname)) options.agent = new HttpsProxyAgent(proxy);
   // the address as the log shows it (no credentials), and how often it says a failed dial
@@ -652,7 +653,7 @@ export function dialOut(token) {
     if (isStopping() || stopped) return;
     const ws = new WebSocket(url, options);
     current = ws;
-    // the HTTP status the app refused the handshake with, if it did
+    // the HTTP status the controller refused the handshake with, if it did
     let refusedStatus = null;
     // why the dial failed (an error, or the refusal and its body), and whether it opened at all
     let failure = null;
@@ -662,7 +663,7 @@ export function dialOut(token) {
       delay = 1000;
       // back after failures : said once, at the default level
       const back = report.connected();
-      if (back) logger.notice(`RTE '${rteName()}': reached the app at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
+      if (back) logger.notice(`RTE '${rteName()}': reached the controller at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
       attach(new Session(ws, "app"));
     });
     ws.on("unexpected-response", (req, res) => {
@@ -692,16 +693,16 @@ export function dialOut(token) {
         // the dial itself failed : why, at warning, the first time and on a change of cause,
         // then at most every few minutes while the same cause lasts
         const why = describeDialFailure(failure || { status: refusedStatus, code }, { side: "app", url, proxy: !!options.agent, secrets });
-        const line = failureLine(report, why, `RTE '${rteName()}': cannot reach the app at ${shown}`);
+        const line = failureLine(report, why, `RTE '${rteName()}': cannot reach the controller at ${shown}`);
         if (line) logger.warning(`${line}: dialing again in ${again}${next.refused ? ", or restart it once an admin acted" : ""}`);
-        else logger.debug(`RTE: dialing the app again in ${again} (${why.text})`);
-      } else if (next.refused && code === CLOSE.CONTRACT) logger.warning(`RTE '${rteName()}': the app speaks another contract (an upgrade in progress?): dialing again in ${Math.round(next.wait / 1000)} seconds`);
-      else if (next.refused) logger.warning(`RTE '${rteName()}': the app refused this RTE (${refusedStatus || code}): dialing again in ${Math.round(next.wait / 60000)} minutes, or restart it once an admin acted`);
-      else logger.info(`RTE: dialing the app again in ${Math.round(next.wait / 1000)} seconds`);
+        else logger.debug(`RTE: dialing the controller again in ${again} (${why.text})`);
+      } else if (next.refused && code === CLOSE.CONTRACT) logger.warning(`RTE '${rteName()}': the controller speaks another contract (an upgrade in progress?): dialing again in ${Math.round(next.wait / 1000)} seconds`);
+      else if (next.refused) logger.warning(`RTE '${rteName()}': the controller refused this RTE (${refusedStatus || code}): dialing again in ${Math.round(next.wait / 60000)} minutes, or restart it once an admin acted`);
+      else logger.info(`RTE: dialing the controller again in ${Math.round(next.wait / 1000)} seconds`);
       setTimeout(connect, next.wait).unref?.();
     });
   };
-  logger.notice(`RTE '${rteName()}': dialing the app at ${shown}${options.agent ? " through the proxy" : ""}`);
+  logger.notice(`RTE '${rteName()}': dialing the controller at ${shown}${options.agent ? " through the proxy" : ""}`);
   connect();
   return () => {
     stopped = true;
@@ -713,7 +714,7 @@ export function dialOut(token) {
  * Whether a host bypasses the proxy (NO_PROXY).
  *
  * Args:
- *   host (string): the app's host name.
+ *   host (string): the controller's host name.
  *
  * Returns:
  *   boolean
@@ -726,9 +727,9 @@ function noProxy(host) {
 // ─── inbound : one registration call ──────────────────────────────────────────
 
 /**
- * Registers an inbound RTE with the app once (APP_URL set) : its runner is added or updated with
- * its mode and its address (RTE_URL), with a join token the first time, so the app dials it from
- * then on. Tried again with a backoff until the app answers ; refused (a wrong token) it stops.
+ * Registers an inbound RTE with the controller once (CONTROLLER_URL set) : its runner is added or updated with
+ * its mode and its address (RTE_URL), with a join token the first time, so the controller dials it from
+ * then on. Tried again with a backoff until the controller answers ; refused (a wrong token) it stops.
  *
  * Args:
  *   token (string): RTE_TOKEN.
@@ -737,32 +738,32 @@ function noProxy(host) {
  *   Promise<void>: settles once registered, or refused.
  */
 async function registerInbound(token) {
-  const base = new URL(process.env.APP_URL);
+  const base = new URL(controllerUrl());
   const url = `${base.origin}${base.pathname.replace(/\/+$/, "")}/api/v2/rte/register`;
   const headers = rteHeaders(token);
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || "";
   const httpsAgent = proxy && !noProxy(base.hostname)
     ? new HttpsProxyAgent(proxy)
-    : new https.Agent({ rejectUnauthorized: String(process.env.APP_TLS_VERIFY ?? "1") !== "0" });
+    : new https.Agent({ rejectUnauthorized: controllerTlsVerify() });
   let delay = 2000;
   for (;;) {
     if (isStopping()) return;
     try {
-      // its certificate goes with it (an https RTE_URL, HTTPS=1) : the app dials it pinned to it
+      // its certificate goes with it (an https RTE_URL, HTTPS=1) : the controller dials it pinned to it
       const cert = certToSend();
       const body = { mode: "inbound", url: process.env.RTE_URL, ...(cert ? { cert } : {}) };
       const { data } = await axios.post(url, body, { headers, httpsAgent, proxy: false, timeout: 15000 });
-      if (data.pending) logger.warning(`RTE '${rteName()}': asked to join as inbound runner '${data.runner}': the app dials it once an admin approves it under Connections > Runners (fingerprint ${fingerprint(token)})`);
-      else logger.notice(`RTE '${rteName()}': registered with the app as inbound runner '${data.runner}' at ${data.uri}: the app dials it from now on`);
+      if (data.pending) logger.warning(`RTE '${rteName()}': asked to join as inbound runner '${data.runner}': the controller dials it once an admin approves it under Connections > Runners (fingerprint ${fingerprint(token)})`);
+      else logger.notice(`RTE '${rteName()}': registered with the controller as inbound runner '${data.runner}' at ${data.uri}: the controller dials it from now on`);
       return;
     } catch (err) {
       const status = err?.response?.status;
       const why = err?.response?.data?.error || err.message;
       if (status && status < 500 && status !== 429) {
-        logger.error(`RTE '${rteName()}': the app refused the registration (${status}): ${why}`);
+        logger.error(`RTE '${rteName()}': the controller refused the registration (${status}): ${why}`);
         return;
       }
-      logger.warning(`RTE '${rteName()}': could not register with the app yet (${why}), trying again in ${delay / 1000} seconds`);
+      logger.warning(`RTE '${rteName()}': could not register with the controller yet (${why}), trying again in ${delay / 1000} seconds`);
       await new Promise((r) => setTimeout(r, delay));
       delay = Math.min(delay * 2, 60000);
     }
@@ -788,24 +789,24 @@ export async function startSocketRte(rteMode) {
     console.error("RTE: set RTE_TOKEN (at least 16 characters) ; refusing to start");
     process.exit(1);
   }
-  if (mode === "outbound" && !process.env.APP_URL) {
-    console.error("RTE: RTE_MODE=outbound needs APP_URL, the app's address (https://forms.example.com) ; refusing to start");
+  if (mode === "outbound" && !controllerUrl()) {
+    console.error("RTE: RTE_MODE=outbound needs CONTROLLER_URL, the controller's address (https://forms.example.com) ; refusing to start");
     process.exit(1);
   }
   if (mode === "outbound") {
     try {
-      socketUrl(process.env.APP_URL);
+      socketUrl(controllerUrl());
     } catch (e) {
       console.error(`RTE: ${e.message} ; refusing to start`);
       process.exit(1);
     }
   }
-  if (mode === "inbound" && process.env.APP_URL && !process.env.RTE_URL) {
-    console.error("RTE: RTE_MODE=inbound with APP_URL registers with the app, which then dials RTE_URL : set RTE_URL (http://this-host:8000) ; refusing to start");
+  if (mode === "inbound" && controllerUrl() && !process.env.RTE_URL) {
+    console.error("RTE: RTE_MODE=inbound with CONTROLLER_URL registers with the controller, which then dials RTE_URL : set RTE_URL (http://this-host:8000) ; refusing to start");
     process.exit(1);
   }
-  if (mode === "inbound" && !process.env.APP_URL) {
-    logger.notice("RTE: inbound without APP_URL: its runner is added under Connections > Runners or in the config seed (type RTE, mode inbound, a credential with its address and RTE_TOKEN)");
+  if (mode === "inbound" && !controllerUrl()) {
+    logger.notice("RTE: inbound without CONTROLLER_URL: its runner is added under Connections > Runners or in the config seed (type RTE, mode inbound, a credential with its address and RTE_TOKEN)");
   }
   installFatalHandlers("RTE");
   useJobIO(socketJobIO);
@@ -818,7 +819,7 @@ export async function startSocketRte(rteMode) {
   for (const sp of JobSpool.loadAll(spoolDir())) {
     if (!sp.ended) sp.append({ kind: "abandon", message: "the RTE restarted while the playbook ran" });
     jobs.set(sp.jobId, { spool: sp, job: {}, paths: {}, files: {}, dirs: null, abort: false, pid: null, running: false });
-    logger.warning(`RTE: job ${sp.jobId} left by an earlier start: sending what the app has not stored`);
+    logger.warning(`RTE: job ${sp.jobId} left by an earlier start: sending what the controller has not stored`);
   }
 
   stopWithin((drainSeconds() + 8) * 1000);
@@ -832,7 +833,7 @@ export async function startSocketRte(rteMode) {
   });
   onShutdown("socket", () => session?.close(CLOSE.GOING_AWAY, "the RTE stops"));
 
-  // the probes and the metrics, as a database-mode RTE's ; ready : connected to the app
+  // the probes and the metrics, as a database-mode RTE's ; ready : connected to the controller
   const app = express();
   app.disable("x-powered-by");
   app.use(requestContext);
@@ -840,11 +841,11 @@ export async function startSocketRte(rteMode) {
   app.get("/live", (req, res) => res.json({ status: "live" }));
   app.get("/ready", (req, res) =>
     isStopping() ? res.status(503).json({ status: "not ready", reason: "stopping" })
-      : mode === "outbound" && !welcomed ? res.status(503).json({ status: "not ready", reason: "not connected to the app" })
+      : mode === "outbound" && !welcomed ? res.status(503).json({ status: "not ready", reason: "not connected to the controller" })
         : res.json({ status: "ready" }));
   addScrapeGauge("af_rte_running_jobs", "The playbooks this RTE runs now", [], async (g) => g.set(capacity().running));
   addScrapeGauge("af_rte_max_jobs", "How many playbooks this RTE runs at once (RTE_MAX_JOBS, 0: no limit)", [], async (g) => g.set(maxJobs()));
-  addScrapeGauge("af_rte_socket_connected", "Whether this RTE's socket to the app is open (1) or not (0)", [], async (g) => g.set(welcomed ? 1 : 0));
+  addScrapeGauge("af_rte_socket_connected", "Whether this RTE's socket to the controller is open (1) or not (0)", [], async (g) => g.set(welcomed ? 1 : 0));
   app.get("/metrics", metricsHandler());
 
   const port = appConfig.port;
@@ -858,8 +859,8 @@ export async function startSocketRte(rteMode) {
   onShutdown("server", () => new Promise((resolve) => server.close(() => resolve())));
 
   if (mode === "inbound") {
-    // the app dials /rte/v1/socket with this RTE's token ; a newer socket replaces the older one
-    // (the app node holding the lease changed)
+    // the controller dials /rte/v1/socket with this RTE's token ; a newer socket replaces the older one
+    // (the controller node holding the lease changed)
     const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
     server.on("upgrade", (req, socket, head) => {
       const url = new URL(req.url, "http://x");
@@ -879,16 +880,16 @@ export async function startSocketRte(rteMode) {
   logger.notice(`RTE '${rteName()}' ${version} (${mode}, files ${filesMode()}) listening on ${httpsConfig.https ? "https" : "http"} ${host ? `${host}:` : "port "}${port}, token fingerprint ${fingerprint(token)}`);
   if (mode === "inbound" && httpsConfig.https && httpsConfig.httpsCert) {
     const pem = httpsConfig.httpsCert.toString("utf8");
-    logger.notice(`RTE '${rteName()}': certificate fingerprint ${certFingerprint(pem) || "?"}${certToSend() ? " (sent to the app when it registers: the app dials it pinned to it)" : ""}`);
+    logger.notice(`RTE '${rteName()}': certificate fingerprint ${certFingerprint(pem) || "?"}${certToSend() ? " (sent to the controller when it registers: the controller dials it pinned to it)" : ""}`);
     if (isTemplateCert(pem)) logger.warning(`[SECURITY] RTE '${rteName()}': HTTPS_CERT is the sample certificate shipped in the image, whose private key is public: mount a certificate of your own (HTTPS_CERT, HTTPS_KEY)`);
   } else if (mode === "inbound" && /^http:\/\//i.test(String(process.env.RTE_URL || ""))) {
-    logger.warning(`RTE '${rteName()}': inbound over plain http: the app sends RTE_TOKEN in clear. Set HTTPS=1 and an https RTE_URL so the app pins this RTE's certificate`);
+    logger.warning(`RTE '${rteName()}': inbound over plain http: the controller sends RTE_TOKEN in clear. Set HTTPS=1 and an https RTE_URL so the controller pins this RTE's certificate`);
   }
   if (mode === "outbound") dialOut(token);
-  // inbound with the app's address : one call so the app knows this RTE and dials it
-  else if (process.env.APP_URL) registerInbound(token).catch((e) => logger.error(`RTE: registration: ${e.message}`));
+  // inbound with the controller's address : one call so the controller knows this RTE and dials it
+  else if (controllerUrl()) registerInbound(token).catch((e) => logger.error(`RTE: registration: ${e.message}`));
 
-  // its health to the app every 20 s : what it runs and its free slots ; and its jobs folder
+  // its health to the controller every 20 s : what it runs and its free slots ; and its jobs folder
   // said alive, so an RTE sharing the cache never takes it for one that is gone
   setInterval(() => {
     sendHealth();

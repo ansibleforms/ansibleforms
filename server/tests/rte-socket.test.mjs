@@ -1,6 +1,6 @@
 // The RTE socket's pieces that need no socket : the addresses (rte/socket/protocol.js), a job's
 // items kept on disk until acked (rte/socket/spool.js), the structured events read as the
-// playbook writes them (rte/events.js), and the job files packed by the app and unpacked by the
+// playbook writes them (rte/events.js), and the job files packed by the controller and unpacked by the
 // RTE (lib/jobFiles.js, rte/socket/files.js).
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("the socket's addresses", () => {
-  test("APP_URL as people know it becomes the app's socket", () => {
+  test("CONTROLLER_URL as people know it becomes the controller's socket", () => {
     assert.equal(socketUrl("https://forms.example.com"), "wss://forms.example.com/api/v2/rte/socket");
     assert.equal(socketUrl("https://forms.example.com/af/"), "wss://forms.example.com/af/api/v2/rte/socket");
     assert.equal(socketUrl("http://app:8000"), "ws://app:8000/api/v2/rte/socket");
@@ -171,7 +171,7 @@ describe("the job files", () => {
     cache.release(one);
     assert.equal(fs.existsSync(one), false);
     assert.equal(fs.existsSync(two), true);
-    // the next job gets the files as the app sent them
+    // the next job gets the files as the controller sent them
     const three = cache.jobFolder(3);
     const d = await cache.checkout(b.hash, () => false, path.join(three, "playbooks"));
     assert.equal(fs.readFileSync(path.join(d, "site.yml"), "utf8"), "- hosts: all\n");
@@ -239,7 +239,7 @@ describe("what goes wrong on the RTE's side", () => {
   });
 });
 
-describe("the RTE dialing the app again", async () => {
+describe("the RTE dialing the controller again", async () => {
   const { redialWait, socketJobIO, jobs, dialOut } = await import("../src/rte/socket/rte-socket.js");
   const { CLOSE, REFUSED_REDIAL_MS, CONTRACT_REDIAL_MS } = await import("../src/rte/socket/protocol.js");
 
@@ -267,13 +267,13 @@ describe("the RTE dialing the app again", async () => {
     assert.equal(next.delay, 1000);
   });
 
-  test("an app it cannot reach : why at warning once, not every dial, and its return said once", async () => {
+  test("a controller it cannot reach : why at warning once, not every dial, and its return said once", async () => {
     const http = await import("http");
     const { WebSocketServer } = await import("ws");
     // the RTE's side writes to the real logger (the alias covers ../lib/logger.js only)
     const { default: logger } = await import("../src/lib/logger.js");
     const wss = new WebSocketServer({ noServer: true });
-    // the app answers 404 (a wrong APP_URL path) until it is told to let the socket in
+    // the controller answers 404 (a wrong CONTROLLER_URL path) until it is told to let the socket in
     let open = false;
     const server = http.createServer((req, res) => {
       res.writeHead(404, { "Content-Type": "application/json" });
@@ -285,8 +285,8 @@ describe("the RTE dialing the app again", async () => {
       socket.destroy();
     });
     await new Promise((r) => server.listen(0, "127.0.0.1", r));
-    const before = process.env.APP_URL;
-    process.env.APP_URL = `http://joe:pw@127.0.0.1:${server.address().port}/af`;
+    const before = process.env.CONTROLLER_URL;
+    process.env.CONTROLLER_URL = `http://joe:pw@127.0.0.1:${server.address().port}/af`;
     const warn = vi.spyOn(logger, "warning");
     const notice = vi.spyOn(logger, "notice");
     const token = "rte-token-0123456789";
@@ -297,24 +297,24 @@ describe("the RTE dialing the app again", async () => {
       // two dials refused the same way (the backoff : 1 to 2 s between them)
       for (let i = 0; i < 250 && said(warn, "cannot reach").length < 1; i++) await new Promise((r) => setTimeout(r, 20));
       await new Promise((r) => setTimeout(r, 2300));
-      const warned = said(warn, "cannot reach the app");
+      const warned = said(warn, "cannot reach the controller");
       assert.equal(warned.length, 1, warned.join("\n"));
       assert.match(warned[0], /at ws:\/\/127\.0\.0\.1:\d+\/af\/api\/v2\/rte\/socket: no RTE socket at this address \(HTTP 404: nothing here\)/);
-      assert.match(warned[0], /APP_URL.*BASE_URL/);
+      assert.match(warned[0], /CONTROLLER_URL.*BASE_URL/);
       assert.ok(!warned[0].includes("joe") && !warned[0].includes("pw@"), "no credentials of the address");
       assert.ok(!warned[0].includes(token), "never the token");
-      // the app lets it in : said once, at notice
+      // the controller lets it in : said once, at notice
       open = true;
-      for (let i = 0; i < 250 && !said(notice, "reached the app").length; i++) await new Promise((r) => setTimeout(r, 20));
-      const back = said(notice, "reached the app");
+      for (let i = 0; i < 250 && !said(notice, "reached the controller").length; i++) await new Promise((r) => setTimeout(r, 20));
+      const back = said(notice, "reached the controller");
       assert.equal(back.length, 1);
       assert.match(back[0], /again, after \d+ failed dial\(s\)/);
     } finally {
       stop?.();
       warn.mockRestore();
       notice.mockRestore();
-      if (before === undefined) delete process.env.APP_URL;
-      else process.env.APP_URL = before;
+      if (before === undefined) delete process.env.CONTROLLER_URL;
+      else process.env.CONTROLLER_URL = before;
       wss.close();
       server.close();
     }

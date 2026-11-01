@@ -1,4 +1,4 @@
-# AnsibleForms split over several containers : two app nodes behind nginx, one worker (and a
+# AnsibleForms split over several containers : two controller nodes behind nginx, one worker (and a
 # second one waiting), one RTE, one database. A starting point - see README.md.
 #
 #   cp .env.example .env   # and fill in the secrets
@@ -9,7 +9,7 @@ x-ansibleforms: &ansibleforms
   depends_on: [db]
   env_file: .env
   volumes:
-    # one volume for every app node and the worker : forms, repositories, uploads, backups
+    # one volume for every controller node and the worker : forms, repositories, uploads, backups
     - persistent:/app/dist/persistent
     # the ssh key and known_hosts for git over ssh, the same everywhere
     - ssh:/home/node/.ssh
@@ -30,12 +30,12 @@ services:
     volumes:
       - mysql:/var/lib/mysql
 
-  app1:
+  controller1:
     <<: *ansibleforms
-    environment: { AF_ROLE: app }
-  app2:
+    environment: { AF_ROLE: controller }
+  controller2:
     <<: *ansibleforms
-    environment: { AF_ROLE: app }
+    environment: { AF_ROLE: controller }
 
   # the background work ; worker2 waits and takes over when worker1 stops
   worker1:
@@ -45,8 +45,8 @@ services:
     <<: *ansibleforms
     environment: { AF_ROLE: worker }
 
-  # runs the playbooks. The app dials it on http://rte:8000 with RTE_TOKEN (RTE_MODE=inbound) and
-  # keeps one WebSocket open, from the app node that holds it : the RTE holds no database
+  # runs the playbooks. The controller dials it on http://rte:8000 with RTE_TOKEN (RTE_MODE=inbound) and
+  # keeps one WebSocket open, from the controller node that holds it : the RTE holds no database
   # credentials, so it does not read the .env, and it is not published on the host. Its runner
   # 'rte' is declared by the config seed (seed.yaml). ansible with its collections ;
   # ansibleforms-rte-core is the smaller one to build your own on (examples/rte)
@@ -57,11 +57,11 @@ services:
       NODE_ENV: production
       RTE_MODE: inbound
       RTE_TOKEN: ${RTE_TOKEN}
-      # its files are the app's own (the shared volume, mounted below) : nothing to send with
-      # each job ; without the volume, leave RTE_FILES out and the app sends them (transfer)
+      # its files are the controller's own (the shared volume, mounted below) : nothing to send with
+      # each job ; without the volume, leave RTE_FILES out and the controller sends them (transfer)
       RTE_FILES: local
       PORT: "8000"
-      # only the app nodes call it, inside the compose network
+      # only the controller nodes call it, inside the compose network
       HTTPS: "0"
     volumes:
       - persistent:/app/dist/persistent
@@ -70,7 +70,7 @@ services:
   lb:
     image: nginx:stable
     restart: unless-stopped
-    depends_on: [app1, app2]
+    depends_on: [controller1, controller2]
     ports: ["8443:443"]
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

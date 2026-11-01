@@ -51,7 +51,7 @@ export async function startWorker() {
   installFatalHandlers("worker");
 
   if (appConfig.encryptionSecretIsDefault) {
-    logger.warning('[SECURITY] ENCRYPTION_SECRET is not set. The worker stores and reads credentials (the config seed) with the default key, which is public in the source code: set the same ENCRYPTION_SECRET as the app nodes.');
+    logger.warning('[SECURITY] ENCRYPTION_SECRET is not set. The worker stores and reads credentials (the config seed) with the default key, which is public in the source code: set the same ENCRYPTION_SECRET as the controller nodes.');
   }
   await waitForDatabase();
   onShutdown("database", () => mysql.end());

@@ -198,6 +198,6 @@ describe("AF_ROLE", () => {
       timeout: 20000,
     });
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /AF_ROLE='workr' is not one of all, app, worker, rte/);
+    assert.match(r.stderr, /AF_ROLE='workr' is not one of all, controller, worker, rte/);
   });
 });

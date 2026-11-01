@@ -1,7 +1,7 @@
 /******************************************************************/
 /*                                                                */
 /*  The RTE socket's protocol (contract 3) : one WebSocket per    */
-/*  RTE, opened by the RTE (outbound) or by the app (inbound),    */
+/*  RTE, opened by the RTE (outbound) or by the controller (inbound),    */
 /*  the same messages both ways whoever dialed. JSON text frames, */
 /*  { t: <type>, ... }.                                           */
 /*                                                                */
@@ -13,7 +13,7 @@
 /*    claimed  it took a job ; refused : it did not (busy, ...)   */
 /*    item     one numbered item of a job : output, events, log,  */
 /*             started, exited, end, abandon ; kept on its disk   */
-/*             until the app acks it, resent after a reconnect    */
+/*             until the controller acks it, resent after a reconnect    */
 /*    fetch    the files of a job it has not cached (a hash)      */
 /*                                                                */
 /*  app -> RTE                                                    */
@@ -48,7 +48,7 @@ export function fingerprint(token) {
 }
 
 // ─── an inbound RTE's certificate (HTTPS=1, an https RTE_URL) ─────────────────
-// It sends its certificate (HTTPS_CERT, PEM) in its registration call, field `cert` ; the app
+// It sends its certificate (HTTPS_CERT, PEM) in its registration call, field `cert` ; the controller
 // keeps it as the ca_bundle of the runner's credential (ignore_certs off) and dials it pinned to
 // that certificate (runners/common.js getHttpsAgent, pin).
 
@@ -132,7 +132,7 @@ export function listenHost(env = process.env) {
   return String(env.LISTEN_HOST || "").trim() || undefined;
 }
 
-// where the app takes an RTE's socket (under BASE_URL), and where an inbound RTE takes the app's
+// where the controller takes an RTE's socket (under BASE_URL), and where an inbound RTE takes the controller's
 export const APP_SOCKET_PATH = "/api/v2/rte/socket";
 export const RTE_SOCKET_PATH = "/rte/v1/socket";
 
@@ -141,7 +141,7 @@ export const MODES = ["outbound", "inbound", "database"];
 // the modes that talk over this socket (a runner's rte_mode) ; database is the deprecated one
 export const SOCKET_MODES = ["outbound", "inbound"];
 
-// ─── the app's side : how long a job waits for an RTE ─────────────────────────
+// ─── the controller's side : how long a job waits for an RTE ─────────────────────────
 // (runners/rte.js and runners/rteHub.js both follow these ; kept here, where nothing is imported)
 
 /**
@@ -181,7 +181,7 @@ export const CLOSE = {
 export const REFUSED_CLOSES = [CLOSE.UNAUTHORIZED];
 export const REFUSED_STATUSES = [401, 403, 409];
 export const REFUSED_REDIAL_MS = 10 * 60 * 1000;
-// another contract (CONTRACT) : the app or the RTE is being upgraded, and the other side
+// another contract (CONTRACT) : the controller or the RTE is being upgraded, and the other side
 // usually follows within minutes. A short wait, not REFUSED_REDIAL_MS : a rolling upgrade must
 // not leave an RTE offline for ten minutes after its app came back
 export const CONTRACT_REDIAL_MS = 60 * 1000;
@@ -228,11 +228,11 @@ export function decode(data) {
 }
 
 /**
- * The address an outbound RTE dials : the app's address as people know it (APP_URL,
+ * The address an outbound RTE dials : the controller's address as people know it (CONTROLLER_URL,
  * https://forms.example.com, with its BASE_URL if any) as a WebSocket address to its socket.
  *
  * Args:
- *   appUrl (string): the app's address (http or https ; ws and wss are taken as they are).
+ *   appUrl (string): the controller's address (http or https ; ws and wss are taken as they are).
  *
  * Returns:
  *   string: the socket's address (wss://forms.example.com/api/v2/rte/socket).
@@ -244,7 +244,7 @@ export function socketUrl(appUrl) {
   const url = new URL(String(appUrl || "").trim());
   if (url.protocol === "https:") url.protocol = "wss:";
   else if (url.protocol === "http:") url.protocol = "ws:";
-  else if (url.protocol !== "wss:" && url.protocol !== "ws:") throw new Error(`APP_URL must be an http or https address, not ${appUrl}`);
+  else if (url.protocol !== "wss:" && url.protocol !== "ws:") throw new Error(`CONTROLLER_URL must be an http or https address, not ${appUrl}`);
   const base = url.pathname.replace(/\/+$/, "");
   // the socket's own path given already : kept
   url.pathname = base.endsWith(APP_SOCKET_PATH) ? base : base + APP_SOCKET_PATH;
@@ -254,7 +254,7 @@ export function socketUrl(appUrl) {
 }
 
 /**
- * The address the app dials for an inbound RTE : its runner's address (RTE_URL, as today) as a
+ * The address the controller dials for an inbound RTE : its runner's address (RTE_URL, as today) as a
  * WebSocket address to its socket.
  *
  * Args:

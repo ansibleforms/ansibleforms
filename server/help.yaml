@@ -359,100 +359,124 @@
   - name: AF_ROLE
     version: 7.0.0
     type: string
-    allowed: all, app, worker, rte
+    allowed: all, controller, worker, rte
     short: What this process runs
     default: all
     description: |
-      `all` (the default, or unset) is AnsibleForms as it always ran: the web app and the
-      worker in one process. To run several app nodes behind a load balancer, split them:
-      `app` serves the web interface and the API only (as many as you like, each with the same
-      `ACCESS_TOKEN_SECRET`), and `worker` runs the background work only - the database
-      bootstrap and seed, the schedules, the nightly backup, the repository syncs and the
-      cleanups. One worker works at a time ; a second one waits and takes over when the first
-      stops. App nodes and the worker share the database and the persistent volume.
+      `all` (the default, or unset) is AnsibleForms as it always ran: the controller's web
+      interface, its API and the worker in one process. To run several controller nodes behind a
+      load balancer, split them: `controller` serves the web interface and the API only (as many
+      as you like, each with the same `ACCESS_TOKEN_SECRET`), and `worker` runs the background
+      work only - the database bootstrap and seed, the schedules, the nightly backup, the
+      repository syncs and the cleanups. One worker works at a time ; a second one waits and takes
+      over when the first stops. Controller nodes and the worker share the database and the
+      persistent volume. `app`, the name of `controller` before 7.6, is still read the same
+      (deprecated, removed in 8.0, said in the log at start) ; a node started with it keeps its
+      `app-` name, so it finds its own jobs again after the upgrade.
 
-      `rte` starts the same image as a runtime environment that runs playbooks for an app, with
-      no web interface, scheduler or seed. How it talks to the app is `RTE_MODE`: over one
-      WebSocket (`outbound`, it dials the app at `APP_URL` ; `inbound`, the app dials it at
-      `RTE_URL`), holding no database credentials ; or, deprecated, reading and writing the app's
-      database itself (`database`, with `DB_*` and the same `ENCRYPTION_SECRET`). Either way it
-      needs `RTE_TOKEN`.
+      `rte` starts the same image as a runtime environment that runs playbooks for a controller,
+      with no web interface, scheduler or seed. How it talks to the controller is `RTE_MODE`: over
+      one WebSocket (`outbound`, it dials the controller at `CONTROLLER_URL` ; `inbound`, the
+      controller dials it at `RTE_URL`), holding no database credentials ; or, deprecated, reading
+      and writing the controller's database itself (`database`, with `DB_*` and the same
+      `ENCRYPTION_SECRET`). Either way it needs `RTE_TOKEN`.
   - name: RTE_MODE
     version: 7.3.0
     type: string
     allowed: outbound, inbound or database
     default: database
-    short: How an RTE talks to the app
-    hint: "Read by an RTE: outbound dials the app, inbound is dialed by it; database is deprecated."
+    short: How an RTE talks to the controller
+    hint: "Read by an RTE: outbound dials the controller, inbound is dialed by it; database is deprecated."
     description: |
       Read by an RTE (`AF_ROLE=rte`).
 
-      `outbound`: the RTE dials the app (`APP_URL`) and keeps one WebSocket open, redialing when
-      it drops. Nothing reaches the RTE from outside: only its zone to the app on the app's port,
-      through a proxy if `HTTPS_PROXY` says so. The first time it joins with `RTE_JOIN_TOKEN`.
+      `outbound`: the RTE dials the controller (`CONTROLLER_URL`) and keeps one WebSocket open,
+      redialing when it drops. Nothing reaches the RTE from outside: only its zone to the
+      controller on the controller's port, through a proxy if `HTTPS_PROXY` says so. The first
+      time it joins with `RTE_JOIN_TOKEN`.
 
       `HTTPS_PROXY` and `NO_PROXY` (lower case read too) are the system's own proxy variables,
       set on the RTE's container rather than here, and a playbook keeps them: the socket to the
-      app and an inbound RTE's registration call go through `HTTPS_PROXY`, unless the app's host
-      is in `NO_PROXY` (host names, `.domain` suffixes, or `*` for every host).
+      controller and an inbound RTE's registration call go through `HTTPS_PROXY`, unless the
+      controller's host is in `NO_PROXY` (host names, `.domain` suffixes, or `*` for every host).
 
       A dial that fails is logged at warning with its cause and a hint: a name that does not
       resolve, nothing listening, a certificate not trusted or not for that name, a proxy, or
-      the app refusing the socket (401 the token, 404 the `APP_URL` path or `BASE_URL`). The
-      first failure and every change of cause are logged at once, the same cause again at most
-      every 5 minutes while it lasts, and reaching the app again at notice. The app does the
-      same for an inbound RTE it cannot dial. The token is never logged.
+      the controller refusing the socket (401 the token, 404 the `CONTROLLER_URL` path or
+      `BASE_URL`). The first failure and every change of cause are logged at once, the same cause
+      again at most every 5 minutes while it lasts, and reaching the controller again at notice.
+      The controller does the same for an inbound RTE it cannot dial. The token is never logged.
 
-      `inbound`: the RTE listens and the app dials it at its runner's address (`RTE_URL`), one
-      app node at a time. With `APP_URL` (and `RTE_JOIN_TOKEN` the first time) it registers
-      itself with one call ; without, add its runner under Connections > Runners (type RTE, mode
-      inbound, its address and `RTE_TOKEN`).
+      `inbound`: the RTE listens and the controller dials it at its runner's address (`RTE_URL`),
+      one controller node at a time. With `CONTROLLER_URL` (and `RTE_JOIN_TOKEN` the first time)
+      it registers itself with one call ; without, add its runner under Connections > Runners
+      (type RTE, mode inbound, its address and `RTE_TOKEN`).
 
-      In both socket modes the RTE holds no database credentials: the app sends it each job and
-      stores what comes back - the output, the events, the end - exactly once, and sends the end
-      notifications. The job's files come with it unless `RTE_FILES=local`.
+      In both socket modes the RTE holds no database credentials: the controller sends it each job
+      and stores what comes back - the output, the events, the end - exactly once, and sends the
+      end notifications. The job's files come with it unless `RTE_FILES=local`.
 
-      `database` (deprecated, removed in 8.0.0): the RTE reads and writes the app's database
+      `database` (deprecated, removed in 8.0.0): the RTE reads and writes the controller's database
       itself, with `DB_*` and the same `ENCRYPTION_SECRET` - the only mode before 7.3, and the one
       of an RTE without `RTE_MODE` throughout 7.x. It logs a deprecation warning at its start.
-  - name: APP_URL
-    version: 7.3.0
+  - name: CONTROLLER_URL
+    version: 7.6.0
     type: string
     allowed: an http:// or https:// address
-    short: The app's address an RTE dials
-    hint: "On an outbound RTE (and an inbound one that registers itself): the app's address."
+    short: The controller's address an RTE dials
+    hint: "On an outbound RTE (and an inbound one that registers itself): the controller's address."
     description: |
-      On an RTE in `outbound` mode: the app's address as people open it -
+      On an RTE in `outbound` mode: the controller's address as people open it -
       `https://forms.example.com`, with its `BASE_URL` if any. The RTE adds the socket's path
       (`/api/v2/rte/socket`) and dials it over `wss://` (`ws://` for an http address).
 
       On an RTE in `inbound` mode: the address of its one registration call (with `RTE_URL` and,
-      the first time, `RTE_JOIN_TOKEN`) ; the app dials it from then on.
+      the first time, `RTE_JOIN_TOKEN`) ; the controller dials it from then on.
 
       The certificate is checked: name a private CA with `NODE_EXTRA_CA_CERTS`, or turn the check
-      off inside one trusted network with `APP_TLS_VERIFY=0`.
+      off inside one trusted network with `CONTROLLER_TLS_VERIFY=0`. Replaces `APP_URL`, still
+      read when this one is not set.
+  - name: CONTROLLER_TLS_VERIFY
+    version: 7.6.0
+    type: number
+    allowed: 0 or 1
+    default: 1
+    short: Whether an RTE checks the controller's certificate
+    hint: "On an RTE: 0 accepts the controller's self-signed certificate, inside one trusted network only."
+    description: |
+      On an RTE that dials the controller (`CONTROLLER_URL`). 1: the controller's certificate must
+      be valid for its name (a private CA through `NODE_EXTRA_CA_CERTS`). 0: any certificate is
+      accepted - only inside one trusted network, such as a compose project or a pod, where the
+      controller's certificate is self-signed. Replaces `APP_TLS_VERIFY`, still read when this one
+      is not set.
+  - name: APP_URL
+    version: 7.3.0
+    type: string
+    allowed: an http:// or https:// address
+    short: The controller's address an RTE dials (deprecated)
+    description: |
+      **Deprecated: use `CONTROLLER_URL` ; removed in 8.0.** Still read when `CONTROLLER_URL` is not
+      set, with a warning in the log at start ; when both are set, `CONTROLLER_URL` wins.
   - name: APP_TLS_VERIFY
     version: 7.3.0
     type: number
     allowed: 0 or 1
     default: 1
-    short: Whether an RTE checks the app's certificate
-    hint: "On an RTE: 0 accepts the app's self-signed certificate, inside one trusted network only."
+    short: Whether an RTE checks the controller's certificate (deprecated)
     description: |
-      On an RTE that dials the app (`APP_URL`). 1: the app's certificate must be valid for its
-      name (a private CA through `NODE_EXTRA_CA_CERTS`). 0: any certificate is accepted - only
-      inside one trusted network, such as a compose project or a pod, where the app's certificate
-      is self-signed.
+      **Deprecated: use `CONTROLLER_TLS_VERIFY` ; removed in 8.0.** Still read when
+      `CONTROLLER_TLS_VERIFY` is not set, with a warning in the log at start ; when both are set,
+      `CONTROLLER_TLS_VERIFY` wins.
   - name: RTE_JOIN_TOKEN
     version: 7.3.0
     type: string
     allowed: a join token of Connections > Runners (afj_...)
-    short: The token an RTE joins the app with, once
+    short: The token an RTE joins the controller with, once
     hint: "On an RTE: a join token that approves it at once, for unattended installs."
     description: |
-      On an RTE in a socket mode, the first time, optional. Without it an RTE the app does not
+      On an RTE in a socket mode, the first time, optional. Without it an RTE the controller does not
       know asks to join and waits for an admin's approval under Connections > Runners. With it
-      the RTE is approved at once - for unattended installs - and the app adds it as a runner
+      the RTE is approved at once - for unattended installs - and the controller adds it as a runner
       (or gives a runner of that name still waiting for approval the new token ; an approved
       runner keeps its token, which only an admin changes). Join tokens are made through the
       API (`POST /api/v2/runner/jointoken`, an admin). From then on the RTE signs in with its own
@@ -473,9 +497,9 @@
     allowed: transfer or local
     default: transfer
     short: Where a socket-mode RTE gets a job's files
-    hint: "On an RTE in a socket mode: transfer gets them from the app, local uses its own folders."
+    hint: "On an RTE in a socket mode: transfer gets them from the controller, local uses its own folders."
     description: |
-      On an RTE in a socket mode. `transfer`: the app sends the playbooks folder and the
+      On an RTE in a socket mode. `transfer`: the controller sends the playbooks folder and the
       inventories with the job, packed and named by a hash of their content ; the RTE keeps them
       packed (`RTE_CACHE_PATH`) and an unchanged folder is never sent twice. Each job unpacks
       them in a private folder of its own, removed when it ends. It needs no shared disk and
@@ -488,29 +512,29 @@
     type: number
     allowed: a positive integer
     default: 512
-    short: The largest folder the app sends an RTE
-    hint: "Read by the app: a bigger playbooks or inventory folder must be mounted on the RTE."
+    short: The largest folder the controller sends an RTE
+    hint: "Read by the controller: a bigger playbooks or inventory folder must be mounted on the RTE."
     description: |
-      Read by the app: a playbooks or inventory folder bigger than this is not sent to an RTE
+      Read by the controller: a playbooks or inventory folder bigger than this is not sent to an RTE
       with `RTE_FILES=transfer` ; the job fails and says to mount the folder on the RTE instead.
   - name: RTE_SPOOL_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-spool"
-    short: Where a socket-mode RTE keeps what the app has not stored yet
+    short: Where a socket-mode RTE keeps what the controller has not stored yet
     hint: "On an RTE in a socket mode: keep it on a volume so a restart resends what is left."
     description: |
-      On an RTE in a socket mode: each job's output, events and end wait here until the app acks
-      them, and are sent again after a reconnect - to the same app node or another. On a volume,
+      On an RTE in a socket mode: each job's output, events and end wait here until the controller acks
+      them, and are sent again after a reconnect - to the same controller node or another. On a volume,
       an RTE that restarts sends what it had not delivered.
   - name: RTE_CACHE_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-files"
-    short: Where a socket-mode RTE keeps the job files the app sent
+    short: Where a socket-mode RTE keeps the job files the controller sent
     hint: "On an RTE with RTE_FILES=transfer: the packed folders it got, up to RTE_CACHE_MB."
     description: |
-      On an RTE with `RTE_FILES=transfer`: the playbooks and inventory folders the app sent,
+      On an RTE with `RTE_FILES=transfer`: the playbooks and inventory folders the controller sent,
       packed, each under its hash ; those used most recently are kept, up to `RTE_CACHE_MB`. Each
       running job unpacks them under `jobs/` in a private folder, removed when the job ends.
   - name: RTE_CACHE_MB
@@ -522,17 +546,17 @@
     hint: "On an RTE with RTE_FILES=transfer, in MB; 0 keeps none. Also on its runner page."
     description: |
       On an RTE with `RTE_FILES=transfer`: how much the job files it keeps (`RTE_CACHE_PATH`)
-      may take, in MB. The ones used longest ago go first ; 0 keeps none, so the app sends a
+      may take, in MB. The ones used longest ago go first ; 0 keeps none, so the controller sends a
       job's files with every job. It can be set on the runner page (Connections >
       Runners > the runner > RTE) ; a value there wins over this variable.
   - name: RTE_TOKEN
     version: 7.0.0
     type: string
     allowed: at least 16 characters
-    short: The token between an app and its RTE
+    short: The token between a controller and its RTE
     description: |
       On an RTE (`AF_ROLE=rte`): the bearer token every call must carry ; the RTE refuses to
-      start without one. The app stores the same token on the runner (Connections > Runners) ;
+      start without one. The controller stores the same token on the runner (Connections > Runners) ;
       a socket-mode RTE that joins (`RTE_JOIN_TOKEN` or an admin's approval) puts it there. A
       database-mode RTE that registers itself (`RTE_REGISTER`) does too, and keeps it in step.
   - name: RTE_REGISTER
@@ -592,7 +616,7 @@
     allowed: 0 or a positive integer
     default: 60
     short: Wait for a busy or disconnected RTE (minutes)
-    hint: Read by the app nodes and the worker.
+    hint: Read by the controller nodes and the worker.
     description: |
       A job handed to an RTE that is full (RTE_MAX_JOBS) or stopping waits for it, asking again
       every 10 seconds, for this many minutes ; then it fails and says why. An abort ends the
@@ -608,19 +632,19 @@
     hint: "On an RTE: 127.0.0.1 keeps it on its own host (a native outbound RTE)."
     description: |
       On an RTE (`AF_ROLE=rte`): the address its listener binds (its probes, its metrics and,
-      inbound, the socket the app dials). Not set: every interface, as before. `127.0.0.1` keeps
-      a native outbound RTE, which takes no call from the app, reachable from its own host only.
-      An inbound RTE must listen where the app reaches it (`RTE_URL`).
+      inbound, the socket the controller dials). Not set: every interface, as before. `127.0.0.1` keeps
+      a native outbound RTE, which takes no call from the controller, reachable from its own host only.
+      An inbound RTE must listen where the controller reaches it (`RTE_URL`).
   - name: RTE_URL
     version: 7.0.0
     type: string
     allowed: an http:// or https:// address, without a slash on the end
-    short: The address the app reaches an RTE on
-    hint: "On an inbound RTE: the address the app dials it on, usually its service name."
+    short: The address the controller reaches an RTE on
+    hint: "On an inbound RTE: the address the controller dials it on, usually its service name."
     description: |
-      On an RTE in `inbound` mode: the address the app dials it on, usually the service name -
+      On an RTE in `inbound` mode: the address the controller dials it on, usually the service name -
       `http://rte:8000` in docker compose, the service in kubernetes. It is required when the RTE
-      registers itself with `APP_URL` (it refuses to start without it), and becomes its runner's
+      registers itself with `CONTROLLER_URL` (it refuses to start without it), and becomes its runner's
       address. On an `outbound` RTE it is optional: it is only recorded as the runner's address.
 
       On a deprecated database-mode RTE that registers itself (`RTE_REGISTER`): the address it
@@ -628,11 +652,11 @@
       `PORT`, named after the node (`rte-<hostname>-<port>`), which change when it is recreated.
 
       An inbound RTE (`RTE_MODE=inbound`) over TLS: set `HTTPS=1` with its own `HTTPS_CERT` and
-      `HTTPS_KEY`, and an `https://` address here. When it registers (`APP_URL`) it sends its
-      certificate, the app keeps it as the ca_bundle of the runner's credential and dials the
+      `HTTPS_KEY`, and an `https://` address here. When it registers (`CONTROLLER_URL`) it sends its
+      certificate, the controller keeps it as the ca_bundle of the runner's credential and dials the
       RTE pinned to it, whatever name the certificate was made for. A runner waiting for
       approval shows the certificate's fingerprint, which the RTE logs at its start. Over plain
-      `http://` to another host the app sends `RTE_TOKEN` in clear, and says so in its log.
+      `http://` to another host the controller sends `RTE_TOKEN` in clear, and says so in its log.
   - name: JOB_RETENTION_DAYS
     version: 6.3.0
     type: number
@@ -733,10 +757,10 @@
     description: | 
       With 1, the worker creates the schema (all AnsibleForms tables) itself at startup when it finds an empty database.
       It only does so on a database without a single AnsibleForms table, so an existing installation is never recreated.
-      App nodes wait until the worker has created and patched the schema before they serve.
+      Controller nodes wait until the worker has created and patched the schema before they serve.
 
       With 0, nothing creates the schema: the worker skips it at startup, the schema endpoint refuses to create it,
-      and app nodes start without waiting for it. Set 0 to rule out any schema creation, for example on a production database.
+      and controller nodes start without waiting for it. Set 0 to rule out any schema creation, for example on a production database.
 
       The docker-compose MySQL only creates the empty `AnsibleForms` database and its user on its first start:
       the tables come from AnsibleForms, so keep 1 for a fresh install.
@@ -1058,7 +1082,7 @@
     hint: "0 turns it off."
     description: |
       A ceiling on the authentication endpoints - the login, the logout, the token refresh and the
-      single sign-on callbacks - per client address and per app node: above it they answer 429
+      single sign-on callbacks - per client address and per controller node: above it they answer 429
       before any password or token is looked at. Generous, so that a person or a script never
       reaches it ; LOGIN_MAX_FAILURES is what stops a password from being guessed. Behind a
       reverse proxy, set TRUST_PROXY so the address is the client's. Applied without a restart.
@@ -1073,7 +1097,7 @@
       After this many failed logins in a row, an account (local or LDAP) is locked for
       LOGIN_LOCKOUT_MINUTES: every attempt is refused with status 429 before any password is
       checked, whether the account exists or not. A successful login clears the count, and so
-      does an admin setting the user's password. Counted in the database, so every app node
+      does an admin setting the user's password. Counted in the database, so every controller node
       sees the same attempts. 0 turns the lockout off. Applied without a restart.
   - name: LOGIN_MAX_FAILURES_PER_IP
     version: 7.0.0
@@ -1301,7 +1325,7 @@
     short: Prometheus metrics token
     hint: Unset, /api/v2/metrics answers 404; applied without a restart.
     description: |
-      Set, an app node (`AF_ROLE` `all` or `app`) serves Prometheus metrics at `/api/v2/metrics`
+      Set, a controller node (`AF_ROLE` `all` or `controller`) serves Prometheus metrics at `/api/v2/metrics`
       and an RTE at `/metrics`, to a scraper that sends `Authorization: Bearer <METRICS_TOKEN>`.
       Unset, they answer 404. A worker (`AF_ROLE=worker`) serves no metrics: it answers only
       `/api/v2/version` and `/health`, for its container healthcheck.
@@ -1565,7 +1589,7 @@
       To keep the communication between client and server safe, we strongly recommend you to set this secret.
 
       Not set: each start generates a random secret, so a restart ends every session and everyone logs in again.
-      An app node (`AF_ROLE=app`) refuses to start without it: set the same value on every app node.
+      A controller node (`AF_ROLE=controller`) refuses to start without it: set the same value on every controller node.
   - name: ACCESS_TOKEN_EXPIRATION
     type: string
     allowed: a valid time indication
@@ -1663,7 +1687,7 @@
       The secret must be 32 characters long ; a shorter one is extended and a longer one cut.
       Setting it, or changing it, re-encrypts every stored secret with it on the next start, in one
       transaction, so none is lost : from the default key the first time, from
-      ENCRYPTION_SECRET_PREVIOUS after that. Set the same value on every app node, the worker and
+      ENCRYPTION_SECRET_PREVIOUS after that. Set the same value on every controller node, the worker and
       every RTE that registers itself.
   - name: ENCRYPTION_SECRET_PREVIOUS
     type: string
@@ -1686,7 +1710,7 @@
     default: "%PERSISTENT_FOLDER%/playbooks"
     description: |
       Read by an RTE (`AF_ROLE=rte`): the folder its playbooks run from when no repository is
-      marked for playbooks. Since 7 the app runs no playbook itself, so set this in the RTE
+      marked for playbooks. Since 7 the controller runs no playbook itself, so set this in the RTE
       container's environment ; it is not editable on the Settings page.
   - name: REGEX_FILTER_JOB_OUTPUT
     type: string
@@ -1750,7 +1774,7 @@
     allowed: a positive number
     default: 5
     short: AWX silence before a job is given up (minutes)
-    hint: Read by the app node or worker following the job.
+    hint: Read by the controller node or worker following the job.
     description: |
       While an AWX job runs, the app asks AWX for its status and output every second. When AWX
       does not answer (a network blip, a restart, a busy controller) it tries again with a
@@ -1846,7 +1870,7 @@
       - allowFormDesign: The user can edit the forms config in the designer (categories, constants, forms: save, restore, pull and push the forms repositories). Without it the designer shows them read-only. Default true. (Added in 7.3.0)
       - designAllForms: The designer shows and edits every form. Without it, only the forms whose `roles` hold one of the user's roles: the others are left out (never named, a name taken by one is only said to be taken, a form of theirs naming one as a subform shows nothing of it). The subforms no hidden form uses (new ones included) are theirs to edit, a subform a hidden form uses as well as one of theirs is shown read only, and a form saved (a subform aside) must keep one of their roles. A file holding several forms keeps the hidden ones as they are, restoring a backup needs this option, and the form files are left out of the designer's other explorers (a repository's whole tree, as the workflows show it). The forms list leaves out the warning of a form name defined twice unless both copies are theirs, and the settings pages' Forms tabs and a credential's Used by tab, reached with a part of the settings only (not showSettings), list only the forms their designer shows. Limits the forms only (playbooks and workflows have designAllPlaybooks and designAllWorkflows); inventories, vars files, categories and constants stay visible to every designer. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowPlaybookDesign: The user can edit the playbooks in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.0.0)
-      - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the app or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
+      - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the controller or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowWorkflowDesign: The user can edit the workflows in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
       - designAllWorkflows: Show and edit every workflow in the designer; without it, only the workflows used by the forms the user can see, and the ones no form uses yet. A form uses the workflow file it runs (`workflow`) and the nested workflows that one runs (every workflow a reference may mean, when several have its name); the forms it can see follow designAllForms. A hidden workflow file is never listed nor read (nor named in a credential's Used by tab, without showSettings): it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Workflows still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowInventoryDesign: The user can edit the inventories in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
@@ -2073,7 +2097,7 @@
           - allowFormDesign: The user can edit the forms config in the designer (categories, constants, forms: save, restore, pull and push the forms repositories). Without it the designer shows them read-only. Default true. (Added in 7.3.0)
           - designAllForms: The designer shows and edits every form. Without it, only the forms whose `roles` hold one of the user's roles: the others are left out (never named, a name taken by one is only said to be taken, a form of theirs naming one as a subform shows nothing of it). The subforms no hidden form uses (new ones included) are theirs to edit, a subform a hidden form uses as well as one of theirs is shown read only, and a form saved (a subform aside) must keep one of their roles. A file holding several forms keeps the hidden ones as they are, restoring a backup needs this option, and the form files are left out of the designer's other explorers (a repository's whole tree, as the workflows show it). The forms list leaves out the warning of a form name defined twice unless both copies are theirs, and the settings pages' Forms tabs and a credential's Used by tab, reached with a part of the settings only (not showSettings), list only the forms their designer shows. Limits the forms only (playbooks and workflows have designAllPlaybooks and designAllWorkflows); inventories, vars files, categories and constants stay visible to every designer. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowPlaybookDesign: The user can edit the playbooks in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.0.0)
-          - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the app or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
+          - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the controller or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowWorkflowDesign: The user can edit the workflows in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
           - designAllWorkflows: Show and edit every workflow in the designer; without it, only the workflows used by the forms the user can see, and the ones no form uses yet. A form uses the workflow file it runs (`workflow`) and the nested workflows that one runs (every workflow a reference may mean, when several have its name); the forms it can see follow designAllForms. A hidden workflow file is never listed nor read (nor named in a credential's Used by tab, without showSettings): it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Workflows still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowInventoryDesign: The user can edit the inventories in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)

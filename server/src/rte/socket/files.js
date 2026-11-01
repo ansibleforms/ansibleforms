@@ -1,8 +1,8 @@
 /******************************************************************/
 /*                                                                */
-/*  The files a job runs from, sent by the app with the job       */
+/*  The files a job runs from, sent by the controller with the job       */
 /*  (RTE_FILES=transfer, the socket modes' default) : the         */
-/*  playbooks folder and the inventories, each a tar.gz the app   */
+/*  playbooks folder and the inventories, each a tar.gz the controller   */
 /*  names by a hash of its content. The RTE keeps the packed      */
 /*  ones it got (RTE_CACHE_PATH, up to its cache size) and asks   */
 /*  for a hash it does not have. Each job unpacks them in a private folder of its own,   */
@@ -19,7 +19,7 @@ import crypto from "crypto";
 import * as tar from "tar";
 import logger from "../../lib/logger.js";
 
-// how long the app may take to send a bundle
+// how long the controller may take to send a bundle
 const FETCH_TIMEOUT_MS = 10 * 60 * 1000;
 // a bundle's name : its hash, then the packed suffix
 const HASH = /^[a-f0-9]{64}$/;
@@ -100,19 +100,19 @@ export class FileCache {
   }
 
   /**
-   * A bundle's file, asking the app for it when it is not here. Two jobs asking for the same
+   * A bundle's file, asking the controller for it when it is not here. Two jobs asking for the same
    * bundle at once wait for one transfer.
    *
    * Args:
    *   hash (string): its hash.
-   *   ask (function): (hash) => boolean : asks the app (a fetch message) ; false when the socket
+   *   ask (function): (hash) => boolean : asks the controller (a fetch message) ; false when the socket
    *     is not open.
    *
    * Returns:
    *   Promise<string>: the file.
    *
    * Raises:
-   *   Error: the app could not send it, or it did not arrive whole in time.
+   *   Error: the controller could not send it, or it did not arrive whole in time.
    */
   async ensure(hash, ask) {
     const file = this.path(hash);
@@ -136,7 +136,7 @@ export class FileCache {
     entry.timer = setTimeout(() => this._fail(hash, new Error(`the files ${hash.slice(0, 12)} did not arrive within ${FETCH_TIMEOUT_MS / 60000} minutes`)), FETCH_TIMEOUT_MS);
     entry.timer.unref?.();
     this.pending.set(hash, entry);
-    if (!ask(hash)) this._fail(hash, new Error("not connected to the app: the job's files cannot be fetched"));
+    if (!ask(hash)) this._fail(hash, new Error("not connected to the controller: the job's files cannot be fetched"));
     return entry.promise;
   }
 
@@ -191,7 +191,7 @@ export class FileCache {
    *   Promise<string>: the folder.
    *
    * Raises:
-   *   Error: the app could not send it, or it could not be unpacked.
+   *   Error: the controller could not send it, or it could not be unpacked.
    */
   async checkout(hash, ask, into) {
     // step 1 : the packed bundle ; one another job's eviction took meanwhile is fetched again
@@ -226,7 +226,7 @@ export class FileCache {
   }
 
   /**
-   * A chunk of a bundle from the app.
+   * A chunk of a bundle from the controller.
    *
    * Args:
    *   msg (object): { hash, data (base64), last, sha256 (with the last), error }.
@@ -234,7 +234,7 @@ export class FileCache {
   deliver(msg) {
     const entry = this.pending.get(msg.hash);
     if (!entry) return;
-    if (msg.error) return this._fail(msg.hash, new Error(`the app could not send the job's files: ${msg.error}`));
+    if (msg.error) return this._fail(msg.hash, new Error(`the controller could not send the job's files: ${msg.error}`));
     if (msg.data) {
       const buf = Buffer.from(msg.data, "base64");
       entry.hasher.update(buf);

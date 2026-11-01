@@ -1,15 +1,15 @@
 // The one place a playbook runs : the RTE (AF_ROLE=rte, src/rte/server.js) calls
-// runAnsibleJob with a job id and the job's secrets, which the app resolved and sealed for it
+// runAnsibleJob with a job id and the job's secrets, which the controller resolved and sealed for it
 // (lib/jobSecrets.js, lib/sealedSecrets.js). The RTE never reads the credentials table nor a
-// secret store. The app never imports this module : since 7 it runs no playbook itself.
+// secret store. The controller never imports this module : since 7 it runs no playbook itself.
 //
 // Everything else - the job, its output, its log, its events, its end - goes through the job's
 // I/O (useJobIO) : the database in database mode (rte/jobio-db.js, deprecated), the socket to
-// the app in the socket modes (socketJobIO in rte/socket/rte-socket.js). This module imports no database
+// the controller in the socket modes (socketJobIO in rte/socket/rte-socket.js). This module imports no database
 // module, so a socket-mode RTE runs without DB_* at all.
 //
 // The approval gate is NOT here : a job reaches an RTE only once it may run
-// (runners/orchestrator.js, in the app).
+// (runners/orchestrator.js, in the controller).
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -125,7 +125,7 @@ export function artifactsEnv(env, directory, artifactsFile, eventsFile = "") {
   // the structured events (callback_plugins/af_events.py, loaded without enabling, as the
   // artifacts one) : one JSON line per play, task and host result, next to the usual text output
   if (eventsFile) out.AF_EVENTS_FILE = eventsFile;
-  // and the keys whose values a stored result masks : the app's own pattern, the plugin adds it to
+  // and the keys whose values a stored result masks : the controller's own pattern, the plugin adds it to
   // its built-in one when Python reads it
   if (eventsFile && appConfig.maskExtravarsRegex) out.AF_EVENTS_MASK_REGEX = String(appConfig.maskExtravarsRegex);
   return out;
@@ -289,7 +289,7 @@ export function runnerIdentity() {
 
 /**
  * The folder the playbook runs from, as the job's I/O finds it : the playbooks repository,
- * else ANSIBLE_PATH (or the files the app sent with the job), plus the form's sub path.
+ * else ANSIBLE_PATH (or the files the controller sent with the job), plus the form's sub path.
  *
  * Args:
  *   playbookSubPath (string): the form's playbookSubPath.
@@ -425,7 +425,7 @@ export function buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravars
  *
  * Args:
  *   jobId (number): the job.
- *   secrets (object): the job's secrets as the app resolved them (lib/jobSecrets.js) :
+ *   secrets (object): the job's secrets as the controller resolved them (lib/jobSecrets.js) :
  *     { credentials, ansible, vault }.
  */
 export async function runAnsibleJob({ jobId, secrets }) {
@@ -438,7 +438,7 @@ export async function runAnsibleJob({ jobId, secrets }) {
   extravars.__jobid__ = jobId;
   const credentials = secrets.credentials || {};
   // what the output must not show : the credentials' secrets and the password fields' values
-  // (in the socket modes the app masks what it writes, and this registers the RTE's own copy)
+  // (in the socket modes the controller masks what it writes, and this registers the RTE's own copy)
   await io.registerOutputSecrets(jobId, { form: job.form, extravars, credentials });
   try {
     return await launchPlaybook(extravars, secrets, jobId, Number(job.lastOrder) || 0);
@@ -507,9 +507,9 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   let sshKey = null;
   try {
     if (ansibleCredentials) {
-      // resolved by the app ; an error is why it could not read it
+      // resolved by the controller ; an error is why it could not read it
       const runCredential = secrets.ansible;
-      if (!runCredential || runCredential.error) throw new Error(runCredential?.error || "the app sent no ansible credentials");
+      if (!runCredential || runCredential.error) throw new Error(runCredential?.error || "the controller sent no ansible credentials");
       hiddenExtravars.ansible_user = runCredential.user;
       // a key without a password : no empty password next to it
       if (!runCredential.privateKey || runCredential.password) hiddenExtravars.ansible_password = runCredential.password;
@@ -527,7 +527,7 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   try {
     if (vaultCredentials) {
       const vaultCredential = secrets.vault;
-      if (!vaultCredential || vaultCredential.error) throw new Error(vaultCredential?.error || "the app sent no vault credentials");
+      if (!vaultCredential || vaultCredential.error) throw new Error(vaultCredential?.error || "the controller sent no vault credentials");
       vaultPassword = vaultCredential.password;
       registerJobSecrets(jobid, [vaultPassword]);
     }
@@ -786,7 +786,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         maxBytes: Number(appConfig.processMaxBuffer) || 0,
       });
       // A playbook may write a log file of its own, .joblogs/job_log_<id>.log next to it,
-      // which the job's Logfile panel shows. The app has no playbook folder, so the file is
+      // which the job's Logfile panel shows. The controller has no playbook folder, so the file is
       // stored on the job (jobs.job_log) : while the playbook runs, when it changed, and once
       // more at the end, after which the file goes.
       const jobLogPath = path.join(directory, ".joblogs", `job_log_${jobid}.log`);

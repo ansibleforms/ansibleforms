@@ -1,5 +1,5 @@
 # An RTE for VMware playbooks : the AnsibleForms RTE + the vmware collections and the vSphere
-# python libraries. Keep the tag on the app's release (7, or the exact 7.x.y the app runs).
+# python libraries. Keep the tag on the controller's release (7, or the exact 7.x.y the controller runs).
 #
 #   docker build -f examples/rte/Dockerfile.vmware -t my-rte-vmware .
 FROM ghcr.io/ansibleforms/ansibleforms-rte-core:7

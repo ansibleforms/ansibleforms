@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "npm-run-all --parallel dev:server dev:rte dev:client",
     "dev:local": "npm-run-all --parallel dev:server dev:client",
-    "dev:split": "npm-run-all --parallel dev:app dev:app2 dev:worker dev:rte dev:client",
-    "dev:app": "cd server && npm run dev:app",
-    "dev:app2": "cd server && npm run dev:app2",
+    "dev:split": "npm-run-all --parallel dev:controller dev:controller2 dev:worker dev:rte dev:client",
+    "dev:controller": "cd server && npm run dev:controller",
+    "dev:controller2": "cd server && npm run dev:controller2",
     "dev:worker": "cd server && npm run dev:worker",
     "dev:server": "cd server && npm run dev",
     "dev:rte": "cd server && npm run dev:rte",

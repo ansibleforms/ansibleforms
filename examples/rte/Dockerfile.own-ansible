@@ -1,6 +1,6 @@
 # An RTE with the python and the ansible YOU choose : the AnsibleForms RTE base (node and the
 # server, no python, no ansible) + a python from the os and an exact ansible-core. Keep the tag
-# on the app's release (7, or the exact 7.x.y the app runs).
+# on the controller's release (7, or the exact 7.x.y the controller runs).
 #
 #   docker build -f examples/rte/Dockerfile.own-ansible --build-arg ANSIBLE_CORE=2.20.6 -t my-rte .
 FROM ghcr.io/ansibleforms/ansibleforms-rte-base:7

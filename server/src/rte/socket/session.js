@@ -20,7 +20,7 @@ export class Session extends EventEmitter {
   /**
    * Args:
    *   ws (WebSocket): the open socket.
-   *   label (string): who is on the other side, for the log (rte 'dmz-1', app node 'app-x-443').
+   *   label (string): who is on the other side, for the log (rte 'dmz-1', controller node 'app-x-443').
    */
   constructor(ws, label) {
     super();
@@ -28,7 +28,7 @@ export class Session extends EventEmitter {
     this.label = label;
     this.lastHeard = Date.now();
     this.closed = false;
-    // what the other side said in its hello (the RTE's) or welcome (the app's)
+    // what the other side said in its hello (the RTE's) or welcome (the controller's)
     this.peer = {};
     ws.on("message", (data) => {
       this.lastHeard = Date.now();
