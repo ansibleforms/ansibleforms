@@ -250,7 +250,9 @@ const UserOfEither = {
       if (Object.keys(values).length) await mysql.do("UPDATE AnsibleForms.`directory_users` SET ? WHERE id = ?", [values, dir]);
       return;
     }
-    const { blocked, type: _type, name: _name, ...rest } = data;
+    // its type and its name are what it is found by, never columns of the users table
+    const blocked = data.blocked;
+    const rest = Object.fromEntries(Object.entries(data).filter(([k]) => !["blocked", "type", "name"].includes(k)));
     // a password the entry does not give : the database's stays (an empty one keeps it)
     if (!rest.password) delete rest.password;
     if (Object.keys(rest).length) await User.update(rest, id, FROM_REPO);

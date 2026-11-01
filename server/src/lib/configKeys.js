@@ -650,7 +650,7 @@ export function assertKeysWritable(doc, sources, served) {
     else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, which is not read (${keyFileProblem(s)}): fix it in git`);
     else if (s.multi && s.exists) {
       // a role refused in git : a save would overwrite it with what the app serves meanwhile
-      let blocking = [];
+      let blocking;
       try {
         blocking = rolesDocument(s, (p) => fs.readFileSync(p, "utf8"), new Map(rolesOf(s))).blocking;
       } catch {
