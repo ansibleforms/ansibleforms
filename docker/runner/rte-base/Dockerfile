@@ -9,7 +9,7 @@
 #
 # Debian trixie, the current stable ; the python of the RTE layers comes from docker/runner/rte-core
 # (3.14, through uv). Pinned by digest ; Dependabot proposes a new pin as a pull request.
-FROM node:26-trixie-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS builder
+FROM node:26-trixie-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS builder
 
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=unknown
@@ -24,7 +24,7 @@ RUN chmod +x /tmp/generate-build-info.sh && /tmp/generate-build-info.sh . "$GIT_
 # no web interface in an RTE
 RUN rm -f .env.* && rm -rf ./views
 
-FROM node:26-trixie-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS final
+FROM node:26-trixie-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS final
 
 ARG VERSION=
 LABEL org.opencontainers.image.source="https://github.com/ansibleforms/ansibleforms" \
