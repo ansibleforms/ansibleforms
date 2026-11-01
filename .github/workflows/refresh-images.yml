@@ -1,0 +1,69 @@
+name: Refresh images
+
+# Rebuilds the latest release every week and pushes it again under its own tags (x.y.z, x.y,
+# x and latest), the controller and the three RTE layers alike. A release's images are
+# otherwise frozen on the day it was published : this gives them Debian's security fixes
+# (the Dockerfiles run apt-get upgrade) and gives ansibleforms-rte-full the newest
+# collections, between releases.
+#
+# It builds from the release tag, so the code, the npm and pip pins and the base image digests
+# stay those of the release. Dependabot keeps moving those pins on main (docker daily, pip and
+# npm weekly) ; they reach the images with the next release, as every other change does.
+#
+# Only the highest final release, and only from 7 on : 6.x has no RTE images and its
+# maintenance line publishes from release/6.x. No layer cache, and latest-rc is left alone
+# (publish.yml, refresh: true).
+#
+#   Actions -> Refresh images -> Run workflow     to refresh now
+
+on:
+  schedule:
+    # Mondays 05:23 UTC - after the CodeQL run (04:17), an hour no in-process cron task of
+    # the app itself occupies
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# one refresh at a time ; a release publishing the same version waits in publish.yml's group
+concurrency:
+  group: refresh-images
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Latest release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.latest.outputs.tag }}
+    steps:
+      # ─── the highest final release tag, e.g. 7.5.0 ; pre-releases and rcs left out ───
+      - name: Find the latest release
+        id: latest
+        run: |
+          tag=$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" \
+            | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ -z "$tag" ]; then
+            echo "::error::no release tag found"
+            exit 1
+          fi
+          if [ "${tag%%.*}" -lt 7 ]; then
+            echo "::error::the latest release is $tag : only 7 and later are refreshed"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Refreshing $tag"
+
+  publish:
+    name: Publish
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      version: ${{ needs.release.outputs.tag }}
+      ref: ${{ needs.release.outputs.tag }}
+      channel: release
+      refresh: true

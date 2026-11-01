@@ -15,7 +15,10 @@ ARG YTT_SHA256_AMD64=15751b45a819edbf22b3d3eadb5fa9a5a2599128d921660a874bd39c47b
 ARG YTT_SHA256_ARM64=fed073d52b780a88ce506e68c44f33cedede2dad3d5f4fbe07a2833e45d996ed
 ARG TARGETARCH=amd64
 
+# upgrade : the pinned base is as old as its pin, and the weekly refresh (refresh-images.yml)
+# rebuilds a release to pick up Debian's security fixes
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends git openssh-client mariadb-client procps ca-certificates curl tini \
  && case "$TARGETARCH" in \
       amd64) sum="$YTT_SHA256_AMD64" ;; \
