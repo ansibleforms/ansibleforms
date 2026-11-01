@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.0](https://github.com/ansibleforms/ansibleforms/compare/7.4.2...7.5.0) (2026-11-01)
+
+
+### Added
+
+* AWX, AAP and Ascender jobs have events, so their results open details ([#1298](https://github.com/ansibleforms/ansibleforms/issues/1298)) ([7417137](https://github.com/ansibleforms/ansibleforms/commit/74171374e6a167a9faeb2925882a013f7706e58b))
+* Databases under Connections, each using a database credential ([#1301](https://github.com/ansibleforms/ansibleforms/issues/1301)) ([5ace215](https://github.com/ansibleforms/ansibleforms/commit/5ace21510d9d0ec27ad95522f4428a3c1914043a))
+* Edit All Forms, Playbooks and Workflows role options limit what designers see ([#1279](https://github.com/ansibleforms/ansibleforms/issues/1279)) ([a8c4fec](https://github.com/ansibleforms/ansibleforms/commit/a8c4fec02c04b10369e2da65c3df417e48854965))
+* stored jobs can be shared with other users ([#1270](https://github.com/ansibleforms/ansibleforms/issues/1270)) ([5107289](https://github.com/ansibleforms/ansibleforms/commit/51072893a3d7c479a0f1ffaf754ef3c574c3f241))
+
+
+### Fixed
+
+* a repository being pushed shows running under Push, not Pull ([#1286](https://github.com/ansibleforms/ansibleforms/issues/1286)) ([c78ada2](https://github.com/ansibleforms/ansibleforms/commit/c78ada2c50f8de7596d968cd2830e85a6be78a30))
+* an unknown repository id says so instead of showing the first repository ([#1281](https://github.com/ansibleforms/ansibleforms/issues/1281)) ([08c5a4e](https://github.com/ansibleforms/ansibleforms/commit/08c5a4e43a67db14193211df70d137eed48d69d9))
+* another user's stored job never shows its password values ([#1275](https://github.com/ansibleforms/ansibleforms/issues/1275)) ([de3daf9](https://github.com/ansibleforms/ansibleforms/commit/de3daf98147ffae32ea33e5db314bb7a5a3ded73))
+* API tokens follow their user's current roles ([#1276](https://github.com/ansibleforms/ansibleforms/issues/1276)) ([ce53aaf](https://github.com/ansibleforms/ansibleforms/commit/ce53aaf4daec7c2baa6a061fa06f3324a6ef8a02))
+* backup folders are looked up on disk, never built from the request ([#1272](https://github.com/ansibleforms/ansibleforms/issues/1272)) ([fee18a5](https://github.com/ansibleforms/ansibleforms/commit/fee18a5c5873eef1177a0cec5ff3338eb6105ff8))
+* designers without connections settings open the Inventories tab without error ([#1282](https://github.com/ansibleforms/ansibleforms/issues/1282)) ([f02f4d9](https://github.com/ansibleforms/ansibleforms/commit/f02f4d9577fdb9875f6267d13828925a22eb0a67))
+* Escape declines a confirm question ([#1277](https://github.com/ansibleforms/ansibleforms/issues/1277)) ([94e156c](https://github.com/ansibleforms/ansibleforms/commit/94e156ca6e7aeae76c22e83bf48f94264de5cd87))
+* header labels never cover the menu links ([#1283](https://github.com/ansibleforms/ansibleforms/issues/1283)) ([0f4263c](https://github.com/ansibleforms/ansibleforms/commit/0f4263cba05a2f87b68788d5d905489ae370c356))
+* only admins can change who is an admin ([#1274](https://github.com/ansibleforms/ansibleforms/issues/1274)) ([1545b97](https://github.com/ansibleforms/ansibleforms/commit/1545b975b24a81f5323526ba9236c1ce320fe3dc))
+* OpenID Connect sign-in sends a state, which some providers require ([#1297](https://github.com/ansibleforms/ansibleforms/issues/1297)) ([4d30296](https://github.com/ansibleforms/ansibleforms/commit/4d30296accb69b4d2b4220dfd1af639a82098d32))
+* result lines open their details at any verbosity ([#1299](https://github.com/ansibleforms/ansibleforms/issues/1299)) ([1e560a5](https://github.com/ansibleforms/ansibleforms/commit/1e560a5e6822ae8f776dd620ab9dc58ad3e62379))
+* sign-in, password, setup and API docs pages are fully translated ([#1280](https://github.com/ansibleforms/ansibleforms/issues/1280)) ([8eb0ce6](https://github.com/ansibleforms/ansibleforms/commit/8eb0ce689ef20808d20469ea03f491ed43a16d31))
+* the forms designer writes one list item per line ([#1284](https://github.com/ansibleforms/ansibleforms/issues/1284)) ([a3520df](https://github.com/ansibleforms/ansibleforms/commit/a3520df13d0698ee9cafc4359b36374f6425721e))
+* the Run later panel is translated ([#1278](https://github.com/ansibleforms/ansibleforms/issues/1278)) ([536b7ef](https://github.com/ansibleforms/ansibleforms/commit/536b7ef24d9d84a0cc38f326f81aadfd8e519afd))
+* updating an SSO provider without its type keeps one provider per type ([#1273](https://github.com/ansibleforms/ansibleforms/issues/1273)) ([3639e96](https://github.com/ansibleforms/ansibleforms/commit/3639e96f45b7c15a717b24ccab73a36d50d3eed1))
+
 ## [7.4.2](https://github.com/ansibleforms/ansibleforms/compare/7.4.1...7.4.2) (2026-10-27)
 
 
