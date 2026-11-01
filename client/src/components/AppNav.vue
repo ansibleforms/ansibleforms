@@ -522,7 +522,7 @@ const buildMismatch = computed(() => {
             <button type="button" class="dropdown-item d-flex align-items-center" @click="showVersion = true">
               <span class="icon"><font-awesome-icon icon="circle-info" /></span>
               <span class="ms-2">{{ t('nav.about') }}</span>
-              <span class="ms-auto ps-3 af-menu-meta">v{{ store.version }}</span>
+              <span class="ms-auto ps-3 af-menu-version">v{{ store.version }}</span>
             </button>
           </li>
         </BsNavMenu>
@@ -934,6 +934,12 @@ const buildMismatch = computed(() => {
   }
   .af-menu-meta {
     color: var(--bs-secondary-color);
+    font-size: 0.85rem;
+  }
+  // the version beside About : smaller, in the row's own colour at all times (the meta grey stayed
+  // dark on a pressed row, whose text turns white)
+  .af-menu-version {
+    color: inherit;
     font-size: 0.85rem;
   }
   // how the account signs in (Local account, LDAP, Microsoft Entra ID) : a soft grey pill with
