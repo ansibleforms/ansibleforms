@@ -4,10 +4,10 @@
 # choose (examples/rte/Dockerfile.own-ansible).
 #
 #   ansibleforms-rte-base     this image
-#     └ ansibleforms-rte-core      + python, ansible-core and the essentials (docker/rte-core)
-#         └ ansibleforms-rte-full   + the ansible package, collections and libraries (docker/rte-full)
+#     └ ansibleforms-rte-core      + python, ansible-core and the essentials (docker/runner/rte-core)
+#         └ ansibleforms-rte-full   + the ansible package, collections and libraries (docker/runner/rte-full)
 #
-# Debian trixie, the current stable ; the python of the RTE layers comes from docker/rte-core
+# Debian trixie, the current stable ; the python of the RTE layers comes from docker/runner/rte-core
 # (3.14, through uv). Pinned by digest ; Dependabot proposes a new pin as a pull request.
 FROM node:26-trixie-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS builder
 
@@ -49,7 +49,7 @@ RUN mkdir -p /app/dist/persistent /home/node/.ssh /etc/ansible/collections /etc/
 
 ENV AF_ROLE=rte
 # never root : a playbook is code a form author wrote, and it runs as this user. A layer built
-# on this one switches to root for its installs and back to node at the end (docker/rte-core)
+# on this one switches to root for its installs and back to node at the end (docker/runner/rte-core)
 USER node
 ENV HOME=/home/node
 # the port takes a connection (server/healthcheck.js) ; its API answers only with the token

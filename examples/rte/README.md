@@ -10,9 +10,9 @@ it in three layers, each built on the one before. Build your own on the layer th
 | `ghcr.io/ansibleforms/ansibleforms-rte-core` | the base + python 3.14, ansible-core and a few common libraries (`jmespath`, `netaddr`, `requests`, `paramiko`). No collections. | To build a **smaller** RTE with only the collections and libraries your playbooks use: [Dockerfile.netapp](Dockerfile.netapp), [Dockerfile.vmware](Dockerfile.vmware) |
 | `ghcr.io/ansibleforms/ansibleforms-rte-full` | the core + the `ansible` package on the same ansible-core, and what the AnsibleForms image had before 7: the NetApp, AWS and community collections, pandas, pyvmomi, boto3 and more | **The default.** Run it as it is: the Helm chart and the docker setup do, and playbooks from 6.5 find what they used. |
 
-What each layer adds: [docker/rte-base](../../docker/rte-base/Dockerfile), [docker/rte-core](../../docker/rte-core/Dockerfile)
-(with [docker/rte-core/requirements.txt](../../docker/rte-core/requirements.txt)), and
-[docker/rte-full](../../docker/rte-full/Dockerfile) (with [docker/rte-full/](../../docker/rte-full)).
+What each layer adds: [docker/runner/rte-base](../../docker/runner/rte-base/Dockerfile),
+[docker/runner/rte-core](../../docker/runner/rte-core/Dockerfile) (with [docker/runner/rte-core/requirements.txt](../../docker/runner/rte-core/requirements.txt)), and
+[docker/runner/rte-full](../../docker/runner/rte-full/Dockerfile) (with [docker/runner/rte-full/](../../docker/runner/rte-full)).
 
 ## Build and run it
 

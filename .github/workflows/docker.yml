@@ -67,7 +67,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-base/Dockerfile
+          file: docker/runner/rte-base/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-base:ci
           build-args: |
@@ -80,7 +80,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-core/Dockerfile
+          file: docker/runner/rte-core/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-core:ci
           build-args: |
@@ -92,7 +92,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-full/Dockerfile
+          file: docker/runner/rte-full/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-full:ci
           build-args: |

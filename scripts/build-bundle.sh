@@ -18,7 +18,7 @@
 #     ansibleforms/bin/ytt         ytt, at the version and checksum of docker/controller/Dockerfile
 #     ansibleforms/rte/            the python requirements and collections of the RTE images
 #     ansibleforms/versions.env    the Node.js major (.nvmrc), and the Python and uv versions
-#                                  of docker/rte-core/Dockerfile, which the installer installs
+#                                  of docker/runner/rte-core/Dockerfile, which the installer installs
 #   ansibleforms-<version>-linux-<arch>.tar.gz.sha256
 
 set -euo pipefail
@@ -39,8 +39,8 @@ esac
 # one source for each version: the files the images are built from
 arg() { sed -n "s/^ARG $1=//p" "$2" | head -1; }
 NODE_MAJOR="$(tr -d '[:space:]v' < .nvmrc)"
-PYTHON_VERSION="$(arg PYTHON_VERSION docker/rte-core/Dockerfile)"
-UV_VERSION="$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' docker/rte-core/Dockerfile | head -1)"
+PYTHON_VERSION="$(arg PYTHON_VERSION docker/runner/rte-core/Dockerfile)"
+UV_VERSION="$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' docker/runner/rte-core/Dockerfile | head -1)"
 YTT_VERSION="$(arg YTT_VERSION docker/controller/Dockerfile)"
 YTT_SHA256="$(arg "YTT_SHA256_${ARCH^^}" docker/controller/Dockerfile)"
 for v in NODE_MAJOR PYTHON_VERSION UV_VERSION YTT_VERSION YTT_SHA256; do
@@ -87,9 +87,9 @@ curl -fsSL -o "$STAGE/bin/ytt" "https://github.com/carvel-dev/ytt/releases/downl
 echo "$YTT_SHA256  $STAGE/bin/ytt" | sha256sum -c -
 chmod +x "$STAGE/bin/ytt"
 
-cp docker/rte-core/requirements.txt "$STAGE/rte/requirements-core.txt"
-cp docker/rte-full/requirements.txt "$STAGE/rte/requirements-full.txt"
-cp docker/rte-full/collections.yml "$STAGE/rte/collections.yml"
+cp docker/runner/rte-core/requirements.txt "$STAGE/rte/requirements-core.txt"
+cp docker/runner/rte-full/requirements.txt "$STAGE/rte/requirements-full.txt"
+cp docker/runner/rte-full/collections.yml "$STAGE/rte/collections.yml"
 
 cat > "$STAGE/versions.env" <<EOF
 VERSION=$VERSION

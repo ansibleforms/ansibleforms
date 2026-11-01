@@ -1,12 +1,12 @@
 name: Publish
 
-# Builds and pushes the images, all with the same tags : the application (ansibleforms,
-# docker/controller/Dockerfile) and the runtime environment that runs its playbooks, in three layers -
-# ansibleforms-rte-base, ansibleforms-rte-core and ansibleforms-rte-full (docker/rte-base,
-# docker/rte-core and docker/rte-full). Called by release.yml when a release is created
-# and by rc.yml for a release candidate. "Run workflow" re-publishes an existing release tag,
-# for when a push failed half way. The tags are the list in installation.md (Image
-# tags) of ansibleforms/website - change that list and this together, never one of them :
+# Builds and pushes the images, all with the same tags : the controller (ansibleforms,
+# docker/controller) and the runtime environment that runs its playbooks, in three layers -
+# ansibleforms-rte-base, ansibleforms-rte-core and ansibleforms-rte-full (docker/runner/rte-*).
+# Called by release.yml when a release is created and by rc.yml for a release candidate.
+# "Run workflow" re-publishes an existing release tag, for when a push failed half way. The
+# tags are the list in installation.md (Image tags) of ansibleforms/website - change that list
+# and this together, never one of them :
 #   release 6.5.3     -> 6.5.3, 6.5, 6 and latest - each only while it is the highest of
 #                        its kind, so a patch on an older line never moves them backwards ;
 #                        a release that takes latest takes latest-rc too, so a test server
@@ -116,7 +116,7 @@ jobs:
           tags="${tags#,}"
           echo "list=$tags" >> "$GITHUB_OUTPUT"
           echo "$tags" | tr ',' '\n'
-          # the three RTE layers (docker/rte-base, rte-core, rte-full) : the same tags on
+          # the three RTE layers (docker/runner/rte-base, rte-core, rte-full) : the same tags on
           # their own image names
           for image in rte-base rte-core rte-full; do
             list=""
@@ -160,7 +160,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-base/Dockerfile
+          file: docker/runner/rte-base/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.rte_base }}
           build-args: |
@@ -175,7 +175,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-core/Dockerfile
+          file: docker/runner/rte-core/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.rte_core }}
           build-args: |
@@ -188,7 +188,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/rte-full/Dockerfile
+          file: docker/runner/rte-full/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.rte_full }}
           build-args: |

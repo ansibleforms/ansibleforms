@@ -107,18 +107,18 @@ and with the same tags as the app :
 
 | Image | Dockerfile | Adds |
 |---|---|---|
-| `ansibleforms-rte-base` | `docker/rte-base/Dockerfile` | node (`node:26-trixie-slim`, pinned by digest) and the server, git, ssh - no python, no ansible |
-| `ansibleforms-rte-core` | `docker/rte-core/Dockerfile` | python and the packages in `docker/rte-core/requirements.txt` (ansible-core and a few libraries) |
-| `ansibleforms-rte-full` | `docker/rte-full/Dockerfile` | the `ansible` package matching rte-core's ansible-core, the libraries and collections the 6.5 image had : `docker/rte-full/requirements.txt`, `collections.yml` and a few os tools |
+| `ansibleforms-rte-base` | `docker/runner/rte-base/Dockerfile` | node (`node:26-trixie-slim`, pinned by digest) and the server, git, ssh - no python, no ansible |
+| `ansibleforms-rte-core` | `docker/runner/rte-core/Dockerfile` | python and the packages in `docker/runner/rte-core/requirements.txt` (ansible-core and a few libraries) |
+| `ansibleforms-rte-full` | `docker/runner/rte-full/Dockerfile` | the `ansible` package matching rte-core's ansible-core, the libraries and collections the 6.5 image had : `docker/runner/rte-full/requirements.txt`, `collections.yml` and a few os tools |
 
-- **Updates** : Dependabot moves the node pin in `docker/rte-base/Dockerfile` and the python pins
-  in `docker/rte*/requirements.txt`. Each one is a pull request, so an image changes only with a
-  commit. The collections of `-full` take their latest version at build time.
-- **The chain** : `docker/rte-core` and `docker/rte-full` take `BASE_IMAGE`. `publish.yml` passes
-  the digest it just pushed, and the Docker check (`docker.yml`) does the same through a
-  registry that lives only for the job. Built by hand, they default to the published `:7`.
-- The controller (`docker/controller/Dockerfile`) needs only node, git, ssh, the mariadb client and ytt, and builds from
-  `node:26-trixie-slim` (pinned by digest, moved by Dependabot).
+- **Updates** : Dependabot moves the node pin in `docker/runner/rte-base/Dockerfile` and the
+  python pins in `docker/runner/rte*/requirements.txt`. Each one is a pull request, so an image
+  changes only with a commit. The collections of `-full` take their latest version at build time.
+- **The chain** : `docker/runner/rte-core` and `rte-full` take `BASE_IMAGE`. `publish.yml` passes
+  the digest it just pushed, and the Docker check (`docker.yml`) does the same through a registry
+  that lives only for the job. Built by hand, they default to the published `:7`.
+- The controller (`docker/controller/Dockerfile`) needs only node, git, ssh, the mariadb client
+  and ytt, and builds from `node:26-trixie-slim` (pinned by digest, moved by Dependabot).
 
 ## A patch release of 6.x
 
