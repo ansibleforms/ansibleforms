@@ -1412,6 +1412,7 @@ export default {
         "{key} lus depuis config.yaml : obsolète, déplacez-les dans un fichier à eux, {file} par exemple (config.yaml n'est plus lu en 8.0.0)",
       configNotRead:
         "{file} n'est pas lu ({reason}) : les {key} lus en dernier depuis ce fichier, sinon ceux de la configuration de base, sont utilisés jusqu'à sa correction dans git",
+      rolesNotice: 'Rôles : {line}',
       configRolesNotRead:
         "{file} n'est pas lu ({reason}) : les rôles lus en dernier depuis ce fichier sont utilisés jusqu'à sa correction dans git, sinon seulement le rôle admin de local/admins, jamais ceux de la configuration de base",
       usagePreviewFailed:

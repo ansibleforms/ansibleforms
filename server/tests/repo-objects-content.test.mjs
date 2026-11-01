@@ -588,12 +588,25 @@ describe("the roles, the categories and the constants, by their key", () => {
     assert.deepEqual((await keys.keySources()).map((s) => [s.key, s.file, s.exists])[0], ["roles", "roles.yaml", true]);
   });
 
-  test("two files giving them : neither read, both named", async () => {
-    write("access", "a.yaml", { controller_roles: [{ name: "admin" }] });
-    write("access", "b/c.yaml", { controller_roles: [{ name: "admin", users: ["local/eve"] }] });
+  test("two files giving the roles : both read, one list ; a name given in both refused, both named", async () => {
+    write("access", "a.yaml", { controller_roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }] });
+    write("access", "b/c.yaml", { controller_roles: [{ name: "ops", users: ["local/eve"] }] });
+    assert.deepEqual(await keys.repositoryKeyProblems("access"), []);
+    const [roles] = await keys.keySources();
+    assert.deepEqual(roles.files, ["a.yaml", "b/c.yaml"]);
+    // ops given again in a.yaml : refused, both places said, the others served
+    write("access", "a.yaml", { controller_roles: [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }, { name: "ops", groups: ["local/ops"] }] });
+    const notices = await keys.repositoryKeyNotices("access");
+    assert.ok(notices.some((n) => /the name 'ops' is given twice: a\.yaml, entry 3 and b\/c\.yaml, entry 1/.test(n)), notices.join("\n"));
+  });
+
+  test("two files giving the constants : neither read, both named", async () => {
+    fx.rowNamed("repositories", "access").use_for_roles = 0;
+    write("access", "a.yaml", { controller_constants: { a: 1 } });
+    write("access", "b/c.yaml", { controller_constants: { b: 2 } });
     const problems = await keys.repositoryKeyProblems("access");
     assert.equal(problems.length, 1);
-    assert.equal(problems[0].reason, "2 files give its roles (a.yaml, b/c.yaml): one file at most gives them");
+    assert.equal(problems[0].reason, "2 files give its constants (a.yaml, b/c.yaml): one file at most gives them");
   });
 
   test("a scan reads each file once : unchanged files are not parsed again", () => {

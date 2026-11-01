@@ -9,7 +9,7 @@ import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import RepoObjects from '../../lib/repoObjects/index.js';
-import { repositoryDeprecations, repositoryKeyProblems } from '../../lib/configKeys.js';
+import { repositoryDeprecations, repositoryKeyProblems, repositoryKeyNotices } from '../../lib/configKeys.js';
 import Form from '../../models/form.model.js';
 import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 import _ from 'lodash';
@@ -224,6 +224,8 @@ const findByName = async function(req, res) {
     if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
     // and those of its key files that are not read : why, said on its page
     if (repository) repository.keyProblems = await repositoryKeyProblems(repository.name).catch(() => []);
+    // and what is said of its roles, role by role (refused, kept, naming what is not there)
+    if (repository) repository.keyNotices = await repositoryKeyNotices(repository.name).catch(() => []);
     // a form name it shares with another forms repository : which copy is used, which skipped
     // (without designAllForms, only those naming forms the user's roles reach ; the roles not sent)
     if (repository?.use_for_forms) {

@@ -491,6 +491,11 @@ onMounted(async () => {
                 t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })
               }}
             </div>
+            <!-- its roles, role by role : one refused (its last version served), a required one kept,
+                 a group, user or runner one names that is not there -->
+            <div v-for="(line, i) in repo.keyNotices || []" :key="'n' + i" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{ t('settings.repositories.rolesNotice', { line }) }}
+            </div>
             <!-- a roles, categories or constants file it holds that is not read : why, what is used meanwhile
                  (the roles never the base configuration's) -->
             <div v-for="d in repo.keyProblems || []" :key="'k' + d.key" class="alert alert-danger py-2">

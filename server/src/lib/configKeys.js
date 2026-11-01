@@ -23,7 +23,8 @@ import Errors from "./errors.js";
 import mysql from "../models/db.model.js";
 import Repo from "../models/repo.model.js";
 import _ from "lodash";
-import { updateMapFile, newMapFile, editedText, parseDocument, keptAsParsed, writtenText } from "./repoObjects/yamlFile.js";
+import { updateMapFile, newMapFile, editedText, parseDocument, keptAsParsed, writtenText, editListEntry, appendListEntries, removeListEntry } from "./repoObjects/yamlFile.js";
+import { servedRoles, missingReferences } from "./configRoles.js";
 import { scanRepository } from "./repoObjects/repoFiles.js";
 import { fileKeyOf, typeKeyOf } from "./repoObjects/types.js";
 
@@ -44,7 +45,9 @@ export const CLOSED_ROLES = Object.freeze([
   Object.freeze({ name: "default", groups: Object.freeze([]) }),
 ]);
 export const CONFIG_KEYS = [
-  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: CLOSED_ROLES },
+  // the roles : each checked on its own, and spread over as many files as the repository likes
+  // (multi : lib/configRoles.js) ; the categories and the constants : one file each
+  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: CLOSED_ROLES, multi: true },
   { key: "categories", flag: "use_for_categories", file: "categories.yaml", list: true },
   { key: "constants", flag: "use_for_constants", file: "constants.yaml", list: false },
 ];
@@ -119,7 +122,9 @@ export async function keySources() {
     const named = path.join(dir, k.file);
     const legacy = path.join(dir, LEGACY_FILE);
     if (own.length) {
-      out.push({ ...k, file: own[0], repository: repo.name, path: path.join(dir, own[0]), deprecated: false, exists: true, ...(own.length > 1 ? { several: own } : {}) });
+      // the roles from each file giving them (files) ; another key from one file at most
+      const spread = own.length > 1 ? (k.multi ? { files: own } : { several: own }) : {};
+      out.push({ ...k, file: own[0], repository: repo.name, path: path.join(dir, own[0]), deprecated: false, exists: true, ...spread });
     } else if (fs.existsSync(named)) {
       // no file gives it, but its own file is there (a typo in its key, a plain map) : read, and
       // not taken (keyDocument) - never the base's in its place, the roles closed
@@ -169,7 +174,8 @@ export async function repositoryDeprecations(name) {
 export async function deprecationLines(name) {
   try {
     const problems = (await repositoryKeyProblems(name)).map((p) => `\nNot read: ${p.file}: ${p.reason} - the ${p.key} last read from it (else ${meanwhile(p.key)}) are used until it is fixed`);
-    return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("") + problems.join("");
+    const notices = (await repositoryKeyNotices(name)).map((line) => `\nRoles: ${line}`);
+    return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("") + problems.join("") + notices.join("");
   } catch (e) {
     logger.debug(`Could not read the configuration keys of repository '${name}': ${e.message}`);
     return "";
@@ -331,6 +337,7 @@ const heldKey = (source) => `${source.repository}\n${source.key}`;
 export function resetKeyReadsForTests() {
   lastRead.clear();
   lastHeld.clear();
+  lastRoles.clear();
   reported.clear();
 }
 
@@ -397,7 +404,7 @@ export function composeConfig(baseText, sources, render) {
     try {
       const absent = absentProblem(s);
       if (absent) throw new Error(absent);
-      from = { doc: keyDocument(s, render(s.path)), key: fileKeyIn(s) };
+      from = s.multi ? rolesDocument(s, render) : { doc: keyDocument(s, render(s.path)), key: fileKeyIn(s) };
       lastRead.set(readKey(s), from);
       lastHeld.set(heldKey(s), from);
       reported.delete(readKey(s));
@@ -417,6 +424,89 @@ export function composeConfig(baseText, sources, render) {
     text = withKeyOf(text, s.key, from.doc, from.key, false);
   }
   return text;
+}
+
+// each role as last served from a repository on this node, by the repository and its name : what a
+// role refused now is served as meanwhile (lib/configRoles.js servedRoles)
+const lastRoles = new Map();
+const rolesOf = (source) => {
+  if (!lastRoles.has(heldKey(source))) lastRoles.set(heldKey(source), new Map());
+  return lastRoles.get(heldKey(source));
+};
+
+/**
+ * The files a key is read from : every file of its repository giving it (the roles), else its one
+ * file - each relative to the repository, with its path.
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   object[]: [{ file, path }].
+ */
+const filesOf = (source) =>
+  source.files ? source.files.map((file) => ({ file, path: path.join(Repo.folderOf(source.repository), file) })) : [{ file: source.file || path.basename(source.path), path: source.path }];
+
+/**
+ * The roles of a repository read from each of its files, each role checked on its own
+ * (lib/configRoles.js servedRoles) : the document they are served as, and what was refused.
+ *
+ * Args:
+ *   source (object): the roles' source (keySources).
+ *   render (function): (file) => its text (the file read, or rendered with ytt).
+ *   last (Map): the roles last served (rolesOf) ; a copy is given to only look (keyFileProblem).
+ *
+ * Returns:
+ *   object: { doc (the document : the file's own when one file gives them as served, its comments
+ *     kept ; else the roles served, as YAML writes them), key (as the document writes it), problems }.
+ *
+ * Raises:
+ *   Error: no file gives them in a way that can be read (one file only, not read) : the caller
+ *     serves them as last read.
+ */
+function rolesDocument(source, render, last = rolesOf(source)) {
+  const key = fileKeyIn(source);
+  const files = filesOf(source).map((f) => {
+    try {
+      const doc = keyDocument(source, render(f.path));
+      const value = (doc.toJS() || {})[key];
+      return { file: f.file, roles: Array.isArray(value) ? value : [], doc };
+    } catch (e) {
+      return { file: f.file, roles: null, problem: e.message };
+    }
+  });
+  // its one file not read : as a key whose file is not read (composeConfig)
+  if (files.length === 1 && files[0].roles === null) throw new Error(files[0].problem);
+  const served = servedRoles(files, last, CLOSED_ROLES);
+  for (const line of served.problems) {
+    const said = `${source.repository}: ${line}`;
+    if (!reported.has(said)) logger.warning(said);
+    reported.set(said, said);
+  }
+  const said = { key, problems: served.problems, blocking: served.blocking };
+  if (!served.changed && files.length === 1) return { doc: files[0].doc, ...said };
+  // one file : its own document, each role served as it is there keeping its node (its comments),
+  // a role refused replaced by its last version or left out, a required one added at the end
+  if (files.length === 1 && files[0].doc) {
+    const doc = files[0].doc;
+    const seq = doc.contents.get(key, true);
+    if (YAML.isSeq(seq)) {
+      const byName = new Map(served.roles.map((r) => [r.name, r]));
+      const placed = new Set();
+      const items = [];
+      for (const item of seq.items) {
+        const role = YAML.isNode(item) ? item.toJS(doc) : item;
+        const want = role && typeof role === "object" ? byName.get(role.name) : undefined;
+        if (!want || placed.has(want.name)) continue;
+        placed.add(want.name);
+        items.push(_.isEqual(role, want) ? item : doc.createNode(want));
+      }
+      for (const role of served.roles) if (!placed.has(role.name)) items.push(doc.createNode(role));
+      seq.items = items;
+      return { doc, ...said };
+    }
+  }
+  return { doc: mapDocument(YAML.stringify({ [key]: served.roles })), ...said };
 }
 
 /**
@@ -463,6 +553,20 @@ function keyDocument(source, text) {
  */
 export function keyFileProblem(source) {
   if (!source.exists) return null;
+  // the roles over several files : the files not read (a role refused is no file's problem :
+  // repositoryKeyNotices)
+  if (source.files) {
+    const unread = [];
+    for (const f of filesOf(source)) {
+      try {
+        const text = fs.readFileSync(f.path, "utf8");
+        if (!isTemplate(text)) keyDocument(source, text);
+      } catch (e) {
+        unread.push(`${f.file}: ${e.message || e}`);
+      }
+    }
+    return unread.length ? unread.join("; ") : null;
+  }
   try {
     const text = fs.readFileSync(source.path, "utf8");
     if (isTemplate(text)) return null;
@@ -492,6 +596,31 @@ export async function repositoryKeyProblems(name) {
   return out;
 }
 
+/**
+ * What is said of the roles a repository holds, role by role, for its pull output and its page :
+ * each role refused (its last version served, else left out), each required role kept, and what
+ * the roles name that is not there. None of them stops the roles being served.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<string[]>: the lines ; none when there is nothing to say (or its files are not read :
+ *     repositoryKeyProblems says it).
+ */
+export async function repositoryKeyNotices(name) {
+  const s = (await keySources()).find((x) => x.multi && x.repository === name);
+  if (!s || !s.exists || absentProblem(s) || keyFileProblem(s)) return [];
+  try {
+    const read = rolesDocument(s, (p) => fs.readFileSync(p, "utf8"), new Map(rolesOf(s)));
+    const roles = read.doc.toJS()?.[fileKeyIn(s)] || [];
+    return [...read.problems, ...(await missingReferences(roles))];
+  } catch {
+    // its files not read : repositoryKeyProblems says it
+    return [];
+  }
+}
+
 // ===========================================================================
 // WRITE : EACH KEY BACK TO ITS FILE
 // ===========================================================================
@@ -519,6 +648,16 @@ export function assertKeysWritable(doc, sources, served) {
     if (s.missing) refused.push(`The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`);
     else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, a ytt template: change them in git`);
     else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, which is not read (${keyFileProblem(s)}): fix it in git`);
+    else if (s.multi && s.exists) {
+      // a role refused in git : a save would overwrite it with what the app serves meanwhile
+      let blocking = [];
+      try {
+        blocking = rolesDocument(s, (p) => fs.readFileSync(p, "utf8"), new Map(rolesOf(s))).blocking;
+      } catch {
+        blocking = [];
+      }
+      if (blocking.length) refused.push(`The roles of repository '${s.repository}' cannot be saved while git has a role it refuses (${blocking.join("; ")}): fix it in git first`);
+    }
   }
   if (refused.length) throw new Errors.ConflictError(refused.join("; "));
 }
@@ -570,6 +709,11 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
     const prior = opts.claim ? await Repository.claimForWrite(repository) : undefined;
     try {
       for (const s of list) {
+        // the roles spread over several files : each role written where it is, only those changed
+        if (s.files) {
+          writeRolesAcross(s, doc[s.key]);
+          continue;
+        }
         const text = fs.existsSync(s.path) ? fs.readFileSync(s.path, "utf8") : "";
         let next;
         // the key as its file writes it (controller_roles ; roles in config.yaml of before)
@@ -584,6 +728,55 @@ export async function writeConfigKeys(doc, sources, opts = {}) {
     }
   }
   return { rest: withoutHeldKeys(doc, sources), repositories: [...byRepo.keys()] };
+}
+
+/**
+ * Writes the roles a repository spreads over several files, each where it is : a role changed is
+ * rewritten in its entry (the file's other entries, its comments, kept), a role gone is taken out of
+ * its file, a new one goes at the end of the first file. A role as it is in its file is not touched.
+ *
+ * Args:
+ *   source (object): the roles' source (keySources, with its files).
+ *   roles (object[]): the roles saved.
+ *
+ * Returns:
+ *   void
+ */
+function writeRolesAcross(source, roles) {
+  const key = fileKeyIn(source);
+  const files = filesOf(source).map((f) => ({ ...f, text: fs.readFileSync(f.path, "utf8") }));
+  // where each role is now, and as it is there
+  const where = new Map();
+  for (const f of files) {
+    const list = (YAML.parse(f.text) || {})[key];
+    for (const role of Array.isArray(list) ? list : []) if (role?.name && !where.has(role.name)) where.set(role.name, { f, role });
+  }
+  const saved = new Map((roles || []).map((r) => [r.name, r]));
+  // gone : out of its file
+  for (const [name, at] of where) {
+    if (saved.has(name)) continue;
+    at.f.text = removeListEntry(at.f.text, key, name).text;
+  }
+  // changed : its entry rewritten whole ; new : at the end of the first file
+  const added = [];
+  for (const role of roles || []) {
+    const at = where.get(role.name);
+    if (!at) {
+      added.push(role);
+      continue;
+    }
+    if (_.isEqual(at.role, role)) continue;
+    at.f.text = editListEntry(at.f.text, key, role.name, (d, map) => {
+      map.items = d.createNode(role).items;
+    });
+  }
+  if (added.length) files[0].text = appendListEntries(files[0].text, key, added);
+  for (const f of files) {
+    if (f.text !== fs.readFileSync(f.path, "utf8")) {
+      fs.writeFileSync(f.path, f.text, "utf8");
+      logger.info(`Saved the roles into ${source.repository}/${f.file}`);
+    }
+  }
 }
 
 /**

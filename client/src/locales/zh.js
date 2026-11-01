@@ -1360,6 +1360,7 @@ export default {
         '{key} 从 config.yaml 读取：已弃用，请移至单独的文件，例如 {file}（8.0.0 起不再读取 config.yaml）',
       configNotRead:
         '{file} 未被读取（{reason}）：在 git 中修复之前，使用最后一次从中读取的 {key}（若无则使用基础配置中的）',
+      rolesNotice: '角色：{line}',
       configRolesNotRead:
         '{file} 未被读取（{reason}）：在 git 中修复之前，使用最后一次从中读取的角色；若无则仅使用 local/admins 的 admin 角色，绝不使用基础配置中的角色',
       usagePreviewFailed: '无法从服务器读取此更改将执行的操作：如果继续，更改仍会应用。',

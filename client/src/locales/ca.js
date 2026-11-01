@@ -1410,6 +1410,7 @@ export default {
         '{key} llegits de config.yaml: obsolet, mou-los a un fitxer propi, {file} per exemple (config.yaml ja no es llegeix a la 8.0.0)',
       configNotRead:
         "{file} no es llegeix ({reason}): s'utilitzen els {key} llegits d'aquest fitxer per última vegada, si no els de la configuració base, fins que es corregeixi a git",
+      rolesNotice: 'Rols: {line}',
       configRolesNotRead:
         "{file} no es llegeix ({reason}): s'utilitzen els rols llegits d'aquest fitxer per última vegada fins que es corregeixi a git, si no només el rol admin de local/admins, mai els de la configuració base",
       usagePreviewFailed: "No s'ha pogut llegir del servidor què farà aquest canvi: s'aplica igualment si continues.",

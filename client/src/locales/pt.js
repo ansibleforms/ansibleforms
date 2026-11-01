@@ -1410,6 +1410,7 @@ export default {
         '{key} lidos de config.yaml: obsoleto, mova-os para um ficheiro próprio, {file} por exemplo (config.yaml deixa de ser lido na 8.0.0)',
       configNotRead:
         '{file} não é lido ({reason}): são usados os {key} lidos dele pela última vez, senão os da configuração base, até ser corrigido no git',
+      rolesNotice: 'Funções: {line}',
       configRolesNotRead:
         '{file} não é lido ({reason}): são usadas as funções lidas dele pela última vez até ser corrigido no git, senão apenas a função admin de local/admins, nunca as da configuração base',
       usagePreviewFailed:
