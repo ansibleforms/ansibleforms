@@ -43,12 +43,14 @@ updates:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
 
-  # Moves the digest pins (the docker updater reads every file named *Dockerfile* in the
-  # directory) : node:26-trixie(-slim) in Dockerfile, the app, and node:26-trixie-slim in
-  # Dockerfile.rte-base, and the uv image Dockerfile.rte-core takes its python from.
-  # Dockerfile.rte-core and .rte-full otherwise build FROM our own layers (BASE_IMAGE).
+  # Moves the digest pins (one Dockerfile per image folder) : node:26-trixie(-slim) in
+  # docker/controller, node:26-trixie-slim in docker/runner/rte-base, and the uv image
+  # docker/runner/rte-core takes its python from. rte-core and rte-full otherwise build FROM our
+  # own layers (BASE_IMAGE).
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /docker/controller
+      - /docker/runner/*
     schedule:
       interval: daily
     commit-message:
@@ -58,12 +60,12 @@ updates:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
 
-  # The python packages of the RTE images (docker/rte-core for ansibleforms-rte-core, docker/rte-full
-  # for ansibleforms-rte-full) : pinned, so an image changes only with a commit here
+  # The python packages of the RTE images (docker/runner/rte-core for ansibleforms-rte-core,
+  # docker/runner/rte-full for ansibleforms-rte-full) : pinned, so an image changes only with a commit here
   - package-ecosystem: pip
     directories:
-      - /docker/rte-core
-      - /docker/rte-full
+      - /docker/runner/rte-core
+      - /docker/runner/rte-full
     schedule:
       interval: weekly
     commit-message:

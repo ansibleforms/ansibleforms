@@ -1,7 +1,7 @@
-# The AnsibleForms RTE, layer 3 of 3 - the one to run : the RTE (Dockerfile.rte-core) + the
+# The AnsibleForms RTE, layer 3 of 3 - the one to run : the RTE (docker/runner/rte-core) + the
 # ansible package with its collections, at the version that matches rte-core's ansible-core,
-# the python libraries (docker/rte-full/requirements.txt), the NetApp, AWS and community
-# collections (docker/rte-full/collections.yml) and the os tools the AnsibleForms 6.5 image had.
+# the python libraries (docker/runner/rte-full/requirements.txt), the NetApp, AWS and community
+# collections (docker/runner/rte-full/collections.yml) and the os tools the AnsibleForms 6.5 image had.
 # The default of the Helm chart and the docker setup : playbooks from 6.5 find what they used.
 #
 # Want a smaller image ? Take ansibleforms-rte-core and add only what your playbooks use.
@@ -35,8 +35,8 @@ RUN apt-get update \
  && echo "$sum  /usr/local/bin/ytt" | sha256sum -c - \
  && chmod +x /usr/local/bin/ytt
 
-COPY ./docker/rte-full/requirements.txt /tmp/full-requirements.txt
-COPY ./docker/rte-full/collections.yml /tmp/full-collections.yml
+COPY ./docker/runner/rte-full/requirements.txt /tmp/full-requirements.txt
+COPY ./docker/runner/rte-full/collections.yml /tmp/full-collections.yml
 RUN pip install --no-cache-dir -r /tmp/full-requirements.txt \
  && ansible-galaxy collection install -r /tmp/full-collections.yml -p /usr/share/ansible/collections \
  && rm /tmp/full-requirements.txt /tmp/full-collections.yml

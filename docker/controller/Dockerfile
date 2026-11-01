@@ -1,5 +1,5 @@
 # The app runs on plain node: it spawns git, ssh, ssh-keyscan, ssh-keygen, mariadb-dump,
-# mariadb, ytt, ps and sh, never ansible or python (playbooks run on an RTE, Dockerfile.rte-*).
+# mariadb, ytt, ps and sh, never ansible or python (playbooks run on an RTE, docker/runner/rte-*).
 # Both node images are pinned by DIGEST, not by tag : a new node build moves the tag, and
 # without the pin that would silently change what every application build starts from - with
 # no commit here to show for it. Dependabot proposes a new pin as a pull request.

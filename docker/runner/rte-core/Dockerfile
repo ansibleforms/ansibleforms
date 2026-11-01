@@ -1,13 +1,13 @@
 # The AnsibleForms RTE, layer 2 of 3 - the one to build on : the base
-# (Dockerfile.rte-base) + python 3.14, ansible-core and the few libraries most playbooks expect
-# (docker/rte-core/requirements.txt). No collections : add the ones your playbooks use.
+# (docker/runner/rte-base) + python 3.14, ansible-core and the few libraries most playbooks expect
+# (requirements.txt, beside this file). No collections : add the ones your playbooks use.
 #
 #   FROM ghcr.io/ansibleforms/ansibleforms-rte-core:7
 #   RUN ansible-galaxy collection install vmware.vmware -p /usr/share/ansible/collections
 #   RUN pip install --no-cache-dir pyvmomi
 #
 # More in examples/rte. Ready to run, with the collections and libraries most playbooks use :
-# ansibleforms-rte-full (Dockerfile.rte-full).
+# ansibleforms-rte-full (docker/runner/rte-full).
 #
 # BASE_IMAGE : CI passes the base it built in the same run, by digest (publish.yml).
 ARG BASE_IMAGE=ghcr.io/ansibleforms/ansibleforms-rte-base:7
@@ -35,7 +35,7 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
  && chmod -R a+rX /opt/python /venv
 ENV PATH="/venv/bin:$PATH"
 
-COPY ./docker/rte-core/requirements.txt /tmp/rte-requirements.txt
+COPY ./docker/runner/rte-core/requirements.txt /tmp/rte-requirements.txt
 RUN pip install --no-cache-dir -r /tmp/rte-requirements.txt && rm /tmp/rte-requirements.txt
 COPY ./server/ansible.cfg /etc/ansible/ansible.cfg
 
