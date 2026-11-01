@@ -36,6 +36,7 @@ import { useFormLinks } from '@/composables/useFormLinks';
 import { useUserLinks } from '@/composables/useUserLinks';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -226,13 +227,29 @@ const details = computed(() =>
   user.value
     ? [
         { key: 'username', icon: 'user', label: t('settings.fields.username'), value: user.value.username },
-        { key: 'source', icon: 'right-to-bracket', label: t('settings.directory.source'), value: sourceName.value },
+        {
+          key: 'signInSource',
+          icon: 'right-to-bracket',
+          label: t('settings.directory.source'),
+          value: sourceName.value,
+        },
         {
           key: 'name',
           icon: 'id-card',
           label: t('settings.directory.displayName'),
-          value: user.value.description || '–',
+          value: user.value.display_name || '–',
         },
+        // what an admin or its repository entry says it is : only when one says it
+        ...(user.value.note
+          ? [
+              {
+                key: 'description',
+                icon: 'info-circle',
+                label: t('settings.fields.description'),
+                value: user.value.note,
+              },
+            ]
+          : []),
         { key: 'email', icon: 'envelope', label: t('settings.fields.email'), value: user.value.email || '–' },
         {
           key: 'first',
@@ -263,6 +280,7 @@ const { search, searching, matches, matchingKeys, shownTabs, tabShown, searchHea
 });
 const shownFields = computed(() =>
   matchingKeys([
+    ...repositorySourceFields(t, user.value || {}),
     ...details.value.map((d) => [d.key, d.label, d.value]),
     [
       'signIn',
@@ -487,7 +505,10 @@ onMounted(async () => {
           <div v-if="tab.key === 'details'" class="af-user-details">
             <template v-if="!searching">
               <div v-if="!user.seen" class="alert alert-secondary py-2">
-                <FaIcon icon="circle-info" class="me-2" />{{ t('settings.directory.neverNote') }}
+                <!-- never signed in : declared by its repository entry, else named by a role -->
+                <FaIcon icon="circle-info" class="me-2" />{{
+                  t(user.repository ? 'settings.directory.repoNeverNote' : 'settings.directory.neverNote')
+                }}
               </div>
               <div v-else class="alert alert-secondary py-2">
                 <FaIcon icon="circle-info" class="me-2" />{{
@@ -495,6 +516,8 @@ onMounted(async () => {
                 }}
               </div>
             </template>
+            <!-- where it comes from : the users repository's entry ; nothing for one it does not hold -->
+            <AppRepositorySource v-show="fieldShown('source')" :record="user" />
             <BsInput
               v-for="d in details"
               v-show="fieldShown(d.key)"

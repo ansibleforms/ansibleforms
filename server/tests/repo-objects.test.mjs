@@ -564,7 +564,7 @@ describe("the rules of the usages", () => {
 
   test("the types and their descriptors agree : what a runner names, every category, every flag once", () => {
     assert.deepEqual(runners.references.map((r) => r.type), types.typeOf("runners").references);
-    assert.equal(new Set(types.USAGE_FLAGS).size, 28);
+    assert.equal(new Set(types.USAGE_FLAGS).size, 30);
     // Appearance : one type per menu item, in the menu's order (Defaults, Logo, Icon, Name, Links ...)
     assert.deepEqual(types.USAGE_TYPES.filter((t) => t.category === "appearance").map((t) => t.key), ["defaults", "logo", "icon", "name", "links", "labels", "announcements"]);
     for (const key of ["defaults", "logo", "icon", "name"]) assert.equal(types.typeOf(key).oneOnly, true, key);

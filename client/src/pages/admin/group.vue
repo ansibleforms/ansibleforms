@@ -29,6 +29,7 @@ import { useFormLinks } from '@/composables/useFormLinks';
 import { formPath } from '@/lib/formsPath';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -250,6 +251,8 @@ const { search, searching, matches, matchingKeys, tableMatches, shownTabs, tabSh
 });
 const shownFields = computed(() =>
   matchingKeys([
+    // where it comes from : the groups repository's entry
+    ...repositorySourceFields(t, group.value || {}),
     ['name', t('settings.fields.name')],
     ['description', t('settings.fields.description')],
   ]),
@@ -370,6 +373,8 @@ onMounted(async () => {
           >
             <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
           </h6>
+          <!-- where it comes from : the groups repository's entry ; nothing for one it does not hold -->
+          <AppRepositorySource v-show="fieldShown('source')" :record="group" />
           <BsInput
             class="af-group-field"
             v-model="edit.name"

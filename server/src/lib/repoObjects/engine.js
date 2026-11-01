@@ -48,7 +48,7 @@ import mysql from "../../models/db.model.js";
 import CrudModel from "../../models/crud.model.js";
 import Repo from "../../models/repo.model.js";
 import Repository from "../../models/repository.model.js";
-import { fileBeside, fileInRepository, appendListEntries, editListEntry, removeListEntry, editMapEntry, applyEdits, hasListEntry, sortedByOrder } from "./yamlFile.js";
+import { fileBeside, fileInRepository, appendListEntries, editListEntry, removeListEntry, editMapEntry, applyEdits, hasListEntry, sortedByOrder, entryName } from "./yamlFile.js";
 import { scanRepository } from "./repoFiles.js";
 import { given } from "./secrets.js";
 import { isMasked } from "../secretMask.js";
@@ -86,7 +86,7 @@ export const nameKey = (name) => String(name || "").trim().toLowerCase();
 const declaredName = (desc, f) => {
   const asMap = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
   const field = desc.nameField || "name";
-  const n = f?.object?.name ?? asMap(f?.raw)?.[field] ?? asMap(f?.entry)?.[field];
+  const n = f?.object?.name ?? entryName(asMap(f?.raw), field) ?? entryName(asMap(f?.entry), field);
   return n === undefined || n === null || String(n).trim() === "" ? null : String(n);
 };
 
@@ -476,7 +476,7 @@ export function entryFileOf(desc, repository, name, hint = null) {
   }
   const found = scanOf(repository)
     .holding(desc.key)
-    .find((f) => Array.isArray(f.value) && f.value.some((e) => e && typeof e === "object" && nameKey(e[field]) === nameKey(name)));
+    .find((f) => Array.isArray(f.value) && f.value.some((e) => e && typeof e === "object" && nameKey(entryName(e, field)) === nameKey(name)));
   return found?.file || null;
 }
 
@@ -653,7 +653,7 @@ async function readEntries(desc, name, ctx, scan) {
       continue;
     }
     value.forEach((item, index) => {
-      const named = item && typeof item === "object" && !Array.isArray(item) ? item[desc.nameField || "name"] : undefined;
+      const named = entryName(item, desc.nameField || "name");
       const place = placeOf(file, named === undefined || named === null || String(named).trim() === "" ? null : String(named), index);
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         entries.push({ place, repoFile: file, index, entry: item, errors: ["an entry must be a dictionary"], object: null, absent: false });
@@ -733,7 +733,7 @@ function declaredOf(desc, row) {
     const holding = scanOf(row.repository).holding(desc.key);
     const ordered = [...holding.filter((f) => f.file === row.repo_file), ...holding.filter((f) => f.file !== row.repo_file)];
     for (const f of ordered) {
-      const entry = (Array.isArray(f.value) ? f.value : []).find((e) => e && typeof e === "object" && nameKey(e[field]) === nameKey(row.name));
+      const entry = (Array.isArray(f.value) ? f.value : []).find((e) => e && typeof e === "object" && nameKey(entryName(e, field)) === nameKey(row.name));
       if (entry) return entry;
     }
     return null;

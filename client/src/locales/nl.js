@@ -1114,6 +1114,8 @@ export default {
       forgetConfirm:
         "{name} vergeten? Het record verdwijnt en komt terug bij de volgende aanmelding. Jobs, opgeslagen jobs en schema's blijven.",
       blockedNote: 'Een beheerder blokkeerde deze gebruiker: sessies beëindigd, elke aanmelding geweigerd.',
+      repoNeverNote:
+        'De vermelding in zijn repository declareert deze gebruiker, maar die heeft nooit aangemeld: de groepen zijn bekend bij de eerste aanmelding.',
       neverNote: 'Genoemd in de rollen, nooit aangemeld: de groepen zijn bekend bij de eerste aanmelding.',
       readOnlyNote: 'Uit {source}: wie het is en de groepen, gelezen bij elke aanmelding, volgens de laatste.',
       groupReadOnlyNote: 'Deze groep komt uit {source}: de gebruikers die er bij hun laatste aanmelding in zaten.',
@@ -1339,6 +1341,9 @@ export default {
         sso: 'SSO-providers, items van een controller_sso:-lijst in een van zijn YAML-bestanden, die hun inloggegevens noemen',
         ldap: 'LDAP-directories, items van een controller_ldap:-lijst in een van zijn YAML-bestanden, in hun zoekvolgorde',
         disclaimer: 'Disclaimerversies, items van een controller_disclaimer:-lijst in een van zijn YAML-bestanden',
+        users:
+          'Gebruikers, lokaal en uit een directory, items van een controller_users:-lijst in een van zijn YAML-bestanden, wachtwoorden alleen als omgevingsverwijzingen',
+        groups: 'Lokale groepen en hun leden, items van een controller_groups:-lijst in een van zijn YAML-bestanden',
         credentials:
           'Inloggegevens, items van een controller_credentials:-lijst in een van zijn YAML-bestanden, geheimen alleen als omgevingsverwijzingen',
         secret_stores:

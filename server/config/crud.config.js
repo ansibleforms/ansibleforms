@@ -289,7 +289,11 @@ const crudConfigs = {
       { name: 'id', isKey: true },
       { name: 'name', isNaturalKey: true, required: true },
       // what the group is for, or who owns it
-      { name: 'description' }
+      { name: 'description' },
+      // the groups repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -309,7 +313,11 @@ const crudConfigs = {
       { name: 'blocked' },
       // its latest sign-in : read with the user, written by User.recordSignIn alone (at each
       // sign-in, lib/signInGate.js), never by a create or an update
-      { name: 'last_login', isDatetime: true }
+      { name: 'last_login', isDatetime: true },
+      // the users repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },
@@ -340,6 +348,8 @@ const crudConfigs = {
       { name: 'use_for_credentials', isBoolean: true },
       { name: 'use_for_secret_stores', isBoolean: true },
       { name: 'use_for_databases', isBoolean: true },
+      { name: 'use_for_groups', isBoolean: true },
+      { name: 'use_for_users', isBoolean: true },
       { name: 'use_for_runners', isBoolean: true },
       { name: 'use_for_notifications', isBoolean: true },
       { name: 'use_for_sso', isBoolean: true },

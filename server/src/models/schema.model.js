@@ -684,11 +684,13 @@ const SCHEMA_MANIFEST = {
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
                                'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
                                'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
-                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_databases', 'repositories.use_for_runners', 'repositories.use_for_notifications', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat_assistant', 'repositories.use_for_disclaimer', 'repositories.use_for_defaults', 'repositories.use_for_logo', 'repositories.use_for_icon', 'repositories.use_for_name', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_repositories', 'repositories.repository', 'repositories.repo_file', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_general', 'repositories.use_for_mcp',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_databases', 'repositories.use_for_runners', 'repositories.use_for_notifications', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat_assistant', 'repositories.use_for_disclaimer', 'repositories.use_for_defaults', 'repositories.use_for_logo', 'repositories.use_for_icon', 'repositories.use_for_name', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_repositories', 'repositories.repository', 'repositories.repo_file', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_general', 'repositories.use_for_mcp', 'repositories.use_for_groups', 'repositories.use_for_users',
                                'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
                                'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.seed_managed_fields',
                                'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file', 'databases.repository', 'databases.repo_file',
+                               'groups.repository', 'groups.repo_file', 'users.repository', 'users.repo_file',
+                               'directory_users.repository', 'directory_users.repo_file', 'directory_users.description',
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
                                'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
@@ -1270,7 +1272,7 @@ async function patchVersion7(messages, success, failed) {
   // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
   // YAML file per object in the type's folder ; the objects of the types built say where they come
   // from (repository, repo_file), the other types' tables will in the version that brings them
-  for (const type of ["credentials", "secret_stores", "databases", "runners", "notifications", "sso", "ldap", "syslog", "chat_assistant", "disclaimer", "defaults", "logo", "icon", "name", "links", "labels", "announcements", "general", "roles", "categories", "constants", "repositories", "mcp"]) {
+  for (const type of ["credentials", "secret_stores", "databases", "runners", "notifications", "sso", "ldap", "syslog", "chat_assistant", "disclaimer", "defaults", "logo", "icon", "name", "links", "labels", "announcements", "general", "roles", "categories", "constants", "repositories", "mcp", "groups", "users"]) {
     await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
   }
   // the Config usage split into Roles, Categories and Constants (the three columns added just above)
@@ -1280,10 +1282,12 @@ async function patchVersion7(messages, success, failed) {
   // the fields the config seed manages per field (its defaults, logo, icon, name, links and mcp
   // sections), read only in the app (lib/seedManaged.js)
   await checkPromise(addColumn("settings", "seed_managed_fields", "text", true, "NULL"), messages, success, failed);
-  for (const table of ["credentials", "runners", "secret_stores", "databases", "notification_channels", "oauth2_providers", "ldap", "syslog_servers", "labels", "announcements", "disclaimer_versions", "repositories"]) {
+  for (const table of ["credentials", "runners", "secret_stores", "databases", "notification_channels", "oauth2_providers", "ldap", "syslog_servers", "labels", "announcements", "disclaimer_versions", "repositories", "groups", "users", "directory_users"]) {
     await checkPromise(addColumn(table, "repository", "varchar(250)", true, "NULL"), messages, success, failed);
     await checkPromise(addColumn(table, "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
   }
+  // what an LDAP or SSO user is, as an admin or its repository entry says (a contractor, until ...)
+  await checkPromise(addColumn("directory_users", "description", "varchar(250)", true, "NULL"), messages, success, failed);
   // a secret store a credential's secret may be written to (secrets/providers write) : off, and
   // only below its write prefix
   await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);

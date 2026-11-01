@@ -1117,6 +1117,8 @@ export default {
       forgetConfirm:
         'Oublier {name} ? Son enregistrement disparaît et revient à sa prochaine connexion. Ses jobs, jobs enregistrés et planifications restent.',
       blockedNote: 'Un administrateur a bloqué cet utilisateur : sessions terminées, connexions refusées.',
+      repoNeverNote:
+        "L'entrée de son dépôt déclare cet utilisateur, mais il ne s'est jamais connecté : ses groupes sont connus à sa première connexion.",
       neverNote: 'Nommé dans les rôles mais jamais connecté : ses groupes seront connus à la 1re connexion.',
       readOnlyNote: 'De {source} : qui il est et ses groupes, lus à chaque connexion, selon la dernière.',
       groupReadOnlyNote: 'Groupe de {source} : ses membres sont ceux qui y figuraient à leur dernière connexion.',
@@ -1344,6 +1346,10 @@ export default {
         ldap: "Annuaires LDAP, entrées d'une liste controller_ldap: dans l'un de ses fichiers YAML, dans leur ordre de recherche",
         disclaimer:
           "Versions de l'avertissement, entrées d'une liste controller_disclaimer: dans l'un de ses fichiers YAML",
+        users:
+          "Utilisateurs, locaux et d'un annuaire, entrées d'une liste controller_users: dans l'un de ses fichiers YAML, mots de passe uniquement en références d'environnement",
+        groups:
+          "Groupes locaux et leurs membres, entrées d'une liste controller_groups: dans l'un de ses fichiers YAML",
         credentials:
           "Identifiants, entrées d'une liste controller_credentials: dans l'un de ses fichiers YAML, secrets uniquement en références d'environnement",
         secret_stores:

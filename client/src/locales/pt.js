@@ -1114,6 +1114,8 @@ export default {
       forgetConfirm:
         'Esquecer {name}? O registo é removido e volta no próximo início de sessão. As tarefas, tarefas guardadas e agendamentos ficam.',
       blockedNote: 'Um administrador bloqueou este utilizador: sessões terminadas, todo o acesso é recusado.',
+      repoNeverNote:
+        'A entrada do seu repositório declara este utilizador, mas nunca iniciou sessão: os seus grupos ficam conhecidos no primeiro início de sessão.',
       neverNote: 'Nomeado nas funções mas nunca iniciou sessão: os grupos são conhecidos no primeiro acesso.',
       readOnlyNote: 'De {source}: quem é e os seus grupos, lidos a cada início de sessão, segundo o último.',
       groupReadOnlyNote: 'Este grupo vem de {source}: os seus utilizadores são os vistos nele no último acesso.',
@@ -1342,6 +1344,10 @@ export default {
         ldap: 'Diretórios LDAP, entradas de uma lista controller_ldap: em qualquer um dos seus ficheiros YAML, pela sua ordem de pesquisa',
         disclaimer:
           'Versões do aviso legal, entradas de uma lista controller_disclaimer: em qualquer um dos seus ficheiros YAML',
+        users:
+          'Utilizadores, locais e de um diretório, entradas de uma lista controller_users: em qualquer um dos seus ficheiros YAML, palavras-passe só como referências de ambiente',
+        groups:
+          'Grupos locais e os seus membros, entradas de uma lista controller_groups: em qualquer um dos seus ficheiros YAML',
         credentials:
           'Credenciais, entradas de uma lista controller_credentials: em qualquer um dos seus ficheiros YAML, segredos só como referências de ambiente',
         secret_stores:

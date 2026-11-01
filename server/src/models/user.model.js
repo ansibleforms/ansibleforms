@@ -108,8 +108,9 @@ async function withGroupIds(users) {
 class User extends CrudModel {
   static modelName = 'users';
 
-  // Override create to hash password
-  static async create(data) {
+  // Override create to hash password ; opts as the crud model takes them (fromRepo : a repository's
+  // entry writes it, lib/repoObjects/users.js)
+  static async create(data, opts = {}) {
     // a new user signs in : its sign-in is blocked by setBlocked alone
     delete data.blocked;
     // nor has it signed in yet : its latest sign-in is written by recordSignIn alone
@@ -118,11 +119,13 @@ class User extends CrudModel {
     // Hash password before storing
     const hash = await crypto.hashPassword(data.password);
     data.password = hash;
-    return super.create(this.modelName, data);
+    return super.create(this.modelName, data, opts);
   }
 
-  // Override update to conditionally hash password
-  static async update(data, id) {
+  // Override update to conditionally hash password ; opts as the crud model takes them (fromRepo :
+  // a repository's entry writes it - a password its entry takes from the environment is git's to
+  // change then, never refused as an edit of the app's)
+  static async update(data, id, opts = {}) {
     logger.info(`Updating user ${data.username ? data.username : id}`);
     // its sign-in is blocked or allowed by setBlocked alone (its own route, its own checks)
     delete data.blocked;
@@ -157,7 +160,7 @@ class User extends CrudModel {
       data.password = hash;
     }
     
-    return super.update(this.modelName, data, id);
+    return super.update(this.modelName, data, id, opts);
   }
 
   // Override delete to cleanup tokens

@@ -1108,6 +1108,8 @@ export default {
       forgetConfirm:
         '{name} を削除しますか？記録は削除され、次回のサインインで再作成されます。ジョブ、保存済みジョブ、スケジュールは残ります。',
       blockedNote: '管理者がこのユーザーをブロック: セッションは終了、サインインはすべて拒否。',
+      repoNeverNote:
+        'リポジトリの項目がこのユーザーを宣言していますが、一度もサインインしていません。グループは最初のサインイン時にわかります。',
       neverNote: 'ロールで指定済みだが未サインイン: グループは初回サインイン時にわかります。',
       readOnlyNote: '{source} から: ユーザー情報とグループ。毎回のサインインで読み、最後の時点のもの。',
       groupReadOnlyNote: 'このグループは {source} から: ユーザーは最後のサインイン時に確認された人です。',
@@ -1332,6 +1334,9 @@ export default {
         sso: 'SSO プロバイダー。任意の YAML ファイルの controller_sso: リストの項目、認証情報を名前で指定',
         ldap: 'LDAP ディレクトリ。任意の YAML ファイルの controller_ldap: リストの項目、検索順で',
         disclaimer: '免責事項のバージョン。任意の YAML ファイルの controller_disclaimer: リストの項目',
+        users:
+          'ユーザー（ローカルとディレクトリ）。任意の YAML ファイルの controller_users: リストの項目、パスワードは環境変数の参照のみ',
+        groups: 'ローカルグループとそのメンバー。任意の YAML ファイルの controller_groups: リストの項目',
         credentials:
           '認証情報。任意の YAML ファイルの controller_credentials: リストの項目、シークレットは環境変数の参照のみ',
         secret_stores:

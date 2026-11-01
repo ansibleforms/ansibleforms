@@ -7,9 +7,16 @@ import { assertMayTouchAdmin } from '../../lib/adminGrants.js';
 import { withGroupRoleCounts, configRoles } from '../../lib/roleCounts.js';
 import DirectoryUser from '../../models/directoryUser.model.js';
 import { directoryGroupRows } from '../../lib/directoryViews.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+import { groupsBefore } from '../../lib/repoObjects/access.js';
 
-// a change only an admin may make (lib/adminGrants.js) : 403, with the reason
+// a change only an admin may make (lib/adminGrants.js) : 403, with the reason ; a change its
+// repository cannot follow now (busy, a file that cannot be read : lib/repoObjects) : 409
 function refused(res, err) {
+  if (err instanceof Errors.ConflictError) {
+    res.status(409).json(RestResult.error(err.message));
+    return true;
+  }
   if (!(err instanceof Errors.AccessDeniedError)) return false;
   res.status(403).json(RestResult.error(err.message));
   return true;
@@ -46,7 +53,12 @@ const create = async function(req, res) {
     }else{
       try {
         await assertMayTouchAdmin(req, { groupName: req.body.name });
-        const group = await Group.create(req.body);
+        // the groups repository, when there is one : written to it as a new entry
+        const group = await RepoObjects.holding("groups", async () => {
+          const id = await Group.create(req.body);
+          await RepoObjects.appCreated("groups", id);
+          return id;
+        });
         res.json(RestResult.single(group));
       } catch(err) {
       if (refused(res, err)) return;
@@ -75,7 +87,12 @@ const update = async function(req, res) {
       try {
         // a group that grants admin is changed by an admin only, and no group is renamed into one
         await assertMayTouchAdmin(req, { groupId: req.params.id, groupName: req.body.name });
-        await Group.update(req.body, req.params.id);
+        // one of the groups repository : its changed fields written to its entry
+        const [before] = await groupsBefore([req.params.id]);
+        await RepoObjects.holding([], async () => {
+          await Group.update(req.body, req.params.id);
+          if (before?.repository) await RepoObjects.appUpdated("groups", before, req.params.id);
+        }, before || null);
         res.json(RestResult.single(null));
       } catch(err) {
       if (refused(res, err)) return;
@@ -87,7 +104,12 @@ const update = async function(req, res) {
 const deleteGroup = async function(req, res) {
   try{
     await assertMayTouchAdmin(req, { groupId: req.params.id });
-    await Group.delete(req.params.id);
+    // one of the groups repository : its entry goes too, for the repository's Push
+    const [before] = await groupsBefore([req.params.id]);
+    await RepoObjects.holding([], async () => {
+      await Group.delete(req.params.id);
+      if (before?.repository) await RepoObjects.appDeleted("groups", before);
+    }, before || null);
     res.json(RestResult.single(null));
   }catch(err){
       if (refused(res, err)) return;

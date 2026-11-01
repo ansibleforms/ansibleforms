@@ -1113,6 +1113,8 @@ export default {
       forgetConfirm:
         'Dimenticare {name}? Il suo record viene rimosso e torna al prossimo accesso. I suoi job, job salvati e pianificazioni restano.',
       blockedNote: "Un amministratore ha bloccato l'utente: sessioni terminate, ogni accesso viene rifiutato.",
+      repoNeverNote:
+        "La voce del suo repository dichiara questo utente, ma non ha mai effettuato l'accesso: i suoi gruppi sono noti al primo accesso.",
       neverNote: 'Nominato nei ruoli ma mai entrato: i suoi gruppi saranno noti al primo accesso.',
       readOnlyNote: "Da {source}: chi è e i suoi gruppi, letti a ogni accesso, aggiornati all'ultimo.",
       groupReadOnlyNote: 'Questo gruppo proviene da {source}: i suoi utenti sono quelli visti al loro ultimo accesso.',
@@ -1340,6 +1342,10 @@ export default {
         ldap: 'Directory LDAP, voci di una lista controller_ldap: in uno qualsiasi dei suoi file YAML, nel loro ordine di ricerca',
         disclaimer:
           'Versioni del disclaimer, voci di una lista controller_disclaimer: in uno qualsiasi dei suoi file YAML',
+        users:
+          'Utenti, locali e di una directory, voci di una lista controller_users: in uno qualsiasi dei suoi file YAML, password solo come riferimenti di ambiente',
+        groups:
+          'Gruppi locali e i loro membri, voci di una lista controller_groups: in uno qualsiasi dei suoi file YAML',
         credentials:
           'Credenziali, voci di una lista controller_credentials: in uno qualsiasi dei suoi file YAML, segreti solo come riferimenti di ambiente',
         secret_stores:

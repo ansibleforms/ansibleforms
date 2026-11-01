@@ -12,6 +12,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import YAML from "yaml";
+import bcrypt from "bcrypt";
 import { fileKeyOf } from "../../src/lib/repoObjects/types.js";
 
 // ===========================================================================
@@ -43,7 +44,7 @@ export const state = {
  *   tables (object): the rows to start with, by table (repositories, credentials, runners).
  */
 export function reset(tables = {}) {
-  const empty = ["repositories", "credentials", "runners", "secret_stores", "databases", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels", "settings", "announcements"];
+  const empty = ["repositories", "credentials", "runners", "secret_stores", "databases", "groups", "users", "user_groups", "directory_users", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels", "settings", "announcements"];
   state.tables = { ...Object.fromEntries(empty.map((t) => [t, []])), ...structuredClone(tables) };
   state.nextId = 100;
   state.calls.length = 0;
@@ -200,7 +201,8 @@ export const db = {
     if (/^INSERT INTO \S+ SET \?/i.test(sql)) {
       // the values : the object itself, as the crud model passes them
       const values = Array.isArray(params) ? params[0] : params;
-      if (rows.some((r) => lower(r.name) === lower(values.name))) throw new Error(`Duplicate entry '${values.name}' for key 'name'`);
+      if (values.name !== undefined && rows.some((r) => lower(r.name) === lower(values.name))) throw new Error(`Duplicate entry '${values.name}' for key 'name'`);
+      if (values.username !== undefined && table === "users" && rows.some((r) => lower(r.username) === lower(values.username))) throw new Error(`Duplicate entry '${values.username}' for key 'username'`);
       const id = state.nextId++;
       rows.push({ id, repository: null, repo_file: null, ...values });
       return { insertId: id, affectedRows: 1 };
@@ -211,7 +213,23 @@ export const db = {
       if (row) Object.assign(row, params[0]);
       return { affectedRows: row ? 1 : 0 };
     }
-    m = sql.match(/^DELETE FROM \S+ WHERE (\w+) = \?/);
+    // a local user's other groups (models/user.model.js addGroup, removeGroup) and its blocked flag
+    if (/^INSERT INTO AnsibleForms\.`user_groups` \(user_id, group_id\) VALUES \(\?, \?\)/.test(sql)) {
+      rows.push({ user_id: Number(params[0]), group_id: Number(params[1]) });
+      return { affectedRows: 1 };
+    }
+    if (/^DELETE FROM AnsibleForms\.`user_groups` WHERE user_id ?= ?\? AND group_id ?= ?\?/.test(sql)) {
+      const before = rows.length;
+      state.tables[table] = rows.filter((r) => !(String(r.user_id) === String(params[0]) && String(r.group_id) === String(params[1])));
+      return { affectedRows: before - state.tables[table].length };
+    }
+    m = sql.match(/^UPDATE AnsibleForms\.`users` SET (blocked|group_id) ?= ?\? WHERE id ?= ?\?/);
+    if (m) {
+      const row = rows.find((r) => String(r.id) === String(params[1]));
+      if (row) row[m[1]] = params[0];
+      return { affectedRows: row ? 1 : 0 };
+    }
+    m = sql.match(/^DELETE FROM \S+ WHERE (\w+) ?= ?\?/);
     if (m) {
       const before = rows.length;
       state.tables[table] = rows.filter((r) => String(r[m[1]]) !== String(params[0]));
@@ -273,6 +291,8 @@ export const repository = {
 export const crypto = {
   encrypt: (text) => `enc:${text}`,
   decrypt: (text) => String(text).replace(/^enc:/, ""),
+  // a local user's password, as models/user.model.js stores it : a bcrypt hash (few rounds here)
+  hashPassword: async (pw) => bcrypt.hashSync(String(pw), 4),
 };
 
 

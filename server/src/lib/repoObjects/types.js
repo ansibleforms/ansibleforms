@@ -63,6 +63,13 @@ export const USAGE_TYPES = [
   { key: "labels", flag: "use_for_labels", category: "appearance", objects: true, oneOnly: true, label: "labels" },
   { key: "announcements", flag: "use_for_announcements", category: "appearance", objects: true, oneOnly: true, label: "announcements" },
   { key: "disclaimer", flag: "use_for_disclaimer", category: "access", objects: true, oneOnly: true, label: "disclaimer" },
+  // in the Access menu's order : the users, then the groups
+  // the users, local and of a directory (LDAP, Entra ID, OIDC) ; a new local user takes the groups
+  // whose entries list it, so they are read again once the groups are pulled
+  { key: "users", references: ["groups"], flag: "use_for_users", category: "access", objects: true, oneOnly: true, label: "users" },
+  // the local groups, each listing its local users ; read again once the users are pulled (a
+  // member made meanwhile is put in it)
+  { key: "groups", references: ["users"], flag: "use_for_groups", category: "access", objects: true, oneOnly: true, label: "groups" },
   { key: "roles", config: true, flag: "use_for_roles", category: "access", oneOnly: true, label: "roles" },
   { key: "ldap", references: ["credentials"], flag: "use_for_ldap", category: "access", objects: true, oneOnly: true, label: "LDAP directories" },
   { key: "sso", references: ["credentials"], flag: "use_for_sso", category: "access", objects: true, oneOnly: true, label: "SSO providers" },
@@ -167,6 +174,9 @@ export const APPLY_ORDER = [
   "runners",
   "sso",
   "ldap",
+  // the groups before the users : a new local user is put in the groups whose entries list it
+  "groups",
+  "users",
   "notifications",
   "syslog",
   "chat_assistant",

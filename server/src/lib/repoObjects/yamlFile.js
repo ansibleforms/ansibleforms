@@ -686,11 +686,15 @@ function listOf(doc, key) {
  */
 function entryOf(seq, name, nameField = "name", doc = null) {
   const key = String(name ?? "").trim().toLowerCase();
-  const nameOf = (item) => {
-    let node = item.get(nameField, true);
+  // a field of an entry's map, its alias resolved
+  const fieldOf = (item, field) => {
+    let node = item.get(field, true);
     if (YAML.isAlias(node)) node = doc ? node.resolve(doc) : undefined;
     return YAML.isScalar(node) ? node.value : node;
   };
+  // its name : a field's value, or what the type's function makes of its fields (a user's type
+  // and username)
+  const nameOf = (item) => (typeof nameField === "function" ? nameField((field) => fieldOf(item, field)) : fieldOf(item, nameField));
   return seq.items.find((item) => YAML.isMap(item) && String(nameOf(item) ?? "").trim().toLowerCase() === key);
 }
 
@@ -852,12 +856,31 @@ export function editListEntry(text, key, name, mutate, opts = {}) {
  * Raises:
  *   Error: the file is not a map of valid YAML, or its key no list.
  */
+/**
+ * The name an entry gives (a plain map, as read or about to be written) : its name field's value,
+ * or what a type's function makes of its fields - a user is named by its type and its username
+ * (lib/repoObjects/users.js).
+ *
+ * Args:
+ *   entry (object): the entry.
+ *   nameField (string|function): the field an entry is named by, or (get) => its name, get(field)
+ *     giving a field's value.
+ *
+ * Returns:
+ *   any: the name (undefined when the entry gives none).
+ */
+export function entryName(entry, nameField = "name") {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+  return typeof nameField === "function" ? nameField((field) => entry[field]) : entry[nameField];
+}
+
 export function appendListEntries(text, key, entries, keyOrder = [], nameField = "name", skipped = []) {
   const doc = mapDocument(text);
   const seq = listOf(doc, key);
   for (const entry of entries) {
-    if (!entryOf(seq, entry[nameField], nameField, doc)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
-    else skipped.push(entry[nameField]);
+    const name = entryName(entry, nameField);
+    if (!entryOf(seq, name, nameField, doc)) seq.items.push(doc.createNode(sortedByOrder(entry, keyOrder)));
+    else skipped.push(name);
   }
   return String(text ?? "").trim() ? editedText(doc, text) : writtenText(doc);
 }

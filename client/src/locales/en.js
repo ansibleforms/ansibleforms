@@ -1106,6 +1106,8 @@ export default {
       forgetConfirm:
         'Forget {name}? Their record goes and comes back at their next sign-in. Their jobs, stored jobs and schedules stay.',
       blockedNote: 'An administrator blocked this user: their sessions ended, every sign-in is refused.',
+      repoNeverNote:
+        'Its repository entry declares this user, but they never signed in: their groups are known at their first sign-in.',
       neverNote: 'Named in the roles but never signed in: their groups are known at their first sign-in.',
       readOnlyNote: 'From {source}: who they are and their groups, read at every sign-in, as of the last one.',
       groupReadOnlyNote: 'This group comes from {source}: its users are those seen in it at their last sign-in.',
@@ -1330,6 +1332,9 @@ export default {
         sso: 'SSO providers, entries of an controller_sso: list in any of its YAML files, naming their credential',
         ldap: 'LDAP directories, entries of an controller_ldap: list in any of its YAML files, in their lookup order',
         disclaimer: 'Disclaimer versions, entries of a controller_disclaimer: list in any of its YAML files',
+        users:
+          'Users, local and of a directory, entries of a controller_users: list in any of its YAML files, passwords only as environment references',
+        groups: 'Local groups and their members, entries of a controller_groups: list in any of its YAML files',
         credentials:
           'Credentials, entries of a controller_credentials: list in any of its YAML files, secrets only as environment references',
         secret_stores:

@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 28 types of the server, in six groups, each flag once', () => {
+  it('are the 30 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -76,7 +76,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(28);
+    expect(new Set(USAGE_FLAGS).size).toBe(30);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -89,7 +89,7 @@ describe('the usage types', () => {
     // Schedules in a section of its own, Jobs, below the Designer
     expect(typesOf('jobs').map((u) => u.key)).toEqual(['schedules']);
     // Roles where Config was : Disclaimer, Roles, LDAP, SSO
-    expect(typesOf('access').map((u) => u.key)).toEqual(['disclaimer', 'roles', 'ldap', 'sso']);
+    expect(typesOf('access').map((u) => u.key)).toEqual(['disclaimer', 'users', 'groups', 'roles', 'ldap', 'sso']);
     expect(typesOf('connections').map((u) => u.key)).toEqual([
       'repositories',
       'credentials',

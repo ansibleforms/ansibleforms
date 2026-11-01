@@ -97,6 +97,9 @@ export const KEPT_REASONS = {
  *       announcement : the start of its message) ; it keeps that name from then on.
  *     nameColumn (string): the column its name is in ('name' when not said : a disclaimer's is its
  *       version).
+ *     nameField (string|function): the field its entries are named by, when not its name column ;
+ *       or (get) => an entry's name, get(field) giving a field of it - a type holding several kinds
+ *       of objects of one name (a local and an LDAP user jdoe) names them by more than one field.
  *     notImported (function): (object) => why a file's object is not imported (an announcement already
  *       ended), or null : said in the pull output, never refused ; the app's object of it goes.
  *     noKeyUnlinks (boolean): no file of the repository holding its key at all : its objects
@@ -148,7 +151,7 @@ export function seedType(spec) {
     keyOrder: fields.keys,
     // the field an entry names its object by (a disclaimer version's number) : what it is found by,
     // and the name a refused entry declares (lib/repoObjects/engine.js declaredName)
-    nameField: spec.nameColumn || "name",
+    nameField: spec.nameField || spec.nameColumn || "name",
     noKeyUnlinks: !!spec.noKeyUnlinks,
     // an object as the seed (or an entry) declares it, checked (lib/repoObjects/fields.js), then
     // what the type refuses besides

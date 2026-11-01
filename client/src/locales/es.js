@@ -1114,6 +1114,8 @@ export default {
       forgetConfirm:
         '¿Olvidar a {name}? Su registro se elimina y vuelve en su próximo inicio de sesión. Sus trabajos, trabajos guardados y programaciones se mantienen.',
       blockedNote: 'Un administrador bloqueó a este usuario: sesiones terminadas, todo acceso se rechaza.',
+      repoNeverNote:
+        'La entrada de su repositorio declara este usuario, pero nunca ha iniciado sesión: sus grupos se conocen en su primer inicio de sesión.',
       neverNote: 'Nombrado en los roles pero sin iniciar sesión: sus grupos se sabrán en su primer acceso.',
       readOnlyNote: 'De {source}: quién es y sus grupos, leídos en cada acceso, según el último.',
       groupReadOnlyNote: 'Este grupo viene de {source}: sus usuarios son los vistos en él en su último acceso.',
@@ -1343,6 +1345,10 @@ export default {
         ldap: 'Directorios LDAP, entradas de una lista controller_ldap: en cualquiera de sus archivos YAML, en su orden de búsqueda',
         disclaimer:
           'Versiones del aviso legal, entradas de una lista controller_disclaimer: en cualquiera de sus archivos YAML',
+        users:
+          'Usuarios, locales y de un directorio, entradas de una lista controller_users: en cualquiera de sus archivos YAML, contraseñas solo como referencias de entorno',
+        groups:
+          'Grupos locales y sus miembros, entradas de una lista controller_groups: en cualquiera de sus archivos YAML',
         credentials:
           'Credenciales, entradas de una lista controller_credentials: en cualquiera de sus archivos YAML, secretos solo como referencias de entorno',
         secret_stores:

@@ -1113,6 +1113,8 @@ export default {
       forgetConfirm:
         "Vols oblidar {name}? El seu registre s'elimina i torna al proper inici de sessió. Les seves tasques, tasques desades i programacions es mantenen.",
       blockedNote: 'Un administrador ha bloquejat aquest usuari: sessions acabades, es rebutja tot accés.',
+      repoNeverNote:
+        "L'entrada del seu repositori declara aquest usuari, però no ha iniciat mai la sessió: els seus grups es coneixen al primer inici de sessió.",
       neverNote: 'Nomenat als rols però mai ha iniciat sessió: els seus grups es coneixen al primer accés.',
       readOnlyNote: 'De {source}: qui és i els seus grups, llegits a cada inici de sessió, segons el darrer.',
       groupReadOnlyNote: 'Grup de {source}: els seus usuaris són els vistos en ell al seu darrer inici de sessió.',
@@ -1342,6 +1344,10 @@ export default {
         ldap: "Directoris LDAP, entrades d'una llista controller_ldap: en qualsevol dels seus fitxers YAML, en el seu ordre de cerca",
         disclaimer:
           "Versions de l'avís legal, entrades d'una llista controller_disclaimer: en qualsevol dels seus fitxers YAML",
+        users:
+          "Usuaris, locals i d'un directori, entrades d'una llista controller_users: en qualsevol dels seus fitxers YAML, contrasenyes només com a referències d'entorn",
+        groups:
+          "Grups locals i els seus membres, entrades d'una llista controller_groups: en qualsevol dels seus fitxers YAML",
         credentials:
           "Credencials, entrades d'una llista controller_credentials: en qualsevol dels seus fitxers YAML, secrets només com a referències d'entorn",
         secret_stores:

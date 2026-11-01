@@ -1111,6 +1111,8 @@ export default {
       forgetConfirm:
         'Zapomnieć {name}? Rekord zostanie usunięty i wróci przy następnym logowaniu. Zadania, zapisane zadania i harmonogramy pozostają.',
       blockedNote: 'Administrator zablokował tego użytkownika: sesje zakończone, każde logowanie odrzucane.',
+      repoNeverNote:
+        'Wpis w jego repozytorium deklaruje tego użytkownika, ale nigdy się nie zalogował: jego grupy będą znane przy pierwszym logowaniu.',
       neverNote: 'Wskazany w rolach, ale się nie logował: grupy będą znane przy pierwszym logowaniu.',
       readOnlyNote: 'Z {source}: kim jest i jego grupy, czytane przy każdym logowaniu, według ostatniego.',
       groupReadOnlyNote: 'Ta grupa pochodzi z {source}: jej użytkownicy to ci widziani w niej przy ostatnim logowaniu.',
@@ -1335,6 +1337,9 @@ export default {
         sso: 'Dostawcy SSO, wpisy listy controller_sso: w dowolnym z jego plików YAML, wskazujący swoje poświadczenie',
         ldap: 'Katalogi LDAP, wpisy listy controller_ldap: w dowolnym z jego plików YAML, w kolejności wyszukiwania',
         disclaimer: 'Wersje zastrzeżenia, wpisy listy controller_disclaimer: w dowolnym z jego plików YAML',
+        users:
+          'Użytkownicy, lokalni i z katalogu, wpisy listy controller_users: w dowolnym z jego plików YAML, hasła tylko jako odwołania do zmiennych środowiskowych',
+        groups: 'Grupy lokalne i ich członkowie, wpisy listy controller_groups: w dowolnym z jego plików YAML',
         credentials:
           'Poświadczenia, wpisy listy controller_credentials: w dowolnym z jego plików YAML, sekrety tylko jako odwołania do zmiennych środowiskowych',
         secret_stores:

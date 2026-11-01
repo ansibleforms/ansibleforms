@@ -17,6 +17,8 @@ import Token from '../../models/token.model.js';
 import { revokeUser } from '../../lib/tokenRevocation.js';
 import { revocationHorizonSeconds } from '../../lib/tokenLifetime.js';
 import { passwordProblem } from '../../lib/passwordPolicy.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+import { groupsBefore, groupIdsOfUser, membersSaved, userBefore, userSaved } from '../../lib/repoObjects/access.js';
 
 // a password the policy refuses (lib/passwordPolicy.js) : 400 with the reason
 function refusePassword(req, res, password, username) {
@@ -42,8 +44,13 @@ async function endSessions(username) {
   await Token.deleteAllForUser(username).catch(() => {});
 }
 
-// a change only an admin may make (lib/adminGrants.js) : 403, with the reason
+// a change only an admin may make (lib/adminGrants.js) : 403, with the reason ; a change its
+// repository cannot follow now, or that git would undo (lib/repoObjects) : 409
 function refused(res, err) {
+  if (err instanceof Errors.ConflictError) {
+    res.status(409).json(RestResult.error(err.message));
+    return true;
+  }
   if (!(err instanceof Errors.AccessDeniedError)) return false;
   res.status(403).json(RestResult.error(err.message));
   return true;
@@ -90,7 +97,15 @@ const create = async function(req, res) {
           // in the admin role
           await assertMayTouchAdmin(req, { username: req.body.username, groupIds: [req.body.group_id] });
           if (req.body.password && refusePassword(req, res, req.body.password, req.body.username)) return;
-          const user = await User.create(req.body);
+          // the users repository, when there is one : written to it as a new entry, and its group's
+          // entry lists it (a group holds its members)
+          const user = await RepoObjects.holding(["users", "groups"], async () => {
+            const groups = await groupsBefore([req.body.group_id]);
+            const id = await User.create(req.body);
+            await userSaved(null, await userBefore({ id }));
+            await membersSaved(groups);
+            return id;
+          });
           res.json(RestResult.single(user));
         } catch(err) {
       if (refused(res, err)) return;
@@ -144,7 +159,16 @@ const update = async function(req, res) {
             const target = await User.findById(req.params.id).catch(() => null);
             if (refusePassword(req, res, req.body.password, target?.username)) return;
           }
-          await User.update(req.body,req.params.id);
+          // one of the users repository : its changed fields written to its entry ; its first group
+          // changed : the entries of the groups it leaves and joins
+          const before = await userBefore({ id: req.params.id });
+          const moved = req.body.group_id !== undefined ? [...(await groupIdsOfUser(req.params.id)), req.body.group_id] : [];
+          await RepoObjects.holding(moved.length ? ["groups"] : [], async () => {
+            const groups = await groupsBefore(moved);
+            await User.update(req.body, req.params.id);
+            await userSaved(before, await userBefore({ id: req.params.id }));
+            await membersSaved(groups);
+          }, before);
           // a password set by an admin also lifts a lockout (lib/loginThrottle.js), and ends
           // the user's sessions : whoever held a token of theirs is out
           if (req.body.password) {
@@ -171,7 +195,12 @@ const addGroup = async function(req, res) {
   }
   try {
     await assertMayTouchAdmin(req, { userId: req.params.id, groupIds: [req.body.group_id] });
-    await User.addGroup(req.params.id, req.body.group_id);
+    // the group's entry lists it (a group holds its members)
+    await RepoObjects.holding(["groups"], async () => {
+      const groups = await groupsBefore([req.body.group_id]);
+      await User.addGroup(req.params.id, req.body.group_id);
+      await membersSaved(groups);
+    });
     res.json(RestResult.single(null));
   } catch(err) {
       if (refused(res, err)) return;
@@ -196,7 +225,12 @@ const setBlocked = async function(req, res) {
     if (blocked && me?.type === 'local' && me.username === target.username) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.cantBlockYourself')));
     }
-    await User.setBlocked(req.params.id, blocked);
+    // one of the users repository : blocked written to its entry
+    const before = await userBefore({ id: req.params.id });
+    await RepoObjects.holding([], async () => {
+      await User.setBlocked(req.params.id, blocked);
+      await userSaved(before, await userBefore({ id: req.params.id }));
+    }, before);
     if (blocked) await endSessions(target.username);
     res.json(RestResult.single({ blocked }));
   } catch(err) {
@@ -211,7 +245,12 @@ const setBlocked = async function(req, res) {
 const removeGroup = async function(req, res) {
   try {
     await assertMayTouchAdmin(req, { userId: req.params.id });
-    await User.removeGroup(req.params.id, req.params.groupId);
+    // the group's entry no longer lists it, nor the one it leaves its first group for
+    await RepoObjects.holding(["groups"], async () => {
+      const groups = await groupsBefore(await groupIdsOfUser(req.params.id));
+      await User.removeGroup(req.params.id, req.params.groupId);
+      await membersSaved(groups);
+    });
     res.json(RestResult.single(null));
   } catch(err) {
       if (refused(res, err)) return;
@@ -292,7 +331,14 @@ const deleteUser = async function(req, res) {
     try {
       await assertMayTouchAdmin(req, { userId: req.params.id });
       const gone = await User.findById(req.params.id).catch(() => null);
-      await User.delete(req.params.id);
+      // one of the users repository : its entry goes, and its groups' entries no longer list it
+      const before = await userBefore({ id: req.params.id });
+      await RepoObjects.holding(["groups"], async () => {
+        const groups = await groupsBefore(await groupIdsOfUser(req.params.id));
+        await User.delete(req.params.id);
+        await userSaved(before, null);
+        await membersSaved(groups);
+      }, before);
       if (gone?.username) await endSessions(gone.username);
       res.json(RestResult.single(null));
     } catch(err) {

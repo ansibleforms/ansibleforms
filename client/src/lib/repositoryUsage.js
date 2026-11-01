@@ -146,6 +146,24 @@ export const USAGE_TYPES = [
     objects: true,
     oneOnly: true,
   },
+  // the users (local and of a directory) and the local groups holding their members, named as
+  // their menu items name them, in the menu's order
+  {
+    key: 'users',
+    flag: 'use_for_users',
+    category: 'access',
+    labelKey: 'sidebar.users',
+    objects: true,
+    oneOnly: true,
+  },
+  {
+    key: 'groups',
+    flag: 'use_for_groups',
+    category: 'access',
+    labelKey: 'sidebar.groups',
+    objects: true,
+    oneOnly: true,
+  },
   {
     key: 'roles',
     flag: 'use_for_roles',
@@ -249,6 +267,9 @@ export const APPLY_ORDER = [
   'runners',
   'sso',
   'ldap',
+  // the groups before the users : a new local user is put in the groups whose entries list it
+  'groups',
+  'users',
   'notifications',
   'syslog',
   'chat_assistant',

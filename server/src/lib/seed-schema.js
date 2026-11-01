@@ -887,6 +887,37 @@ const labelItem = {
   },
 };
 
+// a local group of Settings > Access > Groups : its name, what it is for, and the local users in
+// it (their usernames) - a group holds its members, the users' entries say nothing of their groups
+export const groupItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    description: str,
+    users: { type: "array", items: { type: "string", minLength: 1 } },
+  },
+};
+
+// a user of Settings > Access > Users : a local one (type local, the default) with its email, what
+// it is, its password as an ${ENV} reference (hashed when read ; none : set in the app) and its
+// sign-in blocked or not ; or one of a directory (ldap, entraid, oidc), of which only what the app
+// owns is said - what it is and whether it is blocked : the rest comes from its directory
+export const userItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username"],
+  properties: {
+    username: { type: "string", minLength: 1 },
+    type: { type: "string", enum: ["local", "ldap", "entraid", "oidc"] },
+    email: str,
+    description: str,
+    password: str,
+    blocked: bool,
+  },
+};
+
 const settingsSection = {
   type: "object",
   additionalProperties: false,

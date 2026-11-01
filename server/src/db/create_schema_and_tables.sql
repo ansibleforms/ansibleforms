@@ -10,6 +10,10 @@ CREATE TABLE `groups`(
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `description` varchar(250) DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_AnsibleForms_groups_natural_key` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
@@ -26,6 +30,10 @@ CREATE TABLE `users`(
   `blocked` tinyint(4) NOT NULL DEFAULT 0,
   -- its latest sign-in (lib/signInGate.js), NULL until it signs in
   `last_login` datetime DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_AnsibleForms_users_natural_key` (`username`),
     KEY `FK_users_group` (`group_id`),
@@ -532,6 +540,9 @@ CREATE TABLE `repositories` (
   `use_for_syslog` tinyint(4) DEFAULT 0,
   `use_for_chat_assistant` tinyint(4) DEFAULT 0,
   `use_for_mcp` tinyint(4) DEFAULT 0,
+  -- the local groups and their members, the users (local, LDAP and SSO)
+  `use_for_groups` tinyint(4) DEFAULT 0,
+  `use_for_users` tinyint(4) DEFAULT 0,
   `use_for_disclaimer` tinyint(4) DEFAULT 0,
   `use_for_defaults` tinyint(4) DEFAULT 0,
   `use_for_logo` tinyint(4) DEFAULT 0,
@@ -718,6 +729,12 @@ CREATE TABLE `directory_users` (
   `first_seen` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `blocked` tinyint(4) NOT NULL DEFAULT 0,
+  -- what the user is, as an admin or its repository entry says
+  `description` varchar(250) DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_directory_users_type_username` (`type`, `username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

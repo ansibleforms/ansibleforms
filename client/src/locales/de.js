@@ -1118,6 +1118,8 @@ export default {
       forgetConfirm:
         '{name} vergessen? Der Eintrag wird entfernt und kommt bei der nächsten Anmeldung zurück. Jobs, gespeicherte Jobs und Zeitpläne bleiben.',
       blockedNote: 'Ein Administrator hat diesen Benutzer gesperrt: Sitzungen beendet, Anmeldungen abgelehnt.',
+      repoNeverNote:
+        'Der Eintrag seines Repositorys deklariert diesen Benutzer, aber er hat sich nie angemeldet: Seine Gruppen sind ab der ersten Anmeldung bekannt.',
       neverNote: 'In Rollen genannt, nie angemeldet: seine Gruppen sind ab der ersten Anmeldung bekannt.',
       readOnlyNote: 'Aus {source}: Identität und Gruppen, bei jeder Anmeldung gelesen, Stand: letzte Anmeldung.',
       groupReadOnlyNote: 'Gruppe aus {source}: ihre Benutzer sind die, die bei ihrer letzten Anmeldung darin waren.',
@@ -1345,6 +1347,10 @@ export default {
         ldap: 'LDAP-Verzeichnisse, Einträge einer Liste controller_ldap: in einer seiner YAML-Dateien, in ihrer Suchreihenfolge',
         disclaimer:
           'Versionen des Haftungsausschlusses, Einträge einer Liste controller_disclaimer: in einer seiner YAML-Dateien',
+        users:
+          'Benutzer, lokal und aus einem Verzeichnis, Einträge einer Liste controller_users: in einer seiner YAML-Dateien, Passwörter nur als Umgebungsverweise',
+        groups:
+          'Lokale Gruppen und ihre Mitglieder, Einträge einer Liste controller_groups: in einer seiner YAML-Dateien',
         credentials:
           'Anmeldedaten, Einträge einer Liste controller_credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
         secret_stores:
