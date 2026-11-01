@@ -333,8 +333,8 @@ class CredentialModel extends CrudModel {
   /**
    * How many records use each credential, as its page's Used by tab lists them : the secret
    * stores, notification channels (a login or a token), repositories, LDAP directories, SSO
-   * providers, runners and the chat assistant that name it. The forms and the designer's workflows
-   * are counted by the caller (lib/formLinks.js formCredentials, models/workflowRun.js
+   * providers, runners, databases and the chat assistant that name it. The forms and the
+   * designer's workflows are counted by the caller (lib/formLinks.js formCredentials, models/workflowRun.js
    * workflowCredentials), as they live in files, not in a table.
    *
    * Returns:
@@ -350,6 +350,7 @@ class CredentialModel extends CrudModel {
         "UNION ALL SELECT credential FROM AnsibleForms.`ldap` " +
         "UNION ALL SELECT credential FROM AnsibleForms.`oauth2_providers` " +
         "UNION ALL SELECT credential FROM AnsibleForms.`runners` " +
+        "UNION ALL SELECT credential FROM AnsibleForms.`databases` " +
         "UNION ALL SELECT credential FROM AnsibleForms.`chat_settings`" +
         ") used WHERE name IS NOT NULL AND name <> '' GROUP BY name",
     );
@@ -485,8 +486,21 @@ class CredentialModel extends CrudModel {
    *   Errors.NotFoundError: no credential has that name.
    */
   static async resolveByName(name) {
-    const exact = "^" + String(name ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$";
-    return this.resolveCredential(exact);
+    return this.resolveCredential(this.exactPattern(name));
+  }
+
+  /**
+   * A credential's name as the REGEXP that finds it and nothing else : escaped and anchored, the
+   * way a record that stores a name (a runner, a database of Connections > Databases) resolves it.
+   *
+   * Args:
+   *   name (string): the credential's name.
+   *
+   * Returns:
+   *   string: the pattern, ^name$ with its special characters escaped.
+   */
+  static exactPattern(name) {
+    return "^" + String(name ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$";
   }
 
   // The row a name or pattern finds (fallback when it finds none), cached with its password

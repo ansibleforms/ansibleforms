@@ -28,7 +28,7 @@ export function settingsMenu(t) {
         { title: t('sidebar.ansibleForms'), icon: 'toolbox', link: '/settings/general' },
         { title: t('sidebar.status'), icon: 'heart-pulse', link: '/settings/status' },
         // the database backups : the instance's own data, so with the instance
-        { title: t('sidebar.backups'), icon: 'database', link: '/settings/backups' },
+        { title: t('sidebar.backups'), icon: 'box-archive', link: '/settings/backups' },
       ],
     },
     {
@@ -70,7 +70,8 @@ export function settingsMenu(t) {
       title: t('sidebar.sections.connections'),
       items: [
         // where forms and playbooks come from, what they log in with (and the stores that hold it),
-        // where jobs run ; then the rest
+        // the databases forms query (database credentials, a list of their own), where jobs run ;
+        // then the rest
         {
           title: t('sidebar.repositories'),
           icon: 'fab,git',
@@ -78,6 +79,7 @@ export function settingsMenu(t) {
         },
         { title: t('sidebar.credentials'), icon: 'lock', link: '/settings/credentials' },
         { title: t('sidebar.secretStores'), icon: 'vault', link: '/settings/secret-stores' },
+        { title: t('sidebar.databases'), icon: 'database', link: '/settings/databases' },
         { title: t('sidebar.runners'), icon: 'rocket', link: '/settings/runners' },
         { title: t('sidebar.ssh'), icon: 'key', link: '/settings/ssh' },
         { title: t('sidebar.notifications'), icon: 'bell', link: '/settings/notifications' },

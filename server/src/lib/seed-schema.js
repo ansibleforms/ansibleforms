@@ -430,6 +430,20 @@ const ldapSection = {
 //
 // All seven are required, for the reason spelled out above ldapSection: this is a single-row
 // section, so declaring it means owning all of it.
+// a database of Connections > Databases : the databases forms query (a field's dbConfig names one).
+// Its name, what it is, and the credential of type database it connects with (of the credentials
+// section, or one made in the app), which holds its engine, server, database and login
+const databaseItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "credential"],
+  properties: {
+    name: str,
+    description: str,
+    credential: { type: "string", minLength: 1 },
+  },
+};
+
 // a label beside the header's logo (Settings > Appearance > Labels) : its text, its colour (one
 // of the app's pill tones), shown or not, its place among the others (lowest first)
 const labelItem = {
@@ -469,6 +483,7 @@ export const seedSchema = {
     secret_stores: listSection(secretStoreItem),
     runners: listSection(runnerItem),
     credentials: listSection(credentialItem),
+    databases: listSection(databaseItem),
     oauth2: listSection(oauth2Item),
     repositories: listSection(repositoryItem),
     syslog_servers: listSection(syslogServerItem),
@@ -487,7 +502,7 @@ const validator = ajv.compile(seedSchema);
 // typo here : the second entry silently wins the upsert while the first is counted
 // as declared, so a prune would spare a record nobody can see in the file.
 function assertUniqueNames(doc) {
-  for (const key of ["runners", "secret_stores", "credentials", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels"]) {
+  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels"]) {
     const items = doc[key]?.items;
     if (!Array.isArray(items)) continue;
     const seen = new Set();

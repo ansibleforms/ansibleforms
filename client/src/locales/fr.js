@@ -485,6 +485,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Identifiants',
+    databases: 'Bases de données',
     ssh: 'SSH',
     knownHosts: 'Hotes connus',
     secretStores: 'Coffres de secrets',
@@ -526,6 +527,10 @@ export default {
       runner_jointoken_delete: "Jeton d'adhésion supprimé",
       runner_jointoken_revoke_create: "Jeton d'adhésion révoqué",
       runner_check_create: 'Connexion au runner testée',
+      database_create: 'Base de données créée',
+      database_update: 'Base de données mise à jour',
+      database_delete: 'Base de données supprimée',
+      database_check_create: 'Connexion à la base de données testée',
       announcement_create: 'Annonce créée',
       announcement_update: 'Annonce mise à jour',
       announcement_delete: 'Annonce supprimée',
@@ -936,6 +941,18 @@ export default {
     relaunch: 'Relancer',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Champ',
+      label: 'Base de données',
+      description:
+        "Les bases de données que les formulaires interrogent : le dbConfig d'un champ en nomme une. Chacune se connecte avec un identifiant de type Base de données, qui contient son serveur et sa connexion.",
+      nameHelp: "Le nom que donne le dbConfig d'un champ pour interroger cette base de données.",
+      credential: 'Identifiant',
+      credentialHelp:
+        'Un identifiant de type Base de données : son type de base, son serveur, sa base et sa connexion.',
+      noUse: "Aucun formulaire n'interroge cette base de données.",
+    },
     cron: {
       second: 'Seconde',
       minute: 'Minute',
@@ -1141,6 +1158,7 @@ export default {
       repository: 'Dépôt',
       ldapDirectory: 'Annuaire LDAP',
       ssoProvider: 'Fournisseur SSO',
+      database: 'Base de données',
       chat: 'Assistant de chat',
       noFormRole: 'Aucun formulaire ne nomme ce rôle.',
       noFormGroup: "Aucun rôle du groupe n'ouvre de formulaire.",

@@ -120,6 +120,8 @@ export default {
     joinTokenDeleted: "加入令牌已删除",
     joinTokenNotFound: "未找到加入令牌",
     runnerNotFound: "未找到运行器",
+    databaseAdded: "数据库已添加",
+    databaseNotFound: "未找到数据库",
     runnerAdminOnly:
       "只有 admin 可以添加、更改或删除运行器：运行器会收到它运行的作业的凭据",
     repositoryAdminOnly:

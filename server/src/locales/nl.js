@@ -130,6 +130,8 @@ export default {
     joinTokenDeleted: "Deelnametoken verwijderd",
     joinTokenNotFound: "Deelnametoken niet gevonden",
     runnerNotFound: "Runner niet gevonden",
+    databaseAdded: "Database toegevoegd",
+    databaseNotFound: "Database niet gevonden",
     runnerAdminOnly:
       "Alleen een admin kan een runner toevoegen, wijzigen of verwijderen: een runner ontvangt de credentials van de jobs die hij uitvoert",
     repositoryAdminOnly:

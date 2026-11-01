@@ -29,6 +29,7 @@ const SETTINGS_LISTS = [
   'repositories',
   'credentials',
   'secret-stores',
+  'databases',
   'runners',
   'ldap',
   'sso',

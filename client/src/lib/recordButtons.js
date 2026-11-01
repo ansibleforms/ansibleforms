@@ -36,6 +36,7 @@ const W = {
 // a list's rows by the api's type (AppAdminMulti) : the record pages' kinds
 const ROW_TYPES = {
   credentials: 'credential',
+  databases: 'database',
   runners: 'runner',
   repositories: 'repository',
   'secret-stores': 'secretstore',
@@ -95,6 +96,9 @@ export function recordButtons(kind, id, isAdmin = true) {
       // its password in its Login tab ; a database one can be tested
       return [...(row?.is_database ? [W.testConnection] : []), ...editable()];
     }
+    case 'databases':
+      // its credential's connection : always tested
+      return [W.testConnection, ...editable()];
     case 'runners':
       return [W.testConnection, ...(isAdmin ? editable() : [])];
     case 'secret-stores':

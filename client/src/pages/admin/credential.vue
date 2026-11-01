@@ -34,7 +34,7 @@ import {
   CREDENTIAL_SERVER_EXAMPLE,
   credentialLabels,
 } from '@/config/settings';
-import { slugOf } from '@/lib/formsPath';
+import { formRows, fitsPattern } from '@/lib/formUseRows';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -200,7 +200,7 @@ async function load() {
   } catch {
     credential.value = null;
   }
-  const [stores, mails, repos, directories, providers, chat, runners, forms, workflows] = await Promise.all([
+  const [stores, mails, repos, directories, providers, chat, runners, databases, forms, workflows] = await Promise.all([
     axios.get('/api/v2/secretstore/', auth).catch(() => null),
     axios.get('/api/v2/notificationchannel/', auth).catch(() => null),
     axios.get('/api/v2/repository/', auth).catch(() => null),
@@ -208,16 +208,17 @@ async function load() {
     axios.get('/api/v2/oauth2/', auth).catch(() => null),
     axios.get('/api/v2/chatsettings/', auth).catch(() => null),
     axios.get('/api/v2/runner/', auth).catch(() => null),
+    axios.get('/api/v2/database/', auth).catch(() => null),
     axios.get('/api/v2/config/formscredentials', auth).catch(() => null),
     axios.get('/api/v2/config/workflowscredentials', auth).catch(() => null),
   ]);
   secretStores.value = [{ name: '' }, ...(stores?.data?.records || []).map((s) => ({ name: s.name }))];
   // what names a credential : a secret store (its token or login), a notification channel (a
   // mail server's smtp login, a bot's or a webhook's token), a repository (its git login), an LDAP
-  // directory (its bind account), an SSO provider (its client), a runner (its token or login), the
-  // chat assistant (its key), a form (in its yaml) and a workflow of the designer (its nodes) : one
-  // row per credential a form or a workflow names, where it names it ; the Used by tab keeps those
-  // naming this one
+  // directory (its bind account), an SSO provider (its client), a runner (its token or login), a
+  // database of Connections > Databases (its connection), the chat assistant (its key), a form (in
+  // its yaml) and a workflow of the designer (its nodes) : one row per credential a form or a
+  // workflow names, where it names it ; the Used by tab keeps those naming this one
   users.value = [
     ...(stores?.data?.records || []).map((r) => ({ ...r, kind: 'secretStore', to: `/settings/secret-stores/${r.id}` })),
     ...(mails?.data?.records || []).map((r) => ({
@@ -229,6 +230,7 @@ async function load() {
     ...(directories?.data?.records || []).map((r) => ({ ...r, kind: 'ldapDirectory', to: `/settings/ldap/${r.id}` })),
     ...(providers?.data?.records || []).map((r) => ({ ...r, kind: 'ssoProvider', to: `/settings/sso/${r.id}` })),
     ...(runners?.data?.records || []).map((r) => ({ ...r, kind: 'runner', to: `/settings/runners/${r.id}` })),
+    ...(databases?.data?.records || []).map((r) => ({ ...r, kind: 'database', to: `/settings/databases/${r.id}` })),
     ...(chat?.data?.credential
       ? [{ name: t('sidebar.chat'), credential: chat.data.credential, kind: 'chat', to: '/settings/chat' }]
       : []),
@@ -267,54 +269,6 @@ const users = ref([]);
 // when its name fits their pattern
 const dynamicForms = ref([]);
 
-/**
- * Whether a credential's name fits a name a form builds when it runs : each placeholder
- * ($(field), {{ var }}, ${var}) stands for any text.
- *
- * Args:
- *   pattern (string): the name as the form writes it, such as `$(env)-db`.
- *   name (string): the credential's name.
- *
- * Returns:
- *   boolean: true when the form may build that name.
- */
-function fitsPattern(pattern, name) {
-  const parts = String(pattern).split(/\$\([^)]*\)|\{\{[^}]*\}\}|\$\{[^}]*\}/);
-  const regex = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.+');
-  return new RegExp(`^${regex}$`).test(String(name));
-}
-
-/**
- * The Used by rows of the forms, or of the designer's workflows : one per form (or workflow) and
- * credential it names, saying where (the server's scans : lib/formLinks.js formCredentials,
- * models/workflowRun.js workflowCredentials).
- *
- * Args:
- *   forms (object[]): { name, description, credentials: [{ name, where }] } each.
- *   kind (string): 'form' (a row opens the form in the designer) or 'workflow' (the designer's
- *     Workflows, whose file the row names : the designer opens no file by its address).
- *
- * Returns:
- *   object[]: the rows, each { name, description, credential, how, kind, to }.
- */
-function formRows(forms, kind = 'form') {
-  const rows = [];
-  for (const f of forms) {
-    const byCredential = new Map();
-    for (const c of f.credentials || []) byCredential.set(c.name, [...(byCredential.get(c.name) || []), c.where]);
-    for (const [credentialName, places] of byCredential) {
-      rows.push({
-        name: f.name,
-        description: f.description,
-        credential: credentialName,
-        how: places.join(', '),
-        kind,
-        to: kind === 'form' ? `/designer/forms/${slugOf(f.name)}` : `/designer/workflows#${slugOf(f.name)}`,
-      });
-    }
-  }
-  return rows;
-}
 const usedBy = computed(() =>
   credential.value ? users.value.filter((u) => [u.credential, u.token_credential].includes(credential.value.name)) : [],
 );

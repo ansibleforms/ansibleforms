@@ -202,6 +202,20 @@ CREATE TABLE `secret_stores` (
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- create databases table : the databases forms query (Connections > Databases), each naming the
+-- credential of type database it connects with
+-- keep in sync with create_databases_table.sql, which the upgrade patch uses
+DROP TABLE IF EXISTS `databases`;
+CREATE TABLE `databases` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(250) NOT NULL,
+  `description` text DEFAULT NULL,
+  `credential` varchar(250) NOT NULL,
+  `managed` tinyint(4) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_AnsibleForms_databases_natural_key` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- keep in sync with create_runners_table.sql, which the upgrade patch uses
 DROP TABLE IF EXISTS `runners`;
 CREATE TABLE `runners` (

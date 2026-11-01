@@ -59,6 +59,8 @@ const settings = () => import('@/pages/admin/settings.vue');
 const status = () => import('@/pages/admin/status.vue');
 const secretStores = () => import('@/pages/admin/secretStores.vue');
 const secretStore = () => import('@/pages/admin/secret-store.vue');
+const databases = () => import('@/pages/admin/databases.vue');
+const database = () => import('@/pages/admin/database.vue');
 const runners = () => import('@/pages/admin/runners.vue');
 const runner = () => import('@/pages/admin/runner.vue');
 const audit = () => import('@/pages/admin/audit.vue');
@@ -391,6 +393,20 @@ const routes = [
     path: '/settings/secret-stores/:id(\\d+)/:tab?',
     name: '/settings/secret-stores/:id',
     component: secretStore,
+    meta: { permission: ['showSettings', 'showConnectionsSettings'] },
+  },
+  // /api/v2/database is behind checkConnectionsMiddleware (showSettings or showConnectionsSettings),
+  // as the credentials each database names : the list and a database's page accept any of the two
+  {
+    path: '/settings/databases',
+    name: '/settings/databases',
+    component: databases,
+    meta: { permission: ['showSettings', 'showConnectionsSettings'] },
+  },
+  {
+    path: '/settings/databases/:id(\\d+)/:tab?',
+    name: '/settings/databases/:id',
+    component: database,
     meta: { permission: ['showSettings', 'showConnectionsSettings'] },
   },
   // /api/v2/runner is behind checkConnectionsMiddleware (showSettings or showConnectionsSettings),

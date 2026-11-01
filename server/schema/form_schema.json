@@ -1545,6 +1545,7 @@
           "previewColumn": {"type": "string"},
           "placeholderColumn": {"type": "string"},
           "dbConfig": {
+            "description": "The database the query runs on: a database of Connections > Databases, or (older forms) a credential of type database. A list of names unions their results; the legacy object gives a name and its type.",
             "anyOf": [
               {"type": "string"},
               {

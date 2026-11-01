@@ -56,6 +56,7 @@ import chatRoutes from "./chat/router.js";
 import oauth2Routes from "./routes/v2/oauth2.routes.js";
 import credentialRoutesv2 from "./routes/v2/credential.routes.js";
 import secretStoreRoutesv2 from "./routes/v2/secretStore.routes.js";
+import databaseRoutesv2 from "./routes/v2/database.routes.js";
 import runnerRoutesv2 from "./routes/v2/runner.routes.js";
 import { registerHandler } from "./runners/rteHub.js";
 import notificationChannelRoutesv2 from "./routes/v2/notificationChannel.routes.js";
@@ -269,6 +270,9 @@ const load = async (app) => {
   app.use(`/api/v2/oauth2`, cors(), authobj, Middleware.checkSettingsMiddleware, oauth2Routes);
   app.use(`/api/v2/credential`, cors(), authobj, Middleware.checkConnectionsMiddleware, credentialRoutesv2);
   app.use(`/api/v2/secretstore`, cors(), authobj, Middleware.checkConnectionsMiddleware, secretStoreRoutesv2);
+  // the databases forms query (Connections > Databases) : the credentials' role options, as the
+  // credential each names
+  app.use(`/api/v2/database`, cors(), authobj, Middleware.checkConnectionsMiddleware, databaseRoutesv2);
   app.use(`/api/v2/runner`, cors(), authobj, Middleware.checkConnectionsMiddleware, runnerRoutesv2);
   // an RTE's one registration call (runners/rteHub.js) : its token or a join token is the proof,
   // no user signs in ; limited per address as the sign-in is

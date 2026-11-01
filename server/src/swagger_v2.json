@@ -17,6 +17,7 @@
     { "name": "secretstore", "description": "Secret stores (HashiCorp Vault, ...) that credentials read from" },
     { "name": "syslogserver", "description": "Syslog servers the server log and the audit entries are sent to" },
     { "name": "notificationchannel", "description": "Notification channels: SMTP servers, Slack, Microsoft Teams, Telegram and webhooks" },
+    { "name": "database", "description": "Databases forms query (a field's dbConfig names one), each with the credential of type database it connects with" },
     { "name": "runner", "description": "Runners : where a playbook runs (an RTE container)" },
     { "name": "config", "description": "Form configuration (config.yaml) and designer support" },
     { "name": "ssh", "description": "SSH key management" },
@@ -1825,6 +1826,59 @@
         "tags": ["secretstore"],
         "summary": "Test the connection to a secret store without reading a secret", "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
         "responses": { "200": { "description": "Connection OK, with details" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/database": {
+      "get": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "List databases, or one by name",
+        "description": "The databases of Connections > Databases, each with the database type, database, host, port and TLS of the credential it names (read only, written on the credential; never its login). The list adds used_by_count, the forms naming the database or its credential in a field's dbConfig. Requires the settings or connections settings permission.",
+        "parameters": [ { "name": "name", "in": "query", "required": false, "schema": { "type": "string" } } ],
+        "responses": { "200": { "description": "Database list or single database" }, "403": { "description": "No access (missing role option)" } }
+      },
+      "post": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "Create a database",
+        "description": "Its credential must be a credential of type database. A user who is not an admin cannot name a credential only an admin may (one a runner uses, or one reading its password from a secret store).",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Database" } } } },
+        "responses": { "201": { "description": "Database created ({ message, id })" }, "400": { "description": "Missing name or credential, or a credential that is not of type database" }, "403": { "description": "No access, or a credential only an admin may name" }, "409": { "description": "A database with this name already exists" } }
+      }
+    },
+    "/database/{id}": {
+      "get": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "Get a database by ID",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": { "200": { "description": "Database" }, "404": { "description": "Not found" } }
+      },
+      "put": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "Update a database by ID",
+        "description": "Only name, description and credential are written; the connection fields shown are the credential's. A database of the config seed is read only.",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Database" } } } },
+        "responses": { "200": { "description": "Database updated" }, "400": { "description": "A credential that is not of type database" }, "403": { "description": "Read only (config seed), or a credential only an admin may name" }, "404": { "description": "Not found" } }
+      },
+      "delete": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "Delete a database by ID (its credential stays)",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": { "200": { "description": "Database deleted" }, "403": { "description": "Read only (config seed)" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/database/{id}/check": {
+      "post": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["database"],
+        "summary": "Test the connection of a database",
+        "description": "Runs the least query its engine can run (select 1) with the credential it names.",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": { "200": { "description": "Connection OK" }, "400": { "description": "Its credential has no database type" }, "404": { "description": "Not found" } }
       }
     },
     "/syslogserver": {
@@ -7101,6 +7155,23 @@
           "ca_bundle": { "type": "string" },
           "cache_ttl_seconds": { "type": "integer", "minimum": 0, "default": 60, "description": "0 reads the secret on every use" },
           "extra": { "type": "string", "description": "JSON object with options of the store type" }
+        }
+      },
+      "Database": {
+        "type": "object",
+        "required": ["name", "credential"],
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "description": "The name a field's dbConfig gives", "example": "cmdb" },
+          "description": { "type": "string", "example": "The CMDB" },
+          "credential": { "type": "string", "description": "The credential of type database it connects with: its engine, server, database and login", "example": "cmdb-login" },
+          "db_type": { "type": "string", "readOnly": true, "description": "Its credential's database type", "example": "mysql" },
+          "db_name": { "type": "string", "readOnly": true, "description": "Its credential's database" },
+          "host": { "type": "string", "readOnly": true, "description": "Its credential's host" },
+          "port": { "type": "integer", "readOnly": true, "description": "Its credential's port" },
+          "secure": { "type": "integer", "readOnly": true, "description": "Its credential's TLS (1 on)" },
+          "used_by_count": { "type": "integer", "readOnly": true, "description": "In the list: the forms naming it, or its credential, in a field's dbConfig" },
+          "managed": { "type": "boolean", "readOnly": true, "description": "Declared by the config seed: read only" }
         }
       },
       "Credential": {

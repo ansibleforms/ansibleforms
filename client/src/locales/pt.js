@@ -483,6 +483,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Credenciais',
+    databases: 'Bases de dados',
     ssh: 'SSH',
     knownHosts: 'Hosts conhecidos',
     runners: 'Runners',
@@ -509,6 +510,10 @@ export default {
       runner_jointoken_delete: 'Token de adesão eliminado',
       runner_jointoken_revoke_create: 'Token de adesão revogado',
       runner_check_create: 'Ligação do runner testada',
+      database_create: 'Base de dados criada',
+      database_update: 'Base de dados atualizada',
+      database_delete: 'Base de dados eliminada',
+      database_check_create: 'Ligação à base de dados testada',
       announcement_create: 'Anúncio criado',
       announcement_update: 'Anúncio atualizado',
       announcement_delete: 'Anúncio eliminado',
@@ -934,6 +939,18 @@ export default {
     relaunch: 'Relançar',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Campo',
+      label: 'Base de dados',
+      description:
+        'As bases de dados que os formulários consultam: o dbConfig de um campo indica uma. Cada uma liga-se com uma credencial do tipo Base de dados, que guarda o seu servidor e o seu início de sessão.',
+      nameHelp: 'O nome que o dbConfig de um campo indica para consultar esta base de dados.',
+      credential: 'Credencial',
+      credentialHelp:
+        'Uma credencial do tipo Base de dados: o tipo de base de dados, o servidor, a base de dados e o início de sessão.',
+      noUse: 'Nenhum formulário consulta esta base de dados.',
+    },
     cron: {
       second: 'Segundo',
       minute: 'Minuto',
@@ -1138,6 +1155,7 @@ export default {
       repository: 'Repositório',
       ldapDirectory: 'Diretório LDAP',
       ssoProvider: 'Fornecedor SSO',
+      database: 'Base de dados',
       chat: 'Assistente de chat',
       noFormRole: 'Nenhum formulário nomeia este papel.',
       noFormGroup: 'Nenhum papel do grupo abre um formulário.',

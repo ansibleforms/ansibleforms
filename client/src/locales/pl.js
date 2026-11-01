@@ -480,6 +480,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Poświadczenia',
+    databases: 'Bazy danych',
     ssh: 'SSH',
     knownHosts: 'Znane hosty',
     runners: 'Runnery',
@@ -506,6 +507,10 @@ export default {
       runner_jointoken_delete: 'Token dołączenia usunięty',
       runner_jointoken_revoke_create: 'Token dołączenia unieważniony',
       runner_check_create: 'Przetestowano połączenie runnera',
+      database_create: 'Utworzono bazę danych',
+      database_update: 'Zaktualizowano bazę danych',
+      database_delete: 'Usunięto bazę danych',
+      database_check_create: 'Przetestowano połączenie z bazą danych',
       announcement_create: 'Utworzono ogłoszenie',
       announcement_update: 'Zaktualizowano ogłoszenie',
       announcement_delete: 'Usunięto ogłoszenie',
@@ -931,6 +936,17 @@ export default {
     relaunch: 'Uruchom ponownie',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Pole',
+      label: 'Baza danych',
+      description:
+        'Bazy danych, które odpytują formularze: dbConfig pola wskazuje jedną z nich. Każda łączy się za pomocą poświadczenia typu Baza danych, które przechowuje jej serwer i login.',
+      nameHelp: 'Nazwa, którą podaje dbConfig pola, aby odpytać tę bazę danych.',
+      credential: 'Poświadczenie',
+      credentialHelp: 'Poświadczenie typu Baza danych: typ bazy danych, serwer, baza danych i login.',
+      noUse: 'Żaden formularz nie odpytuje tej bazy danych.',
+    },
     cron: {
       second: 'Sekunda',
       minute: 'Minuta',
@@ -1135,6 +1151,7 @@ export default {
       repository: 'Repozytorium',
       ldapDirectory: 'Katalog LDAP',
       ssoProvider: 'Dostawca SSO',
+      database: 'Baza danych',
       chat: 'Asystent czatu',
       noFormRole: 'Żaden formularz nie wskazuje tej roli.',
       noFormGroup: 'Żadna rola grupy nie otwiera formularza.',

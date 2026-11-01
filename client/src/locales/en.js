@@ -475,6 +475,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Credentials',
+    databases: 'Databases',
     ssh: 'SSH',
     knownHosts: 'Known hosts',
     secretStores: 'Secret stores',
@@ -516,6 +517,10 @@ export default {
       runner_jointoken_delete: 'Join token deleted',
       runner_jointoken_revoke_create: 'Join token revoked',
       runner_check_create: 'Runner connection tested',
+      database_create: 'Database created',
+      database_update: 'Database updated',
+      database_delete: 'Database deleted',
+      database_check_create: 'Database connection tested',
       announcement_create: 'Announcement created',
       announcement_update: 'Announcement updated',
       announcement_delete: 'Announcement deleted',
@@ -925,6 +930,17 @@ export default {
     relaunch: 'Relaunch',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Field',
+      label: 'Database',
+      description:
+        "The databases forms query: a field's dbConfig names one. Each connects with a credential of type Database, which holds its server and login.",
+      nameHelp: "The name a field's dbConfig gives to query this database.",
+      credential: 'Credential',
+      credentialHelp: 'A credential of type Database: its database type, server, database and login.',
+      noUse: 'No form queries this database.',
+    },
     cron: {
       second: 'Second',
       minute: 'Minute',
@@ -1128,6 +1144,7 @@ export default {
       repository: 'Repository',
       ldapDirectory: 'LDAP directory',
       ssoProvider: 'SSO provider',
+      database: 'Database',
       chat: 'Chat assistant',
       noFormRole: 'No form names this role.',
       noFormGroup: "None of the group's roles opens a form.",

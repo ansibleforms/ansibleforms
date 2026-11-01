@@ -28,6 +28,7 @@ const LISTS = {
   repositories: { buttons: [102, 167] },
   credentials: { buttons: [166] },
   'secret-stores': { buttons: [181] },
+  databases: { buttons: [150] },
   runners: { buttons: [151, 139] },
   notifications: { buttons: [244] },
   syslog: { buttons: [192] },

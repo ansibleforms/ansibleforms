@@ -477,6 +477,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: '認証情報',
+    databases: 'データベース',
     ssh: 'SSH',
     knownHosts: '既知のホスト',
     runners: 'ランナー',
@@ -503,6 +504,10 @@ export default {
       runner_jointoken_delete: '参加トークンを削除',
       runner_jointoken_revoke_create: '参加トークンを失効',
       runner_check_create: 'ランナーの接続をテスト',
+      database_create: 'データベースを作成',
+      database_update: 'データベースを更新',
+      database_delete: 'データベースを削除',
+      database_check_create: 'データベースの接続をテスト',
       announcement_create: 'お知らせを作成',
       announcement_update: 'お知らせを更新',
       announcement_delete: 'お知らせを削除',
@@ -928,6 +933,18 @@ export default {
     relaunch: '再起動',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'フィールド',
+      label: 'データベース',
+      description:
+        'フォームが照会するデータベースです。フィールドの dbConfig がその1つを指定します。各データベースは種類がデータベースの認証情報で接続し、その認証情報がサーバーとログインを保持します。',
+      nameHelp: 'このデータベースを照会するためにフィールドの dbConfig が指定する名前です。',
+      credential: '認証情報',
+      credentialHelp:
+        '種類がデータベースの認証情報です。データベースの種類、サーバー、データベース、ログインを保持します。',
+      noUse: 'このデータベースを照会するフォームはありません。',
+    },
     cron: {
       second: '秒',
       minute: '分',
@@ -1132,6 +1149,7 @@ export default {
       repository: 'リポジトリ',
       ldapDirectory: 'LDAP ディレクトリ',
       ssoProvider: 'SSO プロバイダー',
+      database: 'データベース',
       chat: 'チャットアシスタント',
       noFormRole: 'このロールを指定するフォームはありません。',
       noFormGroup: 'グループのどのロールもフォームを開きません。',

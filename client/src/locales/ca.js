@@ -482,6 +482,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: 'Credencials',
+    databases: 'Bases de dades',
     ssh: 'SSH',
     knownHosts: 'Amfitrions coneguts',
     runners: 'Runners',
@@ -508,6 +509,10 @@ export default {
       runner_jointoken_delete: "Token d'unió eliminat",
       runner_jointoken_revoke_create: "Token d'unió revocat",
       runner_check_create: 'Connexió del runner provada',
+      database_create: 'Base de dades creada',
+      database_update: 'Base de dades actualitzada',
+      database_delete: 'Base de dades suprimida',
+      database_check_create: 'Connexió amb la base de dades provada',
       announcement_create: 'Anunci creat',
       announcement_update: 'Anunci actualitzat',
       announcement_delete: 'Anunci suprimit',
@@ -933,6 +938,18 @@ export default {
     relaunch: 'Rellança',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: 'Camp',
+      label: 'Base de dades',
+      description:
+        "Les bases de dades que consulten els formularis: el dbConfig d'un camp n'anomena una. Cadascuna es connecta amb una credencial de tipus Base de dades, que conté el seu servidor i el seu inici de sessió.",
+      nameHelp: "El nom que dona el dbConfig d'un camp per consultar aquesta base de dades.",
+      credential: 'Credencial',
+      credentialHelp:
+        "Una credencial de tipus Base de dades: el tipus de base de dades, el servidor, la base de dades i l'inici de sessió.",
+      noUse: 'Cap formulari no consulta aquesta base de dades.',
+    },
     cron: {
       second: 'Segon',
       minute: 'Minut',
@@ -1137,6 +1154,7 @@ export default {
       repository: 'Repositori',
       ldapDirectory: 'Directori LDAP',
       ssoProvider: 'Proveïdor SSO',
+      database: 'Base de dades',
       chat: 'Assistent de xat',
       noFormRole: 'Cap formulari nomena aquest rol.',
       noFormGroup: 'Cap rol del grup obre un formulari.',

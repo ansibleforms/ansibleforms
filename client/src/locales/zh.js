@@ -467,6 +467,7 @@ export default {
     syslog: 'Syslog',
     oauth2: 'SSO',
     credentials: '凭据',
+    databases: '数据库',
     ssh: 'SSH',
     knownHosts: '已知主机',
     runners: '运行器',
@@ -493,6 +494,10 @@ export default {
       runner_jointoken_delete: '已删除加入令牌',
       runner_jointoken_revoke_create: '已吊销加入令牌',
       runner_check_create: '已测试运行器连接',
+      database_create: '已创建数据库',
+      database_update: '已更新数据库',
+      database_delete: '已删除数据库',
+      database_check_create: '已测试数据库连接',
       announcement_create: '公告已创建',
       announcement_update: '公告已更新',
       announcement_delete: '公告已删除',
@@ -914,6 +919,17 @@ export default {
     relaunch: '重新运行',
   },
   settings: {
+    // Connections > Databases : the databases forms query, each with its database credential
+    databases: {
+      field: '字段',
+      label: '数据库',
+      description:
+        '表单查询的数据库：字段的 dbConfig 指定其中一个。每个数据库使用类型为数据库的凭据连接，该凭据保存其服务器和登录信息。',
+      nameHelp: '字段的 dbConfig 用于查询此数据库的名称。',
+      credential: '凭据',
+      credentialHelp: '类型为数据库的凭据：其数据库类型、服务器、数据库和登录信息。',
+      noUse: '没有表单查询此数据库。',
+    },
     cron: {
       second: '秒',
       minute: '分',
@@ -1107,6 +1123,7 @@ export default {
       repository: '仓库',
       ldapDirectory: 'LDAP 目录',
       ssoProvider: 'SSO 提供程序',
+      database: '数据库',
       chat: '聊天助手',
       noFormRole: '没有表单指定此角色。',
       noFormGroup: '该组的角色都不打开表单。',

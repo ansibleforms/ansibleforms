@@ -1,6 +1,7 @@
 'use strict';
 import logger from "../lib/logger.js";
 import Credential from "./credential.model.v2.js";
+import Database from "./database.model.js";
 import mysql from "../lib/mysql.js";
 import mssql from "../lib/mssql.js";
 import postgres from "../lib/postgres.js";
@@ -8,6 +9,11 @@ import mongodb from "../lib/mongodb.js";
 import oracle from "../lib/oracle.js";
 import { runJq } from "../lib/jq.js";
 import { substitute } from "../lib/queryPolicy.js";
+
+// the engine of each database type : each runs a query on the credential a name resolves to
+const ENGINES = { mysql, mssql, postgres, oracle, mongodb }
+// a type's engine, or none for a type without one (never a property every object has, toString)
+const engineOf = (type) => (Object.hasOwn(ENGINES, type) ? ENGINES[type] : null)
 
 //reporter object create
 var Query=function(){
@@ -54,9 +60,12 @@ Query.findAll = async function (query,jqExpression="",cfg,noLog,values=null) {
   for await (var c of config){
 
     var res
+    // step 1 : what the name connects with - a database of Connections > Databases of that name
+    // (its credential, by its exact name), else a credential of that name, as before databases
+    const source = await Database.credentialFor(c.name)
     if(!c.type){ // if no type is given, we try to find the credential
       logger.debug(`[${c.name}] No type is passed, looking up credential`)
-      var cred = await Credential.resolveCredential(c.name)
+      var cred = await Credential.resolveCredential(source)
       c.type = cred.db_type || "mysql"
     }
     // substituted per datasource, now that the engine is known - see the `values` note
@@ -67,40 +76,16 @@ Query.findAll = async function (query,jqExpression="",cfg,noLog,values=null) {
     }else{
       logger.info(`[${c.type}][${c.name}] Running query ${finalQuery}`)
     }
-    if(c.type=="mssql"){  // use mssql connection lib
-      res = await mssql.query(c.name,finalQuery)
-      if(!noLog){
-        logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
-      }
-      result = result.concat(res)
-
-    }else if(c.type=="mysql"){  // use mysql connection lib
-      res = await mysql.query(c.name,finalQuery)
-      if(!noLog){
-        logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
-      }
-      result = result.concat(res)
-    }else if(c.type=="postgres"){  // use postgres connection lib
-      res = await postgres.query(c.name,finalQuery)
-      if(!noLog){
-        logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
-      }
-      result = result.concat(res)
-    }else if(c.type=="oracle"){  // use postgres connection lib
-      res = await oracle.query(c.name,finalQuery)
-      if(!noLog){
-        logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
-      }
-      result = result.concat(res)
-    }else if(c.type=="mongodb"){  // use postgres connection lib
-      res = await mongodb.query(c.name,finalQuery)
-      if(!noLog){
-        logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
-      }
-      result = result.concat(res)
-    }else{
+    // step 2 : the engine of its type runs it
+    const engine = engineOf(c.type)
+    if(!engine){
       throw new Error("Unsupported database type")
     }
+    res = await engine.query(source,finalQuery)
+    if(!noLog){
+      logger.debug(`[${c.name}] query result: ${JSON.stringify(res)}`)
+    }
+    result = result.concat(res)
   }
   
   // Apply jq expression if provided
@@ -117,4 +102,42 @@ Query.findAll = async function (query,jqExpression="",cfg,noLog,values=null) {
   
   return result
 };
+
+// the query each engine answers when a connection is tested : the least it can run, a MongoDB
+// one in its database~collection~filter form
+const TEST_QUERIES = {
+  mysql: "select 1",
+  mssql: "select 1",
+  postgres: "select 1",
+  oracle: "select 1 from dual",
+  mongodb: "admin~system.version~{}",
+}
+
+/**
+ * Tests a database connection : the least query its engine can run, on the credential it connects
+ * with (a database of Connections > Databases tests its credential, a credential of type database
+ * itself).
+ *
+ * Args:
+ *   credential (string): the credential's name as Credential.resolveCredential reads it (its
+ *     exact pattern, Credential.exactPattern).
+ *   dbType (string): the engine (mysql, mssql, postgres, oracle, mongodb).
+ *
+ * Returns:
+ *   Promise<boolean>: true once it answered.
+ *
+ * Raises:
+ *   Error: a type without an engine (code 'NO_DB_TYPE'), or the connection's or the query's error.
+ */
+Query.testConnection = async function (credential, dbType) {
+  const engine = engineOf(dbType)
+  if(!engine){
+    const err = new Error(`Database type not set: '${dbType || ""}'`)
+    err.code = "NO_DB_TYPE"
+    throw err
+  }
+  await engine.query(credential, TEST_QUERIES[dbType])
+  return true
+}
+
 export default  Query;

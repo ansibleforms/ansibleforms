@@ -129,6 +129,8 @@ export default {
     joinTokenDeleted: "Token d'unió eliminat",
     joinTokenNotFound: "No s'ha trobat el token d'unió",
     runnerNotFound: "No s'ha trobat el runner",
+    databaseAdded: "Base de dades afegida",
+    databaseNotFound: "No s'ha trobat la base de dades",
     runnerAdminOnly:
       "Només un admin pot afegir, canviar o eliminar un runner: un runner rep les credencials dels treballs que executa",
     repositoryAdminOnly:

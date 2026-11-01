@@ -126,6 +126,8 @@ export default {
     joinTokenDeleted: "Token de adesão eliminado",
     joinTokenNotFound: "Token de adesão não encontrado",
     runnerNotFound: "Runner não encontrado",
+    databaseAdded: "Base de dados adicionada",
+    databaseNotFound: "Base de dados não encontrada",
     runnerAdminOnly:
       "Só um admin pode adicionar, alterar ou eliminar um runner: um runner recebe as credenciais dos trabalhos que executa",
     repositoryAdminOnly:
