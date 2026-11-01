@@ -1,4 +1,4 @@
-# The AnsibleForms RTE, layer 3 of 3 - the one to run : the RTE (Dockerfile.rte-core) + the
+# The AnsibleForms RTE, layer 3 of 3 - the one to run : the RTE (docker/rte-core) + the
 # ansible package with its collections, at the version that matches rte-core's ansible-core,
 # the python libraries (docker/rte-full/requirements.txt), the NetApp, AWS and community
 # collections (docker/rte-full/collections.yml) and the os tools the AnsibleForms 6.5 image had.

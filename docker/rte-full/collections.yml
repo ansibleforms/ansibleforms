@@ -1,5 +1,5 @@
 # The collections the AnsibleForms image had before 7, installed at build time in their
-# latest version : the ansibleforms-rte-full image (Dockerfile.rte-full).
+# latest version : the ansibleforms-rte-full image (the Dockerfile beside this file).
 collections:
   - name: netapp.ontap
   - name: netapp.elementsw

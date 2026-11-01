@@ -1,6 +1,6 @@
 **/node_modules/
 node_modules
-Dockerfile
+docker/*/Dockerfile
 .env.*
 # a machine's own dev settings (client/.env.local : the dev server's certificate), never in an image
 **/.env.local

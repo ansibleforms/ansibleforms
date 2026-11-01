@@ -10,10 +10,6 @@ on:
   pull_request:
     branches: [main, 'release/**']
     paths:
-      - 'Dockerfile'
-      - 'Dockerfile.rte-core'
-      - 'Dockerfile.rte-base'
-      - 'Dockerfile.rte-full'
       - 'docker/**'
       - 'server/ansible.cfg'
       - 'server/healthcheck.js'
@@ -54,6 +50,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: docker/controller/Dockerfile
           push: false
           # Built to prove it builds, never published: say so, or buildx warns that the result
           # goes nowhere.
@@ -70,7 +67,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: Dockerfile.rte-base
+          file: docker/rte-base/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-base:ci
           build-args: |
@@ -83,7 +80,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: Dockerfile.rte-core
+          file: docker/rte-core/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-core:ci
           build-args: |
@@ -95,7 +92,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: Dockerfile.rte-full
+          file: docker/rte-full/Dockerfile
           push: true
           tags: localhost:5000/ansibleforms-rte-full:ci
           build-args: |

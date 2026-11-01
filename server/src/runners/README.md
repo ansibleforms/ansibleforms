@@ -101,7 +101,7 @@ the RTE's `RTE_TOKEN`, its url the inbound RTE's address.
 | `rte/ansible-core.js` | The one place a playbook runs: `runAnsibleJob`, `buildAnsibleArgs` (no shell), `executeCommand` (process group, abort flag, output limit, job log). |
 | `models/runner.model.js` | The `runners` table: per-type validation, one default per type, masked secrets. |
 | `models/job.model.js` | `Job.launch`, `Job.continue` (approval), multistep, notifications, `Job.lastOrder`. |
-| `/Dockerfile.rte-base`, `/Dockerfile.rte-core`, `/Dockerfile.rte-full`, `/examples/rte` | The RTE images in three layers - the base (no python, no ansible), core (ansible-core and the essentials), full (the ansible package with collections and what the v6 image had) - and examples to build your own on them. |
+| `/docker/rte-base`, `/docker/rte-core`, `/docker/rte-full`, `/examples/rte` | The RTE images in three layers - the base (no python, no ansible), core (ansible-core and the essentials), full (the ansible package with collections and what the v6 image had) - and examples to build your own on them. |
 
 ### The runner contract
 
