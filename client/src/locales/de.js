@@ -1349,6 +1349,8 @@ export default {
           'Anmeldedaten, Einträge einer Liste controller_credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
         secret_stores:
           'Secret Stores, Einträge einer Liste controller_secret_stores: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        databases:
+          'Datenbanken, die die Formulare abfragen, Einträge einer Liste controller_databases: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
         runners:
           'Runner, Einträge einer Liste controller_runners: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
         notifications:

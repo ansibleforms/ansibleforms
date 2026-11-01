@@ -43,7 +43,7 @@ export const state = {
  *   tables (object): the rows to start with, by table (repositories, credentials, runners).
  */
 export function reset(tables = {}) {
-  const empty = ["repositories", "credentials", "runners", "secret_stores", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels", "settings", "announcements"];
+  const empty = ["repositories", "credentials", "runners", "secret_stores", "databases", "notification_channels", "ldap", "oauth2_providers", "chat_settings", "syslog_servers", "labels", "settings", "announcements"];
   state.tables = { ...Object.fromEntries(empty.map((t) => [t, []])), ...structuredClone(tables) };
   state.nextId = 100;
   state.calls.length = 0;
@@ -177,6 +177,8 @@ export const db = {
     m = sql.match(/^SELECT .+ FROM \S+ WHERE (\w+) ?= ?\?$/);
     if (m) return copy(rows.filter((r) => (m[1] === "name" ? lower(r.name) === lower(params[0]) : String(r[m[1]]) === String(params[0]))));
     if (/^SELECT .+ FROM \S+$/.test(sql)) return copy(rows);
+    // the rows of some names (the credentials a database shows the server of : models/database.model.js)
+    if (/^SELECT .+ FROM \S+ WHERE name IN \(\?\)$/.test(sql)) return copy(rows.filter((r) => [].concat(params[0]).includes(r.name)));
     // a list by name (the repositories)
     if (/^SELECT .+ FROM \S+ ORDER BY name$/.test(sql)) return copy(rows).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     // a list in its order (the LDAP directories, the labels)

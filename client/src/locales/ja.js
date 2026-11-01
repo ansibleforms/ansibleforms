@@ -1336,6 +1336,8 @@ export default {
           '認証情報。任意の YAML ファイルの controller_credentials: リストの項目、シークレットは環境変数の参照のみ',
         secret_stores:
           'シークレットストア。任意の YAML ファイルの controller_secret_stores: リストの項目、認証情報を名前で指定',
+        databases:
+          'フォームが照会するデータベース。任意の YAML ファイルの controller_databases: リストの項目、認証情報を名前で指定',
         runners: 'ランナー。任意の YAML ファイルの controller_runners: リストの項目、認証情報を名前で指定',
         notifications: '通知。任意の YAML ファイルの controller_notifications: リストの項目',
         syslog: 'Syslog サーバー。任意の YAML ファイルの controller_syslog: リストの項目',

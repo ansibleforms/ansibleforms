@@ -1346,6 +1346,8 @@ export default {
           'Credenciais, entradas de uma lista controller_credentials: em qualquer um dos seus ficheiros YAML, segredos só como referências de ambiente',
         secret_stores:
           'Cofres de segredos, entradas de uma lista controller_secret_stores: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
+        databases:
+          'Bases de dados que os formulários consultam, entradas de uma lista controller_databases: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
         runners:
           'Runners, entradas de uma lista controller_runners: em qualquer um dos seus ficheiros YAML, que nomeiam a sua credencial',
         notifications:

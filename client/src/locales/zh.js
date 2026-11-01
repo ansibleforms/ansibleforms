@@ -1311,6 +1311,7 @@ export default {
         disclaimer: '免责声明版本，其任意 YAML 文件中 controller_disclaimer: 列表的条目',
         credentials: '凭据，其任意 YAML 文件中 controller_credentials: 列表的条目，密钥仅以环境变量引用',
         secret_stores: '密钥库，其任意 YAML 文件中 controller_secret_stores: 列表的条目，按名称引用其凭据',
+        databases: '表单查询的数据库，其任意 YAML 文件中 controller_databases: 列表的条目，按名称引用其凭据',
         runners: '运行器，其任意 YAML 文件中 controller_runners: 列表的条目，按名称引用其凭据',
         notifications: '通知，其任意 YAML 文件中 controller_notifications: 列表的条目',
         syslog: 'Syslog 服务器，其任意 YAML 文件中 controller_syslog: 列表的条目',

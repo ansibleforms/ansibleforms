@@ -6604,7 +6604,7 @@
       | --- | --- |
       | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
       | Access | Disclaimer (`use_for_disclaimer`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
-      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Runners (`use_for_runners`), Notifications (`use_for_notifications`), Chat assistant (`use_for_chat_assistant`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
+      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Databases (`use_for_databases`), Runners (`use_for_runners`), Notifications (`use_for_notifications`), Chat assistant (`use_for_chat_assistant`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
       | Appearance | Defaults (`use_for_defaults`), Logo (`use_for_logo`), Icon (`use_for_icon`), Name (`use_for_name`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | General (`use_for_general`) |
 
@@ -6665,7 +6665,7 @@
       | Key | Holds | Example entry |
       | --- | --- | --- |
       | `controller_schedules:` | a list of schedules | `- name: Nightly` |
-      | `controller_credentials:`, `controller_secret_stores:`, `controller_runners:`, `controller_notifications:`, `controller_sso:`, `controller_ldap:`, `controller_syslog:`, `controller_labels:`, `controller_announcements:`, `controller_repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
+      | `controller_credentials:`, `controller_secret_stores:`, `controller_databases:`, `controller_runners:`, `controller_notifications:`, `controller_sso:`, `controller_ldap:`, `controller_syslog:`, `controller_labels:`, `controller_announcements:`, `controller_repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
       | `controller_disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
       | `controller_general:`, `controller_mcp:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
       | `controller_roles:`, `controller_categories:`, `controller_constants:` | the base configuration's key, as before | |
@@ -6804,11 +6804,11 @@
       another type than its credential) is refused alone, said in the pull output with its place
       (`connections.yaml#rte-main`). A runner whose credential does not exist yet **waits**, said in the pull output,
       and is read again when the credentials are next pulled. Removing a credential's entry while a runner, a
-      repository, a secret store, a channel or a sign-in still uses it is refused: the credential stays, the pull
+      repository, a secret store, a database, a channel or a sign-in still uses it is refused: the credential stays, the pull
       output says what uses it; renaming it in its file (the one name gone from that file, the one new name in it)
       while something uses it is refused the same way, unless every one of them is a repository object whose own
       entry names the new name in the same commit (the credential renamed, the runner following it). At the worker's start the types are read in a fixed order:
-      credentials, secret stores, what signs in with them (runners ...), then the others.
+      credentials, secret stores, what signs in or connects with them (databases, runners ...), then the others.
 
       **Turning it on** shows what it will do first: the app's objects written to the repository, and the file they
       go to (those whose secrets stay in the database said), the entries whose name an app object has (git's
@@ -6834,11 +6834,11 @@
 
       **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and read
       in, then its objects are unlinked; they stay in the app as they are, the files in git untouched.
-  - name: Secret stores, notification channels, SSO, LDAP, syslog servers and labels kept in a git repository
+  - name: Secret stores, databases, notification channels, SSO, LDAP, syslog servers and labels kept in a git repository
     short: Lists of objects under their key, in the seed's format
     version: v7.5.0
     description: |
-      Six more object types work exactly as the credentials and the runners (see *Credentials and runners kept in a
+      Seven more object types work exactly as the credentials and the runners (see *Credentials and runners kept in a
       git repository*): the entries of a list under the type's key, in any YAML file of the repository, one
       repository at most per type, two ways, the same question before turning a type on or off, the same pull
       output, and **Repository: <name>** on the object's page. Each entry is in the config seed's format, so a seed
@@ -6847,6 +6847,7 @@
       | Usage | Key | An entry is | Names (waits when missing) | Secrets (`${ENV}` only) |
       | --- | --- | --- | --- | --- |
       | Secret stores | `controller_secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
+      | Databases | `controller_databases:` | an item of `databases:` | `credential` (of type database) | |
       | Notifications | `controller_notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
       | SSO | `controller_sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
       | LDAP | `controller_ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
@@ -6883,9 +6884,19 @@
       **Labels** keep their order the same way: `position` is in each entry, a label moved in the app rewrites the
       positions in the entries, and a label without a position goes after the others.
 
+      **Databases** name the credential they connect with, one of type database (Connections > Credentials);
+      an entry naming a credential of another type is refused, one whose credential is not there yet waits:
+      ```yaml
+      controller_databases:
+        - name: cmdb
+          description: The CMDB
+          credential: cmdb-login
+      ```
+      A database holds no secret and no address: its engine, server, database and login are its credential's.
+
       **Credentials they use** cannot lose their entry: removing a credential's entry while a secret store, a
-      notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat assistant uses it
-      is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
+      database, a notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat
+      assistant uses it is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
       then what names them; Pull all pulls the repositories in the same order.
   - name: Repositories kept in a git repository
     short: The other repositories, entries of a repositories list

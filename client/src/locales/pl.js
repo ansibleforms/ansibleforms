@@ -1339,6 +1339,8 @@ export default {
           'Poświadczenia, wpisy listy controller_credentials: w dowolnym z jego plików YAML, sekrety tylko jako odwołania do zmiennych środowiskowych',
         secret_stores:
           'Magazyny sekretów, wpisy listy controller_secret_stores: w dowolnym z jego plików YAML, wskazujące swoje poświadczenie',
+        databases:
+          'Bazy danych, o które pytają formularze, wpisy listy controller_databases: w dowolnym z jego plików YAML, wskazujące swoje poświadczenie',
         runners:
           'Runnery, wpisy listy controller_runners: w dowolnym z jego plików YAML, wskazujące swoje poświadczenie',
         notifications: 'Powiadomienia, wpisy listy controller_notifications: w dowolnym z jego plików YAML',

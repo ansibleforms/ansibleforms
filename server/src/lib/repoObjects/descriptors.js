@@ -9,6 +9,7 @@ const LOADERS = {
   repositories: () => import("./repositories.js"),
   runners: () => import("./runners.js"),
   secret_stores: () => import("./secretStores.js"),
+  databases: () => import("./databases.js"),
   notifications: () => import("./notifications.js"),
   sso: () => import("./sso.js"),
   ldap: () => import("./ldap.js"),

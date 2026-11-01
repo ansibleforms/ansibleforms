@@ -1343,6 +1343,8 @@ export default {
           'Inloggegevens, items van een controller_credentials:-lijst in een van zijn YAML-bestanden, geheimen alleen als omgevingsverwijzingen',
         secret_stores:
           'Secret stores, items van een controller_secret_stores:-lijst in een van zijn YAML-bestanden, die hun inloggegevens noemen',
+        databases:
+          'Databases die de formulieren bevragen, items van een controller_databases:-lijst in een van zijn YAML-bestanden, die hun inloggegevens noemen',
         runners:
           'Runners, items van een controller_runners:-lijst in een van zijn YAML-bestanden, die hun inloggegevens noemen',
         notifications: 'Meldingen, items van een controller_notifications:-lijst in een van zijn YAML-bestanden',

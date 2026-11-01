@@ -5,7 +5,8 @@
 /*  databases' list (Connections > Databases) : its fields in     */
 /*  tabs, the tab kept in the url -                               */
 /*    Details     its name (the one a field's dbConfig gives) and */
-/*                what it is                                      */
+/*                what it is ; one kept in a repository : where   */
+/*                it comes from (Repository: <name>, its file)    */
 /*    Credentials the credential of type database it connects     */
 /*                with (New credential beside it)                 */
 /*    Used by  the forms whose fields name it in their dbConfig,  */
@@ -25,7 +26,8 @@ import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
 import getSettings, { DATABASES_PATH } from '@/config/settings';
 import { databaseFormRows } from '@/lib/formUseRows';
-import { tableMatches } from '@/lib/recordSearch';
+import { tableMatches, textsMatch } from '@/lib/recordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 import { useConnectionTest } from '@/composables/useConnectionTest';
 
 const { t } = useI18n();
@@ -84,9 +86,13 @@ async function loadForms() {
 }
 
 // ─── search ───────────────────────────────────────────────────────────────────
-// the word of the title line (AppAdminSingle searchable) : the Used by rows with it match too
+// the word of the title line (AppAdminSingle searchable) : the Used by rows with it match too, and
+// the Repository line of one kept in a repository
 const search = ref('');
-const topMatches = computed(() => ({ 'used-by': tableMatches(search.value, usedBy.value, usedByColumns.value) }));
+const topMatches = computed(() => ({
+  details: repositorySourceFields(t, database.value || {}).some((f) => textsMatch(search.value, f.slice(1))),
+  'used-by': tableMatches(search.value, usedBy.value, usedByColumns.value),
+}));
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 // Test connection : its credential's, as saved
@@ -145,6 +151,13 @@ onMounted(async () => {
       @test="() => test({ id: databaseId })"
       @delete="(item) => (deleting = item)"
     >
+      <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+      <template #tab-top-details="{ record, searching, matches }">
+        <AppRepositorySource
+          v-show="!searching || repositorySourceFields(t, record).some((f) => matches(...f.slice(1)))"
+          :record="record"
+        />
+      </template>
       <!-- Used by : the forms that query it -->
       <template #tab-top-used-by="{ active, searching }">
         <!-- only while its tab is shown, or the search covers every tab : its toolbar and pager go

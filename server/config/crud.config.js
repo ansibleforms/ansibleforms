@@ -150,7 +150,11 @@ const crudConfigs = {
       { name: 'description' },
       // a credential of Connections > Credentials, of type database
       { name: 'credential', required: true },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the databases repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -335,6 +339,7 @@ const crudConfigs = {
       { name: 'use_for_repositories', isBoolean: true },
       { name: 'use_for_credentials', isBoolean: true },
       { name: 'use_for_secret_stores', isBoolean: true },
+      { name: 'use_for_databases', isBoolean: true },
       { name: 'use_for_runners', isBoolean: true },
       { name: 'use_for_notifications', isBoolean: true },
       { name: 'use_for_sso', isBoolean: true },

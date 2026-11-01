@@ -180,6 +180,15 @@ export const USAGE_TYPES = [
     objects: true,
     oneOnly: true,
   },
+  // the databases forms query, named as its menu item names it (Databases)
+  {
+    key: 'databases',
+    flag: 'use_for_databases',
+    category: 'connections',
+    labelKey: 'sidebar.databases',
+    objects: true,
+    oneOnly: true,
+  },
   {
     key: 'runners',
     flag: 'use_for_runners',
@@ -231,11 +240,12 @@ export const USAGE_TYPES = [
 export const USAGE_FLAGS = USAGE_TYPES.map((u) => u.flag);
 
 // the order the object types are read and asked about : the credentials first, then what signs
-// in with them, then the others (the server's order)
+// in or connects with them, then the others (the server's order)
 export const APPLY_ORDER = [
   'credentials',
   'repositories',
   'secret_stores',
+  'databases',
   'runners',
   'sso',
   'ldap',

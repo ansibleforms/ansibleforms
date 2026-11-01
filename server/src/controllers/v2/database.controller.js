@@ -1,7 +1,8 @@
 "use strict";
 // Connections > Databases : the databases forms query (models/database.model.js), and a test of
 // the connection of one. A database holds no secret : its login is its credential's, which no
-// answer here hands out.
+// answer here hands out. A database of the databases repository (lib/repoObjects : its
+// controller_databases: entries) is saved the same way, its file following each save.
 import Database from "../../models/database.model.js";
 import CredentialModel from "../../models/credential.model.v2.js";
 import RestResult from "../../models/restResult.model.v2.js";
@@ -13,6 +14,7 @@ import { formCredentials } from "../../lib/formLinks.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
 import { publicError } from "./publicError.js";
 import { testDatabase } from "./credential.controller.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 /**
  * Keeps a user who is not an admin from naming a credential only an admin may name
@@ -78,7 +80,12 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     await guardCredential(req, null);
-    const created = await Database.create(req.body);
+    const created = await RepoObjects.holding("databases", async () => {
+      const created = await Database.create(req.body);
+      // the databases repository, when there is one : written to it as a new entry (lib/repoObjects)
+      await RepoObjects.appCreated("databases", created);
+      return created;
+    });
     // { message, id }, as the other records answer a create
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "resources.databaseAdded"), id: created }));
   } catch (err) {
@@ -104,7 +111,11 @@ const update = async (req, res) => {
     const before = await Database.findById(req.params.id).catch(() => null);
     if (!before) throw new Errors.NotFoundError(i18n.t(req, "resources.databaseNotFound"));
     await guardCredential(req, before);
-    await Database.update(req.body, req.params.id);
+    await RepoObjects.holding([], async () => {
+      await Database.update(req.body, req.params.id);
+      // one of the databases repository : its changed fields written to its entry
+      if (before.repository) await RepoObjects.appUpdated("databases", before, req.params.id);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Database" }) }));
   } catch (err) {
     Errors.ReturnError(res, publicError(req, err));
@@ -113,8 +124,13 @@ const update = async (req, res) => {
 
 const deleteDatabase = async (req, res) => {
   try {
-    const deleted = await Database.delete(req.params.id);
-    if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.databaseNotFound"));
+    const before = await Database.findById(req.params.id).catch(() => null);
+    await RepoObjects.holding([], async () => {
+      const deleted = await Database.delete(req.params.id);
+      if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.databaseNotFound"));
+      // one of the databases repository : its entry goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("databases", before);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Database" }) }));
   } catch (err) {
     Errors.ReturnError(res, publicError(req, err));

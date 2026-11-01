@@ -1,5 +1,6 @@
 // The object types on the engine (lib/repoObjects) beyond the credentials and the runners : secret
-// stores, notification channels, SSO providers, LDAP directories, syslog servers and labels. Each
+// stores, databases, notification channels, SSO providers, LDAP directories, syslog servers and
+// labels. Each
 // type runs the same table of cases, on the shared fixture :
 //   a pull       makes its object from its file, linked to it, in the seed's format
 //   secrets      a plain one refused (the types that have secrets)
@@ -80,6 +81,15 @@ const TYPES = [
     edit: ["description", "the main vault"],
   },
   {
+    key: "databases",
+    folder: "databases",
+    table: "databases",
+    file: { name: "cmdb", description: "The CMDB", credential: "cmdb-login" },
+    check: (r) => assert.deepEqual([r.credential, r.description], ["cmdb-login", "The CMDB"]),
+    app: { id: 30, name: "inventory", credential: "cmdb-login", description: "", managed: 0 },
+    edit: ["description", "the inventory database"],
+  },
+  {
     key: "notifications",
     folder: "notifications",
     table: "notification_channels",
@@ -136,6 +146,7 @@ const CREDENTIALS = [
   { id: 2, name: "smtp-login", credential_type: "smtp", host: "smtp.example.com", port: 587, password: "enc:p" },
   { id: 3, name: "corp-client", credential_type: "entraid", tenant_id: "contoso.onmicrosoft.com", user: "app-id", password: "enc:s" },
   { id: 4, name: "corp-bind", credential_type: "ldap", host: "ldap.corp", port: 636, user: "cn=bind", password: "enc:b" },
+  { id: 5, name: "cmdb-login", credential_type: "database", db_type: "mysql", host: "db.corp", port: 3306, user: "af", password: "enc:d" },
 ];
 
 // the main directory there always is
@@ -311,6 +322,57 @@ describe("what the new types bring to the engine", () => {
     fx.removeFile("creds", "credentials", "corp-bind.yaml");
     const summary = await RepoObjects.syncRepository(credentials, "creds");
     assert.match(summary.refused[0].reasons[0], /LDAP directory 'corp' still uses 'corp-bind'/);
+  });
+});
+
+describe("a database names a credential of type database", () => {
+  const repo = repoOf("databases");
+  const desc = () => RepoObjects.descriptorOf("databases");
+
+  test("a credential of another type is refused, nothing made", async () => {
+    fx.writeEntry(repo, "databases/a.yaml", "databases", { name: "cmdb", credential: "corp-bind" });
+    const summary = await RepoObjects.syncRepository(await desc(), repo);
+    assert.equal(summary.created, 0);
+    assert.match(JSON.stringify(summary.refused), /credential of type database: 'corp-bind' is ldap/);
+    assert.equal(fx.rowNamed("databases", "cmdb"), undefined);
+  });
+
+  test("the credential it connects with cannot lose its file", async () => {
+    fx.state.tables.credentials = [];
+    fx.state.tables.repositories.push({ id: 99, name: "creds", use_for_credentials: 1 });
+    fx.writeEntry("creds", "credentials/cmdb-login.yaml", "credentials", { name: "cmdb-login", credential_type: "database", db_type: "mysql", host: "db.corp" });
+    const credentials = await RepoObjects.descriptorOf("credentials");
+    await RepoObjects.syncRepository(credentials, "creds");
+    fx.writeEntry(repo, "databases/a.yaml", "databases", { name: "cmdb", credential: "cmdb-login" });
+    assert.equal((await RepoObjects.syncRepository(await desc(), repo)).created, 1);
+    fx.removeFile("creds", "credentials", "cmdb-login.yaml");
+    const summary = await RepoObjects.syncRepository(credentials, "creds");
+    assert.match(summary.refused[0].reasons[0], /database 'cmdb' still uses 'cmdb-login'/);
+  });
+});
+
+describe("a database saved in the app : its repository follows", () => {
+  test("made, edited and deleted through its API : its entry written, rewritten and removed", async () => {
+    const { default: controller } = await import("../src/controllers/v2/database.controller.js");
+    const repo = repoOf("databases");
+    fx.cloneEmpty(repo);
+    // made : a new entry, in databases.yaml
+    const made = await asAdmin(controller.create, { body: { name: "cmdb", description: "The CMDB", credential: "cmdb-login" } });
+    assert.equal(made.status, 201, JSON.stringify(made.data));
+    assert.deepEqual(fx.readEntry(repo, "databases.yaml", "databases", "cmdb"), { name: "cmdb", description: "The CMDB", credential: "cmdb-login" });
+    const row = fx.rowNamed("databases", "cmdb");
+    assert.equal(row.repository, repo);
+    // edited : its changed field rewritten
+    CrudModel.flushAllLocal();
+    const edited = await asAdmin(controller.update, { body: { description: "The new CMDB" }, params: { id: String(row.id) } });
+    assert.ok(edited.status < 300, JSON.stringify(edited.data));
+    assert.equal(fx.readEntry(repo, "databases.yaml", "databases", "cmdb").description, "The new CMDB");
+    // deleted : its entry goes, and the file it empties
+    CrudModel.flushAllLocal();
+    const deleted = await asAdmin(controller.delete, { params: { id: String(row.id) } });
+    assert.ok(deleted.status < 300, JSON.stringify(deleted.data));
+    assert.equal(fx.rowNamed("databases", "cmdb"), undefined);
+    assert.equal(fx.exists(repo, "databases.yaml"), false);
   });
 });
 

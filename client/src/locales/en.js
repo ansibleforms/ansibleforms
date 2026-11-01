@@ -1334,6 +1334,8 @@ export default {
           'Credentials, entries of a controller_credentials: list in any of its YAML files, secrets only as environment references',
         secret_stores:
           'Secret stores, entries of a controller_secret_stores: list in any of its YAML files, naming their credential',
+        databases:
+          'Databases the forms query, entries of a controller_databases: list in any of its YAML files, naming their credential',
         runners: 'Runners, entries of a controller_runners: list in any of its YAML files, naming their credential',
         notifications: 'Notifications, entries of a controller_notifications: list in any of its YAML files',
         syslog: 'Syslog servers, entries of a controller_syslog: list in any of its YAML files',

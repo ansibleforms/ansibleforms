@@ -1348,6 +1348,8 @@ export default {
           "Identifiants, entrées d'une liste controller_credentials: dans l'un de ses fichiers YAML, secrets uniquement en références d'environnement",
         secret_stores:
           "Coffres de secrets, entrées d'une liste controller_secret_stores: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
+        databases:
+          "Bases de données que les formulaires interrogent, entrées d'une liste controller_databases: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
         runners:
           "Runners, entrées d'une liste controller_runners: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
         notifications: "Notifications, entrées d'une liste controller_notifications: dans l'un de ses fichiers YAML",

@@ -1344,6 +1344,8 @@ export default {
           'Credenziali, voci di una lista controller_credentials: in uno qualsiasi dei suoi file YAML, segreti solo come riferimenti di ambiente',
         secret_stores:
           'Archivi di segreti, voci di una lista controller_secret_stores: in uno qualsiasi dei suoi file YAML, che nominano la loro credenziale',
+        databases:
+          'Database interrogati dai moduli, voci di una lista controller_databases: in uno qualsiasi dei suoi file YAML, che nominano la loro credenziale',
         runners:
           'Runner, voci di una lista controller_runners: in uno qualsiasi dei suoi file YAML, che nominano la loro credenziale',
         notifications: 'Notifiche, voci di una lista controller_notifications: in uno qualsiasi dei suoi file YAML',

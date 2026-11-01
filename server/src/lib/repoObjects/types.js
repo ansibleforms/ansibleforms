@@ -69,6 +69,8 @@ export const USAGE_TYPES = [
   { key: "repositories", references: ["credentials"], flag: "use_for_repositories", category: "connections", objects: true, oneOnly: true, label: "repositories" },
   { key: "credentials", flag: "use_for_credentials", category: "connections", objects: true, oneOnly: true, label: "credentials" },
   { key: "secret_stores", references: ["credentials"], flag: "use_for_secret_stores", category: "connections", objects: true, oneOnly: true, label: "secret stores" },
+  // the databases forms query, each naming its credential of type database
+  { key: "databases", references: ["credentials"], flag: "use_for_databases", category: "connections", objects: true, oneOnly: true, label: "databases" },
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", objects: true, oneOnly: true, label: "runners" },
   { key: "notifications", references: ["credentials"], flag: "use_for_notifications", category: "connections", objects: true, oneOnly: true, label: "notifications" },
   { key: "chat_assistant", single: true, references: ["credentials"], flag: "use_for_chat_assistant", category: "connections", objects: true, oneOnly: true, label: "chat assistant" },
@@ -151,14 +153,17 @@ export const USAGE_FLAGS = USAGE_TYPES.map((t) => t.flag);
 export const ONE_ONLY_FLAGS = USAGE_TYPES.filter((t) => t.oneOnly).map((t) => t.flag);
 
 // The order the object types are read in, at the worker's start and in one pull : the
-// credentials and the secret stores first, then what signs in with them, then the independent
-// ones - so an object finds what it names. One that does not is said and waits (engine.js).
+// credentials and the secret stores first, then what signs in or connects with them, then the
+// independent ones - so an object finds what it names. One that does not is said and waits
+// (engine.js).
 export const APPLY_ORDER = [
   "credentials",
   // the repositories after the credentials they sign in with, before every other type : one made
   // from its repositories: entries may hold any of them
   "repositories",
   "secret_stores",
+  // the databases after the credentials they connect with
+  "databases",
   "runners",
   "sso",
   "ldap",

@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 27 types of the server, in six groups, each flag once', () => {
+  it('are the 28 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -76,7 +76,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(27);
+    expect(new Set(USAGE_FLAGS).size).toBe(28);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -94,6 +94,7 @@ describe('the usage types', () => {
       'repositories',
       'credentials',
       'secret_stores',
+      'databases',
       'runners',
       'notifications',
       'chat_assistant',
@@ -120,12 +121,13 @@ describe('the usage types', () => {
     }
   });
 
-  it('named as their menu items : Roles, Categories, Constants, Chat assistant', () => {
+  it('named as their menu items : Roles, Categories, Constants, Databases, Chat assistant', () => {
     const labels = Object.fromEntries(USAGE_TYPES.filter((u) => u.labelKey).map((u) => [u.key, u.labelKey]));
     expect(labels).toMatchObject({
       roles: 'sidebar.roles',
       categories: 'sidebar.categories',
       constants: 'sidebar.constants',
+      databases: 'sidebar.databases',
       chat_assistant: 'sidebar.chat',
     });
     expect(read('pages/admin/repository.vue')).toContain(
@@ -173,6 +175,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
     expect(USAGE_FLAGS.filter((f) => record[f])).toEqual([
       'use_for_repositories',
       'use_for_secret_stores',
+      'use_for_databases',
       'use_for_runners',
       'use_for_notifications',
       'use_for_chat_assistant',
@@ -248,6 +251,7 @@ describe('one question when a save turns several object types on or off', () => 
       'credentials',
       'repositories',
       'secret_stores',
+      'databases',
       'runners',
       'notifications',
       'syslog',
@@ -424,10 +428,14 @@ describe('Pull all, and a linked object', () => {
       expect(read(page), page).toMatch(/<AppRepositorySource v-show="fieldShown\('source'\)" :record="\w+" \/>/);
       expect(read(page), page).toContain('...repositorySourceFields(t, ');
     }
-    // the LDAP directory's page : its Details tab's top, the record its page loaded
-    const ldap = read('pages/admin/ldap-directory.vue');
-    expect(ldap).toContain('<template #tab-top-details="{ record, searching, matches }">');
-    expect(ldap).toContain(':record="record"');
+    // the LDAP directory's and the database's pages : their Details tab's top, the record the page
+    // loaded
+    for (const page of ['pages/admin/ldap-directory.vue', 'pages/admin/database.vue']) {
+      const text = read(page);
+      expect(text, page).toContain('<template #tab-top-details="{ record, searching, matches }">');
+      expect(text, page).toContain(':record="record"');
+      expect(text, page).toContain('repositorySourceFields(t, record)');
+    }
     expect(read('components/AppAdminSingle.vue')).toMatch(/:matches="matches"\s+:record="item"/);
     expect(repositorySourceFields(t, { repository: null })).toEqual([]);
     expect(repositorySourceFields(t, { repository: 'ops', repo_file: 'runners/a.yaml' })[0]).toEqual([

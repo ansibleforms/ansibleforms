@@ -1346,6 +1346,8 @@ export default {
           "Credencials, entrades d'una llista controller_credentials: en qualsevol dels seus fitxers YAML, secrets només com a referències d'entorn",
         secret_stores:
           "Magatzems de secrets, entrades d'una llista controller_secret_stores: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
+        databases:
+          "Bases de dades que consulten els formularis, entrades d'una llista controller_databases: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
         runners:
           "Runners, entrades d'una llista controller_runners: en qualsevol dels seus fitxers YAML, que nomenen la seva credencial",
         notifications:
