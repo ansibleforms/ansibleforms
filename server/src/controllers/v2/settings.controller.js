@@ -12,7 +12,7 @@ import yaml from 'yaml';
 import appConfig from '../../../config/app.config.js';
 import { auditConfigChange, configHash as auditConfigHash } from '../../lib/configAudit.js';
 import { readableSettingsFields, writableSettingsFields } from '../../lib/settingsSections.js';
-import { assertAdminRoleUnchanged } from '../../lib/adminGrants.js';
+import { assertAdminRoleUnchanged, assertKeepsOwnAdmin } from '../../lib/adminGrants.js';
 import Errors from '../../lib/errors.js';
 
 
@@ -173,9 +173,18 @@ const importConfig = async function(req, res) {
       if (await refuseWhileDesignerLocked(req, res)) return;
       // who is an admin is the admin's : the model hands the roles of the file to this check
       // before it writes, and a non-admin whose file changes the admin role is refused
-      const message = await Settings.importConfig({ assertRoles: (roles) => assertAdminRoleUnchanged(req, roles) });
+      // and an admin whose file would take admin away from them is refused too
+      const message = await Settings.importConfig({
+        assertRoles: async (roles) => {
+          await assertAdminRoleUnchanged(req, roles);
+          await assertKeepsOwnAdmin(req, roles);
+        },
+      });
       res.json(RestResult.single({ message }));
     } catch(err) {
+      if (err instanceof Errors.ConflictError) {
+        return res.status(409).json(RestResult.error(i18n.t(req, 'resources.failedImportConfig'), err.message));
+      }
       if (err instanceof Errors.AccessDeniedError) {
         return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedImportConfig'), err.message));
       }
@@ -235,9 +244,14 @@ const saveConfig = async function(req, res) {
       // Settings > Roles saves through here : a user with settings access edits the other
       // roles, but only an admin changes who the admin role makes an admin
       await assertAdminRoleUnchanged(req, parsed?.roles || []);
+      // and an admin never saves roles that take admin away from them
+      await assertKeepsOwnAdmin(req, parsed?.roles || []);
     } catch(err) {
       if (err instanceof Errors.AccessDeniedError) {
         return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), err.message));
+      }
+      if (err instanceof Errors.ConflictError) {
+        return res.status(409).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), err.message));
       }
       return res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
     }

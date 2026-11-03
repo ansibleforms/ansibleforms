@@ -94,7 +94,7 @@
           "name"
         ],
         "if": { "properties": { "name": { "enum": ["default", "public"] } }, "required": ["name"] },
-        "then": { "properties": { "groups": { "const": [] }, "users": { "not": {} }, "credentials": { "not": {} }, "secretStores": { "not": {} }, "runners": { "not": {} } } },
+        "then": { "properties": { "groups": { "const": [] }, "users": { "not": {} }, "credentials": { "not": {} }, "secretStores": { "not": {} }, "runners": { "not": {} }, "options": { "properties": { "admin": { "not": { "const": true } } } } } },
         "anyOf": [
           {
             "required": [
@@ -117,6 +117,7 @@
           "options": {
             "type": "object",
             "properties": {
+              "admin": { "type": "boolean" },
               "showDesigner": { "type": "boolean"},
               "allowFormDesign": { "type": "boolean" },
               "designAllForms": { "type": "boolean" },

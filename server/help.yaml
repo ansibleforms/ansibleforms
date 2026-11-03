@@ -1816,6 +1816,7 @@
       - allowApiTokens: The user can make API tokens (Profile > API token), living up to API_TOKEN_MAX_DAYS. Default false (true for a role that only sets extendedTokenExpiration, as before this option). (Added in 7.3.0)
       - extendedTokenExpiration: With allowApiTokens, the user can also make API tokens that never expire. Default false.
       - showAllJobLogs: The user can see all job logs (not only his own) (Added in 5.0.9)
+      - admin: The role's users are admins, as the admin role's own: every form, the designer, the settings and the users, whatever the role is called (platformAdmins, infra_admins). Only an admin turns it on for a role with members or adds members to such a role, and a save that would take admin away from the admin saving it is refused. Never on the default role. Default false ; always true for the admin role. (Added in 7.6.0)
       - allowLogin: The user can login.
       - allowBackupOps: The user can perform database operations, such as backup and restore.
       - allowVerboseMode: The user can enable verbose mode on ansible forms.
@@ -2042,6 +2043,7 @@
           - allowApiTokens: The user can make API tokens (Profile > API token), living up to API_TOKEN_MAX_DAYS. Default false (true for a role that only sets extendedTokenExpiration, as before this option). (Added in 7.3.0)
           - extendedTokenExpiration: With allowApiTokens, the user can also make API tokens that never expire. Default false.
           - showAllJobLogs: The user can see all job logs (not only his own) (Added in 5.0.9)
+          - admin: The role's users are admins, as the admin role's own: every form, the designer, the settings and the users, whatever the role is called (platformAdmins, infra_admins). Only an admin turns it on for a role with members or adds members to such a role, and a save that would take admin away from the admin saving it is refused. Never on the default role. Default false ; always true for the admin role. (Added in 7.6.0)
           - allowLogin: The user can login.
           - allowBackupOps: The user can perform database operations, such as backup and restore.
           - allowVerboseMode: The user can enable verbose mode on ansible forms.

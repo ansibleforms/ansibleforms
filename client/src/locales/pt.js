@@ -397,6 +397,8 @@ export default {
       showAllJobLogs: 'Ver as tarefas de todos os utilizadores, não só as suas.',
       showArtifacts: 'Ver os artefactos que uma tarefa devolve.',
       showExtravars: 'Ver as extravars de um formulário e de uma tarefa.',
+      admin:
+        'Os seus utilizadores são administradores, como os da função admin: todos os formulários, o designer, as definições e os utilizadores. Nunca na função default.',
       allowLogin: 'Iniciar sessão no AnsibleForms.',
       allowBackupOps: 'Fazer cópias de segurança da base de dados e restaurá-las.',
       allowChat: 'Utilizar o assistente de chat, quando está ativado.',
@@ -2213,6 +2215,7 @@ export default {
       roleOptionShowAllJobLogs: 'Mostrar as tarefas de todos os utilizadores',
       roleOptionShowArtifacts: 'Mostrar artefactos',
       roleOptionShowJobs: 'Mostrar o menu Tarefas',
+      roleOptionAdmin: 'Administrador',
       roleOptionAllowLogin: 'Permitir início de sessão',
       roleOptionAllowBackupOps: 'Mostrar as Cópias de segurança',
       roleOptionAllowVerboseMode: 'Permitir modo detalhado',

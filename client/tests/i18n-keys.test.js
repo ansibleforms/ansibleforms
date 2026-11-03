@@ -107,7 +107,7 @@ describe('keys built by concatenation are covered too', () => {
       roles.indexOf('];', roles.indexOf('export const roleOptionKeys')),
     );
     const keys = [...block.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
-    expect(keys.length).toBe(35);
+    expect(keys.length).toBe(36);
     const gaps = [];
     for (const k of keys)
       for (const lang of LANGS) {

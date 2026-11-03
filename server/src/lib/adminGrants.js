@@ -13,9 +13,11 @@ import mysql from "../models/db.model.js";
 import Errors from "./errors.js";
 import yaml from "yaml";
 import { memberRefs } from "./directoryTypes.js";
+import { adminRoles, grantsAdmin } from "./adminRole.js";
 
 /**
- * The local groups and users the admin role names.
+ * The local groups and users the roles that make admins name : the admin role, and every role
+ * with admin: true (lib/adminRole.js).
  *
  * Args:
  *   configRoles (object[]): the roles of the configuration (config.yaml).
@@ -24,9 +26,14 @@ import { memberRefs } from "./directoryTypes.js";
  *   {groups: Set<string>, users: Set<string>}: their names, without the local/ prefix.
  */
 export function adminGrantsFromRoles(configRoles = []) {
-  const admin = (configRoles || []).find((r) => r?.name === "admin") || {};
-  const local = (list) => new Set((list || []).filter((x) => typeof x === "string" && x.startsWith("local/")).map((x) => x.slice(6)));
-  return { groups: local(admin.groups), users: local(admin.users) };
+  const local = (list) => (list || []).filter((x) => typeof x === "string" && x.startsWith("local/")).map((x) => x.slice(6));
+  const groups = new Set();
+  const users = new Set();
+  for (const role of adminRoles(configRoles)) {
+    for (const g of local(role.groups)) groups.add(g);
+    for (const u of local(role.users)) users.add(u);
+  }
+  return { groups, users };
 }
 
 /**
@@ -118,7 +125,8 @@ export async function assertMayTouchAdmin(req, { userId, username, groupIds, gro
 }
 
 /**
- * Who the admin role makes an admin : every group and user the roles named admin list, as a
+ * Who the roles make an admin : every group and user the roles that make admins list (the admin
+ * role, and every role with admin: true : lib/adminRole.js), as a
  * sorted list without duplicates, so two configurations compare whatever their order or layout.
  * The names are compared as the sign-in matches them (memberRefs, user.model.js) : entraid/x is
  * azuread/x, anything else as written.
@@ -131,8 +139,8 @@ export async function assertMayTouchAdmin(req, { userId, username, groupIds, gro
  */
 function adminMembers(configRoles = []) {
   const members = new Set();
-  for (const role of Array.isArray(configRoles) ? configRoles : []) {
-    if (role?.name !== "admin") continue;
+  // the admin role, and every role with admin: true : each makes its members admins
+  for (const role of adminRoles(configRoles)) {
     // groups and users kept apart : the same name means another account in each
     for (const g of memberRefs(role.groups)) members.add(`group:${g}`);
     for (const u of memberRefs(role.users)) members.add(`user:${u}`);
@@ -176,4 +184,32 @@ export async function assertAdminRoleUnchanged(req, roles) {
   }
 }
 
-export default { adminGrantsFromRoles, adminGrants, isAdminRequest, assertMayTouchAdmin, assertAdminRoleUnchanged };
+/**
+ * Refuses a save of the roles that would take admin away from the admin saving them : none of the
+ * roles that make admins (the admin role, a role with admin: true) would name them, or one of
+ * their groups, any more. The roles page does not keep an admin from removing their own group,
+ * and once saved nobody could put it back but another admin.
+ *
+ * Args:
+ *   req (object): the request (the signed-in user, an admin ; a non-admin is assertAdminRoleUnchanged's).
+ *   roles (object[]|null): the roles about to be written ; null when they cannot be read.
+ *
+ * Raises:
+ *   Errors.ConflictError: the admin saving them would no longer be one.
+ */
+export async function assertKeepsOwnAdmin(req, roles) {
+  if (!isAdminRequest(req) || !Array.isArray(roles)) return;
+  const user = req?.user?.user;
+  if (!user?.username || !user?.type) return;
+  // step 1 : who they are, and their groups as the sign-in matched them
+  const full = `${user.type}/${user.username}`;
+  const { groupsOf } = await import("./userGroups.js");
+  const groups = await groupsOf(user).catch(() => []);
+  // step 2 : a role that makes admins still naming them or one of their groups
+  const stays = roles.some((role) => grantsAdmin(role) && (memberRefs(role.users).includes(full) || memberRefs(role.groups).some((g) => groups.includes(g))));
+  if (!stays) {
+    throw new Errors.ConflictError(`This save would take admin away from you (${full}): keep yourself or one of your groups in the admin role, or in a role with Admin on`);
+  }
+}
+
+export default { adminGrantsFromRoles, adminGrants, isAdminRequest, assertMayTouchAdmin, assertAdminRoleUnchanged, assertKeepsOwnAdmin };

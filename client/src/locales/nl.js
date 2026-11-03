@@ -396,6 +396,8 @@ export default {
       showAllJobLogs: 'De jobs van alle gebruikers zien, niet alleen die van jezelf.',
       showArtifacts: 'De artifacts zien die een job teruggeeft.',
       showExtravars: 'De extravars van een formulier en van een taak zien.',
+      admin:
+        'De gebruikers zijn beheerders, zoals die van de rol admin: elk formulier, de designer, de instellingen en de gebruikers. Nooit op de rol default.',
       allowLogin: 'Aanmelden bij AnsibleForms.',
       allowBackupOps: 'Een back-up van de database maken en terugzetten.',
       allowChat: 'De chatassistent gebruiken, als die is ingeschakeld.',
@@ -2205,6 +2207,7 @@ export default {
       roleOptionShowAllJobLogs: 'Taken van alle gebruikers tonen',
       roleOptionShowArtifacts: 'Artefacten tonen',
       roleOptionShowJobs: 'Takenmenu tonen',
+      roleOptionAdmin: 'Beheerder',
       roleOptionAllowLogin: 'Inloggen toestaan',
       roleOptionAllowBackupOps: 'Back-ups tonen',
       roleOptionAllowVerboseMode: 'Uitgebreide modus toestaan',

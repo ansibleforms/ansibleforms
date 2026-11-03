@@ -25,7 +25,7 @@
 /*                                                                */
 /******************************************************************/
 
-import { ref, computed, h } from 'vue';
+import { ref, computed, h, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   requiredRoleDescription,
@@ -34,6 +34,7 @@ import {
   roleOptionNeeds,
   roleOptionDescription,
   providerPrefix,
+  adminByDefaultOptions,
 } from '@/config/roles';
 
 const props = defineProps({
@@ -118,6 +119,21 @@ const role = defineModel('role', { type: Object, required: true });
 const emit = defineEmits(['removed']);
 
 const { t, te } = useI18n();
+
+// ─── the Admin option ─────────────────────────────────────────────────────────
+// fixed on the admin role (always admins) and on the default role (never : everyone's), greyed out
+const adminFixed = computed(() => (role.value._required ? !role.value._default : null));
+// turned on or off : the options an admin gets by default follow it, unless one was set apart from
+// that default (it keeps its own value)
+watch(
+  () => role.value.options?.admin,
+  (now, before) => {
+    if (role.value._required || before === undefined || !!now === !!before) return;
+    for (const key of adminByDefaultOptions) {
+      if (role.value.options[key] === !!before) role.value.options[key] = !!now;
+    }
+  },
+);
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
 // the role in three tabs : General (its name and options), its users and its groups, each of
@@ -244,8 +260,17 @@ function removeUser(index) {
             <!-- given by another option that is on (Show all settings) : on, greyed out, its own value
                  kept for when that one is turned off -->
             <div class="af-role-option">
+              <!-- Admin on the admin role (on) or the default role (off) : fixed, greyed out -->
               <BsInput
-                v-if="includedBy(optKey)"
+                v-if="optKey === 'admin' && adminFixed !== null"
+                type="checkbox"
+                :isSwitch="true"
+                :modelValue="adminFixed"
+                :label="optionLabel(optKey)"
+                :disabled="true"
+              />
+              <BsInput
+                v-else-if="includedBy(optKey)"
                 type="checkbox"
                 :isSwitch="true"
                 :modelValue="true"

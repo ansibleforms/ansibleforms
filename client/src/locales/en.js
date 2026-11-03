@@ -389,6 +389,8 @@ export default {
       showAllJobLogs: 'See the jobs of every user, not only your own.',
       showArtifacts: 'See the artifacts a job returns.',
       showExtravars: 'See the extravars of a form and of a job.',
+      admin:
+        "Its users are admins, as the admin role's: every form, the designer, the settings and the users. Never on the default role.",
       allowLogin: 'Sign in to AnsibleForms.',
       allowBackupOps: 'Back up and restore the database.',
       allowChat: 'Use the chat assistant, when it is enabled.',
@@ -2178,6 +2180,7 @@ export default {
       roleOptionShowAllJobLogs: "Show all users' jobs",
       roleOptionShowArtifacts: 'Show artifacts',
       roleOptionShowJobs: 'Show Jobs menu',
+      roleOptionAdmin: 'Admin',
       roleOptionAllowLogin: 'Allow login',
       roleOptionAllowBackupOps: 'Show Backups',
       roleOptionAllowVerboseMode: 'Allow verbose mode',

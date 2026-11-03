@@ -397,6 +397,8 @@ export default {
       showAllJobLogs: 'Ver los jobs de todos los usuarios, no solo los tuyos.',
       showArtifacts: 'Ver los artifacts que devuelve un job.',
       showExtravars: 'Ver las extravars de un formulario y de un trabajo.',
+      admin:
+        'Sus usuarios son administradores, como los del rol admin: todos los formularios, el diseñador, la configuración y los usuarios. Nunca en el rol default.',
       allowLogin: 'Iniciar sesión en AnsibleForms.',
       allowBackupOps: 'Hacer copias de seguridad de la base de datos y restaurarlas.',
       allowChat: 'Usar el asistente de chat, cuando está activado.',
@@ -2215,6 +2217,7 @@ export default {
       roleOptionShowAllJobLogs: 'Mostrar los trabajos de todos los usuarios',
       roleOptionShowArtifacts: 'Mostrar artefactos',
       roleOptionShowJobs: 'Mostrar el menú Trabajos',
+      roleOptionAdmin: 'Administrador',
       roleOptionAllowLogin: 'Permitir inicio de sesion',
       roleOptionAllowBackupOps: 'Mostrar las Copias de seguridad',
       roleOptionAllowVerboseMode: 'Permitir modo detallado',

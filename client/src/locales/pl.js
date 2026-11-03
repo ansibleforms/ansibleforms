@@ -394,6 +394,8 @@ export default {
       showAllJobLogs: 'Wyświetlanie zadań wszystkich użytkowników, nie tylko własnych.',
       showArtifacts: 'Wyświetlanie artefaktów zwracanych przez zadanie.',
       showExtravars: 'Wyświetlanie extravars formularza i zadania.',
+      admin:
+        'Jej użytkownicy są administratorami, jak użytkownicy roli admin: każdy formularz, projektant, ustawienia i użytkownicy. Nigdy w roli default.',
       allowLogin: 'Logowanie do AnsibleForms.',
       allowBackupOps: 'Tworzenie kopii zapasowej bazy danych i jej przywracanie.',
       allowChat: 'Korzystanie z asystenta czatu, gdy jest włączony.',
@@ -2197,6 +2199,7 @@ export default {
       roleOptionShowAllJobLogs: 'Pokaż zadania wszystkich użytkowników',
       roleOptionShowArtifacts: 'Pokaż artefakty',
       roleOptionShowJobs: 'Pokaż menu Zadania',
+      roleOptionAdmin: 'Administrator',
       roleOptionAllowLogin: 'Zezwalaj na logowanie',
       roleOptionAllowBackupOps: 'Pokaż Kopie zapasowe',
       roleOptionAllowVerboseMode: 'Zezwalaj na tryb szczegółowy (verbose)',

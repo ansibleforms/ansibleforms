@@ -22,7 +22,7 @@ import Errors from '../../lib/errors.js';
 import { formLinks, formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
 import yaml from 'yaml';
-import { isAdminRequest } from '../../lib/adminGrants.js';
+import { isAdminRequest, assertKeepsOwnAdmin } from '../../lib/adminGrants.js';
 import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
 import { designsAllForms, designsEverything, designerConfig, designerWarnings, designerForms, designerWorkflowFiles, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
@@ -449,8 +449,11 @@ const save = async function(req,res){
       try { incomingRoles = Form.parse(newConfig)?.roles || [] } catch { incomingRoles = null }
       try {
         await assertRolesUnchanged(req, incomingRoles)
+        // an admin's save never takes admin away from them
+        await assertKeepsOwnAdmin(req, incomingRoles)
       } catch (err) {
         if (err instanceof Errors.AccessDeniedError) return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
+        if (err instanceof Errors.ConflictError) return res.status(409).json(RestResult.error(i18n.t(req, 'config.failedSaveForms'), err.message))
         throw err
       }
       // without designAllForms : what the user sent laid over the forms they do not see, kept as
