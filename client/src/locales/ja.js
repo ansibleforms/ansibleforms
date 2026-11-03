@@ -391,6 +391,8 @@ export default {
       showAllJobLogs: '自分のジョブだけでなく、すべてのユーザーのジョブを表示します。',
       showArtifacts: 'ジョブが返す artifacts を表示します。',
       showExtravars: 'フォームとジョブの extravars を表示します。',
+      admin:
+        'このロールのユーザーは admin ロールと同じく管理者になります: すべてのフォーム、デザイナー、設定、ユーザー。default ロールでは使えません。',
       allowLogin: 'AnsibleForms にサインインします。',
       allowBackupOps: 'データベースをバックアップ、復元します。',
       allowChat: '有効な場合に、チャットアシスタントを使用します。',
@@ -2169,6 +2171,7 @@ export default {
       roleOptionShowAllJobLogs: '全ユーザーのジョブを表示',
       roleOptionShowArtifacts: 'Artifacts を表示',
       roleOptionShowJobs: 'ジョブメニューを表示',
+      roleOptionAdmin: '管理者',
       roleOptionAllowLogin: 'ログインを許可',
       roleOptionAllowBackupOps: 'バックアップを表示',
       roleOptionAllowVerboseMode: '詳細モードを許可',

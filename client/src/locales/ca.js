@@ -396,6 +396,8 @@ export default {
       showAllJobLogs: 'Veure les tasques de tots els usuaris, no només les teves.',
       showArtifacts: 'Veure els artefactes que retorna una tasca.',
       showExtravars: "Veure les extravars d'un formulari i d'una tasca.",
+      admin:
+        'Els seus usuaris són administradors, com els del rol admin: tots els formularis, el dissenyador, la configuració i els usuaris. Mai al rol default.',
       allowLogin: 'Iniciar sessió a AnsibleForms.',
       allowBackupOps: 'Fer còpies de seguretat de la base de dades i restaurar-les.',
       allowChat: "Utilitzar l'assistent de xat, quan està activat.",
@@ -2220,6 +2222,7 @@ export default {
       roleOptionShowAllJobLogs: 'Mostra les tasques de tots els usuaris',
       roleOptionShowArtifacts: 'Mostra els artefactes',
       roleOptionShowJobs: 'Mostra el menú Tasques',
+      roleOptionAdmin: 'Administrador',
       roleOptionAllowLogin: "Permet l'inici de sessió",
       roleOptionAllowBackupOps: 'Mostra les Còpies de seguretat',
       roleOptionAllowVerboseMode: 'Permet el mode detallat',

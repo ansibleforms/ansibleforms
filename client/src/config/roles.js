@@ -70,12 +70,15 @@ export const roleOptionGroups = [
       'allowStoredJobs',
       'allowStoredJobsShare',
       'allowStoredJobsViewAll',
+      // the files a form's file fields take, for the job they launch
+      'allowFileUploads',
     ],
   },
   {
     name: 'access',
     title: 'profilePage.groupAccess',
-    keys: ['allowLogin', 'allowChat', 'allowMcp', 'allowFileUploads', 'allowApiTokens', 'extendedTokenExpiration'],
+    // admin : the role's users are admins, as the admin role's (issue #1313) - first, as it gives most
+    keys: ['admin', 'allowLogin', 'allowChat', 'allowMcp', 'allowApiTokens', 'extendedTokenExpiration'],
   },
 ];
 
@@ -176,10 +179,11 @@ export const roleOptionKeys = [
   'allowStoredJobs',
   'allowStoredJobsShare',
   'allowStoredJobsViewAll',
+  'allowFileUploads',
+  'admin',
   'allowLogin',
   'allowChat',
   'allowMcp',
-  'allowFileUploads',
   'allowApiTokens',
   'extendedTokenExpiration',
 ];
@@ -215,7 +219,7 @@ const trueByDefaultOptions = [
 ];
 
 // Options whose effective value defaults to the "is this an admin" check.
-const adminByDefaultOptions = [
+export const adminByDefaultOptions = [
   'showSettings',
   'showDesigner',
   'showLogs',
@@ -234,12 +238,16 @@ const adminByDefaultOptions = [
 // defaults on all of his roles, which this per-role view cannot express.
 // Mind too that the server ANDs an option across all the roles a user matches,
 // so an explicit false in one role wins over a default in another.
-export function roleOptionDefaults(roleName) {
-  const isAdmin = roleName === 'admin';
+export function roleOptionDefaults(roleName, admin = false) {
+  // the admin role, or a role with its Admin option on : its users are admins (the server's
+  // lib/adminRole.js), so the options an admin gets by default are on
+  const isAdmin = roleName === 'admin' || admin === true;
   const defaults = {};
   for (const key of roleOptionKeys) defaults[key] = false;
   for (const key of trueByDefaultOptions) defaults[key] = true;
   for (const key of adminByDefaultOptions) defaults[key] = isAdmin;
+  // the admin role always makes admins : its Admin option is on, and never written
+  defaults.admin = roleName === 'admin';
   return defaults;
 }
 
@@ -304,7 +312,7 @@ function listOf(list) {
 }
 
 export function roleToEditable(r) {
-  const defaults = roleOptionDefaults(r.name);
+  const defaults = roleOptionDefaults(r.name, r.options?.admin === true);
   const options = { ...defaults };
   for (const [k, v] of Object.entries(r.options || {})) {
     // Known flags are normalized to real booleans so the switches and the
@@ -391,13 +399,15 @@ export function serializeRole(r) {
   // showed those switches off. Comparing against the current name writes the
   // explicit values needed to preserve exactly what the user saw. The trimmed
   // name is the one being written, so it is the one to branch on.
-  const defaults = roleOptionDefaults(name);
+  const defaults = roleOptionDefaults(name, !!r.options?.admin && !isDefault);
   // allowMcp left out is read as the role's allowChat : it is written whenever it differs
   defaults.allowMcp = r.options?.allowChat === undefined ? defaults.allowChat : !!r.options.allowChat;
   const explicit = r._explicitOptions || [];
   const options = {};
   for (const k of roleOptionKeys) {
     const value = !!r.options?.[k];
+    // the default role, every user's, never makes admins ; the admin role always does
+    if (k === 'admin' && (isDefault || name === 'admin')) continue;
     if (explicit.includes(k) || value !== defaults[k]) options[k] = value;
   }
   for (const [k, v] of Object.entries(r.options || {})) {

@@ -56,7 +56,11 @@ describe('the baseline follows the role name', () => {
   it('the SAME option values serialize differently depending on the name', () => {
     // this is what stops a rename to 'admin' granting admin silently: the switches are
     // compared against the admin baseline, so the ones that differ are written out
-    const adminDefaults = roleOptionDefaults('admin');
+    // the admin role's other options : its Admin one (always on for it) would make the other
+    // role an admin role too, whose baseline is the admin one
+    const adminDefaults = Object.fromEntries(
+      Object.entries(roleOptionDefaults('admin')).filter(([k]) => k !== 'admin'),
+    );
     const asAdmin = serializeRole({ name: 'admin', groups: ['local/x'], options: { ...adminDefaults } });
     const asOther = serializeRole({ name: 'operators', groups: ['local/x'], options: { ...adminDefaults } });
     // against the admin baseline nothing changed, so nothing is written
@@ -146,5 +150,26 @@ describe('a role keeps what it may use through an edit', () => {
     expect(out).not.toHaveProperty('credentials');
     expect(out).not.toHaveProperty('secretStores');
     expect(out).not.toHaveProperty('runners');
+  });
+});
+
+describe('the Admin option', () => {
+  it('a role with it on : written, the admin baseline for its other options', () => {
+    const role = serializeRole({
+      name: 'platformAdmins',
+      groups: ['local/x'],
+      options: { ...roleOptionDefaults('platformAdmins', true), admin: true },
+    });
+    expect(role.options).toEqual({ admin: true });
+  });
+
+  it('never written for the admin role (always on) nor the default role (never)', () => {
+    expect(
+      serializeRole({ name: 'admin', groups: ['local/x'], options: { ...roleOptionDefaults('admin') } }).options,
+    ).toBeUndefined();
+    expect(
+      serializeRole({ name: 'default', groups: [], options: { ...roleOptionDefaults('default'), admin: true } }).options
+        ?.admin,
+    ).toBeUndefined();
   });
 });

@@ -31,6 +31,9 @@ vi.mock("../src/models/settings.model.js", () => ({
 }));
 vi.mock("../src/models/lock.model.js", () => ({ default: { isHeld: async () => false } }));
 vi.mock("../src/lib/configAudit.js", () => ({ auditConfigChange: () => {}, configHash: () => "h" }));
+// the groups of the admin saving : local/admins, which the admin role keeps (the lockout guard,
+// assertKeepsOwnAdmin)
+vi.mock("../src/lib/userGroups.js", () => ({ groupsOf: async () => ["local/admins"] }));
 
 const { default: controller } = await import("../src/controllers/v2/settings.controller.js");
 
