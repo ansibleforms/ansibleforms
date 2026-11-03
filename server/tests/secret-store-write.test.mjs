@@ -136,7 +136,7 @@ describe("the write prefix", () => {
     storeRows.vault = vaultRow({ write_prefix: "" });
     await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), /has no write prefix/);
     storeRows.vault = vaultRow();
-    await assert.rejects(Registry.writeSecret("vault", "secret/teams/db", LOGIN), /not below the write prefix/);
+    await assert.rejects(Registry.writeSecret("vault", "secret/teams/db", LOGIN), /outside what secret store 'vault' may write to/);
     assert.equal(writes.length, 0);
   });
 });

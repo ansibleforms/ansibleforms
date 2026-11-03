@@ -1784,6 +1784,20 @@ export default {
       writePrefixHelp: 'Referenties worden alleen op dit pad of eronder geschreven, bijv. secret/ansibleforms.',
       writePrefixRequired:
         'Schrijven heeft een schrijfprefix nodig: geef aan onder welk pad referenties mogen worden geschreven.',
+      writeEnabledHelpCyberArk:
+        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan als account van een kluis worden geschreven, via de PVWA (de CCP leest alleen).',
+      writeSafes: 'Kluizen om naar te schrijven',
+      writeSafesHelp: "Accounts worden alleen naar deze kluizen geschreven, gescheiden door komma's, bijv. Linux, DB.",
+      writeSafesRequired: 'Schrijven heeft minstens één kluis nodig.',
+      pvwaUrl: 'PVWA-adres',
+      pvwaUrlHelp: 'De Password Vault Web Access waar de API-aanroepen heen gaan, bijv. https://pvwa.example.com.',
+      pvwaCredential: 'PVWA-referentie',
+      pvwaCredentialHelp:
+        'De API-gebruiker waarmee het aanmeldt: die heeft Add accounts en Update account content op deze kluizen nodig.',
+      pvwaAuth: 'Aanmeldmethode',
+      platformId: 'Platform-ID',
+      platformIdHelp: 'Het platform van een nieuw account, bijv. UnixSSH. Een bestaand account houdt het zijne.',
+      pvwaRequired: 'Schrijven naar CyberArk heeft het PVWA-adres en de referentie om mee aan te melden nodig.',
       cacheTtl: 'Cache (seconden)',
       cacheTtlHelp: 'Hoe lang een gelezen secret hergebruikt wordt. 0 leest het bij elk gebruik.',
       caBundleHelp: 'Leeg laten om de certificaatautoriteiten van het systeem te vertrouwen.',

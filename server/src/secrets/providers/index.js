@@ -104,7 +104,8 @@ export async function writeSecret(storeName, ref, payload, opts = {}) {
   if (!Number(store.write_enabled)) throw new Errors.BadRequestError(`Secret store '${store.name}' does not allow writing: turn writing on in its Options`);
   if (!String(store.write_prefix || "").trim()) throw new Errors.BadRequestError(`Secret store '${store.name}' has no write prefix: set where it may be written in its Options`);
   if (!provider.withinWritePrefix(store, path)) {
-    throw new Errors.BadRequestError(`${path} is not below the write prefix of secret store '${store.name}' (${store.write_prefix})`);
+    // a Vault's prefix is a path, a CyberArk's the safes it may write to
+    throw new Errors.BadRequestError(`${path} is outside what secret store '${store.name}' may write to (${store.write_prefix})`);
   }
   // step 2 : a secret there is replaced only when asked
   const replaced = await provider.exists(store, path);

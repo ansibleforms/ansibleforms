@@ -233,6 +233,12 @@ const crudConfigs = {
       // a credential's secret may be written to it, below its prefix (secrets/providers write)
       { name: 'write_enabled', isBoolean: true },
       { name: 'write_prefix' },
+      // a CyberArk's writes : its PVWA, the API user's credential and logon method, the platform of
+      // a new account
+      { name: 'pvwa_url' },
+      { name: 'pvwa_credential' },
+      { name: 'pvwa_auth' },
+      { name: 'platform_id' },
       { name: 'managed', isBoolean: true }
     ],
     allowCache: true,

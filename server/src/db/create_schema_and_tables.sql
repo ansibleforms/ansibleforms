@@ -201,6 +201,13 @@ CREATE TABLE `secret_stores` (
   -- written to the store on save (secrets/providers write), only below write_prefix
   `write_enabled` tinyint(4) DEFAULT 0,
   `write_prefix` varchar(250) DEFAULT NULL,
+  -- a CyberArk's writes go through its PVWA (the CCP only reads) : its address, the credential
+  -- of the API user it logs on as and how (cyberark, ldap, radius, windows), and the platform a
+  -- new account gets ; write_prefix is then the safes it may write to
+  `pvwa_url` varchar(500) DEFAULT NULL,
+  `pvwa_credential` varchar(250) DEFAULT NULL,
+  `pvwa_auth` varchar(20) DEFAULT NULL,
+  `platform_id` varchar(250) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)
