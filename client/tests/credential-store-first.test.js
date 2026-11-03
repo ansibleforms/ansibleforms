@@ -2,7 +2,7 @@
 // (issue #1314) : read from a secret store, none is typed - the Login step says where they come
 // from instead - and none is sent.
 import { describe, it, expect } from 'vitest';
-import getSettings from '@/config/settings';
+import getSettings, { secretRefText } from '@/config/settings';
 
 const credentials = getSettings((key) => key).credentials;
 const field = (key) => credentials.fields.find((f) => f.key === key);
@@ -53,5 +53,33 @@ describe('the New credential dialog', () => {
       login_from_store: undefined,
     });
     expect(saved).toEqual({ name: 'db', credential_type: 'userpass', secret_store: 'vault', secret_ref: 'kv/db' });
+  });
+});
+
+describe('the reference of a secret, as the store chosen names it', () => {
+  const ref = field('secret_ref');
+  const lists = {
+    secretstores: [
+      { name: 'vault', type: 'vault' },
+      { name: 'cyberark', type: 'cyberark_ccp' },
+    ],
+  };
+  it('a CyberArk account for a CyberArk store, a path for a Vault, either before one is chosen', () => {
+    expect(ref.placeholder({ secret_store: 'cyberark' }, {}, lists)).toBe(
+      'settings.credentials.secretRefPlaceholderCyberArk',
+    );
+    expect(ref.help({ secret_store: 'cyberark' }, {}, lists)).toBe('settings.credentials.secretRefHelpCyberArk');
+    expect(ref.placeholder({ secret_store: 'vault' }, {}, lists)).toBe(
+      'settings.credentials.secretRefPlaceholderVault',
+    );
+    expect(ref.help({ secret_store: '' }, {}, lists)).toBe('settings.credentials.secretRefHelp');
+    expect(secretRefText((k) => k, '', 'placeholder')).toBe('settings.credentials.secretRefPlaceholder');
+  });
+
+  it('a CyberArk or Vault login never reads from a store, a choice left from another type aside', () => {
+    const left = { credential_type: 'cyberark', secret_source: 'store' };
+    expect(field('user').showWhen(left)).toBe(true);
+    expect(field('login_from_store').showWhen(left)).toBe(false);
+    expect(steps(left)).toEqual(['credential', 'type', 'login']);
   });
 });

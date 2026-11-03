@@ -1778,7 +1778,7 @@ export default function getSettings(t) {
       // password typed are not kept) or MySQL, the app's database (then no secret store)
       // the Login step's note (login_from_store) is something to read, never a field of the record
       beforeSave: ({ secret_source, login_from_store: _note, ...item }) => {
-        if (secret_source === 'store' && !['cyberark', 'vault'].includes(item.credential_type)) {
+        if (readFromStore({ ...item, secret_source })) {
           delete item.user;
           delete item.password;
           return item;
@@ -2031,7 +2031,7 @@ export default function getSettings(t) {
           help: (r) => (r.credential_type === 'cyberark' ? t('settings.secretStores.appIdHelp') : null),
           // a Vault, an RTE, a Semaphore and a Rundeck log in with a token only ; none typed when
           // the user and password are read from a secret store
-          showWhen: (r) => !TOKEN_CREDENTIAL_TYPES.includes(r.credential_type) && r.secret_source !== 'store',
+          showWhen: (r) => !TOKEN_CREDENTIAL_TYPES.includes(r.credential_type) && !readFromStore(r),
           // no column : what it is depends on the type (a user, a bind DN, a client id), its page
           // shows it
           noTable: true,
@@ -2058,7 +2058,7 @@ export default function getSettings(t) {
           help: (r) => credentialLabels(t, r.credential_type).passwordHelp,
           // a cyberark credential has a client key instead ; none typed when the user and password
           // are read from a secret store
-          showWhen: (r) => r.credential_type !== 'cyberark' && r.secret_source !== 'store',
+          showWhen: (r) => r.credential_type !== 'cyberark' && !readFromStore(r),
         },
         {
           // read from a secret store : said where the user and password would be, so the step
@@ -2069,7 +2069,7 @@ export default function getSettings(t) {
           type: 'component',
           noTable: true,
           hidden: true,
-          showWhen: (r) => r.secret_source === 'store',
+          showWhen: (r) => readFromStore(r),
           component: (props) => h('p', { class: 'form-text mt-2 mb-0' }, props.text),
           props: () => ({ text: t('settings.credentials.loginFromStoreNew') }),
         },
@@ -2175,8 +2175,9 @@ export default function getSettings(t) {
           // no secret store yet : nothing to refer to
           needsChoicesOf: 'secret_store',
           label: t('settings.credentials.secretRef'),
-          placeholder: t('settings.credentials.secretRefPlaceholder'),
-          help: t('settings.credentials.secretRefHelp'),
+          // as the store chosen names a secret : a Vault path, or a CyberArk account
+          placeholder: (r, _config, lists) => secretRefText(t, storeTypeOf(r, lists), 'placeholder'),
+          help: (r, _config, lists) => secretRefText(t, storeTypeOf(r, lists), 'help'),
           sortable: false,
           required: false,
           filterable: false,
@@ -3867,11 +3868,63 @@ export default function getSettings(t) {
   // and its Save comes with the Store step (#1314)
   const loginStep = all.credentials.steps.find((s) => s.key === 'login');
   loginStep.when = (item) =>
-    item.secret_source !== 'store' ||
+    !readFromStore(item) ||
     all.credentials.fields.some(
       (f) => f.step === 'login' && !['user', 'password', 'login_from_store'].includes(f.key) && fieldShownFor(f, item),
     );
   return all;
+}
+
+// the credentials a secret store logs in with : never read from a store themselves
+const STORE_LOGIN_TYPES = ['cyberark', 'vault'];
+
+/**
+ * Whether a credential being made reads its user and password from a secret store : its Store
+ * step said so, and it is not a secret store's own login (a CyberArk or Vault one has no Store
+ * step - a choice made there for another type before is not its own).
+ *
+ * Args:
+ *   item (object): the credential being made.
+ *
+ * Returns:
+ *   boolean: true when they are read from a store.
+ */
+function readFromStore(item) {
+  return item?.secret_source === 'store' && !STORE_LOGIN_TYPES.includes(item?.credential_type);
+}
+
+/**
+ * The type of the secret store a credential being made reads from (vault, cyberark_ccp), from the
+ * stores' list the dialog loaded.
+ *
+ * Args:
+ *   item (object): the credential being made.
+ *   lists (object): the dialog's dropdown lists, by parent (secretstores).
+ *
+ * Returns:
+ *   string: the store's type ; '' when none is chosen yet.
+ */
+function storeTypeOf(item, lists) {
+  const store = (lists?.secretstores || []).find((s) => s?.name && s.name === item?.secret_store);
+  return store?.type || '';
+}
+
+/**
+ * What a secret's reference is, for the store it is in : a Vault path, a CyberArk account, or
+ * either while no store is chosen.
+ *
+ * Args:
+ *   t (Function): vue-i18n's translate function.
+ *   type (string): the store's type ('' : none chosen).
+ *   what (string): 'placeholder' or 'help'.
+ *
+ * Returns:
+ *   string: the text.
+ */
+export function secretRefText(t, type, what) {
+  const kind = type === 'vault' ? 'Vault' : type === 'cyberark_ccp' ? 'CyberArk' : '';
+  if (what === 'placeholder') return t(`settings.credentials.secretRefPlaceholder${kind}`);
+  return t(`settings.credentials.secretRefHelp${kind}`);
 }
 
 /**

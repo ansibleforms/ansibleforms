@@ -45,7 +45,9 @@
 /*  field.suffix: a fixed text after the input, not in its value  */
 /*      (a text, or (item) => text)                               */
 /*  field.help / field.placeholder / field.dialogLabel: a text,   */
-/*      or (item) => text, following the record shown (its type) */
+/*      or (item, config, lists) => text, following the record    */
+/*      shown (its type) and the dropdowns' lists (a secret store */
+/*      chosen : its type)                                        */
 /*  field.onEdit: a password shown when editing too, as ******** ;*/
 /*      left empty it is not sent, so the stored one stays        */
 /*  field.keepHelp: the help of an onEdit field when editing      */
@@ -826,8 +828,9 @@ const title = computed(() => {
  *   string: the text for the record shown.
  */
 function textOf(value) {
-  // a rule gets the record and the app's settings (its URL : an SSO credential's redirect URL)
-  return typeof value === 'function' ? value(item.value || {}, config.value || {}) : value;
+  // a rule gets the record, the app's settings (its URL : an SSO credential's redirect URL) and
+  // the dropdowns' lists (the secret store chosen : its type)
+  return typeof value === 'function' ? value(item.value || {}, config.value || {}, parentLists.value || {}) : value;
 }
 
 // ─── create from a dropdown ──────────────────────────────────────────────────
