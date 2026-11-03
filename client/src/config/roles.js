@@ -70,21 +70,15 @@ export const roleOptionGroups = [
       'allowStoredJobs',
       'allowStoredJobsShare',
       'allowStoredJobsViewAll',
+      // the files a form's file fields take, for the job they launch
+      'allowFileUploads',
     ],
   },
   {
     name: 'access',
     title: 'profilePage.groupAccess',
     // admin : the role's users are admins, as the admin role's (issue #1313) - first, as it gives most
-    keys: [
-      'admin',
-      'allowLogin',
-      'allowChat',
-      'allowMcp',
-      'allowFileUploads',
-      'allowApiTokens',
-      'extendedTokenExpiration',
-    ],
+    keys: ['admin', 'allowLogin', 'allowChat', 'allowMcp', 'allowApiTokens', 'extendedTokenExpiration'],
   },
 ];
 
@@ -185,11 +179,11 @@ export const roleOptionKeys = [
   'allowStoredJobs',
   'allowStoredJobsShare',
   'allowStoredJobsViewAll',
+  'allowFileUploads',
   'admin',
   'allowLogin',
   'allowChat',
   'allowMcp',
-  'allowFileUploads',
   'allowApiTokens',
   'extendedTokenExpiration',
 ];
