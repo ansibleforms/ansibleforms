@@ -2184,8 +2184,8 @@ export default function getSettings(t) {
           icon: 'shield-alt',
           hidden: true,
           step: 'store',
-          dependency: 'secret_source',
-          dependencyValues: ['store'],
+          // read from a store, and one chosen : what to read in it means nothing before
+          showWhen: (r) => r?.secret_source === 'store' && !!r?.secret_store,
         },
       ],
     },

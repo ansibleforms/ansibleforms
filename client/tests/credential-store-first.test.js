@@ -83,3 +83,12 @@ describe('the reference of a secret, as the store chosen names it', () => {
     expect(steps(left)).toEqual(['credential', 'type', 'login']);
   });
 });
+
+describe('the reference field', () => {
+  it('shows once a store is chosen, never before', () => {
+    const ref = field('secret_ref');
+    expect(ref.showWhen({ credential_type: 'userpass', secret_source: 'store', secret_store: '' })).toBe(false);
+    expect(ref.showWhen({ credential_type: 'userpass', secret_source: 'store', secret_store: 'vault' })).toBe(true);
+    expect(ref.showWhen({ credential_type: 'userpass', secret_source: 'local', secret_store: 'vault' })).toBe(false);
+  });
+});

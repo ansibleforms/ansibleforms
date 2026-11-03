@@ -531,11 +531,13 @@ const tabFields = computed(() => {
         t('settings.credentials.secretStore'),
         t('settings.credentials.secretStoreHelp'),
       ],
-      fromStore.value && [
-        'secret_ref',
-        t('settings.credentials.secretRef'),
-        secretRefText(t, chosenStoreType.value, 'help'),
-      ],
+      // what to read in the store : only once a store is chosen
+      fromStore.value &&
+        edit.value?.secret_store && [
+          'secret_ref',
+          t('settings.credentials.secretRef'),
+          secretRefText(t, chosenStoreType.value, 'help'),
+        ],
     ].filter(Boolean),
   };
 });
@@ -1014,7 +1016,9 @@ onMounted(async () => {
                   :help="t('settings.credentials.secretStoreHelp')"
                   :label="t('settings.credentials.secretStore')"
                 />
+                <!-- what to read in the store : only once a store is chosen -->
                 <BsInput
+                  v-if="edit.secret_store"
                   class="af-credential-field"
                   v-model="edit.secret_ref"
                   v-show="fieldShown('secret_ref')"
