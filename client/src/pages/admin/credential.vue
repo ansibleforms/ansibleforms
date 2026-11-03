@@ -33,6 +33,7 @@ import {
   TOKEN_CREDENTIAL_TYPES,
   CREDENTIAL_SERVER_EXAMPLE,
   credentialLabels,
+  secretRefText,
 } from '@/config/settings';
 import { formRows, fitsPattern } from '@/lib/formUseRows';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -163,6 +164,10 @@ const isDatabase = computed(() => type.value === 'database');
 // a secret store's login never comes from a secret store (it would read a store to find it)
 const noStore = computed(() => ['cyberark', 'vault'].includes(type.value));
 // read from a secret store : the user and password typed here are not kept
+// the type of the store the reference is in (vault, cyberark_ccp) ; '' while none is chosen
+const chosenStoreType = computed(
+  () => secretStores.value.find((s) => s.name && s.name === edit.value?.secret_store)?.type || '',
+);
 const fromStore = computed(() => !noStore.value && edit.value?.secret_source === 'store');
 // a Vault, an RTE, a Semaphore and a Rundeck log in with a token only : no user
 const hasUser = computed(() => !TOKEN_CREDENTIAL_TYPES.includes(type.value));
@@ -212,7 +217,9 @@ async function load() {
     axios.get('/api/v2/config/formscredentials', auth).catch(() => null),
     axios.get('/api/v2/config/workflowscredentials', auth).catch(() => null),
   ]);
-  secretStores.value = [{ name: '' }, ...(stores?.data?.records || []).map((s) => ({ name: s.name }))];
+  // with their type : the reference's example and help follow the store chosen (a Vault path, a
+  // CyberArk account)
+  secretStores.value = [{ name: '' }, ...(stores?.data?.records || []).map((s) => ({ name: s.name, type: s.type }))];
   // what names a credential : a secret store (its token or login), a notification channel (a
   // mail server's smtp login, a bot's or a webhook's token), a repository (its git login), an LDAP
   // directory (its bind account), an SSO provider (its client), a runner (its token or login), a
@@ -524,7 +531,13 @@ const tabFields = computed(() => {
         t('settings.credentials.secretStore'),
         t('settings.credentials.secretStoreHelp'),
       ],
-      fromStore.value && ['secret_ref', t('settings.credentials.secretRef'), t('settings.credentials.secretRefHelp')],
+      // what to read in the store : only once a store is chosen
+      fromStore.value &&
+        edit.value?.secret_store && [
+          'secret_ref',
+          t('settings.credentials.secretRef'),
+          secretRefText(t, chosenStoreType.value, 'help'),
+        ],
     ].filter(Boolean),
   };
 });
@@ -1003,15 +1016,17 @@ onMounted(async () => {
                   :help="t('settings.credentials.secretStoreHelp')"
                   :label="t('settings.credentials.secretStore')"
                 />
+                <!-- what to read in the store : only once a store is chosen -->
                 <BsInput
+                  v-if="edit.secret_store"
                   class="af-credential-field"
                   v-model="edit.secret_ref"
                   v-show="fieldShown('secret_ref')"
                   icon="shield-alt"
                   :readonly="secretRefLocked"
-                  :placeholder="t('settings.credentials.secretRefPlaceholder')"
+                  :placeholder="secretRefText(t, chosenStoreType, 'placeholder')"
                   :isFloating="false"
-                  :help="t('settings.credentials.secretRefHelp')"
+                  :help="secretRefText(t, chosenStoreType, 'help')"
                   :label="t('settings.credentials.secretRef')"
                 />
               </template>
