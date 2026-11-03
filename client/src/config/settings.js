@@ -1779,19 +1779,20 @@ export default function getSettings(t) {
       // the Login step's notes are something to read, never fields of the record
       beforeSave: ({
         secret_source,
+        secret_action,
         login_from_store: _note,
         login_written_note: _written,
         secret_overwrite,
         ...item
       }) => {
-        if (readFromStore({ ...item, secret_source })) {
+        if (readFromStore({ ...item, secret_source, secret_action })) {
           delete item.user;
           delete item.password;
           return item;
         }
         // typed here, written to the store on Save : the server writes them, then keeps the
         // reference only (credential.controller.js writeTypedSecret)
-        if (writesToStore({ ...item, secret_source }))
+        if (writesToStore({ ...item, secret_source, secret_action }))
           return { ...item, secret_write: true, secret_overwrite: !!secret_overwrite };
         return { ...item, secret_store: '', secret_ref: '' };
       },
@@ -1841,14 +1842,32 @@ export default function getSettings(t) {
               label: t('settings.credentials.secretFromStore'),
               hint: t('settings.credentials.secretFromStoreHint'),
             },
+          ],
+          initial: (r) => (r?.secret_store ? 'store' : 'local'),
+          hidden: true,
+          noTable: true,
+        },
+        {
+          // in a secret store : a secret there already pointed to, or one typed in the Login step
+          // and written to a store that allows writing (its Options) on Save
+          key: 'secret_action',
+          step: 'store',
+          label: '',
+          type: 'radio',
+          options: [
             {
-              // typed in the Login step, written to a store that allows writing (its Options)
+              value: 'point',
+              label: t('settings.credentials.secretPoint'),
+              hint: t('settings.credentials.secretPointHint'),
+            },
+            {
               value: 'write',
               label: t('settings.credentials.secretWriteToStore'),
               hint: t('settings.credentials.secretWriteToStoreHint'),
             },
           ],
-          initial: (r) => (r?.secret_store ? 'store' : 'local'),
+          initial: () => 'point',
+          showWhen: (r) => r?.secret_source === 'store',
           hidden: true,
           noTable: true,
         },
@@ -2185,8 +2204,8 @@ export default function getSettings(t) {
           createWith: 'secretStores',
           createLabel: t('settings.credentials.newSecretStore'),
           // pointed to or written to ; written to : only the stores that allow writing
-          showWhen: (r) => ['store', 'write'].includes(r?.secret_source),
-          choicesWhen: (store, r) => r?.secret_source !== 'write' || !store?.name || !!Number(store.write_enabled),
+          showWhen: (r) => r?.secret_source === 'store',
+          choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
           label: t('settings.credentials.secretStore'),
           help: t('settings.credentials.secretStoreHelp'),
           type: 'select',
@@ -2216,7 +2235,7 @@ export default function getSettings(t) {
           hidden: true,
           step: 'store',
           // read from a store, and one chosen : what to read in it means nothing before
-          showWhen: (r) => ['store', 'write'].includes(r?.secret_source) && !!r?.secret_store,
+          showWhen: (r) => r?.secret_source === 'store' && !!r?.secret_store,
         },
         {
           // written to a place the store has a secret at already : replaced only when ticked
@@ -3935,7 +3954,11 @@ const STORE_LOGIN_TYPES = ['cyberark', 'vault'];
  *   boolean: true when they are read from a store.
  */
 function readFromStore(item) {
-  return item?.secret_source === 'store' && !STORE_LOGIN_TYPES.includes(item?.credential_type);
+  return (
+    item?.secret_source === 'store' &&
+    item?.secret_action !== 'write' &&
+    !STORE_LOGIN_TYPES.includes(item?.credential_type)
+  );
 }
 
 /**
@@ -3949,7 +3972,11 @@ function readFromStore(item) {
  *   boolean: true when they are written to a store.
  */
 function writesToStore(item) {
-  return item?.secret_source === 'write' && !STORE_LOGIN_TYPES.includes(item?.credential_type);
+  return (
+    item?.secret_source === 'store' &&
+    item?.secret_action === 'write' &&
+    !STORE_LOGIN_TYPES.includes(item?.credential_type)
+  );
 }
 
 /**

@@ -66,6 +66,7 @@ const EDITED = [
   'issuer',
   'redirect_uri',
   'secret_source',
+  'secret_action',
   'secret_store',
   'secret_ref',
   'host',
@@ -111,6 +112,8 @@ function editable(record) {
     issuer: record.issuer ?? '',
     redirect_uri: record.redirect_uri ?? '',
     secret_source: record.secret_store ? 'store' : 'local',
+    // in a secret store : point to what is there (as saved), or write a new secret on Save
+    secret_action: 'point',
     // written to a store : replacing a secret there is asked each time, never remembered
     secret_overwrite: false,
     secret_store: record.secret_store ?? '',
@@ -170,10 +173,14 @@ const chosenStoreType = computed(
   () => secretStores.value.find((s) => s.name && s.name === edit.value?.secret_store)?.type || '',
 );
 // read from a secret store : the user and password typed here are not kept
-const fromStore = computed(() => !noStore.value && edit.value?.secret_source === 'store');
+const fromStore = computed(
+  () => !noStore.value && edit.value?.secret_source === 'store' && edit.value?.secret_action !== 'write',
+);
 // typed here and written to a secret store on Save (a new secret, or a new password for the one
 // it reads) : the stores that allow writing only
-const writesToStore = computed(() => !noStore.value && edit.value?.secret_source === 'write');
+const writesToStore = computed(
+  () => !noStore.value && edit.value?.secret_source === 'store' && edit.value?.secret_action === 'write',
+);
 const storeChoices = computed(() =>
   writesToStore.value ? secretStores.value.filter((s) => !s.name || s.write_enabled) : secretStores.value,
 );
@@ -1017,11 +1024,6 @@ onMounted(async () => {
                     label: t('settings.credentials.secretFromStore'),
                     hint: t('settings.credentials.secretFromStoreHint'),
                   },
-                  {
-                    value: 'write',
-                    label: t('settings.credentials.secretWriteToStore'),
-                    hint: t('settings.credentials.secretWriteToStoreHint'),
-                  },
                 ]"
                 v-show="fieldShown(`source-${opt.value}`)"
                 :key="opt.value"
@@ -1034,12 +1036,45 @@ onMounted(async () => {
                   type="radio"
                   name="af-credential-source"
                   :value="opt.value"
-                  :disabled="(opt.value === 'store' && storeSourceLocked) || (opt.value === 'write' && secretRefLocked)"
+                  :disabled="opt.value === 'store' && storeSourceLocked"
                 />
                 <label class="form-check-label" :for="'af-source-' + opt.value">
                   <span class="af-short-label">{{ opt.label }}</span>
                   <span class="text-body-secondary small">{{ opt.hint }}</span>
                 </label>
+              </div>
+              <!-- in a secret store : point to what is there, or write a new secret on Save -->
+              <div v-if="edit.secret_source === 'store' && !noStore" class="ms-4 mt-2">
+                <div
+                  v-for="opt in [
+                    {
+                      value: 'point',
+                      label: t('settings.credentials.secretPoint'),
+                      hint: t('settings.credentials.secretPointHint'),
+                    },
+                    {
+                      value: 'write',
+                      label: t('settings.credentials.secretWriteToStore'),
+                      hint: t('settings.credentials.secretWriteToStoreHint'),
+                    },
+                  ]"
+                  :key="opt.value"
+                  class="form-check af-short-check"
+                >
+                  <input
+                    :id="'af-action-' + opt.value"
+                    v-model="edit.secret_action"
+                    class="form-check-input"
+                    type="radio"
+                    name="af-credential-action"
+                    :value="opt.value"
+                    :disabled="opt.value === 'write' && secretRefLocked"
+                  />
+                  <label class="form-check-label" :for="'af-action-' + opt.value">
+                    <span class="af-short-label">{{ opt.label }}</span>
+                    <span class="text-body-secondary small">{{ opt.hint }}</span>
+                  </label>
+                </div>
               </div>
               <template v-if="fromStore || writesToStore">
                 <BsInput

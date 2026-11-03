@@ -96,7 +96,8 @@ describe('the reference field', () => {
 describe('writing a credential to a secret store', () => {
   const item = {
     credential_type: 'userpass',
-    secret_source: 'write',
+    secret_source: 'store',
+    secret_action: 'write',
     secret_store: 'vault',
     secret_ref: 'secret/ansibleforms/db',
   };
@@ -108,7 +109,7 @@ describe('writing a credential to a secret store', () => {
     expect(field('login_written_note').showWhen(item)).toBe(true);
     expect(field('login_from_store').showWhen(item)).toBe(false);
     expect(field('secret_overwrite').showWhen(item)).toBe(true);
-    expect(field('secret_overwrite').showWhen({ ...item, secret_source: 'store' })).toBe(false);
+    expect(field('secret_overwrite').showWhen({ ...item, secret_action: 'point' })).toBe(false);
   });
 
   it('offers only the stores that allow writing', () => {
@@ -117,7 +118,7 @@ describe('writing a credential to a secret store', () => {
         .filter((s) => field('secret_store').choicesWhen(s, r))
         .map((s) => s.name);
     expect(choices(item)).toEqual(['', 'vault']);
-    expect(choices({ ...item, secret_source: 'store' })).toEqual(['', 'vault', 'ro']);
+    expect(choices({ ...item, secret_action: 'point' })).toEqual(['', 'vault', 'ro']);
   });
 
   it('saved : asks the server to write them, overwrite as ticked, no note sent', () => {
@@ -139,5 +140,16 @@ describe('writing a credential to a secret store', () => {
       secret_write: true,
       secret_overwrite: true,
     });
+  });
+});
+
+describe('the Store step : Database or Secret store, then point or write', () => {
+  it('the sub-choice shows under Secret store only, pointing when none is chosen', () => {
+    expect(field('secret_source').options.map((o) => o.value)).toEqual(['local', 'store']);
+    expect(field('secret_action').options.map((o) => o.value)).toEqual(['point', 'write']);
+    expect(field('secret_action').showWhen({ secret_source: 'store' })).toBe(true);
+    expect(field('secret_action').showWhen({ secret_source: 'local' })).toBe(false);
+    // no action chosen yet : read from the store, nothing typed
+    expect(field('user').showWhen({ credential_type: 'userpass', secret_source: 'store' })).toBe(false);
   });
 });
