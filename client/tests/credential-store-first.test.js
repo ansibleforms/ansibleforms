@@ -92,3 +92,52 @@ describe('the reference field', () => {
     expect(ref.showWhen({ credential_type: 'userpass', secret_source: 'local', secret_store: 'vault' })).toBe(false);
   });
 });
+
+describe('writing a credential to a secret store', () => {
+  const item = {
+    credential_type: 'userpass',
+    secret_source: 'write',
+    secret_store: 'vault',
+    secret_ref: 'secret/ansibleforms/db',
+  };
+
+  it('asks the user and password in the Login step, says where they are written', () => {
+    expect(steps(item)).toEqual(['credential', 'type', 'store', 'login']);
+    expect(field('user').showWhen(item)).toBe(true);
+    expect(field('password').showWhen(item)).toBe(true);
+    expect(field('login_written_note').showWhen(item)).toBe(true);
+    expect(field('login_from_store').showWhen(item)).toBe(false);
+    expect(field('secret_overwrite').showWhen(item)).toBe(true);
+    expect(field('secret_overwrite').showWhen({ ...item, secret_source: 'store' })).toBe(false);
+  });
+
+  it('offers only the stores that allow writing', () => {
+    const choices = (r) =>
+      [{ name: '' }, { name: 'vault', write_enabled: 1 }, { name: 'ro', write_enabled: 0 }]
+        .filter((s) => field('secret_store').choicesWhen(s, r))
+        .map((s) => s.name);
+    expect(choices(item)).toEqual(['', 'vault']);
+    expect(choices({ ...item, secret_source: 'store' })).toEqual(['', 'vault', 'ro']);
+  });
+
+  it('saved : asks the server to write them, overwrite as ticked, no note sent', () => {
+    const saved = credentials.beforeSave({
+      name: 'db',
+      ...item,
+      user: 'svc',
+      password: 'p',
+      secret_overwrite: true,
+      login_written_note: undefined,
+    });
+    expect(saved).toEqual({
+      name: 'db',
+      credential_type: 'userpass',
+      secret_store: 'vault',
+      secret_ref: 'secret/ansibleforms/db',
+      user: 'svc',
+      password: 'p',
+      secret_write: true,
+      secret_overwrite: true,
+    });
+  });
+});

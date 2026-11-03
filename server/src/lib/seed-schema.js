@@ -104,6 +104,9 @@ const secretStoreItem = {
     cache_ttl_seconds: strOrInt,
     // an object, or the same as JSON text
     extra: { type: ["object", "string"] },
+    // a credential's secret typed in the app may be written to it, below this prefix
+    write_enabled: bool,
+    write_prefix: str,
   },
 };
 

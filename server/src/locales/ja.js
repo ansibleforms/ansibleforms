@@ -134,6 +134,8 @@ export default {
       "リポジトリを追加または削除し、そのアドレス、ブランチ、用途を変更できるのは admin だけです：その内容は AnsibleForms が実行する設定、フォーム、プレイブックになります",
     secretStoreAdminOnly:
       "シークレットストアを追加、変更、削除できるのは admin だけです：そのアドレスに送られるトークンまたはキーでログインします",
+    credentialWriteNeedsStore: "シークレットを書き込むシークレットストアとその場所を指定してください",
+    credentialWriteNeedsPassword: "シークレットストアに書き込むパスワードを入力してください",
     credentialSecretRefAdminOnly:
       "認証情報がパスワードを読み取るシークレットストアとシークレットを選択または変更できるのは admin だけです",
     credentialAdminOnly:

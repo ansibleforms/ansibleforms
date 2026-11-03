@@ -249,4 +249,108 @@ async function mounts(store) {
     .sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export default { type: "vault", read, check, mounts };
+// ===========================================================================
+// WRITING : a credential's secret typed in the app, written to its KV path
+// ===========================================================================
+
+/**
+ * A path as it is written below a mount, without KV v2's data/ : what a write prefix is compared
+ * with (secret/ansibleforms/db, whatever the KV version).
+ *
+ * Args:
+ *   rawPath (string): the path (secret/foo, foo - the default mount's -, secret/data/foo).
+ *   defaultMount (string): the store's default mount.
+ *
+ * Returns:
+ *   string: mount/path, without data/ or metadata/ and without a slash at either end.
+ */
+export function logicalPath(rawPath, defaultMount) {
+  let p = stripTrailingSlashes(stripLeadingSlashes(String(rawPath ?? "").trim()));
+  if (!p) return "";
+  if (!p.includes("/")) p = `${defaultMount || "secret"}/${p}`;
+  const [mount, ...rest] = p.split("/");
+  if (rest[0] === "data" || rest[0] === "metadata") rest.shift();
+  return [mount, ...rest].join("/");
+}
+
+/**
+ * Whether a path is one the store may be written at : its write prefix, or below it.
+ *
+ * Args:
+ *   store (object): the secret store (write_prefix, default_mount).
+ *   ref (string): the path.
+ *
+ * Returns:
+ *   boolean: true when the path is the prefix or below it ; false without a prefix.
+ */
+export function withinWritePrefix(store, ref) {
+  const prefix = logicalPath(store?.write_prefix, store?.default_mount);
+  const path = logicalPath(ref, store?.default_mount);
+  if (!prefix || !path) return false;
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
+ * Whether a secret is at a path already : what a write that may not overwrite asks first.
+ *
+ * Args:
+ *   store (object): the secret store, its token decrypted.
+ *   ref (string): the path.
+ *
+ * Returns:
+ *   Promise<boolean>: true when Vault has a secret there ; false when it answers 404.
+ *
+ * Raises:
+ *   Error: Vault refused or could not be reached.
+ */
+async function exists(store, ref) {
+  assertConfigured(store);
+  assertSafeRef(ref);
+  const apiPath = buildApiPath(ref, kvVersion(store), store.default_mount);
+  try {
+    const res = await axios.get(`${baseUrl(store)}/v1/${apiPath}`, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
+    // KV v2 answers a deleted (or destroyed) latest version with its metadata and no data
+    return kvVersion(store) === 2 ? !!res?.data?.data?.data : !!res?.data?.data;
+  } catch (e) {
+    const status = e?.response?.status;
+    if (status === 404) return false;
+    const msg = e?.response?.data?.errors?.join(", ") || e.message;
+    throw new Error(`Vault could not tell whether ${apiPath} has a secret (HTTP ${status || "?"}): ${msg}`, { cause: e });
+  }
+}
+
+/**
+ * Writes a secret's key/value pairs to its KV path : a new secret, or a new version of the one
+ * there (KV v2 keeps the earlier versions, KV v1 replaces it). A dynamic engine's path is never
+ * written : Vault makes those credentials itself.
+ *
+ * Args:
+ *   store (object): the secret store, its token decrypted.
+ *   ref (string): the path.
+ *   payload (object): the pairs ({ username, password }).
+ *
+ * Returns:
+ *   Promise<void>
+ *
+ * Raises:
+ *   Error: a dynamic engine's path, or Vault refused the write (the token's policy) or could not
+ *     be reached - said with the path, never with the secret.
+ */
+async function write(store, ref, payload) {
+  assertConfigured(store);
+  assertSafeRef(ref);
+  if (await isDynamicRef(store, ref)) throw new Error(`Vault path ${ref} is a dynamic secret engine's: Vault makes those credentials itself, nothing is written there`);
+  const version = kvVersion(store);
+  const apiPath = buildApiPath(ref, version, store.default_mount);
+  const body = version === 2 ? { data: payload } : payload;
+  try {
+    await axios.post(`${baseUrl(store)}/v1/${apiPath}`, body, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
+  } catch (e) {
+    const status = e?.response?.status;
+    if (status === 403) throw new Error(`Vault refused the write to ${apiPath} (403): the store's token needs the create and update capabilities on that path`, { cause: e });
+    const msg = e?.response?.data?.errors?.join(", ") || e.message;
+    throw new Error(`Vault write failed for ${apiPath} (HTTP ${status || "?"}): ${msg}`, { cause: e });
+  }
+}
+
+export default { type: "vault", read, check, mounts, exists, write, withinWritePrefix };

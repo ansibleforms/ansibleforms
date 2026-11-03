@@ -19,6 +19,10 @@ CREATE TABLE `secret_stores` (
   `ca_bundle` text DEFAULT NULL,
   `cache_ttl_seconds` int(11) DEFAULT 60,
   `extra` text DEFAULT NULL,
+  -- writing to it (Settings > Secret stores, Options) : a credential's secret typed in the app is
+  -- written to the store on save (secrets/providers write), only below write_prefix
+  `write_enabled` tinyint(4) DEFAULT 0,
+  `write_prefix` varchar(250) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)

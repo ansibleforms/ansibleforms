@@ -230,6 +230,9 @@ const crudConfigs = {
       { name: 'ca_bundle' },
       { name: 'cache_ttl_seconds' },
       { name: 'extra' },
+      // a credential's secret may be written to it, below its prefix (secrets/providers write)
+      { name: 'write_enabled', isBoolean: true },
+      { name: 'write_prefix' },
       { name: 'managed', isBoolean: true }
     ],
     allowCache: true,

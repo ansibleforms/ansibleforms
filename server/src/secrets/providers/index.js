@@ -1,4 +1,6 @@
-// The secret store providers. A provider is { type, read(store, ref), check(store), mounts?(store) } ;
+// The secret store providers. A provider is { type, read(store, ref), check(store), mounts?(store) },
+// and a provider that can write a credential's secret to its store adds exists(store, ref),
+// write(store, ref, payload) and withinWritePrefix(store, ref) ;
 // adding a backend is one file here and one entry in PROVIDERS (and in the client's list in
 // client/src/config/settings.js).
 import vault from "./vault.js";
@@ -73,6 +75,64 @@ export async function listMounts(store) {
 }
 
 /**
+ * Writes a credential's secret, typed in the app, to a secret store : refused unless the store has
+ * writing on and the path is below its write prefix ; a secret already there is replaced only when
+ * the caller says so (overwrite). The store's cache is emptied after it, so the next read gets the
+ * new secret.
+ *
+ * Args:
+ *   storeName (string): the store.
+ *   ref (string): where in it (a Vault path).
+ *   payload (object): the pairs written ({ username, password }).
+ *   opts (object): { overwrite (true : a secret there is replaced) }.
+ *
+ * Returns:
+ *   Promise<object>: { store, ref, replaced (a secret was there) }.
+ *
+ * Raises:
+ *   Errors.BadRequestError: the store does not write, has no prefix, or the path is outside it.
+ *   Errors.ConflictError: a secret is there and overwrite was not asked (code secretExists).
+ *   Error: the store refused the write (its message names the path, never the secret).
+ */
+export async function writeSecret(storeName, ref, payload, opts = {}) {
+  const store = await getStore(storeName);
+  const provider = providerFor(store);
+  const path = String(ref ?? "").trim();
+  if (!path) throw new Errors.BadRequestError("Say where in the secret store to write the secret (its reference)");
+  // step 1 : a store that writes, and only below its prefix
+  if (!provider.write) throw new Errors.BadRequestError(`A ${store.type} secret store cannot be written to`);
+  if (!Number(store.write_enabled)) throw new Errors.BadRequestError(`Secret store '${store.name}' does not allow writing: turn writing on in its Options`);
+  if (!String(store.write_prefix || "").trim()) throw new Errors.BadRequestError(`Secret store '${store.name}' has no write prefix: set where it may be written in its Options`);
+  if (!provider.withinWritePrefix(store, path)) {
+    throw new Errors.BadRequestError(`${path} is not below the write prefix of secret store '${store.name}' (${store.write_prefix})`);
+  }
+  // step 2 : a secret there is replaced only when asked
+  const replaced = await provider.exists(store, path);
+  if (replaced && !opts.overwrite) {
+    const err = new Errors.ConflictError(`Secret store '${store.name}' has a secret at ${path} already: tick Overwrite to replace it`);
+    err.code = "secretExists";
+    throw err;
+  }
+  // step 3 : written, and no stale copy served afterwards
+  await provider.write(store, path, payload);
+  clearSecretCache();
+  return { store: store.name, ref: path, replaced };
+}
+
+/**
+ * Whether a store may be written to : a type that writes, and writing turned on.
+ *
+ * Args:
+ *   store (object): the secret store row.
+ *
+ * Returns:
+ *   boolean: true when a credential's secret may be written to it.
+ */
+export function storeWrites(store) {
+  return !!store && !!PROVIDERS[store.type]?.write && !!Number(store.write_enabled);
+}
+
+/**
  * A payload as a credential : user and password under the names stores commonly use.
  * Other keys are passed through so they stay available to expressions and playbooks.
  */
@@ -111,4 +171,4 @@ export function parseInlineSecret(name) {
 
 export { clearSecretCache };
 
-export default { SECRET_STORE_TYPES, VAULT_STORE_NAME, readSecret, checkStore, listMounts, getStore, mapPayloadToCredential, parseInlineSecret, clearSecretCache };
+export default { SECRET_STORE_TYPES, VAULT_STORE_NAME, readSecret, writeSecret, storeWrites, checkStore, listMounts, getStore, mapPayloadToCredential, parseInlineSecret, clearSecretCache };
