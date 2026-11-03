@@ -1749,6 +1749,8 @@ export default {
       tokenOrPasswordHelp: 'Um token; com um utilizador, a sua palavra-passe.',
       notFound: "Não existe nenhuma credencial com o id '{id}'.",
       fieldsRequired: 'O nome e a descrição são obrigatórios.',
+      loginFromStoreNew:
+        'O utilizador e a palavra-passe são lidos do cofre de segredos escolhido no passo anterior: não há nada a escrever aqui.',
       loginFromStore: 'O utilizador e a palavra-passe são lidos do cofre de segredos, no separador Armazenamento.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Um servidor de correio, a sua porta e TLS, e o seu início de sessão (nenhum para um relay)',

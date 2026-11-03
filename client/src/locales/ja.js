@@ -1729,6 +1729,8 @@ export default {
       tokenOrPasswordHelp: 'トークン。ユーザーがある場合はそのパスワード。',
       notFound: "ID '{id}' の資格情報はありません。",
       fieldsRequired: '名前と説明は必須です。',
+      loginFromStoreNew:
+        'ユーザーとパスワードは前のステップで選んだシークレットストアから読み取られます。ここで入力するものはありません。',
       loginFromStore: 'ユーザーとパスワードはシークレットストアから読み取られます（ストアタブ）。',
       type_smtp: 'SMTP',
       type_smtpHint: 'メールサーバー、そのポートと TLS、ログイン（リレーの場合はなし）',

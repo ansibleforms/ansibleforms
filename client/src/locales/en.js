@@ -1880,6 +1880,8 @@ export default {
       tokenOrPasswordHelp: "A token; with a user, that user's password.",
       notFound: "There is no credential with the id '{id}'.",
       fieldsRequired: 'Name and description are required.',
+      loginFromStoreNew:
+        'The user and password are read from the secret store chosen in the previous step: nothing to type here.',
       loginFromStore: 'The user and password are read from the secret store, on the Store tab.',
       type_smtp: 'SMTP',
       type_smtpHint: 'A mail server, its port and TLS, and its login (none for a relay)',

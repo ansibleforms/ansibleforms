@@ -1673,6 +1673,7 @@ export default {
       tokenOrPasswordHelp: '一个令牌；如有用户，则为该用户的密码。',
       notFound: "没有 ID 为 '{id}' 的凭据。",
       fieldsRequired: '名称和描述为必填项。',
+      loginFromStoreNew: '用户和密码从上一步选择的密钥存储中读取：此处无需输入。',
       loginFromStore: '用户和密码从密钥库读取，见“存储”选项卡。',
       type_smtp: 'SMTP',
       type_smtpHint: '邮件服务器、其端口和 TLS，以及登录（中继无需）',

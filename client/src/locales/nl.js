@@ -1901,6 +1901,8 @@ export default {
       tokenOrPasswordHelp: 'Een token; met een gebruiker, diens wachtwoord.',
       notFound: "Er is geen referentie met id '{id}'.",
       fieldsRequired: 'Naam en beschrijving zijn verplicht.',
+      loginFromStoreNew:
+        'De gebruiker en het wachtwoord worden gelezen uit de secret store die in de vorige stap is gekozen: hier hoeft niets ingevuld te worden.',
       loginFromStore: 'Gebruiker en wachtwoord worden uit de secret store gelezen, op het tabblad Opslag.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Een mailserver, de poort en TLS, en de login (geen voor een relay)',

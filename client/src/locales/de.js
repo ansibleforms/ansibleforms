@@ -1912,6 +1912,8 @@ export default {
       tokenOrPasswordHelp: 'Ein Token; mit einem Benutzer dessen Passwort.',
       notFound: "Es gibt keine Anmeldeinformation mit der ID '{id}'.",
       fieldsRequired: 'Name und Beschreibung sind erforderlich.',
+      loginFromStoreNew:
+        'Benutzer und Passwort werden aus dem im vorherigen Schritt gewählten Secret Store gelesen: hier ist nichts einzugeben.',
       loginFromStore: 'Benutzer und Passwort werden aus dem Secret Store gelesen, auf der Registerkarte Speicher.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Ein Mailserver, sein Port und TLS und seine Anmeldung (keine für ein Relay)',

@@ -1898,6 +1898,8 @@ export default {
       tokenOrPasswordHelp: 'Un token; con un utente, la sua password.',
       notFound: "Non esiste alcuna credenziale con l'id '{id}'.",
       fieldsRequired: 'Nome e descrizione sono obbligatori.',
+      loginFromStoreNew:
+        "L'utente e la password vengono letti dal secret store scelto nel passo precedente: qui non c'è nulla da inserire.",
       loginFromStore: 'Utente e password sono letti dal secret store, nella scheda Archivio.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Un server di posta, la sua porta e TLS, e il suo accesso (nessuno per un relay)',

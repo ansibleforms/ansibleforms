@@ -1910,6 +1910,8 @@ export default {
       tokenOrPasswordHelp: 'Un token; con un usuario, su contraseña.',
       notFound: "No hay ninguna credencial con el id '{id}'.",
       fieldsRequired: 'El nombre y la descripción son obligatorios.',
+      loginFromStoreNew:
+        'El usuario y la contraseña se leen del almacén de secretos elegido en el paso anterior: aquí no hay nada que escribir.',
       loginFromStore: 'El usuario y la contraseña se leen del almacén de secretos, en la pestaña Almacén.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Un servidor de correo, su puerto y TLS, y su inicio de sesión (ninguno para un relay)',

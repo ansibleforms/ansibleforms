@@ -1917,6 +1917,8 @@ export default {
       tokenOrPasswordHelp: 'Un jeton ; avec un utilisateur, son mot de passe.',
       notFound: "Aucun identifiant avec l'id '{id}'.",
       fieldsRequired: 'Le nom et la description sont obligatoires.',
+      loginFromStoreNew:
+        "L'utilisateur et le mot de passe sont lus dans le coffre de secrets choisi à l'étape précédente : rien à saisir ici.",
       loginFromStore: "L'utilisateur et le mot de passe sont lus dans le coffre de secrets, onglet Stockage.",
       type_smtp: 'SMTP',
       type_smtpHint: 'Un serveur de messagerie, son port et TLS, et sa connexion (aucune pour un relais)',

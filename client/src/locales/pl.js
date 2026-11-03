@@ -1743,6 +1743,8 @@ export default {
       tokenOrPasswordHelp: 'Token; z użytkownikiem jego hasło.',
       notFound: "Nie ma poświadczenia o id '{id}'.",
       fieldsRequired: 'Nazwa i opis są wymagane.',
+      loginFromStoreNew:
+        'Użytkownik i hasło są odczytywane z magazynu sekretów wybranego w poprzednim kroku: nie trzeba tu nic wpisywać.',
       loginFromStore: 'Użytkownik i hasło są odczytywane z magazynu sekretów, na karcie Magazyn.',
       type_smtp: 'SMTP',
       type_smtpHint: 'Serwer poczty, jego port i TLS oraz logowanie (brak dla przekaźnika)',
