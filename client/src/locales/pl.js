@@ -1690,7 +1690,7 @@ export default {
       secretStore: 'Magazyn sekretów',
       secretRefPlaceholderVault: 'np. secret/myapp/prod',
       secretRefPlaceholderCyberArk: 'np. Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'Jego ścieżka w Vault: secret/myapp/prod.',
+      secretRefHelpVault: 'Jego ścieżka w HashiCorp Vault: secret/myapp/prod.',
       secretRefHelpCyberArk: 'Jego konto CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'np. secret/myapp/prod',
       newSecretStore: 'Dodaj magazyn sekretów',

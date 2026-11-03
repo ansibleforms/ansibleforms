@@ -1856,7 +1856,7 @@ export default {
       secretStore: 'Almacén de secretos',
       secretRefPlaceholderVault: 'p. ej. secret/myapp/prod',
       secretRefPlaceholderCyberArk: 'p. ej. Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'Su ruta en el Vault: secret/myapp/prod.',
+      secretRefHelpVault: 'Su ruta en HashiCorp Vault: secret/myapp/prod.',
       secretRefHelpCyberArk: 'Su cuenta de CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'ej. secret/myapp/prod',
       newSecretStore: 'Añadir almacén de secretos',

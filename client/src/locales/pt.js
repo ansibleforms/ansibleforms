@@ -1695,7 +1695,7 @@ export default {
       secretStore: 'Cofre de segredos',
       secretRefPlaceholderVault: 'p. ex. secret/myapp/prod',
       secretRefPlaceholderCyberArk: 'p. ex. Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'O seu caminho no Vault: secret/myapp/prod.',
+      secretRefHelpVault: 'O seu caminho no HashiCorp Vault: secret/myapp/prod.',
       secretRefHelpCyberArk: 'A sua conta CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'ex. secret/myapp/prod',
       newSecretStore: 'Adicionar cofre de segredos',

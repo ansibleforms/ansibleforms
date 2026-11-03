@@ -1620,7 +1620,7 @@ export default {
       secretStore: '密钥库',
       secretRefPlaceholderVault: '例如 secret/myapp/prod',
       secretRefPlaceholderCyberArk: '例如 Safe=Linux;Object=srv01',
-      secretRefHelpVault: '其在 Vault 中的路径：secret/myapp/prod。',
+      secretRefHelpVault: '其在 HashiCorp Vault 中的路径：secret/myapp/prod。',
       secretRefHelpCyberArk: '其 CyberArk 账户：Safe=Linux;Object=srv01。',
       secretRefPlaceholder: '例如 secret/myapp/prod',
       newSecretStore: '添加机密存储',

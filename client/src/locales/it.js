@@ -1845,7 +1845,7 @@ export default {
       secretStore: 'Archivio di segreti',
       secretRefPlaceholderVault: 'es. secret/myapp/prod',
       secretRefPlaceholderCyberArk: 'es. Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'Il suo percorso nel Vault: secret/myapp/prod.',
+      secretRefHelpVault: 'Il suo percorso in HashiCorp Vault: secret/myapp/prod.',
       secretRefHelpCyberArk: 'Il suo account CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'es. secret/myapp/prod',
       newSecretStore: 'Aggiungi secret store',

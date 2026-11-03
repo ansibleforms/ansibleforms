@@ -1699,7 +1699,7 @@ export default {
       secretStore: 'Magatzem de secrets',
       secretRefPlaceholderVault: 'p. ex. secret/myapp/prod',
       secretRefPlaceholderCyberArk: 'p. ex. Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'El seu camí al Vault: secret/myapp/prod.',
+      secretRefHelpVault: 'El seu camí a HashiCorp Vault: secret/myapp/prod.',
       secretRefHelpCyberArk: 'El seu compte de CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'p. ex. secret/myapp/prod',
       newSecretStore: 'Afegeix un magatzem de secrets',

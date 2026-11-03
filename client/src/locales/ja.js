@@ -1676,7 +1676,7 @@ export default {
       secretStore: 'シークレットストア',
       secretRefPlaceholderVault: '例: secret/myapp/prod',
       secretRefPlaceholderCyberArk: '例: Safe=Linux;Object=srv01',
-      secretRefHelpVault: 'Vault 内のパス: secret/myapp/prod。',
+      secretRefHelpVault: 'HashiCorp Vault 内のパス: secret/myapp/prod。',
       secretRefHelpCyberArk: 'CyberArk のアカウント: Safe=Linux;Object=srv01。',
       secretRefPlaceholder: '例: secret/myapp/prod',
       newSecretStore: 'シークレットストアを追加',
