@@ -611,6 +611,7 @@ export default {
       schedule_update: 'Pianificazione aggiornata',
       schedule_delete: 'Pianificazione eliminata',
       schedule_launch_create: 'Pianificazione avviata manualmente',
+      schedule_launch: 'Job avviato da una pianificazione',
       schema_create: 'Schema del database creato',
       settings_update: 'Impostazioni aggiornate',
       settings_env_update: 'Impostazioni ambiente aggiornate',

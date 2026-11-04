@@ -613,6 +613,7 @@ export default {
       schedule_update: 'Zeitplan aktualisiert',
       schedule_delete: 'Zeitplan gelöscht',
       schedule_launch_create: 'Zeitplan manuell gestartet',
+      schedule_launch: 'Job von einem Zeitplan gestartet',
       schema_create: 'Datenbankschema erstellt',
       settings_update: 'Einstellungen aktualisiert',
       settings_env_update: 'Umgebungseinstellungen aktualisiert',

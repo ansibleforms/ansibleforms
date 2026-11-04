@@ -612,6 +612,7 @@ export default {
       schedule_update: 'Programación actualizada',
       schedule_delete: 'Programación eliminada',
       schedule_launch_create: 'Programación iniciada manualmente',
+      schedule_launch: 'Trabajo lanzado por una programación',
       schema_create: 'Esquema de base de datos creado',
       settings_update: 'Configuración actualizada',
       settings_env_update: 'Ajustes de entorno actualizados',

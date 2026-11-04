@@ -604,6 +604,7 @@ export default {
       schedule_update: 'Schedule updated',
       schedule_delete: 'Schedule deleted',
       schedule_launch_create: 'Schedule launched manually',
+      schedule_launch: 'Job launched by a schedule',
       schema_create: 'Database schema created',
       settings_update: 'Settings updated',
       settings_env_update: 'Environment settings updated',

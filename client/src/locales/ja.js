@@ -606,6 +606,7 @@ export default {
       schedule_update: 'スケジュールを更新',
       schedule_delete: 'スケジュールを削除',
       schedule_launch_create: 'スケジュールを手動で起動',
+      schedule_launch: 'スケジュールが起動したジョブ',
       schema_create: 'データベーススキーマを作成',
       settings_update: '設定を更新',
       settings_env_update: '環境設定を更新',
