@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0](https://github.com/ansibleforms/ansibleforms/compare/7.5.0...7.6.0) (2026-11-04)
+
+
+### Added
+
+* a credential's login can be written to CyberArk on save ([#1319](https://github.com/ansibleforms/ansibleforms/issues/1319)) ([6c00568](https://github.com/ansibleforms/ansibleforms/commit/6c00568693c0684bcce9a1a072addee90f05c251))
+* a credential's login can be written to HashiCorp Vault on save ([#1318](https://github.com/ansibleforms/ansibleforms/issues/1318)) ([341529a](https://github.com/ansibleforms/ansibleforms/commit/341529ac8c79844ada3ded6090193e4b136b1266))
+* a role's Admin option makes its users admins ([#1313](https://github.com/ansibleforms/ansibleforms/issues/1313)) ([0807ceb](https://github.com/ansibleforms/ansibleforms/commit/0807ceb6c92bd39bca36177e1619b1bffbda49ad))
+
+
+### Fixed
+
+* a new credential asks where its secret is kept first ([#1314](https://github.com/ansibleforms/ansibleforms/issues/1314)) ([3584ebf](https://github.com/ansibleforms/ansibleforms/commit/3584ebf9b4b671de512a285b7790d1bf5b538dd6))
+* MCP launches and changes are audited ([#1324](https://github.com/ansibleforms/ansibleforms/issues/1324)) ([f92aa88](https://github.com/ansibleforms/ansibleforms/commit/f92aa88f4d66114366476a3199c5a02a7c5af6e1))
+* MySQL queries no longer log mysql2 warnings ([#1317](https://github.com/ansibleforms/ansibleforms/issues/1317)) ([c3157d9](https://github.com/ansibleforms/ansibleforms/commit/c3157d99df4c6706584a155aca1ce6ce2e554af5))
+* scheduled job launches are audited ([#1323](https://github.com/ansibleforms/ansibleforms/issues/1323)) ([f346571](https://github.com/ansibleforms/ansibleforms/commit/f346571b84d60755be4863ea4683fc7ce8cc79cd))
+
+
+### Changed
+
+* finished jobs are kept 90 days by default ([#1320](https://github.com/ansibleforms/ansibleforms/issues/1320)) ([df3b1ba](https://github.com/ansibleforms/ansibleforms/commit/df3b1baec81814fd07a69836ca3c713aa54a4d35))
+* log files are kept 90 days by default ([#1321](https://github.com/ansibleforms/ansibleforms/issues/1321)) ([adc4f3a](https://github.com/ansibleforms/ansibleforms/commit/adc4f3a7bb8ac0ec4edd5a8330aa2a28440eeae5))
+* nightly backups are kept 30 days by default ([#1322](https://github.com/ansibleforms/ansibleforms/issues/1322)) ([9323677](https://github.com/ansibleforms/ansibleforms/commit/9323677fbfdc53defbcc564f84ca62c261a80474))
+
 ## [7.5.0](https://github.com/ansibleforms/ansibleforms/compare/7.4.2...7.5.0) (2026-11-01)
 
 
