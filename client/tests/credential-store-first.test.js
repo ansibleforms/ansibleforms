@@ -121,6 +121,11 @@ describe('writing a credential to a secret store', () => {
     expect(choices({ ...item, secret_action: 'point' })).toEqual(['', 'vault', 'ro']);
   });
 
+  it('none allows writing : the dropdown still shown, saying so ; pointed to, its button only', () => {
+    expect(field('secret_store').emptyText(item)).toBe('settings.credentials.noWritableStore');
+    expect(field('secret_store').emptyText({ ...item, secret_action: 'point' })).toBe('');
+  });
+
   it('saved : asks the server to write them, overwrite as ticked, no note sent', () => {
     const saved = credentials.beforeSave({
       name: 'db',

@@ -1860,6 +1860,7 @@ export default {
       secretRefHelpCyberArk: 'Het CyberArk-account: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'bv. secret/myapp/prod',
       newSecretStore: 'Secret store toevoegen',
+      noWritableStore: 'Nog geen secret store staat schrijven toe',
       secretFromStore: 'Geheimenkluis',
       secretFromStoreHint: 'HashiCorp Vault of CyberArk',
       secretPoint: 'Verwijzen naar een sleutel',

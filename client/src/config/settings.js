@@ -2208,6 +2208,8 @@ export default function getSettings(t) {
           // pointed to or written to ; written to : only the stores that allow writing
           showWhen: (r) => r?.secret_source === 'store',
           choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
+          // written to, none allows writing yet : the dropdown still shown, saying so, over its button
+          emptyText: (r) => (writesToStore(r) ? t('settings.credentials.noWritableStore') : ''),
           label: t('settings.credentials.secretStore'),
           help: t('settings.credentials.secretStoreHelp'),
           type: 'select',

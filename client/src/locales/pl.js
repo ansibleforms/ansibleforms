@@ -1701,6 +1701,7 @@ export default {
       secretRefHelpCyberArk: 'Jego konto CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'np. secret/myapp/prod',
       newSecretStore: 'Dodaj magazyn sekretów',
+      noWritableStore: 'Żaden magazyn sekretów nie pozwala jeszcze na zapis',
       secretFromStore: 'Magazyn sekretów',
       secretFromStoreHint: 'HashiCorp Vault lub CyberArk',
       secretPoint: 'Wskaż klucz',

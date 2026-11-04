@@ -1707,6 +1707,7 @@ export default {
       secretRefHelpCyberArk: 'A sua conta CyberArk: Safe=Linux;Object=srv01.',
       secretRefPlaceholder: 'ex. secret/myapp/prod',
       newSecretStore: 'Adicionar cofre de segredos',
+      noWritableStore: 'Nenhum cofre de segredos permite escrever ainda',
       secretFromStore: 'Cofre de segredos',
       secretFromStoreHint: 'HashiCorp Vault ou CyberArk',
       secretPoint: 'Apontar para uma chave',

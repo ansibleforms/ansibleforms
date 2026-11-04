@@ -1631,6 +1631,7 @@ export default {
       secretRefHelpCyberArk: '其 CyberArk 账户：Safe=Linux;Object=srv01。',
       secretRefPlaceholder: '例如 secret/myapp/prod',
       newSecretStore: '添加机密存储',
+      noWritableStore: '尚无允许写入的机密存储',
       secretFromStore: '密钥库',
       secretFromStoreHint: 'HashiCorp Vault 或 CyberArk',
       secretPoint: '指向键',

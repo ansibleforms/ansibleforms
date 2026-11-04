@@ -71,6 +71,9 @@
 /*      gets `created` with its name                              */
 /*  canCreateChoices (prop): a dialogOnly dialog that keeps its   */
 /*      dropdowns' New buttons (a page opens it, not a dialog)    */
+/*  field.emptyText: what a dropdown with nothing to choose says, */
+/*      disabled, over its New button, or (item) => that ('' :    */
+/*      its New button only)                                      */
 /*  field.createDefaults: what a New record is preset with, or    */
 /*      (item) => that, from the record being edited              */
 /*  field.rows: the lines of a textarea field (3 when not given)  */
@@ -863,16 +866,19 @@ function noChoices(field) {
 }
 
 /**
- * What a credential dropdown with nothing to choose says, disabled : no credential of the type its
- * New button makes yet. Another dropdown with nothing to choose shows its New button only.
+ * What a dropdown with nothing to choose says, disabled : its own emptyText (no secret store that
+ * allows writing yet), or for a credential dropdown no credential of the type its New button makes
+ * yet. Another dropdown with nothing to choose shows its New button only.
  *
  * Args:
  *   field (object): the select field.
  *
  * Returns:
- *   string: the message, or '' when it is not a credential dropdown of one type.
+ *   string: the message, or '' when it has none.
  */
 function emptyTextOf(field) {
+  // its own message, as the record being edited asks
+  if (field.emptyText) return textOf(field.emptyText) || '';
   if (field.createWith !== 'credentials') return '';
   const type = textOf(field.createDefaults)?.credential_type;
   return type ? noCredentialsText(t, type) : '';
