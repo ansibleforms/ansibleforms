@@ -13,6 +13,7 @@ import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 const LAUNCH_MAX_MINUTES = 10;
 import Form from './form.model.js';
 import Errors from '../lib/errors.js';
+import Audit from './audit.model.js';
 
 /**
  * Adds when a schedule runs next (next_run, an ISO string or null) : its cron's next occurrence,
@@ -41,6 +42,41 @@ function withNextRun(row) {
     next = null;
   }
   return { ...row, next_run: next ? next.toISOString() : null };
+}
+
+
+/**
+ * Writes a scheduled launch to the audit log. No request launches it, so the audit middleware
+ * never sees it, and once the job history is pruned this entry is the record of what ran.
+ *
+ * Args:
+ *   schedule (object): the schedule row (id, name, owner).
+ *   form (string): the form it launches.
+ *   user (object|null): the user it ran as (a planned job's owner, or the schedule service) ;
+ *       null when the launch failed before it was known.
+ *   planned (boolean): whether it is a job planned by a user (Schedule.plan).
+ *   outcome (string): success or failure.
+ *   jobId (number|undefined): the job it started.
+ *   error (string|undefined): why it failed.
+ *
+ * Returns:
+ *   Promise<void>: resolved once written ; Audit.log never throws.
+ */
+async function auditScheduledLaunch(schedule, form, user, planned, outcome, jobId, error) {
+  await Audit.log({
+    user: user && user.username ? user : { username: 'Schedule Service', type: 'schedule' },
+    action: 'schedule.launch',
+    targetType: 'job',
+    target: jobId ?? null,
+    outcome,
+    detail: {
+      schedule: schedule?.name,
+      scheduleId: schedule?.id,
+      form,
+      planned,
+      ...(error ? { error } : {}),
+    },
+  });
 }
 
 class Schedule extends CrudModel {
@@ -329,10 +365,14 @@ class Schedule extends CrudModel {
         output = `The schedule ran but no job was created.\nCheck the job log that launched the schedule for more details.`;
         status = "failed";
       }
+      // no request launched it, so the audit middleware never sees it : written here, as the
+      // user it ran as (a planned job's owner, or the schedule service), naming the job
+      await auditScheduledLaunch(schedule, form, user, planned, launched?.id ? 'success' : 'failure', launched?.id, launched?.id ? undefined : 'no job was created');
     } catch (err) {
       logger.error("Errors in schedule launch: ", err);
       output = "Failed to launch: " + err.message;
       status = "failed";
+      await auditScheduledLaunch(schedule, schedule.form, null, !!schedule.owner, 'failure', undefined, err.message || String(err));
     }
     // A one-time schedule is deleted after its run, BEFORE anything sets it idle : idle, its
     // run_at passed and still enabled, it is exactly what the cron's every-minute check queues,

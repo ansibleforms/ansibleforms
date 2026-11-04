@@ -595,6 +595,7 @@ export default {
       schedule_update: '已更新调度',
       schedule_delete: '已删除调度',
       schedule_launch_create: '已手动运行调度',
+      schedule_launch: '由计划启动的作业',
       schema_create: '已创建数据库架构',
       settings_update: '已更新设置',
       settings_env_update: '已更新环境设置',

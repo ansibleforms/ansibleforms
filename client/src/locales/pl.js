@@ -609,6 +609,7 @@ export default {
       schedule_update: 'Zaktualizowano harmonogram',
       schedule_delete: 'Usunięto harmonogram',
       schedule_launch_create: 'Ręcznie uruchomiono harmonogram',
+      schedule_launch: 'Zadanie uruchomione przez harmonogram',
       schema_create: 'Utworzono schemat bazy danych',
       settings_update: 'Zaktualizowano ustawienia',
       settings_env_update: 'Zaktualizowano ustawienia środowiska',

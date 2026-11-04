@@ -611,6 +611,7 @@ export default {
       schedule_update: 'Programació actualitzada',
       schedule_delete: 'Programació suprimida',
       schedule_launch_create: 'Programació llançada manualment',
+      schedule_launch: 'Treball llançat per una programació',
       schema_create: 'Esquema de base de dades creat',
       settings_update: 'Configuració actualitzada',
       settings_env_update: "Configuració de l'entorn actualitzada",

@@ -611,6 +611,7 @@ export default {
       schedule_update: 'Planning bijgewerkt',
       schedule_delete: 'Planning verwijderd',
       schedule_launch_create: 'Planning handmatig gestart',
+      schedule_launch: 'Job gestart door een planning',
       schema_create: 'Databaseschema aangemaakt',
       settings_update: 'Instellingen bijgewerkt',
       settings_env_update: 'Omgevingsinstellingen bijgewerkt',

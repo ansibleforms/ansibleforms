@@ -614,6 +614,7 @@ export default {
       schedule_update: 'Planification modifiée',
       schedule_delete: 'Planification supprimée',
       schedule_launch_create: 'Planification lancée manuellement',
+      schedule_launch: 'Job lancé par une planification',
       schema_create: 'Schéma de base de données créé',
       settings_update: 'Paramètres modifiés',
       settings_env_update: "Paramètres d'environnement modifiés",

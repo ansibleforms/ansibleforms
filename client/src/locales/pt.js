@@ -612,6 +612,7 @@ export default {
       schedule_update: 'Agendamento atualizado',
       schedule_delete: 'Agendamento eliminado',
       schedule_launch_create: 'Agendamento iniciado manualmente',
+      schedule_launch: 'Trabalho iniciado por um agendamento',
       schema_create: 'Esquema da base de dados criado',
       settings_update: 'Definições atualizadas',
       settings_env_update: 'Definições de ambiente atualizadas',
