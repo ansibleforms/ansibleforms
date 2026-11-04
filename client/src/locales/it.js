@@ -1859,9 +1859,9 @@ export default {
       newSecretStore: 'Aggiungi secret store',
       secretFromStore: 'Archivio di segreti',
       secretFromStoreHint: 'HashiCorp Vault o CyberArk',
-      secretPoint: 'Punta a un percorso o una chiave',
+      secretPoint: 'Punta a una chiave',
       secretPointHint: 'Già nello store, letto a ogni utilizzo',
-      secretWriteToStore: 'Scrivi in un percorso o una chiave',
+      secretWriteToStore: 'Scrivi in una chiave',
       secretWriteToStoreHint: 'Inserito nel passo successivo, scritto nello store al salvataggio',
       secretOverwrite: 'Sovrascrivi un segreto già presente',
       secretOverwriteHelp:

@@ -234,7 +234,7 @@ async function load() {
   ]);
   // with their type : the reference's example and help follow the store chosen (a Vault path, a
   // CyberArk account)
-  // and whether each allows writing : Write to a path or key lists only those
+  // and whether each allows writing : Write to a key lists only those
   secretStores.value = [
     { name: '' },
     ...(stores?.data?.records || []).map((s) => ({
