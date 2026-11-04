@@ -471,7 +471,7 @@ class CronService {
 
     // 2c. Job retention - runs at 2:30 AM. Job output is longtext and nothing pruned
     // it before, so this is the table that grows without limit on a busy instance.
-    // 60 days by default since 7.6.0 (JOB_RETENTION_DAYS) ; 0 keeps every job. The health
+    // 90 days by default since 7.6.0 (JOB_RETENTION_DAYS) ; 0 keeps every job. The health
     // page reports the size, and says so when pruning is switched off.
     const jobCleanupTask = new Cron('30 2 * * *', {
       timezone: this.timezone,
