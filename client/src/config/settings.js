@@ -2238,8 +2238,9 @@ export default function getSettings(t) {
           icon: 'shield-alt',
           hidden: true,
           step: 'store',
-          // read from a store, and one chosen : what to read in it means nothing before
-          showWhen: (r) => r?.secret_source === 'store' && !!r?.secret_store,
+          // pointed to, once a store is chosen : what to read in it means nothing before ; written
+          // to, always : where the login typed next is written
+          showWhen: (r) => r?.secret_source === 'store' && (writesToStore(r) || !!r?.secret_store),
         },
         {
           // written to a place the store has a secret at already : replaced only when ticked

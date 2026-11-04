@@ -712,10 +712,11 @@ function showField(field) {
   // Only hide if noInput is set, not readonly
   if (field.noInput) return false;
   // a field that means nothing until another dropdown has a choice (a secret's reference,
-  // with no secret store yet) : hidden until then
+  // with no secret store yet) : hidden until then, unless that dropdown is still shown, saying it
+  // has nothing to choose (its emptyText : written to a store, none allowing it yet)
   if (field.needsChoicesOf) {
     const other = fields.value.find((f) => f.key === field.needsChoicesOf);
-    if (other && noChoices(other)) return false;
+    if (other && noChoices(other) && !emptyTextOf(other)) return false;
   }
   let depShow = true;
   // a field shown by a rule of its own (field.showWhen(item)) : the user of a Jenkins runner,

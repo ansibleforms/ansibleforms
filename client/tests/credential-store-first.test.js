@@ -126,6 +126,11 @@ describe('writing a credential to a secret store', () => {
     expect(field('secret_store').emptyText({ ...item, secret_action: 'point' })).toBe('');
   });
 
+  it('the reference shown before a store is chosen when writing, as when pointing once one is', () => {
+    expect(field('secret_ref').showWhen({ ...item, secret_store: '' })).toBe(true);
+    expect(field('secret_ref').showWhen({ ...item, secret_action: 'point', secret_store: '' })).toBe(false);
+  });
+
   it('saved : asks the server to write them, overwrite as ticked, no note sent', () => {
     const saved = credentials.beforeSave({
       name: 'db',
