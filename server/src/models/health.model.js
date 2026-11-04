@@ -693,8 +693,8 @@ async function storageCheck() {
   const total = rows.reduce((sum, r) => sum + Number(r.bytes || 0), 0);
   const mb = Math.round(total / 1048576);
   // The size alone is not actionable : what matters is whether anything prunes it.
-  // JOB_RETENTION_DAYS defaults to 0 (keep for ever), so "4 GB and no retention" is the
-  // line worth reading, and a large table with pruning switched off is a warning.
+  // JOB_RETENTION_DAYS set to 0 keeps every job, so "4 GB and no retention" is the line
+  // worth reading, and a large table with pruning switched off is a warning.
   const keep = appConfig.jobRetentionDays;
   const pruning = keep >= 1;
   const status = (!pruning && mb > 1024) ? WARNING : OK;

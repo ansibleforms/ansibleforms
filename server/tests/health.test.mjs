@@ -665,7 +665,7 @@ describe("the checks added after the first release round", () => {
   });
 
   test("storage says whether anything actually prunes it", async () => {
-    // the size alone is not actionable : JOB_RETENTION_DAYS defaults to 0 = never
+    // the size alone is not actionable : JOB_RETENTION_DAYS 0 = never pruned
     appConfig.jobRetentionDays = 0;
     let r = await Health.check();
     assert.match(checkOf(r, "storage").value, /retention disabled/);
