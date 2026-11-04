@@ -335,7 +335,7 @@
     type: number
     allowed: a whole number where 0 disables the cleanup
     short: Nightly backups kept
-    default: "7"
+    default: "30"
     description: | 
       Number of automated nightly backups to retain.
       AnsibleForms automatically creates a full backup (database + config + forms) every night at midnight.

@@ -86,7 +86,7 @@ var app_config = {
   // staging area for new forms in repository mode : they live here until a
   // 'Push to repo' assigns them to a chosen repository (issue #414)
   formsStagingPath: process.env.FORMS_STAGING_PATH || path.resolve(__dirname + "/../persistent/forms_staging"),
-  nightlyBackupRetention: parseInt(process.env.NIGHTLY_BACKUP_RETENTION || "7", 10),
+  nightlyBackupRetention: parseInt(process.env.NIGHTLY_BACKUP_RETENTION || "30", 10),
   // How long audit entries are kept. The trail is append only, so without a sweep
   // it grows for ever - set to 0 to disable the sweep and keep everything.
   auditRetentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS || "365", 10),
