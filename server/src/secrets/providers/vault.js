@@ -317,6 +317,8 @@ async function exists(store, ref) {
   } catch (e) {
     const status = e?.response?.status;
     if (status === 404) return false;
+    // the token's policy : said plainly, with what it needs
+    if (status === 403) throw new Error(`Vault refused to read ${apiPath} (403): the store's token needs the read, create and update capabilities on that path`, { cause: e });
     const msg = e?.response?.data?.errors?.join(", ") || e.message;
     throw new Error(`Vault could not tell whether ${apiPath} has a secret (HTTP ${status || "?"}): ${msg}`, { cause: e });
   }

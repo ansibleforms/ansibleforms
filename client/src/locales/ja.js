@@ -1609,7 +1609,7 @@ export default {
       defaultMountHelp: '参照がトークンから見えるマウントで始まらない場合に使用されます。',
       writeEnabled: '書き込みを許可',
       writeEnabledHelp:
-        'AnsibleForms で入力した資格情報のユーザーとパスワードを、保存時にここへ書き込めます。トークンには書き込みプレフィックス以下で create と update の権限が必要です。',
+        'AnsibleForms で入力した資格情報のユーザーとパスワードを、保存時にここへ書き込めます。トークンには書き込みプレフィックス以下で read、create、update の権限が必要です。',
       writePrefix: '書き込みプレフィックス',
       writePrefixHelp: '資格情報はこのパスかその配下にのみ書き込まれます。例: secret/ansibleforms。',
       writePrefixRequired: '書き込みにはプレフィックスが必要です。資格情報を書き込めるパスを指定してください。',

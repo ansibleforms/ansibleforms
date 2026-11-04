@@ -1627,7 +1627,7 @@ export default {
       defaultMountHelp: 'Usado quando uma referência não começa por um mount que o token consegue ver.',
       writeEnabled: 'Permitir escrita',
       writeEnabledHelp:
-        'O utilizador e a palavra-passe de uma credencial escritos no AnsibleForms podem ser gravados aqui ao guardar. O token precisa das capacidades create e update abaixo do prefixo de escrita.',
+        'O utilizador e a palavra-passe de uma credencial escritos no AnsibleForms podem ser gravados aqui ao guardar. O token precisa das capacidades read, create e update abaixo do prefixo de escrita.',
       writePrefix: 'Prefixo de escrita',
       writePrefixHelp: 'As credenciais só são escritas neste caminho ou abaixo dele, p. ex. secret/ansibleforms.',
       writePrefixRequired:

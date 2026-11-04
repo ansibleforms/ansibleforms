@@ -1793,7 +1793,7 @@ export default {
       defaultMountHelp: 'Utilisé quand une référence ne commence pas par un montage visible pour le jeton.',
       writeEnabled: "Autoriser l'écriture",
       writeEnabledHelp:
-        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement. Le jeton a besoin des capacités create et update sous le préfixe d'écriture.",
+        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement. Le jeton a besoin des capacités read, create et update sous le préfixe d'écriture.",
       writePrefix: "Préfixe d'écriture",
       writePrefixHelp: "Les identifiants ne sont écrits qu'à ce chemin ou en dessous, p. ex. secret/ansibleforms.",
       writePrefixRequired:

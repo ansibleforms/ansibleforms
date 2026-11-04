@@ -38,6 +38,7 @@ vi.mock("../src/models/crud.model.js", () => ({
 let secrets = {};
 const writes = [];
 let writeStatus = 200;
+let readStatus = 200;
 let mountTypes = {};
 const server = http.createServer((req, res) => {
   res.setHeader("Content-Type", "application/json");
@@ -62,6 +63,10 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ data: {} }));
     });
     return;
+  }
+  if (readStatus !== 200) {
+    res.statusCode = readStatus;
+    return res.end(JSON.stringify({ errors: ["1 error occurred:\n\t* permission denied\n\n"] }));
   }
   if (!(path in secrets)) {
     res.statusCode = 404;
@@ -100,6 +105,7 @@ beforeEach(() => {
   secrets = {};
   writes.length = 0;
   writeStatus = 200;
+  readStatus = 200;
   mountTypes = {};
   clearMountTypeCache();
   Registry.clearSecretCache();
@@ -173,5 +179,14 @@ describe("writing", () => {
       assert.doesNotMatch(e.message, /s3cret/);
       return true;
     });
+  });
+
+  test("the token's policy refusing the check before the write : said with the capabilities", async () => {
+    readStatus = 403;
+    await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), (e) => {
+      assert.match(e.message, /refused to read secret\/data\/ansibleforms\/db \(403\).*read, create and update/);
+      return true;
+    });
+    assert.equal(writes.length, 0);
   });
 });

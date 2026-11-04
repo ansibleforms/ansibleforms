@@ -1779,7 +1779,7 @@ export default {
       defaultMountHelp: 'Gebruikt wanneer een referentie niet begint met een mount die het token kan zien.',
       writeEnabled: 'Schrijven toestaan',
       writeEnabledHelp:
-        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan worden geschreven. Het token heeft de mogelijkheden create en update onder het schrijfprefix nodig.',
+        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan worden geschreven. Het token heeft de mogelijkheden read, create en update onder het schrijfprefix nodig.',
       writePrefix: 'Schrijfprefix',
       writePrefixHelp: 'Referenties worden alleen op dit pad of eronder geschreven, bijv. secret/ansibleforms.',
       writePrefixRequired:

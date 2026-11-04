@@ -1759,7 +1759,7 @@ export default {
       defaultMountHelp: 'Used when a reference does not start with a mount the token can see.',
       writeEnabled: 'Allow writing',
       writeEnabledHelp:
-        "A credential's user and password typed in AnsibleForms can be written here on Save. The token needs the create and update capabilities below the write prefix.",
+        "A credential's user and password typed in AnsibleForms can be written here on Save. The token needs the read, create and update capabilities below the write prefix.",
       writePrefix: 'Write prefix',
       writePrefixHelp: 'Credentials are written only at this path or below it, e.g. secret/ansibleforms.',
       writePrefixRequired: 'Writing needs a write prefix: say below which path credentials may be written.',

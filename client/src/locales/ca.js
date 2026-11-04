@@ -1630,7 +1630,7 @@ export default {
       defaultMountHelp: "S'utilitza quan una referència no comença amb un punt de muntatge que el token pugui veure.",
       writeEnabled: "Permet l'escriptura",
       writeEnabledHelp:
-        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar. El testimoni necessita les capacitats create i update sota el prefix d'escriptura.",
+        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar. El testimoni necessita les capacitats read, create i update sota el prefix d'escriptura.",
       writePrefix: "Prefix d'escriptura",
       writePrefixHelp: "Les credencials només s'escriuen en aquest camí o per sota, p. ex. secret/ansibleforms.",
       writePrefixRequired:

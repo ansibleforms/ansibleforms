@@ -1789,7 +1789,7 @@ export default {
       defaultMountHelp: 'Wird verwendet, wenn eine Referenz nicht mit einem für das Token sichtbaren Mount beginnt.',
       writeEnabled: 'Schreiben erlauben',
       writeEnabledHelp:
-        'Benutzer und Passwort einer Anmeldeinformation, in AnsibleForms eingegeben, können beim Speichern hierhin geschrieben werden. Das Token braucht die Fähigkeiten create und update unterhalb des Schreibpräfixes.',
+        'Benutzer und Passwort einer Anmeldeinformation, in AnsibleForms eingegeben, können beim Speichern hierhin geschrieben werden. Das Token braucht die Fähigkeiten read, create und update unterhalb des Schreibpräfixes.',
       writePrefix: 'Schreibpräfix',
       writePrefixHelp:
         'Anmeldeinformationen werden nur in diesen Pfad oder darunter geschrieben, z. B. secret/ansibleforms.',

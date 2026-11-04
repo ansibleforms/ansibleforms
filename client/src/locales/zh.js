@@ -1557,7 +1557,7 @@ export default {
       defaultMountHelp: '当引用不以 token 可见的挂载点开头时使用。',
       writeEnabled: '允许写入',
       writeEnabledHelp:
-        '在 AnsibleForms 中输入的凭据用户和密码可在保存时写入此处。令牌需要在写入前缀下具有 create 和 update 权限。',
+        '在 AnsibleForms 中输入的凭据用户和密码可在保存时写入此处。令牌需要在写入前缀下具有 read、create 和 update 权限。',
       writePrefix: '写入前缀',
       writePrefixHelp: '凭据只写入此路径或其下级，例如 secret/ansibleforms。',
       writePrefixRequired: '写入需要前缀：请说明凭据可以写入哪个路径之下。',

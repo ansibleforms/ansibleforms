@@ -1621,7 +1621,7 @@ export default {
       defaultMountHelp: 'Używany, gdy odwołanie nie zaczyna się od punktu montowania widocznego dla tokenu.',
       writeEnabled: 'Zezwól na zapis',
       writeEnabledHelp:
-        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane przy zapisie. Token potrzebuje uprawnień create i update poniżej prefiksu zapisu.',
+        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane przy zapisie. Token potrzebuje uprawnień read, create i update poniżej prefiksu zapisu.',
       writePrefix: 'Prefiks zapisu',
       writePrefixHelp: 'Poświadczenia są zapisywane tylko w tej ścieżce lub poniżej, np. secret/ansibleforms.',
       writePrefixRequired: 'Zapis wymaga prefiksu: wskaż, poniżej której ścieżki można zapisywać poświadczenia.',

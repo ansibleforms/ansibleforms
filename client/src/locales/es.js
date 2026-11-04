@@ -1786,7 +1786,7 @@ export default {
       defaultMountHelp: 'Se usa cuando una referencia no empieza por un montaje visible para el token.',
       writeEnabled: 'Permitir la escritura',
       writeEnabledHelp:
-        'El usuario y la contraseña de una credencial escritos en AnsibleForms se pueden escribir aquí al guardar. El token necesita las capacidades create y update bajo el prefijo de escritura.',
+        'El usuario y la contraseña de una credencial escritos en AnsibleForms se pueden escribir aquí al guardar. El token necesita las capacidades read, create y update bajo el prefijo de escritura.',
       writePrefix: 'Prefijo de escritura',
       writePrefixHelp: 'Las credenciales solo se escriben en esta ruta o por debajo, p. ej. secret/ansibleforms.',
       writePrefixRequired:
