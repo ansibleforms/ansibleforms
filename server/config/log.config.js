@@ -17,8 +17,8 @@ const __dirname = path.dirname(__filename);
  *   number: the days, 0 for for ever.
  */
 export function parseRetentionDays(value) {
-  const days = parseInt(value ?? '30', 10);
-  return Number.isNaN(days) || days < 0 ? 30 : days;
+  const days = parseInt(value ?? '60', 10);
+  return Number.isNaN(days) || days < 0 ? 60 : days;
 }
 
 // The levels the logger knows : winston's syslog levels, the most severe first. They have
