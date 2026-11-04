@@ -13,6 +13,7 @@ import Query from '../models/query.model.js';
 import { resolveFormQuery } from '../lib/queryPolicy.js';
 import Schedule from '../models/schedule.model.js';
 import Settings from '../models/settings.model.js';
+import Audit from '../models/audit.model.js';
 import cronService from '../services/cron.service.js';
 import CrudModel from '../models/crud.model.js';
 import { createHandlers, registerTools } from './tools.js';
@@ -62,7 +63,13 @@ router.post('/', async (req, res) => {
   const server = new McpServer({ name: 'ansibleforms', version });
   // the MCP settings, read per request so a change applies at once : read only, and which
   // forms are offered (the chat assistant shares the handlers, without this policy)
-  const policy = { readOnly: appConfig.mcpReadOnly, chatFormsOnly: appConfig.mcpChatFormsOnly };
+  // what changes through a tool is audited as such (mcp.job.launch...) : the request alone is
+  // only `mcp.create` to the audit middleware
+  const policy = {
+    readOnly: appConfig.mcpReadOnly,
+    chatFormsOnly: appConfig.mcpChatFormsOnly,
+    audit: (entry) => Audit.log({ user, ip: req.ip, ...entry }),
+  };
   registerTools(server, createHandlers({ user, deps, policy }), policy, user);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

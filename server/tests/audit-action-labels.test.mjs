@@ -72,7 +72,7 @@ function labelKeys(lang) {
  * the actions in a real audit table, which is the only place both sources meet.
  */
 function explicitActions() {
-  const roots = ["src/controllers", "src/models", "src/lib"];
+  const roots = ["src/controllers", "src/models", "src/lib", "src/mcp", "src/chat", "src/services", "src/init", "src/auth"];
   const found = new Set();
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
