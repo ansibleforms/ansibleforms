@@ -636,15 +636,15 @@
     type: number
     allowed: a whole number where 0 keeps jobs for ever
     short: Job history retention (days)
-    default: "0"
+    default: "60"
     description: |
       How long finished jobs and their output are kept. Job output can be large, so this is
       usually the fastest growing table in the database; the Status page reports its size.
       A daily task at 2:30 AM removes finished jobs older than this, together with their output.
       Only finished jobs are ever removed - a running job, or one awaiting approval, is kept
       however old it is.
-      Defaults to 0, which means keep everything: upgrading must never silently delete job
-      history, so switching this on is a deliberate choice.
+      Defaults to 60 days since 7.6.0; before, the default 0 kept everything. Set 0 to keep
+      every job for ever.
   - name: ENTRA_AUTHORITY_URI
     version: 7.3.0
     type: string
