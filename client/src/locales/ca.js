@@ -1720,8 +1720,7 @@ export default {
       secretWriteToStoreHint: "S'escriu al pas següent i es desa al magatzem en desar",
       secretOverwrite: 'Sobreescriu un secret que ja hi sigui',
       secretOverwriteHelp: 'Sense això, es rebutja desar quan el magatzem ja té un secret en aquest lloc.',
-      loginWriteNew:
-        "En desar, l'usuari i la contrasenya s'escriuen a {store} a {ref}; AnsibleForms només en conserva la referència.",
+      loginWriteNew: "S'escriu a {store} a {ref} en desar; només se'n guarda la referència.",
       secretLocal: 'Base de dades',
       secretLocalHint: "Xifrats a la base de dades d'AnsibleForms",
       stepCredential: 'Credencial',

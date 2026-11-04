@@ -1884,8 +1884,7 @@ export default {
       secretWriteToStoreHint: "Saisi à l'étape suivante, écrit dans le coffre à l'enregistrement",
       secretOverwrite: 'Écraser un secret déjà présent',
       secretOverwriteHelp: "Sans cela, l'enregistrement est refusé quand le coffre a déjà un secret à cet endroit.",
-      loginWriteNew:
-        "À l'enregistrement, l'utilisateur et le mot de passe sont écrits dans {store} à {ref} ; AnsibleForms ne garde que cette référence.",
+      loginWriteNew: "Écrit dans {store} à {ref} à l'enregistrement ; seule la référence est gardée.",
       secretLocal: 'Base de données',
       secretLocalHint: "Chiffrés dans la base de données d'AnsibleForms",
       stepCredential: 'Identifiant',

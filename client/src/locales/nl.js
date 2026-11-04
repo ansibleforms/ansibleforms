@@ -1869,8 +1869,7 @@ export default {
       secretWriteToStoreHint: 'Getypt in de volgende stap, bij Opslaan naar de store geschreven',
       secretOverwrite: 'Een bestaand geheim overschrijven',
       secretOverwriteHelp: 'Zonder dit wordt Opslaan geweigerd als de store op die plek al een geheim heeft.',
-      loginWriteNew:
-        'Bij Opslaan worden gebruiker en wachtwoord naar {store} op {ref} geschreven; AnsibleForms bewaart alleen die verwijzing.',
+      loginWriteNew: 'Bij Opslaan naar {store} op {ref} geschreven; alleen de verwijzing blijft.',
       secretLocal: 'Database',
       secretLocalHint: 'Versleuteld in de AnsibleForms-database',
       stepCredential: 'Referentie',

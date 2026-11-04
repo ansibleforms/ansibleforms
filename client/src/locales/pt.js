@@ -1716,8 +1716,7 @@ export default {
       secretWriteToStoreHint: 'Escrito no passo seguinte e gravado no cofre ao guardar',
       secretOverwrite: 'Substituir um segredo que já lá esteja',
       secretOverwriteHelp: 'Sem isto, guardar é recusado quando o cofre já tem um segredo nesse lugar.',
-      loginWriteNew:
-        'Ao guardar, o utilizador e a palavra-passe são escritos em {store} em {ref}; o AnsibleForms guarda apenas essa referência.',
+      loginWriteNew: 'Escrito em {store} em {ref} ao guardar; só a referência é guardada.',
       secretLocal: 'Base de dados',
       secretLocalHint: 'Cifrados na base de dados do AnsibleForms',
       stepCredential: 'Credencial',

@@ -1710,8 +1710,7 @@ export default {
       secretWriteToStoreHint: 'Wpisany w następnym kroku, zapisany w magazynie przy zapisie',
       secretOverwrite: 'Nadpisz sekret, który już tam jest',
       secretOverwriteHelp: 'Bez tego zapis jest odrzucany, gdy magazyn ma już sekret w tym miejscu.',
-      loginWriteNew:
-        'Przy zapisie użytkownik i hasło są zapisywane w {store} pod {ref}; AnsibleForms przechowuje tylko to odwołanie.',
+      loginWriteNew: 'Przy zapisie zapisywane w {store} pod {ref}; zostaje tylko odwołanie.',
       secretLocal: 'Baza danych',
       secretLocalHint: 'Zaszyfrowane w bazie danych AnsibleForms',
       stepCredential: 'Poświadczenie',

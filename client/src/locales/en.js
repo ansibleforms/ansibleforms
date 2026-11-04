@@ -1847,8 +1847,7 @@ export default {
       secretWriteToStoreHint: 'Typed in the next step, written to the store on Save',
       secretOverwrite: 'Overwrite a secret already there',
       secretOverwriteHelp: 'Without it, Save is refused when the store has a secret at this place.',
-      loginWriteNew:
-        'On Save, the user and password are written to {store} at {ref}; AnsibleForms keeps only that reference.',
+      loginWriteNew: 'Written to {store} at {ref} on Save; only the reference is kept.',
       secretLocal: 'Database',
       secretLocalHint: 'Encrypted in the AnsibleForms database',
       stepCredential: 'Credential',

@@ -1696,8 +1696,7 @@ export default {
       secretWriteToStoreHint: '次のステップで入力し、保存時にストアへ書き込みます',
       secretOverwrite: '既にあるシークレットを上書きする',
       secretOverwriteHelp: 'オフの場合、ストアのその場所に既にシークレットがあると保存は拒否されます。',
-      loginWriteNew:
-        '保存時に、ユーザーとパスワードは {store} の {ref} に書き込まれます。AnsibleForms はその参照だけを保持します。',
+      loginWriteNew: '保存時に {store} の {ref} に書き込まれ、参照だけが保持されます。',
       secretLocal: 'データベース',
       secretLocalHint: 'AnsibleForms のデータベースに暗号化して保存',
       stepCredential: '認証情報',

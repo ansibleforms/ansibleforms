@@ -1867,8 +1867,7 @@ export default {
       secretOverwrite: 'Sovrascrivi un segreto già presente',
       secretOverwriteHelp:
         'Senza questa opzione, il salvataggio viene rifiutato quando lo store ha già un segreto in quel punto.',
-      loginWriteNew:
-        'Al salvataggio, utente e password vengono scritti in {store} in {ref}; AnsibleForms conserva solo quel riferimento.',
+      loginWriteNew: 'Scritto in {store} in {ref} al salvataggio; resta solo il riferimento.',
       secretLocal: 'Database',
       secretLocalHint: 'Cifrati nel database di AnsibleForms',
       stepCredential: 'Credenziale',

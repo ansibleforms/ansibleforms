@@ -1640,7 +1640,7 @@ export default {
       secretWriteToStoreHint: '在下一步输入，保存时写入存储',
       secretOverwrite: '覆盖已存在的密钥',
       secretOverwriteHelp: '不勾选时，如果密钥库在该位置已有密钥，保存将被拒绝。',
-      loginWriteNew: '保存时，用户和密码会写入 {store} 的 {ref}；AnsibleForms 只保留该引用。',
+      loginWriteNew: '保存时写入 {store} 的 {ref}，只保留该引用。',
       secretLocal: '数据库',
       secretLocalHint: '加密存储在 AnsibleForms 数据库中',
       stepCredential: '凭据',

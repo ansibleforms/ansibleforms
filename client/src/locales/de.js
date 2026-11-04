@@ -1882,8 +1882,7 @@ export default {
       secretOverwrite: 'Ein vorhandenes Geheimnis überschreiben',
       secretOverwriteHelp:
         'Ohne diese Option wird das Speichern abgelehnt, wenn der Store an dieser Stelle bereits ein Geheimnis hat.',
-      loginWriteNew:
-        'Beim Speichern werden Benutzer und Passwort in {store} unter {ref} geschrieben; AnsibleForms behält nur diesen Verweis.',
+      loginWriteNew: 'Beim Speichern in {store} unter {ref} geschrieben; nur der Verweis bleibt.',
       secretLocal: 'Datenbank',
       secretLocalHint: 'Verschlüsselt in der AnsibleForms-Datenbank',
       stepCredential: 'Anmeldedaten',

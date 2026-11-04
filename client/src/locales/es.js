@@ -1877,8 +1877,7 @@ export default {
       secretWriteToStoreHint: 'Se escribe en el paso siguiente y se guarda en el almacén al guardar',
       secretOverwrite: 'Sobrescribir un secreto que ya esté allí',
       secretOverwriteHelp: 'Sin esto, se rechaza guardar cuando el almacén ya tiene un secreto en ese lugar.',
-      loginWriteNew:
-        'Al guardar, el usuario y la contraseña se escriben en {store} en {ref}; AnsibleForms solo conserva esa referencia.',
+      loginWriteNew: 'Se escribe en {store} en {ref} al guardar; solo se guarda la referencia.',
       secretLocal: 'Base de datos',
       secretLocalHint: 'Cifrados en la base de datos de AnsibleForms',
       stepCredential: 'Credencial',
