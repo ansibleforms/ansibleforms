@@ -12,6 +12,8 @@ import { formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import { SECRET_MASK, masked, isMasked } from '../../lib/secretMask.js';
+import Audit from '../../models/audit.model.js';
+import { writeSecret } from '../../secrets/providers/index.js';
 
 // the credential types an SSO provider signs in with : a change to one of them is a change to the
 // sign-in, which reads its client, tenant or issuer and redirect URL when it starts
@@ -107,6 +109,60 @@ function assertSecretRefUnchanged(req, before) {
   // every reference dropped : it reads no secret, nothing to receive
   if (SECRET_REF_FIELDS.every((f) => after(f) === '')) return;
   throw new Errors.AccessDeniedError(i18n.t(req, 'resources.credentialSecretRefAdminOnly'));
+}
+
+/**
+ * Writes the user and password typed for a credential to the secret store it names, when the
+ * request asks for it (secret_write, the dialog's Write to a secret store) : the store's write
+ * rules apply (lib secrets/providers writeSecret : writing on, below its prefix, a secret there
+ * replaced only with secret_overwrite). Once written, the request keeps only the reference : the
+ * credential reads its secret from the store from then on, and keeps no password of its own.
+ * An admin's, as choosing the secret a credential reads is (assertSecretRefUnchanged).
+ *
+ * Args:
+ *   req (object): the request ; its body is changed in place.
+ *   before (object|null): the credential as it is, null on a create.
+ *
+ * Returns:
+ *   Promise<void>: settles once written, or at once when no write is asked.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: the user is not an admin.
+ *   Errors.BadRequestError: no store, no reference or no password, or the store refuses writing
+ *     there.
+ *   Errors.ConflictError: a secret is there and secret_overwrite was not sent.
+ */
+async function writeTypedSecret(req, before) {
+  const body = req.body || {};
+  const asked = body.secret_write;
+  delete body.secret_write;
+  const overwrite = !!body.secret_overwrite;
+  delete body.secret_overwrite;
+  if (!asked) return;
+  if (!isAdminRequest(req)) throw new Errors.AccessDeniedError(i18n.t(req, 'resources.credentialSecretRefAdminOnly'));
+  const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
+  // step 1 : where, and what - the password typed, never the mask sent back
+  const store = text(body.secret_store !== undefined ? body.secret_store : before?.secret_store);
+  const ref = text(body.secret_ref !== undefined ? body.secret_ref : before?.secret_ref);
+  if (!store || !ref) throw new Errors.BadRequestError(i18n.t(req, 'resources.credentialWriteNeedsStore'));
+  const password = body.password;
+  if (password === undefined || password === null || password === '' || isMasked(password)) {
+    throw new Errors.BadRequestError(i18n.t(req, 'resources.credentialWriteNeedsPassword'));
+  }
+  const user = text(body.user !== undefined ? body.user : before?.user);
+  // step 2 : written to the store (its rules, its refusals)
+  const done = await writeSecret(store, ref, { username: user, password: String(password) }, { overwrite });
+  const name = text(body.name !== undefined ? body.name : before?.name);
+  Audit.log({
+    user: req.user?.user,
+    ip: req.ip,
+    action: 'credential.secret_write',
+    targetType: 'credential',
+    target: name,
+    detail: { store: done.store, ref: done.ref, replaced: done.replaced },
+  });
+  // step 3 : the credential keeps the reference only
+  Object.assign(body, { secret_store: store, secret_ref: ref, user: '', password: '' });
 }
 
 /**
@@ -237,6 +293,8 @@ const credentialController = {
       await assertMayChange(req, req.body);
       // the secret it reads from a secret store : an admin's to choose
       assertSecretRefUnchanged(req, null);
+      // typed here and written to its secret store : the store first, the reference saved after
+      await writeTypedSecret(req, null);
       const credential = await CredentialModel.create(req.body);
       res.json(RestResult.single({ message: i18n.t(req, 'success.created', { resource: 'Credential' }), id: credential }));
     } catch (err) {
@@ -267,6 +325,9 @@ const credentialController = {
       dropSecretOnRetarget(req, before);
       // a new name leaves what names the old one pointing at nothing
       if (before && req.body?.name !== undefined && req.body.name !== before.name) await assertUnused(req, before.name);
+      // typed here and written to its secret store (a new one, or a new password for the one it
+      // reads) : the store first, the reference saved after
+      await writeTypedSecret(req, before);
       await CredentialModel.update(req.body, req.params.id);
       if ([before?.credential_type, req.body?.credential_type].some((t) => SSO_TYPES.includes(t))) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.updated', { resource: 'Credential' }) }));

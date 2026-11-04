@@ -53,6 +53,8 @@ const EDITED = [
   'default_mount',
   'cache_ttl_seconds',
   'extra',
+  'write_enabled',
+  'write_prefix',
 ];
 // the types, Vault last, as the dialog's : a short name beside the radio, the rest in its hint
 const TYPES = [...SECRET_STORE_TYPES].reverse();
@@ -78,6 +80,9 @@ function editable(record) {
     default_mount: record.default_mount ?? '',
     cache_ttl_seconds: record.cache_ttl_seconds ?? '',
     extra: record.extra ?? '',
+    // a credential's secret typed in the app may be written to it, below its prefix
+    write_enabled: !!Number(record.write_enabled),
+    write_prefix: record.write_prefix ?? '',
   };
 }
 
@@ -245,6 +250,13 @@ const tabFields = computed(() => {
         t('settings.secretStores.kv1Hint'),
       ],
       vault && ['default_mount', t('settings.secretStores.defaultMount'), t('settings.secretStores.defaultMountHelp')],
+      vault && ['write_enabled', t('settings.secretStores.writeEnabled'), t('settings.secretStores.writeEnabledHelp')],
+      vault &&
+        e.write_enabled && [
+          'write_prefix',
+          t('settings.secretStores.writePrefix'),
+          t('settings.secretStores.writePrefixHelp'),
+        ],
       ['cache_ttl_seconds', t('settings.secretStores.cacheTtl'), t('settings.secretStores.cacheTtlHelp')],
       ['extra', t('settings.secretStores.extra'), t('settings.secretStores.extraHelp')],
     ].filter(Boolean),
@@ -279,7 +291,19 @@ async function save() {
     extra: typeof e.extra === 'string' ? e.extra.trim() : e.extra,
   };
   data.credential = e.credential;
-  if (isVault.value) Object.assign(data, { kv_version: e.kv_version, default_mount: e.default_mount.trim() });
+  if (isVault.value) {
+    Object.assign(data, {
+      kv_version: e.kv_version,
+      default_mount: e.default_mount.trim(),
+      write_enabled: e.write_enabled ? 1 : 0,
+      write_prefix: e.write_enabled ? e.write_prefix.trim() : '',
+    });
+  }
+  // writing on needs a prefix : never the whole store
+  if (isVault.value && e.write_enabled && !e.write_prefix.trim()) {
+    toast.warning(t('settings.secretStores.writePrefixRequired'));
+    return;
+  }
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     await load();
@@ -567,6 +591,36 @@ onMounted(async () => {
                   :isFloating="false"
                   :help="t('settings.secretStores.defaultMountHelp')"
                   :label="t('settings.secretStores.defaultMount')"
+                />
+                <!-- writing : a credential's secret typed in the app written here on Save, only
+                     below the prefix -->
+                <div v-show="fieldShown('write_enabled')" class="form-check form-switch mb-1">
+                  <input
+                    id="af-store-write"
+                    v-model="edit.write_enabled"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :disabled="readOnly"
+                  />
+                  <label class="form-check-label" for="af-store-write">{{
+                    t('settings.secretStores.writeEnabled')
+                  }}</label>
+                </div>
+                <div v-show="fieldShown('write_enabled')" class="form-text mb-3">
+                  {{ t('settings.secretStores.writeEnabledHelp') }}
+                </div>
+                <BsInput
+                  v-if="edit.write_enabled"
+                  class="af-store-field"
+                  v-model="edit.write_prefix"
+                  v-show="fieldShown('write_prefix')"
+                  icon="folder-tree"
+                  placeholder="secret/ansibleforms"
+                  :isFloating="false"
+                  :required="true"
+                  :help="t('settings.secretStores.writePrefixHelp')"
+                  :label="t('settings.secretStores.writePrefix')"
                 />
               </template>
               <BsInput

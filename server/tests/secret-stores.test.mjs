@@ -137,7 +137,7 @@ describe("reading a secret", () => {
 
   test("a missing secret is an error naming the path", async () => {
     storeRows.vault = vaultRow();
-    await assert.rejects(Registry.readSecret("vault", "secret/nope"), /secret\/data\/nope \(HTTP 404\)/);
+    await assert.rejects(Registry.readSecret("vault", "secret/nope"), /No secret at secret\/data\/nope in secret store 'vault'/);
   });
 
   test("an unknown store is a not found", async () => {

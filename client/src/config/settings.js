@@ -1776,13 +1776,24 @@ export default function getSettings(t) {
       ],
       // where the user and password are kept is not stored : a secret store (then the user and
       // password typed are not kept) or MySQL, the app's database (then no secret store)
-      // the Login step's note (login_from_store) is something to read, never a field of the record
-      beforeSave: ({ secret_source, login_from_store: _note, ...item }) => {
-        if (readFromStore({ ...item, secret_source })) {
+      // the Login step's notes are something to read, never fields of the record
+      beforeSave: ({
+        secret_source,
+        secret_action,
+        login_from_store: _note,
+        login_written_note: _written,
+        secret_overwrite,
+        ...item
+      }) => {
+        if (readFromStore({ ...item, secret_source, secret_action })) {
           delete item.user;
           delete item.password;
           return item;
         }
+        // typed here, written to the store on Save : the server writes them, then keeps the
+        // reference only (credential.controller.js writeTypedSecret)
+        if (writesToStore({ ...item, secret_source, secret_action }))
+          return { ...item, secret_write: true, secret_overwrite: !!secret_overwrite };
         return { ...item, secret_store: '', secret_ref: '' };
       },
       // a credential has its own page (pages/admin/credential.vue) : its row and Edit open it, New
@@ -1833,6 +1844,32 @@ export default function getSettings(t) {
             },
           ],
           initial: (r) => (r?.secret_store ? 'store' : 'local'),
+          hidden: true,
+          noTable: true,
+        },
+        {
+          // in a secret store : a secret there already pointed to, or one typed in the Login step
+          // and written to a store that allows writing (its Options) on Save
+          key: 'secret_action',
+          step: 'store',
+          label: '',
+          type: 'radio',
+          // under Secret store, indented with a line joining it to that choice
+          nested: true,
+          options: [
+            {
+              value: 'point',
+              label: t('settings.credentials.secretPoint'),
+              hint: t('settings.credentials.secretPointHint'),
+            },
+            {
+              value: 'write',
+              label: t('settings.credentials.secretWriteToStore'),
+              hint: t('settings.credentials.secretWriteToStoreHint'),
+            },
+          ],
+          initial: () => 'point',
+          showWhen: (r) => r?.secret_source === 'store',
           hidden: true,
           noTable: true,
         },
@@ -2074,6 +2111,20 @@ export default function getSettings(t) {
           props: () => ({ text: t('settings.credentials.loginFromStoreNew') }),
         },
         {
+          // written to a store on Save : said where, under the user and password typed
+          key: 'login_written_note',
+          step: 'login',
+          label: '',
+          type: 'component',
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => writesToStore(r),
+          component: (props) => h('p', { class: 'form-text mt-2 mb-0' }, props.text),
+          props: (r) => ({
+            text: t('settings.credentials.loginWriteNew', { store: r?.secret_store || '', ref: r?.secret_ref || '' }),
+          }),
+        },
+        {
           // an entraid or oidc credential's redirect URL, as registered with the client : empty,
           // the app's address and the type's callback path (shown as its placeholder)
           key: 'redirect_uri',
@@ -2154,8 +2205,13 @@ export default function getSettings(t) {
           // none yet : only a New secret store button
           createWith: 'secretStores',
           createLabel: t('settings.credentials.newSecretStore'),
-          dependency: 'secret_source',
-          dependencyValues: ['store'],
+          // pointed to or written to ; written to : only the stores that allow writing
+          showWhen: (r) => r?.secret_source === 'store',
+          choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
+          // a New one while writing : writing already on, so it is offered once made
+          createDefaults: (r) => (writesToStore(r) ? { write_enabled: true } : {}),
+          // written to, none allows writing yet : the dropdown still shown, saying so, over its button
+          emptyText: (r) => (writesToStore(r) ? t('settings.credentials.noWritableStore') : ''),
           label: t('settings.credentials.secretStore'),
           help: t('settings.credentials.secretStoreHelp'),
           type: 'select',
@@ -2184,8 +2240,20 @@ export default function getSettings(t) {
           icon: 'shield-alt',
           hidden: true,
           step: 'store',
-          // read from a store, and one chosen : what to read in it means nothing before
-          showWhen: (r) => r?.secret_source === 'store' && !!r?.secret_store,
+          // pointed to, once a store is chosen : what to read in it means nothing before ; written
+          // to, always : where the login typed next is written
+          showWhen: (r) => r?.secret_source === 'store' && (writesToStore(r) || !!r?.secret_store),
+        },
+        {
+          // written to a place the store has a secret at already : replaced only when ticked
+          key: 'secret_overwrite',
+          step: 'store',
+          type: 'checkbox',
+          label: t('settings.credentials.secretOverwrite'),
+          help: t('settings.credentials.secretOverwriteHelp'),
+          showWhen: (r) => writesToStore(r) && !!r?.secret_store,
+          hidden: true,
+          noTable: true,
         },
       ],
     },
@@ -3560,6 +3628,9 @@ export default function getSettings(t) {
         ...item,
         // no namespace but in a Vault Enterprise
         namespace: item.type === 'vault' && vault_enterprise ? item.namespace || '' : '',
+        // writing : on with its prefix, off with none
+        write_enabled: item.write_enabled ? 1 : 0,
+        write_prefix: item.write_enabled ? String(item.write_prefix || '').trim() : '',
       }),
       // a store has its own page (pages/admin/secret-store.vue) : its row and Edit open it, New the
       // wizard
@@ -3738,6 +3809,33 @@ export default function getSettings(t) {
           dependencyValues: ['vault'],
         },
         {
+          // writing : a credential's secret typed in the app written here on Save, only below
+          // the prefix (Write to a key, in the New credential dialog)
+          key: 'write_enabled',
+          step: 'options',
+          type: 'checkbox',
+          flush: true,
+          label: t('settings.secretStores.writeEnabled'),
+          help: t('settings.secretStores.writeEnabledHelp'),
+          initial: (r) => !!Number(r?.write_enabled),
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => r?.type === 'vault',
+        },
+        {
+          // where it may write : never the whole store
+          key: 'write_prefix',
+          step: 'options',
+          icon: 'folder-tree',
+          label: t('settings.secretStores.writePrefix'),
+          help: t('settings.secretStores.writePrefixHelp'),
+          placeholder: 'secret/ansibleforms',
+          requiredWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
+        },
+        {
           // in a credential now ; kept on the record for the stores that still have their own,
           // on no step of the dialog
           key: 'app_id',
@@ -3870,7 +3968,10 @@ export default function getSettings(t) {
   loginStep.when = (item) =>
     !readFromStore(item) ||
     all.credentials.fields.some(
-      (f) => f.step === 'login' && !['user', 'password', 'login_from_store'].includes(f.key) && fieldShownFor(f, item),
+      (f) =>
+        f.step === 'login' &&
+        !['user', 'password', 'login_from_store', 'login_written_note'].includes(f.key) &&
+        fieldShownFor(f, item),
     );
   return all;
 }
@@ -3890,7 +3991,29 @@ const STORE_LOGIN_TYPES = ['cyberark', 'vault'];
  *   boolean: true when they are read from a store.
  */
 function readFromStore(item) {
-  return item?.secret_source === 'store' && !STORE_LOGIN_TYPES.includes(item?.credential_type);
+  return (
+    item?.secret_source === 'store' &&
+    item?.secret_action !== 'write' &&
+    !STORE_LOGIN_TYPES.includes(item?.credential_type)
+  );
+}
+
+/**
+ * Whether a credential being made writes its user and password, typed in the dialog, to a secret
+ * store on Save (never a secret store's own login).
+ *
+ * Args:
+ *   item (object): the credential being made.
+ *
+ * Returns:
+ *   boolean: true when they are written to a store.
+ */
+function writesToStore(item) {
+  return (
+    item?.secret_source === 'store' &&
+    item?.secret_action === 'write' &&
+    !STORE_LOGIN_TYPES.includes(item?.credential_type)
+  );
 }
 
 /**

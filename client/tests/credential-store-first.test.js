@@ -92,3 +92,105 @@ describe('the reference field', () => {
     expect(ref.showWhen({ credential_type: 'userpass', secret_source: 'local', secret_store: 'vault' })).toBe(false);
   });
 });
+
+describe('writing a credential to a secret store', () => {
+  const item = {
+    credential_type: 'userpass',
+    secret_source: 'store',
+    secret_action: 'write',
+    secret_store: 'vault',
+    secret_ref: 'secret/ansibleforms/db',
+  };
+
+  it('asks the user and password in the Login step, says where they are written', () => {
+    expect(steps(item)).toEqual(['credential', 'type', 'store', 'login']);
+    expect(field('user').showWhen(item)).toBe(true);
+    expect(field('password').showWhen(item)).toBe(true);
+    expect(field('login_written_note').showWhen(item)).toBe(true);
+    expect(field('login_from_store').showWhen(item)).toBe(false);
+    expect(field('secret_overwrite').showWhen(item)).toBe(true);
+    expect(field('secret_overwrite').showWhen({ ...item, secret_action: 'point' })).toBe(false);
+  });
+
+  it('offers only the stores that allow writing', () => {
+    const choices = (r) =>
+      [{ name: '' }, { name: 'vault', write_enabled: 1 }, { name: 'ro', write_enabled: 0 }]
+        .filter((s) => field('secret_store').choicesWhen(s, r))
+        .map((s) => s.name);
+    expect(choices(item)).toEqual(['', 'vault']);
+    expect(choices({ ...item, secret_action: 'point' })).toEqual(['', 'vault', 'ro']);
+  });
+
+  it('none allows writing : the dropdown still shown, saying so ; pointed to, its button only', () => {
+    expect(field('secret_store').emptyText(item)).toBe('settings.credentials.noWritableStore');
+    expect(field('secret_store').emptyText({ ...item, secret_action: 'point' })).toBe('');
+  });
+
+  it('the reference shown before a store is chosen when writing, as when pointing once one is', () => {
+    expect(field('secret_ref').showWhen({ ...item, secret_store: '' })).toBe(true);
+    expect(field('secret_ref').showWhen({ ...item, secret_action: 'point', secret_store: '' })).toBe(false);
+  });
+
+  it('saved : asks the server to write them, overwrite as ticked, no note sent', () => {
+    const saved = credentials.beforeSave({
+      name: 'db',
+      ...item,
+      user: 'svc',
+      password: 'p',
+      secret_overwrite: true,
+      login_written_note: undefined,
+    });
+    expect(saved).toEqual({
+      name: 'db',
+      credential_type: 'userpass',
+      secret_store: 'vault',
+      secret_ref: 'secret/ansibleforms/db',
+      user: 'svc',
+      password: 'p',
+      secret_write: true,
+      secret_overwrite: true,
+    });
+  });
+});
+
+describe('the Store step : Database or Secret store, then point or write', () => {
+  it('the sub-choice shows under Secret store only, pointing when none is chosen', () => {
+    expect(field('secret_source').options.map((o) => o.value)).toEqual(['local', 'store']);
+    expect(field('secret_action').options.map((o) => o.value)).toEqual(['point', 'write']);
+    expect(field('secret_action').showWhen({ secret_source: 'store' })).toBe(true);
+    expect(field('secret_action').showWhen({ secret_source: 'local' })).toBe(false);
+    // no action chosen yet : read from the store, nothing typed
+    expect(field('user').showWhen({ credential_type: 'userpass', secret_source: 'store' })).toBe(false);
+  });
+});
+
+describe('a New secret store, from the New credential dialog', () => {
+  const stores = getSettings((key) => key).secretStores;
+  const sfield = (key) => stores.fields.find((f) => f.key === key);
+
+  it('writing on when made while writing a credential, off when pointing', () => {
+    const create = field('secret_store').createDefaults;
+    expect(create({ credential_type: 'userpass', secret_source: 'store', secret_action: 'write' })).toEqual({
+      write_enabled: true,
+    });
+    expect(create({ credential_type: 'userpass', secret_source: 'store', secret_action: 'point' })).toEqual({});
+  });
+
+  it('a Vault : the writing switch, then its prefix, needed while writing is on', () => {
+    expect(sfield('write_enabled').showWhen({ type: 'vault' })).toBe(true);
+    expect(sfield('write_prefix').showWhen({ type: 'vault', write_enabled: false })).toBe(false);
+    expect(sfield('write_prefix').requiredWhen({ type: 'vault', write_enabled: true })).toBe(true);
+  });
+
+  it('saved : writing as 1 or 0, its prefix trimmed, none without writing', () => {
+    const save = (over) => stores.beforeSave({ name: 's', type: 'vault', ...over });
+    expect(save({ write_enabled: true, write_prefix: ' secret/af ' })).toMatchObject({
+      write_enabled: 1,
+      write_prefix: 'secret/af',
+    });
+    expect(save({ write_enabled: false, write_prefix: 'secret/af' })).toMatchObject({
+      write_enabled: 0,
+      write_prefix: '',
+    });
+  });
+});

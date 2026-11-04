@@ -145,6 +145,8 @@ export default {
       "Seul un admin peut ajouter ou supprimer un depot, ou changer son adresse, sa branche ou son usage : son contenu devient la configuration, les formulaires ou les playbooks qu'AnsibleForms execute",
     secretStoreAdminOnly:
       "Seul un admin peut ajouter, modifier ou supprimer un coffre de secrets : il se connecte avec un jeton ou une cle qui serait envoye a son adresse",
+    credentialWriteNeedsStore: "Indiquez dans quel coffre de secrets et où le secret est écrit",
+    credentialWriteNeedsPassword: "Saisissez le mot de passe à écrire dans le coffre de secrets",
     credentialSecretRefAdminOnly:
       "Seul un admin peut choisir ou changer le coffre de secrets et le secret dont un identifiant lit son mot de passe",
     credentialAdminOnly:

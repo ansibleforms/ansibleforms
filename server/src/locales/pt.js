@@ -134,6 +134,8 @@ export default {
       "Só um admin pode adicionar ou eliminar um repositório, ou alterar o seu endereço, o seu ramo ou para que é usado: o seu conteúdo torna-se a configuração, os formulários ou os playbooks que o AnsibleForms executa",
     secretStoreAdminOnly:
       "Só um admin pode adicionar, alterar ou eliminar um cofre de segredos: inicia sessão com um token ou uma chave que seria enviado para o seu endereço",
+    credentialWriteNeedsStore: "Indique em que cofre de segredos e onde o segredo é escrito",
+    credentialWriteNeedsPassword: "Escreva a palavra-passe a escrever no cofre de segredos",
     credentialSecretRefAdminOnly:
       "Só um admin pode escolher ou alterar o cofre de segredos e o segredo do qual uma credencial lê a sua palavra-passe",
     credentialAdminOnly:

@@ -136,6 +136,8 @@ export default {
       "Solo un admin può aggiungere o eliminare un repository, o cambiarne l'indirizzo, il branch o l'uso: il suo contenuto diventa la configurazione, i form o i playbook che AnsibleForms esegue",
     secretStoreAdminOnly:
       "Solo un admin può aggiungere, modificare o eliminare un secret store: accede con un token o una chiave che verrebbe inviata al suo indirizzo",
+    credentialWriteNeedsStore: "Indica in quale secret store e dove viene scritto il segreto",
+    credentialWriteNeedsPassword: "Digita la password da scrivere nel secret store",
     credentialSecretRefAdminOnly:
       "Solo un admin può scegliere o cambiare il secret store e il segreto da cui una credenziale legge la password",
     credentialAdminOnly:

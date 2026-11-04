@@ -71,6 +71,9 @@
 /*      gets `created` with its name                              */
 /*  canCreateChoices (prop): a dialogOnly dialog that keeps its   */
 /*      dropdowns' New buttons (a page opens it, not a dialog)    */
+/*  field.emptyText: what a dropdown with nothing to choose says, */
+/*      disabled, over its New button, or (item) => that ('' :    */
+/*      its New button only)                                      */
 /*  field.createDefaults: what a New record is preset with, or    */
 /*      (item) => that, from the record being edited              */
 /*  field.rows: the lines of a textarea field (3 when not given)  */
@@ -709,10 +712,11 @@ function showField(field) {
   // Only hide if noInput is set, not readonly
   if (field.noInput) return false;
   // a field that means nothing until another dropdown has a choice (a secret's reference,
-  // with no secret store yet) : hidden until then
+  // with no secret store yet) : hidden until then, unless that dropdown is still shown, saying it
+  // has nothing to choose (its emptyText : written to a store, none allowing it yet)
   if (field.needsChoicesOf) {
     const other = fields.value.find((f) => f.key === field.needsChoicesOf);
-    if (other && noChoices(other)) return false;
+    if (other && noChoices(other) && !emptyTextOf(other)) return false;
   }
   let depShow = true;
   // a field shown by a rule of its own (field.showWhen(item)) : the user of a Jenkins runner,
@@ -863,16 +867,19 @@ function noChoices(field) {
 }
 
 /**
- * What a credential dropdown with nothing to choose says, disabled : no credential of the type its
- * New button makes yet. Another dropdown with nothing to choose shows its New button only.
+ * What a dropdown with nothing to choose says, disabled : its own emptyText (no secret store that
+ * allows writing yet), or for a credential dropdown no credential of the type its New button makes
+ * yet. Another dropdown with nothing to choose shows its New button only.
  *
  * Args:
  *   field (object): the select field.
  *
  * Returns:
- *   string: the message, or '' when it is not a credential dropdown of one type.
+ *   string: the message, or '' when it has none.
  */
 function emptyTextOf(field) {
+  // its own message, as the record being edited asks
+  if (field.emptyText) return textOf(field.emptyText) || '';
   if (field.createWith !== 'credentials') return '';
   const type = textOf(field.createDefaults)?.credential_type;
   return type ? noCredentialsText(t, type) : '';
@@ -1869,8 +1876,9 @@ defineExpose({
           role="radiogroup"
           :aria-label="field.label"
         >
-          <!-- a follow-up choice (nested) : under the option it follows, with its own title -->
-          <div v-if="field.nested" class="af-radio-title">{{ field.label }}</div>
+          <!-- a follow-up choice (nested) : under the option it follows, with its own title when it
+               has one -->
+          <div v-if="field.nested && field.label" class="af-radio-title">{{ field.label }}</div>
           <div v-for="opt in field.options" :key="String(opt.value)" class="form-check af-short-check">
             <input
               :id="'af-radio-' + field.key + '-' + opt.value"

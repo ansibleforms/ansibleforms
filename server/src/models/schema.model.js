@@ -652,6 +652,7 @@ const SCHEMA_MANIFEST = {
                                'schedule.claim_node', 'schedule.claim_since', 'runners.flavour', 'runners.project',
                                'credentials.credential_type', 'repositories.credential', 'groups.description',
                                'secret_stores.credential', 'credentials.client_cert', 'credentials.client_key',
+                               'secret_stores.write_enabled', 'secret_stores.write_prefix',
                                'chat_settings.credential',
                                'users.description', 'schedule.raw_form_data', 'users.blocked', 'users.last_login', 'settings.favicon',
                                'settings.app_name', 'settings.env_label', 'settings.env_label_show', 'settings.env_label_color',
@@ -1214,6 +1215,10 @@ async function patchVersion7(messages, success, failed) {
   const databases = fs.readFileSync(`${__dirname}/../db/create_databases_table.sql`);
   await checkPromise(addTable("databases", databases.toString()), messages, success, failed);
   await checkPromise(addDatabasesForCredentials(), messages, success, failed);
+  // a secret store a credential's secret may be written to (secrets/providers write) : off, and
+  // only below its write prefix
+  await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);
+  await checkPromise(addColumn("secret_stores", "write_prefix", "varchar(250)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

@@ -66,6 +66,7 @@ const EDITED = [
   'issuer',
   'redirect_uri',
   'secret_source',
+  'secret_action',
   'secret_store',
   'secret_ref',
   'host',
@@ -111,6 +112,10 @@ function editable(record) {
     issuer: record.issuer ?? '',
     redirect_uri: record.redirect_uri ?? '',
     secret_source: record.secret_store ? 'store' : 'local',
+    // in a secret store : point to what is there (as saved), or write a new secret on Save
+    secret_action: 'point',
+    // written to a store : replacing a secret there is asked each time, never remembered
+    secret_overwrite: false,
     secret_store: record.secret_store ?? '',
     secret_ref: record.secret_ref ?? '',
     host: record.host ?? '',
@@ -163,12 +168,22 @@ const isCyberark = computed(() => type.value === 'cyberark');
 const isDatabase = computed(() => type.value === 'database');
 // a secret store's login never comes from a secret store (it would read a store to find it)
 const noStore = computed(() => ['cyberark', 'vault'].includes(type.value));
-// read from a secret store : the user and password typed here are not kept
 // the type of the store the reference is in (vault, cyberark_ccp) ; '' while none is chosen
 const chosenStoreType = computed(
   () => secretStores.value.find((s) => s.name && s.name === edit.value?.secret_store)?.type || '',
 );
-const fromStore = computed(() => !noStore.value && edit.value?.secret_source === 'store');
+// read from a secret store : the user and password typed here are not kept
+const fromStore = computed(
+  () => !noStore.value && edit.value?.secret_source === 'store' && edit.value?.secret_action !== 'write',
+);
+// typed here and written to a secret store on Save (a new secret, or a new password for the one
+// it reads) : the stores that allow writing only
+const writesToStore = computed(
+  () => !noStore.value && edit.value?.secret_source === 'store' && edit.value?.secret_action === 'write',
+);
+const storeChoices = computed(() =>
+  writesToStore.value ? secretStores.value.filter((s) => !s.name || s.write_enabled) : secretStores.value,
+);
 // a Vault, an RTE, a Semaphore and a Rundeck log in with a token only : no user
 const hasUser = computed(() => !TOKEN_CREDENTIAL_TYPES.includes(type.value));
 // the types in the order of their names, in the language shown, as the dialog's
@@ -219,7 +234,15 @@ async function load() {
   ]);
   // with their type : the reference's example and help follow the store chosen (a Vault path, a
   // CyberArk account)
-  secretStores.value = [{ name: '' }, ...(stores?.data?.records || []).map((s) => ({ name: s.name, type: s.type }))];
+  // and whether each allows writing : Write to a key lists only those
+  secretStores.value = [
+    { name: '' },
+    ...(stores?.data?.records || []).map((s) => ({
+      name: s.name,
+      type: s.type,
+      write_enabled: !!Number(s.write_enabled),
+    })),
+  ];
   // what names a credential : a secret store (its token or login), a notification channel (a
   // mail server's smtp login, a bot's or a webhook's token), a repository (its git login), an LDAP
   // directory (its bind account), an SSO provider (its client), a runner (its token or login), a
@@ -392,6 +415,16 @@ async function save() {
   };
   if (fromStore.value) {
     Object.assign(data, { secret_store: e.secret_store, secret_ref: e.secret_ref.trim() });
+  } else if (writesToStore.value) {
+    // written to the store by the server, which then keeps the reference only
+    Object.assign(data, {
+      secret_store: e.secret_store,
+      secret_ref: e.secret_ref.trim(),
+      user: hasUser.value ? e.user.trim() : '',
+      password: newPassword.value,
+      secret_write: true,
+      secret_overwrite: !!e.secret_overwrite,
+    });
   } else {
     Object.assign(data, { secret_store: '', secret_ref: '', user: hasUser.value ? e.user.trim() : '' });
     // an Entra ID one's tenant
@@ -869,6 +902,15 @@ onMounted(async () => {
                 {{ t('settings.credentials.loginFromStore') }}
               </p>
               <template v-else>
+                <!-- typed here, written to the store on Save -->
+                <p v-if="writesToStore" class="form-text">
+                  {{
+                    t('settings.credentials.loginWriteNew', {
+                      store: edit.secret_store || '…',
+                      ref: edit.secret_ref || '…',
+                    })
+                  }}
+                </p>
                 <!-- an Entra ID one's tenant : the tenant id the app is in, first as in
                      the Entra admin center (tenant, client id, secret) -->
                 <BsInput
@@ -1001,7 +1043,40 @@ onMounted(async () => {
                   <span class="text-body-secondary small">{{ opt.hint }}</span>
                 </label>
               </div>
-              <template v-if="fromStore">
+              <!-- in a secret store : point to what is there, or write a new secret on Save -->
+              <div v-if="edit.secret_source === 'store' && !noStore" class="ms-4 mt-2">
+                <div
+                  v-for="opt in [
+                    {
+                      value: 'point',
+                      label: t('settings.credentials.secretPoint'),
+                      hint: t('settings.credentials.secretPointHint'),
+                    },
+                    {
+                      value: 'write',
+                      label: t('settings.credentials.secretWriteToStore'),
+                      hint: t('settings.credentials.secretWriteToStoreHint'),
+                    },
+                  ]"
+                  :key="opt.value"
+                  class="form-check af-short-check"
+                >
+                  <input
+                    :id="'af-action-' + opt.value"
+                    v-model="edit.secret_action"
+                    class="form-check-input"
+                    type="radio"
+                    name="af-credential-action"
+                    :value="opt.value"
+                    :disabled="opt.value === 'write' && secretRefLocked"
+                  />
+                  <label class="form-check-label" :for="'af-action-' + opt.value">
+                    <span class="af-short-label">{{ opt.label }}</span>
+                    <span class="text-body-secondary small">{{ opt.hint }}</span>
+                  </label>
+                </div>
+              </div>
+              <template v-if="fromStore || writesToStore">
                 <BsInput
                   class="af-credential-field mt-3"
                   v-model="edit.secret_store"
@@ -1010,7 +1085,7 @@ onMounted(async () => {
                   icon="vault"
                   :disabled="secretRefLocked"
                   :isFloating="false"
-                  :values="secretStores"
+                  :values="storeChoices"
                   valueKey="name"
                   labelKey="name"
                   :help="t('settings.credentials.secretStoreHelp')"
@@ -1029,6 +1104,19 @@ onMounted(async () => {
                   :help="secretRefText(t, chosenStoreType, 'help')"
                   :label="t('settings.credentials.secretRef')"
                 />
+                <!-- written to the store : a secret already there replaced only when ticked -->
+                <div v-if="writesToStore && edit.secret_store" class="form-check mb-3">
+                  <input
+                    id="af-credential-overwrite"
+                    v-model="edit.secret_overwrite"
+                    class="form-check-input"
+                    type="checkbox"
+                  />
+                  <label class="form-check-label" for="af-credential-overwrite">{{
+                    t('settings.credentials.secretOverwrite')
+                  }}</label>
+                  <div class="form-text">{{ t('settings.credentials.secretOverwriteHelp') }}</div>
+                </div>
               </template>
             </template>
           </fieldset>
