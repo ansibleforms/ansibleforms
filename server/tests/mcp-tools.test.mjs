@@ -830,3 +830,50 @@ describe("MCP stored jobs", () => {
     await expect(createHandlers({ user: storer, deps }).resolveField({ form: "Create volume", subform: "x", storedJob: { id: 1 } })).rejects.toMatchObject({ code: "invalid_request" });
   });
 });
+
+// What an AI agent changes through MCP is audited per tool (mcp.job.launch...) : the request
+// alone is only `mcp.create` to the audit middleware. Never the values, which may hold secrets.
+describe("the MCP audit entries", () => {
+  test("a launch : the job, the form and the payload hash, never the values", async () => {
+    const audit = vi.fn();
+    const h = createHandlers({ user, deps, policy: { audit } });
+    await h.launchJob({ form: "Create volume", values: { cluster: "c1", name: "v1", secret: "pw" } });
+    expect(audit).toHaveBeenCalledTimes(1);
+    const [entry] = audit.mock.calls[0];
+    expect(entry).toMatchObject({ action: "mcp.job.launch", targetType: "job", target: 42, outcome: "success" });
+    expect(entry.detail.form).toBe("Create volume");
+    expect(JSON.stringify(entry)).not.toMatch(/pw|"v1"/);
+  });
+
+  test("a relaunch names the job it repeats ; a preview writes nothing", async () => {
+    deps.Job.relaunchWithValues = vi.fn(async ({ preview }) => (preview
+      ? { form: "Create volume", extravars: {}, credentials: {}, payloadHash: "sha256:x", warnings: [] }
+      : { id: 43, payloadHash: "sha256:x", warnings: [] }));
+    const audit = vi.fn();
+    const h = createHandlers({ user, deps, policy: { audit } });
+    await h.relaunchJob({ id: 42, values: {}, preview: true });
+    expect(audit).not.toHaveBeenCalled();
+    await h.relaunchJob({ id: 42, values: {}, expectedPayloadHash: "sha256:x" });
+    expect(audit.mock.calls[0][0]).toMatchObject({ action: "mcp.job.relaunch", target: 43, outcome: "success", detail: { relaunchOf: 42 } });
+  });
+
+  test("a refusal is denied, a failure a failure, each with why ; the error still thrown", async () => {
+    const audit = vi.fn();
+    const ro = createHandlers({ user, deps, policy: { readOnly: true, audit } });
+    await expect(ro.launchJob({ form: "Create volume", values: {} })).rejects.toMatchObject({ code: "access_denied" });
+    expect(audit.mock.calls[0][0]).toMatchObject({ action: "mcp.job.launch", outcome: "denied", target: null });
+    expect(audit.mock.calls[0][0].detail.error).toMatch(/read only/);
+    const h = createHandlers({ user, deps, policy: { audit } });
+    await expect(h.launchJob({ form: "Create volume", values: { cluster: "c1" } })).rejects.toBeTruthy();
+    expect(audit.mock.calls[1][0].outcome).toBe("failure");
+  });
+
+  test("reading writes nothing, and without the hook (the chat assistant) nothing is wrapped", async () => {
+    const audit = vi.fn();
+    await createHandlers({ user, deps, policy: { audit } }).listForms();
+    expect(audit).not.toHaveBeenCalled();
+    const plain = createHandlers({ user, deps });
+    await plain.launchJob({ form: "Create volume", values: { cluster: "c1", name: "v1" } });
+    expect(audit).not.toHaveBeenCalled();
+  });
+});

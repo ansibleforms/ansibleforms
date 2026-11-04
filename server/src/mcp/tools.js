@@ -682,7 +682,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     return { formObj, extravars, credentials, payloadHash, rawFormData: wizardRawFormData(formObj, drafts, skips), warnings: [...(res.warnings || []), ...storedWarnings] };
   }
 
-  return {
+  const handlers = {
     async listForms() {
       const cfg = await Form.load(roles);
       return {
@@ -966,6 +966,66 @@ export function createHandlers({ user, deps, policy = {} }) {
       };
     },
   };
+
+  return policy.audit ? withAudit(handlers, policy.audit) : handlers;
+}
+
+// ===========================================================================
+// AUDIT : what an AI agent changed through MCP, one entry per tool call
+// ===========================================================================
+
+// The tools that change something, the action each writes, and what names its object. The
+// audit middleware sees one POST /api/v2/mcp per call (`mcp.create`), never which tool ran nor
+// what it launched ; these entries say it. Never the values : a form's values may hold secrets.
+const AUDITED_TOOLS = {
+  launchJob: { action: 'mcp.job.launch', targetType: 'job', target: (args, out) => out?.id, detail: (args, out) => ({ form: out?.form ?? args.form, payloadHash: out?.payloadHash, storedJob: args.storedJob }) },
+  relaunchJob: { action: 'mcp.job.relaunch', targetType: 'job', target: (args, out) => out?.id, detail: (args, out) => ({ relaunchOf: args.id, payloadHash: out?.payloadHash }), skip: (args) => !!args.preview },
+  planJob: { action: 'mcp.job.plan', targetType: 'schedule', target: (args, out) => out?.id, detail: (args, out) => ({ name: args.name, form: out?.form ?? args.form, run_at: args.run_at, payloadHash: out?.payloadHash }) },
+  createSchedule: { action: 'mcp.schedule.create', targetType: 'schedule', target: (args, out) => out?.id, detail: (args) => ({ name: args.name, form: args.form, cron: args.cron, run_at: args.run_at }) },
+  deleteSchedule: { action: 'mcp.schedule.delete', targetType: 'schedule', target: (args) => args.id, detail: (args, out) => ({ name: out?.name }) },
+  storeJob: { action: 'mcp.storedjob.create', targetType: 'stored_job', target: (args, out) => out?.id, detail: (args) => ({ name: args.name, form: args.form }) },
+  deleteStoredJob: { action: 'mcp.storedjob.delete', targetType: 'stored_job', target: (args) => args.id, detail: (args, out) => ({ name: out?.name }) },
+};
+
+/**
+ * The handlers with every tool that changes something writing an audit entry : success with
+ * what it made, or denied or failure with why, then the error thrown on as it was.
+ *
+ * Args:
+ *   handlers (object): the tool handlers (createHandlers).
+ *   audit (function): (entry) => void, Audit.log with the user and the address filled in.
+ *
+ * Returns:
+ *   object: the same handlers, those of AUDITED_TOOLS wrapped.
+ */
+function withAudit(handlers, audit) {
+  const wrapped = { ...handlers };
+  for (const [name, spec] of Object.entries(AUDITED_TOOLS)) {
+    const run = handlers[name];
+    if (typeof run !== 'function') continue;
+    wrapped[name] = async (args = {}) => {
+      // a preview changes nothing : not an entry
+      if (spec.skip?.(args)) return run(args);
+      // Step 1 : run the tool, writing its failure (a refusal as denied) before throwing on
+      let out;
+      try {
+        out = await run(args);
+      } catch (err) {
+        await audit({
+          action: spec.action,
+          targetType: spec.targetType,
+          target: spec.target(args, undefined) ?? null,
+          outcome: err?.code === 'access_denied' ? 'denied' : 'failure',
+          detail: { ...spec.detail(args, undefined), error: err?.message || String(err) },
+        });
+        throw err;
+      }
+      // Step 2 : what it made
+      await audit({ action: spec.action, targetType: spec.targetType, target: spec.target(args, out) ?? null, outcome: 'success', detail: spec.detail(args, out) });
+      return out;
+    };
+  }
+  return wrapped;
 }
 
 const valuesSchema = z.record(z.string(), z.any())
