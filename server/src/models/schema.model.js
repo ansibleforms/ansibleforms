@@ -653,6 +653,7 @@ const SCHEMA_MANIFEST = {
                                'credentials.credential_type', 'repositories.credential', 'groups.description',
                                'secret_stores.credential', 'credentials.client_cert', 'credentials.client_key',
                                'secret_stores.write_enabled', 'secret_stores.write_prefix',
+                               'secret_stores.pvwa_url', 'secret_stores.pvwa_credential', 'secret_stores.pvwa_auth', 'secret_stores.platform_id',
                                'chat_settings.credential',
                                'users.description', 'schedule.raw_form_data', 'users.blocked', 'users.last_login', 'settings.favicon',
                                'settings.app_name', 'settings.env_label', 'settings.env_label_show', 'settings.env_label_color',
@@ -1219,6 +1220,12 @@ async function patchVersion7(messages, success, failed) {
   // only below its write prefix
   await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);
   await checkPromise(addColumn("secret_stores", "write_prefix", "varchar(250)", true, "NULL"), messages, success, failed);
+  // a CyberArk's writes go through its PVWA : its address, the API user's credential and logon
+  // method, the platform a new account gets
+  await checkPromise(addColumn("secret_stores", "pvwa_url", "varchar(500)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("secret_stores", "pvwa_credential", "varchar(250)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("secret_stores", "pvwa_auth", "varchar(20)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("secret_stores", "platform_id", "varchar(250)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

@@ -1795,6 +1795,21 @@ export default {
         'Anmeldeinformationen werden nur in diesen Pfad oder darunter geschrieben, z. B. secret/ansibleforms.',
       writePrefixRequired:
         'Schreiben braucht ein Schreibpräfix: Geben Sie an, unterhalb welches Pfades Anmeldeinformationen geschrieben werden dürfen.',
+      writeEnabledHelpCyberArk:
+        'Benutzer und Passwort einer Anmeldeinformation, in AnsibleForms eingegeben, können beim Speichern als Konto eines Safes über den PVWA hierhin geschrieben werden (der CCP liest nur).',
+      writeSafes: 'Safes zum Schreiben',
+      writeSafesHelp: 'Konten werden nur in diese Safes geschrieben, durch Kommas getrennt, z. B. Linux, DB.',
+      writeSafesRequired: 'Schreiben braucht mindestens einen Safe.',
+      pvwaUrl: 'PVWA-Adresse',
+      pvwaUrlHelp: 'Der Password Vault Web Access, an den die API-Aufrufe gehen, z. B. https://pvwa.example.com.',
+      pvwaCredential: 'PVWA-Anmeldeinformation',
+      pvwaCredentialHelp:
+        'Der API-Benutzer, mit dem es sich anmeldet: Er braucht Add accounts und Update account content in diesen Safes.',
+      pvwaAuth: 'Anmeldemethode',
+      platformId: 'Plattform-ID',
+      platformIdHelp: 'Die Plattform eines neuen Kontos, z. B. UnixSSH. Ein vorhandenes Konto behält seine eigene.',
+      pvwaRequired:
+        'Schreiben in CyberArk braucht die PVWA-Adresse und die Anmeldeinformation, mit der es sich anmeldet.',
       cacheTtl: 'Cache (Sekunden)',
       cacheTtlHelp: 'Wie lange ein gelesenes Secret wiederverwendet wird. 0 liest es bei jeder Verwendung.',
       caBundleHelp: 'Leer lassen, um den Zertifizierungsstellen des Systems zu vertrauen.',

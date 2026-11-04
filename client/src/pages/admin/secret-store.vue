@@ -55,6 +55,10 @@ const EDITED = [
   'extra',
   'write_enabled',
   'write_prefix',
+  'pvwa_url',
+  'pvwa_credential',
+  'pvwa_auth',
+  'platform_id',
 ];
 // the types, Vault last, as the dialog's : a short name beside the radio, the rest in its hint
 const TYPES = [...SECRET_STORE_TYPES].reverse();
@@ -83,6 +87,11 @@ function editable(record) {
     // a credential's secret typed in the app may be written to it, below its prefix
     write_enabled: !!Number(record.write_enabled),
     write_prefix: record.write_prefix ?? '',
+    // a CyberArk's writes : through its PVWA, as the API user of a credential
+    pvwa_url: record.pvwa_url ?? '',
+    pvwa_credential: record.pvwa_credential ?? '',
+    pvwa_auth: record.pvwa_auth || 'cyberark',
+    platform_id: record.platform_id ?? '',
   };
 }
 
@@ -127,6 +136,22 @@ const credentials = computed(() => [
     .filter((c) => c.credential_type === (isVault.value ? 'vault' : 'cyberark'))
     .map((c) => ({ name: c.name })),
 ]);
+
+// the API user a CyberArk writes as through its PVWA : a login of its own (user and password),
+// never one read from a secret store
+const pvwaCredentials = computed(() => [
+  { name: '' },
+  ...allCredentials.value
+    .filter((c) => ['userpass', 'api'].includes(c.credential_type) && !c.secret_store)
+    .map((c) => ({ name: c.name })),
+]);
+// the PVWA's logon methods (its API's auth/<method>/Logon)
+const PVWA_AUTH = [
+  { name: 'cyberark', label: 'CyberArk' },
+  { name: 'ldap', label: 'LDAP' },
+  { name: 'radius', label: 'RADIUS' },
+  { name: 'windows', label: 'Windows' },
+];
 
 // where it connects : the server of the credential chosen ; none, it needs one
 const chosenServer = computed(() => allCredentials.value.find((c) => c.name === edit.value?.credential)?.url || '');
@@ -250,12 +275,30 @@ const tabFields = computed(() => {
         t('settings.secretStores.kv1Hint'),
       ],
       vault && ['default_mount', t('settings.secretStores.defaultMount'), t('settings.secretStores.defaultMountHelp')],
-      vault && ['write_enabled', t('settings.secretStores.writeEnabled'), t('settings.secretStores.writeEnabledHelp')],
-      vault &&
+      [
+        'write_enabled',
+        t('settings.secretStores.writeEnabled'),
+        t(vault ? 'settings.secretStores.writeEnabledHelp' : 'settings.secretStores.writeEnabledHelpCyberArk'),
+      ],
+      e.write_enabled && [
+        'write_prefix',
+        t(vault ? 'settings.secretStores.writePrefix' : 'settings.secretStores.writeSafes'),
+        t(vault ? 'settings.secretStores.writePrefixHelp' : 'settings.secretStores.writeSafesHelp'),
+      ],
+      !vault &&
+        e.write_enabled && ['pvwa_url', t('settings.secretStores.pvwaUrl'), t('settings.secretStores.pvwaUrlHelp')],
+      !vault &&
         e.write_enabled && [
-          'write_prefix',
-          t('settings.secretStores.writePrefix'),
-          t('settings.secretStores.writePrefixHelp'),
+          'pvwa_credential',
+          t('settings.secretStores.pvwaCredential'),
+          t('settings.secretStores.pvwaCredentialHelp'),
+        ],
+      !vault && e.write_enabled && ['pvwa_auth', t('settings.secretStores.pvwaAuth')],
+      !vault &&
+        e.write_enabled && [
+          'platform_id',
+          t('settings.secretStores.platformId'),
+          t('settings.secretStores.platformIdHelp'),
         ],
       ['cache_ttl_seconds', t('settings.secretStores.cacheTtl'), t('settings.secretStores.cacheTtlHelp')],
       ['extra', t('settings.secretStores.extra'), t('settings.secretStores.extraHelp')],
@@ -291,17 +334,30 @@ async function save() {
     extra: typeof e.extra === 'string' ? e.extra.trim() : e.extra,
   };
   data.credential = e.credential;
-  if (isVault.value) {
+  if (isVault.value) Object.assign(data, { kv_version: e.kv_version, default_mount: e.default_mount.trim() });
+  // writing : a Vault below its prefix, a CyberArk to its safes through its PVWA
+  Object.assign(data, {
+    write_enabled: e.write_enabled ? 1 : 0,
+    write_prefix: e.write_enabled ? e.write_prefix.trim() : '',
+  });
+  if (!isVault.value) {
     Object.assign(data, {
-      kv_version: e.kv_version,
-      default_mount: e.default_mount.trim(),
-      write_enabled: e.write_enabled ? 1 : 0,
-      write_prefix: e.write_enabled ? e.write_prefix.trim() : '',
+      pvwa_url: e.write_enabled ? e.pvwa_url.trim() : '',
+      pvwa_credential: e.write_enabled ? e.pvwa_credential : '',
+      pvwa_auth: e.write_enabled ? e.pvwa_auth : '',
+      platform_id: e.write_enabled ? e.platform_id.trim() : '',
     });
   }
-  // writing on needs a prefix : never the whole store
-  if (isVault.value && e.write_enabled && !e.write_prefix.trim()) {
-    toast.warning(t('settings.secretStores.writePrefixRequired'));
+  // writing on needs a prefix (a Vault's path, a CyberArk's safes) and, for a CyberArk, its PVWA
+  // and the API user : never the whole store, never half set up
+  if (e.write_enabled && !e.write_prefix.trim()) {
+    toast.warning(
+      t(isVault.value ? 'settings.secretStores.writePrefixRequired' : 'settings.secretStores.writeSafesRequired'),
+    );
+    return;
+  }
+  if (e.write_enabled && !isVault.value && (!e.pvwa_url.trim() || !e.pvwa_credential)) {
+    toast.warning(t('settings.secretStores.pvwaRequired'));
     return;
   }
   if (await update(data)) {
@@ -592,36 +648,92 @@ onMounted(async () => {
                   :help="t('settings.secretStores.defaultMountHelp')"
                   :label="t('settings.secretStores.defaultMount')"
                 />
-                <!-- writing : a credential's secret typed in the app written here on Save, only
-                     below the prefix -->
-                <div v-show="fieldShown('write_enabled')" class="form-check form-switch mb-1">
-                  <input
-                    id="af-store-write"
-                    v-model="edit.write_enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    :disabled="readOnly"
-                  />
-                  <label class="form-check-label" for="af-store-write">{{
-                    t('settings.secretStores.writeEnabled')
-                  }}</label>
-                </div>
-                <div v-show="fieldShown('write_enabled')" class="form-text mb-3">
-                  {{ t('settings.secretStores.writeEnabledHelp') }}
-                </div>
+              </template>
+              <!-- writing : a credential's secret typed in the app written here on Save - a Vault only
+                   below its prefix, a CyberArk only to its safes, through its PVWA -->
+              <div v-show="fieldShown('write_enabled')" class="form-check form-switch mb-1">
+                <input
+                  id="af-store-write"
+                  v-model="edit.write_enabled"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  :disabled="readOnly"
+                />
+                <label class="form-check-label" for="af-store-write">{{
+                  t('settings.secretStores.writeEnabled')
+                }}</label>
+              </div>
+              <div v-show="fieldShown('write_enabled')" class="form-text mb-3">
+                {{
+                  t(
+                    isVault
+                      ? 'settings.secretStores.writeEnabledHelp'
+                      : 'settings.secretStores.writeEnabledHelpCyberArk',
+                  )
+                }}
+              </div>
+              <template v-if="edit.write_enabled">
                 <BsInput
-                  v-if="edit.write_enabled"
                   class="af-store-field"
                   v-model="edit.write_prefix"
                   v-show="fieldShown('write_prefix')"
                   icon="folder-tree"
-                  placeholder="secret/ansibleforms"
+                  :placeholder="isVault ? 'secret/ansibleforms' : 'Linux, DB'"
                   :isFloating="false"
                   :required="true"
-                  :help="t('settings.secretStores.writePrefixHelp')"
-                  :label="t('settings.secretStores.writePrefix')"
+                  :help="t(isVault ? 'settings.secretStores.writePrefixHelp' : 'settings.secretStores.writeSafesHelp')"
+                  :label="t(isVault ? 'settings.secretStores.writePrefix' : 'settings.secretStores.writeSafes')"
                 />
+                <template v-if="!isVault">
+                  <BsInput
+                    class="af-store-field"
+                    v-model="edit.pvwa_url"
+                    v-show="fieldShown('pvwa_url')"
+                    icon="globe"
+                    placeholder="https://pvwa.example.com"
+                    :isFloating="false"
+                    :required="true"
+                    :help="t('settings.secretStores.pvwaUrlHelp')"
+                    :label="t('settings.secretStores.pvwaUrl')"
+                  />
+                  <BsInput
+                    class="af-store-field"
+                    v-model="edit.pvwa_credential"
+                    v-show="fieldShown('pvwa_credential')"
+                    type="select"
+                    icon="user-shield"
+                    :values="pvwaCredentials"
+                    valueKey="name"
+                    labelKey="name"
+                    :isFloating="false"
+                    :required="true"
+                    :help="t('settings.secretStores.pvwaCredentialHelp')"
+                    :label="t('settings.secretStores.pvwaCredential')"
+                  />
+                  <BsInput
+                    class="af-store-field"
+                    v-model="edit.pvwa_auth"
+                    v-show="fieldShown('pvwa_auth')"
+                    type="select"
+                    icon="right-to-bracket"
+                    :values="PVWA_AUTH"
+                    valueKey="name"
+                    labelKey="label"
+                    :isFloating="false"
+                    :label="t('settings.secretStores.pvwaAuth')"
+                  />
+                  <BsInput
+                    class="af-store-field"
+                    v-model="edit.platform_id"
+                    v-show="fieldShown('platform_id')"
+                    icon="server"
+                    placeholder="UnixSSH"
+                    :isFloating="false"
+                    :help="t('settings.secretStores.platformIdHelp')"
+                    :label="t('settings.secretStores.platformId')"
+                  />
+                </template>
               </template>
               <BsInput
                 class="af-store-field"

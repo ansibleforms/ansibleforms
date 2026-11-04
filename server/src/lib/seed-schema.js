@@ -107,6 +107,12 @@ const secretStoreItem = {
     // a credential's secret typed in the app may be written to it, below this prefix
     write_enabled: bool,
     write_prefix: str,
+    // a CyberArk's writes go through its PVWA : its address, the API user's credential and logon
+    // method, the platform a new account gets (write_prefix : the safes it may write to)
+    pvwa_url: str,
+    pvwa_credential: str,
+    pvwa_auth: { type: "string", enum: ["cyberark", "ldap", "radius", "windows"] },
+    platform_id: str,
   },
 };
 

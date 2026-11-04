@@ -1635,6 +1635,20 @@ export default {
       writePrefixHelp: "Les credencials només s'escriuen en aquest camí o per sota, p. ex. secret/ansibleforms.",
       writePrefixRequired:
         "L'escriptura necessita un prefix: indiqueu sota quin camí es poden escriure les credencials.",
+      writeEnabledHelpCyberArk:
+        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar, com a compte d'una caixa forta, a través del PVWA (el CCP només llegeix).",
+      writeSafes: 'Caixes fortes on escriure',
+      writeSafesHelp: "Els comptes només s'escriuen en aquestes caixes fortes, separades per comes, p. ex. Linux, DB.",
+      writeSafesRequired: "L'escriptura necessita almenys una caixa forta.",
+      pvwaUrl: 'Adreça del PVWA',
+      pvwaUrlHelp: "El Password Vault Web Access on van les crides de l'API, p. ex. https://pvwa.example.com.",
+      pvwaCredential: 'Credencial del PVWA',
+      pvwaCredentialHelp:
+        "L'usuari de l'API amb què inicia sessió: necessita Add accounts i Update account content en aquestes caixes fortes.",
+      pvwaAuth: "Mètode d'inici de sessió",
+      platformId: 'ID de plataforma',
+      platformIdHelp: 'La plataforma que rep un compte nou, p. ex. UnixSSH. Un compte que ja hi és conserva la seva.',
+      pvwaRequired: "Escriure a CyberArk necessita l'adreça del PVWA i la credencial amb què inicia sessió.",
       cacheTtl: 'Memòria cau (segons)',
       cacheTtlHelp: "Quant de temps es reutilitza un secret llegit. Amb 0 es llegeix cada vegada que s'utilitza.",
       caBundleHelp: 'Deixa-ho buit per confiar en les autoritats de certificació del sistema.',

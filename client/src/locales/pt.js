@@ -1632,6 +1632,20 @@ export default {
       writePrefixHelp: 'As credenciais só são escritas neste caminho ou abaixo dele, p. ex. secret/ansibleforms.',
       writePrefixRequired:
         'A escrita precisa de um prefixo: indique abaixo de que caminho as credenciais podem ser escritas.',
+      writeEnabledHelpCyberArk:
+        'O utilizador e a palavra-passe de uma credencial escritos no AnsibleForms podem ser gravados aqui ao guardar, como conta de um cofre, através do PVWA (o CCP só lê).',
+      writeSafes: 'Cofres onde escrever',
+      writeSafesHelp: 'As contas só são escritas nestes cofres, separados por vírgulas, p. ex. Linux, DB.',
+      writeSafesRequired: 'A escrita precisa de pelo menos um cofre.',
+      pvwaUrl: 'Endereço do PVWA',
+      pvwaUrlHelp: 'O Password Vault Web Access para onde vão as chamadas da API, p. ex. https://pvwa.example.com.',
+      pvwaCredential: 'Credencial do PVWA',
+      pvwaCredentialHelp:
+        'O utilizador da API com que inicia sessão: precisa de Add accounts e Update account content nestes cofres.',
+      pvwaAuth: 'Método de início de sessão',
+      platformId: 'ID da plataforma',
+      platformIdHelp: 'A plataforma de uma conta nova, p. ex. UnixSSH. Uma conta que já lá esteja mantém a sua.',
+      pvwaRequired: 'Escrever no CyberArk precisa do endereço do PVWA e da credencial com que inicia sessão.',
       cacheTtl: 'Cache (segundos)',
       cacheTtlHelp: 'Durante quanto tempo um segredo lido é reutilizado. 0 lê-o em cada utilização.',
       caBundleHelp: 'Deixe vazio para confiar nas autoridades de certificação do sistema.',

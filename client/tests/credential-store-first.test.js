@@ -177,7 +177,8 @@ describe('a New secret store, from the New credential dialog', () => {
   });
 
   it('a Vault : the writing switch, then its prefix, needed while writing is on', () => {
-    expect(sfield('write_enabled').showWhen({ type: 'vault' })).toBe(true);
+    // the writing switch : for both types
+    expect(sfield('write_enabled').showWhen).toBeUndefined();
     expect(sfield('write_prefix').showWhen({ type: 'vault', write_enabled: false })).toBe(false);
     expect(sfield('write_prefix').requiredWhen({ type: 'vault', write_enabled: true })).toBe(true);
   });
@@ -191,6 +192,46 @@ describe('a New secret store, from the New credential dialog', () => {
     expect(save({ write_enabled: false, write_prefix: 'secret/af' })).toMatchObject({
       write_enabled: 0,
       write_prefix: '',
+    });
+  });
+});
+
+describe('a New CyberArk secret store that allows writing', () => {
+  const stores = getSettings((key) => key).secretStores;
+  const sfield = (key) => stores.fields.find((f) => f.key === key);
+  const cyberark = { type: 'cyberark_ccp', write_enabled: true };
+
+  it('its safes in place of a prefix, then its PVWA, its API user and platform', () => {
+    expect(sfield('write_prefix').dialogLabel(cyberark)).toBe('settings.secretStores.writeSafes');
+    for (const key of ['pvwa_url', 'pvwa_credential', 'pvwa_auth', 'platform_id']) {
+      expect(sfield(key).showWhen(cyberark)).toBe(true);
+      expect(sfield(key).showWhen({ ...cyberark, write_enabled: false })).toBe(false);
+      expect(sfield(key).showWhen({ type: 'vault', write_enabled: true })).toBe(false);
+    }
+    expect(sfield('pvwa_url').requiredWhen(cyberark)).toBe(true);
+    expect(sfield('pvwa_credential').requiredWhen(cyberark)).toBe(true);
+  });
+
+  it('its API user : a login of its own, never one read from a secret store', () => {
+    const keep = sfield('pvwa_credential').choicesWhen;
+    expect(keep({ name: 'api', credential_type: 'userpass' })).toBe(true);
+    expect(keep({ name: 'ref', credential_type: 'userpass', secret_store: 'vault' })).toBe(false);
+    expect(keep({ name: 'ssh', credential_type: 'ssh' })).toBe(false);
+  });
+
+  it('saved : its PVWA kept while writing, emptied for a Vault', () => {
+    const pvwa = { pvwa_url: ' https://pvwa ', pvwa_credential: 'api', pvwa_auth: 'ldap', platform_id: 'Unix' };
+    expect(stores.beforeSave({ name: 's', ...cyberark, write_prefix: 'Linux', ...pvwa })).toMatchObject({
+      write_enabled: 1,
+      pvwa_url: 'https://pvwa',
+      pvwa_credential: 'api',
+      pvwa_auth: 'ldap',
+    });
+    expect(stores.beforeSave({ name: 's', type: 'vault', write_enabled: true, ...pvwa })).toMatchObject({
+      pvwa_url: '',
+      pvwa_credential: '',
+      pvwa_auth: '',
+      platform_id: '',
     });
   });
 });
