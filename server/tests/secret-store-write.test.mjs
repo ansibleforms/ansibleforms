@@ -116,6 +116,10 @@ describe("the write prefix", () => {
     assert.equal(withinWritePrefix(store, "secret/ansibleforms-other/db"), false);
     assert.equal(withinWritePrefix(store, "secret/teams/db"), false);
     assert.equal(withinWritePrefix({ write_prefix: "" }, "secret/x"), false);
+    // a prefix of one segment : the whole mount, the default one or another
+    assert.equal(withinWritePrefix({ write_prefix: "secret", default_mount: "secret" }, "secret/teams/db"), true);
+    assert.equal(withinWritePrefix({ write_prefix: "secret/", default_mount: "secret" }, "db"), true);
+    assert.equal(withinWritePrefix({ write_prefix: "kv", default_mount: "secret" }, "secret/db"), false);
   });
 
   test("refused without writing on, without a prefix, or outside it - Vault never asked", async () => {

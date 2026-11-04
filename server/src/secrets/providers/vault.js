@@ -260,14 +260,16 @@ async function mounts(store) {
  * Args:
  *   rawPath (string): the path (secret/foo, foo - the default mount's -, secret/data/foo).
  *   defaultMount (string): the store's default mount.
+ *   bareIsMount (boolean): a path of one segment is a mount (a write prefix : secret, the whole
+ *       mount), not a secret of the default mount.
  *
  * Returns:
  *   string: mount/path, without data/ or metadata/ and without a slash at either end.
  */
-export function logicalPath(rawPath, defaultMount) {
+export function logicalPath(rawPath, defaultMount, bareIsMount = false) {
   let p = stripTrailingSlashes(stripLeadingSlashes(String(rawPath ?? "").trim()));
   if (!p) return "";
-  if (!p.includes("/")) p = `${defaultMount || "secret"}/${p}`;
+  if (!p.includes("/") && !bareIsMount) p = `${defaultMount || "secret"}/${p}`;
   const [mount, ...rest] = p.split("/");
   if (rest[0] === "data" || rest[0] === "metadata") rest.shift();
   return [mount, ...rest].join("/");
@@ -284,7 +286,8 @@ export function logicalPath(rawPath, defaultMount) {
  *   boolean: true when the path is the prefix or below it ; false without a prefix.
  */
 export function withinWritePrefix(store, ref) {
-  const prefix = logicalPath(store?.write_prefix, store?.default_mount);
+  // a prefix of one segment is a whole mount (secret), never secret/secret
+  const prefix = logicalPath(store?.write_prefix, store?.default_mount, true);
   const path = logicalPath(ref, store?.default_mount);
   if (!prefix || !path) return false;
   return path === prefix || path.startsWith(`${prefix}/`);
