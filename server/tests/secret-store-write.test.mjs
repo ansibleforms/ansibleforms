@@ -39,6 +39,7 @@ let secrets = {};
 const writes = [];
 let writeStatus = 200;
 let readStatus = 200;
+let readErrors = ["1 error occurred:\n\t* permission denied\n\n"];
 let mountTypes = {};
 const server = http.createServer((req, res) => {
   res.setHeader("Content-Type", "application/json");
@@ -66,7 +67,7 @@ const server = http.createServer((req, res) => {
   }
   if (readStatus !== 200) {
     res.statusCode = readStatus;
-    return res.end(JSON.stringify({ errors: ["1 error occurred:\n\t* permission denied\n\n"] }));
+    return res.end(JSON.stringify({ errors: readErrors }));
   }
   if (!(path in secrets)) {
     res.statusCode = 404;
@@ -106,6 +107,7 @@ beforeEach(() => {
   writes.length = 0;
   writeStatus = 200;
   readStatus = 200;
+  readErrors = ["1 error occurred:\n\t* permission denied\n\n"];
   mountTypes = {};
   clearMountTypeCache();
   Registry.clearSecretCache();
@@ -175,10 +177,20 @@ describe("writing", () => {
   test("the token's policy refusing : said with the path and the capabilities, never the secret", async () => {
     writeStatus = 403;
     await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), (e) => {
-      assert.match(e.message, /refused the write to secret\/data\/ansibleforms\/db \(403\).*create and update/);
+      assert.match(e.message, /refused to write secret\/data\/ansibleforms\/db \(403\).*read, create and update/);
       assert.doesNotMatch(e.message, /s3cret/);
       return true;
     });
+  });
+
+  test("Vault's answers said plainly : a token revoked, no secret there, Vault unreachable", async () => {
+    readStatus = 403;
+    readErrors = ["2 errors occurred:\n\t* permission denied\n\t* invalid token\n\n"];
+    await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), /refused the token of secret store 'vault': it is invalid, expired or revoked/);
+    readStatus = 200;
+    await assert.rejects(Registry.readSecret("vault", "secret/ansibleforms/none"), /No secret at secret\/data\/ansibleforms\/none in secret store 'vault'/);
+    storeRows.vault = vaultRow({ url: "http://127.0.0.1:1" });
+    await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), /Vault at http:\/\/127.0.0.1:1 could not be reached: ECONNREFUSED/);
   });
 
   test("the token's policy refusing the check before the write : said with the capabilities", async () => {
