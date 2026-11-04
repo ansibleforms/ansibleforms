@@ -3631,6 +3631,8 @@ export default function getSettings(t) {
         // writing : on with its prefix, off with none
         write_enabled: item.write_enabled ? 1 : 0,
         write_prefix: item.write_enabled ? String(item.write_prefix || '').trim() : '',
+        // a CyberArk's writes : through its PVWA, only while writing is on
+        ...pvwaOf(item),
       }),
       // a store has its own page (pages/admin/secret-store.vue) : its row and Edit open it, New the
       // wizard
@@ -3816,24 +3818,98 @@ export default function getSettings(t) {
           type: 'checkbox',
           flush: true,
           label: t('settings.secretStores.writeEnabled'),
-          help: t('settings.secretStores.writeEnabledHelp'),
+          // a Vault below its prefix, a CyberArk to its safes through its PVWA
+          help: (r) =>
+            t(
+              r?.type === 'cyberark_ccp'
+                ? 'settings.secretStores.writeEnabledHelpCyberArk'
+                : 'settings.secretStores.writeEnabledHelp',
+            ),
           initial: (r) => !!Number(r?.write_enabled),
           noTable: true,
           hidden: true,
-          showWhen: (r) => r?.type === 'vault',
         },
         {
-          // where it may write : never the whole store
+          // where it may write, never the whole store : a Vault's prefix, a CyberArk's safes
           key: 'write_prefix',
           step: 'options',
           icon: 'folder-tree',
           label: t('settings.secretStores.writePrefix'),
-          help: t('settings.secretStores.writePrefixHelp'),
-          placeholder: 'secret/ansibleforms',
-          requiredWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
+          dialogLabel: (r) =>
+            t(r?.type === 'cyberark_ccp' ? 'settings.secretStores.writeSafes' : 'settings.secretStores.writePrefix'),
+          help: (r) =>
+            t(
+              r?.type === 'cyberark_ccp'
+                ? 'settings.secretStores.writeSafesHelp'
+                : 'settings.secretStores.writePrefixHelp',
+            ),
+          placeholder: (r) => (r?.type === 'cyberark_ccp' ? 'Linux, DB' : 'secret/ansibleforms'),
+          requiredWhen: (r) => !!r?.write_enabled,
           noTable: true,
           hidden: true,
-          showWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
+          showWhen: (r) => !!r?.write_enabled,
+        },
+        {
+          // a CyberArk writing : its PVWA's address
+          key: 'pvwa_url',
+          step: 'options',
+          icon: 'globe',
+          label: t('settings.secretStores.pvwaUrl'),
+          help: t('settings.secretStores.pvwaUrlHelp'),
+          placeholder: 'https://pvwa.example.com',
+          requiredWhen: (r) => pvwaShown(r),
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => pvwaShown(r),
+        },
+        {
+          // the API user it writes as : a login of its own (user and password), never one read
+          // from a secret store
+          key: 'pvwa_credential',
+          step: 'options',
+          icon: 'user-shield',
+          label: t('settings.secretStores.pvwaCredential'),
+          help: t('settings.secretStores.pvwaCredentialHelp'),
+          type: 'select',
+          parent: 'credentials',
+          values: 'credential',
+          valueKey: 'name',
+          labelKey: 'name',
+          choicesWhen: (c) => !c?.name || (['userpass', 'api'].includes(c.credential_type) && !c.secret_store),
+          // none chosen at first, never the first credential of the list
+          initial: (r) => r?.pvwa_credential || '',
+          requiredWhen: (r) => pvwaShown(r),
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => pvwaShown(r),
+        },
+        {
+          // how it logs on to the PVWA (its API's auth/<method>/Logon)
+          key: 'pvwa_auth',
+          step: 'options',
+          icon: 'right-to-bracket',
+          label: t('settings.secretStores.pvwaAuth'),
+          type: 'select',
+          parent: 'pvwaAuths',
+          values: PVWA_AUTH,
+          valueKey: 'name',
+          labelKey: 'label',
+          initial: (r) => r?.pvwa_auth || 'cyberark',
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => pvwaShown(r),
+        },
+        {
+          // the platform of the accounts it adds
+          key: 'platform_id',
+          step: 'options',
+          icon: 'server',
+          label: t('settings.secretStores.platformId'),
+          help: t('settings.secretStores.platformIdHelp'),
+          placeholder: 'UnixSSH',
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => pvwaShown(r),
         },
         {
           // in a credential now ; kept on the record for the stores that still have their own,
@@ -3996,6 +4072,51 @@ function readFromStore(item) {
     item?.secret_action !== 'write' &&
     !STORE_LOGIN_TYPES.includes(item?.credential_type)
   );
+}
+
+// ---------------------------------------------------------------------------
+// A CyberArk secret store's writes, through its PVWA
+// ---------------------------------------------------------------------------
+
+// the PVWA's logon methods (its API's auth/<method>/Logon)
+const PVWA_AUTH = [
+  { name: 'cyberark', label: 'CyberArk' },
+  { name: 'ldap', label: 'LDAP' },
+  { name: 'radius', label: 'RADIUS' },
+  { name: 'windows', label: 'Windows' },
+];
+
+/**
+ * Whether a secret store's PVWA settings are asked : a CyberArk one that allows writing.
+ *
+ * Args:
+ *   store (object): the secret store being made.
+ *
+ * Returns:
+ *   boolean: true when its PVWA fields show.
+ */
+function pvwaShown(store) {
+  return store?.type === 'cyberark_ccp' && !!store?.write_enabled;
+}
+
+/**
+ * A secret store's PVWA settings as saved : kept for a CyberArk that allows writing, emptied
+ * otherwise.
+ *
+ * Args:
+ *   store (object): the secret store being saved.
+ *
+ * Returns:
+ *   object: its pvwa_url, pvwa_credential, pvwa_auth and platform_id.
+ */
+function pvwaOf(store) {
+  const on = pvwaShown(store);
+  return {
+    pvwa_url: on ? String(store.pvwa_url || '').trim() : '',
+    pvwa_credential: on ? store.pvwa_credential || '' : '',
+    pvwa_auth: on ? store.pvwa_auth || 'cyberark' : '',
+    platform_id: on ? String(store.platform_id || '').trim() : '',
+  };
 }
 
 /**
