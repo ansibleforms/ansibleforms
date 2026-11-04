@@ -1318,7 +1318,7 @@
     allowed: a whole number where 0 keeps the log files for ever
     short: Log file retention (days)
     hint: How many days of server log files are kept (0 keeps them all)
-    default: "30"
+    default: "90"
     description: |
       How many days of server log files are kept: the main log and the errors log, one file a
       day, zipped once the day is over. Older files are deleted. 0 keeps every file. Takes
