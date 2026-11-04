@@ -1869,8 +1869,9 @@ defineExpose({
           role="radiogroup"
           :aria-label="field.label"
         >
-          <!-- a follow-up choice (nested) : under the option it follows, with its own title -->
-          <div v-if="field.nested" class="af-radio-title">{{ field.label }}</div>
+          <!-- a follow-up choice (nested) : under the option it follows, with its own title when it
+               has one -->
+          <div v-if="field.nested && field.label" class="af-radio-title">{{ field.label }}</div>
           <div v-for="opt in field.options" :key="String(opt.value)" class="form-check af-short-check">
             <input
               :id="'af-radio-' + field.key + '-' + opt.value"

@@ -1854,6 +1854,8 @@ export default function getSettings(t) {
           step: 'store',
           label: '',
           type: 'radio',
+          // under Secret store, indented with a line joining it to that choice
+          nested: true,
           options: [
             {
               value: 'point',
