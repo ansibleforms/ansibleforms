@@ -5,13 +5,25 @@ import Credential from '../models/credential.model.v2.js';
 
 const MySql = {}
 
+// the options mysql2 takes from a credential : anything else (a credential's tenant_id, issuer,
+// redirect_uri, its secret store...) warns on every connection, and a later mysql2 refuses it
+const CONNECTION_OPTIONS = ["host", "port", "user", "password", "database", "ssl", "multipleStatements"]
+
+/**
+ * A credential as mysql2 connects with it : its connection options only.
+ *
+ * Args:
+ *   config (object): the credential resolved, with database, ssl and multipleStatements set.
+ *
+ * Returns:
+ *   object: a new object with the options mysql2 knows, those set (null and undefined left out).
+ */
 MySql.clean=function(config){
-  delete config.name
-  delete config.db_type
-  delete config.db_name
-  delete config.secure
-  delete config.is_database
-  return config
+  const clean = {}
+  for (const key of CONNECTION_OPTIONS) {
+    if (config?.[key] !== undefined && config[key] !== null) clean[key] = config[key]
+  }
+  return clean
 }
 
 // rewrite with await 5.0.3
@@ -41,8 +53,7 @@ MySql.query = async function (connection_name, query) {
       }
     }
     // get connection
-    config=MySql.clean(config) // remove unsupported properties      
-
+    // its connection options only : mysql2 warns on any other
     conn = await client.createConnection(MySql.clean(config))
     var result
     try{
