@@ -2208,6 +2208,8 @@ export default function getSettings(t) {
           // pointed to or written to ; written to : only the stores that allow writing
           showWhen: (r) => r?.secret_source === 'store',
           choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
+          // a New one while writing : writing already on, so it is offered once made
+          createDefaults: (r) => (writesToStore(r) ? { write_enabled: true } : {}),
           // written to, none allows writing yet : the dropdown still shown, saying so, over its button
           emptyText: (r) => (writesToStore(r) ? t('settings.credentials.noWritableStore') : ''),
           label: t('settings.credentials.secretStore'),
@@ -3626,6 +3628,9 @@ export default function getSettings(t) {
         ...item,
         // no namespace but in a Vault Enterprise
         namespace: item.type === 'vault' && vault_enterprise ? item.namespace || '' : '',
+        // writing : on with its prefix, off with none
+        write_enabled: item.write_enabled ? 1 : 0,
+        write_prefix: item.write_enabled ? String(item.write_prefix || '').trim() : '',
       }),
       // a store has its own page (pages/admin/secret-store.vue) : its row and Edit open it, New the
       // wizard
@@ -3802,6 +3807,33 @@ export default function getSettings(t) {
           hidden: true,
           dependency: 'type',
           dependencyValues: ['vault'],
+        },
+        {
+          // writing : a credential's secret typed in the app written here on Save, only below
+          // the prefix (Write to a key, in the New credential dialog)
+          key: 'write_enabled',
+          step: 'options',
+          type: 'checkbox',
+          flush: true,
+          label: t('settings.secretStores.writeEnabled'),
+          help: t('settings.secretStores.writeEnabledHelp'),
+          initial: (r) => !!Number(r?.write_enabled),
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => r?.type === 'vault',
+        },
+        {
+          // where it may write : never the whole store
+          key: 'write_prefix',
+          step: 'options',
+          icon: 'folder-tree',
+          label: t('settings.secretStores.writePrefix'),
+          help: t('settings.secretStores.writePrefixHelp'),
+          placeholder: 'secret/ansibleforms',
+          requiredWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
+          noTable: true,
+          hidden: true,
+          showWhen: (r) => r?.type === 'vault' && !!r?.write_enabled,
         },
         {
           // in a credential now ; kept on the record for the stores that still have their own,

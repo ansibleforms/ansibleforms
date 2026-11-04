@@ -163,3 +163,34 @@ describe('the Store step : Database or Secret store, then point or write', () =>
     expect(field('user').showWhen({ credential_type: 'userpass', secret_source: 'store' })).toBe(false);
   });
 });
+
+describe('a New secret store, from the New credential dialog', () => {
+  const stores = getSettings((key) => key).secretStores;
+  const sfield = (key) => stores.fields.find((f) => f.key === key);
+
+  it('writing on when made while writing a credential, off when pointing', () => {
+    const create = field('secret_store').createDefaults;
+    expect(create({ credential_type: 'userpass', secret_source: 'store', secret_action: 'write' })).toEqual({
+      write_enabled: true,
+    });
+    expect(create({ credential_type: 'userpass', secret_source: 'store', secret_action: 'point' })).toEqual({});
+  });
+
+  it('a Vault : the writing switch, then its prefix, needed while writing is on', () => {
+    expect(sfield('write_enabled').showWhen({ type: 'vault' })).toBe(true);
+    expect(sfield('write_prefix').showWhen({ type: 'vault', write_enabled: false })).toBe(false);
+    expect(sfield('write_prefix').requiredWhen({ type: 'vault', write_enabled: true })).toBe(true);
+  });
+
+  it('saved : writing as 1 or 0, its prefix trimmed, none without writing', () => {
+    const save = (over) => stores.beforeSave({ name: 's', type: 'vault', ...over });
+    expect(save({ write_enabled: true, write_prefix: ' secret/af ' })).toMatchObject({
+      write_enabled: 1,
+      write_prefix: 'secret/af',
+    });
+    expect(save({ write_enabled: false, write_prefix: 'secret/af' })).toMatchObject({
+      write_enabled: 0,
+      write_prefix: '',
+    });
+  });
+});
