@@ -24,7 +24,7 @@ import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
-import getSettings, { SECRET_STORE_TYPES, noCredentialsText } from '@/config/settings';
+import getSettings, { SECRET_STORE_TYPES, PVWA_AUTH, noCredentialsText } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -145,13 +145,6 @@ const pvwaCredentials = computed(() => [
     .filter((c) => ['userpass', 'api'].includes(c.credential_type) && !c.secret_store)
     .map((c) => ({ name: c.name })),
 ]);
-// the PVWA's logon methods (its API's auth/<method>/Logon)
-const PVWA_AUTH = [
-  { name: 'cyberark', label: 'CyberArk' },
-  { name: 'ldap', label: 'LDAP' },
-  { name: 'radius', label: 'RADIUS' },
-  { name: 'windows', label: 'Windows' },
-];
 
 // where it connects : the server of the credential chosen ; none, it needs one
 const chosenServer = computed(() => allCredentials.value.find((c) => c.name === edit.value?.credential)?.url || '');

@@ -45,6 +45,7 @@ import getSettings, {
   noCredentialsText,
   credentialTypeOf,
   SEND_THROUGH,
+  sendThroughOptionList,
 } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -141,13 +142,7 @@ const throughMicrosoft = computed(
   () => type.value === 'mail' && credentialTypeOf(credentials.value, edit.value?.credential) === 'entraid',
 );
 // Microsoft Graph or SMTP with OAuth2, each its label and a few words
-const sendThroughOptions = computed(() =>
-  SEND_THROUGH.map((value) => ({
-    value,
-    label: t(`settings.notificationChannels.sendThrough_${value}`),
-    hint: t(`settings.notificationChannels.sendThroughHint_${value}`),
-  })),
-);
+const sendThroughOptions = computed(() => sendThroughOptionList(t));
 const METHODS = ['POST', 'PUT'].map((value) => ({ value, label: value }));
 
 /**
