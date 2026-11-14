@@ -406,18 +406,53 @@ class CredentialModel extends CrudModel {
     return data;
   }
 
-  // opts carries { fromSeed:true } for the declarative config seed only
-  static async create(data, opts = {}) {
+  /**
+   * Normalises and checks a new credential exactly as create() writes it : the RTE's pin, an
+   * empty passphrase or SSH key as none, the SSH key, the port, the deprecated vault_path, the type
+   * and the fields the type needs. Nothing is written.
+   *
+   * Args:
+   *   data (object): the record written (changed in place).
+   *   opts (object): { fromSeed:true } for the declarative config seed, { fromRte:true } for the
+   *     RTE hub.
+   *
+   * Returns:
+   *   object: the record, as create() hands it to the database.
+   *
+   * Raises:
+   *   BadRequestError: a field the credential cannot be saved with (its type, its port, its SSH
+   *     key, a field its type needs).
+   */
+  static prepareCreate(data, opts = {}) {
     this.guardRtePin(data, null, opts);
     // an empty passphrase is none, and so is an ssh one's empty private key (a CyberArk or an
     // Entra ID one's client key is written as it was sent)
     if (data.key_passphrase === '') data.key_passphrase = null;
     if (data.credential_type === 'ssh' && data.client_key === '') data.client_key = null;
     this.checkSshKey(data, true);
-    return super.create(this.modelName, this.requireTypeFields(this.mirrorType(this.mirrorVaultPath(this.normalizePort(data)), true), true, opts), opts);
+    return this.requireTypeFields(this.mirrorType(this.mirrorVaultPath(this.normalizePort(data)), true), true, opts);
   }
 
-  static async update(data, id, opts = {}) {
+  /**
+   * Normalises and checks a change of a credential exactly as update() writes it : the masked
+   * secrets sent back left as they are, the SSH key, the type it keeps, the RTE's pin, the port,
+   * the deprecated vault_path and the fields the type needs. Nothing is written.
+   *
+   * Args:
+   *   data (object): the fields written (changed in place).
+   *   id (number|string): the credential's id.
+   *   opts (object): { fromSeed:true } for the declarative config seed, { fromRte:true } for the
+   *     RTE hub.
+   *
+   * Returns:
+   *   Promise<object>: the fields, as update() hands them to the database.
+   *
+   * Raises:
+   *   BadRequestError: a field the credential cannot be saved with, or another type than the one
+   *     it was made as.
+   *   NotFoundError: no credential with that id (read for its type or its ca_bundle).
+   */
+  static async prepareUpdate(data, id, opts = {}) {
     // the api shows the client key (a CyberArk or an Entra ID one's, an SSH one's private key) and
     // an SSH key's
     // passphrase masked ; the mask sent back means "unchanged", and an empty one too (the
@@ -437,7 +472,62 @@ class CredentialModel extends CrudModel {
     // the RTE's pin : the hub's to write ; a changed ca_bundle is the writer's from now on
     const stored = !opts.fromRte && data.ca_bundle !== undefined ? await this.findById(id) : null;
     this.guardRtePin(data, stored, opts);
-    return super.update(this.modelName, this.requireTypeFields(this.mirrorType(this.mirrorVaultPath(this.normalizePort(data))), false, opts), id, opts);
+    return this.requireTypeFields(this.mirrorType(this.mirrorVaultPath(this.normalizePort(data))), false, opts);
+  }
+
+  /**
+   * Checks, without writing anything, that a create or an update of a credential will pass every
+   * check the save itself runs : the model's (prepareCreate, prepareUpdate), the table's (its
+   * required fields, the record existing and not managed by the config seed) and its unique name.
+   * Run on a copy : the record sent is left as it is. A caller that must do something outside the
+   * database before the save (the controller writing a typed password to a secret store) calls it
+   * first, so a save that would be refused changes nothing anywhere.
+   *
+   * Args:
+   *   data (object): the record or the fields written (not changed).
+   *   id (number|string|null): the credential's id on an update, null on a create.
+   *   opts (object): the options create() or update() is called with.
+   *
+   * Returns:
+   *   Promise<void>: settles when the save would pass its checks.
+   *
+   * Raises:
+   *   BadRequestError: a field the credential cannot be saved with, a required one missing.
+   *   NotFoundError: no credential with that id.
+   *   AccessDeniedError: the credential is managed by the config seed.
+   *   ConflictError: another credential has that name already.
+   */
+  static async assertSavable(data, id = null, opts = {}) {
+    const creating = id === null || id === undefined;
+    // step 1 : the model's normalising and checks, on a copy, as create() or update() runs them
+    const copy = { ...(data || {}) };
+    this.stripManaged(copy, opts);
+    if (creating) {
+      this.prepareCreate(copy, opts);
+      this.assertRequired(this.modelName, copy);
+    } else {
+      // the record first : a missing one is a 404, a seeded one read only, as update() answers
+      await this.checkExist(this.modelName, id);
+      if (!opts.fromSeed) await this.assertNotManaged(this.modelName, id);
+      await this.prepareUpdate(copy, id, opts);
+    }
+    this.assertValidCronFields(this.modelName, copy);
+    // step 2 : its name, unique in the table (the database refuses a second one on the write)
+    if (copy.name === undefined || copy.name === null) return;
+    const table = this.getConfig(this.modelName).table;
+    const rows = await mysql.do(`SELECT id FROM ${table} WHERE name = ?`, [copy.name]);
+    if ((rows || []).some((r) => creating || String(r.id) !== String(id))) {
+      throw new Errors.ConflictError(`A credential named '${copy.name}' exists already`);
+    }
+  }
+
+  // opts carries { fromSeed:true } for the declarative config seed only
+  static async create(data, opts = {}) {
+    return super.create(this.modelName, this.prepareCreate(data, opts), opts);
+  }
+
+  static async update(data, id, opts = {}) {
+    return super.update(this.modelName, await this.prepareUpdate(data, id, opts), id, opts);
   }
 
   static async delete(id, opts = {}) {

@@ -30,6 +30,8 @@ vi.mock("../src/models/credential.model.v2.js", async () => {
         calls.push(["update", { ...data }, id]);
         return true;
       },
+      // the save's own checks, run before the store is written (credential-secret-write-checks)
+      assertSavable: async () => {},
       findById: async (id) => ({ ...rows[id] }),
       usageOf: async () => 0,
       runnersUsing: async () => [],
