@@ -45,7 +45,7 @@ The [installation guide](https://ansibleforms.com/installation) covers every opt
 | Docker Compose | [ansibleforms/docker](https://github.com/ansibleforms/docker) |
 | Kubernetes (Helm) | [ansibleforms/helm-charts](https://github.com/ansibleforms/helm-charts) |
 
-The images, all on `ghcr.io/ansibleforms`:
+The images, all on `ghcr.io/ansibleforms`, each for `linux/amd64` and `linux/arm64` under the same tags:
 
 | Image | What it is |
 |---|---|

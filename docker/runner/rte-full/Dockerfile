@@ -22,7 +22,9 @@ LABEL org.opencontainers.image.title="AnsibleForms RTE (full)" \
 ARG YTT_VERSION=0.55.3
 ARG YTT_SHA256_AMD64=15751b45a819edbf22b3d3eadb5fa9a5a2599128d921660a874bd39c47bb41e1
 ARG YTT_SHA256_ARM64=fed073d52b780a88ce506e68c44f33cedede2dad3d5f4fbe07a2833e45d996ed
-ARG TARGETARCH=amd64
+# set by the builder from the target platform (docker buildx, podman) : no default here, a
+# default would be kept over that value and an arm64 image would get the amd64 binary
+ARG TARGETARCH
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libxslt1.1 curl wget vim sudo tzdata mariadb-client \
  && rm -rf /var/lib/apt/lists/* \

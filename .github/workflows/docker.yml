@@ -2,9 +2,10 @@ name: Docker
 
 # Builds the images (the app and the three RTE layers) without publishing them, and runs a
 # playbook on the RTE, so "does the image still assemble and work" is answered at review time
-# instead of by hand during publish.sh. Path-filtered because it is the slow
-# one - it runs npm ci and a vite build inside the image - and for that reason it is not
-# a check worth requiring in branch protection.
+# instead of by hand during publish.sh. Built on amd64 and on arm64, each on a runner of its
+# own, as publish.yml does. Path-filtered because it is the slow one - it runs npm ci and a
+# vite build inside the image - and for that reason it is not a check worth requiring in
+# branch protection.
 
 on:
   pull_request:
@@ -30,8 +31,17 @@ concurrency:
 
 jobs:
   build:
-    name: Build image
-    runs-on: ubuntu-latest
+    name: Build image (${{ matrix.arch }})
+    strategy:
+      # one architecture failing still lets the other one report
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     # a registry for this job only : the RTE layers build on one another through it
     services:
       registry:
@@ -57,8 +67,8 @@ jobs:
           outputs: type=cacheonly
           build-args: |
             GIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=app
-          cache-to: type=gha,mode=max,scope=app
+          cache-from: type=gha,scope=app-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=app-${{ matrix.arch }}
 
       # The RTE layers build FROM one another : each is pushed to a registry that lives only
       # for this job, and the next one builds on it by digest, as publish.yml does on ghcr
@@ -72,8 +82,8 @@ jobs:
           tags: localhost:5000/ansibleforms-rte-base:ci
           build-args: |
             GIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=rte-base
-          cache-to: type=gha,mode=max,scope=rte-base
+          cache-from: type=gha,scope=rte-base-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rte-base-${{ matrix.arch }}
 
       - name: Build the RTE (no publish)
         id: rte
@@ -85,8 +95,8 @@ jobs:
           tags: localhost:5000/ansibleforms-rte-core:ci
           build-args: |
             BASE_IMAGE=localhost:5000/ansibleforms-rte-base@${{ steps.rte_base.outputs.digest }}
-          cache-from: type=gha,scope=rte-core
-          cache-to: type=gha,mode=max,scope=rte-core
+          cache-from: type=gha,scope=rte-core-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rte-core-${{ matrix.arch }}
 
       - name: Build the RTE full (no publish)
         uses: docker/build-push-action@v7
@@ -97,12 +107,13 @@ jobs:
           tags: localhost:5000/ansibleforms-rte-full:ci
           build-args: |
             BASE_IMAGE=localhost:5000/ansibleforms-rte-core@${{ steps.rte.outputs.digest }}
-          cache-from: type=gha,scope=rte-full
-          cache-to: type=gha,mode=max,scope=rte-full
+          cache-from: type=gha,scope=rte-full-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rte-full-${{ matrix.arch }}
 
       # An image that builds can still run nothing : a python ansible does not support, a
       # library without a wheel, a collection that fails to load. Run a playbook on both
-      # runnable layers, and on -full a collection module and the libraries 6.5 playbooks use.
+      # runnable layers, and on -full a collection module, the libraries 6.5 playbooks use and
+      # ytt (a binary per architecture : the wrong one does not even start).
       - name: Smoke test the RTE images
         run: |
           set -euo pipefail
@@ -140,4 +151,5 @@ jobs:
               ansible-galaxy collection list "$c" >/dev/null 2>&1 || { echo "missing collection $c"; exit 1; }
             done &&
             python -c "import pandas, pyVmomi, boto3, netapp_ontap, netapp_lib, solidfire, hvac, lxml, openpyxl, pymysql, bs4, yaml" &&
+            ytt version &&
             echo "rte-full : playbook, collections and libraries ok"'

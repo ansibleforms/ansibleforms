@@ -126,6 +126,11 @@ and with the same tags as the app :
 - **The chain** : `docker/runner/rte-core` and `rte-full` take `BASE_IMAGE`. `publish.yml` passes
   the digest it just pushed, and the Docker check (`docker.yml`) does the same through a registry
   that lives only for the job. Built by hand, they default to the published `:7`.
+- **Architectures** : every image, the controller included, is published for `linux/amd64` and
+  `linux/arm64` under the same tags. `publish.yml` builds each architecture on a runner of its
+  own (`ubuntu-latest`, `ubuntu-24.04-arm`) and pushes it by digest; a last job then writes one
+  manifest list per image under every tag, so no tag moves unless both architectures built.
+  The Docker check builds and smoke tests both architectures too.
 - The controller (`docker/controller/Dockerfile`) needs only node, git, ssh, the mariadb client
   and ytt, and builds from `node:26-trixie-slim` (pinned by digest, moved by Dependabot).
 

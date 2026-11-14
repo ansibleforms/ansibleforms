@@ -13,7 +13,9 @@ FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b2
 ARG YTT_VERSION=0.55.3
 ARG YTT_SHA256_AMD64=15751b45a819edbf22b3d3eadb5fa9a5a2599128d921660a874bd39c47bb41e1
 ARG YTT_SHA256_ARM64=fed073d52b780a88ce506e68c44f33cedede2dad3d5f4fbe07a2833e45d996ed
-ARG TARGETARCH=amd64
+# set by the builder from the target platform (docker buildx, podman) : no default here, a
+# default would be kept over that value and an arm64 image would get the amd64 binary
+ARG TARGETARCH
 
 # upgrade : the pinned base is as old as its pin, and the weekly refresh (refresh-images.yml)
 # rebuilds a release to pick up Debian's security fixes
