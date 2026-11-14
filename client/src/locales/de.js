@@ -957,8 +957,7 @@ export default {
     databases: {
       field: 'Feld',
       label: 'Datenbank',
-      description:
-        'Die Datenbanken, die Formulare abfragen: Das dbConfig eines Feldes nennt eine davon. Jede verbindet sich mit Anmeldedaten vom Typ Datenbank, die ihren Server und ihre Anmeldung enthalten.',
+      description: 'Die Datenbanken, die Formulare abfragen (dbConfig eines Feldes), je mit Anmeldedaten.',
       nameHelp: 'Der Name, den das dbConfig eines Feldes angibt, um diese Datenbank abzufragen.',
       credential: 'Anmeldedaten',
       credentialHelp: 'Anmeldedaten vom Typ Datenbank: ihr Datenbanktyp, Server, Datenbank und Anmeldung.',
@@ -1119,7 +1118,7 @@ export default {
       displayName: 'Name',
       firstSeen: 'Zuerst gesehen',
       lastLogin: 'Letzte Anmeldung',
-      signInHelp: 'An: Anmeldung über {source}.\nAus: die Sitzungen enden jetzt und jede Anmeldung wird abgelehnt.',
+      signInHelp: 'An: Anmeldung über {source}. Aus: Sitzungen enden, jede Anmeldung wird abgelehnt.',
       blockSignIn: 'Anmeldung sperren',
       allowSignIn: 'Anmeldung erlauben',
       endSessions: 'Sitzungen beenden',
@@ -1128,14 +1127,10 @@ export default {
         'Die Anmeldung von {name} sperren? Die Sitzungen enden jetzt, und jede Anmeldung wird abgelehnt, bis du sie wieder erlaubst.',
       forgetConfirm:
         '{name} vergessen? Der Eintrag wird entfernt und kommt bei der nächsten Anmeldung zurück. Jobs, gespeicherte Jobs und Zeitpläne bleiben.',
-      blockedNote:
-        'Ein Administrator hat die Anmeldung dieses Benutzers gesperrt: die Sitzungen wurden beendet und jede Anmeldung wird abgelehnt.',
-      neverNote:
-        'Die Rollen der Konfiguration nennen diesen Benutzer, aber er hat sich nie angemeldet: seine Gruppen sind ab der ersten Anmeldung bekannt.',
-      readOnlyNote:
-        'Dieser Benutzer kommt aus {source}: wer er ist und seine Gruppen werden bei jeder Anmeldung dort gelesen und hier nach der letzten gezeigt.',
-      groupReadOnlyNote:
-        'Diese Gruppe kommt aus {source}: ihre Benutzer sind die, die bei ihrer letzten Anmeldung darin gesehen wurden.',
+      blockedNote: 'Ein Administrator hat diesen Benutzer gesperrt: Sitzungen beendet, Anmeldungen abgelehnt.',
+      neverNote: 'In Rollen genannt, nie angemeldet: seine Gruppen sind ab der ersten Anmeldung bekannt.',
+      readOnlyNote: 'Aus {source}: wer er ist und seine Gruppen, bei jeder Anmeldung gelesen, Stand: letzte.',
+      groupReadOnlyNote: 'Diese Gruppe kommt aus {source}: ihre Benutzer, wie bei ihrer letzten Anmeldung gesehen.',
       sessionsEnded: 'Die Sitzungen von {name} wurden beendet.',
       nowBlocked: 'Die Anmeldung von {name} ist gesperrt.',
       nowAllowed: 'Die Anmeldung von {name} ist erlaubt.',
@@ -1185,8 +1180,7 @@ export default {
     labels: {
       label: 'Label',
       labelPlural: 'Labels',
-      description:
-        'Die Labels neben dem Logo der Kopfzeile: PRODUCTION, EU... mehrere nebeneinander geöffnete Instanzen sind auf einen Blick zu unterscheiden.',
+      description: 'Labels neben dem Logo (PRODUCTION, EU...), um Instanzen auf einen Blick zu unterscheiden.',
       enable: 'Aktivieren',
       disable: 'Deaktivieren',
       moveUp: 'Nach oben',
@@ -1234,8 +1228,7 @@ export default {
       linksTooMany:
         'Höchstens {max} Links in der Kopfzeile und {inside} in jedem. Lege die anderen in einen davon oder entferne sie.',
       nameDescription: 'Der Name der Anwendung, im Browser-Tab und auf der Anmeldeseite.',
-      announcementDescription:
-        'Nachrichten unter der Kopfzeile für alle, etwa ein Wartungsfenster, jede von ihrem Beginn bis zu ihrem Ende angezeigt.',
+      announcementDescription: 'Nachrichten für alle unter der Kopfzeile, etwa Wartung, von Beginn bis Ende angezeigt.',
       designer: 'Designer',
       designerHelp: 'Den Designer-Link in der Kopfzeile anzeigen.',
       languageHelp: 'Legt die Sprache der Anwendung fest, für Benutzer ohne eigene Wahl.',
@@ -1316,7 +1309,7 @@ export default {
     repositories: {
       label: 'Repository',
       labelPlural: 'Repositories',
-      description: 'Git-Repositories zum Speichern von Formularen, Playbooks, Konfiguration und Variablendateien.',
+      description: 'Git-Repositories für Formulare, Playbooks, Konfiguration und Variablendateien.',
       resetRepository: 'Repository zuruecksetzen',
       helpName: 'Alphanumerisch mit Bindestrich und Unterstrich',
       helpUri: 'Nur SSH- oder HTTPS-URIs sind erlaubt',
@@ -1325,12 +1318,9 @@ export default {
       useForForms: 'Fuer Formulare verwenden?',
       useForPlaybooks: 'Fuer Playbooks verwenden?',
       useForWorkflows: 'Für Workflows verwenden?',
-      helpUseForConfig:
-        'Die App-Konfiguration (Kategorien und Konstanten) wird aus config.yaml in diesem Repository gelesen (nur in einem Repository aktivieren).',
-      helpUseForForms:
-        "Formulare werden aus diesem Repository bereitgestellt UND dorthin gespeichert (Unterordner 'forms' oder Wurzel), ihre Variablendateien aus dessen Ordner 'vars'; der Designer bearbeitet die Arbeitskopie und 'In Repo pushen' veröffentlicht die Änderungen.",
-      helpUseForPlaybooks:
-        "Ansible-Playbooks werden aus diesem Repository ausgefuehrt (Unterordner 'playbooks' oder Stammverzeichnis, nur fuer ein Repository aktivieren).",
+      helpUseForConfig: 'Kategorien und Konstanten aus seiner config.yaml gelesen (nur in einem Repository).',
+      helpUseForForms: 'Formulare aus seinem Ordner forms oder der Wurzel; Push im Designer veröffentlicht.',
+      helpUseForPlaybooks: 'Playbooks laufen aus seinem Ordner playbooks oder der Wurzel (nur in einem Repository).',
       helpUseForWorkflows:
         'Die Workflows des Designers werden aus diesem Repository gelesen und dorthin zurückgepusht.',
       helpCloneOnStart: 'Das Repository wird bei jedem Start der Anwendung gepullt (beim ersten Mal geklont).',
@@ -1338,8 +1328,7 @@ export default {
       cloneOnStartShort: 'Beim Start pullen',
       cloneOnStart: 'Beim Start der App pullen',
       credential: 'Anmeldedaten',
-      helpCredential:
-        'Anmeldedaten aus Verbindungen > Anmeldedaten: Benutzername und Passwort (oder Token), die git verwendet.',
+      helpCredential: 'Anmeldedaten aus Verbindungen > Anmeldedaten: Benutzer und Passwort (oder Token) für git.',
       helpScheduledPull: 'Das Repository automatisch nach Zeitplan pullen.',
       newCredential: 'Anmeldedaten hinzufügen',
       scheduledPull: 'Geplanten Pull aktivieren',
@@ -1349,18 +1338,16 @@ export default {
       stepUsage: 'Verwendung',
       useConfigHint: 'config.yaml mit den Kategorien und Konstanten (nur ein Repository)',
       useConfigShort: 'Einstellungen',
-      useFormsHint: 'Formulardateien und ihre Variablendateien, vom Designer bearbeitet und zurückgepusht',
+      useFormsHint: 'Formulare und Variablendateien, vom Designer bearbeitet und gepusht',
       useFormsShort: 'Formulare',
       usePlaybooksHint: 'Ansible-Playbooks, die die Formulare ausführen (nur ein Repository)',
       usePlaybooksShort: 'Playbooks',
       useWorkflowsHint: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
       useWorkflowsShort: 'Workflows',
       notPushed: 'Ausstehende Änderungen',
-      notPushedHint:
-        'Hier gespeicherte Änderungen sind noch nicht zum Remote gepusht: pushe sie im Designer oder mit Push.',
+      notPushedHint: 'Änderungen noch nicht zum Remote gepusht: pushe sie im Designer oder mit Push.',
       useForInventories: 'Für Inventare verwenden?',
-      helpUseForInventories:
-        'Dieses Repository ist ein Inventar mit seinem Namen: seine Wurzel enthält inventory.yaml, group_vars und host_vars. Ein Playbook-Formular nennt es mit inventory: <Repository-Name>; der Designer bearbeitet es und pusht es zurück.',
+      helpUseForInventories: 'Inventar: Formulare nennen es mit inventory: <Repository-Name>; der Designer ändert es.',
       useInventoriesHint: 'Ein Inventar: inventory.yaml, group_vars und host_vars in seiner Wurzel',
       useInventoriesShort: 'Inventare',
       fieldsRequired: 'Name, Branch, URI und Beschreibung sind erforderlich.',
@@ -1389,7 +1376,7 @@ export default {
     oauth2: {
       label: 'SSO-Anbieter',
       labelPlural: 'SSO-Anbieter',
-      description: 'Externe Identitätsanbieter für Single Sign-On konfigurieren (Microsoft Entra ID, OIDC, usw.).',
+      description: 'Externe Identitätsanbieter für Single Sign-On (Microsoft Entra ID, OIDC usw.).',
       tabProviders: 'Anbieter',
       active: 'Aktiviert',
       credential: 'Anmeldedaten-Eintrag',
@@ -1406,7 +1393,7 @@ export default {
       type_azuread: 'Microsoft Entra ID',
       type_oidc: 'Open ID',
       typeHint_azuread: 'Benutzer melden sich mit ihrem Microsoft-Geschäfts- oder Schulkonto an',
-      typeHint_oidc: 'Benutzer melden sich über einen OpenID-Connect-Anbieter an (Keycloak, Okta...)',
+      typeHint_oidc: 'Anmeldung über einen OpenID-Connect-Anbieter (Keycloak, Okta...)',
       stepSignIn: 'Anmeldung',
       stepGroups: 'Gruppen',
       provider: 'Anbieter',
@@ -1415,8 +1402,7 @@ export default {
       clientSecret: 'Client-Secret',
       groupFilter: 'Gruppenfilter',
       redirectUrl: 'Umleitungs-URI',
-      redirectHelp:
-        'Wie beim Client des Identitätsanbieters registriert. Leer: die URL der App (Einstellungen > URL) und der angezeigte Callback-Pfad.',
+      redirectHelp: 'Wie beim Identitätsanbieter registriert. Leer: die URL der App und der angezeigte Pfad.',
       issuer: 'Issuer',
       scope: 'Scope',
       authUrl: 'Auth-URL',
@@ -1430,8 +1416,7 @@ export default {
       disable: 'Deaktivieren',
       label: 'Zeitplan',
       labelPlural: 'Zeitplaene',
-      description:
-        'Formularübermittlungen mit einem wiederkehrenden Cron-Zeitplan oder einmaliger Ausführung automatisieren.',
+      description: 'Formularübermittlungen per wiederkehrendem Cron-Zeitplan oder einmalig automatisieren.',
       stepSchedule: 'Zeitplan',
       stepExtraVars: 'Extra-Variablen',
       nextRun: 'Nächster Lauf',
@@ -1480,8 +1465,7 @@ export default {
       rejectConfirm:
         '{name} ablehnen? Sie wird mit ihrer Anmeldeinformation entfernt. Sie kann erneut beitreten wollen.',
       label: 'Runner',
-      description:
-        'Wo Jobs laufen: Runtime-Environment-Container (RTE) für Playbooks (das AnsibleForms-Image mit AF_ROLE=rte) und AWX / Ansible Automation Platform / Ascender für Templates.',
+      description: 'Wo Jobs laufen: eine RTE für Playbooks oder AWX, AAP, Ascender, Jenkins oder Semaphore.',
       nameHelp: 'Ein Formular verweist mit diesem Namen auf den Runner: runner: <Name>.',
       type: 'Typ',
       isDefault: 'Standard',
@@ -1490,8 +1474,7 @@ export default {
         'Ausgeschaltet bekommt er keine Jobs, auch nicht als Standard seines Typs. Er bleibt mit seinen Einstellungen in der Liste.',
       enable: 'Aktivieren',
       disable: 'Deaktivieren',
-      isDefaultHelp:
-        'Der Standard seines Typs: Playbook-Formulare ohne Runner laufen auf dem Standard-RTE, Template-Formulare auf dem Standard-AWX. Ohne Standard schlägt ein solcher Job fehl. Der erste Runner eines Typs wird automatisch zum Standard.',
+      isDefaultHelp: 'Führt Formulare seines Typs ohne Runner aus; der erste Runner eines Typs ist Standard.',
       uriHelp: 'RTE: wo er lauscht, z.B. https://rte-vmware:8000. AWX: seine Adresse, z.B. https://aap.example.com.',
       tokenHelp: 'RTE: sein RTE_TOKEN. AWX: ein API-Token, oder Anmeldedaten verwenden ankreuzen.',
       useCredentials: 'Anmeldedaten verwenden',
@@ -1512,17 +1495,13 @@ export default {
       stepAuth: 'Anmeldedaten',
       credential: 'Zugangsdaten',
       credentialHelp_rte: 'Das Token der RTE, und ihre Adresse bei Eingehend.',
-      credentialHelp_awx:
-        'Eine AWX-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse und Token oder Benutzer und Passwort.',
-      credentialHelp_aap:
-        'Eine AAP-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse und Token oder Benutzer und Passwort.',
-      credentialHelp_ascender:
-        'Eine Ascender-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse und Token oder Benutzer und Passwort.',
+      credentialHelp_awx: 'AWX-Anmeldedaten: Adresse und Token oder Benutzer und Passwort.',
+      credentialHelp_aap: 'AAP-Anmeldedaten: Adresse und Token oder Benutzer und Passwort.',
+      credentialHelp_ascender: 'Ascender-Anmeldedaten: Adresse und Token oder Benutzer und Passwort.',
       credentialHelp_semaphore:
         'Eine Semaphore-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse und API-Token.',
       credentialHelp_rundeck: 'Eine Rundeck-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse und API-Token.',
-      credentialHelp_jenkins:
-        'Eine Jenkins-Anmeldeinformation aus Verbindungen > Zugangsdaten: Adresse, Benutzer und dessen API-Token.',
+      credentialHelp_jenkins: 'Jenkins-Anmeldedaten aus Verbindungen > Anmeldedaten: Adresse, Benutzer und API-Token.',
       ownToken: 'Meldet sich mit dem eigenen Token von vor den Zugangsdaten an, bis ein Eintrag gewählt wird.',
       ownTokenRte: 'Meldet sich mit dem Token an, mit dem sich sein RTE registriert hat, bis ein Eintrag gewählt wird.',
       rteMode: 'Modus',
@@ -1530,7 +1509,7 @@ export default {
       rteMode_outbound: 'Ausgehend',
       rteMode_outboundHint: 'Die RTE verbindet sich mit der App: von außen erreicht sie nichts',
       rteMode_inbound: 'Eingehend',
-      rteMode_inboundHint: 'Die App verbindet sich mit der RTE unter der Adresse ihrer Anmeldeinformation',
+      rteMode_inboundHint: 'Die App verbindet sich mit der RTE unter der Adresse der Anmeldedaten',
       rteMode_database: 'Datenbank (veraltet)',
       rteMode_databaseHint: 'Die RTE nutzt die Datenbank der App selbst: entfällt in 8.0.0',
       socket: 'Verbindung',
@@ -1557,8 +1536,7 @@ export default {
       overridesRte: 'Überschreibt {env} auf dem RTE ({value}).',
       socketConnected: 'Verbunden',
       socketDisconnected: 'Nicht verbunden',
-      socketDisconnectedHint:
-        'Kein App-Knoten hält einen Socket zu dieser RTE: prüfen Sie, ob sie läuft, ihre Adresse oder APP_URL und ihr Token',
+      socketDisconnectedHint: 'Kein Socket zu dieser RTE: prüfen Sie, ob sie läuft, Adresse oder APP_URL und Token.',
       socketHint: 'App-Knoten {node}, RTE {version}, {running} von {max} Jobs laufen',
       joinTokenValid_1: '1 Stunde',
       joinTokenValid_24: '1 Tag',
@@ -1603,23 +1581,20 @@ export default {
       uriHelp_semaphore: 'Die Adresse von Semaphore UI, ohne Pfad, z. B. https://semaphore.example.com.',
       uriHelp_rundeck: 'Die Adresse von Rundeck, ohne Pfad, z. B. https://rundeck.example.com.',
       project: 'Projekt',
-      projectHelp_semaphore:
-        'Die ID des Semaphore-Projekts mit den Vorlagen: die Zahl in seiner Adresse, /project/<id>.',
+      projectHelp_semaphore: 'Die ID des Semaphore-Projekts: die Zahl in seiner Adresse, /project/<id>.',
       projectHelp_rundeck: 'Der Name des Rundeck-Projekts mit den Jobs.',
       tokenHelp_semaphore: 'Ein API-Token eines Semaphore-Benutzers: Benutzermenü, API tokens.',
       tokenHelp_rundeck: 'Das API-Token eines Rundeck-Benutzers: Benutzerprofil, User API Tokens.',
       kind_jenkins: 'Jenkins',
       type_jenkins: 'Jenkins',
       type_jenkinsHint: 'Jenkins-Jobs, für Vorlagenformulare, die ihn nennen',
-      uriHelp_jenkins:
-        'Die Jenkins-Adresse, z. B. https://jenkins.example.com, mit Pfad, wenn Jenkins unter einem läuft.',
+      uriHelp_jenkins: 'Die Jenkins-Adresse, z. B. https://jenkins.example.com, ggf. mit Pfad.',
       projectHelp_jenkins: 'Der Ordner der Jobs (ops oder ops/web); leer für die Jobs auf oberster Ebene.',
       tokenHelp_jenkins: 'Ein API-Token des Jenkins-Benutzers: Benutzermenü, Security, API Token.',
       usernameHelp_jenkins: 'Der Jenkins-Benutzer, zu dem das API-Token gehört; die Jobs laufen als dieser Benutzer.',
     },
     disclaimer: {
-      description:
-        'Bedingungen, die jeder einmal akzeptiert, bevor er die Anwendung nutzt, festgehalten mit wer welche Version wann akzeptiert hat.',
+      description: 'Bedingungen, die jeder einmal akzeptiert, festgehalten mit wer welche Version wann.',
       preview: 'Vorschau',
       tabVersions: 'Versionen',
       versionLabel: 'Version',
@@ -1673,8 +1648,7 @@ export default {
     notificationChannels: {
       label: 'Benachrichtigungskanal',
       labelPlural: 'Benachrichtigungskanäle',
-      description:
-        'Wohin Benachrichtigungen gehen: SMTP-Server (einer davon der Standard, über ihn sendet die App ihre Mails), Slack, Microsoft Teams, Telegram und Webhooks. Ein Formular nennt seine Kanäle in seinen Benachrichtigungen und seiner Genehmigung.',
+      description: 'Wohin Benachrichtigungen gehen: Mail, Slack, Microsoft Teams, Telegram und Webhooks.',
       enable: 'Aktivieren',
       disable: 'Deaktivieren',
       enabled: 'Aktiviert',
@@ -1705,30 +1679,25 @@ export default {
       addressWebhook: 'Eingehender Webhook',
       addressChat: 'Chat {chat}',
       credential: 'Zugangsdaten',
-      helpCredential:
-        'Ein smtp-Zugang unter Verbindungen > Zugangsdaten: der Mailserver, sein Port und TLS und die Anmeldung (kein Benutzer für ein Relay). Keiner: der Mailserver unten, ohne Anmeldung. Oder ein Microsoft Entra ID-Zugang, um über Microsoft 365 mit OAuth2 zu senden.',
+      helpCredential: 'SMTP-Anmeldedaten (Keine Anmeldung für ein Relay) oder Microsoft Entra ID-Anmeldedaten.',
       sendThrough: 'Senden über',
       sendThrough_graph: 'Microsoft Graph',
       sendThroughHint_graph: 'HTTPS zu Microsoft Graph: die App braucht die Berechtigung Mail.Send',
       sendThrough_smtp: 'SMTP (OAuth2)',
-      sendThroughHint_smtp: 'smtp.office365.com, Port 587: das Postfach braucht eingeschaltetes SMTP AUTH',
+      sendThroughHint_smtp: 'smtp.office365.com, Port 587: das Postfach braucht SMTP AUTH aktiviert',
       serverHelp: 'Der Mailserver, über den gesendet wird, wenn kein Zugang gewählt ist, ohne Anmeldung (ein Relay).',
-      webhookUrl: 'Webhook-Adresse',
-      webhookUrlHelp_slack:
-        'Der eingehende Webhook des Slack-Kanals (Slack-App > Incoming Webhooks): ein Geheimnis, nach dem Speichern nie wieder angezeigt.',
+      webhookUrl: 'Webhook',
+      webhookUrlHelp_slack: 'Ein eingehender Slack-Webhook (Slack-App > Incoming Webhooks). Geheim, danach verborgen.',
       webhookUrlHelp_teams:
-        'Der Webhook des Teams-Kanals (Workflows: in einem Kanal posten, wenn eine Webhook-Anfrage eingeht): ein Geheimnis, nach dem Speichern nie wieder angezeigt.',
+        'Ein Teams-Workflows-Webhook (bei Eingang einer Webhook-Anfrage). Geheim, danach verborgen.',
       chatId: 'Chat-ID',
-      chatIdHelp:
-        'Der Chat, die Gruppe oder der Kanal, in dem der Bot schreibt: seine ID (eine negative Zahl für eine Gruppe oder einen Kanal).',
+      chatIdHelp: 'Die ID des Chats, der Gruppe oder des Kanals des Bots (negativ für Gruppe oder Kanal).',
       apiUrl: 'Bot-API-Adresse',
       apiUrlHelp: 'Ein eigener Bot-API-Server; leer für api.telegram.org.',
       tokenCredential_telegram: 'Bot-Token',
-      tokenCredentialHelp_telegram:
-        'Ein api-Zugang unter Verbindungen > Zugangsdaten, dessen Passwort das Bot-Token ist (von BotFather).',
+      tokenCredentialHelp_telegram: 'Api-Anmeldedaten, deren Passwort das Bot-Token ist (von BotFather).',
       tokenCredential_webhook: 'Bearer-Token',
-      tokenCredentialHelp_webhook:
-        'Ein api-Zugang unter Verbindungen > Zugangsdaten, dessen Passwort als Bearer-Token gesendet wird. Leer: keins.',
+      tokenCredentialHelp_webhook: 'Api-Anmeldedaten, deren Passwort als Bearer-Token gesendet wird. Leer: keins.',
       url: 'Url',
       urlHelp: 'Die Adresse, an die die JSON-Anfrage gesendet wird.',
       method: 'Methode',
@@ -1737,7 +1706,7 @@ export default {
       headers: 'Header',
       headersHelp: 'Zusätzliche Header: ein JSON-Objekt aus Namen und Werten.',
       payload: 'Inhalt',
-      payloadHelp: 'Das gesendete JSON, {placeholders} werden ausgefüllt. Leer: das angezeigte.',
+      payloadHelp: 'Das gesendete JSON, Platzhalter (wie im gezeigten) ausgefüllt. Leer: das gezeigte.',
       sendTest: 'Test senden',
       testSaveFirst: 'Zuerst speichern: der Test geht über den Kanal, wie er gespeichert ist',
       testHelp: 'Eine Testbenachrichtigung wird über {name}, wie gespeichert, an {to} gesendet.',
@@ -1749,16 +1718,14 @@ export default {
     syslogServers: {
       label: 'Syslog-Server',
       labelPlural: 'Syslog-Server',
-      description:
-        'Die Syslog-Server, an die das Serverprotokoll und die Audit-Einträge gesendet werden, etwa ein SIEM: Jeder erhält das Serverprotokoll, die Audit-Einträge oder beides.',
+      description: 'Ziel von Serverprotokoll und Audit-Einträgen, etwa ein SIEM: je eins oder beide.',
       enable: 'Aktivieren',
       disable: 'Deaktivieren',
       enabled: 'Aktiviert',
       enabledHelp: 'Ob Zeilen an ihn gesendet werden.',
       address: 'Adresse',
       protocol: 'Protokoll',
-      protocolHelp:
-        'udp sendet ohne Verbindung, tcp hält eine, tls verschlüsselt sie; unix schreibt in einen lokalen Socket.',
+      protocolHelp: 'udp: ohne Verbindung, tcp: mit Verbindung, tls: verschlüsselt, unix: lokaler Socket.',
       host: 'Host',
       hostHelp: 'Der Hostname oder die IP-Adresse des Syslog-Servers.',
       port: 'Port',
@@ -1766,13 +1733,12 @@ export default {
       path: 'Socket-Pfad',
       pathHelp: 'Der lokale Syslog-Socket, etwa /dev/log.',
       receives: 'Empfängt',
-      receivesHelp:
-        'Das Serverprotokoll, die Audit-Einträge (wer was geändert hat, wie auf der Seite Audit) oder beides.',
+      receivesHelp: 'Das Serverprotokoll, die Audit-Einträge (wer was geändert hat, siehe Audit) oder beides.',
       receives_log: 'Nur Serverprotokoll',
       receives_audit: 'Nur Audit-Protokoll',
       receives_both: 'Audit-Protokoll + Serverprotokoll',
       level: 'Stufe',
-      levelHelp: 'Die niedrigste Stufe des Serverprotokolls, die er erhält. Audit-Einträge werden immer gesendet.',
+      levelHelp: 'Die niedrigste Stufe des Serverprotokolls, die er erhält. Audit-Einträge gehen immer.',
       type: 'Format',
       typeHelp: 'Wie eine Zeile geschrieben wird: BSD (RFC 3164) oder RFC 5424.',
       appName: 'App-Name',
@@ -1792,8 +1758,8 @@ export default {
     },
     secretStores: {
       label: 'Secret Store',
-      description: 'Externe Secret-Manager wie HashiCorp Vault, aus denen Zugangsdaten Benutzer und Passwort lesen.',
-      nameHelp: "Zugangsdaten nutzen diesen Namen; einen HashiCorp Vault 'vault' nennen, damit Vault-Pfade gehen.",
+      description: 'Externe Secret-Manager wie HashiCorp Vault, aus denen Anmeldedaten lesen.',
+      nameHelp: "Anmeldedaten nutzen den Namen; HashiCorp Vault 'vault' nennen, damit Vault-Pfade gehen.",
       type: 'Typ',
       namespace: 'Namespace',
       namespaceHelp: 'Vault-Enterprise-Namespace. Sonst leer lassen.',
@@ -1816,8 +1782,7 @@ export default {
       pvwaUrl: 'PVWA-Adresse',
       pvwaUrlHelp: 'Der Password Vault Web Access, an den die API-Aufrufe gehen, z. B. https://pvwa.example.com.',
       pvwaCredential: 'PVWA-Anmeldeinformation',
-      pvwaCredentialHelp:
-        'Der API-Benutzer, mit dem es sich anmeldet: Er braucht Add accounts und Update account content in diesen Safes.',
+      pvwaCredentialHelp: 'Der API-Benutzer: braucht Add accounts und Update account content in diesen Safes.',
       pvwaAuth: 'Anmeldemethode',
       platformId: 'Plattform-ID',
       platformIdHelp: 'Die Plattform eines neuen Kontos, z. B. UnixSSH. Ein vorhandenes Konto behält seine eigene.',
@@ -1831,8 +1796,7 @@ export default {
       appId: 'AppID',
       appIdHelp: 'Die in CyberArk für AnsibleForms angelegte Application ID.',
       clientCert: 'Client-Zertifikat',
-      clientCertHelp:
-        'PEM-Zertifikat, wenn die AppID auf ein Client-Zertifikat beschränkt ist. Leer lassen bei einer Beschränkung auf IP oder OS-Benutzer.',
+      clientCertHelp: 'PEM-Zertifikat, nur wenn die AppID ein Client-Zertifikat verlangt.',
       clientKey: 'Client-Schlüssel',
       clientKeyHelp: 'PEM-Privatschlüssel des Client-Zertifikats. Wird verschlüsselt gespeichert.',
       enterprise: 'Vault Enterprise',
@@ -1859,8 +1823,7 @@ export default {
     storedJobs: {
       label: 'Gespeicherter Job',
       labelPlural: 'Gespeicherte Jobs',
-      description:
-        'Gespeicherte Formularwerte zum erneuten Ausführen: hier oder über den Laden-Knopf des Formulars ausgefüllt öffnen.',
+      description: 'Gespeicherte Formularwerte zum erneuten Ausführen: hier oder per Laden im Formular.',
       viewDetails: 'Details des gespeicherten Jobs anzeigen',
       userTypeName: 'Benutzer (typ/name)',
       visibility: 'Sichtbarkeit',
@@ -1879,19 +1842,18 @@ export default {
     },
     knownhosts: {
       label: 'Bekannter Host',
-      description:
-        'Die Server, denen die App per SSH vertraut. Der Host eines Repositorys wird beim ersten Klonen hinzugefügt; Playbooks laufen auf einem RTE, das seine eigenen hat.',
+      description: 'Server, denen die App per SSH vertraut; ein Repository-Host kommt beim ersten Klonen.',
       showEntry: 'Host in die Zwischenablage kopieren',
       hostEntry: 'Host-Eintrag',
     },
     credentials: {
       label: 'Anmeldedaten',
-      description:
-        'Wiederverwendbare Zugangsdaten für die Verbindung zu Datenbanken und externen Diensten aus Formularen.',
+      description: 'Wiederverwendbare Zugangsdaten für Datenbanken und externe Dienste aus Formularen.',
       adminOnlyNotice:
         'Nur ein Admin kann diese Zugangsdaten ändern: ein Runner, eine Verbindung oder eine Anmeldung nimmt daraus seine Adresse und sein Geheimnis.',
       enableDbFields: 'Datenbankfelder aktivieren',
       databaseType: 'Datenbanktyp',
+      databaseEngine: 'Engine',
       database: 'Datenbank',
       secretStore: 'Secret Store',
       secretRefPlaceholderVault: 'z. B. secret/myapp/prod',
@@ -1908,8 +1870,7 @@ export default {
       secretWriteToStore: 'In einen Schlüssel schreiben',
       secretWriteToStoreHint: 'Im nächsten Schritt eingegeben, beim Speichern in den Store geschrieben',
       secretOverwrite: 'Ein vorhandenes Geheimnis überschreiben',
-      secretOverwriteHelp:
-        'Ohne diese Option wird das Speichern abgelehnt, wenn der Store an dieser Stelle bereits ein Geheimnis hat.',
+      secretOverwriteHelp: 'Ohne diese Option wird Speichern abgelehnt, wenn der Store hier schon ein Geheimnis hat.',
       loginWriteNew: 'Beim Speichern in {store} unter {ref} geschrieben; nur der Verweis bleibt.',
       secretLocal: 'Datenbank',
       secretLocalHint: 'Verschlüsselt in der AnsibleForms-Datenbank',
@@ -1921,7 +1882,7 @@ export default {
       type_ssh: 'SSH',
       type_sshHint: 'Benutzer mit Passwort oder privatem Schlüssel für SSH zu einem Server',
       type_userpass: 'Benutzer und Passwort',
-      type_userpassHint: 'Benutzer und Passwort für jede andere Anmeldung, wie die Anmeldedaten von vor v7',
+      type_userpassHint: 'Benutzer und Passwort für andere Anmeldungen, wie Anmeldedaten vor v7',
       type_git: 'Git',
       type_gitHint: 'Benutzer und Passwort oder Token für Git-Repositorys',
       type_api: 'API',
@@ -1932,24 +1893,46 @@ export default {
       secretRefHelp: 'Vault-Pfad (secret/myapp/prod) oder CyberArk-Konto (Safe=Linux;Object=srv01).',
       secretRef: 'Referenz',
       type_cyberark: 'CyberArk',
-      type_cyberarkHint: 'AppID, Client-Zertifikat und Schlüssel, mit denen sich ein CyberArk Secret Store anmeldet',
+      type_cyberarkHint: 'AppID, Client-Zertifikat und Schlüssel für einen CyberArk-Store',
       clientKeyKeep: 'Leer gelassen bleibt der gespeicherte Client-Schlüssel.',
+      addHostPort: 'Host und Port hinzufügen',
+      addHostPortHelp: 'Mit den Anmeldedaten an das Playbook und an Ausdrücke übergeben.',
+      smtpSignIn: 'Anmelden mit',
+      smtpSignIn_none: 'Keine Anmeldung',
+      smtpSignInHint_none: 'Ein Relay, das Mail ohne Anmeldung annimmt',
+      smtpSignIn_password: 'Anmeldung',
+      smtpSignInHint_password: 'Ein Benutzer und sein Passwort',
+      smtpUserRequired: 'Geben Sie den Benutzer ein, mit dem es sich anmeldet.',
+      gitSignIn: 'Anmelden mit',
+      gitSignIn_token: 'Token',
+      gitSignInHint_token: 'Ein Zugriffstoken, kein Benutzer',
+      gitSignIn_password: 'Passwort',
+      gitSignInHint_password: 'Ein Benutzer und sein Passwort',
+      awxSignIn: 'Anmelden mit',
+      awxSignIn_token: 'Token',
+      awxSignInHint_token: 'Ein API-Token, kein Benutzer',
+      awxSignIn_password: 'Passwort',
+      awxSignInHint_password: 'Ein Benutzer und sein Passwort',
+      awxUserRequired: 'Geben Sie den Benutzer ein, mit dem es sich anmeldet.',
+      sshSignIn: 'Anmelden mit',
+      sshSignIn_password: 'Passwort',
+      sshSignInHint_password: 'Benutzer und Passwort',
+      sshSignIn_key: 'Privater Schlüssel',
+      sshSignInHint_key: 'Ein PEM- oder OpenSSH-Schlüssel, mit optionaler Passphrase',
+      sshKeyDropped: 'Beim Speichern werden der gespeicherte private Schlüssel und seine Passphrase entfernt.',
+      privateKeyRequired: 'Fügen Sie den privaten Schlüssel ein, mit dem es sich anmeldet.',
       entraSignIn: 'Anmelden mit',
-      entraSignIn_secret: 'Client-Geheimnis',
+      entraSignIn_secret: 'Geheimnis',
       entraSignInHint_secret: 'Das Geheimnis der App-Registrierung: für die SSO-Anmeldung und Mail',
       entraSignIn_certificate: 'Zertifikat',
       entraSignInHint_certificate: 'Ein Zertifikat und sein privater Schlüssel: nur für Mail über Microsoft 365',
-      entraCertHelp:
-        'Das PEM-Zertifikat, das in die App-Registrierung hochgeladen wurde (Zertifikate & Geheimnisse); sein privater Schlüssel unten.',
+      entraCertHelp: 'Das in die App-Registrierung hochgeladene PEM-Zertifikat; sein privater Schlüssel unten.',
       privateKey: 'Privater Schlüssel',
-      privateKeyHelp:
-        'Der PEM- oder OpenSSH-Schlüssel, mit dem sich das Playbook anmeldet. Verschlüsselt gespeichert, nie wieder angezeigt.',
+      privateKeyHelp: 'Der PEM- oder OpenSSH-Schlüssel für die Anmeldung, verschlüsselt, nie wieder angezeigt.',
       privateKeyKeep: 'Leer gelassen bleibt der gespeicherte private Schlüssel.',
       keyPassphrase: 'Passphrase',
-      keyPassphraseHelp: 'Die Passphrase des privaten Schlüssels, falls er eine hat. Verschlüsselt gespeichert.',
+      keyPassphraseHelp: 'Optional: Die Passphrase des privaten Schlüssels, falls vorhanden. Verschlüsselt.',
       keyPassphraseKeep: 'Leer gelassen bleibt die gespeicherte Passphrase.',
-      sshPasswordHelp: 'Optional mit einem privaten Schlüssel.',
-      removeKey: 'Gespeicherten privaten Schlüssel und Passphrase entfernen',
       server: 'Server',
       serverHelp: 'Die Adresse des Secret Stores, für den diese Anmeldung gilt.',
       optionalHostHelp: 'Optional. Wird mit den Anmeldedaten als host an das Playbook und an Ausdrücke übergeben.',
@@ -1972,14 +1955,8 @@ export default {
       type_jenkinsHint: 'Ein Benutzer, sein API-Token und die Adresse eines Jenkins',
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'Token und Adresse, mit denen sich ein HashiCorp Vault Secret Store anmeldet',
-      userOptional: 'Benutzer (optional)',
-      passwordOptional: 'Passwort (optional)',
-      smtpLoginHelp: 'Leer für einen Mailserver, der Mails ohne Anmeldung annimmt (ein Relay).',
-      rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'Das RTE_TOKEN, mit dem die RTE gestartet wurde.',
       apiToken: 'API-Token',
-      tokenOrPassword: 'Token oder Passwort',
-      tokenOrPasswordHelp: 'Ein Token; mit einem Benutzer dessen Passwort.',
       notFound: "Es gibt keine Anmeldeinformation mit der ID '{id}'.",
       fieldsRequired: 'Name und Beschreibung sind erforderlich.',
       loginFromStoreNew:
@@ -1990,23 +1967,19 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: 'Server, TLS und Bind-Konto eines LDAP-Verzeichnisses: DN und Passwort',
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint:
-        'Die App eines Microsoft Entra ID-Anbieters oder für Microsoft 365-Mail: Mandanten-ID, Client-ID und ein Geheimnis oder ein Zertifikat',
+      type_entraidHint: 'Eine Entra ID-App für SSO oder Microsoft 365-Mail: Mandanten- und Client-ID',
       type_oidc: 'Open ID',
-      type_oidcHint: 'Der Client eines Open ID-Anbieters: Aussteller, Client-ID und Client-Geheimnis',
+      type_oidcHint: 'Client eines Open ID-Anbieters: Aussteller, Client-ID und Geheimnis',
     },
     ssh: {
       tabKey: 'Schlüssel',
       label: 'SSH-Schluessel',
-      description:
-        "Das Schlüsselpaar, mit dem sich die App per SSH verbindet: zu Git, für ein Repository unter git{'@'}host:org/repo.git.",
+      description: "Das Schlüsselpaar der App für Git per SSH (git{'@'}host:org/repo.git).",
       privateKeyArt: 'Private-Key-Art',
       privateKey: 'Privater Schluessel',
-      privateKeyHelp:
-        'Zum Ueberschreiben des aktuellen privaten Schluessels verwenden. Nur wenn Sie wissen, was Sie tun!',
+      privateKeyHelp: 'Überschreibt den aktuellen privaten Schlüssel. Nur wenn Sie wissen, was Sie tun!',
       publicKey: 'Oeffentlicher Schluessel',
-      publicKeyHelp:
-        'Automatisch vom privaten Schluessel abgeleitet. Kopieren Sie diesen in die authorized_keys Ihrer Remote-Server.',
+      publicKeyHelp: 'Vom privaten Schlüssel abgeleitet. Kopieren Sie ihn in die authorized_keys Ihrer Server.',
     },
     chat: {
       tabGeneral: 'Allgemein',
@@ -2014,8 +1987,7 @@ export default {
       tabCredentials: 'Anmeldedaten',
       tabLimits: 'Grenzen',
       label: 'Chat-Assistent',
-      description:
-        'Der KI-Modellanbieter des Chat-Assistenten. Der Chat braucht außerdem ENABLE_CHAT=1, und ein Formular nimmt nur mit enableForChat: true teil.',
+      description: 'KI-Anbieter des Chat-Assistenten; nötig sind auch ENABLE_CHAT=1 und enableForChat: true.',
       provider: 'Anbieter',
       providerHelp: 'Der Dienst, der das KI-Modell ausführt; die Auswahl trägt seine Adresse ein',
       providerNone: 'Keiner - Chat aus',
@@ -2034,8 +2006,7 @@ export default {
       timeout: 'Zeitlimit (Sekunden)',
       timeoutHelp: 'Wie lange auf die Antwort des Modells gewartet wird',
       allowJobStatus: 'Den Assistenten seine Jobs verfolgen lassen',
-      allowJobStatusHelp:
-        'Er sieht, ob die gestarteten Jobs laufen, erfolgreich waren oder fehlschlugen, nie ihre Ausgabe',
+      allowJobStatusHelp: 'Er sieht, ob seine Jobs laufen, erfolgreich waren oder fehlschlugen, nie ihre Ausgabe',
       authType: 'Authentifizierung',
       authTypeHelp: 'Wie der Schlüssel gesendet wird',
       authDefault: 'Standard des Anbieters',
@@ -2054,27 +2025,22 @@ export default {
     },
     ldap: {
       label: 'LDAP',
-      description:
-        'Verbindung zu einem LDAP- oder Active Directory-Server für Benutzerauthentifizierung und Gruppenzuordnung.',
+      description: 'Verbindung zu LDAP oder Active Directory für Benutzeranmeldung und Gruppenzuordnung.',
       enableLdap: 'LDAP aktivieren',
       enableLdapHelp: 'Benutzer melden sich mit ihrem LDAP- oder Active-Directory-Konto an',
       credential: 'Anmeldedaten-Eintrag',
-      credentialHelp:
-        'Ein ldap-Eintrag aus Verbindungen > Anmeldedaten: Server, Port, TLS und Zertifikate des Verzeichnisses sowie Bind-DN und Passwort.',
-      nameHelp:
-        'Stellt seinen Mitgliedern in Rollen den Namen voran: corp/jane, ldap/corp/Admins. Das Verzeichnis default behält die kurzen Namen und seinen eigenen Namen.',
+      credentialHelp: 'Ldap-Anmeldedaten: Server, Port, TLS, Zertifikate, Bind-DN und Passwort.',
+      nameHelp: 'Präfix seiner Mitglieder in Rollen (corp/jane); default behält kurze Namen.',
       servers: 'Server',
-      serversHelp:
-        'Einer pro Feld (host, host:port oder ldaps://host:port), in dieser Reihenfolge versucht: Ist einer nicht erreichbar, wird der nächste versucht.',
+      serversHelp: 'Einer pro Feld (host, host:port oder ldaps://host:port), der Reihe nach versucht.',
       addServer: 'Server hinzufügen',
       domains: 'Anmeldedomänen',
-      domainsHelp:
-        "Eine pro Feld. Wer sich als benutzer{'@'}domäne mit einer davon anmeldet, geht direkt zu diesem Verzeichnis.",
+      domainsHelp: "Eine pro Feld: Wer sich als benutzer{'@'}domäne anmeldet, geht direkt zu diesem Verzeichnis.",
       addDomain: 'Domäne hinzufügen',
       enabled: 'Aktiviert',
       directory: 'LDAP-Verzeichnis',
       directoriesDescription:
-        "Die LDAP- und Active-Directory-Verzeichnisse, mit denen sich Benutzer anmelden. Ein Benutzername wird in ihrer Reihenfolge gesucht, außer er nennt ein Verzeichnis (corp\\jane) oder eine seiner Anmeldedomänen (jane{'@'}corp.example).",
+        'Die LDAP- und Active-Directory-Verzeichnisse der Anmeldung, in ihrer Reihenfolge gesucht.',
       moveUp: 'Nach oben',
       moveDown: 'Nach unten',
       tabGeneral: 'Allgemein',
@@ -2091,16 +2057,13 @@ export default {
       mailAttributeDesc: 'LDAP-Attribut mit der E-Mail-Adresse des Benutzers (z.B. mail).',
       bindUserDn: 'Bind-User-DN',
       bindUserDnDesc: 'DN des Dienstkontos für die Verzeichnissuche.',
-      bindUserPassword: 'Bind-User-Passwort',
       bindUserPasswordDesc: 'Passwort für das Bind-Dienstkonto.',
       usernameAttribute: 'Benutzername-Attribut',
       usernameAttributeDesc: 'LDAP-Attribut, das als Anmeldename verwendet wird (z.B. sAMAccountName, uid).',
       groupsAttribute: 'Gruppen-Attribut',
-      groupsAttributeDesc:
-        'Das Attribut mit den Gruppen eines Benutzers (memberOf), oder groups für das Ergebnis der Gruppensuche.',
+      groupsAttributeDesc: 'Das Attribut mit den Gruppen des Benutzers (memberOf), oder groups für die Gruppensuche.',
       groupsSearchBase: 'Gruppen-Search-Base',
-      groupsSearchBaseDesc:
-        'Wo die Gruppensuche beginnt (mit Gruppenklasse und Gruppenattribut groups). Leer: Gruppen aus dem Benutzer.',
+      groupsSearchBaseDesc: 'Wo die Gruppensuche beginnt (mit Gruppenattribut groups). Leer: aus dem Benutzer.',
       groupClass: 'Gruppenklasse',
       groupClassDesc: 'LDAP-objectClass für Gruppen (z.B. groupOfNames, posixGroup).',
       groupMemberAttribute: 'Gruppenmitglied-Attribut',
@@ -2110,8 +2073,7 @@ export default {
       groupMemberUserAttributeDesc:
         'Benutzerattribut, das mit dem Gruppenmitglied-Attribut abgeglichen wird (z.B. dn, uid).',
       groupFilter: 'Gruppenfilter',
-      groupFilterDesc:
-        'Regulärer Ausdruck: nur Gruppen mit passendem Namen bleiben, für Rollen, Formulare und Playbooks. Leer behält alle Gruppen.',
+      groupFilterDesc: 'Regulärer Ausdruck: nur passende Gruppen bleiben. Leer behält alle Gruppen.',
     },
     mail: {
       label: 'Mail-Einstellungen',
@@ -2120,8 +2082,7 @@ export default {
       subject: 'Betreff',
       body: 'Nachricht',
       useTls: 'TLS verwenden',
-      useTlsHelp:
-        'Verbindung zum Mailserver verschluesseln (STARTTLS). Die meisten Anbieter erfordern dies auf Port 587.',
+      useTlsHelp: 'Verbindung verschlüsseln (STARTTLS); die meisten Anbieter verlangen es auf Port 587.',
       mailServer: 'Mail-Server',
       mailServerHelp: 'Hostname oder IP-Adresse des SMTP-Servers (z.B. smtp.gmail.com).',
       mailPort: 'Mail-Port',
@@ -2132,8 +2093,7 @@ export default {
       mailPassword: 'Mail-Passwort',
       mailPasswordHelp: 'Passwort oder App-spezifisches Passwort fuer die SMTP-Authentifizierung.',
       mailFrom: 'Mail-Absender',
-      mailFromHelp:
-        "Die Absenderadresse, die Empfaengern angezeigt wird (z.B. noreply{'@'}firma.de). Kann vom Benutzernamen abweichen.",
+      mailFromHelp: "Der angezeigte Absender (z. B. noreply{'@'}firma.de); kann vom Benutzer abweichen.",
       smtpServer: 'SMTP-Server',
     },
     backups: {

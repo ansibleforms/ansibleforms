@@ -20,6 +20,10 @@ import { releasedOperationsSql } from '../lib/repositoryClaims.js';
 const CLAIM_MAX_HOURS = 2;
 import { friendlyPullError, configRepoFromPath } from "../lib/forms-git.js";
 
+// the user git sends with a token when a credential keeps none : any one works with a GitHub,
+// GitLab or Azure DevOps token, oauth2 is GitLab's documented one
+export const GIT_TOKEN_USER = 'oauth2';
+
 // ===========================================================================
 // STAGING FOLDER HELPERS
 // ===========================================================================
@@ -345,16 +349,22 @@ class Repository extends CrudModel {
    * Returns:
    *   Promise<object>: a copy with user and password set from its credential, or the record.
    *
+   * A git credential signing in with a token keeps no user : git still sends one, GIT_TOKEN_USER,
+   * which GitHub, GitLab and Azure DevOps accept with a token (Bitbucket's x-token-auth is typed as
+   * the user of a Password one).
+   *
    * Raises:
    *   Error: the credential it names does not exist.
    */
   static async withCredential(repo) {
     if (!repo?.credential) return repo
     const cred = await Credential.resolveByName(repo.credential)
-    if (!cred || !cred.user) {
+    if (!cred || (!cred.user && !cred.password)) {
       throw new Error(`Repository '${repo.name}' uses the credential '${repo.credential}', which is not found`)
     }
-    return { ...repo, user: cred.user, password: cred.password }
+    // a token without a user : the user git sends with it
+    const user = cred.user || (cred.password ? GIT_TOKEN_USER : '')
+    return { ...repo, user, password: cred.password }
   }
 
   /**

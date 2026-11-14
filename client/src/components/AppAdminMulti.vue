@@ -113,6 +113,7 @@ import yaml from 'yaml';
 import { required, requiredIf, helpers, email, sameAs } from '@vuelidate/validators';
 import { useI18n } from 'vue-i18n';
 import BsDataTable from './BsDataTable.vue';
+import BsRadioChoice from './BsRadioChoice.vue';
 import getSettings, { noCredentialsText } from '@/config/settings';
 import { inSentence } from '@/lib/inSentence';
 import { rememberRows } from '@/lib/recordButtons';
@@ -1870,6 +1871,16 @@ defineExpose({
 
         <!-- RADIO BUTTONS (type radio) : one choice of field.options, at the dialog's left edge,
              each its label and a few grey words (hint) on one line -->
+        <!-- A CHOICE AMONG THE FIELDS (type radio, alignHints) : each option a row like theirs, the
+             radio in the label column, its hint where their inputs start (BsRadioChoice) -->
+        <BsRadioChoice
+          v-else-if="showField(field) && field.type === 'radio' && field.alignHints"
+          v-model="$v.item[field.key].$model"
+          :options="field.options"
+          :name="field.key"
+          :disabled="!!field.readonly"
+          aligned
+        />
         <div
           v-else-if="showField(field) && field.type === 'radio'"
           class="mb-3 af-radio-group"

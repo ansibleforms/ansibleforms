@@ -41,6 +41,11 @@ import {
   credentialLabels,
   secretRefText,
   entraAuthOptionList,
+  sshAuthOptionList,
+  awxAuthOptionList,
+  gitAuthOptionList,
+  smtpAuthOptionList,
+  AWX_CREDENTIAL_TYPES,
   secretActionOptionList,
 } from '@/config/settings';
 import { formRows, fitsPattern } from '@/lib/formUseRows';
@@ -49,6 +54,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import BsRadioChoice from '@/components/BsRadioChoice.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -63,7 +69,7 @@ const edit = ref(null); // as edited
 const secretStores = ref([]); // the stores a credential can read from
 // what this page edits : the password has its own dialog ; a CyberArk's client key, and an SSH
 // one's private key and its passphrase, are typed on the Login tab, left empty to keep the stored
-// ones (or removed with remove_key)
+// ones (or removed when it logs in with its password again)
 const EDITED = [
   'name',
   'description',
@@ -73,7 +79,11 @@ const EDITED = [
   'client_key',
   'entra_auth',
   'key_passphrase',
-  'remove_key',
+  'ssh_auth',
+  'awx_auth',
+  'git_auth',
+  'smtp_auth',
+  'with_host',
   'tenant_id',
   'issuer',
   'redirect_uri',
@@ -123,9 +133,16 @@ function editable(record) {
     client_key: '',
     // an Entra ID one : its client secret, or the certificate it keeps (mail through Microsoft 365)
     entra_auth: record.client_cert ? 'certificate' : 'secret',
-    // an SSH one's passphrase, never sent back either ; the stored key and passphrase removed
+    // an SSH one's passphrase, never sent back either
     key_passphrase: '',
-    remove_key: false,
+    // an SSH one : its password, or the private key it keeps
+    ssh_auth: record.client_key ? 'key' : 'password',
+    // an AWX, AAP or Ascender one : a token, or the user it signs in as with its password
+    awx_auth: record.user ? 'password' : 'token',
+    // a git one : a token without a user, or the user it signs in as with its password
+    git_auth: record.user ? 'password' : 'token',
+    // an smtp one : a relay without a login, or the user it signs in as with its password
+    smtp_auth: record.user ? 'password' : 'none',
     tenant_id: record.tenant_id ?? '',
     issuer: record.issuer ?? '',
     redirect_uri: record.redirect_uri ?? '',
@@ -137,6 +154,8 @@ function editable(record) {
     secret_store: record.secret_store ?? '',
     secret_ref: record.secret_ref ?? '',
     host: record.host ?? '',
+    // a user and password or an api one : its host and port shown, once this is on
+    with_host: !!String(record.host ?? '').trim(),
     port: record.port ?? '',
     secure: !!record.secure,
     url: record.url ?? '',
@@ -197,6 +216,9 @@ const secretActionOptions = computed(() => secretActionOptionList(t));
 // its user and password ; whether one is stored (the api sends it masked)
 const isSsh = computed(() => type.value === 'ssh');
 const keyStored = computed(() => !!credential.value?.client_key);
+// an SSH one logging in with a private key : its key and passphrase asked, not its password
+const sshKey = computed(() => isSsh.value && edit.value?.ssh_auth === 'key');
+const sshAuthOptions = computed(() => sshAuthOptionList(t));
 const isDatabase = computed(() => type.value === 'database');
 // a secret store's login never comes from a secret store (it would read a store to find it)
 const noStore = computed(() => ['cyberark', 'vault'].includes(type.value));
@@ -217,7 +239,17 @@ const storeChoices = computed(() =>
   writesToStore.value ? secretStores.value.filter((s) => !s.name || s.write_enabled) : secretStores.value,
 );
 // a Vault, an RTE, a Semaphore and a Rundeck log in with a token only : no user
-const hasUser = computed(() => !TOKEN_CREDENTIAL_TYPES.includes(type.value));
+// an AWX, AAP or Ascender one : what it signs in with, a token or a user and its password
+const isAwx = computed(() => AWX_CREDENTIAL_TYPES.includes(type.value));
+const awxAuthOptions = computed(() => awxAuthOptionList(t));
+// a user to type : not for the types that sign in with a token only, nor an AWX one with a token
+const hasUser = computed(
+  () =>
+    !TOKEN_CREDENTIAL_TYPES.includes(type.value) &&
+    !(isAwx.value && edit.value?.awx_auth !== 'password') &&
+    !(type.value === 'smtp' && edit.value?.smtp_auth === 'none') &&
+    !(type.value === 'git' && edit.value?.git_auth !== 'password'),
+);
 // the types in the order of their names, in the language shown, as the dialog's
 const sortedTypes = computed(() =>
   [...CREDENTIAL_TYPES].sort((a, b) =>
@@ -225,7 +257,13 @@ const sortedTypes = computed(() =>
   ),
 );
 // what its fields are called for its type
-const labels = computed(() => credentialLabels(t, type.value));
+const labels = computed(() => credentialLabels(t, type.value, edit.value?.awx_auth, edit.value?.git_auth));
+// a git one : what its user signs in with, a token or its password
+const isGit = computed(() => type.value === 'git');
+const gitAuthOptions = computed(() => gitAuthOptionList(t));
+// an smtp one : a relay without a login, or a user and its password
+const smtpAuthOptions = computed(() => smtpAuthOptionList(t));
+const smtpRelay = computed(() => type.value === 'smtp' && edit.value?.smtp_auth === 'none');
 const dirty = computed(
   () =>
     !!credential.value &&
@@ -435,8 +473,10 @@ async function save() {
     name: e.name.trim(),
     description: e.description.trim(),
     credential_type: e.credential_type,
-    host: hasConnection.value ? e.host.trim() : '',
-    port: hasConnection.value && String(e.port ?? '').trim() !== '' ? e.port : null,
+    // a user and password or an api one with its switch off : none
+    host: hasConnection.value && (!optionalHost.value || e.with_host) ? e.host.trim() : '',
+    port:
+      hasConnection.value && (!optionalHost.value || e.with_host) && String(e.port ?? '').trim() !== '' ? e.port : null,
     // an api, userpass or cyberark one's server
     url: hasServer.value ? e.url.trim() : '',
     // an ldap one's, or a server's : certificates not checked, the CA bundle (an ldap one's client
@@ -482,15 +522,43 @@ async function save() {
     data.client_cert = '';
     data.client_key = null;
   }
-  // an SSH one's private key and its passphrase : left empty, the stored ones stay ; removed,
-  // both go
+  // a git one with a token : no user kept ; with a password, the user it signs in as
+  if (type.value === 'git' && e.git_auth !== 'password') {
+    data.user = '';
+  } else if (type.value === 'git' && !e.user.trim()) {
+    toast.warning(t('settings.credentials.smtpUserRequired'));
+    return;
+  }
+  // an smtp relay : no login kept ; with a password, the user it signs in as
+  if (type.value === 'smtp' && e.smtp_auth === 'none') {
+    data.user = '';
+    data.password = null;
+  } else if (type.value === 'smtp' && !e.user.trim()) {
+    toast.warning(t('settings.credentials.smtpUserRequired'));
+    return;
+  }
+  // an AWX, AAP or Ascender one signing in with a password : the user it signs in as
+  if (isAwx.value && e.awx_auth === 'password' && !e.user.trim()) {
+    toast.warning(t('settings.credentials.awxUserRequired'));
+    return;
+  }
+  // an SSH one logs in with its password or with a private key, never both : a key chosen drops
+  // its password, the password chosen drops the stored key and passphrase ; left empty, the
+  // stored key and passphrase stay
   if (isSsh.value) {
-    if (e.remove_key) {
-      data.client_key = null;
-      data.key_passphrase = null;
-    } else {
+    if (e.ssh_auth === 'key') {
+      // Step 1 : a key to log in with : typed, or the one stored
+      if (!e.client_key.trim() && !keyStored.value) {
+        toast.warning(t('settings.credentials.privateKeyRequired'));
+        return;
+      }
       if (e.client_key.trim()) data.client_key = e.client_key;
       if (e.key_passphrase) data.key_passphrase = e.key_passphrase;
+      // Step 2 : no password kept beside it
+      data.password = null;
+    } else if (keyStored.value) {
+      data.client_key = null;
+      data.key_passphrase = null;
     }
   }
   if (await update(data)) {
@@ -554,7 +622,8 @@ const tabFields = computed(() => {
       conn && isDatabase.value && ['db_type', t('settings.credentials.databaseType')],
       conn && isLdap.value && ['servers', t('settings.ldap.servers'), t('settings.ldap.serversHelp')],
       conn &&
-        !isLdap.value && [
+        !isLdap.value &&
+        !optionalHost.value && [
           'host',
           isSmtp.value ? t('settings.mail.mailServer') : t('settings.fields.host'),
           isSmtp.value
@@ -563,15 +632,16 @@ const tabFields = computed(() => {
               ? t('settings.credentials.optionalHostHelp')
               : '',
         ],
-      conn && [
-        'port',
-        isSmtp.value ? t('settings.mail.mailPort') : t('settings.fields.port'),
-        isSmtp.value
-          ? t('settings.mail.mailPortHelp')
-          : optionalHost.value
-            ? t('settings.credentials.optionalPortHelp')
-            : '',
-      ],
+      conn &&
+        !optionalHost.value && [
+          'port',
+          isSmtp.value ? t('settings.mail.mailPort') : t('settings.fields.port'),
+          isSmtp.value
+            ? t('settings.mail.mailPortHelp')
+            : optionalHost.value
+              ? t('settings.credentials.optionalPortHelp')
+              : '',
+        ],
       conn &&
         (isSmtp.value || isLdap.value) && [
           'tls',
@@ -591,6 +661,16 @@ const tabFields = computed(() => {
       !typed && ['from_store', t('settings.credentials.loginFromStore')],
       typed && e.credential_type === 'entraid' && ['tenant_id', t('settings.oauth2.tenantId')],
       typed && e.credential_type === 'oidc' && ['issuer', t('settings.oauth2.issuer')],
+      typed && isSso.value && ['redirect_uri', t('settings.oauth2.redirectUrl'), t('settings.oauth2.redirectHelp')],
+      ...(typed && type.value === 'smtp'
+        ? smtpAuthOptions.value.map((opt) => [`smtp_auth-${opt.value}`, opt.label, opt.hint])
+        : []),
+      ...(typed && isGit.value
+        ? gitAuthOptions.value.map((opt) => [`git_auth-${opt.value}`, opt.label, opt.hint])
+        : []),
+      ...(typed && isAwx.value
+        ? awxAuthOptions.value.map((opt) => [`awx_auth-${opt.value}`, opt.label, opt.hint])
+        : []),
       typed && hasUser.value && ['user', userLabel.value, isCyberark.value ? t('settings.secretStores.appIdHelp') : ''],
       ...(typed && isEntra.value
         ? entraAuthOptions.value.map((opt) => [`entra_auth-${opt.value}`, opt.label, opt.hint])
@@ -607,27 +687,35 @@ const tabFields = computed(() => {
           t('settings.secretStores.clientKey'),
           t('settings.credentials.clientKeyKeep'),
         ],
+      optionalHost.value && [
+        'with_host',
+        t('settings.credentials.addHostPort'),
+        t('settings.credentials.addHostPortHelp'),
+      ],
+      optionalHost.value && e.with_host && ['host', t('settings.fields.host'), ''],
+      optionalHost.value && e.with_host && ['port', t('settings.fields.port'), ''],
+      ...(isSsh.value ? sshAuthOptions.value.map((opt) => [`ssh_auth-${opt.value}`, opt.label, opt.hint]) : []),
       typed &&
-        !hasClientKey.value && [
+        !hasClientKey.value &&
+        !sshKey.value &&
+        !smtpRelay.value && [
           'password',
           passwordLabel.value,
           labels.value.passwordHelp
             ? `${labels.value.passwordHelp} ${t('settings.common.passwordKeep')}`
             : t('settings.common.passwordKeep'),
         ],
-      typed && isSso.value && ['redirect_uri', t('settings.oauth2.redirectUrl'), t('settings.oauth2.redirectHelp')],
-      // an SSH one's private key and its passphrase, whatever reads its user and password
-      isSsh.value && [
+      // an SSH one's private key and its passphrase, when it logs in with one
+      sshKey.value && [
         'private_key',
         t('settings.credentials.privateKey'),
         keyStored.value ? t('settings.credentials.privateKeyKeep') : t('settings.credentials.privateKeyHelp'),
       ],
-      isSsh.value && [
+      sshKey.value && [
         'key_passphrase',
         t('settings.credentials.keyPassphrase'),
         keyStored.value ? t('settings.credentials.keyPassphraseKeep') : t('settings.credentials.keyPassphraseHelp'),
       ],
-      isSsh.value && keyStored.value && ['remove_key', t('settings.credentials.removeKey')],
     ].filter(Boolean),
     store: [
       ['source-local', t('settings.credentials.secretLocal'), t('settings.credentials.secretLocalHint')],
@@ -844,7 +932,7 @@ onMounted(async () => {
                   :label="t('settings.ldap.servers')"
                 />
                 <BsInput
-                  v-else
+                  v-else-if="!optionalHost"
                   class="af-credential-field"
                   v-model="edit.host"
                   v-show="fieldShown('host')"
@@ -862,6 +950,7 @@ onMounted(async () => {
                   :label="isSmtp ? t('settings.mail.mailServer') : t('settings.fields.host')"
                 />
                 <BsInput
+                  v-if="!optionalHost"
                   class="af-credential-field"
                   v-model="edit.port"
                   v-show="fieldShown('port')"
@@ -1021,6 +1110,51 @@ onMounted(async () => {
                   :required="true"
                   :label="t('settings.oauth2.issuer')"
                 />
+                <!-- an Entra ID or Open ID one's redirect URL, as registered with its client -->
+                <BsInput
+                  v-if="isSso"
+                  class="af-credential-field"
+                  v-model="edit.redirect_uri"
+                  v-show="fieldShown('redirect_uri')"
+                  icon="link"
+                  :placeholder="defaultRedirect"
+                  :isFloating="false"
+                  :help="t('settings.oauth2.redirectHelp')"
+                  :label="t('settings.oauth2.redirectUrl')"
+                />
+                <!-- an smtp one : a relay without a login, or a user and its password -->
+                <BsRadioChoice
+                  v-if="type === 'smtp'"
+                  v-show="smtpAuthOptions.some((opt) => fieldShown(`smtp_auth-${opt.value}`))"
+                  v-model="edit.smtp_auth"
+                  name="smtp-auth"
+                  :title="t('settings.credentials.smtpSignIn')"
+                  :options="smtpAuthOptions"
+                  :shown="(opt) => fieldShown(`smtp_auth-${opt.value}`)"
+                  :disabled="readOnly"
+                />
+                <!-- a git one : its user's token or password -->
+                <BsRadioChoice
+                  v-if="isGit"
+                  v-show="gitAuthOptions.some((opt) => fieldShown(`git_auth-${opt.value}`))"
+                  v-model="edit.git_auth"
+                  name="git-auth"
+                  :title="t('settings.credentials.gitSignIn')"
+                  :options="gitAuthOptions"
+                  :shown="(opt) => fieldShown(`git_auth-${opt.value}`)"
+                  :disabled="readOnly"
+                />
+                <!-- an AWX, AAP or Ascender one : a token, or a user and its password -->
+                <BsRadioChoice
+                  v-if="isAwx"
+                  v-show="awxAuthOptions.some((opt) => fieldShown(`awx_auth-${opt.value}`))"
+                  v-model="edit.awx_auth"
+                  name="awx-auth"
+                  :title="t('settings.credentials.awxSignIn')"
+                  :options="awxAuthOptions"
+                  :shown="(opt) => fieldShown(`awx_auth-${opt.value}`)"
+                  :disabled="readOnly"
+                />
                 <BsInput
                   v-if="hasUser"
                   class="af-credential-field"
@@ -1032,33 +1166,16 @@ onMounted(async () => {
                   :label="userLabel"
                 />
                 <!-- an Entra ID one : its client secret, or a certificate (mail through Microsoft 365) -->
-                <div
+                <BsRadioChoice
                   v-if="isEntra"
                   v-show="entraAuthOptions.some((opt) => fieldShown(`entra_auth-${opt.value}`))"
-                  class="mb-3"
-                >
-                  <label class="form-label">{{ t('settings.credentials.entraSignIn') }}</label>
-                  <div
-                    v-for="opt in entraAuthOptions"
-                    v-show="fieldShown(`entra_auth-${opt.value}`)"
-                    :key="opt.value"
-                    class="form-check af-short-check"
-                  >
-                    <input
-                      :id="'af-entra-auth-' + opt.value"
-                      v-model="edit.entra_auth"
-                      class="form-check-input"
-                      type="radio"
-                      name="af-entra-auth"
-                      :value="opt.value"
-                      :disabled="readOnly"
-                    />
-                    <label class="form-check-label" :for="'af-entra-auth-' + opt.value">
-                      <span class="af-short-label">{{ opt.label }}</span>
-                      <span class="text-body-secondary small">{{ opt.hint }}</span>
-                    </label>
-                  </div>
-                </div>
+                  v-model="edit.entra_auth"
+                  name="entra-auth"
+                  :title="t('settings.credentials.entraSignIn')"
+                  :options="entraAuthOptions"
+                  :shown="(opt) => fieldShown(`entra_auth-${opt.value}`)"
+                  :disabled="readOnly"
+                />
                 <template v-if="hasClientKey">
                   <BsInput
                     class="af-credential-field"
@@ -1085,9 +1202,10 @@ onMounted(async () => {
                     :label="t('settings.secretStores.clientKey')"
                   />
                 </template>
-                <!-- its password, masked : left empty, the stored one is kept ; typed, replaced -->
+                <!-- its password, masked : left empty, the stored one is kept ; typed, replaced ; an
+                     SSH one logging in with a private key has none -->
                 <BsInput
-                  v-else
+                  v-else-if="!sshKey && !smtpRelay"
                   class="af-credential-field"
                   v-model="newPassword"
                   v-show="fieldShown('password')"
@@ -1103,22 +1221,63 @@ onMounted(async () => {
                   "
                   :label="passwordLabel"
                 />
-                <!-- an Entra ID or Open ID one's redirect URL, as registered with its client -->
-                <BsInput
-                  v-if="isSso"
-                  class="af-credential-field"
-                  v-model="edit.redirect_uri"
-                  v-show="fieldShown('redirect_uri')"
-                  icon="link"
-                  :placeholder="defaultRedirect"
-                  :isFloating="false"
-                  :help="t('settings.oauth2.redirectHelp')"
-                  :label="t('settings.oauth2.redirectUrl')"
-                />
               </template>
-              <!-- an SSH one's private key and its passphrase : kept in the app (encrypted),
-                   whatever reads its user and password ; left empty, the stored ones stay -->
-              <template v-if="isSsh">
+              <!-- a user and password or an api one : a host and a port handed with it, once on -->
+              <template v-if="optionalHost">
+                <div v-show="fieldShown('with_host')" class="form-check form-switch mb-1">
+                  <input
+                    id="af-credential-with-host"
+                    v-model="edit.with_host"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :disabled="readOnly"
+                  />
+                  <label class="form-check-label" for="af-credential-with-host">{{
+                    t('settings.credentials.addHostPort')
+                  }}</label>
+                </div>
+                <div v-show="fieldShown('with_host')" class="form-text mb-3">
+                  {{ t('settings.credentials.addHostPortHelp') }}
+                </div>
+                <template v-if="edit.with_host">
+                  <BsInput
+                    class="af-credential-field"
+                    v-model="edit.host"
+                    v-show="fieldShown('host')"
+                    icon="server"
+                    :isFloating="false"
+                    :label="t('settings.fields.host')"
+                  />
+                  <BsInput
+                    class="af-credential-field"
+                    v-model="edit.port"
+                    v-show="fieldShown('port')"
+                    type="number"
+                    icon="arrows-alt-v"
+                    :isFloating="false"
+                    :label="t('settings.fields.port')"
+                  />
+                </template>
+              </template>
+              <!-- an SSH one : what it logs in with, its password or a private key -->
+              <BsRadioChoice
+                v-if="isSsh"
+                v-show="sshAuthOptions.some((opt) => fieldShown(`ssh_auth-${opt.value}`))"
+                v-model="edit.ssh_auth"
+                name="ssh-auth"
+                :title="t('settings.credentials.sshSignIn')"
+                :options="sshAuthOptions"
+                :shown="(opt) => fieldShown(`ssh_auth-${opt.value}`)"
+                :disabled="readOnly"
+              >
+                <div v-if="keyStored && edit.ssh_auth === 'password'" class="form-text">
+                  {{ t('settings.credentials.sshKeyDropped') }}
+                </div>
+              </BsRadioChoice>
+              <!-- an SSH one's private key and its passphrase : kept in the app (encrypted) ; left
+                   empty, the stored ones stay -->
+              <template v-if="sshKey">
                 <BsInput
                   class="af-credential-field"
                   v-model="edit.client_key"
@@ -1127,7 +1286,7 @@ onMounted(async () => {
                   icon="key"
                   placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
                   :isFloating="false"
-                  :disabled="readOnly || edit.remove_key"
+                  :disabled="readOnly"
                   :help="
                     keyStored ? t('settings.credentials.privateKeyKeep') : t('settings.credentials.privateKeyHelp')
                   "
@@ -1141,7 +1300,7 @@ onMounted(async () => {
                   icon="lock"
                   :placeholder="keyStored ? '**********' : ''"
                   :isFloating="false"
-                  :disabled="readOnly || edit.remove_key"
+                  :disabled="readOnly"
                   :help="
                     keyStored
                       ? t('settings.credentials.keyPassphraseKeep')
@@ -1149,20 +1308,6 @@ onMounted(async () => {
                   "
                   :label="t('settings.credentials.keyPassphrase')"
                 />
-                <!-- the stored key and its passphrase removed on Save -->
-                <div v-if="keyStored" v-show="fieldShown('remove_key')" class="form-check form-switch mb-3">
-                  <input
-                    id="af-credential-remove-key"
-                    v-model="edit.remove_key"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    :disabled="readOnly"
-                  />
-                  <label class="form-check-label" for="af-credential-remove-key">{{
-                    t('settings.credentials.removeKey')
-                  }}</label>
-                </div>
               </template>
             </template>
             <!-- Store : the app's database, or a secret store and the place in it -->
