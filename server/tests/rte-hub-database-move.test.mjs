@@ -4,10 +4,7 @@
 // never for a runner the config seed declares in database mode or one waiting for approval.
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { execFileSync } from "child_process";
+import { makeCertificate } from "./helpers/certificates.mjs";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
 process.env.DB_HOST = process.env.DB_HOST || "127.0.0.1";
@@ -109,15 +106,10 @@ const headers = (extra = {}) => ({ authorization: `Bearer ${TOKEN}`, "x-af-rte-n
 // a runner the 7.2 RTE registered itself : its token on the row, its node id, no mode
 const registered = (extra = {}) => ({ id: 1, name: "rte", type: "rte", uri: "http://rte:8000", token: TOKEN, node_id: "rte-a1b2c3d4e5f6-8000", rte_mode: null, pending: 0, ...extra });
 
-// a self-signed certificate, made with openssl, as an inbound RTE with an https RTE_URL sends it
+// a self-signed certificate, made with openssl, as an inbound RTE with an https RTE_URL sends it :
+// valid from a day ago (tests/helpers/certificates.mjs)
 function selfSigned() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-rte-move-"));
-  const key = path.join(dir, "key.pem");
-  const cert = path.join(dir, "cert.pem");
-  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=10.0.0.5", "-addext", "subjectAltName=IP:10.0.0.5"], { stdio: "ignore" });
-  const pem = fs.readFileSync(cert, "utf8");
-  fs.rmSync(dir, { recursive: true, force: true });
-  return pem;
+  return makeCertificate({ cn: "10.0.0.5", san: "IP:10.0.0.5" }).cert;
 }
 const CERT = selfSigned();
 

@@ -16,7 +16,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import crypto from "crypto";
-import { execFileSync } from "child_process";
+import { makeCertificate, CERTIFICATE_TIMEOUT_MS } from "./helpers/certificates.mjs";
 
 process.env.DB_HOST ||= "127.0.0.1";
 process.env.DB_PORT ||= "3306";
@@ -125,19 +125,15 @@ let otherKeyPem;
 let dir;
 
 /**
- * A self-signed certificate and its key, made with openssl.
- *
- * Args:
- *   name (string): the file names' prefix.
+ * A self-signed RSA certificate and its key (the client assertion is signed RS256), made with
+ * openssl and valid from a day ago (tests/helpers/certificates.mjs).
  *
  * Returns:
  *   object: { cert, key } (PEM).
  */
-function makeCert(name) {
-  const key = path.join(dir, `${name}.key`);
-  const cert = path.join(dir, `${name}.pem`);
-  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=ansibleforms-mail"], { stdio: "ignore" });
-  return { cert: fs.readFileSync(cert, "utf8"), key: fs.readFileSync(key, "utf8") };
+function makeCert() {
+  const { cert, key } = makeCertificate({ cn: "ansibleforms-mail", keyType: "rsa" });
+  return { cert, key };
 }
 
 beforeAll(async () => {
@@ -147,14 +143,16 @@ beforeAll(async () => {
   process.env.ENTRA_AUTHORITY_URI = base;
   process.env.ENTRA_GRAPH_URI = base;
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-m365-"));
-  ({ cert: certPem, key: keyPem } = makeCert("a"));
-  ({ key: otherKeyPem } = makeCert("b"));
+  ({ cert: certPem, key: keyPem } = makeCert());
+  ({ key: otherKeyPem } = makeCert());
   mail = await import("../src/lib/microsoftMail.js");
   NotificationChannel = (await import("../src/models/notificationChannel.model.js")).default;
   Settings = (await import("../src/models/settings.model.js")).default;
   Credential = (await import("../src/models/credential.model.v2.js")).default;
   OAuth2 = (await import("../src/models/oauth2.model.js")).default;
-});
+  // two RSA keys made with openssl and the app's modules loaded : longer than the usual 10 seconds
+  // on a loaded machine
+}, CERTIFICATE_TIMEOUT_MS);
 
 afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
