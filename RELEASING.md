@@ -39,7 +39,8 @@ The tags and what they point to are listed once, for users, under
 [ansibleforms/website](https://github.com/ansibleforms/website)). Do not repeat or change them elsewhere.
 publish.yml implements that list: `latest`, `<major>` and `<major>.<minor>` only move when
 the release is the highest of its kind, so a patch on an older line never moves them
-backwards. The release workflow also keeps GitHub's "Latest release" badge on the highest
+backwards. That is decided in the last job, right before the tags are written, so a weekly
+refresh that ends after a newer release has started never takes them back. The release workflow also keeps GitHub's "Latest release" badge on the highest
 version.
 
 ### Changing the changelog wording before a release

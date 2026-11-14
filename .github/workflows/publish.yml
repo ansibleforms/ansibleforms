@@ -20,7 +20,12 @@ name: Publish
 # the merge job writes one manifest list per image under every tag. So a tag never moves to a
 # half-built set : when a build fails on either architecture, no tag moves at all.
 #
-#   prepare (tags, Dockerfiles) -> build amd64 + build arm64 (in parallel) -> merge (tags)
+#   prepare (Dockerfiles) -> build amd64 + build arm64 (in parallel) -> merge (tags)
+#
+# Which moving tags (latest, x, x.y) a version gets is decided in merge, right before they are
+# written, from the release tags as they are then : not in prepare, an hour of builds earlier.
+# A weekly refresh of 7.6.0 that is still building when 7.6.1 is released would otherwise
+# point latest, 7 and 7.6 back to 7.6.0 when it finishes, until the next week.
 #
 # Images go to GHCR only. Docker Hub (ansibleguy/ansibleforms) is no longer published to:
 # it keeps the releases it already has and gets no new version, of either line.
@@ -79,11 +84,7 @@ jobs:
       build_time: ${{ steps.v.outputs.build_time }}
       sha: ${{ steps.v.outputs.sha }}
       sha_short: ${{ steps.v.outputs.sha_short }}
-      ghcr: ${{ steps.tags.outputs.ghcr }}
-      list: ${{ steps.tags.outputs.list }}
-      rte_base: ${{ steps.tags.outputs.rte_base }}
-      rte_core: ${{ steps.tags.outputs.rte_core }}
-      rte_full: ${{ steps.tags.outputs.rte_full }}
+      ghcr: ${{ steps.v.outputs.ghcr }}
       controller_file: ${{ steps.files.outputs.controller }}
       rte_base_file: ${{ steps.files.outputs.rte_base }}
       rte_core_file: ${{ steps.files.outputs.rte_core }}
@@ -100,11 +101,15 @@ jobs:
         id: v
         run: |
           case "$CHANNEL" in release|rc) ;; *) echo "::error::unknown channel '$CHANNEL'"; exit 1 ;; esac
-          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          # short, not the full sha : scripts/generate-build-info.sh writes GIT_SHA verbatim into
-          # build-info.json and the About dialog has always shown the short form
-          echo "sha_short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          {
+            echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "sha=$(git rev-parse HEAD)"
+            # short, not the full sha : scripts/generate-build-info.sh writes GIT_SHA verbatim
+            # into build-info.json and the About dialog has always shown the short form
+            echo "sha_short=$(git rev-parse --short=7 HEAD)"
+            # GHCR rejects uppercase, and github.repository keeps the owner's case
+            echo "ghcr=ghcr.io/${GITHUB_REPOSITORY,,}"
+          } >> "$GITHUB_OUTPUT"
           echo "Publishing $VERSION ($CHANNEL) from $(git rev-parse HEAD)"
 
       # A release must be built from a commit whose manifest names that release, or the
@@ -119,54 +124,6 @@ jobs:
             exit 1
           fi
           echo "manifest and release agree on $VERSION"
-
-      - name: Work out the tags
-        id: tags
-        run: |
-          # GHCR rejects uppercase, and github.repository keeps the owner's case
-          ghcr="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "ghcr=$ghcr" >> "$GITHUB_OUTPUT"
-          major="${VERSION%%.*}"
-          minor="$major.$(echo "$VERSION" | cut -d. -f2)"
-
-          # the final release tags of the repository, e.g. 6.5.2 ; pre-releases and rcs left out
-          finals=$(git ls-remote --tags --refs origin | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
-          highest() { { echo "$finals"; echo "$VERSION"; } | grep -E "^$1" | sort -V | tail -1; }
-
-          if [ "$CHANNEL" = "rc" ]; then
-            names="$VERSION latest-rc"
-          elif [[ "$VERSION" == *-* ]]; then
-            names="$VERSION"   # a pre-release version : no moving tag at all
-          else
-            names="$VERSION"
-            [ "$(highest "$minor\.")" = "$VERSION" ] && names="$names $minor"
-            [ "$(highest "$major\.")" = "$VERSION" ] && names="$names $major"
-            # a refresh rebuilds a release that is already out : latest-rc may name a newer
-            # candidate by now, and stays where it is
-            if [ "$(highest "")" = "$VERSION" ]; then
-              names="$names latest"
-              [ "$REFRESH" = "true" ] || names="$names latest-rc"
-            fi
-          fi
-
-          tags=""
-          for n in $names; do
-            tags="$tags,$ghcr:$n"
-          done
-          tags="${tags#,}"
-          echo "list=$tags" >> "$GITHUB_OUTPUT"
-          echo "$tags" | tr ',' '\n'
-          # the three RTE layers (docker/runner/rte-base, rte-core, rte-full) : the same tags on
-          # their own image names
-          for image in rte-base rte-core rte-full; do
-            list=""
-            for n in $names; do
-              list="$list,$ghcr-$image:$n"
-            done
-            list="${list#,}"
-            echo "${image//-/_}=$list" >> "$GITHUB_OUTPUT"
-            echo "$list" | tr ',' '\n'
-          done
 
       # Releases up to 7.5.0 keep their Dockerfiles at the root (Dockerfile, Dockerfile.rte-*) ;
       # later ones in docker/controller and docker/runner/rte-*. A re-publish or a refresh of an
@@ -321,10 +278,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GHCR: ${{ needs.prepare.outputs.ghcr }}
-      APP_TAGS: ${{ needs.prepare.outputs.list }}
-      RTE_BASE_TAGS: ${{ needs.prepare.outputs.rte_base }}
-      RTE_CORE_TAGS: ${{ needs.prepare.outputs.rte_core }}
-      RTE_FULL_TAGS: ${{ needs.prepare.outputs.rte_full }}
       SHA: ${{ needs.prepare.outputs.sha }}
     steps:
       # each artifact in a folder of its own : digests/digests-amd64/app, ...
@@ -341,6 +294,60 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Worked out here and not in prepare : the release tags are read again right before the
+      # moving tags are written, so only the version that is the highest now takes them. The
+      # git tag of a release exists before its publish starts, so a refresh of an older
+      # version that ends after it has started never takes latest, x or x.y back. The exact
+      # version tag is always written.
+      - name: Work out the tags
+        run: |
+          ghcr="$GHCR"
+          major="${VERSION%%.*}"
+          minor="$major.$(echo "$VERSION" | cut -d. -f2)"
+
+          # the final release tags of the repository, e.g. 6.5.2 ; pre-releases and rcs left out
+          # (no checkout in this job : the repository is read by its URL). A failed read stops
+          # the step : with no tags at all, any version would look like the highest one
+          remote=$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git")
+          finals=$(echo "$remote" | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          highest() { { echo "$finals"; echo "$VERSION"; } | grep -E "^$1" | sort -V | tail -1; }
+
+          if [ "$CHANNEL" = "rc" ]; then
+            names="$VERSION latest-rc"
+          elif [[ "$VERSION" == *-* ]]; then
+            names="$VERSION"   # a pre-release version : no moving tag at all
+          else
+            names="$VERSION"
+            [ "$(highest "$minor\.")" = "$VERSION" ] && names="$names $minor"
+            [ "$(highest "$major\.")" = "$VERSION" ] && names="$names $major"
+            # a refresh rebuilds a release that is already out : latest-rc may name a newer
+            # candidate by now, and stays where it is
+            if [ "$(highest "")" = "$VERSION" ]; then
+              names="$names latest"
+              [ "$REFRESH" = "true" ] || names="$names latest-rc"
+            fi
+          fi
+
+          tags=""
+          for n in $names; do
+            tags="$tags,$ghcr:$n"
+          done
+          tags="${tags#,}"
+          echo "APP_TAGS=$tags" >> "$GITHUB_ENV"
+          echo "$tags" | tr ',' '\n'
+          # the three RTE layers (docker/runner/rte-base, rte-core, rte-full) : the same tags on
+          # their own image names
+          for image in rte-base rte-core rte-full; do
+            list=""
+            for n in $names; do
+              list="$list,$ghcr-$image:$n"
+            done
+            list="${list#,}"
+            name="${image//-/_}"
+            echo "${name^^}_TAGS=$list" >> "$GITHUB_ENV"
+            echo "$list" | tr ',' '\n'
+          done
 
       # imagetools copies nothing : the manifest list points at the images the build jobs
       # pushed, in the same repository. Every tag of an image gets the same list.
