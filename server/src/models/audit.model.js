@@ -240,8 +240,10 @@ Audit.find = async function (filter = {}) {
   if (targetType) { where.push('target_type = ?'); vars.push(targetType); }
   if (target) { where.push('target LIKE ?'); vars.push(`%${target}%`); }
   if (outcome) { where.push('outcome = ?'); vars.push(outcome); }
+  // a period is [from, to) : `to` is the start of the next one (the next day, month or
+  // year), so its first second is not counted twice and its last one is not lost
   if (from) { where.push('created_at >= ?'); vars.push(from); }
-  if (to) { where.push('created_at <= ?'); vars.push(to); }
+  if (to) { where.push('created_at < ?'); vars.push(to); }
   const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
 
   const limit = Math.min(Math.max(parseInt(one(filter.limit), 10) || 100, 1), 1000);
@@ -272,13 +274,17 @@ function safeParse(text) {
 }
 
 // The distinct actions and actors present, so a filter dropdown does not have to be
-// a hardcoded list that drifts from what is actually recorded.
+// a hardcoded list that drifts from what is actually recorded, and the oldest entry's time.
 Audit.facets = async function () {
   const actions = await mysql.do('SELECT DISTINCT action FROM AnsibleForms.`audit` ORDER BY action');
   const actors = await mysql.do('SELECT DISTINCT actor FROM AnsibleForms.`audit` WHERE actor IS NOT NULL ORDER BY actor');
+  // the oldest entry's time : the first year the page's period offers (MIN on the indexed
+  // column, one cheap read) ; null while nothing has been recorded
+  const oldest = await mysql.do('SELECT MIN(created_at) AS oldest FROM AnsibleForms.`audit`');
   return {
     actions: actions.map((r) => r.action),
     actors: actors.map((r) => r.actor),
+    oldest: oldest[0]?.oldest ?? null,
   };
 };
 

@@ -672,8 +672,9 @@ export default {
     allActions: 'すべての操作',
     allOutcomes: 'すべての結果',
     reset: '選択をリセット',
-    resetHint: 'すべてのユーザー、すべての操作、すべての結果に戻します',
+    resetHint: 'すべての期間、ユーザー、操作、結果に戻します',
     empty: '監査エントリはまだありません',
+    noEntriesFor: '{period} の監査エントリはありません。',
     emptyHint: '記録はこのバージョンのインストール時から始まるため、それ以前の内容は含まれません。',
     refresh: '更新',
     failedLoad: '監査ログの読み込みに失敗しました',
@@ -3151,11 +3152,10 @@ export default {
   logs: {
     title: 'サーバーログ',
     description:
-      'サーバー自身のログ (ログイン、リクエスト、エラー)。今日の最後の行で、最新は一番下。ダウンロードで一日分を取得。',
-    clear: 'クリア',
-    clearHint: 'ログではなく表示を空にします。今後書き込まれる行だけが表示されます',
-    cleared: 'クリアしました。新しい行は書き込まれるとここに表示されます。',
+      'サーバー自身のログ (ログイン、リクエスト、エラー)。選んだ日の最後の行で、最新は一番下。ダウンロードで一日分を取得。',
     download: 'ダウンロード',
+    noLog: '{date} のサーバーログはありません。',
+    resetHint: '今日のログに戻り、新しい行を追い、検索を消します',
   },
   changePassword: {
     title: 'パスワードを変更してください',
@@ -3185,5 +3185,13 @@ export default {
     version: 'REST API は {version} です (API v1 は 7.0.0 で削除されました)。',
     endpoint: 'API ドキュメントのエンドポイント:',
     hint: '上のリンクをクリックするか、ブラウザーに入力して、対話型の Swagger UI を開いてください。',
+  },
+  datePick: {
+    year: '年',
+    month: '月',
+    day: '日',
+    allYears: 'すべての年',
+    allMonths: 'すべての月',
+    allDays: 'すべての日',
   },
 };

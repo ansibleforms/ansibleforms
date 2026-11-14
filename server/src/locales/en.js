@@ -61,6 +61,7 @@ export default {
   },
   audit: {
     failedGet: "Failed to get the audit trail",
+    invalidPeriod: "The period's from and to must be ISO dates, such as 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Failed to check the system health",
@@ -231,6 +232,7 @@ export default {
     failedConvertLegacy: "Failed to convert forms.yaml",
     dbTypeNotSet: "Database type not set",
     logNotFound: "Log file not found",
+    invalidLogDate: "The date must be a real day, written as YYYY-MM-DD",
     failedGetLog: "Failed to get log",
     failedLoadHelp: "Failed to load help",
     fileUploadFailed: "File upload failed",

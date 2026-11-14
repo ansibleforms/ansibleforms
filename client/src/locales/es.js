@@ -678,8 +678,9 @@ export default {
     allActions: 'Todas las acciones',
     allOutcomes: 'Todos los resultados',
     reset: 'Restablecer la selección',
-    resetHint: 'De nuevo todos los usuarios, todas las acciones y todos los resultados',
+    resetHint: 'De nuevo todos los periodos, usuarios, acciones y resultados',
     empty: 'Aún no hay entradas de auditoría',
+    noEntriesFor: 'No hay entradas de auditoría para {period}.',
     emptyHint: 'El registro empieza al instalar esta versión, por lo que no contiene nada anterior.',
     refresh: 'Actualizar',
     failedLoad: 'No se pudo cargar el registro de auditoría',
@@ -3186,11 +3187,10 @@ export default {
   logs: {
     title: 'Registro del servidor',
     description:
-      'El registro del servidor: sesiones, peticiones y errores. Últimas líneas de hoy, las nuevas abajo; Descargar: el día entero.',
-    clear: 'Limpiar',
-    clearHint: 'Vacía la vista, no el registro: solo se muestran las líneas escritas a partir de ahora',
-    cleared: 'Limpio: las líneas nuevas aparecen aquí a medida que se escriben.',
+      'El registro del servidor: sesiones, peticiones y errores. Últimas líneas del día elegido, las nuevas abajo; Descargar: el día entero.',
     download: 'Descargar',
+    noLog: 'No hay registro del servidor del {date}.',
+    resetHint: 'De nuevo el registro de hoy, siguiendo sus líneas nuevas, sin búsqueda',
   },
   changePassword: {
     title: 'Cambia tu contraseña',
@@ -3222,5 +3222,13 @@ export default {
     version: 'La API REST es la {version} (la API v1 se eliminó en la 7.0.0).',
     endpoint: 'Endpoint de la documentación de la API:',
     hint: 'Haz clic en el enlace de arriba o introdúcelo en el navegador para abrir la interfaz interactiva Swagger UI.',
+  },
+  datePick: {
+    year: 'Año',
+    month: 'Mes',
+    day: 'Día',
+    allYears: 'Todos los años',
+    allMonths: 'Todos los meses',
+    allDays: 'Todos los días',
   },
 };

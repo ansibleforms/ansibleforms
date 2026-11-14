@@ -62,6 +62,7 @@ export default {
   },
   audit: {
     failedGet: "Falha ao obter o registo de auditoria",
+    invalidPeriod: "from e to do período devem ser datas ISO, como 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Falha ao verificar o estado do sistema",
@@ -237,6 +238,7 @@ export default {
     failedConvertLegacy: "Falha ao converter o forms.yaml",
     dbTypeNotSet: "Tipo de base de dados não definido",
     logNotFound: "Ficheiro de registo não encontrado",
+    invalidLogDate: "A data deve ser um dia real, escrito AAAA-MM-DD",
     failedGetLog: "Falha ao obter o registo",
     failedLoadHelp: "Falha ao carregar a ajuda",
     fileUploadFailed: "O carregamento do ficheiro falhou",

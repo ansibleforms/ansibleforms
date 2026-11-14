@@ -64,6 +64,7 @@ export default {
   },
   audit: {
     failedGet: "Audit-Protokoll konnte nicht geladen werden",
+    invalidPeriod: "from und to des Zeitraums müssen ISO-Daten sein, etwa 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Systemzustand konnte nicht geprüft werden",
@@ -244,6 +245,7 @@ export default {
     failedConvertLegacy: "Konvertierung der forms.yaml fehlgeschlagen",
     dbTypeNotSet: "Datenbanktyp nicht gesetzt",
     logNotFound: "Logdatei nicht gefunden",
+    invalidLogDate: "Das Datum muss ein echter Tag im Format JJJJ-MM-TT sein",
     failedGetLog: "Abrufen des Logs fehlgeschlagen",
     failedLoadHelp: "Laden der Hilfe fehlgeschlagen",
     fileUploadFailed: "Datei-Upload fehlgeschlagen",

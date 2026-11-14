@@ -605,27 +605,75 @@
       "get": {
         "tags": ["log"],
         "summary": "Get application log",
-        "description": "Returns the last N lines of the current application log file.",
+        "description": "Returns the last N lines of a day's application log file (today by default), unzipping a past day's .gz. A day without a file answers an empty log with the header X-Log-Missing: true.",
         "security": [ { "bearerAuth": [] } ],
         "parameters": [
           {
             "name": "lines",
             "in": "query",
-            "description": "The last lines of today's log to return: at most LOG_VIEW_LINES, and LOG_VIEW_LINES when left out (1000 by default)",
+            "description": "The last lines of the day's log to return: at most LOG_VIEW_LINES, and LOG_VIEW_LINES when left out (1000 by default)",
             "schema": {
               "type": "integer",
               "minimum": 1
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "The day, YYYY-MM-DD (a real calendar day, the server's local date); today when left out",
+            "schema": {
+              "type": "string",
+              "format": "date"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Log content retrieved successfully",
+            "description": "Log content retrieved successfully; empty, with X-Log-Missing: true, when the day has no log file",
+            "headers": {
+              "X-Log-Missing": {
+                "description": "true when the day has no log file",
+                "schema": { "type": "string", "enum": ["true"] }
+              },
+              "X-Log-Date": {
+                "description": "The day read, YYYY-MM-DD: the server's today when no date was asked",
+                "schema": { "type": "string", "format": "date" }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "string",
                   "description": "Last N lines of log file"
+                }
+              }
+            }
+          },
+          "400": { "description": "The date is not a real day written as YYYY-MM-DD" },
+          "500": { "description": "Failed to get log" }
+        }
+      }
+    },
+    "/log/dates": {
+      "get": {
+        "tags": ["log"],
+        "summary": "List the days that have a log file",
+        "description": "The days with a main log file, plain or zipped (.gz), newest first. The errors log files are not counted.",
+        "security": [ { "bearerAuth": [] } ],
+        "responses": {
+          "200": {
+            "description": "The days",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "records": {
+                      "type": "array",
+                      "items": { "type": "string", "format": "date", "example": "2026-11-14" }
+                    }
+                  }
                 }
               }
             }
@@ -637,9 +685,20 @@
     "/log/download": {
       "get": {
         "tags": ["log"],
-        "summary": "Download current log file",
-        "description": "Downloads the current day's log file.",
+        "summary": "Download a day's log file",
+        "description": "Downloads a day's log file (today by default): its .log, or a past day's zipped .log.gz as it is.",
         "security": [ { "bearerAuth": [] } ],
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "The day, YYYY-MM-DD (a real calendar day, the server's local date); today when left out",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Log file download",
@@ -652,6 +711,7 @@
               }
             }
           },
+          "400": { "description": "The date is not a real day written as YYYY-MM-DD" },
           "404": { "description": "Log file not found" }
         }
       }
@@ -3222,7 +3282,7 @@
               "type": "string",
               "format": "date-time"
             },
-            "description": "Unparsable dates are ignored"
+            "description": "The period's start, inclusive: an ISO date or date-time (2026-11-13T23:00:00.000Z); anything else is a 400"
           },
           {
             "name": "to",
@@ -3230,7 +3290,8 @@
             "schema": {
               "type": "string",
               "format": "date-time"
-            }
+            },
+            "description": "The period's end, exclusive (the start of the next day, month or year): an ISO date or date-time; anything else is a 400"
           },
           {
             "name": "limit",
@@ -3321,6 +3382,9 @@
               }
             }
           },
+          "400": {
+            "description": "The period's from or to is not an ISO date"
+          },
           "403": {
             "description": "Forbidden - no settings access"
           },
@@ -3335,7 +3399,7 @@
         "tags": [
           "audit"
         ],
-        "summary": "Distinct actions and actors in the audit trail",
+        "summary": "Distinct actions and actors in the audit trail, and its oldest entry's time",
         "description": "For filter dropdowns. Requires settings access.",
         "security": [
           {
@@ -3361,6 +3425,12 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "oldest": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The oldest entry's time, null when there is none"
                     }
                   }
                 }

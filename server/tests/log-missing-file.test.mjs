@@ -12,10 +12,10 @@ vi.mock("../src/models/log.model.js", () => ({
       if (!state.exists) throw new Error("No logfile ansibleforms.2026-10-18.log found");
       return "/tmp/ansibleforms.2026-10-18.log";
     },
-    find: async () => {
-      if (!state.exists) throw new Error("ENOENT");
-      return state.lines;
-    },
+    today: () => "2026-10-18",
+    isDate: (value) => value === "2026-10-18",
+    // no file for the day : null, as the model answers it
+    find: async () => (state.exists ? state.lines : null),
   },
 }));
 
@@ -28,7 +28,11 @@ const { default: controller } = await import("../src/controllers/v2/log.controll
  *   object: the response ; statusCode and body once answered.
  */
 function response() {
-  const res = { statusCode: 200, body: undefined };
+  const res = { statusCode: 200, body: undefined, headers: {} };
+  res.set = (name, value) => {
+    res.headers[name] = value;
+    return res;
+  };
   res.status = (code) => {
     res.statusCode = code;
     return res;
@@ -51,6 +55,8 @@ describe("GET /api/v2/log", () => {
     await controller.get({ query: { lines: 50 } }, res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe("");
+    // said missing, so the page can say there is no log for that day
+    expect(res.headers["X-Log-Missing"]).toBe("true");
   });
 
   test("today's file present gives its last lines", async () => {
@@ -58,5 +64,6 @@ describe("GET /api/v2/log", () => {
     await controller.get({ query: {} }, res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe("line 1\nline 2\n");
+    expect(res.headers["X-Log-Missing"]).toBeUndefined();
   });
 });

@@ -621,6 +621,17 @@ textarea:focus::placeholder {
 .af-title-controls > :has(> .form-select) {
   margin-right: auto;
 }
+// a page's filters as one group (af-filter-group, the Audit log's) : it takes the room the buttons
+// leave and wraps within itself, so a narrow row puts filters on a second line, never a button
+.af-title-controls > .af-filter-group {
+  flex: 1 1 0;
+  min-width: 0;
+}
+// a year / month / day pick beside a page's search (the Server log's) : before it, at the row's
+// left (the search is ordered first of all, so the pick goes one place earlier still)
+.af-title-controls > :has(.af-search) > .af-date-pick {
+  order: -2;
+}
 
 // the Required badge of an item the config must keep (the admin and default roles) : a border and
 // darker text, so it reads on a white row as on a hovered one

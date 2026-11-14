@@ -65,6 +65,7 @@ export default {
   },
   audit: {
     failedGet: "Nie udało się pobrać dziennika audytu",
+    invalidPeriod: "from i to okresu muszą być datami ISO, np. 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Nie udało się sprawdzić stanu systemu",
@@ -240,6 +241,7 @@ export default {
     failedConvertLegacy: "Nie udało się przekonwertować pliku forms.yaml",
     dbTypeNotSet: "Nie ustawiono typu bazy danych",
     logNotFound: "Nie znaleziono pliku dziennika",
+    invalidLogDate: "Data musi być prawdziwym dniem w formacie RRRR-MM-DD",
     failedGetLog: "Nie udało się pobrać dziennika",
     failedLoadHelp: "Nie udało się wczytać pomocy",
     fileUploadFailed: "Przesyłanie pliku nie powiodło się",

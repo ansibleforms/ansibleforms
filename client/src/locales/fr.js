@@ -680,8 +680,9 @@ export default {
     allActions: 'Toutes les actions',
     allOutcomes: 'Tous les résultats',
     reset: 'Réinitialiser la sélection',
-    resetHint: 'De nouveau tous les utilisateurs, toutes les actions et tous les résultats',
+    resetHint: 'De nouveau toutes les périodes, utilisateurs, actions et résultats',
     empty: "Aucune entrée d'audit",
+    noEntriesFor: "Aucune entrée d'audit pour {period}.",
     emptyHint: "Le journal démarre à l'installation de cette version, il ne contient rien d'antérieur.",
     refresh: 'Actualiser',
     failedLoad: "Échec du chargement du journal d'audit",
@@ -3191,11 +3192,10 @@ export default {
   logs: {
     title: 'Journal du serveur',
     description:
-      'Le journal du serveur : connexions, requêtes, erreurs. Dernières lignes du jour, récentes en bas ; Télécharger : toute la journée.',
-    clear: 'Effacer',
-    clearHint: "Vide l'affichage, pas le journal : seules les lignes écrites à partir de maintenant s'affichent",
-    cleared: "Effacé : les nouvelles lignes s'affichent ici à mesure qu'elles sont écrites.",
+      'Le journal du serveur : connexions, requêtes, erreurs. Dernières lignes du jour choisi, récentes en bas ; Télécharger : toute la journée.',
     download: 'Télécharger',
+    noLog: 'Aucun journal du serveur pour le {date}.',
+    resetHint: 'De nouveau le journal du jour, qui suit ses nouvelles lignes, sans recherche',
   },
   changePassword: {
     title: 'Changez votre mot de passe',
@@ -3228,5 +3228,13 @@ export default {
     version: "L'API REST est en {version} (l'API v1 a été supprimée en 7.0.0).",
     endpoint: "Point d'accès de la documentation de l'API :",
     hint: "Cliquez sur le lien ci-dessus ou saisissez-le dans votre navigateur pour ouvrir l'interface interactive Swagger UI.",
+  },
+  datePick: {
+    year: 'Année',
+    month: 'Mois',
+    day: 'Jour',
+    allYears: 'Toutes les années',
+    allMonths: 'Tous les mois',
+    allDays: 'Tous les jours',
   },
 };

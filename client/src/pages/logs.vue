@@ -5,8 +5,9 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useFollowOutput } from '@/composables/useFollowOutput';
 import { toast } from 'vue-sonner';
 import Helpers from '@/lib/Helpers';
+import { todayPick, samePick, isoDay, pickLabel } from '@/lib/datePick';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const log = ref('');
 const isLoading = ref(false);
@@ -34,26 +35,88 @@ const filterMatcher = computed(() => {
   }
 });
 
-// Clear empties the view, never the log : the last line shown then is remembered, and only the
-// lines after it are shown from there on. Not among the lines read any more (more than LOG_VIEW_LINES
-// were written since), every line read is newer. Reloading the page shows the last lines again.
-const clearedAfter = ref(null);
+// ─── the day shown ────────────────────────────────────────────────────────────
+// The year, month and day dropdowns (AppDatePick) pick the day whose log is shown : today by
+// default, followed as it is written ; another day is read once, as it was left. Today is the
+// SERVER's today (its local date names the files, and may not be the browser's) : every read
+// names its day (X-Log-Date), and while today is followed the dropdowns move with it, also past
+// midnight. Until the first read, the browser's today stands in.
+const pick = ref(todayPick());
+// following today (no date asked : the server reads its today) ; false for a day picked apart
+const followToday = ref(true);
+// the server's today, as the last read while following named it
+const serverToday = ref(null);
+// the read day has no log file (X-Log-Missing) : said in the log's place
+const missing = ref(false);
+// the days that have a log file (GET /api/v2/log/dates), the newest first
+const dates = ref([]);
+
+// the years offered : those with a log file, and this year (no "All" : a log is one day)
+const years = computed(() => {
+  const set = new Set(dates.value.map((d) => Number(d.slice(0, 4))));
+  set.add(new Date().getFullYear());
+  if (pick.value.year) set.add(pick.value.year);
+  return [...set].filter((y) => Number.isInteger(y)).sort((a, b) => b - a);
+});
+// the day shown, in words of the page's language : 14 November 2026
+const pickedLabel = computed(() => pickLabel(pick.value, locale.value));
 
 /**
- * Empties the view : from now on only the lines written after this moment are shown.
+ * The day a read named (X-Log-Date) as a pick.
+ *
+ * Args:
+ *   day (string): YYYY-MM-DD.
+ *
+ * Returns:
+ *   object|null: { year, month, day }, null when it is no such day.
  */
-function clearView() {
-  const lines = log.value.split('\n').filter((x) => x != '');
-  clearedAfter.value = lines.length ? lines[lines.length - 1] : '';
+function pickOf(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || '');
+  return m ? { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) } : null;
 }
+
+/**
+ * Reads the days that have a log file, for the years offered. A failure leaves this year only.
+ */
+async function loadDates() {
+  try {
+    const result = await axios.get('/api/v2/log/dates');
+    dates.value = result.data?.records || [];
+  } catch {
+    dates.value = [];
+  }
+}
+
+/**
+ * Shows the day picked : today is followed again, another day is read once.
+ *
+ * Args:
+ *   value (object): the pick, { year, month, day }.
+ */
+function onPick(value) {
+  pick.value = value;
+  // step 1 : today (the server's, else the browser's) is followed, any other day is not
+  followToday.value = samePick(value, serverToday.value || todayPick());
+  // step 2 : the day's lines replace the others, the grey placeholders until they come
+  log.value = '';
+  missing.value = false;
+  firstRead.value = false;
+  load(true);
+}
+
+/**
+ * Back to today, followed, with no search : the page as it opens.
+ */
+function resetView() {
+  filter.value = '';
+  onPick(serverToday.value || todayPick());
+}
+// nothing to reset while today is followed and nothing is searched
+const changed = computed(() => !followToday.value || !!filter.value);
 
 const filtered = computed(() => {
   const match = filterMatcher.value;
-  let lines = log.value.split('\n').filter((x) => x != '');
-  if (clearedAfter.value !== null) {
-    const at = clearedAfter.value === '' ? -1 : lines.lastIndexOf(clearedAfter.value);
-    if (at >= 0) lines = lines.slice(at + 1);
-  }
+  const lines = log.value.split('\n').filter((x) => x != '');
   return (match ? lines.filter(match) : lines).map((x) => ansiParse(x));
 });
 // ─── following the log ────────────────────────────────────────────────────────
@@ -64,15 +127,18 @@ const filtered = computed(() => {
 // 30 seconds), and the reading goes on at its pace as soon as one answers ; Refresh tries at once.
 const POLL_MS = 2000;
 const MAX_BACKOFF_MS = 30000;
+// a past day is not live : read once, it has nothing to follow and no "New lines" to offer
 const { newLines, paused, jumpToEnd } = useFollowOutput(
   scroller,
   () => log.value,
-  () => true,
+  () => followToday.value,
 );
 let pollTimer = null;
 let stopped = false;
 // the reads that failed in a row : 0 while it answers
 let failures = 0;
+// the reads asked, counted : an answer to an older one (another day, picked since) is dropped
+let readCount = 0;
 
 function stopPolling() {
   if (pollTimer) clearTimeout(pollTimer);
@@ -94,42 +160,65 @@ function schedulePoll() {
 }
 
 /**
- * Reads the last lines of the log, then plans the next read.
+ * Reads the last lines of the day's log, then plans the next read while today is followed.
  *
  * Args:
- *   force (boolean): Refresh, or the first read : read now, even while the tab is hidden.
+ *   force (boolean): Refresh, the first read or a day picked : read now, even while the tab is
+ *     hidden or a read of another day is still under way (its answer is then dropped).
  */
 async function load(force = false) {
-  if (isLoading.value) return;
+  if (isLoading.value && !force) return;
   // a hidden tab reads nothing : the next visible poll catches up
   if (!force && document.hidden) return schedulePoll();
+  const mine = ++readCount;
+  stopPolling();
   isLoading.value = true;
   try {
-    const result = await axios.get('/api/v2/log');
-    // followed down by useFollowOutput, or said by AppFollowButton while scrolled up
+    // step 1 : today's (the server's) while following, else the day picked
+    const params = followToday.value ? {} : { date: isoDay(pick.value) };
+    const result = await axios.get('/api/v2/log', { params });
+    // another day was picked while it was read : its answer is not this day's
+    if (mine !== readCount) return;
+    // step 2 : the day read ; while following, the dropdowns move with the server's today
+    const day = pickOf(result.headers?.['x-log-date']);
+    if (followToday.value && day) {
+      serverToday.value = day;
+      if (!samePick(day, pick.value)) pick.value = day;
+    }
+    // step 3 : no file for that day is said, its lines are followed down by useFollowOutput
+    // (or said by AppFollowButton while scrolled up)
+    missing.value = result.headers?.['x-log-missing'] === 'true';
     if (result.data != '...' && result.data !== log.value) log.value = result.data;
     failures = 0;
   } catch (err) {
+    if (mine !== readCount) return;
     // said once per run of failures (not every few seconds), then tried again later
     if (!stopped && (failures === 0 || force)) toast.error(Helpers.parseAxiosResponseError(err));
     failures++;
   } finally {
-    // always released, also when the server answered the "..." placeholder
-    isLoading.value = false;
-    firstRead.value = true;
+    // always released, also when the server answered the "..." placeholder ; by the latest read
+    if (mine === readCount) {
+      isLoading.value = false;
+      firstRead.value = true;
+    }
   }
-  schedulePoll();
+  // a past day is read once ; today goes on being read
+  if (mine === readCount && followToday.value) schedulePoll();
 }
 
 async function download() {
   try {
-    await Helpers.downloadFile(`/api/v2/log/download`);
+    // the day shown : its .log, or a past day's .log.gz as the server keeps it
+    await Helpers.downloadFile(`/api/v2/log/download?date=${isoDay(pick.value)}`);
   } catch (err) {
     // the server's reason (downloadFile decodes its error body), else a translated fallback
     toast.error(Helpers.parseAxiosResponseError(err, t('common.downloadFailed')));
   }
 }
-onMounted(() => load(true));
+onMounted(() => {
+  loadDates();
+  load(true);
+});
 onUnmounted(() => {
   stopped = true;
   stopPolling();
@@ -142,17 +231,25 @@ onUnmounted(() => {
       <AppSidebar />
       <AppSettings :title="t('logs.title')" :description="t('logs.description')" icon="file-lines">
         <template #headerActions>
-          <div>
+          <div class="ms-2">
+            <!-- the day shown first : its year, month and day ; the search then looks in it -->
+            <AppDatePick :model-value="pick" :years="years" @change="onPick" />
             <!-- the search box of the other pages : the placeholder goes on click, an X clears it -->
             <BsSearch v-model="filter" style="width: 16rem" />
           </div>
-          <!-- view controls only : these decide WHAT the card shows. Refresh re-reads the same
-               view, it does not act on anything ; the download follows, with the page's buttons -->
+          <!-- view controls only : these decide WHAT the card shows. Reset (the funnel crossed out,
+               as the Audit log's) goes back to today, followed, with no search ; Refresh re-reads
+               the same view, it does not act on anything ; the download follows, with the page's
+               buttons -->
+          <BsButton
+            cssClass="ms-2 text-nowrap"
+            icon="filter-circle-xmark"
+            :title="t('logs.resetHint')"
+            :disabled="!changed"
+            @click="resetView()"
+            >{{ t('audit.reset') }}</BsButton
+          >
           <AppRefreshButton class="ms-2" :action="() => load(true)" :label="t('jobs.refresh')" />
-          <!-- empties the view, not the log : only the lines written after it show from then on -->
-          <BsButton class="ms-2 text-nowrap" icon="eraser" :title="t('logs.clearHint')" @click="clearView()">{{
-            t('logs.clear')
-          }}</BsButton>
         </template>
         <template #actions>
           <BsButton class="text-nowrap" icon="download" @click="download()">{{ t('logs.download') }}</BsButton>
@@ -171,8 +268,9 @@ onUnmounted(() => {
           >
             <!-- the first read : the log's lines as grey placeholders, where they come -->
             <AppSkeleton v-if="!firstRead" shape="editor" :count="24" />
-            <div v-else-if="clearedAfter !== null && !filtered.length" class="text-body-secondary fst-italic py-2">
-              {{ t('logs.cleared') }}
+            <!-- the day has no log file : said in the log's place -->
+            <div v-else-if="missing && !filtered.length" class="text-body-secondary fst-italic py-2 ps-3">
+              {{ t('logs.noLog', { date: pickedLabel }) }}
             </div>
             <!-- a line : its number, then its text in a column of its own, so a long line wraps
                  under its own start and the number's grey runs down beside it -->

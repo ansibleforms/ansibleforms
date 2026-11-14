@@ -677,8 +677,9 @@ export default {
     allActions: 'Tutte le azioni',
     allOutcomes: 'Tutti gli esiti',
     reset: 'Reimposta la selezione',
-    resetHint: 'Di nuovo tutti gli utenti, tutte le azioni e tutti gli esiti',
+    resetHint: 'Di nuovo tutti i periodi, utenti, azioni ed esiti',
     empty: 'Nessuna voce di audit',
+    noEntriesFor: 'Nessuna voce di audit per {period}.',
     emptyHint: 'Il registro inizia con l’installazione di questa versione, quindi non contiene nulla di precedente.',
     refresh: 'Aggiorna',
     failedLoad: 'Impossibile caricare il registro di audit',
@@ -3185,11 +3186,10 @@ export default {
   logs: {
     title: 'Log del server',
     description:
-      "Il log del server: accessi, richieste, errori. Ultime righe di oggi, le nuove in fondo; Scarica: l'intera giornata.",
-    clear: 'Pulisci',
-    clearHint: 'Svuota la vista, non il log: si vedono solo le righe scritte da ora in poi',
-    cleared: 'Pulito: le nuove righe compaiono qui man mano che vengono scritte.',
+      "Il log del server: accessi, richieste, errori. Ultime righe del giorno scelto, le nuove in fondo; Scarica: l'intera giornata.",
     download: 'Scarica',
+    noLog: 'Nessun log del server per il {date}.',
+    resetHint: 'Di nuovo il log di oggi, che segue le nuove righe, senza ricerca',
   },
   changePassword: {
     title: 'Cambia la tua password',
@@ -3220,5 +3220,13 @@ export default {
     version: "L'API REST è la {version} (l'API v1 è stata rimossa nella 7.0.0).",
     endpoint: 'Endpoint della documentazione API:',
     hint: "Fai clic sul link qui sopra o inseriscilo nel browser per aprire l'interfaccia interattiva Swagger UI.",
+  },
+  datePick: {
+    year: 'Anno',
+    month: 'Mese',
+    day: 'Giorno',
+    allYears: 'Tutti gli anni',
+    allMonths: 'Tutti i mesi',
+    allDays: 'Tutti i giorni',
   },
 };

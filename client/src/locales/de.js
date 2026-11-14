@@ -679,8 +679,9 @@ export default {
     allActions: 'Alle Aktionen',
     allOutcomes: 'Alle Ergebnisse',
     reset: 'Auswahl zurücksetzen',
-    resetHint: 'Wieder alle Benutzer, alle Aktionen und alle Ergebnisse',
+    resetHint: 'Wieder alle Zeiträume, Benutzer, Aktionen und Ergebnisse',
     empty: 'Noch keine Audit-Einträge',
+    noEntriesFor: 'Keine Audit-Einträge für {period}.',
     emptyHint: 'Das Protokoll beginnt mit der Installation dieser Version und enthält nichts von davor.',
     refresh: 'Aktualisieren',
     failedLoad: 'Audit-Protokoll konnte nicht geladen werden',
@@ -3202,11 +3203,10 @@ export default {
   logs: {
     title: 'Serverprotokoll',
     description:
-      'Das Serverprotokoll: Anmeldungen, Anfragen, Fehler. Die letzten Zeilen von heute, neueste unten; Herunterladen: der ganze Tag.',
-    clear: 'Leeren',
-    clearHint: 'Leert die Ansicht, nicht das Log: nur die ab jetzt geschriebenen Zeilen werden angezeigt',
-    cleared: 'Geleert: neue Zeilen erscheinen hier, sobald sie geschrieben werden.',
+      'Das Serverprotokoll: Anmeldungen, Anfragen, Fehler. Die letzten Zeilen des gewählten Tages, neueste unten; Herunterladen: der ganze Tag.',
     download: 'Herunterladen',
+    noLog: 'Kein Serverprotokoll für {date}.',
+    resetHint: 'Wieder das heutige Protokoll, mit neuen Zeilen, ohne Suche',
   },
   changePassword: {
     title: 'Ändern Sie Ihr Passwort',
@@ -3239,5 +3239,13 @@ export default {
     version: 'Die REST-API ist {version} (API v1 wurde in 7.0.0 entfernt).',
     endpoint: 'Endpunkt der API-Dokumentation:',
     hint: 'Klicken Sie auf den Link oben oder geben Sie ihn im Browser ein, um die interaktive Swagger UI zu öffnen.',
+  },
+  datePick: {
+    year: 'Jahr',
+    month: 'Monat',
+    day: 'Tag',
+    allYears: 'Alle Jahre',
+    allMonths: 'Alle Monate',
+    allDays: 'Alle Tage',
   },
 };

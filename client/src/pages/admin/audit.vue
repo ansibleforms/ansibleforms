@@ -6,8 +6,9 @@ import axios from 'axios';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers.js';
 import { PILL } from '@/lib/tableCells';
+import { periodOf, pickLabel, yearRange } from '@/lib/datePick';
 
-const { t, te } = useI18n();
+const { t, te, locale } = useI18n();
 
 const authenticated = ref(false);
 const loading = ref(false);
@@ -33,6 +34,17 @@ const filterVersion = ref(0);
 const filterActor = ref('');
 const filterAction = ref('');
 const filterOutcome = ref('');
+// the period, first of the filters : a year, a month of it, a day of that (AppDatePick), All by
+// default. The browser's own calendar : its first and next first moments are sent as [from, to).
+const period = ref({ year: null, month: null, day: null });
+// the period in words of the page's language, for the empty table : November 2026
+const periodLabel = computed(() => pickLabel(period.value, locale.value));
+// the years offered : from the oldest entry's (facets) to this one, the newest first
+const years = computed(() => {
+  const now = new Date().getFullYear();
+  const oldest = facets.value.oldest ? new Date(facets.value.oldest).getFullYear() : now;
+  return yearRange([Number.isInteger(oldest) ? oldest : now, now]);
+});
 
 // Null-prototype maps with explicit fallbacks. A plain object literal resolves
 // `constructor` and `__proto__` to inherited members, which are truthy - so a row with
@@ -104,16 +116,35 @@ async function onPageChange(slice, meta) {
   await load();
 }
 
+/**
+ * The filters and the period as the server takes them.
+ *
+ * Returns:
+ *   URLSearchParams: actor, action, outcome, from and to, those that are set.
+ */
+function filterParams() {
+  const params = new URLSearchParams();
+  if (filterActor.value) params.set('actor', filterActor.value);
+  if (filterAction.value) params.set('action', filterAction.value);
+  if (filterOutcome.value) params.set('outcome', filterOutcome.value);
+  // the period as instants, [from, to)
+  const range = periodOf(period.value);
+  if (range) {
+    params.set('from', range.from);
+    params.set('to', range.to);
+  }
+  return params;
+}
+
 // the audit table is the one place in this app where loading every row is not an
 // option, so paging happens server side
 async function load() {
   loading.value = true;
   lastRequest.value = `${offset.value}:${pageSize.value}`;
   try {
-    const params = new URLSearchParams({ limit: String(pageSize.value), offset: String(offset.value) });
-    if (filterActor.value) params.set('actor', filterActor.value);
-    if (filterAction.value) params.set('action', filterAction.value);
-    if (filterOutcome.value) params.set('outcome', filterOutcome.value);
+    const params = filterParams();
+    params.set('limit', String(pageSize.value));
+    params.set('offset', String(offset.value));
     const res = await axios.get(`/api/v2/audit?${params.toString()}`);
     const data = res.data?.records !== undefined ? res.data : res.data?.result;
     records.value = data?.records || [];
@@ -146,6 +177,17 @@ async function loadFacets() {
   }
 }
 
+/**
+ * Picks the period : back to page 1, as any filter.
+ *
+ * Args:
+ *   value (object): the pick, { year, month, day }, null for All.
+ */
+async function onPeriod(value) {
+  period.value = value;
+  await applyFilters();
+}
+
 // changing a filter has to reset to the first page, or you can end up on an offset
 // past the end of the newly filtered set and see nothing
 async function applyFilters() {
@@ -157,12 +199,16 @@ async function applyFilters() {
   await load();
 }
 
-// the filters back to every user, action and outcome ; nothing to do when they are already
-const filtered = computed(() => !!(filterActor.value || filterAction.value || filterOutcome.value));
+// the filters back to every period, user, action and outcome ; nothing to do when they are
+// already
+const filtered = computed(
+  () => !!(filterActor.value || filterAction.value || filterOutcome.value) || period.value.year !== null,
+);
 async function resetFilters() {
   filterActor.value = '';
   filterAction.value = '';
   filterOutcome.value = '';
+  period.value = { year: null, month: null, day: null };
   await applyFilters();
 }
 
@@ -190,11 +236,15 @@ onMounted(async () => {
            actors' and the actions' at least as wide as their names make them once read : they do
            not widen (and push the table down) when the first page of entries comes -->
       <template #headerActions>
-        <div class="d-flex align-items-center gap-2">
+        <!-- the filters : one group that wraps within itself (af-filter-group), so on a narrow row
+             they take a second line and the buttons stay together at the right -->
+        <div class="d-flex flex-wrap align-items-center gap-2 af-filter-group">
+          <!-- the period first : a year, a month of it, a day of that, All by default -->
+          <AppDatePick :model-value="period" :years="years" allow-all @change="onPeriod" />
           <select
             v-model="filterActor"
             class="form-select"
-            style="width: auto; min-width: 16rem"
+            style="width: auto; max-width: 14rem"
             @change="applyFilters"
           >
             <option value="">{{ t('audit.allUsers') }}</option>
@@ -203,7 +253,7 @@ onMounted(async () => {
           <select
             v-model="filterAction"
             class="form-select"
-            style="width: auto; min-width: 22rem"
+            style="width: auto; max-width: 14rem"
             @change="applyFilters"
           >
             <option value="">{{ t('audit.allActions') }}</option>
@@ -233,6 +283,10 @@ onMounted(async () => {
         <AppSkeleton v-if="loading && records.length === 0" shape="table" :count="10" />
         <div v-else-if="loadFailed" class="text-center text-muted py-4">
           <div class="fw-bold">{{ t('audit.failedLoad') }}</div>
+        </div>
+        <!-- a period without entries is said by its name ; without a period, the trail's start -->
+        <div v-else-if="records.length === 0 && periodLabel" class="text-center text-muted py-4">
+          <div class="fw-bold">{{ t('audit.noEntriesFor', { period: periodLabel }) }}</div>
         </div>
         <div v-else-if="records.length === 0" class="text-center text-muted py-4">
           <div class="fw-bold">{{ t('audit.empty') }}</div>
