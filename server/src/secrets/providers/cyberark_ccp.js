@@ -306,6 +306,55 @@ async function exists(store, ref) {
 }
 
 /**
+ * Writes a credential's user and password to an account found (or not) in the session it runs in :
+ * a new account on the store's platform, or the one there given the user name and, in the Vault
+ * only, the new password.
+ *
+ * Args:
+ *   call (function): the PVWA request (withPvwa).
+ *   store (object): the secret store (name, platform_id).
+ *   target (object): { safe, object, address }.
+ *   account (object|null): the account there (findAccount), null for a new one.
+ *   payload (object): { username, password }.
+ *
+ * Returns:
+ *   Promise<void>
+ *
+ * Raises:
+ *   Error: a new account without a platform, or the PVWA refused (its code and message, never the
+ *     password).
+ */
+async function writeAccount(call, store, target, account, payload) {
+  // step 1 : no account there, a new one on the store's platform
+  if (!account) {
+    if (!store.platform_id) throw new Error(`Secret store '${store.name}' has no platform for new accounts: set its platform ID in its Options`);
+    try {
+      await call("post", "Accounts", {
+        name: target.object,
+        safeName: target.safe,
+        platformId: store.platform_id,
+        address: target.address || undefined,
+        userName: payload.username || undefined,
+        secretType: "password",
+        secret: payload.password,
+      });
+    } catch (e) {
+      throw new Error(`CyberArk PVWA refused the new account ${target.object} in safe ${target.safe} (${pvwaError(e)})`, { cause: e });
+    }
+    return;
+  }
+  // step 2 : the account there, its user name patched when it changed and its password updated
+  try {
+    if (payload.username && payload.username !== account.userName) {
+      await call("patch", `Accounts/${encodeURIComponent(account.id)}`, [{ op: "replace", path: "/userName", value: payload.username }]);
+    }
+    await call("post", `Accounts/${encodeURIComponent(account.id)}/Password/Update`, { ChangeEntireGroup: false, NewCredentials: payload.password });
+  } catch (e) {
+    throw new Error(`CyberArk PVWA refused the change of account ${target.object} in safe ${target.safe} (${pvwaError(e)})`, { cause: e });
+  }
+}
+
+/**
  * Writes a credential's user and password as an account of a safe : a new account on the store's
  * platform, or the one there given the user name and, in the Vault only, the new password.
  *
@@ -323,34 +372,39 @@ async function exists(store, ref) {
  */
 async function write(store, ref, payload) {
   const target = writeTarget(ref);
-  await withPvwa(store, async (call) => {
+  await withPvwa(store, async (call) => writeAccount(call, store, target, await findAccount(call, target), payload));
+}
+
+/**
+ * Finds the account a reference names and writes it, in ONE PVWA session : one logon, one search
+ * and one logoff per save, and no other session between the check and the write. An account there
+ * is left as it is unless the caller says to replace it (overwrite).
+ *
+ * Args:
+ *   store (object): the secret store.
+ *   ref (string): the reference (Safe=..;Object=..[;Address=..]).
+ *   payload (object): { username, password }.
+ *   opts (object): { overwrite (true : an account there is replaced) }.
+ *
+ * Returns:
+ *   Promise<object>: { replaced (an account was there), written (false : one was there and
+ *     overwrite was not asked, nothing written) }.
+ *
+ * Raises:
+ *   Error: a new account without a platform, the logon refused, or the PVWA refused (its code and
+ *     message, never the password).
+ */
+async function findAndWrite(store, ref, payload, opts = {}) {
+  const target = writeTarget(ref);
+  return withPvwa(store, async (call) => {
+    // step 1 : the account there, if any
     const account = await findAccount(call, target);
-    if (!account) {
-      if (!store.platform_id) throw new Error(`Secret store '${store.name}' has no platform for new accounts: set its platform ID in its Options`);
-      try {
-        await call("post", "Accounts", {
-          name: target.object,
-          safeName: target.safe,
-          platformId: store.platform_id,
-          address: target.address || undefined,
-          userName: payload.username || undefined,
-          secretType: "password",
-          secret: payload.password,
-        });
-      } catch (e) {
-        throw new Error(`CyberArk PVWA refused the new account ${target.object} in safe ${target.safe} (${pvwaError(e)})`, { cause: e });
-      }
-      return;
-    }
-    try {
-      if (payload.username && payload.username !== account.userName) {
-        await call("patch", `Accounts/${encodeURIComponent(account.id)}`, [{ op: "replace", path: "/userName", value: payload.username }]);
-      }
-      await call("post", `Accounts/${encodeURIComponent(account.id)}/Password/Update`, { ChangeEntireGroup: false, NewCredentials: payload.password });
-    } catch (e) {
-      throw new Error(`CyberArk PVWA refused the change of account ${target.object} in safe ${target.safe} (${pvwaError(e)})`, { cause: e });
-    }
+    // step 2 : one there is replaced only when asked ; the caller refuses the save
+    if (account && !opts.overwrite) return { replaced: true, written: false };
+    // step 3 : created or updated, in the same session
+    await writeAccount(call, store, target, account, payload);
+    return { replaced: !!account, written: true };
   });
 }
 
-export default { type: "cyberark_ccp", read, check, exists, write, withinWritePrefix };
+export default { type: "cyberark_ccp", read, check, exists, write, findAndWrite, withinWritePrefix };

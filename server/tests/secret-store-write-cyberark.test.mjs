@@ -3,7 +3,8 @@
 //   the safes     only those of the store's write prefix ; the reference names the safe and object
 //   a new account added on the store's platform ; an account there replaced only with overwrite :
 //                 its user name patched, its password changed in the Vault only
-//   the session   logged on as the store's API user (its method), logged off whatever happened
+//   the session   ONE per write (the search and the create or update), logged on as the store's
+//                 API user (its method), logged off whatever happened
 //   refusals      the logon, a new account without a platform - never with the password
 import { test, describe, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
@@ -92,6 +93,10 @@ const cyberarkRow = (over = {}) => ({
 });
 const LOGIN = { username: "root", password: "s3cret!" };
 const REF = "Safe=Linux;Object=srv01-root;Address=srv01";
+// the logons, the logoffs and the account searches the fake PVWA got
+const logons = () => calls.filter((c) => c.url.startsWith("/PasswordVault/API/auth/")).length;
+const logoffs = () => calls.filter((c) => c.url === "/PasswordVault/API/Auth/Logoff").length;
+const searches = () => calls.filter((c) => c.method === "GET" && c.url.startsWith("/PasswordVault/API/Accounts?")).length;
 
 beforeEach(() => {
   storeRows = { cyberark: cyberarkRow() };
@@ -128,13 +133,20 @@ describe("writing", () => {
     const add = calls.find((c) => c.method === "POST" && c.url === "/PasswordVault/API/Accounts");
     assert.equal(add.auth, "pvwa-token");
     assert.deepEqual(add.data, { name: "srv01-root", safeName: "Linux", platformId: "UnixSSH", address: "srv01", userName: "root", secretType: "password", secret: "s3cret!" });
-    // the exists check and the write, each its own session, each logged off
-    assert.equal(calls.filter((c) => c.url === "/PasswordVault/API/Auth/Logoff").length, 2);
+    // the search and the write in one session : one logon, one search, one logoff (the last call)
+    assert.equal(logons(), 1);
+    assert.equal(searches(), 1);
+    assert.equal(logoffs(), 1);
+    assert.equal(calls.at(-1).url, "/PasswordVault/API/Auth/Logoff");
   });
 
   test("an account there : refused without overwrite ; with it, its user name patched and its password changed in the Vault", async () => {
     accounts = [{ id: "12_3", name: "srv01-root", safeName: "Linux", userName: "old" }];
-    await assert.rejects(Registry.writeSecret("cyberark", REF, LOGIN), (e) => e.status === 409 && e.code === "secretExists");
+    await assert.rejects(Registry.writeSecret("cyberark", REF, LOGIN), (e) => e.status === 409 && e.code === "secretExists" && /tick Overwrite/.test(e.message));
+    // refused in one session, nothing changed
+    assert.equal(logons(), 1);
+    assert.equal(logoffs(), 1);
+    assert.ok(!calls.some((c) => c.method === "PATCH" || c.url.endsWith("/Password/Update")));
     calls.length = 0;
     const done = await Registry.writeSecret("cyberark", REF, LOGIN, { overwrite: true });
     assert.equal(done.replaced, true);
@@ -143,12 +155,16 @@ describe("writing", () => {
     assert.deepEqual(patch.data, [{ op: "replace", path: "/userName", value: "root" }]);
     const update = calls.find((c) => c.url === "/PasswordVault/API/Accounts/12_3/Password/Update");
     assert.deepEqual(update.data, { ChangeEntireGroup: false, NewCredentials: "s3cret!" });
+    assert.equal(logons(), 1);
+    assert.equal(searches(), 1);
+    assert.equal(logoffs(), 1);
   });
 
   test("a new account without a platform : refused, logged off", async () => {
     storeRows.cyberark = cyberarkRow({ platform_id: "" });
     await assert.rejects(Registry.writeSecret("cyberark", REF, LOGIN), /no platform for new accounts/);
-    assert.ok(calls.some((c) => c.url === "/PasswordVault/API/Auth/Logoff"));
+    assert.equal(logons(), 1);
+    assert.equal(logoffs(), 1);
   });
 
   test("the logon refused : said with the API user and the PVWA's answer, never a password", async () => {
