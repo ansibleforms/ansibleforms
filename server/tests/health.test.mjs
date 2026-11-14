@@ -708,3 +708,58 @@ describe("the summary counts match the checks", () => {
     assert.equal(r.summary.ok + r.summary.warning + r.summary.error, r.checks.length);
   });
 });
+
+// ─── the mail row ─────────────────────────────────────────────────────────────
+
+describe("the mail row says where the active mail channel sends", () => {
+  /**
+   * Makes the active mail channel the one given, and its credential of the type given.
+   *
+   * Args:
+   *   channel (object|null): the active mail channel, or null for none.
+   *   credentialType (string|null): the type of the credential it names (smtp, entraid), or null.
+   *   server (object|null): what withServer gives it : { server, port, secure }.
+   *
+   * Returns:
+   *   Promise<void>: once the spies are in place.
+   */
+  async function activeChannel(channel, credentialType = null, server = null) {
+    const { default: NotificationChannel } = await import("../src/models/notificationChannel.model.js");
+    vi.spyOn(NotificationChannel, "findActive").mockResolvedValue(channel);
+    vi.spyOn(NotificationChannel, "credentialType").mockResolvedValue(credentialType);
+    vi.spyOn(NotificationChannel, "withServer").mockImplementation(async (list) => list.map((c) => ({ ...c, ...(server || {}) })));
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("a Microsoft 365 channel sending through Graph is configured, sending as its sender", async () => {
+    await activeChannel({ name: "m365", type: "mail", credential: "entra", send_through: "graph", from_address: "AnsibleForms <noreply@contoso.com>", server: null }, "entraid");
+    const mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.value, "Microsoft Graph as noreply@contoso.com");
+    assert.equal(mail.detail.through, "Microsoft Graph");
+    assert.equal(mail.detail.authenticated, true);
+    assert.equal(mail.detail.note, null);
+  });
+
+  test("a Microsoft 365 channel sending through SMTP names Exchange Online's server", async () => {
+    await activeChannel({ name: "m365", type: "mail", credential: "entra", send_through: "smtp", from_address: "noreply@contoso.com" }, "entraid");
+    const mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.value, "smtp.office365.com:587 (Microsoft 365) as noreply@contoso.com");
+    assert.equal(mail.detail.through, "SMTP with OAuth2");
+  });
+
+  test("an SMTP server as before ; no active channel is not configured", async () => {
+    await activeChannel({ name: "smtp", type: "mail", credential: "login" }, "smtp", { server: "smtp.example.com", port: 587, secure: 1 });
+    let mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.value, "smtp.example.com:587");
+    assert.equal(mail.detail.secure, true);
+    assert.equal(mail.detail.authenticated, true);
+    vi.restoreAllMocks();
+    await activeChannel(null);
+    mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.value, "not configured");
+    assert.match(mail.detail.note, /go nowhere/);
+  });
+});
