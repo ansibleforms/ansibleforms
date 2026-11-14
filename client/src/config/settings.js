@@ -1884,18 +1884,7 @@ export default function getSettings(t) {
           type: 'radio',
           // under Secret store, indented with a line joining it to that choice
           nested: true,
-          options: [
-            {
-              value: 'point',
-              label: t('settings.credentials.secretPoint'),
-              hint: t('settings.credentials.secretPointHint'),
-            },
-            {
-              value: 'write',
-              label: t('settings.credentials.secretWriteToStore'),
-              hint: t('settings.credentials.secretWriteToStoreHint'),
-            },
-          ],
+          options: secretActionOptionList(t),
           initial: () => 'point',
           showWhen: (r) => r?.secret_source === 'store',
           hidden: true,
@@ -2122,11 +2111,7 @@ export default function getSettings(t) {
           step: 'login',
           label: t('settings.credentials.entraSignIn'),
           type: 'radio',
-          options: ['secret', 'certificate'].map((value) => ({
-            value,
-            label: t(`settings.credentials.entraSignIn_${value}`),
-            hint: t(`settings.credentials.entraSignInHint_${value}`),
-          })),
+          options: entraAuthOptionList(t),
           initial: (r) => (r?.client_cert ? 'certificate' : 'secret'),
           hidden: true,
           noTable: true,
@@ -3160,11 +3145,7 @@ export default function getSettings(t) {
           step: 'credentials',
           label: t('settings.notificationChannels.sendThrough'),
           type: 'radio',
-          options: SEND_THROUGH.map((value) => ({
-            value,
-            label: t(`settings.notificationChannels.sendThrough_${value}`),
-            hint: t(`settings.notificationChannels.sendThroughHint_${value}`),
-          })),
+          options: sendThroughOptionList(t),
           initial: (r) => (SEND_THROUGH.includes(r?.send_through) ? r.send_through : 'graph'),
           hidden: true,
           noTable: true,
@@ -4256,11 +4237,81 @@ export function credentialTypeOf(credentials, name) {
 export const SEND_THROUGH = ['graph', 'smtp'];
 
 // ---------------------------------------------------------------------------
+// Radio choices shared by the settings fields and the admin pages
+// ---------------------------------------------------------------------------
+
+// what an Entra ID credential signs in with : its client secret (the default) or a certificate
+export const ENTRA_AUTH = ['secret', 'certificate'];
+
+/**
+ * How a mail channel with an entraid credential sends, as radio choices : Microsoft Graph or SMTP
+ * with OAuth2, each its label and a few words. The send_through field and the notification channel
+ * page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per SEND_THROUGH value, in its order.
+ */
+export function sendThroughOptionList(t) {
+  return SEND_THROUGH.map((value) => ({
+    value,
+    label: t(`settings.notificationChannels.sendThrough_${value}`),
+    hint: t(`settings.notificationChannels.sendThroughHint_${value}`),
+  }));
+}
+
+/**
+ * What an Entra ID credential signs in with, as radio choices : its client secret or a certificate,
+ * each its label and a few words. The entra_auth field and the credential page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per ENTRA_AUTH value, in its order.
+ */
+export function entraAuthOptionList(t) {
+  return ENTRA_AUTH.map((value) => ({
+    value,
+    label: t(`settings.credentials.entraSignIn_${value}`),
+    hint: t(`settings.credentials.entraSignInHint_${value}`),
+  }));
+}
+
+/**
+ * What a credential does with a secret store, as radio choices : point to a secret already there,
+ * or write the one typed in the Login step to the store on Save. The secret_action field and the
+ * credential page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } for point, then write.
+ */
+export function secretActionOptionList(t) {
+  return [
+    {
+      value: 'point',
+      label: t('settings.credentials.secretPoint'),
+      hint: t('settings.credentials.secretPointHint'),
+    },
+    {
+      value: 'write',
+      label: t('settings.credentials.secretWriteToStore'),
+      hint: t('settings.credentials.secretWriteToStoreHint'),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // A CyberArk secret store's writes, through its PVWA
 // ---------------------------------------------------------------------------
 
-// the PVWA's logon methods (its API's auth/<method>/Logon)
-const PVWA_AUTH = [
+// the PVWA's logon methods (its API's auth/<method>/Logon) ; the secret store page offers the same
+export const PVWA_AUTH = [
   { name: 'cyberark', label: 'CyberArk' },
   { name: 'ldap', label: 'LDAP' },
   { name: 'radius', label: 'RADIUS' },

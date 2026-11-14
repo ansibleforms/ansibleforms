@@ -40,6 +40,8 @@ import {
   CREDENTIAL_SERVER_EXAMPLE,
   credentialLabels,
   secretRefText,
+  entraAuthOptionList,
+  secretActionOptionList,
 } from '@/config/settings';
 import { formRows, fitsPattern } from '@/lib/formUseRows';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -188,13 +190,9 @@ const entraCert = computed(() => isEntra.value && edit.value?.entra_auth === 'ce
 // a certificate and its key asked : a CyberArk one's, an Entra ID one's with Certificate chosen
 const hasClientKey = computed(() => isCyberark.value || entraCert.value);
 // Secret or Certificate, each its label and a few words
-const entraAuthOptions = computed(() =>
-  ['secret', 'certificate'].map((value) => ({
-    value,
-    label: t(`settings.credentials.entraSignIn_${value}`),
-    hint: t(`settings.credentials.entraSignInHint_${value}`),
-  })),
-);
+const entraAuthOptions = computed(() => entraAuthOptionList(t));
+// in a secret store : point to what is there, or write a new secret on Save
+const secretActionOptions = computed(() => secretActionOptionList(t));
 // an SSH one may log in with a private key (and its passphrase), kept in the app whatever reads
 // its user and password ; whether one is stored (the api sends it masked)
 const isSsh = computed(() => type.value === 'ssh');
@@ -1211,22 +1209,7 @@ onMounted(async () => {
               </div>
               <!-- in a secret store : point to what is there, or write a new secret on Save -->
               <div v-if="edit.secret_source === 'store' && !noStore" class="ms-4 mt-2">
-                <div
-                  v-for="opt in [
-                    {
-                      value: 'point',
-                      label: t('settings.credentials.secretPoint'),
-                      hint: t('settings.credentials.secretPointHint'),
-                    },
-                    {
-                      value: 'write',
-                      label: t('settings.credentials.secretWriteToStore'),
-                      hint: t('settings.credentials.secretWriteToStoreHint'),
-                    },
-                  ]"
-                  :key="opt.value"
-                  class="form-check af-short-check"
-                >
+                <div v-for="opt in secretActionOptions" :key="opt.value" class="form-check af-short-check">
                   <input
                     :id="'af-action-' + opt.value"
                     v-model="edit.secret_action"
