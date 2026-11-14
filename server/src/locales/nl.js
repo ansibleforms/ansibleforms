@@ -97,6 +97,10 @@ export default {
       "Je hebt al een opgeslagen job met de naam '{name}': kies een andere naam",
     cantTouchDirectoryAdmin:
       "Alleen een admin kan een gebruiker met de admin-rol blokkeren, afmelden, vergeten of zijn tokens intrekken",
+    adminOptionAdminOnly:
+      "Alleen een admin kan een admin een optie afnemen: '{option}' van {member}",
+    adminKeepsOwnAccess:
+      "Deze opslag zou '{option}' voor u ({user}) uitzetten: een admin houdt de aanmelding en de instellingen",
     credentialNotFound:
       "Geen referentie met de naam '{name}'",
     repositoryCredentialType:

@@ -386,8 +386,8 @@
         "responses": {
           "200": { "description": "Config saved" },
           "400": { "description": "Missing config_yaml, invalid yaml, or config that fails the base schema validation" },
-          "403": { "description": "Only an admin can change who is an admin (the groups and users of the admin role)" },
-          "409": { "description": "The active config changed elsewhere (stale baseHash)" },
+          "403": { "description": "Only an admin can change who is an admin (the groups and users of the admin role), or take an option away from an admin" },
+          "409": { "description": "The active config changed elsewhere (stale baseHash), or the save would take admin, the sign-in or the settings away from the admin saving it" },
           "423": { "description": "Configuration is locked by the designer" },
           "500": { "description": "Failed to update settings" }
         }

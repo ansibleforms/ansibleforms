@@ -96,6 +96,10 @@ export default {
       "'{name}' という名前の保存済みジョブはすでにあります: 別の名前を選んでください",
     cantTouchDirectoryAdmin:
       "admin ロールを持つユーザーのブロック、サインアウト、削除、トークンの取り消しができるのは admin だけです",
+    adminOptionAdminOnly:
+      "admin のオプションを外せるのは admin だけです: {member} の '{option}'",
+    adminKeepsOwnAccess:
+      "この保存はあなた ({user}) の '{option}' をオフにします: admin はサインインと設定を保持します",
     credentialNotFound:
       "'{name}' という名前の資格情報はありません",
     repositoryCredentialType:

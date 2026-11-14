@@ -95,6 +95,10 @@ export default {
       "Hai già un job salvato chiamato '{name}': scegli un altro nome",
     cantTouchDirectoryAdmin:
       "Solo un admin può bloccare, disconnettere, dimenticare o revocare i token di un utente con il ruolo admin",
+    adminOptionAdminOnly:
+      "Solo un admin può togliere un'opzione a un admin: '{option}' di {member}",
+    adminKeepsOwnAccess:
+      "Questo salvataggio disattiverebbe '{option}' per te ({user}): un admin mantiene l'accesso e le impostazioni",
     credentialNotFound:
       "Nessuna credenziale chiamata '{name}'",
     repositoryCredentialType:

@@ -102,6 +102,10 @@ export default {
       "Masz już zapisane zadanie o nazwie '{name}': wybierz inną nazwę",
     cantTouchDirectoryAdmin:
       "Tylko admin może zablokować, wylogować, zapomnieć lub unieważnić tokeny użytkownika z rolą admin",
+    adminOptionAdminOnly:
+      "Tylko admin może odebrać opcję adminowi: '{option}' dla {member}",
+    adminKeepsOwnAccess:
+      "To zapisanie wyłączyłoby '{option}' dla Ciebie ({user}): admin zachowuje logowanie i ustawienia",
     credentialNotFound:
       "Brak poświadczenia o nazwie '{name}'",
     repositoryCredentialType:

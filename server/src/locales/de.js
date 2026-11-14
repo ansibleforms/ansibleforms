@@ -101,6 +101,10 @@ export default {
       "Du hast bereits einen gespeicherten Job namens '{name}': waehle einen anderen Namen",
     cantTouchDirectoryAdmin:
       "Nur ein Admin kann einen Benutzer mit der Admin-Rolle sperren, abmelden, vergessen oder seine Tokens widerrufen",
+    adminOptionAdminOnly:
+      "Nur ein Admin kann einem Admin eine Option wegnehmen: '{option}' von {member}",
+    adminKeepsOwnAccess:
+      "Diese Speicherung würde '{option}' für Sie ({user}) ausschalten: ein Admin behält die Anmeldung und die Einstellungen",
     credentialNotFound:
       "Keine Zugangsdaten mit dem Namen '{name}'",
     repositoryCredentialType:
