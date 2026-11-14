@@ -21,9 +21,12 @@ const rows = {
   5: { id: 5, name: "sso-client", credential_type: "oidc", issuer: "https://idp" },
   6: { id: 6, name: "smtp-relay", credential_type: "smtp", host: "mail.local", port: 25, password: "stored" },
   7: { id: 7, name: "from-store", credential_type: "database", host: "db.local", port: 3306, secret_store: "vault", secret_ref: "db/app" },
+  8: { id: 8, name: "pvwa-api", credential_type: "userpass", user: "api", password: "stored" },
 };
 const usage = new Map([["ldap-bind", 2], ["runner-login", 1]]);
 const runnerRefs = { "runner-login": ["awx1"] };
+// the CyberArk stores that write with a credential (secret_stores.pvwa_credential)
+const storeRefs = { "pvwa-api": ["cyberark"] };
 
 vi.mock("../src/models/credential.model.v2.js", async () => {
   // the real comparison of which fields say where the secret goes
@@ -38,6 +41,7 @@ vi.mock("../src/models/credential.model.v2.js", async () => {
     findById: async (id) => ({ ...rows[id] }),
     usageOf: async (name) => usage.get(name) || 0,
     runnersUsing: async (name) => runnerRefs[name] || [],
+    storesWritingWith: async (name) => storeRefs[name] || [],
   } };
 });
 vi.mock("../src/auth/auth_entraid.js", () => ({ default: { initialize: async () => {} } }));
@@ -90,6 +94,20 @@ describe("a credential a connection takes its address from", () => {
     expect((await call(controller.create, connectionsUser, { body: { name: "y", credential_type: "userpass" } })).status).toBeLessThan(300);
     expect((await call(controller.update, connectionsUser, { body: { password: "p" }, params: { id: "2" } })).status).toBeLessThan(300);
     expect((await call(controller.delete, connectionsUser, { params: { id: "2" } })).status).toBeLessThan(300);
+  });
+});
+
+describe("the PVWA API user a CyberArk secret store writes with", () => {
+  test("updating, renaming or deleting it: refused for a connections user", async () => {
+    expect((await call(controller.update, connectionsUser, { body: { password: "x" }, params: { id: "8" } })).status).toBe(403);
+    expect((await call(controller.update, connectionsUser, { body: { name: "other" }, params: { id: "8" } })).status).toBe(403);
+    expect((await call(controller.delete, connectionsUser, { params: { id: "8" } })).status).toBe(403);
+    expect(calls).toEqual([]);
+  });
+
+  test("an admin may change it", async () => {
+    expect((await call(controller.update, admin, { body: { password: "x" }, params: { id: "8" } })).status).toBeLessThan(300);
+    expect(calls.length).toBe(1);
   });
 });
 

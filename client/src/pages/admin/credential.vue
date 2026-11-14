@@ -363,14 +363,16 @@ async function update(data) {
 // ─── Used by ──────────────────────────────────────────────────────────────────
 // the secret stores, notification channels, repositories, LDAP directories, SSO providers,
 // runners, the chat assistant, the forms and the designer's workflows that name the credential (a
-// channel as its login or its token) ; a row opens it
+// channel as its login or its token, a CyberArk store as its PVWA API user too) ; a row opens it
 const users = ref([]);
 // the forms that build a credential's name when they run ($(field) in it) : they may use this one
 // when its name fits their pattern
 const dynamicForms = ref([]);
 
 const usedBy = computed(() =>
-  credential.value ? users.value.filter((u) => [u.credential, u.token_credential].includes(credential.value.name)) : [],
+  credential.value
+    ? users.value.filter((u) => [u.credential, u.token_credential, u.pvwa_credential].includes(credential.value.name))
+    : [],
 );
 const usedByColumns = computed(() => [
   { key: 'name', label: t('settings.fields.name') },

@@ -36,6 +36,7 @@ vi.mock("../src/models/credential.model.v2.js", async () => {
     findById: async (id) => ({ ...rows[id] }),
     usageOf: async () => 0,
     runnersUsing: async () => [],
+    storesWritingWith: async () => [],
   } };
 });
 vi.mock("../src/auth/auth_entraid.js", () => ({ default: { initialize: async () => {} } }));
