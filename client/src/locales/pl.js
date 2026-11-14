@@ -3175,7 +3175,7 @@ export default {
   logs: {
     title: 'Dziennik serwera',
     description:
-      'Własny dziennik serwera AnsibleForms: logowania, wczytania konfiguracji, żądania i błędy. Najnowsze wiersze są na dole.',
+      'Dziennik serwera: logowania, żądania i błędy. Ostatnie wiersze z dzisiaj, najnowsze na dole; Pobierz daje cały dzień.',
     clear: 'Wyczyść',
     clearHint: 'Czyści widok, nie log: widoczne są tylko wiersze zapisane od teraz',
     cleared: 'Wyczyszczono: nowe wiersze pojawiają się tutaj w miarę zapisywania.',

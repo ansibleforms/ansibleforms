@@ -21,6 +21,42 @@ export function parseRetentionDays(value) {
   return Number.isNaN(days) || days < 0 ? 90 : days;
 }
 
+// the lines the Logs page shows when LOG_VIEW_LINES is unset or not a whole number of at least 1
+export const LOG_VIEW_LINES_DEFAULT = 1000;
+
+/**
+ * The lines of today's log the Logs page shows, and the most the log endpoint answers : a whole
+ * number of at least 1, no upper limit (an admin who sets it high makes the page heavier to
+ * follow, their choice) ; the default (1000) when unset or not one.
+ *
+ * Args:
+ *   value (string|number|undefined): LOG_VIEW_LINES.
+ *
+ * Returns:
+ *   number: the lines.
+ */
+export function parseViewLines(value) {
+  const text = String(value ?? '').trim();
+  if (!/^\d+$/.test(text)) return LOG_VIEW_LINES_DEFAULT;
+  const lines = Number(text);
+  return lines >= 1 ? lines : LOG_VIEW_LINES_DEFAULT;
+}
+
+/**
+ * Whether a value is one LOG_VIEW_LINES takes : empty (the default), or a whole number of at
+ * least 1.
+ *
+ * Args:
+ *   value (string|undefined): the value.
+ *
+ * Returns:
+ *   boolean: true when it is.
+ */
+export function validViewLines(value) {
+  const text = String(value ?? '').trim();
+  return text === '' || (/^\d+$/.test(text) && Number(text) >= 1);
+}
+
 // The levels the logger knows : winston's syslog levels, the most severe first. They have
 // `warning` and no `warn`, and winston logs NOTHING at all (errors included) for a level it does
 // not know - which is what LOG_LEVEL=warn did, the value the documentation once gave.
@@ -81,6 +117,8 @@ var log_config = {
   tz: process.env.LOG_TZ || "UTC",
   // how many days of log files are kept (the main log and the errors log) ; 0 keeps them all
   retentionDays: parseRetentionDays(process.env.LOG_RETENTION_DAYS),
+  // the lines of today's log the Logs page shows, and the most the log endpoint answers
+  viewLines: parseViewLines(process.env.LOG_VIEW_LINES),
 };
 if ( !fs.existsSync( log_config.path ) ) {
   try{

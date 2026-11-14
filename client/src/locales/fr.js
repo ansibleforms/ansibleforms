@@ -3191,11 +3191,11 @@ export default {
   logs: {
     title: 'Journal du serveur',
     description:
-      'Le journal propre du serveur AnsibleForms : connexions, chargements de la configuration, requêtes et erreurs. Les lignes les plus récentes sont en bas.',
+      'Le journal du serveur : connexions, requêtes, erreurs. Dernières lignes du jour, récentes en bas ; Télécharger : toute la journée.',
     clear: 'Effacer',
     clearHint: "Vide l'affichage, pas le journal : seules les lignes écrites à partir de maintenant s'affichent",
     cleared: "Effacé : les nouvelles lignes s'affichent ici à mesure qu'elles sont écrites.",
-    download: 'Telecharger',
+    download: 'Télécharger',
   },
   changePassword: {
     title: 'Changez votre mot de passe',

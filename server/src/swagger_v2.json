@@ -611,10 +611,10 @@
           {
             "name": "lines",
             "in": "query",
-            "description": "Number of lines to return (default: 100)",
+            "description": "The last lines of today's log to return: at most LOG_VIEW_LINES, and LOG_VIEW_LINES when left out (1000 by default)",
             "schema": {
               "type": "integer",
-              "default": 100
+              "minimum": 1
             }
           }
         ],

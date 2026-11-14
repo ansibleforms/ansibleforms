@@ -3202,7 +3202,7 @@ export default {
   logs: {
     title: 'Serverprotokoll',
     description:
-      'Das eigene Protokoll des AnsibleForms-Servers: Anmeldungen, Laden der Konfiguration, Anfragen und Fehler. Die neuesten Zeilen stehen unten.',
+      'Das Serverprotokoll: Anmeldungen, Anfragen, Fehler. Die letzten Zeilen von heute, neueste unten; Herunterladen: der ganze Tag.',
     clear: 'Leeren',
     clearHint: 'Leert die Ansicht, nicht das Log: nur die ab jetzt geschriebenen Zeilen werden angezeigt',
     cleared: 'Geleert: neue Zeilen erscheinen hier, sobald sie geschrieben werden.',

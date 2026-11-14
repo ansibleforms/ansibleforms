@@ -3185,7 +3185,7 @@ export default {
   logs: {
     title: 'Log del server',
     description:
-      'Il log del server AnsibleForms: accessi, caricamenti della configurazione, richieste ed errori. Le righe più recenti sono in fondo.',
+      "Il log del server: accessi, richieste, errori. Ultime righe di oggi, le nuove in fondo; Scarica: l'intera giornata.",
     clear: 'Pulisci',
     clearHint: 'Svuota la vista, non il log: si vedono solo le righe scritte da ora in poi',
     cleared: 'Pulito: le nuove righe compaiono qui man mano che vengono scritte.',

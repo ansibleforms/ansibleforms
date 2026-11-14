@@ -2,6 +2,25 @@
 import Log from '../../models/log.model.js';
 import RestResult from '../../models/restResult.model.v2.js';
 import i18n from '../../lib/i18n.js';
+import logConfig from '../../../config/log.config.js';
+
+/**
+ * The lines a request is answered : the lines it asks, at most LOG_VIEW_LINES (the Logs page's
+ * setting, 1000 by default), and LOG_VIEW_LINES when it asks none or no whole number of at
+ * least 1. So no request can make the server read the whole day's file : that is the download.
+ *
+ * Args:
+ *   asked (string|undefined): query.lines.
+ *   limit (number): LOG_VIEW_LINES.
+ *
+ * Returns:
+ *   number: the lines to read.
+ */
+export function linesToRead(asked, limit) {
+  const text = String(asked ?? '').trim();
+  const n = /^\d+$/.test(text) ? Number(text) : 0;
+  return n >= 1 ? Math.min(n, limit) : limit;
+}
 
 /**
  * The last lines of today's log (Settings > Logs reads it every 2 seconds).
@@ -12,12 +31,14 @@ import i18n from '../../lib/i18n.js';
  * it stop reading.
  *
  * Args:
- *   req (object): the request ; query.lines, how many lines (100 by default).
+ *   req (object): the request ; query.lines, how many lines (LOG_VIEW_LINES by default, and at
+ *     most).
  *   res (object): the response.
  */
 const get = async function(req, res) {
   try {
-    const lines = req.query.lines || 100;
+    // the lines asked, at most the Logs page's setting (LOG_VIEW_LINES) ; none asked, that many
+    const lines = linesToRead(req.query.lines, logConfig.viewLines);
     // step 1 : no file for today yet, an empty log
     try {
       Log.getFileName();

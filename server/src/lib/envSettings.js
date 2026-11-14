@@ -13,7 +13,7 @@ import { rebuildBodyParsers } from './bodyParsers.js';
 import { applyTrustProxy, compileTrustProxy } from './trustProxy.js';
 import { MIN_HEADER_SIZE, MAX_HEADER_SIZE } from './httpServerOptions.js';
 import authConfig, { entraEnv } from '../../config/auth.config.js';
-import logConfig, { parseRetentionDays, knownLogLevel, LOG_LEVEL_DEFAULTS, LOG_LEVELS } from '../../config/log.config.js';
+import logConfig, { parseRetentionDays, parseViewLines, validViewLines, knownLogLevel, LOG_LEVEL_DEFAULTS, LOG_LEVELS } from '../../config/log.config.js';
 import ansibleConfig from '../../config/ansible.config.js';
 
 // Editing environment variables from the settings page.
@@ -261,6 +261,8 @@ const LIVE_CUSTOM = {
   // the rotating files are told how long to keep their files when built : rebuilt, with the
   // new value (0 keeps them all)
   LOG_RETENTION_DAYS: (v) => { logConfig.retentionDays = parseRetentionDays(v); return rebuildFileTransports(); },
+  // read by the log endpoint on every request : setting it is enough
+  LOG_VIEW_LINES: (v) => { logConfig.viewLines = parseViewLines(v); },
   // node's setSecureContext replaces the TLS context for new connections, so a renewed
   // certificate needs no restart. Returns false in http mode - there is no context to swap -
   // and false if the files cannot be read, keeping the working certificate in place.
@@ -430,6 +432,10 @@ export function validate(name, value, doc) {
   // case) accepted as the level it means
   if (name in LOG_LEVEL_DEFAULTS && v !== '' && !knownLogLevel(v)) {
     return `${name} must be one of ${LOG_LEVELS.join(', ')}`;
+  }
+  // the Logs page's lines : a whole number of at least 1, no upper limit (empty : the default)
+  if (name === 'LOG_VIEW_LINES' && !validViewLines(v)) {
+    return 'LOG_VIEW_LINES must be a whole number of at least 1';
   }
   if (name === 'LAUNCH_VALIDATION' && v !== '' && !['off', 'log', 'enforce'].includes(v.trim().toLowerCase())) {
     return 'LAUNCH_VALIDATION must be off, log or enforce';

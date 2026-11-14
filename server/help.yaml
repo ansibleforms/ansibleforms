@@ -1324,6 +1324,19 @@
       How many days of server log files are kept: the main log and the errors log, one file a
       day, zipped once the day is over. Older files are deleted. 0 keeps every file. Takes
       effect at once, without a restart.
+  - name: LOG_VIEW_LINES
+    version: 7.7.0
+    type: number
+    allowed: a whole number of at least 1
+    short: Lines on the Server log page
+    hint: The number of last lines the Server log page shows; more can make it slow or unresponsive
+    default: "1000"
+    description: |
+      The number of last lines of today's server log the Server log page shows and searches, and
+      the most the log endpoint (GET /api/v2/log) answers, whatever a request asks: the whole day's
+      file is the page's Download. No upper limit, but the page reads that many lines every 2
+      seconds, and many lines can make it slow or unresponsive. Takes effect at once, without a
+      restart.
   - name: LOG_PATH
     type: string
     allowed: a valid folder path
