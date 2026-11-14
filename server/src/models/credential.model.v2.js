@@ -3,6 +3,7 @@ import Errors from '../lib/errors.js';
 import logger from '../lib/logger.js';
 import mysql from './db.model.js';
 import crypto from '../lib/crypto.js';
+import { X509Certificate, createPrivateKey } from 'node:crypto';
 import { readSecret, mapPayloadToCredential, parseInlineSecret, VAULT_STORE_NAME } from '../secrets/providers/index.js';
 import dbConfig from '../../config/db.config.js';
 import { stripTrailingSlashes } from '../lib/url.js';
@@ -34,7 +35,8 @@ class CredentialModel extends CrudModel {
   // one for SSH to a server, the login a workflow node's playbook connects with
   // ldap : an LDAP directory's bind account (its user the bind DN) ; entraid and oidc : an SSO
   // provider's client (its user the client id, its password the client secret ; an entraid one its
-  // tenant too, an oidc one its issuer) ; smtp : a mail server (its host, port and TLS) and its
+  // tenant too, an oidc one its issuer), an entraid one also how mail is sent through Microsoft 365
+  // (its secret, or a certificate and its key : client_cert, client_key) ; smtp : a mail server (its host, port and TLS) and its
   // login (none for a relay)
   // rte, awx, aap, ascender, semaphore, rundeck and jenkins : how a runner of that kind signs in,
   // and where (its url) ; vault : how a HashiCorp Vault secret store logs in (its password the
@@ -141,6 +143,7 @@ class CredentialModel extends CrudModel {
     } else if (data.redirect_uri !== undefined && data.redirect_uri !== null) {
       data.redirect_uri = String(data.redirect_uri).trim() || null;
     }
+    if (data.credential_type === 'entraid') this.checkEntraCertificate(data, creating);
     if (data.credential_type === 'smtp' && empty('host')) {
       throw new Errors.BadRequestError('An smtp credential needs its mail server (host)');
     }
@@ -161,6 +164,52 @@ class CredentialModel extends CrudModel {
       throw new Errors.BadRequestError(`A ${data.credential_type} credential needs its server (url)`);
     }
     return data;
+  }
+
+  /**
+   * An Entra ID credential's certificate and private key, when it signs in with a certificate
+   * instead of its secret (mail through Microsoft 365, lib/microsoftMail.js) : the certificate a
+   * PEM certificate, the key a PEM private key without a passphrase, and a new certificate comes
+   * with its key. The messages never hold the key.
+   *
+   * Args:
+   *   data (object): the record written (client_cert, client_key).
+   *   creating (boolean): a create (a certificate then needs its key in the same write).
+   *
+   * Raises:
+   *   BadRequestError: the certificate or the key does not read, a new certificate comes without
+   *     its key, or the two do not go together.
+   */
+  static checkEntraCertificate(data, creating = false) {
+    const text = (v) => String(v ?? '').trim();
+    // step 1 : what is written ; the key left out (or masked, removed by update) keeps the stored one
+    const certPem = text(data.client_cert);
+    const keyPem = isMasked(data.client_key) ? '' : text(data.client_key);
+    if (!certPem && !keyPem) return;
+    // step 2 : each reads
+    let cert = null;
+    let key = null;
+    if (certPem) {
+      try {
+        cert = new X509Certificate(certPem);
+      } catch {
+        throw new Errors.BadRequestError('The certificate of a Microsoft Entra ID credential is a PEM certificate (-----BEGIN CERTIFICATE-----)');
+      }
+    }
+    if (keyPem) {
+      try {
+        key = createPrivateKey(keyPem);
+      } catch {
+        throw new Errors.BadRequestError('The private key of a Microsoft Entra ID credential is a PEM private key without a passphrase (-----BEGIN PRIVATE KEY-----)');
+      }
+    }
+    // step 3 : a new certificate comes with its key, and they go together
+    if (cert && !key && creating) {
+      throw new Errors.BadRequestError("A Microsoft Entra ID credential that signs in with a certificate needs the certificate's private key too");
+    }
+    if (cert && key && !cert.checkPrivateKey(key)) {
+      throw new Errors.BadRequestError('The private key does not belong to the certificate of this Microsoft Entra ID credential');
+    }
   }
 
   // the types that carry the address of the one server they log in to (Credential.url) : a

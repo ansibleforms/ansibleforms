@@ -1540,7 +1540,12 @@ export default {
       addressChat: 'Czat {chat}',
       credential: 'Poświadczenie',
       helpCredential:
-        'Poświadczenie smtp z Połączenia > Poświadczenia: serwer poczty, jego port i TLS oraz logowanie (bez użytkownika dla przekaźnika). Brak: serwer poczty poniżej, bez logowania.',
+        'Poświadczenie smtp z Połączenia > Poświadczenia: serwer poczty, jego port i TLS oraz logowanie (bez użytkownika dla przekaźnika). Brak: serwer poczty poniżej, bez logowania. Albo poświadczenie Microsoft Entra ID, aby wysyłać przez Microsoft 365 z OAuth2.',
+      sendThrough: 'Wysyłaj przez',
+      sendThrough_graph: 'Microsoft Graph',
+      sendThroughHint_graph: 'HTTPS do Microsoft Graph: aplikacja potrzebuje uprawnienia Mail.Send',
+      sendThrough_smtp: 'SMTP (OAuth2)',
+      sendThroughHint_smtp: 'smtp.office365.com, port 587: skrzynka musi mieć włączone SMTP AUTH',
       serverHelp: 'Serwer poczty, przez który wysyła, gdy nie wybrano poświadczenia, bez logowania (przekaźnik).',
       webhookUrl: 'Adres webhooka',
       webhookUrlHelp_slack:
@@ -1758,6 +1763,13 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: 'AppID, certyfikat i klucz klienta, którymi loguje się magazyn CyberArk',
       clientKeyKeep: 'Pozostawiony pusty, zapisany klucz klienta zostaje.',
+      entraSignIn: 'Logowanie przez',
+      entraSignIn_secret: 'Sekret klienta',
+      entraSignInHint_secret: 'Sekret rejestracji aplikacji: do logowania SSO i poczty',
+      entraSignIn_certificate: 'Certyfikat',
+      entraSignInHint_certificate: 'Certyfikat i jego klucz prywatny: tylko dla poczty przez Microsoft 365',
+      entraCertHelp:
+        'Certyfikat PEM przesłany do rejestracji aplikacji (Certyfikaty i wpisy tajne); jego klucz prywatny poniżej.',
       server: 'Serwer',
       serverHelp: 'Adres magazynu sekretów, do którego służy to logowanie.',
       optionalHostHelp: 'Opcjonalny. Przekazywany z poświadczeniami do playbooka i wyrażeń jako host.',
@@ -1798,7 +1810,8 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: 'Serwery, TLS i konto powiązania katalogu LDAP: jego DN i hasło',
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint: 'Aplikacja dostawcy Microsoft Entra ID: ID dzierżawy, ID klienta i sekret',
+      type_entraidHint:
+        'Aplikacja dostawcy Microsoft Entra ID lub poczty Microsoft 365: ID dzierżawy, ID klienta oraz sekret lub certyfikat',
       type_oidc: 'Open ID',
       type_oidcHint: 'Klient dostawcy Open ID: wystawca, ID klienta i sekret',
     },

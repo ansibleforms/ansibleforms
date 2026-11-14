@@ -1703,7 +1703,12 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Credencial',
       helpCredential:
-        'Una credencial smtp de Conexiones > Credenciales: el servidor de correo, su puerto y TLS, y el inicio de sesión (sin usuario para un relay). Ninguna: el servidor de correo de abajo, sin inicio de sesión.',
+        'Una credencial smtp de Conexiones > Credenciales: el servidor de correo, su puerto y TLS, y el inicio de sesión (sin usuario para un relay). Ninguna: el servidor de correo de abajo, sin inicio de sesión. O una credencial Microsoft Entra ID, para enviar a través de Microsoft 365 con OAuth2.',
+      sendThrough: 'Enviar a través de',
+      sendThrough_graph: 'Microsoft Graph',
+      sendThroughHint_graph: 'HTTPS a Microsoft Graph: la aplicación necesita el permiso Mail.Send',
+      sendThrough_smtp: 'SMTP (OAuth2)',
+      sendThroughHint_smtp: 'smtp.office365.com, puerto 587: el buzón necesita SMTP AUTH activado',
       serverHelp:
         'El servidor de correo por el que envía cuando no se elige ninguna credencial, sin inicio de sesión (un relay).',
       webhookUrl: 'Dirección del webhook',
@@ -1928,6 +1933,13 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: 'El AppID, el certificado y la clave de cliente con los que accede un almacén CyberArk',
       clientKeyKeep: 'Si se deja vacía, se conserva la clave de cliente guardada.',
+      entraSignIn: 'Iniciar sesión con',
+      entraSignIn_secret: 'Secreto de cliente',
+      entraSignInHint_secret: 'El secreto del registro de aplicación: para el inicio de sesión SSO y el correo',
+      entraSignIn_certificate: 'Certificado',
+      entraSignInHint_certificate: 'Un certificado y su clave privada: solo para el correo a través de Microsoft 365',
+      entraCertHelp:
+        'El certificado PEM subido al registro de aplicación (Certificados y secretos); su clave privada abajo.',
       server: 'Servidor',
       serverHelp: 'La dirección del almacén de secretos para el que sirve este acceso.',
       optionalHostHelp: 'Opcional. Se pasa con las credenciales al playbook y a las expresiones, como host.',
@@ -1968,7 +1980,8 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: 'Los servidores, el TLS y la cuenta de bind de un directorio LDAP: su DN y contraseña',
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint: 'La aplicación de un proveedor Microsoft Entra ID: su ID de tenant, ID de cliente y secreto',
+      type_entraidHint:
+        'La aplicación de un proveedor Microsoft Entra ID o del correo de Microsoft 365: su ID de tenant, ID de cliente, y un secreto o un certificado',
       type_oidc: 'Open ID',
       type_oidcHint: 'El cliente de un proveedor Open ID: su emisor, ID de cliente y secreto',
     },

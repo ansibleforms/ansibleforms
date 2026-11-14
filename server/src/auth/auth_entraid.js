@@ -81,6 +81,11 @@ const initialize = async () => {
     logger.error('Could not enable Microsoft Entra ID: the client id and the redirect uri are required');
     return false;
   }
+  // the sign-in uses a client secret : a credential with a certificate only (mail) cannot sign in
+  if (!entraConfig.client_secret) {
+    logger.error('Could not enable Microsoft Entra ID: the sign-in needs a client secret, and its client has none (a certificate is used for mail only): add the client secret to its credential');
+    return false;
+  }
   if (!isSingleTenant(entraConfig.tenant_id)) {
     logger.error(`Could not enable Microsoft Entra ID: set the tenant id to your tenant ('${entraConfig.tenant_id || ''}' would let any Microsoft tenant log in)`);
     return false;

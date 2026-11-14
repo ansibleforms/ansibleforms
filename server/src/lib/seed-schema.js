@@ -58,6 +58,8 @@ const credentialItem = {
     // what it is for (is_database follows it) ; without it, is_database decides
     credential_type: { type: "string", enum: ["userpass", "ssh", "git", "api", "database", "cyberark", "smtp", "ldap", "entraid", "oidc",
       "rte", "awx", "aap", "ascender", "semaphore", "rundeck", "jenkins", "vault"] },
+    // a cyberark one's client certificate and key ; an entraid one's, signing in with them
+    // instead of its secret when it sends mail through Microsoft 365
     client_cert: str,
     client_key: str,
     // an entraid credential's tenant, an oidc one's issuer ; an entraid or oidc one's redirect URL
@@ -333,7 +335,10 @@ const notificationChannelItem = {
     port: strOrInt,
     secure: bool,
     from_address: str,
+    // mail : an smtp credential, or an entraid one (Microsoft 365, sending as from_address)
     credential: str,
+    // mail with an entraid credential : Microsoft Graph (the default) or SMTP with OAuth2
+    send_through: { type: "string", enum: ["graph", "smtp"] },
     webhook_url: str,
     chat_id: strOrInt,
     api_url: str,

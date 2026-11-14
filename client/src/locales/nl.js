@@ -1696,7 +1696,12 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Inloggegevens',
       helpCredential:
-        'Een smtp-inloggegeven van Verbindingen > Inloggegevens: de mailserver, de poort en TLS, en de login (geen gebruiker voor een relay). Geen: de mailserver hieronder, zonder login.',
+        'Een smtp-inloggegeven van Verbindingen > Inloggegevens: de mailserver, de poort en TLS, en de login (geen gebruiker voor een relay). Geen: de mailserver hieronder, zonder login. Of een Microsoft Entra ID-inloggegeven, om via Microsoft 365 met OAuth2 te verzenden.',
+      sendThrough: 'Verzenden via',
+      sendThrough_graph: 'Microsoft Graph',
+      sendThroughHint_graph: 'HTTPS naar Microsoft Graph: de app heeft de machtiging Mail.Send nodig',
+      sendThrough_smtp: 'SMTP (OAuth2)',
+      sendThroughHint_smtp: 'smtp.office365.com, poort 587: de mailbox heeft SMTP AUTH aan nodig',
       serverHelp: 'De mailserver waarlangs het verzendt als er geen inloggegeven gekozen is, zonder login (een relay).',
       webhookUrl: 'Webhookadres',
       webhookUrlHelp_slack:
@@ -1917,6 +1922,13 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: 'De AppID, het clientcertificaat en de sleutel waarmee een CyberArk secret store aanmeldt',
       clientKeyKeep: 'Leeg gelaten blijft de opgeslagen clientsleutel.',
+      entraSignIn: 'Aanmelden met',
+      entraSignIn_secret: 'Clientgeheim',
+      entraSignInHint_secret: 'Het geheim van de app-registratie: voor SSO-aanmelding en mail',
+      entraSignIn_certificate: 'Certificaat',
+      entraSignInHint_certificate: 'Een certificaat en zijn privésleutel: alleen voor mail via Microsoft 365',
+      entraCertHelp:
+        'Het PEM-certificaat dat naar de app-registratie is geüpload (Certificaten en geheimen); de privésleutel hieronder.',
       server: 'Server',
       serverHelp: 'Het adres van de secret store waarvoor deze login geldt.',
       optionalHostHelp: 'Optioneel. Wordt met de referentie als host aan het playbook en aan expressies doorgegeven.',
@@ -1957,7 +1969,8 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: 'De servers, TLS en het bind-account van een LDAP-directory: DN en wachtwoord',
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint: 'De app van een Microsoft Entra ID-provider: tenant-ID, client-ID en clientgeheim',
+      type_entraidHint:
+        'De app van een Microsoft Entra ID-provider of van Microsoft 365-mail: tenant-ID, client-ID, en een geheim of een certificaat',
       type_oidc: 'Open ID',
       type_oidcHint: 'De client van een Open ID-provider: uitgever, client-ID en clientgeheim',
     },

@@ -1706,7 +1706,12 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Zugangsdaten',
       helpCredential:
-        'Ein smtp-Zugang unter Verbindungen > Zugangsdaten: der Mailserver, sein Port und TLS und die Anmeldung (kein Benutzer für ein Relay). Keiner: der Mailserver unten, ohne Anmeldung.',
+        'Ein smtp-Zugang unter Verbindungen > Zugangsdaten: der Mailserver, sein Port und TLS und die Anmeldung (kein Benutzer für ein Relay). Keiner: der Mailserver unten, ohne Anmeldung. Oder ein Microsoft Entra ID-Zugang, um über Microsoft 365 mit OAuth2 zu senden.',
+      sendThrough: 'Senden über',
+      sendThrough_graph: 'Microsoft Graph',
+      sendThroughHint_graph: 'HTTPS zu Microsoft Graph: die App braucht die Berechtigung Mail.Send',
+      sendThrough_smtp: 'SMTP (OAuth2)',
+      sendThroughHint_smtp: 'smtp.office365.com, Port 587: das Postfach braucht eingeschaltetes SMTP AUTH',
       serverHelp: 'Der Mailserver, über den gesendet wird, wenn kein Zugang gewählt ist, ohne Anmeldung (ein Relay).',
       webhookUrl: 'Webhook-Adresse',
       webhookUrlHelp_slack:
@@ -1931,6 +1936,13 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: 'AppID, Client-Zertifikat und Schlüssel, mit denen sich ein CyberArk Secret Store anmeldet',
       clientKeyKeep: 'Leer gelassen bleibt der gespeicherte Client-Schlüssel.',
+      entraSignIn: 'Anmelden mit',
+      entraSignIn_secret: 'Client-Geheimnis',
+      entraSignInHint_secret: 'Das Geheimnis der App-Registrierung: für die SSO-Anmeldung und Mail',
+      entraSignIn_certificate: 'Zertifikat',
+      entraSignInHint_certificate: 'Ein Zertifikat und sein privater Schlüssel: nur für Mail über Microsoft 365',
+      entraCertHelp:
+        'Das PEM-Zertifikat, das in die App-Registrierung hochgeladen wurde (Zertifikate & Geheimnisse); sein privater Schlüssel unten.',
       server: 'Server',
       serverHelp: 'Die Adresse des Secret Stores, für den diese Anmeldung gilt.',
       optionalHostHelp: 'Optional. Wird mit den Anmeldedaten als host an das Playbook und an Ausdrücke übergeben.',
@@ -1971,7 +1983,8 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: 'Server, TLS und Bind-Konto eines LDAP-Verzeichnisses: DN und Passwort',
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint: 'Die App eines Microsoft Entra ID-Anbieters: Mandanten-ID, Client-ID und Client-Geheimnis',
+      type_entraidHint:
+        'Die App eines Microsoft Entra ID-Anbieters oder für Microsoft 365-Mail: Mandanten-ID, Client-ID und ein Geheimnis oder ein Zertifikat',
       type_oidc: 'Open ID',
       type_oidcHint: 'Der Client eines Open ID-Anbieters: Aussteller, Client-ID und Client-Geheimnis',
     },

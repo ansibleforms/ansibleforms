@@ -63,6 +63,15 @@ async function guardChannelCredentials(req, existing) {
   const chosen = CHANNEL_CREDENTIALS.filter((k) => data[k] && data[k] !== existing?.[k]).map((k) => data[k]);
   const guarded = await CredentialModel.firstAdminGuarded(chosen);
   if (guarded) throw new Errors.AccessDeniedError(i18n.t(req, "resources.credentialNotAllowed", { name: guarded }));
+  // a mail channel through Microsoft 365 sends as the mailbox it names, with the app's token : the
+  // mailbox and the way are the admin's to change, as its entraid credential is
+  if (existing?.type === "mail" && existing.credential && (data.credential === undefined || data.credential === existing.credential)) {
+    const text = (v) => (v === null || v === undefined ? "" : String(v).trim());
+    const moved = ["from_address", "send_through"].some((f) => data[f] !== undefined && text(data[f]) !== text(existing[f]));
+    if (moved && (await CredentialModel.findRowByName(existing.credential))?.credential_type === "entraid") {
+      throw new Errors.AccessDeniedError(i18n.t(req, "resources.credentialNotAllowed", { name: existing.credential }));
+    }
+  }
   // moved elsewhere : the credential it keeps stays behind
   if (existing && channelTargetChanged(existing, data)) {
     for (const k of CHANNEL_CREDENTIALS) {

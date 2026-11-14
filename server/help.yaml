@@ -657,7 +657,7 @@
       of the provider after it (`<authority>/<tenant>/v2.0`). Change it for a national cloud,
       e.g. `https://login.microsoftonline.us` (US Government) or `https://login.chinacloudapi.cn`
       (China), together with `ENTRA_GRAPH_URI`. Read when the Microsoft Entra ID provider is enabled or
-      saved. Only HTTPS is accepted, except with `NODE_ENV=development`, for a local test
+      saved, and for the token of a mail channel sending through Microsoft 365. Only HTTPS is accepted, except with `NODE_ENV=development`, for a local test
       provider. Replaces `AZURE_AUTHORITY_URI`, still read when this one is not set.
   - name: ENTRA_GRAPH_URI
     version: 7.3.0
@@ -671,7 +671,8 @@
       group membership (`/v1.0/me/transitiveMemberOf`). Since 6.5.3 that call is made by the
       AnsibleForms server, not by the browser, so the server needs a route to it - behind an
       egress proxy set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`. Change it for a national
-      cloud, e.g. `https://graph.microsoft.us`. Replaces `AZURE_GRAPH_URI`, still read when this
+      cloud, e.g. `https://graph.microsoft.us`. A mail channel sending through Microsoft Graph uses it
+      too (`/v1.0/users/<sender>/sendMail`). Replaces `AZURE_GRAPH_URI`, still read when this
       one is not set.
   - name: AZURE_AUTHORITY_URI
     version: 7.0.4
@@ -6661,6 +6662,63 @@
         runLocal: true
         expression: "{vc_cred: 'vcenter',ad_cred: 'ad',veeam_cred:'$(veeam_server)'}"
         # note: in the expression you can use placeholders to make them dynamic
+  - name: Mail through Microsoft 365
+    short: Send mail with OAuth2 instead of an SMTP password
+    version: v7.6.0
+    description: |
+      Exchange Online turns off SMTP AUTH with a user and a password (basic authentication) by default at the end of December 2026.
+      A mail channel (Connections > Notifications) can send through Microsoft 365 with OAuth2 instead: give it a **Microsoft Entra ID**
+      credential (an app registration) in place of an smtp one, and choose how it sends with **Send through**.
+      The sender address is the mailbox the mail is sent as. Mail channels with an smtp credential (a login or a relay) work as before.
+
+      - **Microsoft Graph** (the default): HTTPS to Graph's `sendMail`, no SMTP at all.
+      - **SMTP (OAuth2)**: `smtp.office365.com`, port 587 with STARTTLS, signed in with a token instead of a password.
+
+      ## The app registration
+
+      1. In the Microsoft Entra admin center, **App registrations > New registration**, single tenant. Note its **Application (client) ID** and **Directory (tenant) ID**.
+      2. **Certificates & secrets**: a new client secret (copy its *Value*, not its ID), or upload a certificate (see below).
+      3. In AnsibleForms, a credential of type **Microsoft Entra ID**: its tenant ID, client ID, and the secret or the certificate.
+
+      ## Microsoft Graph
+
+      1. **API permissions > Add a permission > Microsoft Graph > Application permissions > Mail.Send**, then **Grant admin consent**.
+      2. That permission lets the app send as **every** mailbox. To keep it to the sending mailbox, use Exchange RBAC for Applications instead of the
+         Entra ID permission (remove Mail.Send from the app registration), in Exchange Online PowerShell:
+
+      ```powershell
+      # the ObjectId is the one of the Enterprise application (service principal), not of the app registration
+      New-ServicePrincipal -AppId <client-id> -ObjectId <enterprise-app-object-id> -DisplayName "AnsibleForms mail"
+      New-ManagementScope -Name "AnsibleForms mail" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'noreply@contoso.com'"
+      New-ManagementRoleAssignment -App <client-id> -Role "Application Mail.Send" -CustomResourceScope "AnsibleForms mail"
+      # check: InScope is True for the sender, False for another mailbox
+      Test-ServicePrincipalAuthorization -Identity <client-id> -Resource noreply@contoso.com
+      ```
+
+      ## SMTP (OAuth2)
+
+      1. **API permissions > Add a permission > APIs my organization uses > Office 365 Exchange Online > Application permissions > SMTP.SendAsApp**, then **Grant admin consent**.
+      2. In Exchange Online PowerShell, register the app in Exchange, give it the mailbox, and turn SMTP AUTH on for that mailbox:
+
+      ```powershell
+      New-ServicePrincipal -AppId <client-id> -ObjectId <enterprise-app-object-id> -DisplayName "AnsibleForms mail"
+      Add-MailboxPermission -Identity noreply@contoso.com -User <enterprise-app-object-id> -AccessRights FullAccess
+      Set-CASMailbox -Identity noreply@contoso.com -SmtpClientAuthenticationDisabled $false
+      ```
+
+      ## A certificate instead of a secret
+
+      On the credential, **Sign in with > Certificate**: paste the certificate and its private key (PEM, RSA, without a passphrase; the key is stored
+      encrypted and never shown again), and upload the same certificate to the app registration (**Certificates & secrets > Certificates**). For example:
+
+      ```bash
+      openssl req -x509 -newkey rsa:2048 -nodes -days 730 -subj "/CN=AnsibleForms mail" -keyout ansibleforms-mail.key -out ansibleforms-mail.pem
+      ```
+
+      The certificate is used for mail only: an SSO provider signs in with the client secret, so a credential used for both keeps its secret too.
+      A national cloud uses `ENTRA_AUTHORITY_URI` for the token and `ENTRA_GRAPH_URI` for Graph. **Send test** on the channel says what is missing
+      when Microsoft refuses: the Mail.Send permission or its consent, a mailbox outside the app's scope, an unknown mailbox, an expired secret or
+      certificate, or SMTP AUTH turned off for the mailbox.
   - name: Jobid
     short: Pass the current jobid
     description: |

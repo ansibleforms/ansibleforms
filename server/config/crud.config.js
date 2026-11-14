@@ -43,7 +43,8 @@ const crudConfigs = {
       { name: 'is_database', isBoolean: true, setDefault: true },
       // what it is for : ssh, git, api or database (is_database follows it)
       { name: 'credential_type' },
-      // a cyberark credential's client certificate and key (PEM) : how its AppID is restricted
+      // a cyberark credential's client certificate and key (PEM) : how its AppID is restricted ;
+      // an entraid one's certificate and key, signing in with it instead of its secret (mail)
       { name: 'client_cert' },
       { name: 'client_key', isEncrypted: true },
       // an entraid credential's tenant
@@ -153,7 +154,9 @@ const crudConfigs = {
       { name: 'port' },
       { name: 'secure', isBoolean: true },
       { name: 'from_address' },
+      // an smtp credential, or an entraid one for Microsoft 365 : then how it sends (graph, smtp)
       { name: 'credential' },
+      { name: 'send_through' },
       { name: 'webhook_url', isEncrypted: true },
       { name: 'chat_id' },
       { name: 'api_url' },

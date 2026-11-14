@@ -40,8 +40,9 @@
 /*      (AWX : which product) - indented, with its label as title */
 /*  field.flush: a switch at the dialog's left edge, its help the */
 /*      full width under it                                       */
-/*  field.showWhen: (item) => Boolean - shown by a rule of its    */
-/*      own, instead of field.dependency                          */
+/*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
+/*      its own, instead of field.dependency (the dropdowns'      */
+/*      lists : the credential chosen, its type)                  */
 /*  field.suffix: a fixed text after the input, not in its value  */
 /*      (a text, or (item) => text)                               */
 /*  field.help / field.placeholder / field.dialogLabel: a text,   */
@@ -722,7 +723,7 @@ function showField(field) {
   // a field shown by a rule of its own (field.showWhen(item)) : the user of a Jenkins runner,
   // or of an AWX signing in with a user and password
   if (field.showWhen) {
-    depShow = !!field.showWhen(item.value);
+    depShow = !!field.showWhen(item.value, parentLists.value || {});
   } else if (field.dependency) {
     const depValue = item.value[field.dependency];
     if (Array.isArray(field.dependencyValues)) {

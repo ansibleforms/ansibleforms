@@ -654,7 +654,7 @@ const SCHEMA_MANIFEST = {
                                'secret_stores.credential', 'credentials.client_cert', 'credentials.client_key',
                                'secret_stores.write_enabled', 'secret_stores.write_prefix',
                                'secret_stores.pvwa_url', 'secret_stores.pvwa_credential', 'secret_stores.pvwa_auth', 'secret_stores.platform_id',
-                               'chat_settings.credential',
+                               'chat_settings.credential', 'notification_channels.send_through',
                                'users.description', 'schedule.raw_form_data', 'users.blocked', 'users.last_login', 'settings.favicon',
                                'settings.app_name', 'settings.env_label', 'settings.env_label_show', 'settings.env_label_color',
                                'settings.banner_show', 'settings.disclaimer_enabled',
@@ -1226,6 +1226,9 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("secret_stores", "pvwa_credential", "varchar(250)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("secret_stores", "pvwa_auth", "varchar(20)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("secret_stores", "platform_id", "varchar(250)", true, "NULL"), messages, success, failed);
+  // a mail channel with an entraid credential sends through Microsoft 365 : Microsoft Graph or
+  // SMTP with OAuth2 (graph, smtp) ; empty for an smtp credential
+  await checkPromise(addColumn("notification_channels", "send_through", "varchar(20)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

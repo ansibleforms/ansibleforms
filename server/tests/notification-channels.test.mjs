@@ -285,7 +285,7 @@ describe("a channel checked by its type", () => {
     rows.nohost = { name: "nohost", credential_type: "smtp", host: "" };
     await expect(NotificationChannel.create({ name: "m", type: "mail", credential: "nohost" })).rejects.toThrow(/needs its mail server/);
     rows.api = { name: "api", credential_type: "api" };
-    await expect(NotificationChannel.create({ name: "m", type: "mail", server: "smtp", credential: "api" })).rejects.toThrow(/needs an smtp credential/);
+    await expect(NotificationChannel.create({ name: "m", type: "mail", server: "smtp", credential: "api" })).rejects.toThrow(/needs an smtp or an entraid credential/);
     const data = { name: "m", type: "mail", server: "smtp" };
     await NotificationChannel.create(data);
     expect(data.is_active).toBe(1);

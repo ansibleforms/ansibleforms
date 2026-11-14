@@ -93,6 +93,11 @@ class OAuth2 extends CrudModel {
         if (type === 'entraid' && !isSingleTenant(cred.tenant_id)) {
             throw new Errors.BadRequestError(`The credential '${name}' needs the tenant id of your tenant (a GUID or its domain)`);
         }
+        // the sign-in uses the client secret : a credential that signs in with a certificate only
+        // (for mail through Microsoft 365) has none
+        if (type === 'entraid' && String(cred.client_cert || '').trim() && !cred.password && !cred.secret_store && !cred.vault_path) {
+            throw new Errors.BadRequestError(`The credential '${name}' signs in with a certificate, and the SSO sign-in needs a client secret: add the app registration's client secret to it`);
+        }
     }
     static assertClient(state) {
         if (state.credential) return;

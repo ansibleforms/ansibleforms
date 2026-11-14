@@ -2,6 +2,7 @@
 import logger from "../lib/logger.js";
 import mysql from "./db.model.js";
 import nodemailer from "nodemailer";
+import { sendMicrosoftMail } from "../lib/microsoftMail.js";
 import crypto from "../lib/crypto.js";
 import Repository from './repository.model.js';
 import Lock from './lock.model.js';
@@ -626,7 +627,14 @@ Settings.mailsend = async function(to,subject,message){
   const config = active ? await NotificationChannel.toMailConfig(active) : await Settings.findMailSettings()
   return Settings.maildo(config,to,subject,message)
 }
+// Sends a mail with a mail config (NotificationChannel.toMailConfig, or the mail settings) :
+// through Microsoft 365 with OAuth2 for a channel with an entraid credential (Graph, or SMTP with a
+// token : lib/microsoftMail.js), else to its SMTP server with its user and password (none for a
+// relay). Resolves the message id ; false without a server.
 Settings.maildo = function(config,to,subject,message){
+  if(config.mail_provider === "graph" || config.mail_provider === "smtp_oauth2"){
+    return sendMicrosoftMail(config,to,subject,message)
+  }
   var mailConfig
   if(!config.mail_server)return false
   if(config.mail_username){
