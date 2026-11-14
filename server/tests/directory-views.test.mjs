@@ -31,6 +31,27 @@ test("a directory user's roles: by name, through a group seen, and default", () 
   expect(rolesOfDirectoryUser(roles, "ldap", "eve", ["ldap/Ops"])).toEqual(["default"]);
 });
 
+test("a directory user's effective roles: a role with admin: true counts as the admin role, as at sign-in", async () => {
+  const { effectiveRolesOfDirectoryUser } = await import("../src/lib/directoryViews.js");
+  const { effectiveRoleNames } = await import("../src/lib/adminRole.js");
+  const withOption = [
+    { name: "ops", users: ["ldap/carol"], groups: ["ldap/ops"] },
+    { name: "platformAdmins", users: ["oidc/cto"], groups: ["ldap/infra-admins"], options: { admin: true } },
+    // admin: true on the default role grants nothing : it is everyone's
+    { name: "default", users: [], groups: [], options: { admin: true } },
+  ];
+  // through a group seen, and by name never seen
+  expect(effectiveRolesOfDirectoryUser(withOption, "ldap", "jdoe", ["ldap/infra-admins"]).sort()).toEqual(["admin", "default", "platformAdmins"]);
+  expect(effectiveRolesOfDirectoryUser(withOption, "oidc", "cto", []).sort()).toEqual(["admin", "default", "platformAdmins"]);
+  // no role that grants admin : no admin
+  expect(effectiveRolesOfDirectoryUser(withOption, "ldap", "bob", ["ldap/ops"]).sort()).toEqual(["default", "ops"]);
+  // the lists still count the roles the config lists, admin not added
+  expect(rolesOfDirectoryUser(withOption, "ldap", "jdoe", ["ldap/infra-admins"]).sort()).toEqual(["default", "platformAdmins"]);
+  // the shared rule : each name once, admin once
+  expect(effectiveRoleNames([{ name: "a", options: { admin: true } }, { name: "b", options: { admin: true } }, { name: "admin" }])).toEqual(["a", "admin", "b"]);
+  expect(effectiveRoleNames([{ name: "ops", options: { admin: false } }])).toEqual(["ops"]);
+});
+
 test("the users list: those seen, then those the roles name who never signed in, once", () => {
   const rows = directoryUserRows(
     [

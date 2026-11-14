@@ -41,4 +41,42 @@ export function grantsAdmin(role) {
  */
 export const adminRoles = (roles) => (Array.isArray(roles) ? roles : []).filter(grantsAdmin);
 
-export default { ADMIN_ROLE, grantsAdmin, adminRoles };
+/**
+ * Adds a role a user matches to the names of its roles, as the sign-in counts them : the role's
+ * own name, and the admin role too when the role makes its users admins (grantsAdmin). Every
+ * place that works out a user's roles - the sign-in (models/user.model.js getRolesAndOptions),
+ * the directory users' admin checks (lib/directoryViews.js) - goes through it, so a role with
+ * `admin: true` counts as the admin role the same way everywhere.
+ *
+ * Args:
+ *   names (string[]): the role names gathered so far ; changed in place.
+ *   role (object): the role the user matches ({ name, options }).
+ *
+ * Returns:
+ *   string[]: the same names, each once.
+ */
+export function addEffectiveRole(names, role) {
+  // step 1 : the role's own name
+  if (role?.name !== undefined && !names.includes(role.name)) names.push(role.name);
+  // step 2 : the admin role, for a role whose users are admins
+  if (grantsAdmin(role) && !names.includes(ADMIN_ROLE)) names.push(ADMIN_ROLE);
+  return names;
+}
+
+/**
+ * The names of the roles a user has from the roles it matches, as the sign-in counts them
+ * (addEffectiveRole) : each role's name, and the admin role when one of them makes admins.
+ *
+ * Args:
+ *   matched (object[]): the roles the user matches.
+ *
+ * Returns:
+ *   string[]: their names, each once, admin included when one of them grants it.
+ */
+export function effectiveRoleNames(matched) {
+  const names = [];
+  for (const role of Array.isArray(matched) ? matched : []) addEffectiveRole(names, role);
+  return names;
+}
+
+export default { ADMIN_ROLE, grantsAdmin, adminRoles, addEffectiveRole, effectiveRoleNames };

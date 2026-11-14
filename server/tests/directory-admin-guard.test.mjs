@@ -2,7 +2,8 @@
 // account is (lib/adminGrants.js assertMayTouchAdmin) : a user with settings access but not the
 // admin role could otherwise block every admin's sign-in, end their sessions, forget them or
 // revoke their api tokens. Admin by the config's admin role (the user or one of its groups), or
-// by the roles it had at its last sign-in.
+// by a role whose options say admin: true (lib/adminRole.js), or by the roles it had at its last
+// sign-in.
 import { describe, test, expect, vi, beforeEach } from "vitest";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
@@ -16,10 +17,13 @@ const seen = [
   { type: "ldap", username: "Boss", groups: ["ldap/domain admins"], roles: ["public"] },
   { type: "oidc", username: "ceo", groups: [], roles: ["public", "admin"] },
   { type: "ldap", username: "jdoe", groups: ["ldap/ops"], roles: ["public", "ops"] },
+  // an admin through a role with admin: true, its last sign-in before the option was set
+  { type: "ldap", username: "infraboss", groups: ["ldap/infra-admins"], roles: ["public", "platformAdmins"] },
 ];
 const roles = [
   { name: "admin", groups: ["ldap/domain admins"], users: ["azuread/root"] },
   { name: "ops", groups: ["ldap/ops"], users: [] },
+  { name: "platformAdmins", groups: ["ldap/infra-admins"], users: ["oidc/cto"], options: { admin: true } },
   { name: "public", groups: [], users: [] },
 ];
 const changes = [];
@@ -72,6 +76,20 @@ describe("a directory user with the admin role, changed by a settings user who i
 
   test("admin by name in the admin role, never seen: refused", async () => {
     expect((await call(controller.endUserSessions, settingsUser, { type: "azuread", name: "root" })).status).toBe(403);
+  });
+
+  test("admin through a role with admin: true, by a group seen: blocking, ending sessions, forgetting refused", async () => {
+    const params = { type: "ldap", name: "infraboss" };
+    expect((await call(controller.setBlocked, settingsUser, params, { blocked: true })).status).toBe(403);
+    expect((await call(controller.endUserSessions, settingsUser, params)).status).toBe(403);
+    expect((await call(controller.forgetUser, settingsUser, params)).status).toBe(403);
+    expect((await call(tokens.revokeForUser, settingsUser, { ...params, sid: "s1" })).status).toBe(403);
+    expect(changes).toEqual([]);
+  });
+
+  test("admin by name in a role with admin: true, never seen: refused", async () => {
+    expect((await call(controller.setBlocked, settingsUser, { type: "oidc", name: "cto" }, { blocked: true })).status).toBe(403);
+    expect(changes).toEqual([]);
   });
 
   test("its api tokens: not revoked", async () => {

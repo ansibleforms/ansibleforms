@@ -1,7 +1,7 @@
 "use strict";
 import { EVERYONE_ROLES, everyoneEntry } from "../lib/defaultRole.js";
 import { memberRefs } from "../lib/directoryTypes.js";
-import { grantsAdmin, ADMIN_ROLE } from "../lib/adminRole.js";
+import { addEffectiveRole } from "../lib/adminRole.js";
 import crypto from "../lib/crypto.js";
 import logger from "../lib/logger.js";
 import Ldap from "./ldap.model.js";
@@ -334,14 +334,9 @@ class User extends CrudModel {
   }
 
   const addRoleAndOptions = function (role) {
-    if (!roles.includes(role.name)) {
-      roles.push(role.name);
-    }
-    // a role whose users are admins (admin: true, lib/adminRole.js) : the admin role too, so every
-    // check of it holds for them
-    if (grantsAdmin(role) && !roles.includes(ADMIN_ROLE)) {
-      roles.push(ADMIN_ROLE);
-    }
+    // the role's name, and the admin role too for a role whose users are admins (admin: true,
+    // lib/adminRole.js addEffectiveRole), so every check of it holds for them
+    addEffectiveRole(roles, role);
     if (role.options) {
       for (const [key, value] of Object.entries(role.options)) {
         logger.debug(`Adding option ${key} = ${value}`);

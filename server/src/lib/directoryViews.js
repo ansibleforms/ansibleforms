@@ -5,6 +5,7 @@
 // group, default always), on the groups seen at its last sign-in.
 import { everyoneName } from "./defaultRole.js";
 import { DIRECTORY_TYPES, memberRefs } from './directoryTypes.js';
+import { effectiveRoleNames } from './adminRole.js';
 
 /**
  * A reference of the config, type/name, split : null for a local one or one of no known type.
@@ -41,12 +42,50 @@ const names = (list) => memberRefs(list);
  */
 export function rolesOfDirectoryUser(roles, type, username, groups) {
   const out = new Set([everyoneName(roles)]);
-  for (const r of roles || []) {
-    if (names(r.users).includes(`${type}/${username}`) || names(r.groups).some((g) => groups.includes(g))) {
-      out.add(r.name);
-    }
-  }
+  for (const r of matchedRoles(roles, type, username, groups)) out.add(r.name);
   return [...out];
+}
+
+/**
+ * The roles of the config a directory user matches, by the login's rule : named by its users, or
+ * one of its groups named by its groups.
+ *
+ * Args:
+ *   roles (object[]): the config's roles, each { name, users, groups, options }.
+ *   type (string): ldap, azuread or oidc.
+ *   username (string): the username.
+ *   groups (string[]): its groups, prefixed (ldap/ops).
+ *
+ * Returns:
+ *   object[]: the roles it matches, in their order.
+ */
+function matchedRoles(roles, type, username, groups) {
+  const mine = Array.isArray(groups) ? groups : [];
+  return (roles || []).filter((r) => names(r.users).includes(`${type}/${username}`) || names(r.groups).some((g) => mine.includes(g)));
+}
+
+/**
+ * The roles a directory user has as its sign-in would give them (User.getRolesAndOptions) : the
+ * roles it matches, the admin role when one of them makes admins (a role with admin: true :
+ * lib/adminRole.js addEffectiveRole), and the role everyone has. What the admin checks read ;
+ * rolesOfDirectoryUser stays the roles the config lists, which the lists count.
+ *
+ * Args:
+ *   roles (object[]): the config's roles, each { name, users, groups, options }.
+ *   type (string): ldap, azuread or oidc.
+ *   username (string): the username.
+ *   groups (string[]): its groups, prefixed (ldap/ops).
+ *
+ * Returns:
+ *   string[]: the role names, admin included when a role it matches grants it.
+ */
+export function effectiveRolesOfDirectoryUser(roles, type, username, groups) {
+  // step 1 : the roles it matches, admin added for a role that grants it
+  const out = effectiveRoleNames(matchedRoles(roles, type, username, groups));
+  // step 2 : the role everyone has
+  const everyone = everyoneName(roles);
+  if (!out.includes(everyone)) out.push(everyone);
+  return out;
 }
 
 /**
