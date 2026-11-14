@@ -1465,7 +1465,7 @@ export default {
       sendThroughHint_graph: '通过 HTTPS 发往 Microsoft Graph：应用需要 Mail.Send 权限',
       sendThrough_smtp: 'SMTP (OAuth2)',
       sendThroughHint_smtp: 'smtp.office365.com，端口 587：邮箱需要开启 SMTP AUTH',
-      serverHelp: '未选择凭据时用于发送的邮件服务器，不登录（中继）。',
+      serverHelp: '未选凭据（中继）或凭据没有服务器时使用的自有邮件服务器。',
       webhookUrl: 'Webhook',
       webhookUrlHelp_slack: 'Slack 传入 Webhook（Slack 应用 > Incoming Webhooks）。机密，保存后不再显示。',
       webhookUrlHelp_teams: 'Teams Workflows Webhook（收到 Webhook 请求时）。机密，保存后不再显示。',

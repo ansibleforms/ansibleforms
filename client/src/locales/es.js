@@ -1650,8 +1650,7 @@ export default {
       sendThroughHint_graph: 'HTTPS a Microsoft Graph: la aplicación necesita el permiso Mail.Send',
       sendThrough_smtp: 'SMTP (OAuth2)',
       sendThroughHint_smtp: 'smtp.office365.com, puerto 587: el buzón necesita SMTP AUTH activado',
-      serverHelp:
-        'El servidor de correo por el que envía cuando no se elige ninguna credencial, sin inicio de sesión (un relay).',
+      serverHelp: 'Su propio servidor de correo, sin credencial (un relay) o si su credencial no tiene uno.',
       webhookUrl: 'Webhook',
       webhookUrlHelp_slack: 'Un webhook entrante de Slack (app de Slack > Incoming Webhooks). Secreto, luego oculto.',
       webhookUrlHelp_teams:

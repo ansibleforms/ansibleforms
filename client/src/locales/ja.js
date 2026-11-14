@@ -1498,7 +1498,7 @@ export default {
       sendThroughHint_graph: 'Microsoft Graph への HTTPS：アプリに Mail.Send アクセス許可が必要です',
       sendThrough_smtp: 'SMTP (OAuth2)',
       sendThroughHint_smtp: 'smtp.office365.com、ポート 587: メールボックスで SMTP AUTH を有効に',
-      serverHelp: '認証情報を選ばないときに送信に使うメールサーバー。ログインはしません（リレー）。',
+      serverHelp: '認証情報なし（リレー）か、サーバーのない認証情報のときに使う独自のメールサーバー。',
       webhookUrl: 'Webhook',
       webhookUrlHelp_slack: 'Slack の Incoming Webhook (Slack アプリ > Incoming Webhooks)。シークレット、再表示なし。',
       webhookUrlHelp_teams: 'Teams Workflows の Webhook（Webhook 要求の受信時）。シークレットで、再表示されません。',
