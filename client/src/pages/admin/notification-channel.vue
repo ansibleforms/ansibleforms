@@ -11,7 +11,8 @@
 /*                buttons                                         */
 /*    mail        Sender (the from address), Credentials (its     */
 /*                smtp credential : the mail server, its port and */
-/*                TLS, and the login)                             */
+/*                TLS, and the login ; none : its own server,     */
+/*                port and TLS, without a login)                  */
 /*    slack/teams Webhook (its address, a secret)                 */
 /*    telegram    Bot (its token's credential, the chat, the Bot  */
 /*                API)                                            */
@@ -38,6 +39,7 @@ import getSettings, {
   PAYLOAD_PLACEHOLDERS,
   channelType,
   channelAddress,
+  mailWithoutCredential,
   noCredentialsText,
 } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
@@ -57,9 +59,10 @@ const channelId = computed(() => String(route.params.id || ''));
 const channel = ref(null); // as saved
 const edit = ref(null); // as edited
 const type = computed(() => channelType(channel.value));
-// the fields each type edits, besides its name and description
+// the fields each type edits, besides its name and description ; mail's server, port and TLS its
+// own, used without a credential
 const EDITED_BY_TYPE = {
-  mail: ['from_address', 'credential'],
+  mail: ['from_address', 'credential', 'server', 'port', 'secure'],
   slack: ['webhook_url'],
   teams: ['webhook_url'],
   telegram: ['token_credential', 'chat_id', 'api_url'],
@@ -90,6 +93,10 @@ function editable(record) {
     is_active: !!record.is_active,
     from_address: record.from_address ?? '',
     credential: record.credential ?? '',
+    // its own server (the API shows its credential's while it names one with a server)
+    server: record.server ?? '',
+    port: record.port ?? '',
+    secure: !!record.secure,
     // masked by the API : sent back as it is, it stays
     webhook_url: record.webhook_url ?? '',
     token_credential: record.token_credential ?? '',
@@ -267,7 +274,17 @@ const tabFields = computed(() => {
     type: CHANNEL_TYPES.map((kind) => ['type_' + kind, nc(`type_${kind}`), nc(`typeHint_${kind}`)]),
   };
   if (type.value === 'mail') {
-    fields.credentials = [['credential', nc('credential'), nc('helpCredential')]];
+    fields.credentials = [
+      ['credential', nc('credential'), nc('helpCredential')],
+      // without a credential : its own server, port and TLS
+      ...(mailWithoutCredential(edit.value)
+        ? [
+            ['server', t('settings.mail.mailServer'), nc('serverHelp')],
+            ['port', t('settings.mail.mailPort'), t('settings.mail.mailPortHelp')],
+            ['secure', t('settings.mail.useTls'), t('settings.mail.useTlsHelp')],
+          ]
+        : []),
+    ];
     fields.sender = [['from_address', t('settings.mail.mailFrom'), t('settings.mail.mailFromHelp')]];
   } else if (type.value === 'slack' || type.value === 'teams') {
     fields.connection = [['webhook_url', nc('webhookUrl'), nc(`webhookUrlHelp_${type.value}`)]];
@@ -314,6 +331,14 @@ async function save() {
     const value = e[key];
     if (typeof value === 'boolean') data[key] = value ? 1 : 0;
     else data[key] = typeof value === 'string' ? value.trim() : value;
+  }
+  // mail with a credential : the server, port and TLS are the credential's, the channel keeps none
+  // of its own (the ones shown are the credential's)
+  if (type.value === 'mail' && !mailWithoutCredential(e)) Object.assign(data, { server: '', port: '', secure: 0 });
+  // without one : its own server, which it needs
+  if (type.value === 'mail' && mailWithoutCredential(e) && !data.server) {
+    toast.warning(t('settings.common.fieldRequired', { field: t('settings.mail.mailServer') }));
+    return;
   }
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -611,7 +636,8 @@ onMounted(async () => {
                 :shown="(kind) => fieldShown('type_' + kind)"
               />
             </template>
-            <!-- mail : Credentials, its smtp credential (the mail server, its port and TLS, the login) -->
+            <!-- mail : Credentials, its smtp credential (the mail server, its port and TLS, the login) ;
+                 none : its own server, port and TLS, without a login -->
             <template v-if="type === 'mail' && tabShown('credentials')">
               <template v-if="searching && searchHead('credentials')">
                 <hr v-if="!searchHead('credentials').first" class="mt-4 mb-0 af-search-line" />
@@ -635,10 +661,44 @@ onMounted(async () => {
                 :emptyText="noCredentialsText(t, 'smtp')"
                 valueKey="name"
                 labelKey="name"
-                :required="true"
                 :help="t('settings.notificationChannels.helpCredential')"
                 :label="t('settings.notificationChannels.credential')"
               />
+              <template v-if="mailWithoutCredential(edit)">
+                <BsInput
+                  class="af-channel-field"
+                  v-model="edit.server"
+                  v-show="fieldShown('server')"
+                  icon="server"
+                  placeholder="smtp.example.com"
+                  :isFloating="false"
+                  :required="true"
+                  :help="t('settings.notificationChannels.serverHelp')"
+                  :label="t('settings.mail.mailServer')"
+                />
+                <BsInput
+                  class="af-channel-field"
+                  v-model="edit.port"
+                  v-show="fieldShown('port')"
+                  type="number"
+                  icon="arrows-alt-v"
+                  placeholder="25"
+                  :isFloating="false"
+                  :help="t('settings.mail.mailPortHelp')"
+                  :label="t('settings.mail.mailPort')"
+                />
+                <div v-show="fieldShown('secure')" class="form-check form-switch mb-3">
+                  <input
+                    id="af-channel-secure"
+                    v-model="edit.secure"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                  />
+                  <label class="form-check-label" for="af-channel-secure">{{ t('settings.mail.useTls') }}</label>
+                  <div class="form-text mt-1">{{ t('settings.mail.useTlsHelp') }}</div>
+                </div>
+              </template>
             </template>
 
             <!-- mail : Sender, the from address -->

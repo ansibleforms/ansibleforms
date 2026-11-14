@@ -1548,7 +1548,9 @@ export default {
       addressChat: 'Xat {chat}',
       credential: 'Credencial',
       helpCredential:
-        "Una credencial smtp de Connexions > Credencials: el servidor de correu, el seu port i TLS, i l'inici de sessió (sense usuari per a un relay).",
+        "Una credencial smtp de Connexions > Credencials: el servidor de correu, el seu port i TLS, i l'inici de sessió (sense usuari per a un relay). Cap: el servidor de correu de sota, sense inici de sessió.",
+      serverHelp:
+        'El servidor de correu pel qual envia quan no es tria cap credencial, sense inici de sessió (un relay).',
       webhookUrl: 'Adreça del webhook',
       webhookUrlHelp_slack:
         "El webhook d'entrada del canal de Slack (app de Slack > Incoming Webhooks): un secret, mai no es torna a mostrar un cop desat.",
@@ -1789,6 +1791,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: "El token i l'adreça amb què accedeix un magatzem HashiCorp Vault",
       userOptional: 'Usuari (opcional)',
+      passwordOptional: 'Contrasenya (opcional)',
+      smtpLoginHelp: 'Buits per a un servidor de correu que accepta correu sense inici de sessió (un relay).',
       rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'El RTE_TOKEN amb què es va iniciar el RTE.',
       apiToken: "Token d'API",

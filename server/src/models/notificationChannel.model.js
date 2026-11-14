@@ -1,9 +1,9 @@
 // Where notifications go (Settings > Connections > Notifications) : a channel of one type -
 //   mail      an SMTP server : approval requests and job notifications by mail. Several can be
 //             kept, one is active : the one the app sends its mail with. Its server, port, TLS and
-//             login are an smtp credential of Connections > Credentials (the user left empty for
-//             a relay) ; its own server, port and TLS (from before 7.3) are used only while the
-//             credential has no server.
+//             login are an smtp credential of Connections > Credentials (the user and password
+//             left empty for a relay) ; without a credential, its own server, port and TLS, and no
+//             login (a relay too). Its own are also used while its credential has no server.
 //   slack     an incoming webhook of a Slack channel
 //   teams     a Microsoft Teams webhook (a Workflows webhook, or an incoming webhook)
 //   telegram  a bot posting in a chat : its token the password of an api credential
@@ -115,11 +115,13 @@ class NotificationChannel extends CrudModel {
    * Args:
    *   data (object): the fields being saved.
    *   existing (object): the channel as stored, on an update ; null on a create.
+   *   opts (object): { fromSeed:true } for the declarative config seed, which writes what it
+   *     declares as it is.
    *
    * Raises:
    *   BadRequestError: a field is not valid, or one its type needs is missing.
    */
-  static async normalise(data, existing = null) {
+  static async normalise(data, existing = null, opts = {}) {
     if (existing && data.type !== undefined && data.type !== existing.type) {
       throw new Errors.BadRequestError(`A channel's type stays what it was made as: '${existing.name}' is ${existing.type}`);
     }
@@ -146,10 +148,18 @@ class NotificationChannel extends CrudModel {
       data.port = null;
     }
     if (type === 'mail') {
+      // step 1 : its credential, when it names one (none : a relay, its own server without a login)
       await this.assertCredential(data, 'credential', 'smtp', 'mail');
-      // where it sends : its credential's server, else its own (from before credentials held it)
-      if (missing('server') && !(await this.credentialServer(merged.credential))) {
-        throw new Errors.BadRequestError('A mail channel needs an smtp credential with its server (host)');
+      // step 2 : where it sends : its credential's server, else its own
+      const credentialServer = await this.credentialServer(data.credential === undefined ? merged.credential : data.credential);
+      if (missing('server') && !credentialServer) {
+        throw new Errors.BadRequestError('A mail channel needs its mail server: an smtp credential with its server (host), or its own server');
+      }
+      // step 3 : a credential with its server is where it sends : the channel's own, typed before
+      // one was chosen, is emptied, never left to be moved into a credential at the next start
+      // (schema.model.js moveMailServersToCredentials). The seed writes what it declares.
+      if (credentialServer && !opts.fromSeed && String(merged.server ?? '').trim()) {
+        Object.assign(data, { server: null, port: null, secure: 0 });
       }
     } else if (data.is_active) {
       // only mail has an active one
@@ -224,7 +234,7 @@ class NotificationChannel extends CrudModel {
 
   // opts carries { fromSeed:true } for the declarative config seed only
   static async create(data, opts = {}) {
-    await this.normalise(data);
+    await this.normalise(data, null, opts);
     // the first mail channel is the active one : mail needs one, nobody should have to tick it
     if (data.type === 'mail' && !data.is_active && !(await this.findActive({ enabledOnly: false }))) data.is_active = 1;
     const id = await super.create(this.modelName, data, opts);
@@ -235,7 +245,7 @@ class NotificationChannel extends CrudModel {
   static async update(data, id, opts = {}) {
     const existing = await this.findById(id);
     if (!existing) throw new Errors.NotFoundError(`No notification channel with id ${id}`);
-    await this.normalise(data, existing);
+    await this.normalise(data, existing, opts);
     const res = await super.update(this.modelName, data, id, opts);
     if (data.is_active && existing.type === 'mail') await this.clearOtherActive(id);
     return res;

@@ -1477,9 +1477,12 @@ async function freeCredentialName(name, query = (sql, params) => mysql.do(sql, p
  *   - it has the same one : nothing to copy
  *   - it has another (two channels shared one login, each its server) : a copy of the credential
  *     with the channel's server, the channel then names the copy
- *   - no credential (a relay, no login) : a new smtp credential, <channel>-smtp, without a user
- * The channel's own then emptied. Not a seeded channel : the seed owns it, and its own server is
- * still used while its credential has none. Idempotent : only a channel with a server left.
+ *   - a credential it names that is not there : a new smtp credential, <channel>-smtp, without
+ *     a user
+ * The channel's own then emptied. Not a channel without a credential : it sends through its own
+ * server, without a login (a relay), as the app lets one be made. Not a seeded channel : the seed
+ * owns it, and its own server is still used while its credential has none. Idempotent : only a
+ * channel with a server and a credential left.
  *
  * Returns:
  *   Promise<string|null>: what was done, or null when there was nothing to do.
@@ -1487,7 +1490,8 @@ async function freeCredentialName(name, query = (sql, params) => mysql.do(sql, p
 export async function moveMailServersToCredentials() {
   const channels = await mysql.do(
     "SELECT id, name, server, port, secure, credential FROM AnsibleForms.`notification_channels` " +
-      "WHERE type = 'mail' AND COALESCE(managed, 0) = 0 AND server IS NOT NULL AND server <> ''",
+      "WHERE type = 'mail' AND COALESCE(managed, 0) = 0 AND server IS NOT NULL AND server <> '' " +
+      "AND credential IS NOT NULL AND credential <> ''",
   );
   if (!channels.length) return null;
   const done = [];

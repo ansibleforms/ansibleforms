@@ -1709,7 +1709,9 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Identifiant',
       helpCredential:
-        'Un identifiant smtp de Connexions > Identifiants : le serveur de messagerie, son port et TLS, et la connexion (sans utilisateur pour un relais).',
+        'Un identifiant smtp de Connexions > Identifiants : le serveur de messagerie, son port et TLS, et la connexion (sans utilisateur pour un relais). Aucun : le serveur de messagerie ci-dessous, sans connexion.',
+      serverHelp:
+        "Le serveur de messagerie par lequel il envoie quand aucun identifiant n'est choisi, sans connexion (un relais).",
       webhookUrl: 'Adresse du webhook',
       webhookUrlHelp_slack:
         'Le webhook entrant du canal Slack (application Slack > Incoming Webhooks) : un secret, jamais réaffiché une fois enregistré.',
@@ -1953,6 +1955,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: "Le jeton et l'adresse avec lesquels se connecte un coffre HashiCorp Vault",
       userOptional: 'Utilisateur (facultatif)',
+      passwordOptional: 'Mot de passe (facultatif)',
+      smtpLoginHelp: 'Vide pour un serveur de messagerie qui accepte le courrier sans connexion (un relais).',
       rteToken: 'Jeton (RTE_TOKEN)',
       rteTokenHelp: 'Le RTE_TOKEN avec lequel le RTE a été démarré.',
       apiToken: "Jeton d'API",

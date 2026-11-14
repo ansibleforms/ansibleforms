@@ -246,8 +246,14 @@ describe("a mail channel's server moves to its smtp credential", () => {
     expect(queries.find((q) => /SET server = NULL/.test(q.sql)).args).toEqual(["o365-office", 1]);
   });
 
-  test("no credential (a relay): a new smtp one without a user", async () => {
-    answers = [{ match: /FROM AnsibleForms\.`notification_channels`/, rows: [channel({ name: "relay", credential: null, port: 25, secure: 0 })] }];
+  test("a channel without a credential (a relay) keeps its own server: it is not read", async () => {
+    expect(await moveMailServersToCredentials()).toBe(null);
+    const read = queries.find((q) => /FROM AnsibleForms\.`notification_channels`/.test(q.sql));
+    expect(read.sql).toMatch(/credential IS NOT NULL AND credential <> ''/);
+  });
+
+  test("a credential it names that is not there: a new smtp one without a user", async () => {
+    answers = [{ match: /FROM AnsibleForms\.`notification_channels`/, rows: [channel({ name: "relay", credential: "gone", port: 25, secure: 0 })] }];
     expect(await moveMailServersToCredentials()).toMatch(/relay into relay-smtp/);
     const insert = queries.find((q) => /^INSERT INTO AnsibleForms\.`credentials`/.test(q.sql));
     expect(insert.sql).toMatch(/'smtp'/);

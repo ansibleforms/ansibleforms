@@ -1540,7 +1540,8 @@ export default {
       addressChat: 'Czat {chat}',
       credential: 'Poświadczenie',
       helpCredential:
-        'Poświadczenie smtp z Połączenia > Poświadczenia: serwer poczty, jego port i TLS oraz logowanie (bez użytkownika dla przekaźnika).',
+        'Poświadczenie smtp z Połączenia > Poświadczenia: serwer poczty, jego port i TLS oraz logowanie (bez użytkownika dla przekaźnika). Brak: serwer poczty poniżej, bez logowania.',
+      serverHelp: 'Serwer poczty, przez który wysyła, gdy nie wybrano poświadczenia, bez logowania (przekaźnik).',
       webhookUrl: 'Adres webhooka',
       webhookUrlHelp_slack:
         'Webhook przychodzący kanału Slack (aplikacja Slack > Incoming Webhooks): sekret, po zapisaniu nigdy więcej nie jest pokazywany.',
@@ -1778,6 +1779,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'Token i adres, którymi loguje się magazyn HashiCorp Vault',
       userOptional: 'Użytkownik (opcjonalnie)',
+      passwordOptional: 'Hasło (opcjonalnie)',
+      smtpLoginHelp: 'Puste dla serwera poczty, który przyjmuje pocztę bez logowania (przekaźnik).',
       rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'RTE_TOKEN, z którym uruchomiono RTE.',
       apiToken: 'Token API',
