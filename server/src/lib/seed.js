@@ -454,6 +454,76 @@ function warnMailSettingsOnce(mail) {
   );
 }
 
+// a name of the records the mail keys declare : the base, or the base with -2, -3... after it,
+// as the upgrade (schema.model dropSettingsMailColumns) and foldMailSettingsIntoChannel pick them
+const mailNamePattern = (base) => new RegExp(`^${base}(-[0-9]+)?$`);
+// the number a name of that kind carries : 1 for the base, 2 for -2...
+const mailNameRank = (name) => Number(/-([0-9]+)$/.exec(name)?.[1] || 1);
+
+/**
+ * What the seed's mail keys must keep away from and keep using : the records made by hand are
+ * reserved, whatever their kind (a mail channel 'default' or an smtp credential 'mail-login' made
+ * by hand too : declaring their name would adopt them, overwriting their server and login), and
+ * the records the seed already manages for these keys are its own : the mail channel the upgrade
+ * moved the mail settings to on a seeded instance (managed, 'default' or 'default-2'... when the
+ * name was taken) and its smtp credential ('mail-login', 'mail-login-2'...), or the ones an
+ * earlier apply of the keys declared.
+ *
+ * Args:
+ *   channels (object[]): every notification channel, { name, type, credential, managed }.
+ *   credentials (object[]): every credential, { name, credential_type, managed }.
+ *
+ * Returns:
+ *   { reserved: { channels: string[], credentials: string[] }, own: { channel: string|null,
+ *     credential: string|null } }: the names never to take, and the seed's own records' names
+ *     (null when it has none).
+ */
+export function mailSettingsNames(channels, credentials) {
+  // step 1 : every record made by hand is reserved
+  const reserved = {
+    channels: channels.filter((c) => !c.managed).map((c) => c.name),
+    credentials: credentials.filter((c) => !c.managed).map((c) => c.name),
+  };
+  // step 2 : the seed's own mail channel of these keys : managed, of the mail, 'default' or
+  // 'default-N', the lowest first
+  const ownChannel = channels
+    .filter((c) => c.managed && c.type === "mail" && mailNamePattern("default").test(c.name))
+    .sort((a, b) => mailNameRank(a.name) - mailNameRank(b.name))[0];
+  // step 3 : its credential, a managed smtp one : the one its channel names, else 'mail-login'
+  // or 'mail-login-N', the lowest first
+  const managedSmtp = credentials.filter((c) => c.managed && c.credential_type === "smtp").map((c) => c.name);
+  let ownCredential = ownChannel?.credential && managedSmtp.includes(ownChannel.credential) ? ownChannel.credential : null;
+  if (!ownCredential) {
+    ownCredential = managedSmtp.filter((n) => mailNamePattern("mail-login").test(n)).sort((a, b) => mailNameRank(a) - mailNameRank(b))[0] || null;
+  }
+  return { reserved, own: { channel: ownChannel?.name || null, credential: ownCredential } };
+}
+
+/**
+ * Says which names the seed's mail keys took instead of the ones made by hand : when 'default'
+ * or 'mail-login' is a record made by hand and the seed has no record of its own for the keys
+ * yet, the next free name is declared, as the upgrade picks it. Said only then : once the seed
+ * made it, the record is its own, and nothing more is said.
+ *
+ * Args:
+ *   mail (object): what foldMailSettingsIntoChannel returned : the channel and credential
+ *     declared.
+ *   names (object): what mailSettingsNames returned : reserved and own.
+ *
+ * Returns:
+ *   void
+ */
+function warnHandMadeMailNames(mail, names) {
+  const kinds = [
+    { kind: "mail channel", base: "default", name: mail.channel, own: names.own.channel, reserved: names.reserved.channels },
+    { kind: "smtp credential", base: "mail-login", name: mail.credential, own: names.own.credential, reserved: names.reserved.credentials },
+  ];
+  for (const k of kinds) {
+    if (!k.name || k.own || k.name === k.base || !k.reserved.includes(k.base)) continue;
+    logger.warning(`The config seed's mail keys do not take over '${k.base}', made by hand : they declare the ${k.kind} '${k.name}' instead`);
+  }
+}
+
 async function applySeedNow({ schemaIsReady = true } = {}) {
   const seedPath = appConfig.configSeedPath;
   // No seed configured at all : the seed is OFF, and whatever it marked managed on an earlier
@@ -524,17 +594,20 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   }
 
   // the settings' mail keys : deprecated since 7.6 (the settings row has no mail columns), removed
-  // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). The
-  // channels and credentials made by hand of another kind are reserved : declaring their name
-  // would adopt them. Read only when the settings carry mail keys
+  // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). Every
+  // channel and credential made by hand is reserved, of the mail too : declaring their name
+  // would adopt them. The ones the seed manages for these keys (the upgrade's, under the names it
+  // picked) keep their names (mailSettingsNames). Read only when the settings carry mail keys
   if (seedHasMailSettings(doc)) {
-    const reserved = {
-      channels: (await mysql.do("SELECT name FROM AnsibleForms.`notification_channels` WHERE COALESCE(managed, 0) = 0 AND type <> 'mail'")).map((c) => c.name),
-      credentials: (await mysql.do("SELECT name FROM AnsibleForms.`credentials` WHERE COALESCE(managed, 0) = 0 AND COALESCE(credential_type, '') <> 'smtp'")).map((c) => c.name),
-    };
-    const mail = foldMailSettingsIntoChannel(doc, reserved);
+    // the names, kinds and managed flags only : findAll would decrypt every secret for nothing
+    const names = mailSettingsNames(
+      await mysql.do("SELECT name, type, credential, managed FROM AnsibleForms.`notification_channels`"),
+      await mysql.do("SELECT name, credential_type, managed FROM AnsibleForms.`credentials`"),
+    );
+    const mail = foldMailSettingsIntoChannel(doc, names.reserved, names.own);
     doc = mail.doc;
     warnMailSettingsOnce(mail);
+    warnHandMadeMailNames(mail, names);
   }
 
   const summary = { created: [], updated: [], released: [], pruned: [], adopted: [], recloned: [], unchanged: 0 };

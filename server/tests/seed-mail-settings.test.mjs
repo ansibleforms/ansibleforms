@@ -12,17 +12,39 @@ process.env.DB_PORT ||= "3306";
 process.env.DB_USER ||= "test";
 process.env.DB_PASSWORD ||= "test";
 
-// the database : every query answers [] but the settings row and the reserved names
-let reservedChannels = [];
-let reservedCredentials = [];
+// the database : every query answers [] but the settings row, the channels and the credentials
+// already there ({ name, type, credential, managed } and { name, credential_type, managed })
+let channelRows = [];
+let credentialRows = [];
 const queries = [];
+
+/**
+ * The rows of a channels or credentials query, filtered by the conditions its SQL carries (the
+ * managed flag, the type), so whatever the seed asks is answered from the same rows.
+ *
+ * Args:
+ *   sql (string): the statement.
+ *   rows (object[]): the table's rows.
+ *   typeColumn (string): the column of the record's kind (type, credential_type).
+ *   kind (string): the kind of the mail's records (mail, smtp).
+ *
+ * Returns:
+ *   object[]: the rows it selects.
+ */
+function selectRows(sql, rows, typeColumn, kind) {
+  return rows.filter((r) => {
+    if (/COALESCE\(managed, 0\) = 0/.test(sql) && r.managed) return false;
+    if (new RegExp(`${typeColumn}, ''\\) <> '${kind}'|${typeColumn} <> '${kind}'`).test(sql) && r[typeColumn] === kind) return false;
+    return true;
+  });
+}
 vi.mock("../src/models/db.model.js", () => ({
   default: {
     do: async (sql, vars) => {
       queries.push({ sql, vars });
       if (/^SELECT \* FROM AnsibleForms\.`settings`/.test(sql)) return [{ url: "https://af.example.com", managed: 1 }];
-      if (/^SELECT name FROM AnsibleForms\.`notification_channels` WHERE COALESCE\(managed, 0\) = 0 AND type <> 'mail'/.test(sql)) return reservedChannels.map((name) => ({ name }));
-      if (/^SELECT name FROM AnsibleForms\.`credentials` WHERE COALESCE\(managed, 0\) = 0 AND COALESCE\(credential_type, ''\) <> 'smtp'/.test(sql)) return reservedCredentials.map((name) => ({ name }));
+      if (/^SELECT name(, [a-z_, ]+)? FROM AnsibleForms\.`notification_channels`/.test(sql)) return selectRows(sql, channelRows, "type", "mail");
+      if (/^SELECT name(, [a-z_, ]+)? FROM AnsibleForms\.`credentials`/.test(sql)) return selectRows(sql, credentialRows, "credential_type", "smtp");
       return [];
     },
   },
@@ -110,8 +132,8 @@ describe("a seed with mail keys, applied", () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-seed-mail-"));
     created.length = 0;
     queries.length = 0;
-    reservedChannels = [];
-    reservedCredentials = [];
+    channelRows = [];
+    credentialRows = [];
     _resetSeedState();
     // the list sections' writes recorded rather than run
     for (const section of listSections) {
@@ -153,9 +175,50 @@ describe("a seed with mail keys, applied", () => {
   });
 
   test("a hand-made Slack channel named 'default' is not adopted : the mail channel is default-2", async () => {
-    reservedChannels = ["default"];
+    channelRows = [{ name: "default", type: "slack", managed: 0 }];
     await apply(SEED);
     expect(created.find((c) => c.section === "notification_channels").data.name).toBe("default-2");
+  });
+
+  test("a hand-made mail channel 'default' and smtp credential 'mail-login' are never taken over : default-2 and mail-login-2, said in the log", async () => {
+    channelRows = [{ name: "default", type: "mail", credential: "mail-login", managed: 0 }];
+    credentialRows = [{ name: "mail-login", credential_type: "smtp", managed: 0 }];
+    const warning = vi.spyOn(logger, "warning");
+    await apply(SEED);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+    expect(created[1].data.credential).toBe("mail-login-2");
+    const said = warning.mock.calls.map(([m]) => String(m));
+    expect(said.some((m) => /'default'.*made by hand.*'default-2'/.test(m))).toBe(true);
+    expect(said.some((m) => /'mail-login'.*made by hand.*'mail-login-2'/.test(m))).toBe(true);
+    warning.mockRestore();
+  });
+
+  test("the records the upgrade made for the mail settings, managed : the seed keeps their names, default-2 and mail-login-2", async () => {
+    // the upgrade found 'default' and 'mail-login' made by hand, and made default-2 and
+    // mail-login-2, managed (a seeded instance) ; the hand-made ones were since deleted
+    channelRows = [{ name: "default-2", type: "mail", credential: "mail-login-2", managed: 1 }];
+    credentialRows = [{ name: "mail-login-2", credential_type: "smtp", managed: 1 }];
+    await apply(SEED);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+  });
+
+  test("its records managed and the hand-made ones still there : the seed's own, never the hand-made", async () => {
+    channelRows = [
+      { name: "default", type: "mail", credential: "mail-login", managed: 0 },
+      { name: "default-2", type: "mail", credential: "mail-login-2", managed: 1 },
+    ];
+    credentialRows = [
+      { name: "mail-login", credential_type: "smtp", managed: 0 },
+      { name: "mail-login-2", credential_type: "smtp", managed: 1 },
+    ];
+    await apply(SEED);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+  });
+
+  test("a relay : a hand-made mail channel 'default' is not taken over either", async () => {
+    channelRows = [{ name: "default", type: "mail", credential: null, managed: 0 }];
+    await apply("version: 1\nsettings:\n  url: https://af.example.com\n  mail_server: relay.example.com\n");
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["notification_channels:default-2"]);
   });
 
   test("says the deprecation once per process, not at every apply", async () => {
