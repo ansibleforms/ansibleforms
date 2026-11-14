@@ -483,7 +483,7 @@
       "get": {
         "tags": ["config"],
         "summary": "List form names",
-        "description": "Returns a sorted, de-duplicated flat list of the form names, for the form dropdown of schedules. Subforms are excluded because they cannot be launched standalone.",
+        "description": "Returns a sorted, de-duplicated flat list of the form names, for the form dropdown of schedules and stored jobs. A user of the settings or the schedules gets every form ; a user who may only store jobs (allowStoredJobs) gets the forms their roles open. Subforms are excluded because they cannot be launched standalone.",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {

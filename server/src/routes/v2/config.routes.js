@@ -32,7 +32,7 @@ router.get('/formscredentials', middleware.checkConnectionsMiddleware, configCon
 // the credentials each of the designer's workflows names (models/workflowRun.js workflowCredentials)
 router.get('/workflowscredentials', middleware.checkConnectionsMiddleware, configController.workflowsCredentials);
 // flat list of form names (for dropdowns : datasources and schedules)
-router.get('/formnames', middleware.checkSettingsOrScheduledJobsMiddleware, configController.formNames);
+router.get('/formnames', middleware.checkFormNamesMiddleware, configController.formNames);
 // get one config (no admin)
 router.get('/form', configController.findOne);
 // 

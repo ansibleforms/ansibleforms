@@ -114,6 +114,11 @@ Middleware.checkMcpMiddleware = permissionGuard(u => u.options.allowMcp !== fals
 Middleware.checkSettingsOrScheduledJobsMiddleware = permissionGuard(
   u => u.options.showSettings || u.options.allowScheduledJobs, 'errors.noSettingsAccess')
 
+// the form names a stored job, a schedule or the settings pick from : a user who may store jobs
+// gets those of their own forms (config.controller formNames), the others every form
+Middleware.checkFormNamesMiddleware = permissionGuard(
+  u => u.options.showSettings || u.options.allowScheduledJobs || u.options.allowStoredJobs, 'errors.noSettingsAccess')
+
 // A user who signed in with the public default password (config/app.config.js
 // DEFAULT_ADMIN_PASSWORD) may do one thing : change it, on /api/v2/profile. Everything else
 // answers 403 with code password_change_required, which the client turns into the
