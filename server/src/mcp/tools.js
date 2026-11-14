@@ -1006,7 +1006,8 @@ function withAudit(handlers, audit) {
     wrapped[name] = async (args = {}) => {
       // a preview changes nothing : not an entry
       if (spec.skip?.(args)) return run(args);
-      // Step 1 : run the tool, writing its failure (a refusal as denied) before throwing on
+      // Step 1 : run the tool, writing its failure (a refusal as denied, a model's AccessDeniedError
+      // too : isRefusal) before throwing on
       let out;
       try {
         out = await run(args);
@@ -1015,7 +1016,7 @@ function withAudit(handlers, audit) {
           action: spec.action,
           targetType: spec.targetType,
           target: spec.target(args, undefined) ?? null,
-          outcome: err?.code === 'access_denied' ? 'denied' : 'failure',
+          outcome: isRefusal(err) ? 'denied' : 'failure',
           detail: { ...spec.detail(args, undefined), error: err?.message || String(err) },
         });
         throw err;
@@ -1067,6 +1068,22 @@ export function describeError(err) {
     return { code: err.statusCode === 403 ? 'access_denied' : err.statusCode === 404 ? 'not_found' : 'invalid_request', message: err.message };
   }
   return { code: 'internal_error', message: `Internal error: ${err?.message || err}` };
+}
+
+/**
+ * Whether a handler's error is a refusal : the code describeError gives it is access_denied. A
+ * ToolError refusing (read only, a role option missing) and a model's refusal (an
+ * AccessDeniedError thrown by Job.launch, Schedule.plan..., which carries no tool code until
+ * describeError maps it by name) alike, so the audit and the caller agree on what was denied.
+ *
+ * Args:
+ *   err (Error): what the handler threw.
+ *
+ * Returns:
+ *   boolean: true when it is a refusal, false for any other failure.
+ */
+export function isRefusal(err) {
+  return describeError(err).code === 'access_denied';
 }
 
 function wrap(fn) {
@@ -1300,4 +1317,4 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
   }, wrap((a) => handlers.getJob(a)));
 }
 
-export default { createHandlers, registerTools, describeError, ToolError };
+export default { createHandlers, registerTools, describeError, isRefusal, ToolError };
