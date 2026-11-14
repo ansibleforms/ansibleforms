@@ -72,8 +72,11 @@ function base64url(value) {
  */
 export function senderAddress(from) {
   const text = String(from ?? "").trim();
-  const inBrackets = text.match(/<([^>]+)>/);
-  return (inBrackets ? inBrackets[1] : text).trim();
+  // the last "<" and the ">" after it, found by position : a regex over a sender full of "<" would
+  // take quadratic time
+  const open = text.lastIndexOf("<");
+  const close = open < 0 ? -1 : text.indexOf(">", open + 1);
+  return (close > open + 1 ? text.slice(open + 1, close) : text).trim();
 }
 
 /**

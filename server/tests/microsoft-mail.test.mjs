@@ -450,3 +450,14 @@ describe("an entraid credential's certificate", () => {
     await expect(OAuth2.assertCredential("both", "azuread")).resolves.toBeUndefined();
   });
 });
+
+describe("the sender's address", () => {
+  test("taken from Name <a@b>, an address alone as it is, at once on a sender full of '<'", () => {
+    expect(mail.senderAddress("AnsibleForms <forms@example.com>")).toBe("forms@example.com");
+    expect(mail.senderAddress(" forms@example.com ")).toBe("forms@example.com");
+    expect(mail.senderAddress("broken <")).toBe("broken <");
+    const started = Date.now();
+    mail.senderAddress("<".repeat(200000) + "=");
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+});
