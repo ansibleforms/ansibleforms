@@ -363,9 +363,62 @@ async function exists(store, ref) {
 }
 
 /**
+ * The key/value pairs a secret holds now, to be kept by a write : a KV write replaces the whole
+ * secret (KV v2 makes its new version of the body alone), so the keys it does not name (host,
+ * db_name, ...) would be lost.
+ *
+ * Args:
+ *   store (object): the secret store, its token decrypted.
+ *   apiPath (string): the secret's API path (secret/data/foo on KV v2).
+ *   version (number): the store's KV version.
+ *
+ * Returns:
+ *   Promise<object>: the pairs ; {} when no secret is there (404, or a deleted KV v2 version).
+ *
+ * Raises:
+ *   Error: Vault refused the read (the token's policy) or could not be reached - said with the
+ *     path, never with the secret.
+ */
+async function currentPairs(store, apiPath, version) {
+  let res;
+  try {
+    res = await axios.get(`${baseUrl(store)}/v1/${apiPath}`, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
+  } catch (e) {
+    if (e?.response?.status === 404) return {};
+    throw vaultError(e, store, "read", apiPath, "read, create and update");
+  }
+  // KV v2 wraps the pairs under data.data (null for a deleted version) ; KV v1 under data
+  const pairs = version === 2 ? res?.data?.data?.data : res?.data?.data;
+  return pairs && typeof pairs === "object" && !Array.isArray(pairs) ? pairs : {};
+}
+
+/**
+ * The secret to write : the pairs there now, with the written ones replacing theirs. A secret
+ * keeping its user under 'user' (read before 'username' as a credential) gets the new username
+ * there too, so the old one is never read back instead.
+ *
+ * Args:
+ *   current (object): the pairs there now ({} for a new secret).
+ *   payload (object): the pairs written ({ username, password }).
+ *
+ * Returns:
+ *   object: the merged pairs.
+ */
+export function mergePairs(current, payload) {
+  // step 1 : every key kept, the written ones replaced
+  const merged = { ...current, ...payload };
+  // step 2 : the alias read before username follows it
+  if (Object.prototype.hasOwnProperty.call(current, "user") && payload.username !== undefined && payload.user === undefined) {
+    merged.user = payload.username;
+  }
+  return merged;
+}
+
+/**
  * Writes a secret's key/value pairs to its KV path : a new secret, or a new version of the one
- * there (KV v2 keeps the earlier versions, KV v1 replaces it). A dynamic engine's path is never
- * written : Vault makes those credentials itself.
+ * there (KV v2 keeps the earlier versions, KV v1 replaces it). The keys of the secret there that
+ * the payload does not name are kept : it is read first and written back merged. A dynamic
+ * engine's path is never written : Vault makes those credentials itself.
  *
  * Args:
  *   store (object): the secret store, its token decrypted.
@@ -376,7 +429,7 @@ async function exists(store, ref) {
  *   Promise<void>
  *
  * Raises:
- *   Error: a dynamic engine's path, or Vault refused the write (the token's policy) or could not
+ *   Error: a dynamic engine's path, or Vault refused the read or the write (the token's policy) or could not
  *     be reached - said with the path, never with the secret.
  */
 async function write(store, ref, payload) {
@@ -385,7 +438,10 @@ async function write(store, ref, payload) {
   if (await isDynamicRef(store, ref)) throw new Error(`Vault path ${ref} is a dynamic secret engine's: Vault makes those credentials itself, nothing is written there`);
   const version = kvVersion(store);
   const apiPath = buildApiPath(ref, version, store.default_mount);
-  const body = version === 2 ? { data: payload } : payload;
+  // step 1 : the secret there now, so its other keys are written back (never logged)
+  const pairs = mergePairs(await currentPairs(store, apiPath, version), payload);
+  // step 2 : the whole secret written, under data on KV v2
+  const body = version === 2 ? { data: pairs } : pairs;
   try {
     await axios.post(`${baseUrl(store)}/v1/${apiPath}`, body, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
   } catch (e) {
