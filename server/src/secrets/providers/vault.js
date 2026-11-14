@@ -3,6 +3,7 @@ import axios from "axios";
 import { agentsFor, baseUrl } from "./http.js";
 import { LEASE_SECONDS } from "../lease.js";
 import { stripTrailingSlashes, stripLeadingSlashes } from "../../lib/url.js";
+import Errors from "../../lib/errors.js";
 
 function headers(store) {
   const h = { "X-Vault-Token": store.token };
@@ -334,6 +335,33 @@ export function withinWritePrefix(store, ref) {
 }
 
 /**
+ * Refuses a path that names a KV v2 secret's metadata endpoint (secret/metadata/foo) for a write :
+ * the write prefix is compared without that segment (logicalPath), but the API path keeps it
+ * (buildApiPath), so the check would ask the metadata (no secret there) and the write would post
+ * to it, Vault answering 204 with no secret stored. On KV v1 a folder named metadata is a folder.
+ *
+ * Args:
+ *   store (object): the secret store (kv_version, default_mount).
+ *   ref (string): the path.
+ *
+ * Returns:
+ *   void
+ *
+ * Raises:
+ *   Errors.BadRequestError: the path names the metadata endpoint ; the message gives the secret's
+ *     own path to use instead.
+ */
+export function assertWritablePath(store, ref) {
+  // step 1 : only KV v2 has the metadata API segment after its mount
+  if (kvVersion(store) !== 2) return;
+  // step 2 : the path as the API is called with it, metadata/ right after the mount refused
+  const [mount, segment] = buildApiPath(ref, 2, store.default_mount).split("/");
+  if (segment !== "metadata") return;
+  const own = logicalPath(ref, store.default_mount, false, 2);
+  throw new Errors.BadRequestError(`Vault path ${stripLeadingSlashes(String(ref).trim())} names the metadata of a secret, not the secret: give the secret's path (${own || mount})`);
+}
+
+/**
  * Whether a secret is at a path already : what a write that may not overwrite asks first.
  *
  * Args:
@@ -344,11 +372,14 @@ export function withinWritePrefix(store, ref) {
  *   Promise<boolean>: true when Vault has a secret there ; false when it answers 404.
  *
  * Raises:
+ *   Errors.BadRequestError: the path names a KV v2 secret's metadata (assertWritablePath).
  *   Error: Vault refused or could not be reached.
  */
 async function exists(store, ref) {
   assertConfigured(store);
   assertSafeRef(ref);
+  // the path checked is the one written : never the metadata endpoint
+  assertWritablePath(store, ref);
   const apiPath = buildApiPath(ref, kvVersion(store), store.default_mount);
   try {
     const res = await axios.get(`${baseUrl(store)}/v1/${apiPath}`, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
@@ -429,12 +460,15 @@ export function mergePairs(current, payload) {
  *   Promise<void>
  *
  * Raises:
+ *   Errors.BadRequestError: the path names a KV v2 secret's metadata (assertWritablePath).
  *   Error: a dynamic engine's path, or Vault refused the read or the write (the token's policy) or could not
  *     be reached - said with the path, never with the secret.
  */
 async function write(store, ref, payload) {
   assertConfigured(store);
   assertSafeRef(ref);
+  // a secret's data is written, never its metadata (Vault would answer 204 and store nothing)
+  assertWritablePath(store, ref);
   if (await isDynamicRef(store, ref)) throw new Error(`Vault path ${ref} is a dynamic secret engine's: Vault makes those credentials itself, nothing is written there`);
   const version = kvVersion(store);
   const apiPath = buildApiPath(ref, version, store.default_mount);
