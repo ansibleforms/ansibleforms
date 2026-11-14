@@ -282,25 +282,30 @@ export function seedHasMailSettings(doc) {
  * The channel's is_active is not declared : the first mail channel made is the active one
  * (NotificationChannel.create), and an active channel made by hand stays it, as it was preferred
  * to the mail settings before.
- * Without a mail server (mail_server empty) nothing is declared : no mail, as before. A name the
- * seed's own sections declare already, or one in `reserved`, is not taken : -2, -3... after it.
- * The caller reserves the records made by hand of another kind (a Slack channel named 'default',
- * an ssh credential named 'mail-login') : declaring their name would ADOPT them
- * (applyListSection). A mail channel or an smtp credential of that name is the one the upgrade
- * made from the mail settings, which the seed takes over. Returns a new document ; the warning
- * is the caller's.
+ * Without a mail server (mail_server empty) nothing is declared : no mail, as before. The names :
+ *   - the ones in `own` first : the records the seed already manages for these keys (the
+ *     upgrade's move of the mail settings made them managed on a seeded instance, under
+ *     default-2 or mail-login-2 when the names were taken), so the seed keeps declaring them
+ *   - else 'default' and 'mail-login', or -2, -3... after them
+ * Never a name the seed's own sections declare already, nor one in `reserved`. The caller
+ * reserves every record made by hand (a mail channel 'default' or an smtp credential
+ * 'mail-login' too, which the upgrade did not take either) : declaring their name would ADOPT
+ * them (applyListSection), overwriting their server and login. Returns a new document ; the
+ * warning is the caller's.
  *
  * Args:
  *   doc (object): the seed document, validated.
  *   reserved (object): { channels: Iterable<string>, credentials: Iterable<string> }, names the
  *     channel and the credential must not take ; none by default.
+ *   own (object): { channel: string|null, credential: string|null }, the names of the records
+ *     the seed manages for these keys, taken first when free ; none by default.
  *
  * Returns:
  *   { doc: object, folded: boolean, channel: string|null, credential: string|null }: the
  *     document, whether mail keys were folded, and the channel and credential declared for them
  *     (null without a mail server ; the credential null for a relay).
  */
-export function foldMailSettingsIntoChannel(doc, reserved = {}) {
+export function foldMailSettingsIntoChannel(doc, reserved = {}, own = {}) {
   // step 1 : nothing to fold
   if (!seedHasMailSettings(doc)) return { doc, folded: false, channel: null, credential: null };
   const mail = doc.settings;
@@ -315,18 +320,20 @@ export function foldMailSettingsIntoChannel(doc, reserved = {}) {
   credentials.items = [...(credentials.items || [])];
   const channels = doc.notification_channels ? { ...doc.notification_channels } : { items: [] };
   channels.items = [...(channels.items || [])];
-  const free = (base, taken) => {
+  // the seed's own record's name when free, else the base or the first free one after it
+  const free = (base, taken, ownName) => {
+    if (ownName && !taken.has(ownName)) return ownName;
     let name = base;
     for (let i = 2; taken.has(name); i++) name = `${base}-${i}`;
     return name;
   };
-  const channel = free("default", new Set([...channels.items.map((c) => c.name), ...(reserved.channels || [])]));
+  const channel = free("default", new Set([...channels.items.map((c) => c.name), ...(reserved.channels || [])]), own.channel);
   const item = { name: channel, description: "From the config seed's mail settings", type: "mail" };
   if (mail.mail_from !== undefined) item.from_address = mail.mail_from;
   let credential = null;
   if (String(mail.mail_username ?? "").trim()) {
     // step 4 : a login : the smtp credential holds where the mail goes and as whom
-    credential = free("mail-login", new Set([...credentials.items.map((c) => c.name), ...(reserved.credentials || [])]));
+    credential = free("mail-login", new Set([...credentials.items.map((c) => c.name), ...(reserved.credentials || [])]), own.credential);
     const cred = { name: credential, description: "The mail server of the config seed's settings", credential_type: "smtp", host: mail.mail_server, user: mail.mail_username };
     if (mail.mail_port !== undefined) cred.port = mail.mail_port;
     if (mail.mail_secure !== undefined) cred.secure = mail.mail_secure;
