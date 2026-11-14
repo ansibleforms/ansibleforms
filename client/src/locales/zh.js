@@ -1519,7 +1519,6 @@ export default {
       send: '发送',
       notFound: "没有 ID 为 '{id}' 的通知通道。",
       fieldsRequired: '名称为必填项。',
-      fromSeed: '配置种子设置了邮件参数: 在没有默认邮件通道时, 应用使用这些参数发送。',
     },
     syslogServers: {
       label: 'syslog 服务器',

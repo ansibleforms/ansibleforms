@@ -373,7 +373,7 @@ async function lastBackupCheck() {
 // NOT a check : there is no failing value for "where does the config come from". It is a
 // fact about this instance, so it goes in the information block.
 async function configSourceFacts() {
-  const settings = await Settings.findFormsYaml();
+  const settings = await Settings.findConfigYaml();
   const inDatabase = Settings.resolveConfigInDatabase(settings);
   const active = await Settings.getActiveConfig().catch(() => '');
   const templated = /^\s*#@/m.test(active || '');
@@ -983,12 +983,13 @@ Health.check = async function () {
   // row that goes amber for a legitimate setup is noise. Whether it actually WORKS is left
   // to Mail's own test button - reading the row proves nothing about the smtp host.
   try {
-    // the active mail channel ; none, the mail settings (a seeded instance's)
+    // the active mail channel ; none : no mail is sent (the mail settings of before 7.6 became
+    // a mail channel at the upgrade)
     const { default: NotificationChannel } = await import('./notificationChannel.model.js');
     const active = await NotificationChannel.findActive();
     const mail = active
       ? { ...(await NotificationChannel.withServer([active]).then(([c]) => ({ mail_server: c.server, mail_port: c.port, mail_secure: c.secure }))), mail_username: active.credential }
-      : await Settings.findMailSettings();
+      : null;
     add('mail', mail?.mail_server ? `${mail.mail_server}:${mail.mail_port || '?'}` : 'not configured', {
       // never the password, and the username only as a yes/no
       secure: mail?.mail_server ? !!mail.mail_secure : null,

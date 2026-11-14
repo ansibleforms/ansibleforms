@@ -2,7 +2,7 @@
 // Declarative config seed : config as code for the admin objects.
 //
 // When CONFIG_SEED_PATH is set, that file is read at startup and the objects it
-// declares (awx, credentials, databases, oauth2 providers, repositories, ldap, mail/url) are
+// declares (awx, credentials, databases, oauth2 providers, repositories, ldap, url) are
 // upserted into the database. This is the piece that lets a whole instance be
 // rebuilt from git on an empty database - see https://ansibleforms.com/seed.
 //
@@ -25,9 +25,8 @@ import fs from "fs";
 import { createHash } from "node:crypto";
 import yaml from "yaml";
 import logger from "./logger.js";
-import crypto from "./crypto.js";
 import appConfig from "../../config/app.config.js";
-import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets } from "./seed-schema.js";
+import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -350,24 +349,30 @@ async function applyLdap(cfg, summary) {
   summary.updated.push("ldap");
 }
 
+/**
+ * Applies the seed's settings section : the public url. Its mail keys of before 7.6 are no
+ * longer settings : foldMailSettingsIntoChannel made them a mail channel and its credential
+ * before this runs, and left them out of `cfg`.
+ *
+ * Args:
+ *   cfg (object): the settings section, without its mail keys.
+ *   summary (object): the apply's summary, completed here.
+ *
+ * Returns:
+ *   Promise<void>
+ */
 async function applySettings(cfg, summary) {
   const stored = await Settings.find();
-  // Partial update on purpose : the settings row also carries forms_yaml, the logo
+  // Partial update on purpose : the settings row also carries config_yaml, the logo
   // and the theme defaults, none of which are seed material.
   const record = {};
-  for (const k of ["mail_server", "mail_port", "mail_username", "mail_from", "url"]) {
-    if (cfg[k] !== undefined) record[k] = cfg[k];
-  }
-  if (cfg.mail_secure !== undefined) record.mail_secure = cfg.mail_secure ? 1 : 0;
-  if (cfg.mail_password !== undefined) {
-    record.mail_password = cfg.mail_password === "" ? "" : crypto.encrypt(cfg.mail_password);
-  }
+  if (cfg.url !== undefined) record.url = cfg.url;
   if (stored?.managed && !differs(cfg, stored)) {
     summary.unchanged++;
     return;
   }
   if (!stored?.managed) {
-    logger.warning("Config seed adopts the existing mail/url settings, which were not managed before: its declared fields are now enforced from the seed file");
+    logger.warning("Config seed adopts the existing url setting, which was not managed before: its declared fields are now enforced from the seed file");
     summary.adopted.push("settings");
   }
   record.managed = 1;
@@ -421,6 +426,32 @@ export function applyConfigSeed(opts) {
 
 export function reloadConfigSeed(opts) {
   return oneAtATime(() => reloadSeedNow(opts));
+}
+
+// whether the deprecation of the settings' mail keys was said already : once per process, not at
+// every reload of the seed
+let mailSettingsWarned = false;
+
+/**
+ * Says once per process that the seed's settings carry the mail keys of before 7.6, deprecated,
+ * and what they were applied as.
+ *
+ * Args:
+ *   mail (object): what foldMailSettingsIntoChannel returned : channel and credential, the names
+ *     declared for them (null without a mail server).
+ *
+ * Returns:
+ *   void
+ */
+function warnMailSettingsOnce(mail) {
+  if (mailSettingsWarned) return;
+  mailSettingsWarned = true;
+  const applied = mail.channel
+    ? ` (applied now as the mail channel '${mail.channel}'${mail.credential ? ` and its smtp credential '${mail.credential}'` : ", a relay without a credential"})`
+    : " (no mail_server : no mail channel is declared for them)";
+  logger.warning(
+    `The config seed's settings carry mail_server, mail_port, mail_secure, mail_username, mail_password or mail_from, deprecated since 7.6 and removed in 8: declare a mail channel under notification_channels: and its smtp credential under credentials:${applied}`,
+  );
 }
 
 async function applySeedNow({ schemaIsReady = true } = {}) {
@@ -490,6 +521,20 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   for (const name of runnerSecrets.folded) {
     const credential = doc.runners.items.find((r) => r.name === name).credential;
     logger.warning(`The config seed's runner '${name}' carries its own token or user and password, deprecated since 7.3 and removed in 8: declare a credential of its kind with its url and name it with credential: (applied now as the credential '${credential}')`);
+  }
+
+  // the settings' mail keys : deprecated since 7.6 (the settings row has no mail columns), removed
+  // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). The
+  // channels and credentials made by hand of another kind are reserved : declaring their name
+  // would adopt them. Read only when the settings carry mail keys
+  if (seedHasMailSettings(doc)) {
+    const reserved = {
+      channels: (await mysql.do("SELECT name FROM AnsibleForms.`notification_channels` WHERE COALESCE(managed, 0) = 0 AND type <> 'mail'")).map((c) => c.name),
+      credentials: (await mysql.do("SELECT name FROM AnsibleForms.`credentials` WHERE COALESCE(managed, 0) = 0 AND COALESCE(credential_type, '') <> 'smtp'")).map((c) => c.name),
+    };
+    const mail = foldMailSettingsIntoChannel(doc, reserved);
+    doc = mail.doc;
+    warnMailSettingsOnce(mail);
   }
 
   const summary = { created: [], updated: [], released: [], pruned: [], adopted: [], recloned: [], unchanged: 0 };
@@ -640,6 +685,7 @@ export function getSeedState() {
 export function _resetSeedState() {
   lastApplied = { hash: null, at: null };
   lastFailure = { hash: null, error: null, at: null };
+  mailSettingsWarned = false;
 }
 
 function recordFailure(hash, err, trigger) {

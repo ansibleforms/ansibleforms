@@ -386,15 +386,9 @@ CREATE TABLE `job_output` (
 -- create settings table
 DROP TABLE IF EXISTS `settings`;
 CREATE TABLE `settings` (
-  `mail_server` varchar(250) DEFAULT NULL,
-  `mail_port` int(11) DEFAULT NULL,
-  `mail_secure` tinyint(4) DEFAULT NULL,
-  `mail_username` varchar(250) DEFAULT NULL,
-  `mail_password` text DEFAULT NULL,
   `encryption_check` text DEFAULT NULL,
-  `mail_from` varchar(250) DEFAULT NULL,
   `url` varchar(250) DEFAULT NULL,
-  `forms_yaml` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `config_yaml` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `logo` longtext DEFAULT NULL,
   -- the website icon (browser tab), a data url ; NULL : the bundled one
   `favicon` longtext DEFAULT NULL,

@@ -57,10 +57,9 @@ vi.mock("../src/models/schema.model.js", () => ({
 }));
 vi.mock("../src/models/settings.model.js", () => ({
   default: {
-    findFormsYaml: async () => ({ forms_yaml: "categories: []", config_source: null }),
+    findConfigYaml: async () => ({ config_yaml: "categories: []", config_source: null }),
     resolveConfigInDatabase: () => false,
     getActiveConfig: async () => "categories: []\n",
-    findMailSettings: async () => ({ mail_server: "smtp.example.com", mail_port: 587, mail_secure: 1, mail_username: "mailer" }),
   },
 }));
 // the scheduler lives in-process, so in a test there are no registered tasks and

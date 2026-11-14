@@ -623,7 +623,7 @@ const workflowsCredentials = async function(req,res){
 // endpoint.
 const configMode = async function(req,res){
   try{
-    const settings = await Settings.findFormsYaml()
+    const settings = await Settings.findConfigYaml()
     const configInDatabase = Settings.resolveConfigInDatabase(settings)
     res.json(RestResult.single({ configInDatabase }))
   }catch(err){

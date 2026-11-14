@@ -245,6 +245,102 @@ export function foldRunnerSecretsIntoCredentials(doc, reserved = []) {
   return { doc: { ...doc, runners: { ...doc.runners, items: runnerItems }, credentials }, folded };
 }
 
+// the settings' mail keys of before 7.6 (deprecated, removed in 8), as foldMailSettingsIntoChannel
+// takes them
+export const SEED_MAIL_KEYS = ["mail_server", "mail_port", "mail_secure", "mail_username", "mail_password", "mail_from"];
+
+/**
+ * Whether the seed's settings section still carries a mail key of before 7.6 : what
+ * foldMailSettingsIntoChannel folds.
+ *
+ * Args:
+ *   doc (object): the seed document, validated.
+ *
+ * Returns:
+ *   boolean: true when it does.
+ */
+export function seedHasMailSettings(doc) {
+  const settings = doc?.settings;
+  return !!settings && SEED_MAIL_KEYS.some((key) => settings[key] !== undefined);
+}
+
+/**
+ * The settings' mail keys of before 7.6 (mail_server, mail_port, mail_secure, mail_username,
+ * mail_password, mail_from) as a mail channel and its smtp credential : deprecated since 7.6,
+ * removed in 8. The settings row has no mail columns any more, the mail goes through the mail
+ * channels (Connections > Notifications), so a seed written before keeps working : its mail keys
+ * leave the settings section, and with a mail server set the notification_channels section gets
+ * a mail channel, 'default', sending from mail_from, as the upgrade's move of the mail settings
+ * makes it :
+ *   - with a mail_username : the credentials section gets an smtp credential, 'mail-login',
+ *     holding the server, port, TLS and login, which the channel names
+ *   - without one (a relay) : no credential, the channel holds the server, port and TLS itself
+ *     and sends without a login
+ * The channel's is_active is not declared : the first mail channel made is the active one
+ * (NotificationChannel.create), and an active channel made by hand stays it, as it was preferred
+ * to the mail settings before.
+ * Without a mail server (mail_server empty) nothing is declared : no mail, as before. A name the
+ * seed's own sections declare already, or one in `reserved`, is not taken : -2, -3... after it.
+ * The caller reserves the records made by hand of another kind (a Slack channel named 'default',
+ * an ssh credential named 'mail-login') : declaring their name would ADOPT them
+ * (applyListSection). A mail channel or an smtp credential of that name is the one the upgrade
+ * made from the mail settings, which the seed takes over. Returns a new document ; the warning
+ * is the caller's.
+ *
+ * Args:
+ *   doc (object): the seed document, validated.
+ *   reserved (object): { channels: Iterable<string>, credentials: Iterable<string> }, names the
+ *     channel and the credential must not take ; none by default.
+ *
+ * Returns:
+ *   { doc: object, folded: boolean, channel: string|null, credential: string|null }: the
+ *     document, whether mail keys were folded, and the channel and credential declared for them
+ *     (null without a mail server ; the credential null for a relay).
+ */
+export function foldMailSettingsIntoChannel(doc, reserved = {}) {
+  // step 1 : nothing to fold
+  if (!seedHasMailSettings(doc)) return { doc, folded: false, channel: null, credential: null };
+  const mail = doc.settings;
+  const settings = { ...mail };
+  for (const key of SEED_MAIL_KEYS) delete settings[key];
+  // step 2 : no mail server, no mail : only the keys leave
+  if (!String(mail.mail_server ?? "").trim()) {
+    return { doc: { ...doc, settings }, folded: true, channel: null, credential: null };
+  }
+  // step 3 : free names, never one the seed declares nor one reserved
+  const credentials = doc.credentials ? { ...doc.credentials } : { items: [] };
+  credentials.items = [...(credentials.items || [])];
+  const channels = doc.notification_channels ? { ...doc.notification_channels } : { items: [] };
+  channels.items = [...(channels.items || [])];
+  const free = (base, taken) => {
+    let name = base;
+    for (let i = 2; taken.has(name); i++) name = `${base}-${i}`;
+    return name;
+  };
+  const channel = free("default", new Set([...channels.items.map((c) => c.name), ...(reserved.channels || [])]));
+  const item = { name: channel, description: "From the config seed's mail settings", type: "mail" };
+  if (mail.mail_from !== undefined) item.from_address = mail.mail_from;
+  let credential = null;
+  if (String(mail.mail_username ?? "").trim()) {
+    // step 4 : a login : the smtp credential holds where the mail goes and as whom
+    credential = free("mail-login", new Set([...credentials.items.map((c) => c.name), ...(reserved.credentials || [])]));
+    const cred = { name: credential, description: "The mail server of the config seed's settings", credential_type: "smtp", host: mail.mail_server, user: mail.mail_username };
+    if (mail.mail_port !== undefined) cred.port = mail.mail_port;
+    if (mail.mail_secure !== undefined) cred.secure = mail.mail_secure;
+    if (mail.mail_password !== undefined) cred.password = mail.mail_password;
+    credentials.items.push(cred);
+    item.credential = credential;
+  } else {
+    // step 4 : a relay : the channel's own server, port and TLS, no login
+    item.server = mail.mail_server;
+    if (mail.mail_port !== undefined) item.port = mail.mail_port;
+    if (mail.mail_secure !== undefined) item.secure = mail.mail_secure;
+  }
+  // step 5 : the mail channel
+  channels.items.push(item);
+  return { doc: { ...doc, settings, credentials, notification_channels: channels }, folded: true, channel, credential };
+}
+
 const oauth2Item = {
   type: "object",
   additionalProperties: false,
@@ -438,12 +534,14 @@ const ldapSection = {
   },
 };
 
-// Only the mail fields and the public url. The settings row also holds forms_yaml, the logo
-// and the theme defaults - those are not seed material and stay editable, which is what the
-// field-scoped refusal in settings.controller.js protects.
+// The public url, and the mail fields of before 7.6 (deprecated, removed in 8 : the settings row
+// has no mail columns any more, foldMailSettingsIntoChannel makes them a mail channel and its
+// smtp credential). The settings row also holds config_yaml, the logo and the theme defaults -
+// those are not seed material and stay editable, which is what the field-scoped refusal in
+// settings.controller.js protects.
 //
-// All seven are required, for the reason spelled out above ldapSection: this is a single-row
-// section, so declaring it means owning all of it.
+// The url is required, for the reason spelled out above ldapSection: this is a single-row
+// section, so declaring it means owning all of it. The mail fields are optional now.
 // a database of Connections > Databases : the databases forms query (a field's dbConfig names one).
 // Its name, what it is, and the credential of type database it connects with (of the credentials
 // section, or one made in the app), which holds its engine, server, database and login
@@ -475,9 +573,9 @@ const labelItem = {
 const settingsSection = {
   type: "object",
   additionalProperties: false,
-  required: ["mail_server", "mail_port", "mail_secure", "mail_username", "mail_password",
-             "mail_from", "url"],
+  required: ["url"],
   properties: {
+    // deprecated since 7.6, removed in 8 : a mail channel (foldMailSettingsIntoChannel)
     mail_server: str,
     mail_port: strOrInt,
     mail_secure: bool,
@@ -577,8 +675,9 @@ export function validateSeed(doc) {
       .join(" ; ");
     throw new Error(`Seed file validation failed: ${details}`);
   }
-  // the deprecated awx: items count as runners for the cross-item rules
-  const folded = foldAwxIntoRunners(doc);
+  // the deprecated awx: items count as runners for the cross-item rules, and the deprecated mail
+  // keys of the settings as the channel and credential they become
+  const folded = foldMailSettingsIntoChannel(foldAwxIntoRunners(doc)).doc;
   assertUniqueNames(folded);
   assertSingletonFlags(folded);
   return true;

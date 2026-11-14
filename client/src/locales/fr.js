@@ -1749,8 +1749,6 @@ export default {
       send: 'Envoyer',
       notFound: "Il n'y a pas de canal de notification avec l'id '{id}'.",
       fieldsRequired: 'Le nom est requis.',
-      fromSeed:
-        "Le seed de configuration fixe les paramètres mail : l'application envoie avec eux tant qu'aucun canal mail n'est défini par défaut.",
     },
     syslogServers: {
       label: 'Serveur syslog',

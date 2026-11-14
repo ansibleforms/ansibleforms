@@ -1745,8 +1745,6 @@ export default {
       send: 'Senden',
       notFound: "Es gibt keinen Benachrichtigungskanal mit der ID '{id}'.",
       fieldsRequired: 'Der Name ist erforderlich.',
-      fromSeed:
-        'Der Config-Seed setzt die Mail-Einstellungen: die App sendet damit, solange kein Mail-Kanal der Standard ist.',
     },
     syslogServers: {
       label: 'Syslog-Server',

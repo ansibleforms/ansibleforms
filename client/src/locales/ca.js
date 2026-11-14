@@ -1587,8 +1587,6 @@ export default {
       send: 'Envia',
       notFound: "No hi ha cap canal de notificació amb l'id '{id}'.",
       fieldsRequired: 'El nom és obligatori.',
-      fromSeed:
-        "El seed de configuració fixa els paràmetres de correu: l'aplicació envia amb ells mentre no hi hagi cap canal de correu predeterminat.",
     },
     syslogServers: {
       label: 'Servidor syslog',

@@ -37,7 +37,7 @@ export function useRoleAssignments() {
   async function loadRoles() {
     try {
       const result = await axios.get('/api/v2/settings/config');
-      const config = yaml.parse(result.data?.forms_yaml || '') || {};
+      const config = yaml.parse(result.data?.config_yaml || '') || {};
       roles.value = (Array.isArray(config.roles) ? config.roles : [])
         .filter((r) => r && typeof r === 'object')
         .map(roleToEditable);

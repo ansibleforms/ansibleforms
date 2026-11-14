@@ -1743,8 +1743,6 @@ export default {
       send: 'Enviar',
       notFound: "No hay ningún canal de notificación con el id '{id}'.",
       fieldsRequired: 'El nombre es obligatorio.',
-      fromSeed:
-        'El seed de configuración fija los ajustes de correo: la aplicación envía con ellos mientras no haya un canal de correo predeterminado.',
     },
     syslogServers: {
       label: 'Servidor syslog',

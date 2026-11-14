@@ -1567,7 +1567,6 @@ export default {
       send: '送信',
       notFound: "ID '{id}' の通知チャネルはありません。",
       fieldsRequired: '名前は必須です。',
-      fromSeed: '設定シードがメール設定を指定しています: 既定のメールチャネルがない間、アプリはその設定で送信します。',
     },
     syslogServers: {
       label: 'syslog サーバー',

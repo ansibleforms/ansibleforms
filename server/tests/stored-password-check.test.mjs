@@ -1,5 +1,6 @@
 // A connection check with the masked password tests with the stored one : only against the
-// stored server, never against one the request names (it would receive the password).
+// stored server, never against one the request names (it would receive the password). The mail
+// check has no stored password since 7.6 (the mail goes through the mail channels).
 import { describe, test, expect, vi, beforeEach } from "vitest";
 
 process.env.DB_HOST ||= "127.0.0.1";
@@ -67,16 +68,18 @@ describe("/ldap/check with the masked bind password", () => {
 describe("/settings/mailcheck with the masked mail password", () => {
   const masked = { ...storedSettings, mail_password: "**********", to: "a@b.c" };
 
-  test("tests the stored server with the stored password", async () => {
-    const res = await call(settingsController.mailcheck, { ...masked });
-    expect(res.statusCode).toBe(200);
-    expect(mailChecked.mail_password).toBe("Mail-Secret");
-  });
-
-  test.each([["mail_server", "evil.example.com"], ["mail_port", 25], ["mail_secure", true]])(
-    "another %s never receives the stored password", async (field, value) => {
-      const res = await call(settingsController.mailcheck, { ...masked, [field]: value });
+  // 7.6 : the settings hold no mail password any more, the mask stands for nothing
+  test("a masked password is refused, whatever server : there is no stored one", async () => {
+    for (const body of [masked, { ...masked, mail_server: "evil.example.com" }]) {
+      const res = await call(settingsController.mailcheck, { ...body });
       expect(res.statusCode).toBe(400);
       expect(mailChecked).toBe(null);
-    });
+    }
+  });
+
+  test("a typed password tests the server sent, with the values sent and nothing stored", async () => {
+    const res = await call(settingsController.mailcheck, { ...storedSettings, mail_secure: true, mail_password: "typed", to: "a@b.c" });
+    expect(res.statusCode).toBe(200);
+    expect(mailChecked).toEqual({ mail_server: "smtp.corp", mail_port: 587, mail_secure: 1, mail_username: "svc", mail_password: "typed", mail_from: undefined });
+  });
 });

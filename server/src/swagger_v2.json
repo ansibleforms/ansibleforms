@@ -287,7 +287,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "Get application settings",
-        "description": "Returns application settings (mail server, URL, etc.). Mail password is masked.",
+        "description": "Returns application settings (URL, config source, language, theme, etc.). The mail settings are not settings since 7.6 : the mail goes through the mail channels (/notificationchannel).",
         "security": [ { "bearerAuth": [] } ],
         "responses": {
           "200": {
@@ -297,14 +297,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "mail_server": { "type": "string" },
-                    "mail_port": { "type": "integer" },
-                    "mail_secure": { "type": "integer", "description": "1 for TLS, 0 for plain" },
-                    "mail_username": { "type": "string" },
-                    "mail_password": { "type": "string", "example": "**********", "description": "Always masked" },
-                    "mail_from": { "type": "string" },
                     "url": { "type": "string", "description": "Application base URL" },
-                    "forms_yaml": { "type": "string" }
+                    "config_yaml": { "type": "string", "description": "The config.yaml content stored in the database (forms_yaml before 7.6)" }
                   }
                 }
               }
@@ -316,7 +310,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Update application settings",
-        "description": "Updates the settings row. Config CONTENT is deliberately not accepted here : it is written through PUT /settings/config, which validates it, honours the designer lock and the baseHash concurrency check, and writes a restore point.",
+        "description": "Updates the settings row. Config CONTENT is deliberately not accepted here : it is written through PUT /settings/config, which validates it, honours the designer lock and the baseHash concurrency check, and writes a restore point. The mail_* fields of before 7.6 are ignored : the mail goes through the mail channels (/notificationchannel).",
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,
@@ -325,12 +319,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "mail_server": { "type": "string" },
-                  "mail_port": { "type": "integer" },
-                  "mail_secure": { "type": "integer" },
-                  "mail_username": { "type": "string" },
-                  "mail_password": { "type": "string", "description": "Use '**********' to preserve existing password, empty string to clear, or new password" },
-                  "mail_from": { "type": "string" },
                   "url": { "type": "string" },
                   "config_source": { "type": "string", "enum": ["database", "file"], "description": "Where the active config is read from and written to" },
                   "default_language": { "type": "string" },
@@ -362,8 +350,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "forms_yaml": { "type": "string", "description": "The active config.yaml content (empty string when there is none yet)" },
-                    "baseHash": { "type": "string", "description": "sha256 fingerprint of forms_yaml, for optimistic concurrency on save" }
+                    "config_yaml": { "type": "string", "description": "The active config.yaml content (empty string when there is none yet)" },
+                    "forms_yaml": { "type": "string", "deprecated": true, "description": "The same content as config_yaml, under its name before 7.6 (deprecated, removed in 8)" },
+                    "baseHash": { "type": "string", "description": "sha256 fingerprint of config_yaml, for optimistic concurrency on save" }
                   }
                 }
               }
@@ -383,9 +372,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["forms_yaml"],
+                "required": ["config_yaml"],
                 "properties": {
-                  "forms_yaml": { "type": "string", "description": "The full config.yaml content (categories, roles, constants)" },
+                  "config_yaml": { "type": "string", "description": "The full config.yaml content (categories, roles, constants)" },
+                  "forms_yaml": { "type": "string", "deprecated": true, "description": "Its name before 7.6 (deprecated, removed in 8) : taken when config_yaml is not sent" },
                   "baseHash": { "type": "string", "description": "Optional baseHash from GET /settings/config; when sent, the save is refused with 409 if the active config changed in the meantime" }
                 }
               }
@@ -394,7 +384,7 @@
         },
         "responses": {
           "200": { "description": "Config saved" },
-          "400": { "description": "Missing forms_yaml, invalid yaml, or config that fails the base schema validation" },
+          "400": { "description": "Missing config_yaml, invalid yaml, or config that fails the base schema validation" },
           "403": { "description": "Only an admin can change who is an admin (the groups and users of the admin role)" },
           "409": { "description": "The active config changed elsewhere (stale baseHash)" },
           "423": { "description": "Configuration is locked by the designer" },
@@ -517,7 +507,7 @@
       "post": {
         "tags": ["settings"],
         "summary": "Test mail settings",
-        "description": "Sends a test email to verify mail configuration.",
+        "description": "Sends a test email with the mail server values sent. Nothing is read from the settings, which hold no mail settings since 7.6 : a masked password is refused (400), type it. A stored mail channel is tested through its own check.",
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,

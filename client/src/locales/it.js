@@ -1735,8 +1735,6 @@ export default {
       send: 'Invia',
       notFound: "Non esiste un canale di notifica con l'id '{id}'.",
       fieldsRequired: 'Il nome è obbligatorio.',
-      fromSeed:
-        "Il seed di configurazione imposta le impostazioni di posta: l'app invia con quelle finché nessun canale di posta è predefinito.",
     },
     syslogServers: {
       label: 'Server syslog',

@@ -67,21 +67,21 @@ beforeEach(() => { written.length = 0; });
 
 describe("saving the configuration (Settings > Roles)", () => {
   test("a settings user who is not an admin cannot grant their own group the admin role", async () => {
-    const r = await call(controller.saveConfig, settingsUser, { forms_yaml: escalated });
+    const r = await call(controller.saveConfig, settingsUser, { config_yaml: escalated });
     expect(r.status).toBe(403);
     expect(r.data.details).toMatch(/Only an admin can change who is an admin/);
     expect(written).toEqual([]);
   });
 
   test("nor name a user in it", async () => {
-    const r = await call(controller.saveConfig, settingsUser, { forms_yaml: active.replace("groups: [local/admins]", "groups: [local/admins]\n    users: [local/bob]") });
+    const r = await call(controller.saveConfig, settingsUser, { config_yaml: active.replace("groups: [local/admins]", "groups: [local/admins]\n    users: [local/bob]") });
     expect(r.status).toBe(403);
     expect(written).toEqual([]);
   });
 
   test("still changes the other roles, and the admin role written another way", async () => {
     const other = active.replace("groups: [local/ops]", "groups: [local/ops, local/helpdesk]").replace("groups: [local/admins]", "groups:\n      - local/admins\n    users: []");
-    const r = await call(controller.saveConfig, settingsUser, { forms_yaml: other });
+    const r = await call(controller.saveConfig, settingsUser, { config_yaml: other });
     expect(r.status).toBe(200);
     expect(written).toEqual([other]);
   });
@@ -91,15 +91,35 @@ describe("saving the configuration (Settings > Roles)", () => {
     const entra = active.replace("groups: [local/admins]", "groups: [local/admins, azuread/it]");
     const { default: Settings } = await import("../src/models/settings.model.js");
     const spy = vi.spyOn(Settings, "getActiveConfig").mockResolvedValue(entra);
-    const r = await call(controller.saveConfig, settingsUser, { forms_yaml: before.replace("groups: [local/admins]", "groups: [local/admins, entraid/it]") });
+    const r = await call(controller.saveConfig, settingsUser, { config_yaml: before.replace("groups: [local/admins]", "groups: [local/admins, entraid/it]") });
     spy.mockRestore();
     expect(r.status).toBe(200);
   });
 
   test("an admin changes the admin role", async () => {
+    const r = await call(controller.saveConfig, admin, { config_yaml: escalated });
+    expect(r.status).toBe(200);
+    expect(written).toEqual([escalated]);
+  });
+
+  // 7.6 : config_yaml, the name of before (forms_yaml) still taken, deprecated, and checked the same
+  test("forms_yaml, the name before 7.6, is still saved and checked the same", async () => {
+    expect((await call(controller.saveConfig, settingsUser, { forms_yaml: escalated })).status).toBe(403);
     const r = await call(controller.saveConfig, admin, { forms_yaml: escalated });
     expect(r.status).toBe(200);
     expect(written).toEqual([escalated]);
+  });
+
+  test("config_yaml wins over forms_yaml, and neither is a missing field", async () => {
+    await call(controller.saveConfig, admin, { config_yaml: active, forms_yaml: escalated });
+    expect(written).toEqual([active]);
+    expect((await call(controller.saveConfig, admin, {})).status).toBe(400);
+  });
+
+  test("the config is read back as config_yaml, and as forms_yaml for the clients of before", async () => {
+    const r = await call(controller.getConfig, admin);
+    expect(r.status).toBe(200);
+    expect(r.data).toMatchObject({ config_yaml: active, forms_yaml: active, baseHash: "h" });
   });
 });
 

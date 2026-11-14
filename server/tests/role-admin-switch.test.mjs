@@ -123,7 +123,7 @@ describe("who may grant admin", () => {
 
   test("a settings user who is not an admin cannot turn Admin on for a role with members", async () => {
     const flipped = active.replace("  - name: ops\n    groups: [local/ops]\n", "  - name: ops\n    options: { admin: true }\n    groups: [local/ops]\n");
-    const r = await call(controller.saveConfig, settingsUser, { forms_yaml: flipped });
+    const r = await call(controller.saveConfig, settingsUser, { config_yaml: flipped });
     expect(r.status).toBe(403);
     expect(r.data.details).toMatch(/Only an admin can change who is an admin/);
     expect(written).toEqual([]);
@@ -133,7 +133,7 @@ describe("who may grant admin", () => {
 describe("an admin never locks themselves out", () => {
   test("a save taking their own group out of every role that makes admins : refused", async () => {
     const without = active.replace("groups: [local/admins]", "groups: [local/platform]");
-    const r = await call(controller.saveConfig, admin, { forms_yaml: without });
+    const r = await call(controller.saveConfig, admin, { config_yaml: without });
     expect(r.status).toBe(409);
     expect(r.data.details).toMatch(/This save would take admin away from you \(local\/admin\)/);
     expect(written).toEqual([]);
@@ -143,7 +143,7 @@ describe("an admin never locks themselves out", () => {
     const moved = active
       .replace("groups: [local/admins]", "groups: [local/platform]")
       .replace("  - name: ops\n", "  - name: platformAdmins\n    options: { admin: true }\n    groups: [local/admins]\n  - name: ops\n");
-    const r = await call(controller.saveConfig, admin, { forms_yaml: moved });
+    const r = await call(controller.saveConfig, admin, { config_yaml: moved });
     expect(r.status).toBe(200);
     expect(written.length).toBe(1);
   });

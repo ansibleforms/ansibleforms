@@ -258,6 +258,21 @@ async function tablePresent(table) {
   const res = await mysql.do("SHOW TABLES FROM ?? WHERE ?? = ?", ["AnsibleForms", "Tables_in_AnsibleForms", table]);
   return res.length > 0;
 }
+
+/**
+ * PATCHING : whether a column exists on a table of the AnsibleForms schema.
+ *
+ * Args:
+ *   table (string): the table.
+ *   name (string): the column.
+ *
+ * Returns:
+ *   Promise<boolean>: true when the table has that column.
+ */
+async function columnPresent(table, name) {
+  const res = await mysql.do("SHOW COLUMNS FROM ??.?? WHERE Field = ?", ["AnsibleForms", table, name]);
+  return res.length > 0;
+}
 function addIdPrimaryKey(table) {
   var message;
   var db = "AnsibleForms";
@@ -619,7 +634,7 @@ const SCHEMA_MANIFEST = {
                      // not azuread.groupfilter : its patch is commented out below, and an app node
                      // waits for every column listed here (app-start.js)
                      columns: ['users.email', 'jobs.awx_id',
-                               'settings.forms_yaml', 'repositories.branch', 'jobs.awx_artifacts',
+                               'settings.config_yaml', 'repositories.branch', 'jobs.awx_artifacts',
                                'jobs.abort_requested'] },
     // One entry per patch function, and there is one patch function per MAJOR version -
     // so everything 6.x adds is listed here, including all of 6.3.0. `indexes` is a
@@ -739,9 +754,13 @@ async function patchVersion5(messages, success, failed) {
 
   // In 5.0.3, the settings was extended with a new column, forms_yaml, to store the forms in yaml format
   // If you use GIT to store the forms, but not the master forms.yaml, you can now store it in the database
+  // In 7.6.0 that column is config_yaml, as the file it holds is config.yaml : a database that still
+  // has forms_yaml gets it renamed first (its config kept), so the column is never added a second
+  // time beside it, then a database without either gets config_yaml
 
-  await checkPromise(addColumn("settings", "forms_yaml", "longtext", true, "NULL"), messages, success, failed); // add forms_yaml column
-  await checkPromise(setUtf8mb4CharacterSet("settings", "forms_yaml", "longtext"), messages, success, failed); // allow emoticon or utf16 characters
+  await checkPromise(renameFormsYamlToConfigYaml(), messages, success, failed); // forms_yaml is config_yaml since 7.6.0
+  await checkPromise(addColumn("settings", "config_yaml", "longtext", true, "NULL"), messages, success, failed); // add config_yaml column
+  await checkPromise(setUtf8mb4CharacterSet("settings", "config_yaml", "longtext"), messages, success, failed); // allow emoticon or utf16 characters
 
   // In 5.0.8, the repositories table was extended with a new column, branch, to store the branch of the repository
   await checkPromise(addColumn("repositories", "branch", "varchar(250)", true, "NULL"), messages, success, failed); // add branch column
@@ -1018,6 +1037,10 @@ async function patchVersion7(messages, success, failed) {
   // a mail channel's server, port and TLS belong to its smtp credential, with its login (the
   // SSO providers and the LDAP directories move theirs further down, once their columns are there)
   await checkPromise(moveMailServersToCredentials(), messages, success, failed);
+  // 7.6 : the settings' mail columns go, the mail goes through the mail channels only. What they
+  // still hold (a seeded instance's, or left by a channel named 'default' already) becomes the
+  // active mail channel first, its login and server an smtp credential, as the copy above does
+  await checkPromise(dropSettingsMailColumns(), messages, success, failed);
   // the syslog servers the server log and the audit entries go to (Connections > Syslog) ; the
   // LOG_SYSLOG_* variables of before become the first, once (lib/syslogServers.js)
   const syslogBuffer = fs.readFileSync(`${__dirname}/../db/create_syslog_servers_table.sql`);
@@ -1414,8 +1437,8 @@ export async function moveMailServersToChannels() {
  *
  * A channel already named 'default' (a Slack or Teams one made by hand) is never overwritten :
  * the insert would fail on its unique name and fail the whole patch at every start. The settings
- * are then left as they are (the mail still goes out through them while no mail channel is
- * active) and the log says what to rename.
+ * are then left as they are, and the 7.6 step that drops the mail columns right after
+ * (dropSettingsMailColumns) moves them to a mail channel of a free name.
  *
  * Returns:
  *   Promise<string|null>: what was done, or null when there was nothing to do.
@@ -1429,29 +1452,162 @@ export async function copyMailSettingsToServers() {
   // the name it takes is somebody's already : skipped, said once per start
   const named = await mysql.do("SELECT type FROM AnsibleForms.`notification_channels` WHERE name = 'default'");
   if (named.length) {
-    const message = `The mail settings were not copied to a mail channel: a ${named[0].type} channel is named 'default' already. Rename it and restart, or add a mail channel under Connections > Notifications`;
+    const message = `The mail settings were not copied to a mail channel: a ${named[0].type} channel is named 'default' already: they become a mail channel of another name when the mail columns are dropped (7.6)`;
     logger.warning(message);
     return message;
   }
   let credential = null;
   await mysql.transaction(async (query) => {
-    if (s.mail_username) {
-      // the password is copied as it is stored : the same key encrypts both tables ; a
-      // credential already named mail-login (made by hand) is never taken over
-      credential = await freeCredentialName("mail-login", query);
-      await query(
-        "INSERT INTO AnsibleForms.`credentials` (name, user, password, description, is_database, credential_type) VALUES (?, ?, ?, 'The login of the mail server (from the mail settings)', 0, 'smtp')",
-        [credential, s.mail_username, s.mail_password || null],
-      );
-    }
-    await query(
-      "INSERT INTO AnsibleForms.`notification_channels` (name, description, type, enabled, server, port, secure, from_address, credential, is_active) VALUES (?, ?, 'mail', 1, ?, ?, ?, ?, ?, 1)",
-      ["default", "From the mail settings", s.mail_server, s.mail_port || null, s.mail_secure ? 1 : 0, s.mail_from || null, credential],
-    );
+    credential = await insertMailSettingsChannel(s, "default", query);
     // copied : the settings no longer send, nor copy again ('' : what a fresh install has)
     await query("UPDATE AnsibleForms.`settings` SET mail_server = '', mail_username = '', mail_password = ''");
   });
   return "Copied the mail settings to the mail channel 'default'" + (credential ? `, its login to the credential '${credential}'` : "");
+}
+
+/**
+ * The mail settings of the settings row written as a mail channel, active, their login an smtp
+ * credential : the copy of the 7.3 upgrade (copyMailSettingsToServers), shared with the 7.6
+ * upgrade that drops the mail columns (dropSettingsMailColumns). The channel keeps the server,
+ * port and TLS ; moveMailServersToCredentials moves them into its credential afterwards.
+ *
+ * Args:
+ *   s (object): the settings row, as stored (its mail_password encrypted).
+ *   name (string): the channel's name, free already.
+ *   query (function): the transaction's query function (mysql.transaction hands one over).
+ *
+ * Returns:
+ *   Promise<string|null>: the credential made for the login, or null without a mail user.
+ */
+async function insertMailSettingsChannel(s, name, query) {
+  let credential = null;
+  if (s.mail_username) {
+    // the password is copied as it is stored : the same key encrypts both tables ; a
+    // credential already named mail-login (made by hand) is never taken over
+    credential = await freeCredentialName("mail-login", query);
+    await query(
+      "INSERT INTO AnsibleForms.`credentials` (name, user, password, description, is_database, credential_type) VALUES (?, ?, ?, 'The login of the mail server (from the mail settings)', 0, 'smtp')",
+      [credential, s.mail_username, s.mail_password || null],
+    );
+  }
+  await query(
+    "INSERT INTO AnsibleForms.`notification_channels` (name, description, type, enabled, server, port, secure, from_address, credential, is_active) VALUES (?, ?, 'mail', 1, ?, ?, ?, ?, ?, 1)",
+    [name, "From the mail settings", s.mail_server, s.mail_port || null, s.mail_secure ? 1 : 0, s.mail_from || null, credential],
+  );
+  return credential;
+}
+
+/**
+ * A notification channel name not taken yet : the one asked for, else with -2, -3... after it.
+ *
+ * Args:
+ *   name (string): the name wanted.
+ *   query (function): what runs the lookups ; the move's transaction, so the name is checked on
+ *     the connection that inserts it.
+ *
+ * Returns:
+ *   Promise<string>: a free name.
+ */
+async function freeChannelName(name, query) {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? name : `${name}-${n}`;
+    const taken = await query("SELECT 1 FROM AnsibleForms.`notification_channels` WHERE name = ?", [candidate]);
+    if (!taken.length) return candidate;
+  }
+}
+
+// the mail columns of the settings row, dropped in 7.6 (dropSettingsMailColumns)
+const SETTINGS_MAIL_COLUMNS = ["mail_server", "mail_port", "mail_secure", "mail_username", "mail_password", "mail_from"];
+
+/**
+ * 7.6 : the mail columns of the settings row dropped, the mail goes through the mail channels
+ * (Connections > Notifications) only. Until 7.5 the app still sent with the mail settings while
+ * no mail channel was active and enabled : a seeded instance's (the 7.3 copy leaves them to the
+ * seed), or settings the copy could not move (a channel of another type named 'default'). So
+ * what they still hold moves first, as the 7.3 copy does it :
+ *   - a mail server set and no active, enabled mail channel : an active mail channel 'default'
+ *     (else default-2, ...) with the server, its login an smtp credential (mail-login), the
+ *     other mail channels no longer active ; then the server moves into that credential
+ *     (moveMailServersToCredentials), as for every channel of before 7.3. Without a mail user
+ *     (a relay) there is no credential : the channel keeps its own server and sends without a
+ *     login
+ *   - the settings managed by the config seed : the channel and its credential are managed too,
+ *     so the seed (whose mail keys declare those, lib/seed-schema.js foldMailSettingsIntoChannel)
+ *     takes them over without a warning, and releases them when it no longer declares them
+ *   - an active mail channel already : it is what the mail went through, nothing to move
+ * Then the six columns go. The channel and its credential are written in one transaction, the
+ * drop only after it. Idempotent : nothing to do once mail_server is gone, and a run again after
+ * a failure part way finds the channel active and only drops what is left.
+ *
+ * Returns:
+ *   Promise<string|null>: what was done, or null when there was nothing to do.
+ *
+ * Raises:
+ *   Error: a statement failed ; the columns left are kept, and the next start tries again.
+ */
+export async function dropSettingsMailColumns() {
+  // step 1 : nothing to do once the columns are gone
+  if (!(await columnPresent("settings", "mail_server"))) return null;
+  const done = [];
+  // step 2 : mail settings the app still sent with, as a mail channel
+  const rows = await mysql.do("SELECT * FROM AnsibleForms.`settings` LIMIT 1");
+  const s = rows[0];
+  if (s && String(s.mail_server || "").trim()) {
+    const active = await mysql.do("SELECT COUNT(*) AS n FROM AnsibleForms.`notification_channels` WHERE type = 'mail' AND is_active = 1 AND enabled = 1");
+    if (!active[0]?.n) {
+      let name = null;
+      let credential = null;
+      await mysql.transaction(async (query) => {
+        name = await freeChannelName("default", query);
+        credential = await insertMailSettingsChannel(s, name, query);
+        // the one active mail channel : the others stop being it
+        await query("UPDATE AnsibleForms.`notification_channels` SET is_active = 0 WHERE type = 'mail' AND name <> ?", [name]);
+      });
+      // its server into its credential, as for every mail channel of before 7.3
+      await moveMailServersToCredentials();
+      // a seeded instance : the seed owns them, as it owned the mail settings
+      if (s.managed) {
+        const [channel] = await mysql.do("SELECT credential FROM AnsibleForms.`notification_channels` WHERE name = ?", [name]);
+        await mysql.do("UPDATE AnsibleForms.`notification_channels` SET managed = 1 WHERE name = ?", [name]);
+        if (channel?.credential) await mysql.do("UPDATE AnsibleForms.`credentials` SET managed = 1 WHERE name = ?", [channel.credential]);
+      }
+      done.push(`moved the mail settings to the active mail channel '${name}'` + (credential ? `, its login to the credential '${credential}'` : ""));
+    }
+  }
+  // step 3 : the columns go
+  for (const column of SETTINGS_MAIL_COLUMNS) {
+    await dropColumn("settings", column);
+  }
+  const message = `Dropped the mail columns of the settings, the mail goes through the mail channels${done.length ? ` (${done.join(", ")})` : ""}`;
+  logger.warning(message);
+  return message;
+}
+
+/**
+ * 7.6 : the settings' forms_yaml column renamed config_yaml, keeping the config it holds (the
+ * file it stands for is config.yaml since 6). Run before config_yaml is added (patchVersion5),
+ * so on a database that still has forms_yaml the column is renamed rather than added empty
+ * beside it.
+ *   - forms_yaml only : renamed (ALTER TABLE ... CHANGE COLUMN, which MySQL and MariaDB both
+ *     have), its utf8mb4 character set kept
+ *   - both (an older release started on the database again re-added forms_yaml) : an empty
+ *     config_yaml takes forms_yaml's content, then forms_yaml is dropped
+ *   - config_yaml only, or neither : nothing to do
+ * Idempotent : a second run finds config_yaml only.
+ *
+ * Returns:
+ *   Promise<string|null>: what was done, or null when there was nothing to do.
+ */
+export async function renameFormsYamlToConfigYaml() {
+  // step 1 : nothing to rename
+  if (!(await columnPresent("settings", "forms_yaml"))) return null;
+  // step 2 : renamed, when config_yaml is not there yet
+  if (!(await columnPresent("settings", "config_yaml"))) {
+    return renameColumn("settings", "forms_yaml", "config_yaml", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+  }
+  // step 3 : both there : forms_yaml's config kept where config_yaml has none, then dropped
+  await mysql.do("UPDATE AnsibleForms.`settings` SET config_yaml = forms_yaml WHERE COALESCE(config_yaml, '') = '' AND COALESCE(forms_yaml, '') <> ''");
+  return dropColumn("settings", "forms_yaml");
 }
 
 /**
@@ -2466,6 +2622,9 @@ async function checkAll({ patch = true } = {}) {
 export { SCHEMA_MANIFEST };
 // the 7 patch on its own, for the test that runs it on a database from before its columns
 export { patchVersion7 };
+// the 5 patch on its own, for the test that runs it on a database with forms_yaml (renamed
+// config_yaml in 7.6, never added beside it)
+export { patchVersion5 };
 // what makes a start back up the database before patching, for its test
 export { pendingUpgrade, backupBeforeUpgrade };
 export default Schema;

@@ -112,9 +112,10 @@ describe("the seed schema refuses anything it does not understand", () => {
     assert.equal(validateSeed({ settings: FULL_SETTINGS }), true);
   });
 
-  // THE regression for the frozen Mail page : url alone used to be accepted
-  test("settings rejects a section declaring only url", () => {
-    assert.throws(() => validateSeed({ settings: { url: "https://x" } }), /required property 'mail_server'/);
+  // 7.6 : the mail keys are deprecated (a mail channel now), url alone is the section
+  test("settings accepts a section declaring only url, and still requires the url", () => {
+    assert.equal(validateSeed({ settings: { url: "https://x" } }), true);
+    assert.throws(() => validateSeed({ settings: { mail_server: "smtp.x" } }), /required property 'url'/);
   });
 
   test("an unsupported version is rejected", () => {

@@ -1716,8 +1716,6 @@ export default {
       send: 'Send',
       notFound: "There is no notification channel with the id '{id}'.",
       fieldsRequired: 'The name is required.',
-      fromSeed:
-        'The config seed sets the mail settings: the app sends with those while no mail channel is the default.',
     },
     syslogServers: {
       label: 'Syslog server',
