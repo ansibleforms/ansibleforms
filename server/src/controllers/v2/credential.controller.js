@@ -214,6 +214,37 @@ async function saveAfterWrite(plan, save) {
 }
 
 /**
+ * Saves a credential, writing first the secret typed for its secret store when one is asked : the
+ * save's checks (nothing is written for a save that would be refused), then the store, then the
+ * credential with the reference only. Used by create and update alike.
+ *
+ * Args:
+ *   req (object): the request ; its body is changed in place (planTypedSecret).
+ *   before (object|null): the credential as it is, null on a create.
+ *   id (string|number|null): the credential's id on an update, null on a create.
+ *   save (function): the save, () => Promise.
+ *
+ * Returns:
+ *   Promise<any>: what the save answers.
+ *
+ * Raises:
+ *   Errors.AccessDeniedError: a write asked by a user who is not an admin.
+ *   Errors.BadRequestError: no store, no reference or no password, or the store refuses writing.
+ *   Errors.ConflictError: a secret is there and overwrite was not asked.
+ *   Error: the save's checks or the save's own error, as it is.
+ */
+async function saveWithTypedSecret(req, before, id, save) {
+  // step 1 : what to write, taken out of the body (null when no write is asked)
+  const plan = planTypedSecret(req, before);
+  // step 2 : the save's checks, before anything is written
+  if (plan) await CredentialModel.assertSavable(req.body, id);
+  // step 3 : the secret written to its store, audited
+  await writeTypedSecret(req, plan);
+  // step 4 : the credential saved, a secret left behind logged when the save fails
+  return saveAfterWrite(plan, save);
+}
+
+/**
  * Refuses to delete or rename a credential records still name (an LDAP directory, an SSO provider,
  * a runner, a mail channel...) : they would point at nothing, and stop working without a word.
  *
@@ -346,10 +377,7 @@ const credentialController = {
       assertSecretRefUnchanged(req, null);
       // typed here and written to its secret store : the save's checks first (nothing is written
       // for a save that would be refused), then the store, then the reference saved
-      const plan = planTypedSecret(req, null);
-      if (plan) await CredentialModel.assertSavable(req.body, null);
-      await writeTypedSecret(req, plan);
-      const credential = await saveAfterWrite(plan, () => CredentialModel.create(req.body));
+      const credential = await saveWithTypedSecret(req, null, null, () => CredentialModel.create(req.body));
       res.json(RestResult.single({ message: i18n.t(req, 'success.created', { resource: 'Credential' }), id: credential }));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));
@@ -383,10 +411,7 @@ const credentialController = {
       // typed here and written to its secret store (a new one, or a new password for the one it
       // reads) : the save's checks first (nothing is written for a save that would be refused),
       // then the store, then the reference saved
-      const plan = planTypedSecret(req, before);
-      if (plan) await CredentialModel.assertSavable(req.body, req.params.id);
-      await writeTypedSecret(req, plan);
-      await saveAfterWrite(plan, () => CredentialModel.update(req.body, req.params.id));
+      await saveWithTypedSecret(req, before, req.params.id, () => CredentialModel.update(req.body, req.params.id));
       if ([before?.credential_type, req.body?.credential_type].some((t) => SSO_TYPES.includes(t))) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.updated', { resource: 'Credential' }) }));
     } catch (err) {
