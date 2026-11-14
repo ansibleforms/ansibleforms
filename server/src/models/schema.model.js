@@ -1592,13 +1592,24 @@ export async function dropSettingsMailColumns() {
  * beside it.
  *   - forms_yaml only : renamed (ALTER TABLE ... CHANGE COLUMN, which MySQL and MariaDB both
  *     have), its utf8mb4 character set kept
- *   - both (an older release started on the database again re-added forms_yaml) : an empty
- *     config_yaml takes forms_yaml's content, then forms_yaml is dropped
+ *   - both (an older release started on the database again re-added forms_yaml : a downgrade,
+ *     or a 7.5 node of a cluster upgraded one node at a time, which saves the designer's changes
+ *     there) : forms_yaml is dropped, its config never lost on the way :
+ *       - forms_yaml empty, or the same as config_yaml : nothing to keep
+ *       - config_yaml empty : it takes forms_yaml's config
+ *       - each its own config : which one is newer cannot be told (the row keeps no time of a
+ *         save), so config_yaml, what this release serves, stays the config, and forms_yaml's
+ *         is written as a restore point of the database config (Settings > Backups, see
+ *         writeFormsYamlRestorePoint) with a warning naming it. When it cannot be written the
+ *         column is kept, and the next start tries again
  *   - config_yaml only, or neither : nothing to do
  * Idempotent : a second run finds config_yaml only.
  *
  * Returns:
  *   Promise<string|null>: what was done, or null when there was nothing to do.
+ *
+ * Raises:
+ *   Error: the restore point of forms_yaml's config could not be written ; forms_yaml is kept.
  */
 export async function renameFormsYamlToConfigYaml() {
   // step 1 : nothing to rename
@@ -1607,9 +1618,52 @@ export async function renameFormsYamlToConfigYaml() {
   if (!(await columnPresent("settings", "config_yaml"))) {
     return renameColumn("settings", "forms_yaml", "config_yaml", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
   }
-  // step 3 : both there : forms_yaml's config kept where config_yaml has none, then dropped
-  await mysql.do("UPDATE AnsibleForms.`settings` SET config_yaml = forms_yaml WHERE COALESCE(config_yaml, '') = '' AND COALESCE(forms_yaml, '') <> ''");
+  // step 3 : both there : what each holds
+  const rows = await mysql.do("SELECT config_yaml, forms_yaml FROM AnsibleForms.`settings` LIMIT 1");
+  const configYaml = rows[0]?.config_yaml || "";
+  const formsYaml = rows[0]?.forms_yaml || "";
+  if (formsYaml.trim() && !configYaml.trim()) {
+    // step 4 : config_yaml empty : it takes forms_yaml's config
+    await mysql.do("UPDATE AnsibleForms.`settings` SET config_yaml = forms_yaml WHERE COALESCE(config_yaml, '') = '' AND COALESCE(forms_yaml, '') <> ''");
+  } else if (formsYaml.trim() && formsYaml !== configYaml) {
+    // step 4 : each its own : forms_yaml's kept as a restore point before its column goes
+    const file = writeFormsYamlRestorePoint(formsYaml);
+    logger.warning(
+      `The settings held a config in both config_yaml and forms_yaml (an older release saved to forms_yaml after the upgrade) : config_yaml stays the config, forms_yaml's is kept as the restore point '${file}' (Settings > Backups), restore it from there if it is the one to keep`,
+    );
+  }
+  // step 5 : forms_yaml goes
   return dropColumn("settings", "forms_yaml");
+}
+
+/**
+ * Writes a config as a restore point of the database config, as Settings.importConfig has one
+ * written (Form.backup with the source 'database') : named <config name>.database<ext>.bak.<time>
+ * in the backups folder (FORMS_BACKUP_PATH), so the backups page lists it and its restore puts
+ * it back into the database (form.model configBackupPathForSource). Written here rather than
+ * through Form.backup, which snapshots what the settings row serves, not a column about to go.
+ *
+ * Args:
+ *   content (string): the config to keep.
+ *
+ * Returns:
+ *   string: the restore point's file name.
+ *
+ * Raises:
+ *   Error: the folder or the file could not be written.
+ */
+function writeFormsYamlRestorePoint(content) {
+  // step 1 : the name, as configBackupPathForSource('database') makes it, with the time of now
+  // as Form.backup writes it (YYYYMMDDHHmmssSSS, 17 digits)
+  const parsed = path.parse(path.basename(appConfig.configPath));
+  const d = new Date();
+  const pad = (n, w = 2) => String(n).padStart(w, "0");
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${pad(d.getMilliseconds(), 3)}`;
+  const file = `${parsed.name}.database${parsed.ext}.bak.${stamp}`;
+  // step 2 : written ; a failure throws, so the column is not dropped
+  fs.mkdirSync(appConfig.formsBackupPath, { recursive: true });
+  fs.writeFileSync(path.join(appConfig.formsBackupPath, file), content, { flag: "wx" });
+  return file;
 }
 
 /**
