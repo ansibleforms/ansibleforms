@@ -192,6 +192,37 @@ describe("writing", () => {
     assert.equal((await Registry.readSecret("vault", "secret/ansibleforms/db")).password, "s3cret!");
   });
 
+  test("overwrite on KV v2 : the secret's other keys kept, username and password replaced", async () => {
+    secrets["secret/data/ansibleforms/db"] = { data: { data: { username: "old", password: "old", host: "db1", db_name: "app" } } };
+    await Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN, { overwrite: true });
+    assert.deepEqual(writes, [{ path: "secret/data/ansibleforms/db", body: { data: { username: "svc-db", password: "s3cret!", host: "db1", db_name: "app" } } }]);
+    const cred = Registry.mapPayloadToCredential(await Registry.readSecret("vault", "secret/ansibleforms/db"));
+    assert.equal(cred.host, "db1");
+    assert.equal(cred.db_name, "app");
+    assert.equal(cred.password, "s3cret!");
+  });
+
+  test("overwrite on KV v1 : the secret's other keys kept, username and password replaced", async () => {
+    storeRows.vault = vaultRow({ kv_version: 1 });
+    secrets["secret/ansibleforms/db"] = { data: { username: "old", password: "old", host: "db1", db_name: "app" } };
+    await Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN, { overwrite: true });
+    assert.deepEqual(writes, [{ path: "secret/ansibleforms/db", body: { username: "svc-db", password: "s3cret!", host: "db1", db_name: "app" } }]);
+  });
+
+  test("overwrite of a secret keeping its user under 'user' : that key gets the new username too", async () => {
+    secrets["secret/data/ansibleforms/db"] = { data: { data: { user: "old", password: "old", port: 5432 } } };
+    await Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN, { overwrite: true });
+    assert.deepEqual(writes[0].body, { data: { user: "svc-db", username: "svc-db", password: "s3cret!", port: 5432 } });
+    // read back as a credential : the new user, not the one under the old key
+    assert.equal(Registry.mapPayloadToCredential(await Registry.readSecret("vault", "secret/ansibleforms/db")).user, "svc-db");
+  });
+
+  test("overwrite of a deleted KV v2 version : only the new pairs written", async () => {
+    secrets["secret/data/ansibleforms/db"] = { data: { data: null, metadata: { deletion_time: "2026-01-01T00:00:00Z" } } };
+    await Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN, { overwrite: true });
+    assert.deepEqual(writes, [{ path: "secret/data/ansibleforms/db", body: { data: LOGIN } }]);
+  });
+
   test("a dynamic engine's path is never written", async () => {
     storeRows.vault = vaultRow({ write_prefix: "database/creds" });
     mountTypes.database = "database";
