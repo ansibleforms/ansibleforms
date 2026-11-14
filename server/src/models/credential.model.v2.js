@@ -576,9 +576,12 @@ class CredentialModel extends CrudModel {
     // the api shows the client key (a CyberArk or an Entra ID one's, an SSH one's private key) and
     // an SSH key's
     // passphrase masked ; the mask sent back means "unchanged", and an empty one too (the
-    // dialog leaves a secret empty to keep it). null removes it.
+    // dialog leaves a secret empty to keep it). null removes it. The config seed writes what it
+    // declares : its empty one removes it too, or a seed could never clear it (and would say it
+    // updated the credential at every start, the stored one still differing from its empty one)
     for (const key of ['client_key', 'key_passphrase']) {
-      if (isMasked(data[key]) || data[key] === '') delete data[key];
+      if (data[key] === '' && opts.fromSeed) data[key] = null;
+      else if (isMasked(data[key]) || data[key] === '') delete data[key];
     }
     await this.checkSshKeyOnUpdate(data, id);
     // its type stays what it was made as (what uses it expects it : an SSO provider an entraid

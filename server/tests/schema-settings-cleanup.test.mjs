@@ -92,7 +92,10 @@ function answer(sql, args = []) {
   }
   // the config copied when both columns are there
   if (/^UPDATE AnsibleForms\.`settings` SET config_yaml = forms_yaml/.test(sql)) {
-    if (db.row && !db.row.config_yaml && db.row.forms_yaml) db.row.config_yaml = db.row.forms_yaml;
+    // as MySQL reads its WHERE : COALESCE(config_yaml, '') equal to the value bound (or to '' when
+    // the statement says so), forms_yaml not empty ; whitespace is not empty to SQL
+    const empty = /COALESCE\(config_yaml, ''\) = \?/.test(sql) ? args[0] : "";
+    if (db.row && (db.row.config_yaml ?? "") === empty && (db.row.forms_yaml ?? "") !== "") db.row.config_yaml = db.row.forms_yaml;
     return { affectedRows: 1 };
   }
   if (/^SELECT \* FROM AnsibleForms\.`settings`/.test(sql)) return db.row ? [{ ...db.row }] : [];
@@ -135,6 +138,9 @@ function answer(sql, args = []) {
   }
   if (/^SELECT credential FROM AnsibleForms\.`notification_channels` WHERE name = \?/.test(sql)) {
     return db.channels.filter((c) => c.name === args[0]).map((c) => ({ credential: c.credential }));
+  }
+  if (/^SELECT name, credential FROM AnsibleForms\.`notification_channels` WHERE type = 'mail' AND description = \? AND COALESCE\(managed, 0\) = 0/.test(sql)) {
+    return db.channels.filter((c) => c.type === "mail" && c.description === args[0] && !c.managed).map((c) => ({ name: c.name, credential: c.credential }));
   }
   if (/^UPDATE AnsibleForms\.`notification_channels` SET managed = 1 WHERE name = \?/.test(sql)) {
     for (const c of db.channels) if (c.name === args[0]) c.managed = 1;
@@ -234,6 +240,31 @@ describe("forms_yaml is renamed config_yaml, its config kept", () => {
     const drop = statements.findIndex((s) => /DROP COLUMN/.test(s.sql));
     expect(copy).toBeGreaterThan(-1);
     expect(copy).toBeLessThan(drop);
+  });
+
+  test("both columns, config_yaml only whitespace : it still takes forms_yaml's config, never dropped with it", async () => {
+    setDb({ columns: ["url", "config_yaml", "forms_yaml"], row: { config_yaml: "  \n", forms_yaml: CONFIG } });
+    await renameFormsYamlToConfigYaml();
+    expect(db.row.config_yaml).toBe(CONFIG);
+    expect(db.columns.has("forms_yaml")).toBe(false);
+  });
+
+  test("both columns, config_yaml written between the read and the copy : forms_yaml is kept, the next start tries again", async () => {
+    setDb({ columns: ["url", "config_yaml", "forms_yaml"], row: { config_yaml: "", forms_yaml: CONFIG } });
+    const mysql = (await import("../src/models/db.model.js")).default;
+    const run = mysql.do;
+    mysql.do = async (sql, args) => {
+      // a node of the older release saves its config just before the copy
+      if (/SET config_yaml = forms_yaml/.test(sql)) db.row.config_yaml = "saved: meanwhile\n";
+      return run(sql, args);
+    };
+    try {
+      await expect(renameFormsYamlToConfigYaml()).rejects.toThrow(/forms_yaml is kept/);
+    } finally {
+      mysql.do = run;
+    }
+    expect(db.columns.has("forms_yaml")).toBe(true);
+    expect(db.row.forms_yaml).toBe(CONFIG);
   });
 
   test("both columns, each with its own config (saves of an older release since) : config_yaml kept, forms_yaml's a restore point, a warning naming it", async () => {
@@ -358,6 +389,34 @@ describe("the settings' mail columns are dropped, their mail settings kept as a 
     await dropSettingsMailColumns();
     expect(db.channels.find((c) => c.name === "default").managed).toBe(1);
     expect(db.credentials.find((c) => c.name === "mail-login").managed).toBe(1);
+  });
+
+  test("a seeded instance, a run that stopped before they were marked : the next one marks them, and only them", async () => {
+    // the 7.3 copy's channel (made before the instance was seeded) : not the upgrade's, left alone
+    const copied = { id: 1, name: "old", type: "mail", description: "From the mail settings", enabled: 0, is_active: 0, credential: null, managed: 0 };
+    setDb({ columns: [...MAIL, "url"], row: mailRow({ managed: 1 }), channels: [copied] });
+    // the marking fails : the channel and its credential made and moved, the columns still there
+    const original = db.channels;
+    let failing = true;
+    const mysql = (await import("../src/models/db.model.js")).default;
+    const run = mysql.do;
+    mysql.do = async (sql, args) => {
+      if (failing && /SET managed = 1/.test(sql)) throw new Error("lost connection");
+      return run(sql, args);
+    };
+    await expect(dropSettingsMailColumns()).rejects.toThrow(/lost connection/);
+    failing = false;
+    mysql.do = run;
+    expect(db.channels.find((c) => c.name === "default").managed).toBe(0);
+    for (const c of MAIL) expect(db.columns.has(c)).toBe(true);
+    // the next start : no second channel, the upgrade's marked managed, the 7.3 copy's not
+    await dropSettingsMailColumns();
+    expect(db.channels.filter((c) => c.type === "mail").map((c) => c.name)).toEqual(["old", "default"]);
+    expect(db.channels.find((c) => c.name === "default").managed).toBe(1);
+    expect(db.credentials.find((c) => c.name === "mail-login").managed).toBe(1);
+    expect(db.channels.find((c) => c.name === "old").managed).toBe(0);
+    expect(db.channels).toBe(original);
+    for (const c of MAIL) expect(db.columns.has(c)).toBe(false);
   });
 
   test("an instance made by hand : they are not managed", async () => {

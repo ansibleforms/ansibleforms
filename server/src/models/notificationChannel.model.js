@@ -343,6 +343,23 @@ class NotificationChannel extends CrudModel {
   }
 
   /**
+   * Whether an smtp credential signs in to its server : it has a user, or reads its login from a
+   * secret store. One without either (a relay's server only, as the upgrade moves it into one)
+   * sends without a login. Nothing is read from the secret store : the health page asks.
+   *
+   * Args:
+   *   name (string): the credential's name.
+   *
+   * Returns:
+   *   Promise<boolean>: true when it signs in ; false without a credential, or for one not found.
+   */
+  static async credentialLogsIn(name) {
+    if (!name) return false;
+    const cred = await CrudModel.findByName('credential', name);
+    return !!(cred && (String(cred.user ?? '').trim() || cred.secret_store));
+  }
+
+  /**
    * The server an smtp credential names : its host, port and TLS. None without a credential, or
    * for one without a host (one from before credentials held the server).
    *
