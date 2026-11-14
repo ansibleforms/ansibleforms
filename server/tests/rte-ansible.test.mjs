@@ -59,7 +59,14 @@ vi.mock("child_process", async (importOriginal) => {
       child.stdin = Object.assign(new EventEmitter(), { end(data) { child.stdinWritten = data; } });
       // what ansible-playbook would read : the extravars files, while it runs
       const read = (name) => JSON.parse(fs.readFileSync(path.join(options.cwd, name), "utf8"));
-      spawned.push({ file, args, options, extravars: read("extravars_11.json"), hidden: read("he_extravars_11.json") });
+      // and their modes, and the ssh connections folder as it is while the playbook runs
+      const mode = (name) => fs.statSync(path.join(options.cwd, name)).mode & 0o777;
+      const cpDir = options.env?.ANSIBLE_SSH_CONTROL_PATH_DIR;
+      spawned.push({
+        file, args, options, extravars: read("extravars_11.json"), hidden: read("he_extravars_11.json"),
+        modes: { extravars: mode("extravars_11.json"), hidden: mode("he_extravars_11.json") },
+        cpDirMode: cpDir && fs.existsSync(cpDir) ? fs.statSync(cpDir).mode & 0o777 : null,
+      });
       return child;
     }),
   };
@@ -273,6 +280,38 @@ describe("a playbook job runs from its jobs row", () => {
     await runToEnd(() => runJob());
     const after = outputs.slice(1).map((o) => o.order);
     assert.ok(after.every((n) => n > 4), "every new line comes after the existing ones");
+  });
+});
+
+describe("the files and the ssh connections of a job are its own", () => {
+  test.skipIf(process.platform === "win32")("the extravars files are readable by this user only, a file already there too", async () => {
+    // a file of that name left 0644 (an older version, a kept extravars file) : 0600 once written
+    fs.writeFileSync(path.join(dir, "he_extravars_11.json"), "{}", { mode: 0o644 });
+    fs.chmodSync(path.join(dir, "he_extravars_11.json"), 0o644);
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "ssh" });
+    await runToEnd(() => runJob());
+    assert.deepEqual(spawned[0].modes, { extravars: 0o600, hidden: 0o600 });
+  });
+
+  test("each job has its own private ssh connections folder, removed at its end", async () => {
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "ssh" });
+    await runToEnd(() => runJob());
+    await runToEnd(() => runJob(), 2);
+    const [first, second] = spawned.map((s) => s.options.env.ANSIBLE_SSH_CONTROL_PATH_DIR);
+    assert.ok(first && second, "set in the playbook's environment");
+    assert.notEqual(first, second, "never shared between jobs");
+    assert.equal(path.dirname(first), os.tmpdir());
+    assert.match(path.basename(first), /^af_cp_11_/);
+    if (process.platform !== "win32") assert.equal(spawned[0].cpDirMode, 0o700, "readable by this user only while the playbook runs");
+    assert.equal(fs.existsSync(first), false, "removed when the job ended");
+    assert.equal(fs.existsSync(second), false, "a failed job's as well");
+  });
+
+  test("a job that fails before the playbook starts leaves no ssh connections folder", async () => {
+    const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_cp_11_"));
+    row({ __playbook__: "site.yml", __playbookSubPath__: "not/mounted" });
+    assert.equal(await runJob(), false);
+    assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_cp_11_")), before);
   });
 });
 

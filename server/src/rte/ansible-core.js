@@ -175,6 +175,67 @@ export function makeArtifactsFile(jobid) {
 }
 
 /**
+ * Writes a file that holds a job's secrets (the extravars files : the resolved credentials, an
+ * SSH credential's password, its private key file's path) readable by this user only : created
+ * 0600, and set to 0600 again, as a file of that name already there keeps the mode it had.
+ * Written with the process's umask (0644) in the playbook folder, any local user could read
+ * them while the playbook ran.
+ *
+ * Args:
+ *   file (string): the file.
+ *   data (string): what to write.
+ *
+ * Returns:
+ *   void
+ */
+export function writePrivateFile(file, data) {
+  fs.writeFileSync(file, data, { mode: 0o600 });
+  // a file already there keeps its mode on a write : said again
+  fs.chmodSync(file, 0o600);
+}
+
+/**
+ * Makes the folder a job's ssh connections are shared in (ANSIBLE_SSH_CONTROL_PATH_DIR) : in a
+ * folder of its own under the temporary folder (mkdtemp, readable by this user only). ansible's
+ * ssh keeps a connection open for a minute after a task (ControlPersist) and, in its default
+ * folder (~/.ansible/cp), the next job to the same host and user rode it : a job with a wrong, a
+ * revoked or no key at all logged in on another job's connection. Each job opens its own now.
+ * The name is short : ssh refuses a socket path longer than about 100 characters.
+ *
+ * Args:
+ *   jobid (number|string): the job.
+ *
+ * Returns:
+ *   string: the folder.
+ */
+export function makeControlPathDir(jobid) {
+  const safeId = String(jobid).replace(/[^0-9A-Za-z_-]/g, "");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `af_cp_${safeId}_`));
+  // mkdtemp makes it 0700 already : said again, whatever the platform
+  fs.chmodSync(dir, 0o700);
+  return dir;
+}
+
+/**
+ * Removes a job's ssh connections folder (makeControlPathDir) and what is left in it, quietly :
+ * an ssh still kept open has its socket gone with it, so no later job can use it.
+ *
+ * Args:
+ *   dir (string): the folder, empty or none for nothing.
+ *
+ * Returns:
+ *   void
+ */
+export function removeControlPathDir(dir) {
+  if (!dir) return;
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (e) {
+    logger.debug(`The ssh connections folder ${dir} could not be removed: ${e.message}`);
+  }
+}
+
+/**
  * Removes a job's events folder and what is left in it, quietly : stop() of the tail removes the
  * file, this the folder, on every way out (a playbook that never started too).
  *
@@ -465,10 +526,14 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   // the private key : in a file of the job's own, or in an ssh-agent of its own with a
   // passphrase ; a key that cannot be used fails the job, saying why
   let keyEnv = {};
+  // the folder the job's ssh connections are kept open in (makeControlPathDir) : its own, so no
+  // job logs in on a connection another job opened ; removed in the cleanup below
+  let controlPathDir = "";
   // from the moment the key is ready, every way out goes through the cleanup below : a step
   // that throws before the playbook starts (its folder, its arguments) as well as the end of
   // the playbook, so the job's ssh-agent never keeps the decrypted key once the job is over
   try {
+    controlPathDir = makeControlPathDir(jobid);
     if (sshKey) {
       try {
         const ready = await prepareSshKey(jobid, sshKey.key, sshKey.passphrase);
@@ -503,8 +568,9 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
       extravarsFileName: extravarsFileName,
       hiddenExtravarsFileName: hiddenExtravarsFileName,
       keepExtravars: keepExtravars,
-      // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase
-      env: keyEnv,
+      // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase, and the
+      // job's own folder for its ssh connections (ANSIBLE_SSH_CONTROL_PATH_DIR)
+      env: { ...keyEnv, ANSIBLE_SSH_CONTROL_PATH_DIR: controlPathDir },
       // what set_stats gathers : written there by the artifacts plugin, stored on the job
       // (a private folder made when the playbook starts : makeArtifactsFile)
       artifactsFile: path.join(os.tmpdir(), `af_artifacts_${jobid}.json`),
@@ -530,6 +596,8 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
     // the key's folder and the job's ssh-agent, whatever the end (a failure, an abort, or an
     // error before the playbook started)
     if (sshKey?.cleanup) await sshKey.cleanup();
+    // and the job's ssh connections folder (makeControlPathDir)
+    removeControlPathDir(controlPathDir);
   }
 }
 
@@ -604,13 +672,14 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
       if (extravarsFileName) {
         logger.debug(`Storing extravars to file ${extravarsFileName}`);
         filepath = path.join(directory, extravarsFileName);
-        fs.writeFileSync(filepath, extravars);
+        // both hold the job's secrets : readable by this user only (writePrivateFile)
+        writePrivateFile(filepath, extravars);
 
         logger.debug(
           `Storing hidden extravars to file ${hiddenExtravarsFileName}`
         );
         he_filepath = path.join(directory, hiddenExtravarsFileName);
-        fs.writeFileSync(he_filepath, hiddenExtravars);
+        writePrivateFile(he_filepath, hiddenExtravars);
       } else {
         logger.warning("No filename was given");
       }
