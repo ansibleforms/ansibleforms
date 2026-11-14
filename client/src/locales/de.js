@@ -1892,6 +1892,7 @@ export default {
       entraSignInHint_secret: 'Das Geheimnis der App-Registrierung: für die SSO-Anmeldung und Mail',
       entraSignIn_certificate: 'Zertifikat',
       entraSignInHint_certificate: 'Ein Zertifikat und sein privater Schlüssel: nur für Mail über Microsoft 365',
+      entraCertSecretHelp: 'Optional: das Client-Secret für die SSO-Anmeldung; Mail nutzt das Zertifikat.',
       entraCertHelp: 'Das in die App-Registrierung hochgeladene PEM-Zertifikat; sein privater Schlüssel unten.',
       privateKey: 'Privater Schlüssel',
       privateKeyHelp: 'Der PEM- oder OpenSSH-Schlüssel für die Anmeldung, verschlüsselt, nie wieder angezeigt.',

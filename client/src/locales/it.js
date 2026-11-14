@@ -1886,6 +1886,7 @@ export default {
       entraSignInHint_secret: "Il segreto della registrazione dell'app: per l'accesso SSO e la posta",
       entraSignIn_certificate: 'Certificato',
       entraSignInHint_certificate: 'Un certificato e la sua chiave privata: solo per la posta via Microsoft 365',
+      entraCertSecretHelp: "Facoltativo: il client secret per l'accesso SSO; la posta usa il certificato.",
       entraCertHelp: "Il certificato PEM caricato nella registrazione dell'app; la sua chiave privata sotto.",
       privateKey: 'Chiave privata',
       privateKeyHelp: 'La chiave privata PEM o OpenSSH con cui accede, salvata cifrata, mai più mostrata.',

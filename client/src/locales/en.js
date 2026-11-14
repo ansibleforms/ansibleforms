@@ -1868,6 +1868,7 @@ export default {
       entraSignInHint_secret: "The app registration's secret: for SSO sign-in and mail",
       entraSignIn_certificate: 'Certificate',
       entraSignInHint_certificate: 'A certificate and its private key: for mail through Microsoft 365 only',
+      entraCertSecretHelp: 'Optional: the client secret for SSO sign-in; mail uses the certificate.',
       entraCertHelp: 'The PEM certificate uploaded to the app registration; its private key below.',
       privateKey: 'Private key',
       privateKeyHelp: 'The PEM or OpenSSH private key it logs in with, stored encrypted, never shown again.',

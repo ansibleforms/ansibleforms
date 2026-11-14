@@ -1697,6 +1697,7 @@ export default {
       entraSignInHint_secret: '应用注册的密钥：用于 SSO 登录和邮件',
       entraSignIn_certificate: '证书',
       entraSignInHint_certificate: '证书及其私钥：仅用于通过 Microsoft 365 发送邮件',
+      entraCertSecretHelp: '可选：用于 SSO 登录的客户端密钥；邮件使用证书。',
       entraCertHelp: '上传到应用注册的 PEM 证书；其私钥在下方。',
       privateKey: '私钥',
       privateKeyHelp: '用于登录的 PEM 或 OpenSSH 私钥，加密存储，不再显示。',

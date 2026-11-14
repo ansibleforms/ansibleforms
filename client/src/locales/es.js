@@ -1888,6 +1888,8 @@ export default {
       entraSignInHint_secret: 'El secreto del registro de aplicación: para SSO y correo',
       entraSignIn_certificate: 'Certificado',
       entraSignInHint_certificate: 'Un certificado y su clave privada: solo para correo vía Microsoft 365',
+      entraCertSecretHelp:
+        'Opcional: el secreto de cliente para el inicio de sesión SSO; el correo usa el certificado.',
       entraCertHelp: 'El certificado PEM subido al registro de aplicación; su clave privada abajo.',
       privateKey: 'Clave privada',
       privateKeyHelp: 'La clave privada PEM u OpenSSH con que inicia sesión, guardada cifrada, nunca mostrada.',

@@ -1732,6 +1732,7 @@ export default {
       entraSignInHint_secret: 'アプリ登録のシークレット：SSO サインインとメール用',
       entraSignIn_certificate: '証明書',
       entraSignInHint_certificate: '証明書とその秘密鍵：Microsoft 365 経由のメール専用',
+      entraCertSecretHelp: '任意: SSO サインイン用のクライアントシークレット。メールは証明書を使用。',
       entraCertHelp: 'アプリ登録にアップロードした PEM 証明書。秘密鍵は下に入力します。',
       privateKey: '秘密鍵',
       privateKeyHelp: 'ログインに使う PEM または OpenSSH の秘密鍵。暗号化保存、再表示なし。',

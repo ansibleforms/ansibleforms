@@ -2258,15 +2258,14 @@ export default function getSettings(t) {
           // an ldap credential's password is the bind password, an entraid or oidc one's the client
           // secret, a runner's and a Vault's a token (an AWX's a token or its user's password)
           dialogLabel: (r) => credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).password,
-          help: (r) => credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).passwordHelp,
-          // a cyberark credential has a client key instead, and so has an entraid one signing in
-          // with a certificate ; none typed when the user and password are read from a secret store
-          showWhen: (r) =>
-            r.credential_type !== 'cyberark' &&
-            !entraCertificate(r) &&
-            !sshUsesKey(r) &&
-            !smtpRelay(r) &&
-            !readFromStore(r),
+          // an entraid one with a certificate : its client secret optional, only for the SSO sign-in
+          help: (r) =>
+            entraCertificate(r)
+              ? t('settings.credentials.entraCertSecretHelp')
+              : credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).passwordHelp,
+          // a cyberark credential has a client key instead (an entraid one signing in with a
+          // certificate keeps its client secret, optional, for the SSO sign-in) ; none typed when the user and password are read from a secret store
+          showWhen: (r) => r.credential_type !== 'cyberark' && !sshUsesKey(r) && !smtpRelay(r) && !readFromStore(r),
           // a new one that signs in with what is typed here : an AWX, AAP or Ascender one (its
           // token or its user's password), an smtp one with a login, a git one (its token or
           // password), an ssh one with its password ; an existing one keeps its stored one when
