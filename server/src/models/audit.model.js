@@ -203,7 +203,20 @@ Audit.log = async function (entry) {
 // Read side. Filters are all optional and combine with AND ; the caller gets a page
 // plus the total so a table can paginate server side (the audit table is the one
 // place in this app where loading every row is not an option).
-Audit.find = async function (filter = {}) {
+
+/**
+ * The WHERE clause of a filter, shared by the page (Audit.find) and the download
+ * (Audit.stream), so both always select the same rows.
+ *
+ * Args:
+ *   filter (object): actor, actorType, action, targetType, target (a substring), outcome,
+ *     from (an instant, inclusive) and to (an instant, exclusive) ; each optional.
+ *
+ * Returns:
+ *   object: where, the conditions (to join with AND) ; vars, their values in order ; limit
+ *     and offset, the page asked (one text value each, or null).
+ */
+Audit.where = function (filter = {}) {
   // Query strings are not trustworthy input. `?actor=a&actor=b` arrives as an ARRAY,
   // which mysql2 escapes as `actor = 'a', 'b'` - a parse error, i.e. a 500 from a plain
   // url. Take the first value and stringify, so a hostile query is an empty result set
@@ -244,14 +257,19 @@ Audit.find = async function (filter = {}) {
   // year), so its first second is not counted twice and its last one is not lost
   if (from) { where.push('created_at >= ?'); vars.push(from); }
   if (to) { where.push('created_at < ?'); vars.push(to); }
+  return { where, vars, limit: one(filter.limit), offset: one(filter.offset) };
+};
+
+Audit.find = async function (filter = {}) {
+  const { where, vars, limit: askedLimit, offset: askedOffset } = Audit.where(filter);
   const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
 
-  const limit = Math.min(Math.max(parseInt(one(filter.limit), 10) || 100, 1), 1000);
+  const limit = Math.min(Math.max(parseInt(askedLimit, 10) || 100, 1), 1000);
   // an offset needs a CEILING as well as a floor : parseInt('9'.repeat(20)) is 1e20,
   // which renders in exponential notation and is a parse error, and a huge-but-valid
   // offset is a deep table scan on the one table designed to grow without bound
   const MAX_OFFSET = 1000000;
-  const rawOffset = parseInt(one(filter.offset), 10);
+  const rawOffset = parseInt(askedOffset, 10);
   const offset = Number.isFinite(rawOffset) ? Math.min(Math.max(rawOffset, 0), MAX_OFFSET) : 0;
 
   const counted = await mysql.do('SELECT COUNT(*) AS total FROM AnsibleForms.`audit`' + clause, vars);
@@ -267,6 +285,26 @@ Audit.find = async function (filter = {}) {
     // detail is stored as text ; hand the caller the object it passed in
     records: records.map((r) => ({ ...r, detail: r.detail ? safeParse(r.detail) : null })),
   };
+};
+
+/**
+ * Every entry a filter selects, the newest first : the download (a CSV of them all). Streamed
+ * from one query, never the table loaded whole : the reader paces it.
+ *
+ * Args:
+ *   filter (object): the filter, as Audit.find's (limit and offset are not used).
+ *
+ * Yields:
+ *   object: an entry, detail as text (as stored).
+ */
+Audit.stream = async function* (filter = {}) {
+  const { where, vars } = Audit.where(filter);
+  const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
+  yield* mysql.stream(
+    'SELECT id, created_at, actor, actor_type, ip, action, target_type, target, outcome, detail ' +
+    'FROM AnsibleForms.`audit`' + clause + ' ORDER BY created_at DESC, id DESC',
+    vars
+  );
 };
 
 function safeParse(text) {

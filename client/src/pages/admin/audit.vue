@@ -117,7 +117,8 @@ async function onPageChange(slice, meta) {
 }
 
 /**
- * The filters and the period as the server takes them.
+ * The filters and the period as the server takes them : the same for a page and for the
+ * download, so the file holds what the table shows, all of it.
  *
  * Returns:
  *   URLSearchParams: actor, action, outcome, from and to, those that are set.
@@ -186,6 +187,22 @@ async function loadFacets() {
 async function onPeriod(value) {
   period.value = value;
   await applyFilters();
+}
+
+/**
+ * Downloads every entry the filters and the period select, the newest first, as a CSV file :
+ * all of them, not only the page shown. Named after the period (audit-2026-11.csv).
+ */
+async function download() {
+  try {
+    const params = filterParams();
+    const range = periodOf(period.value);
+    if (range) params.set('period', range.name);
+    await Helpers.downloadFile(`/api/v2/audit/download?${params.toString()}`);
+  } catch (err) {
+    // the server's reason (downloadFile decodes its error body), else a translated fallback
+    toast.error(Helpers.parseAxiosResponseError(err, t('common.downloadFailed')));
+  }
 }
 
 // changing a filter has to reset to the first page, or you can end up on an offset
@@ -277,6 +294,11 @@ onMounted(async () => {
           >{{ t('audit.reset') }}</BsButton
         >
         <AppRefreshButton :action="load" :label="t('audit.refresh')" />
+      </template>
+      <!-- the page's button : every entry the filters select, as a CSV file, as the Server log's
+           Download -->
+      <template #actions>
+        <BsButton class="text-nowrap" icon="download" @click="download()">{{ t('logs.download') }}</BsButton>
       </template>
       <template #default>
         <!-- the first load : the table's rows as grey placeholders (a reload keeps them shown) -->

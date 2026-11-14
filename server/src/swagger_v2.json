@@ -3394,6 +3394,57 @@
         }
       }
     },
+    "/audit/download": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Download the audit trail as CSV",
+        "description": "Every entry the filters select (no paging), newest first, as a CSV file in UTF-8 with a byte order mark: a header row, then time (ISO), actor, action, target, outcome, ip and detail (JSON text). Cells starting with = + - @ get a leading quote. Requires settings access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "actor", "in": "query", "schema": { "type": "string" } },
+          { "name": "action", "in": "query", "schema": { "type": "string" } },
+          { "name": "targetType", "in": "query", "schema": { "type": "string" } },
+          { "name": "target", "in": "query", "schema": { "type": "string" }, "description": "Substring match" },
+          { "name": "outcome", "in": "query", "schema": { "type": "string", "enum": ["success", "failure", "denied"] } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "The period's start, inclusive" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "The period's end, exclusive" },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": { "type": "string", "example": "2026-11" },
+            "description": "Names the file only: YYYY, YYYY-MM or YYYY-MM-DD gives audit-<period>.csv, otherwise audit.csv"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CSV file",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The period's from or to is not an ISO date"
+          },
+          "403": {
+            "description": "Forbidden - no settings access"
+          },
+          "500": {
+            "description": "Failed to read the audit trail"
+          }
+        }
+      }
+    },
     "/audit/facets": {
       "get": {
         "tags": [
