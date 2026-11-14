@@ -492,6 +492,41 @@ class CredentialModel extends CrudModel {
   }
 
   /**
+   * Checks an SSH credential's private key on an update : checkSshKey by the type sent, or by the
+   * stored type when the write leaves the type out (a key sent alone was stored unchecked, and the
+   * failure only showed when a job connected). The stored credential is read only when a key is
+   * typed without its type ; a CyberArk or an Entra ID credential's client key is not an SSH key
+   * and is left to its own rules (checkEntraPairOnUpdate).
+   *
+   * Args:
+   *   data (object): the fields written, the masked or empty key already removed (changed in
+   *     place by checkSshKey when the type is sent).
+   *   id (number|string): the credential's id.
+   *
+   * Returns:
+   *   Promise<object>: the fields.
+   *
+   * Raises:
+   *   BadRequestError: an SSH credential's key that is not a private key.
+   */
+  static async checkSshKeyOnUpdate(data, id) {
+    // step 1 : the type sent says which rules hold
+    if (data.credential_type !== undefined && data.credential_type !== null && data.credential_type !== '') {
+      return this.checkSshKey(data, false);
+    }
+    // step 2 : no key typed, nothing to check (and nothing to read)
+    if (typeof data.client_key !== 'string' || data.client_key.trim() === '' || isMasked(data.client_key)) {
+      return data;
+    }
+    // step 3 : the stored type ; an SSH credential's key is checked as a create checks it
+    const stored = await this.findById(id);
+    if (stored?.credential_type === 'ssh') {
+      this.checkSshKey({ credential_type: 'ssh', client_key: data.client_key }, false);
+    }
+    return data;
+  }
+
+  /**
    * Normalises and checks a new credential exactly as create() writes it : the RTE's pin, an
    * empty passphrase or SSH key as none, the SSH key, the port, the deprecated vault_path, the type
    * and the fields the type needs. Nothing is written.
@@ -545,7 +580,7 @@ class CredentialModel extends CrudModel {
     for (const key of ['client_key', 'key_passphrase']) {
       if (isMasked(data[key]) || data[key] === '') delete data[key];
     }
-    this.checkSshKey(data, false);
+    await this.checkSshKeyOnUpdate(data, id);
     // its type stays what it was made as (what uses it expects it : an SSO provider an entraid
     // one, a mail channel an smtp one) ; the config seed may change it
     let current = null;
