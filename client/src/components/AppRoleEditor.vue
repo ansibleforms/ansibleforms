@@ -25,7 +25,7 @@
 /*                                                                */
 /******************************************************************/
 
-import { ref, computed, h, watch } from 'vue';
+import { ref, computed, h } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   requiredRoleDescription,
@@ -34,8 +34,8 @@ import {
   roleOptionNeeds,
   roleOptionDescription,
   providerPrefix,
-  adminByDefaultOptions,
 } from '@/config/roles';
+import { useAdminDefaults } from '@/composables/useAdminDefaults';
 
 const props = defineProps({
   readOnly: { type: Boolean, default: false },
@@ -123,17 +123,10 @@ const { t, te } = useI18n();
 // ─── the Admin option ─────────────────────────────────────────────────────────
 // fixed on the admin role (always admins) and on the default role (never : everyone's), greyed out
 const adminFixed = computed(() => (role.value._required ? !role.value._default : null));
-// turned on or off : the options an admin gets by default follow it, unless one was set apart from
-// that default (it keeps its own value)
-watch(
-  () => role.value.options?.admin,
-  (now, before) => {
-    if (role.value._required || before === undefined || !!now === !!before) return;
-    for (const key of adminByDefaultOptions) {
-      if (role.value.options[key] === !!before) role.value.options[key] = !!now;
-    }
-  },
-);
+// turned on or off by hand : the options an admin gets by default follow it, unless one was set
+// apart from that default (it keeps its own value). Another role opened in the editor is no change
+// of its Admin option : its options stay as they are (composables/useAdminDefaults.js)
+useAdminDefaults(role);
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
 // the role in three tabs : General (its name and options), its users and its groups, each of
