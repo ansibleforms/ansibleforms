@@ -10,6 +10,8 @@ import auditController from '../../controllers/v2/audit.controller.js';
 // GET only, on purpose. An append-only trail with an edit or delete endpoint would
 // not be evidence of anything.
 router.get('/', auditController.findAll);
+// every entry the filters select, as a CSV file (the same filters and order as the page)
+router.get('/download', auditController.download);
 router.get('/facets', auditController.facets);
 
 export default router;

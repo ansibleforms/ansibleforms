@@ -3,7 +3,7 @@
 // month's length clamped to its last day, the months named in the page's language, and the
 // period of a pick as the browser's own [from, to) instants. And the two pages wired to them :
 // the Server log without its Clear button and with a reset back to today, the Audit log's
-// reset clearing the period too.
+// reset clearing the period too and its download taking the table's filters.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -135,5 +135,10 @@ describe('the pages', () => {
   it('the Audit log reset clears the period too', () => {
     const reset = audit.slice(audit.indexOf('async function resetFilters()'));
     expect(reset).toMatch(/period\.value = \{ year: null, month: null, day: null \}/);
+  });
+
+  it('the Audit log downloads with the filters of its table', () => {
+    expect(audit).toMatch(/\/api\/v2\/audit\/download\?/);
+    expect(audit).toMatch(/icon="download"/);
   });
 });

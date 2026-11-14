@@ -105,6 +105,44 @@ MySql.do = async function (query, vars, silent = false) {
 };
 
 /**
+ * Runs a query and hands its rows one at a time as they arrive, never the whole result in
+ * memory : for an export of a table that grows without bound (the audit download). The rows
+ * come from one pool connection, which the reader paces (the driver pauses the socket while the
+ * reader is busy). Read to the end, the connection goes back to the pool ; left before the end
+ * (the client went away), it is closed instead, as it may still be receiving the rest.
+ *
+ * Args:
+ *   query (string): the statement, with `?` placeholders.
+ *   vars (Array): its parameters.
+ *
+ * Yields:
+ *   object: a row.
+ *
+ * Raises:
+ *   Error: the query failed, or no connection could be had.
+ */
+MySql.stream = async function* (query, vars) {
+  if (appConfig.enableDbQueryLogging) {
+    logger.info('[ansibleforms] streaming query: ' + query);
+  }
+  const conn = await pool.getConnection();
+  let done = false;
+  try {
+    // the promise wrapper's core connection is the one that can stream a query
+    const rows = conn.connection.query(query, vars).stream({ highWaterMark: 100 });
+    for await (const row of rows) yield row;
+    done = true;
+  } catch (err) {
+    logger.error('[ansibleforms] Query error: ' + err);
+    throw err;
+  } finally {
+    // a connection left in the middle of its rows is not one to hand to another query
+    if (done) conn.release();
+    else conn.destroy();
+  }
+};
+
+/**
  * MySql.do without the error log, for the queries that run every few seconds in every process
  * (the node heartbeat, the cache epochs) : before the schema has their tables, each would log
  * an error per tick. The caller handles the rejection.
