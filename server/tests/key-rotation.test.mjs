@@ -61,7 +61,7 @@ function storeWith(k) {
       { id: 2, password: crypto.encryptWith(k, "another one, with spaces and ünïcode") },
     ],
     runners: [{ id: 7, token: crypto.encryptWith(k, "rte-token-1234"), password: null }],
-    settings: [{ mail_password: crypto.encryptWith(k, "smtp-pass"), encryption_check: null }],
+    settings: [{ encryption_check: null }],
     chat_settings: [{ api_key: "" }],
   };
 }
@@ -74,13 +74,15 @@ beforeEach(() => {
 });
 
 describe("the columns that hold a secret", () => {
-  test("every isEncrypted field of crud.config.js, the mail password and the chat key", () => {
+  test("every isEncrypted field of crud.config.js and the chat key, not the mail password of before 7.6", () => {
     const names = secretColumns().map((c) => `${c.table}.${c.column}`);
     for (const n of ["credentials.password", "credentials.client_key", "runners.token", "runners.password", "secret_stores.token",
       "repositories.password", "ldap.bind_user_pw", "oauth2_providers.client_secret", "notification_channels.webhook_url",
-      "settings.mail_password", "chat_settings.api_key"]) {
+      "chat_settings.api_key"]) {
       assert.ok(names.includes(n), n);
     }
+    // the settings' mail columns are dropped in 7.6 : reading them would fail the rotation
+    assert.ok(!names.includes("settings.mail_password"));
   });
 });
 
@@ -103,12 +105,11 @@ describe("setting ENCRYPTION_SECRET re-encrypts every stored secret", () => {
     storeWith(DEFAULT);
     appConfig.encryptionSecret = NEW;
     const out = await rotateEncryptionKey();
-    assert.equal(out.changed, 4);
+    assert.equal(out.changed, 3);
     assert.equal(committed, true);
     assert.equal(read(NEW, tables.credentials[0].password), "s3cret-password");
     assert.equal(read(NEW, tables.credentials[1].password), "another one, with spaces and ünïcode");
     assert.equal(read(NEW, tables.runners[0].token), "rte-token-1234");
-    assert.equal(read(NEW, tables.settings[0].mail_password), "smtp-pass");
     assert.equal(read(NEW, tables.settings[0].encryption_check), CHECK_TEXT);
   });
 
@@ -129,7 +130,7 @@ describe("setting ENCRYPTION_SECRET re-encrypts every stored secret", () => {
     await rotateEncryptionKey();
     appConfig.encryptionSecret = NEW;
     appConfig.encryptionSecretPrevious = OLD;
-    assert.equal((await rotateEncryptionKey()).changed, 4);
+    assert.equal((await rotateEncryptionKey()).changed, 3);
     assert.equal(read(NEW, tables.runners[0].token), "rte-token-1234");
   });
 

@@ -7,13 +7,14 @@ import Lock from '../../models/lock.model.js';
 import RestResult from '../../models/restResult.model.v2.js';
 import Helpers from '../../lib/common.js';
 import i18n from '../../lib/i18n.js';
-import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
+import { isMasked } from '../../lib/secretMask.js';
 import yaml from 'yaml';
 import appConfig from '../../../config/app.config.js';
 import { auditConfigChange, configHash as auditConfigHash } from '../../lib/configAudit.js';
 import { readableSettingsFields, writableSettingsFields } from '../../lib/settingsSections.js';
 import { assertAdminRoleUnchanged, assertKeepsOwnAdmin } from '../../lib/adminGrants.js';
 import Errors from '../../lib/errors.js';
+import logger from '../../lib/logger.js';
 
 
 // Config edits are exclusive with an active designer session : the designer
@@ -46,10 +47,6 @@ const configHash = auditConfigHash;
 const find = async function(req, res) {
     try {
       const settings = await Settings.find();
-      // Mask mail password before returning to API
-      if (settings && settings.mail_password) {
-        settings.mail_password = SECRET_MASK;
-      }
       // Expose the env-derived config mode so the client (settings page + designer)
       // knows whether the active config lives in the database.
       if (settings) {
@@ -68,39 +65,53 @@ const find = async function(req, res) {
     }
 };
 
+/**
+ * POST /api/v2/settings/mailcheck : sends a test mail with the mail server values of the body.
+ *
+ * Since 7.6 the settings row holds no mail settings (the mail goes through the mail channels of
+ * Connections > Notifications, whose own check tests a stored channel), so there is no stored
+ * password either : the masked password is refused, the password has to be typed.
+ *
+ * Args:
+ *   req (object): the request ; its body mail_server, mail_port, mail_secure, mail_username,
+ *     mail_password, mail_from, to, and optionally subject and body.
+ *   res (object): the response.
+ *
+ * Returns:
+ *   Promise<void>: answers the message id, 400 for a masked password, 500 when sending fails.
+ */
 const mailcheck = async function(req, res) {
   try {
-    // If password is masked, fetch the real one from database for testing
-    let settingsConfig = req.body;
-    if (isMasked(settingsConfig.mail_password)) {
-      const existingSettings = await Settings.find();
-      // the stored password only goes to the stored server, port and security : a test
-      // against another server would hand it the password
-      const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
-      const flag = (v) => v === true || Number(v) === 1;
-      if (text(settingsConfig.mail_server) !== text(existingSettings.mail_server)
-        || text(settingsConfig.mail_port) !== text(existingSettings.mail_port)
-        || flag(settingsConfig.mail_secure) !== flag(existingSettings.mail_secure)) {
-        return res.status(400).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), i18n.t(req, 'resources.storedPasswordOtherServer')));
-      }
-      settingsConfig.mail_password = existingSettings.mail_password;
+    // step 1 : the masked password stood for the stored one, there is none any more
+    if (isMasked(req.body.mail_password)) {
+      return res.status(400).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), i18n.t(req, 'resources.storedPasswordOtherServer')));
     }
-    // the settings page sends no subject or body : the test mail is in the admin's language
+    // step 2 : the server values as they were sent, nothing else from the body
+    const config = {
+      mail_server: req.body.mail_server,
+      mail_port: req.body.mail_port,
+      mail_secure: req.body.mail_secure ? 1 : 0,
+      mail_username: req.body.mail_username,
+      mail_password: req.body.mail_password,
+      mail_from: req.body.mail_from,
+    };
+    // step 3 : the settings page sends no subject or body : the test mail is in the admin's language
     const subject = req.body.subject || i18n.t(req, 'email.test.subject');
     const body = req.body.body || i18n.t(req, 'email.test.body');
-    const messageid = await Settings.mailcheck(new Settings(settingsConfig), req.body.to, subject, body);
+    const messageid = await Settings.mailcheck(config, req.body.to, subject, body);
     res.json(RestResult.single({ message: i18n.t(req, 'resources.mailSent', { id: messageid }) }));
   } catch(err) {
     res.status(500).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), Helpers.getError(err)));
   }
 };
 
-// The only settings fields the declarative config seed writes (see lib/seed.js
+// The only settings field the declarative config seed writes (see lib/seed.js
 // applySettings and the settingsSection in lib/seed-schema.js). Everything else on the
-// settings row - forms_yaml, the logo, the theme, the language, config_source - is not
-// seed material and must stay saveable on a seeded instance.
-const SEED_OWNED_SETTINGS = ['mail_server', 'mail_port', 'mail_secure', 'mail_username',
-                             'mail_password', 'mail_from', 'url'];
+// settings row - config_yaml, the logo, the theme, the language, config_source - is not
+// seed material and must stay saveable on a seeded instance. The seed's mail_* keys of
+// before 7.6 write a mail channel and its smtp credential now, which are managed records
+// of their own.
+const SEED_OWNED_SETTINGS = ['url'];
 
 /**
  * Which seed-owned fields this request would actually CHANGE. Comparing values rather
@@ -112,10 +123,6 @@ export function seedManagedSettingChanges(body, stored) {
   return SEED_OWNED_SETTINGS.filter((field) => {
     const wanted = body[field];
     if (wanted === undefined) return false;
-    // the client sends the mask for 'password unchanged', which is never a change
-    if (field === 'mail_password' && isMasked(wanted)) return false;
-    // mail_secure arrives as a boolean and is stored as 1/0
-    if (field === 'mail_secure') return (stored[field] ? 1 : 0) !== (wanted ? 1 : 0);
     return String(stored[field] ?? '') !== String(wanted ?? '');
   });
 }
@@ -133,7 +140,7 @@ const update = async function(req, res) {
               `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`));
           }
           const existingSettings = await Settings.find();
-          // The seed owns the mail fields and the url. It does NOT own the theme, the
+          // The seed owns the url. It does NOT own the theme, the
           // language or config_source, which travel through this same endpoint - so the
           // refusal has to be scoped to the FIELDS, not to the call. Refusing the whole
           // endpoint meant declaring `url` in a seed froze the theme picker, which
@@ -144,10 +151,6 @@ const update = async function(req, res) {
               return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'),
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
-          }
-          // If password is masked, preserve the existing password
-          if (isMasked(req.body.mail_password)) {
-            req.body.mail_password = existingSettings.mail_password;
           }
           const record = new Settings(req.body);
           // Guard against an effectively-empty record (no recognized fields),
@@ -209,14 +212,36 @@ const getConfig = async function(req, res) {
     try {
       const yaml = await Settings.getActiveConfig();
       // baseHash lets the client detect a concurrent change on save (see saveConfig)
-      res.json(RestResult.single({ forms_yaml: yaml, baseHash: configHash(yaml) }));
+      // config_yaml, and forms_yaml as before 7.6 (deprecated, removed in 8) for the clients
+      // that still read it
+      res.json(RestResult.single({ config_yaml: yaml, forms_yaml: yaml, baseHash: configHash(yaml) }));
     } catch(err) {
       res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedFindSettings'), Helpers.getError(err)));
     }
 };
 
+/**
+ * The config content a PUT /settings/config sends : config_yaml, else forms_yaml, its name
+ * before 7.6 (deprecated, removed in 8 : a warning in the log when a client still sends it).
+ *
+ * Args:
+ *   body (object): the request body.
+ *
+ * Returns:
+ *   string|null: the config text, or null when neither is sent.
+ */
+export function configYamlOf(body) {
+  if (body?.config_yaml != null) return body.config_yaml;
+  if (body?.forms_yaml != null) {
+    logger.warning("PUT /api/v2/settings/config with forms_yaml is deprecated since 7.6 and removed in 8: send config_yaml");
+    return body.forms_yaml;
+  }
+  return null;
+}
+
 const saveConfig = async function(req, res) {
-    if (req.body.forms_yaml == null) {
+    const configYaml = configYamlOf(req.body);
+    if (configYaml == null) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
     }
     // Config editing is exclusive with an active designer session : refuse while held.
@@ -224,7 +249,7 @@ const saveConfig = async function(req, res) {
     // Validate before persisting: bad config breaks every Form.load
     let parsed;
     try {
-      parsed = yaml.parse(req.body.forms_yaml);
+      parsed = yaml.parse(configYaml);
     } catch(err) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
     }
@@ -268,14 +293,14 @@ const saveConfig = async function(req, res) {
           return res.status(409).json(RestResult.error(i18n.t(req, 'resources.configChangedElsewhere')));
         }
       }
-      await Settings.saveActiveConfig(req.body.forms_yaml);
+      await Settings.saveActiveConfig(configYaml);
       // after the write succeeded, and never awaited : a slow audit must not delay
       // the response, and a failing one must not turn a good save into a 500
       auditConfigChange({
         user: req.user?.user,
         ip: req.ip,
         oldYaml: previous,
-        newYaml: req.body.forms_yaml,
+        newYaml: configYaml,
         // already parsed above for validateConfig : reusing it avoids a second parse of
         // the same document, which on a large config is measured in seconds
         parsedAfter: parsed || {},

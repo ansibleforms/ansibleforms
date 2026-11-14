@@ -49,6 +49,10 @@ const SECRETS = {
   cmdb: "cmdb-password",
 };
 
+// the config stored in the database (the settings' forms_yaml of 7.2.0, config_yaml from 7.6) :
+// the rename must keep it, emoji included (the column is utf8mb4)
+const CONFIG_YAML = "categories: []\nconstants:\n  greeting: \"hello \u{1F600}\"\n";
+
 /**
  * A connection to the database server, as the app makes it (DB_* variables).
  *
@@ -93,8 +97,8 @@ async function seed() {
     const enc = (v) => crypto.encrypt(v);
     // step 2 : the rows
     await db.query(
-      "INSERT INTO AnsibleForms.`settings` (mail_server, mail_port, mail_secure, mail_username, mail_password, mail_from, url, forms_yaml, env_label, env_label_color, env_label_show) VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?, 1)",
-      ["smtp.example.com", 587, 1, "mailer", enc(SECRETS.mail), "af@example.com", "PRODUCTION", "red"],
+      "INSERT INTO AnsibleForms.`settings` (mail_server, mail_port, mail_secure, mail_username, mail_password, mail_from, url, forms_yaml, env_label, env_label_color, env_label_show) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, 1)",
+      ["smtp.example.com", 587, 1, "mailer", enc(SECRETS.mail), "af@example.com", CONFIG_YAML, "PRODUCTION", "red"],
     );
     await db.query(
       "INSERT INTO AnsibleForms.`ldap` (server, port, ignore_certs, enable_tls, cert, ca_bundle, bind_user_dn, bind_user_pw, search_base, username_attribute, groups_attribute, enable) VALUES (?, 636, 0, 1, '', '', ?, ?, ?, 'sAMAccountName', 'memberOf', 1)",
@@ -204,7 +208,12 @@ async function check() {
     const channel = await one("SELECT type, credential, is_active FROM AnsibleForms.`notification_channels` WHERE name = 'default'");
     expect("mail channel default type", channel?.type, "mail");
     expect("mail channel default credential", channel?.credential, "mail-login");
-    expect("mail settings emptied", (await one("SELECT mail_server FROM AnsibleForms.`settings`"))?.mail_server, "");
+    // 7.6 : the settings' mail columns dropped (the channel above holds what they held), and
+    // forms_yaml renamed config_yaml with the config it held
+    const settingsColumns = (await db.query("SELECT column_name AS c FROM information_schema.columns WHERE table_schema = 'AnsibleForms' AND table_name = 'settings'"))[0].map((r) => r.c);
+    const leftOver = settingsColumns.filter((c) => /^mail_/.test(c) || c === "forms_yaml");
+    if (leftOver.length || !settingsColumns.includes("config_yaml")) problems.push(`settings columns: ${settingsColumns.join(", ")} (wanted config_yaml, no mail_* nor forms_yaml)`);
+    expect("settings config_yaml", (await one("SELECT config_yaml FROM AnsibleForms.`settings`"))?.config_yaml, CONFIG_YAML);
 
     // step 3 : the renamed and new columns, and the rows made from the old ones
     const columns = (await db.query("SELECT column_name AS c FROM information_schema.columns WHERE table_schema = 'AnsibleForms' AND table_name = 'repositories'"))[0].map((r) => r.c);

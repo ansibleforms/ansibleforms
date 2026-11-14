@@ -1578,8 +1578,6 @@ export default {
       send: 'Wyślij',
       notFound: "Nie ma kanału powiadomień o id '{id}'.",
       fieldsRequired: 'Nazwa jest wymagana.',
-      fromSeed:
-        'Seed konfiguracji ustawia parametry poczty: aplikacja wysyła z nimi, dopóki żaden kanał pocztowy nie jest domyślny.',
     },
     syslogServers: {
       label: 'Serwer syslog',

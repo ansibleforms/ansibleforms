@@ -3291,7 +3291,7 @@ async function deleteLock(proceed = true) {
 const formsRepos = ref([]);
 const configRepo = ref(''); // the repository that holds config.yaml
 const stagedForms = ref(false); // new forms saved but not yet pushed to a repo
-const configInDatabase = ref(false); // true when forms_yaml is stored in and served from the database
+const configInDatabase = ref(false); // true when config_yaml is stored in and served from the database
 
 const isConfigTab = computed(() => ['Categories', 'Constants'].includes(currentTab.value));
 // whether an editor is currently mounted and targeting real content : config

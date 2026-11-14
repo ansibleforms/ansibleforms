@@ -40,7 +40,6 @@ export function secretColumns() {
       if (field.isEncrypted) columns.push({ table, column: field.name, key: "id" });
     }
   }
-  columns.push({ table: "settings", column: "mail_password", key: null });
   columns.push({ table: "chat_settings", column: "api_key", key: null });
   return columns;
 }

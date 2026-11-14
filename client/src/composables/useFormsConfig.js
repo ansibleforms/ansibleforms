@@ -111,11 +111,11 @@ export function useFormsConfig() {
       baseHash.value = result.data.baseHash || null;
       // ytt-templated configs are read-only here: a section merge would still
       // corrupt the template. Show the parsed data but block edits/saves.
-      isTemplated.value = yttDirectiveRegex.test(item.value.forms_yaml || '');
+      isTemplated.value = yttDirectiveRegex.test(item.value.config_yaml || '');
       if (isTemplated.value) {
         toast.warning(t('settings.settingsPage.configTemplated'));
       }
-      const config = parseConfig(item.value.forms_yaml);
+      const config = parseConfig(item.value.config_yaml);
       if (config === null) {
         parseError.value = true;
         toast.error(t('settings.settingsPage.configParseError'));
@@ -160,7 +160,7 @@ export function useFormsConfig() {
       // refreshed from this read : it must stay the hash of what the user
       // started editing, otherwise the server could never detect a conflict.
       const current = await axios.get('/api/v2/settings/config');
-      const rawYaml = current.data.forms_yaml || '';
+      const rawYaml = current.data.config_yaml || '';
 
       // Defense in depth: never section-merge into a ytt template.
       if (yttDirectiveRegex.test(rawYaml)) {
@@ -187,7 +187,7 @@ export function useFormsConfig() {
         doc.set('constants', doc.createNode(arrayToConstants(constants.value)));
       }
 
-      const payload = { forms_yaml: doc.toString() };
+      const payload = { config_yaml: doc.toString() };
       if (baseHash.value) payload.baseHash = baseHash.value;
       await axios.put('/api/v2/settings/config', payload);
       toast.success(t('settings.common.nameUpdated', { name: successLabel || t('settings.settingsPage.label') }));

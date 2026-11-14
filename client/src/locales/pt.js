@@ -1584,8 +1584,6 @@ export default {
       send: 'Enviar',
       notFound: "Não existe nenhum canal de notificação com o id '{id}'.",
       fieldsRequired: 'O nome é obrigatório.',
-      fromSeed:
-        'O seed de configuração define as definições de email: a aplicação envia com elas enquanto nenhum canal de email for o predefinido.',
     },
     syslogServers: {
       label: 'Servidor syslog',

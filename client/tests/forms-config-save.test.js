@@ -67,7 +67,7 @@ forms:
 const okGet =
   (yamlStr, hash = 'HASH-1') =>
   () =>
-    Promise.resolve({ data: { forms_yaml: yamlStr, baseHash: hash } });
+    Promise.resolve({ data: { config_yaml: yamlStr, baseHash: hash } });
 
 beforeEach(() => {
   http.puts.length = 0;
@@ -126,7 +126,7 @@ describe('saving', () => {
     c.categories.value[0].name = 'Operations';
 
     expect(await c.save('cats')).toBe(true);
-    const written = http.puts.at(-1).forms_yaml;
+    const written = http.puts.at(-1).config_yaml;
     expect(written).toContain('Operations');
     expect(written).toContain('# top comment');
     expect(written).toContain('keep-me');
@@ -143,7 +143,7 @@ describe('saving', () => {
     let n = 0;
     http.get = () =>
       Promise.resolve({
-        data: { forms_yaml: YAML, baseHash: n++ === 0 ? 'HASH-1' : 'HASH-MOVED' },
+        data: { config_yaml: YAML, baseHash: n++ === 0 ? 'HASH-1' : 'HASH-MOVED' },
       });
     const c = useFormsConfig();
     await c.load();
@@ -205,7 +205,7 @@ describe('category normalization', () => {
     await c.load();
     c.categories.value[0].name = '  Spaced  ';
     await c.save();
-    expect(http.puts.at(-1).forms_yaml).toContain('Spaced');
-    expect(http.puts.at(-1).forms_yaml).not.toContain('  Spaced  ');
+    expect(http.puts.at(-1).config_yaml).toContain('Spaced');
+    expect(http.puts.at(-1).config_yaml).not.toContain('  Spaced  ');
   });
 });

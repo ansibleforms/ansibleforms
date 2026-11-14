@@ -32,7 +32,7 @@ vi.mock("../src/models/repository.model.js", () => ({
   default: { getFormsFolders: async () => [], getConfigPath: async () => null, claimForWrite: async () => null, releaseWrite: async () => {} },
 }));
 vi.mock("../src/models/settings.model.js", () => ({
-  default: { findFormsYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => "" },
+  default: { findConfigYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => "" },
 }));
 
 const { default: Form } = await import("../src/models/form.model.js");

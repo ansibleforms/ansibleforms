@@ -31,7 +31,7 @@ vi.mock("../src/models/repo.model.js", () => {
   const folderOf = (name) => path.join(ROOT, name);
   return { default: { folderOf, isValidName: () => true }, repoFolder: folderOf };
 });
-vi.mock("../src/models/settings.model.js", () => ({ default: { findFormsYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => fs.readFileSync(path.join(ROOT, "config.yaml"), "utf8") } }));
+vi.mock("../src/models/settings.model.js", () => ({ default: { findConfigYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => fs.readFileSync(path.join(ROOT, "config.yaml"), "utf8") } }));
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;

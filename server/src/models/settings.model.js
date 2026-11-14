@@ -3,7 +3,6 @@ import logger from "../lib/logger.js";
 import mysql from "./db.model.js";
 import nodemailer from "nodemailer";
 import { sendMicrosoftMail } from "../lib/microsoftMail.js";
-import crypto from "../lib/crypto.js";
 import Repository from './repository.model.js';
 import Lock from './lock.model.js';
 import appConfig from "./../../config/app.config.js";
@@ -16,34 +15,14 @@ import Announcement from './announcement.model.js';
 //mail object create
 var Settings=function(settings){
     // Only set properties whose key is actually present on the input, so a
-    // partial update (e.g. only the mail_* fields) never wipes other columns.
-    if(settings.mail_server !== undefined){
-      this.mail_server = settings.mail_server;
-    }
-    if(settings.mail_port !== undefined){
-      this.mail_port = settings.mail_port;
-    }
-    if(settings.mail_secure !== undefined){
-      this.mail_secure = (settings.mail_secure)?1:0;
-    }
-    if(settings.mail_username !== undefined){
-      this.mail_username = settings.mail_username;
-    }
-    // Handle mail_password: undefined = don't update, "" = clear password, "value" = encrypt
-    if(settings.mail_password !== undefined){
-      if(settings.mail_password === ""){
-        this.mail_password = "";
-      } else {
-        this.mail_password = crypto.encrypt(settings.mail_password);
-      }
-    }
-    if(settings.mail_from !== undefined){
-      this.mail_from = settings.mail_from;
-    }
+    // partial update (e.g. only the url) never wipes other columns.
+    // The mail_* fields of before 7.6 are not accepted any more : the mail goes through the
+    // mail channels (Connections > Notifications), and the settings row has no mail columns.
+    // A client that still sends them is answered as before, they are simply left out.
     if(settings.url !== undefined){
       this.url = settings.url;
     }
-    // forms_yaml is deliberately NOT accepted here. This constructor feeds the
+    // config_yaml is deliberately NOT accepted here. This constructor feeds the
     // generic PUT /settings, which knows nothing about config content : writing the
     // config through it would bypass the designer-lock 423, the yaml parse +
     // Form.validateConfig check, the baseHash concurrency check AND the restore
@@ -213,7 +192,7 @@ export const LABEL_COLORS = ['blue', 'green', 'amber', 'orange', 'red', 'grey'];
 export const FORMS_VIEWS = ['tiles', 'list'];
 // the date formats offered, as dayjs writes them : digits and separators only
 export const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'DD.MM.YYYY'];
-// Resolve whether the ACTIVE config lives in the database, from a findFormsYaml record.
+// Resolve whether the ACTIVE config lives in the database, from a findConfigYaml record.
 //
 // Precedence is the same everywhere in the app: the ENVIRONMENT first, then the database,
 // then the built-in default. An explicitly set ENABLE_CONFIG_IN_DATABASE therefore wins over the config_source column, and the UI
@@ -224,7 +203,7 @@ export const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'DD.MM.YY
 // page. Note the upgrade consequence: an instance with the variable set AND a differing
 // column now follows the variable, which can change which configuration it serves.
 //
-// Pure : no I/O, safe to call anywhere the findFormsYaml record is already in hand.
+// Pure : no I/O, safe to call anywhere the findConfigYaml record is already in hand.
 Settings.configSourceFromEnv = function () {
   // undefined means 'not configured', which is not the same as 0
   const explicit = process.env.ENABLE_CONFIG_IN_DATABASE;
@@ -249,7 +228,7 @@ Settings.update = async function (record) {
       return
     }
     // The settings table is implicitly single-row, but on a broken init seed /
-    // partial DB restore it can be empty (findFormsYaml now tolerates that). A
+    // partial DB restore it can be empty (findConfigYaml now tolerates that). A
     // bare UPDATE would then affect 0 rows and silently discard the data while
     // reporting success (a DB-mode designer save, PUT settings/config or
     // importConfig). So upsert : INSERT when the table is empty, else UPDATE.
@@ -372,7 +351,7 @@ Settings.importConfig = async function({ assertRoles } = {}){
   // importing replaces the DATABASE copy : snapshot that copy, not the active
   // config. In file mode getActiveConfig() returns the FILE, so an 'active'
   // snapshot would have made a restore point out of the very file being imported
-  // while the previous forms_yaml was lost unrecoverably.
+  // while the previous config_yaml was lost unrecoverably.
   // Unlike exportConfig there is deliberately no "database must be the active
   // source" guard here : seeding the database from config.yaml BEFORE switching
   // config_source to 'database' is a supported migration path. A 'database'
@@ -381,15 +360,15 @@ Settings.importConfig = async function({ assertRoles } = {}){
   // the caller's check of the roles, before the restore point and the write
   if (assertRoles) await assertRoles(roles)
   await backupConfig('database')
-  var settings = await Settings.findFormsYaml()
-  settings.forms_yaml = configFile
+  var settings = await Settings.findConfigYaml()
+  settings.config_yaml = configFile
   await Settings.update(settings)
   return "config.yaml imported successfully"
 
 }
 Settings.exportConfig = async function(){
   await Settings.assertDesignerNotLocked()
-  const settings = await Settings.findFormsYaml()
+  const settings = await Settings.findConfigYaml()
   // exporting overwrites the config file with the database copy : when the
   // database is not the ACTIVE config source that copy is a stale snapshot while
   // the file is the live config, so refuse instead of destroying it.
@@ -398,7 +377,7 @@ Settings.exportConfig = async function(){
   if(!Settings.resolveConfigInDatabase(settings)){
     throw Object.assign(new Error("The database is not the active config source, refusing to overwrite the config file"),{ statusCode: 400 })
   }
-  if(!settings.forms_yaml || !settings.forms_yaml.trim()){
+  if(!settings.config_yaml || !settings.config_yaml.trim()){
     throw Object.assign(new Error("No config found in the database to export"),{ statusCode: 400 })
   }
   const configPath = (await Repository.getConfigPath()) || appConfig.configPath
@@ -414,7 +393,7 @@ Settings.exportConfig = async function(){
   const repoName = configRepoFromPath(configPath, appConfig.repoPath)
   const token = repoName ? await Repository.claimForWrite(repoName) : undefined
   try {
-    fs.writeFileSync(configPath, settings.forms_yaml, 'utf8')
+    fs.writeFileSync(configPath, settings.config_yaml, 'utf8')
   } finally {
     if (repoName && token !== undefined) {
       await Repository.releaseWrite(repoName, token).catch(e => logger.error(`Failed to release write-lock on '${repoName}': ${e.message}`))
@@ -423,11 +402,11 @@ Settings.exportConfig = async function(){
   return "config.yaml exported successfully"
 }
 Settings.getActiveConfig = async function() {
-  const settings = await Settings.findFormsYaml()
+  const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
-  if (useDatabase && settings.forms_yaml && settings.forms_yaml.trim()) {
-    return settings.forms_yaml
+  if (useDatabase && settings.config_yaml && settings.config_yaml.trim()) {
+    return settings.config_yaml
   }
 
   const configPath = (await Repository.getConfigPath()) || appConfig.configPath
@@ -440,14 +419,14 @@ Settings.getActiveConfig = async function() {
 // Form.getBaseConfig), one word the designer's editor cannot be in the middle of
 Settings.saveActiveConfig = async function(yamlStr, options = {}) {
   if (!options.ignoreDesignerLock) await Settings.assertDesignerNotLocked()
-  const settings = await Settings.findFormsYaml()
+  const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
   if (useDatabase) {
     logger.info("Saving config to database")
     // snapshot the config before it is overwritten
     await backupConfig()
-    await Settings.update({ forms_yaml: yamlStr })
+    await Settings.update({ config_yaml: yamlStr })
     return
   }
 
@@ -478,14 +457,6 @@ Settings.find = function () {
   return mysql.do("SELECT * FROM AnsibleForms.`settings` limit 1;")
     .then((res)=>{
       if(res.length>0){
-        try{
-          if(res[0].mail_password!=""){
-            res[0].mail_password=crypto.decrypt(res[0].mail_password)
-          }
-        }catch(e){
-          logger.error("Couldn't decrypt mail password, did the secretkey change ?")
-          res[0].mail_password=""
-        }
         res[0].enableConfigInDatabase = appConfig.enableConfigInDatabase
         // internal bookkeeping (secrets/importVaultEnv.js, lib/syslogServers.js), not settings
         delete res[0].vault_env_imported_at
@@ -495,26 +466,6 @@ Settings.find = function () {
         delete res[0].env_label
         delete res[0].env_label_color
         delete res[0].env_label_show
-        return res[0]
-      }else{
-        logger.error("No settings record in the database, something is wrong")
-        throw "No settings record in the database, something is wrong"
-      }
-    })
-
-};
-Settings.findMailSettings = function () {
-  return mysql.do("SELECT mail_server,mail_port,mail_secure,mail_username,mail_password,mail_from FROM AnsibleForms.`settings` limit 1;")
-    .then((res)=>{
-      if(res.length>0){
-        try{
-          if(res[0].mail_password!=""){
-            res[0].mail_password=crypto.decrypt(res[0].mail_password)
-          }
-        }catch(e){
-          logger.error("Couldn't decrypt mail password, did the secretkey change ?")
-          res[0].mail_password=""
-        }
         return res[0]
       }else{
         logger.error("No settings record in the database, something is wrong")
@@ -566,18 +517,18 @@ Settings.findAppDefaults = function () {
       };
     })
 }
-Settings.findFormsYaml = function () {
+Settings.findConfigYaml = function () {
 
-  return mysql.do("SELECT forms_yaml, config_source FROM AnsibleForms.`settings` limit 1;")
+  return mysql.do("SELECT config_yaml, config_source FROM AnsibleForms.`settings` limit 1;")
     .then((res)=>{
       if(res.length>0){
         return res[0]
       }else{
         // A missing settings row (failed init seed / partial DB restore) must not
-        // break config loading : every caller guards on a truthy forms_yaml and
+        // break config loading : every caller guards on a truthy config_yaml and
         // falls back to file mode, so return empty values instead of throwing.
         logger.error("No settings record in the database, something is wrong")
-        return { forms_yaml: null, config_source: null }
+        return { config_yaml: null, config_source: null }
       }
     })
     .catch((err)=>{
@@ -590,44 +541,75 @@ Settings.findFormsYaml = function () {
       // silently fall back to a stale disk config when MySQL is merely down.
       if(err && (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_DB_ERROR')){
         logger.error("Settings schema is missing, falling back to file-based config")
-        return { forms_yaml: null, config_source: null }
+        return { config_yaml: null, config_source: null }
       }
       // A missing COLUMN (ER_BAD_FIELD_ERROR) is the un-migrated schema case :
-      // restoring an older database dump does not re-run the schema patches, so
-      // forms_yaml/config_source can be absent on an otherwise healthy database.
-      // Behave like a missing row (no config in the database) instead of failing
-      // every getBaseConfig/Form.load until a restart applies the patches.
+      // a database dump of an older release (before 7.6 the column was forms_yaml),
+      // between its replay and the schema patches that follow it (Backup.restore), or
+      // a database whose patches failed, can lack config_yaml/config_source on an
+      // otherwise healthy database. Behave like a missing row (no config in the
+      // database) instead of failing every getBaseConfig/Form.load until the patches
+      // have run.
       if(err && err.code === 'ER_BAD_FIELD_ERROR'){
         logger.error("Settings schema is outdated (missing config column), falling back to file-based config")
-        return { forms_yaml: null, config_source: null }
+        return { config_yaml: null, config_source: null }
       }
       throw err
     })
 
 };
+/**
+ * Sends a test mail with the mail server values given (POST /api/v2/settings/mailcheck).
+ *
+ * The values are used as they are : nothing is read from the settings row, which holds no mail
+ * settings since 7.6 (the mail goes through the mail channels of Connections > Notifications).
+ *
+ * Args:
+ *   config (object): mail_server, mail_port, mail_secure, mail_username, mail_password (in
+ *     clear) and mail_from.
+ *   to (string): the recipient(s).
+ *   subject (string): the subject ; empty : "Test message".
+ *   body (string): the html body ; empty : a short test text.
+ *
+ * Returns:
+ *   Promise<string|false>: the message id, or false when no mail server is given.
+ */
 Settings.mailcheck = function(config,to,subject,body){
   subject = subject || "Test message"
   var message = body || "<p>This is a test message from AnsibleForms</p>"
-  if(config.mail_password){
-    try{
-      config.mail_password=crypto.decrypt(config.mail_password)
-    }catch(e){
-      config.mail_password=""
-      logger.error("Failed to decrypt mail password")
-    }
-  }
   logger.info("Sending testmail")
   return Settings.maildo(config,to,subject,message)
 }
-// Sent with the active mail channel (Connections > Notifications) ; none active, with the mail
-// settings, which a config seed still writes
+/**
+ * Sends a mail with the active mail channel (Connections > Notifications).
+ *
+ * Without an active (and enabled) mail channel nothing is sent : the mail settings this fell
+ * back to before 7.6 are gone, the upgrade made them a mail channel.
+ *
+ * Args:
+ *   to (string): the recipient(s), comma separated.
+ *   subject (string): the subject.
+ *   message (string): the html body.
+ *
+ * Returns:
+ *   Promise<string|false>: the message id, or false when there is no active mail channel.
+ *
+ * Raises:
+ *   Error: the credential the active channel names does not exist, or the server refuses.
+ */
 Settings.mailsend = async function(to,subject,message){
   const { default: NotificationChannel } = await import('./notificationChannel.model.js')
+  // step 1 : the channel the app sends its mail with
   const active = await NotificationChannel.findActive()
-  const config = active ? await NotificationChannel.toMailConfig(active) : await Settings.findMailSettings()
+  if (!active) {
+    logger.notice("No active mail channel (Connections > Notifications), the mail is not sent")
+    return false
+  }
+  // step 2 : its server and login, then the mail
+  const config = await NotificationChannel.toMailConfig(active)
   return Settings.maildo(config,to,subject,message)
 }
-// Sends a mail with a mail config (NotificationChannel.toMailConfig, or the mail settings) :
+// Sends a mail with a mail config (NotificationChannel.toMailConfig, or the mail check's values) :
 // through Microsoft 365 with OAuth2 for a channel with an entraid credential (Graph, or SMTP with a
 // token : lib/microsoftMail.js), else to its SMTP server with its user and password (none for a
 // relay). Resolves the message id ; false without a server.

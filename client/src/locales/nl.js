@@ -1735,8 +1735,6 @@ export default {
       send: 'Versturen',
       notFound: "Er is geen meldingskanaal met de id '{id}'.",
       fieldsRequired: 'De naam is verplicht.',
-      fromSeed:
-        'De config-seed stelt de mailinstellingen in: de app verstuurt daarmee zolang er geen mailkanaal de standaard is.',
     },
     syslogServers: {
       label: 'Syslog-server',

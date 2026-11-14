@@ -349,7 +349,7 @@ const envGroups = computed(() => {
 const authenticated = ref(false);
 // the page's values read once : until then its fields as grey placeholders
 const loaded = ref(false);
-const item = ref({ url: '', forms_yaml: '', config_source: null });
+const item = ref({ url: '', config_yaml: '', config_source: null });
 const originalItem = ref(null);
 const showImportConfirm = ref(false);
 const showExportConfirm = ref(false);

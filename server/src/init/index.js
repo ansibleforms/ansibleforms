@@ -213,7 +213,7 @@ const initOnce = async function({ boot = false } = {}){
   logger.info("Checking database records")
   const records = {
     ldap:{name:(await import('../lib/ldapDirectories.js')).DEFAULT_NAME,position:1,server:'',port:389,ignore_certs:1,enable_tls:0,cert:'',ca_bundle:'',bind_user_dn:'',bind_user_pw:'',search_base:'',username_attribute:'sAMAccountName',groups_attribute:'memberOf',enable:0,groups_search_base:'',group_class:'',group_member_attribute:'',group_member_user_attribute:'',groupfilter:''},    
-    settings:{mail_server:'',mail_port:25,mail_secure:0,mail_username:'',mail_password:'',mail_from:'',url:'',forms_yaml:''},
+    settings:{url:'',config_yaml:''},
     chat_settings:{provider:'',api_key:'',base_url:'',model:'',max_turns:20,max_tool_rounds:6,timeout_seconds:60,allow_job_status:1,auth_type:'',api_version:'',request_user:'',extra_headers:'',ignore_certs:0}
   }
  

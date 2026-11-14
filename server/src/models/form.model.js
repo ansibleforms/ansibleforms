@@ -112,7 +112,7 @@ function backupConfigSource(backupName){
   return 'active'
 }
 // Whether a config RESTORE must write into the database. The database only counts
-// when it really holds a config : with an empty forms_yaml the config is served
+// when it really holds a config : with an empty config_yaml the config is served
 // from disk/repository (see getBaseConfig), and writing to the database anyway
 // would flip the effective source to the database as a side effect.
 // Form.restore and Form.restoreBackup MUST share this one expression : the former
@@ -121,8 +121,8 @@ function backupConfigSource(backupName){
 // write into a repository working tree - leaving an uncommitted change that breaks
 // the next scheduled pull, which is exactly what that guard exists to forbid.
 async function resolveRestoreInDatabase(){
-  const settings = await Settings.findFormsYaml()
-  return Settings.resolveConfigInDatabase(settings) && !!(settings.forms_yaml && settings.forms_yaml.trim())
+  const settings = await Settings.findConfigYaml()
+  return Settings.resolveConfigInDatabase(settings) && !!(settings.config_yaml && settings.config_yaml.trim())
 }
 // Copy a config snapshot onto the file the config is read from : a repository copy
 // wins over the local one, exactly like the designer save and
@@ -412,7 +412,7 @@ let renameRetried = false
  *   saved (false : the write was refused) }.
  */
 async function saveRenamedRole(renamed) {
-  if (appConfig.useYtt && !Settings.resolveConfigInDatabase(await Settings.findFormsYaml())) {
+  if (appConfig.useYtt && !Settings.resolveConfigInDatabase(await Settings.findConfigYaml())) {
     logger.warning("Role 'public' is renamed 'default' in the config loaded: rename it in the ytt template too")
     return { text: renamed, saved: true }
   }
@@ -432,13 +432,13 @@ async function saveRenamedRole(renamed) {
 async function getBaseConfig() {
   var rawdata=''
 
-  const settings = await Settings.findFormsYaml()
+  const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
   if(useDatabase){
-    if(settings.forms_yaml && settings.forms_yaml.trim()){
+    if(settings.config_yaml && settings.config_yaml.trim()){
       logger.info(`Using config from database`)
-      rawdata = settings.forms_yaml
+      rawdata = settings.config_yaml
     }else{
       logger.warning("No config found in the database, falling back to disk file")
     }
@@ -1242,7 +1242,7 @@ function assertNoDuplicateRoles(obj){
  * The roles page greys them out, but the config can be written from the designer, the API or a
  * hand-edited YAML posted to the settings - so the save refuses it, whoever sends it.
  *
- * Checked on the saves only (Form.validate, the settings' forms_yaml), never on the load : an
+ * Checked on the saves only (Form.validate, the settings' config_yaml), never on the load : an
  * install whose config already lacks one keeps starting, and can be repaired from the pages.
  *
  * Args:
@@ -1552,7 +1552,7 @@ Form.backup = async function(configOnly=false,source='active'){
   Form.removeOld(appConfig.oldBackupDays) // read now : OLD_BACKUP_DAYS changes without a restart
 
   // Back up the ACTIVE base config, whatever serves it : the database (when
-  // config_source or the env default says so and forms_yaml is not empty), a
+  // config_source or the env default says so and config_yaml is not empty), a
   // repository working tree, or the local config.yaml - Settings.getActiveConfig
   // resolves exactly that, the same way the designer save does. Snapshotting
   // appConfig.configPath instead would write nothing at all in repository mode
@@ -1575,8 +1575,8 @@ Form.backup = async function(configOnly=false,source='active'){
     // ACTIVE config IS that file, so an 'active' snapshot would preserve the very
     // content being imported and lose the database copy unrecoverably.
     logger.debug("Backing up the database config")
-    const dbSettings = await Settings.findFormsYaml()
-    activeConfig = dbSettings.forms_yaml || ''
+    const dbSettings = await Settings.findConfigYaml()
+    activeConfig = dbSettings.config_yaml || ''
   }else{
     activeConfig = await Settings.getActiveConfig()
   }
@@ -1663,7 +1663,7 @@ Form.restoreBackup = async function(backupName,configOnly=false){
       // 'database' snapshot (Settings.importConfig) goes here even when a file is
       // what currently serves the config.
       logger.debug(`Restoring database config from '${backupconfigfile}'`)
-      await Settings.update({ forms_yaml: fs.readFileSync(backupconfigfile,'utf8') })
+      await Settings.update({ config_yaml: fs.readFileSync(backupconfigfile,'utf8') })
     }else{
       // a 'file' snapshot (Settings.exportConfig) goes back onto the config file,
       // which is what undoing that export means - reinstating it into the database
@@ -1773,7 +1773,7 @@ Form.save = async function(data){
   formsConfig.forms.forEach(f => { delete f.repository; delete f.source; })
 
   // determine write target before locking to avoid querying settings inside the lock
-  const configSettings = await Settings.findFormsYaml()
+  const configSettings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(configSettings)
 
   // lock the working trees for the duration of the write so a concurrent
@@ -1903,7 +1903,7 @@ Form.save = async function(data){
 
     if (useDatabase) {
       logger.debug("Writing base config to database")
-      await Settings.update({ forms_yaml: configYaml })
+      await Settings.update({ config_yaml: configYaml })
     } else {
       logger.debug(`Writing base file '${targetConfigPath}'`)
       fse.ensureDirSync(path.dirname(targetConfigPath));
@@ -2086,7 +2086,7 @@ Form.restore = async function(backupName,backupBeforeRestore){
   // the SAME expression Form.restoreBackup routes on : with a different one this
   // guard could pass while the restore below still took the disk branch and wrote
   // config.yaml into a repository working tree (issue : config_source='database'
-  // with a forms_yaml that is still empty, e.g. right after switching source)
+  // with a config_yaml that is still empty, e.g. right after switching source)
   const useDatabase = await resolveRestoreInDatabase()
   if (repoMode && !useDatabase) {
     // forms live in git repositories and no config is in the database : the
