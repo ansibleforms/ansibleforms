@@ -346,10 +346,32 @@ class CredentialModel extends CrudModel {
     return data;
   }
 
-  // what an SSH credential's private key reads as : a PEM one (-----BEGIN RSA PRIVATE KEY-----,
-  // -----BEGIN EC PRIVATE KEY-----, -----BEGIN PRIVATE KEY-----...) or an OpenSSH one
-  // (-----BEGIN OPENSSH PRIVATE KEY-----), from its first line to its last
-  static PRIVATE_KEY_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]+-----END [A-Z0-9 ]*PRIVATE KEY-----/;
+  // the first and last lines of an SSH credential's private key : a PEM one (-----BEGIN RSA PRIVATE
+  // KEY-----, -----BEGIN EC PRIVATE KEY-----, -----BEGIN PRIVATE KEY-----...) or an OpenSSH one
+  // (-----BEGIN OPENSSH PRIVATE KEY-----) ; the key type a few words at most
+  static PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY-----/;
+  static PRIVATE_KEY_END = /-----END [A-Z0-9 ]{0,40}PRIVATE KEY-----/;
+
+  /**
+   * Whether a text is a private key : its BEGIN line, some content, then its END line. The two
+   * lines are looked for one after the other : one pattern running from the first to the last
+   * over the whole key took quadratic time on a text made to look like one.
+   *
+   * Args:
+   *   text (string): the key as typed.
+   *
+   * Returns:
+   *   boolean: true when it reads as a PEM or OpenSSH private key.
+   */
+  static isPrivateKey(text) {
+    // Step 1 : its first line
+    const begin = this.PRIVATE_KEY_BEGIN.exec(text);
+    if (!begin) return false;
+    // Step 2 : its last line after it, with something between
+    const rest = text.slice(begin.index + begin[0].length);
+    const end = this.PRIVATE_KEY_END.exec(rest);
+    return !!end && rest.slice(0, end.index).trim() !== '';
+  }
 
   /**
    * Checks an SSH credential's private key and keeps its passphrase to it : the key
@@ -377,7 +399,7 @@ class CredentialModel extends CrudModel {
     // step 2 : a key typed (not the mask, not emptied) must be a private key
     const key = data.client_key;
     if (data.credential_type === 'ssh' && typeof key === 'string' && key.trim() !== '' && !isMasked(key)) {
-      if (!this.PRIVATE_KEY_PATTERN.test(key)) {
+      if (!this.isPrivateKey(key)) {
         throw new Errors.BadRequestError("An SSH credential's private key is a PEM or OpenSSH private key, from -----BEGIN ... PRIVATE KEY----- to -----END ... PRIVATE KEY-----");
       }
     }

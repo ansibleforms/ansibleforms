@@ -158,3 +158,18 @@ describe("a private key in a job's output", () => {
     }
   });
 });
+
+describe("telling a private key", () => {
+  test("its BEGIN line, content and END line ; at once on a text made to look like one", () => {
+    const pem = (type) => `-----BEGIN ${type}PRIVATE KEY-----\nMIIabc\n-----END ${type}PRIVATE KEY-----\n`;
+    assert.equal(Credential.isPrivateKey(pem("")), true);
+    assert.equal(Credential.isPrivateKey(pem("RSA ")), true);
+    assert.equal(Credential.isPrivateKey(pem("OPENSSH ")), true);
+    assert.equal(Credential.isPrivateKey("-----BEGIN PRIVATE KEY----------END PRIVATE KEY-----"), false);
+    assert.equal(Credential.isPrivateKey("-----BEGIN PRIVATE KEY-----\nMIIabc\n"), false);
+    assert.equal(Credential.isPrivateKey("ssh-rsa AAAA user@host"), false);
+    const started = Date.now();
+    Credential.isPrivateKey("-----BEGIN PRIVATE KEY-----" + "-----END ".repeat(100000));
+    assert.ok(Date.now() - started < 200);
+  });
+});
