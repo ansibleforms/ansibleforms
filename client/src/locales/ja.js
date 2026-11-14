@@ -1529,7 +1529,8 @@ export default {
       addressChat: 'チャット {chat}',
       credential: '認証情報',
       helpCredential:
-        '接続 > 認証情報の smtp 認証情報：メールサーバー、そのポートと TLS、ログイン（リレーの場合はユーザーなし）。',
+        '接続 > 認証情報の smtp 認証情報：メールサーバー、そのポートと TLS、ログイン（リレーの場合はユーザーなし）。なし：下のメールサーバーを使い、ログインしません。',
+      serverHelp: '認証情報を選ばないときに送信に使うメールサーバー。ログインはしません（リレー）。',
       webhookUrl: 'Webhook アドレス',
       webhookUrlHelp_slack:
         'Slack チャネルの受信 Webhook (Slack アプリ > Incoming Webhooks): 秘密情報で、保存後は再表示されません。',
@@ -1764,6 +1765,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'HashiCorp Vault シークレットストアがログインに使うトークンとアドレス',
       userOptional: 'ユーザー (任意)',
+      passwordOptional: 'パスワード (任意)',
+      smtpLoginHelp: 'ログインなしでメールを受け付けるメールサーバー（リレー）の場合は空にします。',
       rteToken: 'トークン (RTE_TOKEN)',
       rteTokenHelp: 'RTE の起動に使われた RTE_TOKEN。',
       apiToken: 'API トークン',

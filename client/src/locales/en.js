@@ -1678,7 +1678,8 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Credential',
       helpCredential:
-        'An smtp credential of Connections > Credentials: the mail server, its port and TLS, and the login (no user for a relay).',
+        'An smtp credential of Connections > Credentials: the mail server, its port and TLS, and the login (no user for a relay). None: the mail server below, without a login.',
+      serverHelp: 'The mail server it sends through when no credential is chosen, without a login (a relay).',
       webhookUrl: 'Webhook address',
       webhookUrlHelp_slack:
         "The Slack channel's incoming webhook (Slack app > Incoming Webhooks): a secret, never shown again once saved.",
@@ -1915,6 +1916,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'The token and address a HashiCorp Vault secret store logs in with',
       userOptional: 'User (optional)',
+      passwordOptional: 'Password (optional)',
+      smtpLoginHelp: 'Empty for a mail server that takes mail without a login (a relay).',
       rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'The RTE_TOKEN the RTE was started with.',
       apiToken: 'API token',

@@ -1696,7 +1696,8 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Inloggegevens',
       helpCredential:
-        'Een smtp-inloggegeven van Verbindingen > Inloggegevens: de mailserver, de poort en TLS, en de login (geen gebruiker voor een relay).',
+        'Een smtp-inloggegeven van Verbindingen > Inloggegevens: de mailserver, de poort en TLS, en de login (geen gebruiker voor een relay). Geen: de mailserver hieronder, zonder login.',
+      serverHelp: 'De mailserver waarlangs het verzendt als er geen inloggegeven gekozen is, zonder login (een relay).',
       webhookUrl: 'Webhookadres',
       webhookUrlHelp_slack:
         'De inkomende webhook van het Slack-kanaal (Slack-app > Incoming Webhooks): een geheim, na het opslaan nooit meer getoond.',
@@ -1937,6 +1938,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'Het token en adres waarmee een HashiCorp Vault secret store inlogt',
       userOptional: 'Gebruiker (optioneel)',
+      passwordOptional: 'Wachtwoord (optioneel)',
+      smtpLoginHelp: 'Leeg voor een mailserver die mail zonder login aanneemt (een relay).',
       rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'Het RTE_TOKEN waarmee de RTE is gestart.',
       apiToken: 'API-token',

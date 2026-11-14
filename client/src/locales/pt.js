@@ -1545,7 +1545,9 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Credencial',
       helpCredential:
-        'Uma credencial smtp de Ligações > Credenciais: o servidor de correio, a porta e TLS, e o início de sessão (sem utilizador para um relay).',
+        'Uma credencial smtp de Ligações > Credenciais: o servidor de correio, a porta e TLS, e o início de sessão (sem utilizador para um relay). Nenhuma: o servidor de correio abaixo, sem início de sessão.',
+      serverHelp:
+        'O servidor de correio pelo qual envia quando nenhuma credencial é escolhida, sem início de sessão (um relay).',
       webhookUrl: 'Endereço do webhook',
       webhookUrlHelp_slack:
         'O webhook de entrada do canal Slack (app Slack > Incoming Webhooks): um segredo, nunca mais mostrado depois de guardado.',
@@ -1785,6 +1787,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'O token e o endereço com que acede um cofre HashiCorp Vault',
       userOptional: 'Utilizador (opcional)',
+      passwordOptional: 'Palavra-passe (opcional)',
+      smtpLoginHelp: 'Vazios para um servidor de correio que aceita correio sem início de sessão (um relay).',
       rteToken: 'Token (RTE_TOKEN)',
       rteTokenHelp: 'O RTE_TOKEN com que o RTE foi iniciado.',
       apiToken: 'Token de API',

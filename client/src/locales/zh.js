@@ -1483,7 +1483,9 @@ export default {
       addressWebhook: '传入 Webhook',
       addressChat: '聊天 {chat}',
       credential: '凭据',
-      helpCredential: '连接 > 凭据中的 smtp 凭据：邮件服务器、其端口和 TLS，以及登录（中继无需用户）。',
+      helpCredential:
+        '连接 > 凭据中的 smtp 凭据：邮件服务器、其端口和 TLS，以及登录（中继无需用户）。不选：使用下面的邮件服务器，不登录。',
+      serverHelp: '未选择凭据时用于发送的邮件服务器，不登录（中继）。',
       webhookUrl: 'Webhook 地址',
       webhookUrlHelp_slack: 'Slack 频道的传入 Webhook (Slack 应用 > Incoming Webhooks): 属于机密, 保存后不再显示。',
       webhookUrlHelp_teams:
@@ -1707,6 +1709,8 @@ export default {
       type_vault: 'HashiCorp Vault',
       type_vaultHint: 'HashiCorp Vault 密钥存储登录所用的令牌和地址',
       userOptional: '用户（可选）',
+      passwordOptional: '密码（可选）',
+      smtpLoginHelp: '对于无需登录即可接收邮件的邮件服务器（中继），请留空。',
       rteToken: '令牌 (RTE_TOKEN)',
       rteTokenHelp: '启动 RTE 时使用的 RTE_TOKEN。',
       apiToken: 'API 令牌',

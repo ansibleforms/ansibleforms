@@ -263,6 +263,20 @@ export function channelType(item) {
 }
 
 /**
+ * Whether a channel is a mail one without a credential : it then sends through its own server,
+ * port and TLS, without a login (a relay), and needs its server.
+ *
+ * Args:
+ *   item (object): the channel (or the one being made).
+ *
+ * Returns:
+ *   boolean: true for a mail channel that names no credential.
+ */
+export function mailWithoutCredential(item) {
+  return channelType(item) === 'mail' && !String(item?.credential ?? '').trim();
+}
+
+/**
  * Where a channel sends, as the list shows it : a mail server's host and port, a webhook's host,
  * a Telegram chat ; a Slack or Teams webhook's address is a secret, so only its kind.
  *
@@ -446,8 +460,8 @@ export function noCredentialsText(t, type) {
 
 /**
  * What a credential's fields are called for its type, and what they say : a CyberArk's user is its
- * AppID, an RTE's password its RTE_TOKEN, an AWX's a token or a password, a runner's server its
- * address with what it ends with.
+ * AppID, an RTE's password its RTE_TOKEN, an AWX's a token or a password, an smtp one's user and
+ * password optional (none for a relay), a runner's server its address with what it ends with.
  *
  * Args:
  *   t (function): the translation.
@@ -465,7 +479,7 @@ export function credentialLabels(t, type) {
         ldap: t('settings.ldap.bindUserDn'),
         entraid: t('settings.oauth2.clientId'),
         oidc: t('settings.oauth2.clientId'),
-      }[type] || (awx ? t('settings.credentials.userOptional') : null),
+      }[type] || (awx || type === 'smtp' ? t('settings.credentials.userOptional') : null),
     password:
       {
         ldap: t('settings.ldap.bindUserPassword'),
@@ -476,13 +490,14 @@ export function credentialLabels(t, type) {
         semaphore: t('settings.credentials.apiToken'),
         rundeck: t('settings.credentials.apiToken'),
         jenkins: t('settings.credentials.apiToken'),
+        smtp: t('settings.credentials.passwordOptional'),
       }[type] || (awx ? t('settings.credentials.tokenOrPassword') : null),
+    // an smtp one : both left empty for a mail server that takes mail without a login (a relay)
     passwordHelp:
-      type === 'rte'
-        ? t('settings.credentials.rteTokenHelp')
-        : awx
-          ? t('settings.credentials.tokenOrPasswordHelp')
-          : null,
+      {
+        rte: t('settings.credentials.rteTokenHelp'),
+        smtp: t('settings.credentials.smtpLoginHelp'),
+      }[type] || (awx ? t('settings.credentials.tokenOrPasswordHelp') : null),
     serverHelp: SERVER_CREDENTIAL_TYPES.includes(type)
       ? ['vault', 'cyberark'].includes(type)
         ? t('settings.credentials.serverHelp')
@@ -2889,7 +2904,8 @@ export default function getSettings(t) {
         { key: 'channel', label: t('settings.notificationChannels.stepChannel') },
         { key: 'type', label: t('settings.notificationChannels.stepType') },
         // its credential first, as on every page : mail's smtp one (the mail server, its port and
-        // TLS, the login), a Telegram bot's or a webhook's token ; then mail's from address
+        // TLS, the login ; none : its own server, port and TLS, no login), a Telegram bot's or a
+        // webhook's token ; then mail's from address
         {
           key: 'credentials',
           label: t('settings.common.tabCredentials'),
@@ -3004,10 +3020,10 @@ export default function getSettings(t) {
         },
         {
           // where it sends and as whom : an smtp credential of Connections > Credentials (the mail
-          // server, its port and TLS, the login ; no user for a relay), or a New one
+          // server, its port and TLS, the login ; no user for a relay), or a New one ; none : the
+          // channel's own server below, without a login
           key: 'credential',
           step: 'credentials',
-          requiredWhen: (i) => channelType(i) === 'mail',
           icon: 'key',
           label: t('settings.notificationChannels.credential'),
           help: t('settings.notificationChannels.helpCredential'),
@@ -3024,6 +3040,41 @@ export default function getSettings(t) {
           choicesWhen: (c) => !c?.name || c.credential_type === 'smtp',
           hidden: true,
           showWhen: (i) => channelType(i) === 'mail',
+        },
+        {
+          // no credential : the mail server it sends through itself, without a login (a relay)
+          key: 'server',
+          step: 'credentials',
+          label: t('settings.mail.mailServer'),
+          help: t('settings.notificationChannels.serverHelp'),
+          placeholder: 'smtp.example.com',
+          icon: 'server',
+          noTable: true,
+          hidden: true,
+          showWhen: (i) => mailWithoutCredential(i),
+          requiredWhen: (i) => mailWithoutCredential(i),
+        },
+        {
+          key: 'port',
+          step: 'credentials',
+          type: 'number',
+          label: t('settings.mail.mailPort'),
+          help: t('settings.mail.mailPortHelp'),
+          placeholder: '25',
+          icon: 'arrows-alt-v',
+          noTable: true,
+          hidden: true,
+          showWhen: (i) => mailWithoutCredential(i),
+        },
+        {
+          key: 'secure',
+          step: 'credentials',
+          type: 'checkbox',
+          label: t('settings.mail.useTls'),
+          help: t('settings.mail.useTlsHelp'),
+          noTable: true,
+          hidden: true,
+          showWhen: (i) => mailWithoutCredential(i),
         },
         // ─── slack, teams ───
         {

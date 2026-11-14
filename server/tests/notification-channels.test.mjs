@@ -234,6 +234,27 @@ describe("sending to a channel", () => {
     maildo.mockRestore();
   });
 
+  test("mail without a login: no credential, or an smtp one without a user, sends with no auth", async () => {
+    const sendMail = vi.fn().mockResolvedValue({ messageId: "<id@x>" });
+    const nodemailer = (await import("nodemailer")).default;
+    const transport = vi.spyOn(nodemailer, "createTransport").mockReturnValue({ sendMail });
+    // no credential : the channel's own server
+    await notifiers.send({ name: "relay", type: "mail", server: "relay.example.com", port: 25, from_address: "af@example.com" }, message, ["a@example.com"]);
+    expect(transport.mock.calls[0][0]).toMatchObject({ host: "relay.example.com", port: 25, secure: false });
+    expect(transport.mock.calls[0][0].auth).toBeUndefined();
+    // an smtp credential with only its server
+    rows.relay = { name: "relay", credential_type: "smtp", host: "smtp.relay.example.com", port: 587, secure: 1 };
+    resolved["^relay$"] = { user: "", password: "" };
+    await notifiers.send({ name: "m", type: "mail", credential: "relay", from_address: "af@example.com" }, message, ["a@example.com"]);
+    expect(transport.mock.calls[1][0]).toMatchObject({ host: "smtp.relay.example.com", port: 587, secure: true });
+    expect(transport.mock.calls[1][0].auth).toBeUndefined();
+    // with a user : its login
+    resolved["^relay$"] = { user: "u", password: "p" };
+    await notifiers.send({ name: "m", type: "mail", credential: "relay", from_address: "af@example.com" }, message, ["a@example.com"]);
+    expect(transport.mock.calls[2][0].auth).toEqual({ user: "u", pass: "p" });
+    transport.mockRestore();
+  });
+
   test("by name: an unknown or a turned-off channel is skipped, one failing never stops the others", async () => {
     channels = [
       { id: 1, name: "off", type: "slack", enabled: 0, webhook_url: "https://x/off" },
@@ -259,8 +280,10 @@ describe("a channel checked by its type", () => {
     await expect(NotificationChannel.update({ type: "teams" }, 5)).rejects.toThrow(/stays what it was made as/);
   });
 
-  test("mail needs an smtp credential with its server (or its own, from before) ; the first one is active", async () => {
-    await expect(NotificationChannel.create({ name: "m", type: "mail" })).rejects.toThrow(/needs an smtp credential with its server/);
+  test("mail needs an smtp credential with its server, or its own ; the first one is active", async () => {
+    await expect(NotificationChannel.create({ name: "m", type: "mail" })).rejects.toThrow(/needs its mail server/);
+    rows.nohost = { name: "nohost", credential_type: "smtp", host: "" };
+    await expect(NotificationChannel.create({ name: "m", type: "mail", credential: "nohost" })).rejects.toThrow(/needs its mail server/);
     rows.api = { name: "api", credential_type: "api" };
     await expect(NotificationChannel.create({ name: "m", type: "mail", server: "smtp", credential: "api" })).rejects.toThrow(/needs an smtp credential/);
     const data = { name: "m", type: "mail", server: "smtp" };
@@ -268,6 +291,27 @@ describe("a channel checked by its type", () => {
     expect(data.is_active).toBe(1);
     expect(data.enabled).toBe(1);
     expect(queries.some((q) => /SET is_active = 0 WHERE id <> \? AND type = 'mail'/.test(q.sql) && q.args[0] === 7)).toBe(true);
+  });
+
+  test("mail without a credential (a relay): its own server, port and TLS are kept", async () => {
+    const data = { name: "relay", type: "mail", server: "relay.example.com", port: "25", secure: 0, credential: "" };
+    await expect(NotificationChannel.create(data)).resolves.toBe(7);
+    expect(data).toMatchObject({ server: "relay.example.com", port: 25, credential: null });
+    // an update that drops the credential needs the channel's own server
+    channels = [{ id: 3, name: "m", type: "mail", credential: "o365", server: null }];
+    rows.o365 = { name: "o365", credential_type: "smtp", host: "smtp.office365.com", port: 587, secure: 1 };
+    await expect(NotificationChannel.update({ credential: "" }, 3)).rejects.toThrow(/needs its mail server/);
+    await expect(NotificationChannel.update({ credential: "", server: "relay.example.com" }, 3)).resolves.toBeTruthy();
+  });
+
+  test("mail with a credential that has its server: the channel's own server is emptied, not by the seed", async () => {
+    rows.o365 = { name: "o365", credential_type: "smtp", host: "smtp.office365.com", port: 587, secure: 1 };
+    const data = { name: "m", type: "mail", server: "typed.example.com", port: 25, secure: 1, credential: "o365" };
+    await NotificationChannel.create(data);
+    expect(data).toMatchObject({ server: null, port: null, secure: 0, credential: "o365" });
+    const seeded = { name: "m", type: "mail", server: "typed.example.com", credential: "o365" };
+    await NotificationChannel.create(seeded, { fromSeed: true });
+    expect(seeded.server).toBe("typed.example.com");
   });
 
   test("slack and teams need an http(s) webhook ; its mask sent back keeps the stored one", async () => {

@@ -60,6 +60,19 @@ describe("an Open ID credential's issuer, an smtp one's host", () => {
     assert.throws(() => Credential.requireTypeFields({ credential_type: "smtp" }, true), /needs its mail server/);
     assert.equal(Credential.requireTypeFields({ credential_type: "smtp", host: "smtp.example.com" }, true).host, "smtp.example.com");
   });
+
+  test("an smtp one without a login (a relay): only its server, port and TLS, saved as they are", async () => {
+    const { vi } = await import("vitest");
+    const { default: CrudModel } = await import("../src/models/crud.model.js");
+    const saved = vi.spyOn(CrudModel, "create").mockResolvedValue(11);
+    const relay = { name: "relay", description: "d", credential_type: "smtp", host: "relay.example.com", port: "25", secure: 0, user: "", password: "" };
+    assert.equal(await Credential.create(relay), 11);
+    assert.deepEqual(
+      (({ user, password, host, port }) => ({ user, password, host, port }))(saved.mock.calls[0][1]),
+      { user: "", password: "", host: "relay.example.com", port: 25 },
+    );
+    vi.restoreAllMocks();
+  });
 });
 
 describe("an SSO credential's redirect URL", () => {
