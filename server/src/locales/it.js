@@ -98,7 +98,7 @@ export default {
     credentialNotFound:
       "Nessuna credenziale chiamata '{name}'",
     repositoryCredentialType:
-      "Un repository accede con un utente e una password: la credenziale '{name}' non li ha entrambi",
+      "Un repository accede con una password o un token: la credenziale '{name}' non ha né l'una né l'altro",
     credentialSignInAdminOnly:
       "Solo un admin può aggiungere, modificare o eliminare una credenziale usata da un accesso (LDAP, Microsoft Entra ID o OIDC)",
     credentialNotAllowed:

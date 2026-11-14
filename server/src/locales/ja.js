@@ -99,7 +99,7 @@ export default {
     credentialNotFound:
       "'{name}' という名前の資格情報はありません",
     repositoryCredentialType:
-      "リポジトリはユーザーとパスワードでサインインします: 資格情報 '{name}' には両方がありません",
+      "リポジトリはパスワードまたはトークンでサインインします: 資格情報 '{name}' にはどちらもありません",
     credentialSignInAdminOnly:
       "サインインが使う資格情報 (LDAP、Microsoft Entra ID、OIDC) を追加、変更、削除できるのは admin だけです",
     credentialNotAllowed:

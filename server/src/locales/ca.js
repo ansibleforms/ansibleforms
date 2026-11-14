@@ -102,7 +102,7 @@ export default {
     credentialNotFound:
       "No hi ha cap credencial anomenada '{name}'",
     repositoryCredentialType:
-      "Un repositori inicia sessió amb un usuari i una contrasenya: la credencial '{name}' no té tots dos",
+      "Un repositori inicia sessió amb una contrasenya o un token: la credencial '{name}' no en té cap",
     credentialSignInAdminOnly:
       "Només un admin pot afegir, canviar o eliminar una credencial que fa servir un inici de sessió (LDAP, Microsoft Entra ID o OIDC)",
     credentialNotAllowed:

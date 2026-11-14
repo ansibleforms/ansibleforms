@@ -93,7 +93,7 @@ export default {
     credentialNotFound:
       "没有名为 '{name}' 的凭据",
     repositoryCredentialType:
-      "仓库使用用户名和密码登录：凭据 '{name}' 缺少其中之一",
+      "仓库使用密码或令牌登录：凭据 '{name}' 两者都没有",
     credentialSignInAdminOnly:
       "只有 admin 可以添加、更改或删除登录所用的凭据 (LDAP、Microsoft Entra ID 或 OIDC)",
     credentialNotAllowed:
