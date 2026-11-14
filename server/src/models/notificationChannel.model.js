@@ -187,6 +187,12 @@ class NotificationChannel extends CrudModel {
         if (missing('from_address')) {
           throw new Errors.BadRequestError('A mail channel sending through Microsoft 365 needs its sender address: the mailbox it sends as');
         }
+        // step 3 (Microsoft 365) : it only ever sends to Microsoft (Graph, or smtp.office365.com
+        // for SMTP) : a server, port or TLS of its own, left from when it was a relay or declared
+        // with it, is emptied, so its token is never handed to another server. The seed too.
+        if (!missing('server') || !missing('port') || Number(merged.secure)) {
+          Object.assign(data, { server: null, port: null, secure: 0 });
+        }
       } else {
         // step 2 : where it sends : its credential's server, else its own
         const credentialServer = await this.credentialServer(credentialName);
@@ -414,8 +420,9 @@ class NotificationChannel extends CrudModel {
 
   /**
    * A mail channel with an entraid credential, as the mail sender takes it : how it sends
-   * (mail_provider graph, or smtp_oauth2 to its own server, else smtp.office365.com:587 with
-   * STARTTLS), its sender, and the app registration it gets its token as (lib/microsoftMail.js) :
+   * (mail_provider graph, or smtp_oauth2 to smtp.office365.com:587 with STARTTLS, never to a
+   * server of the channel's own : its token is Exchange Online's, for Microsoft only), its sender,
+   * and the app registration it gets its token as (lib/microsoftMail.js) :
    * the tenant, the client ID (the user, read from a secret store when the credential names one),
    * the client secret (its password) or the certificate and its private key.
    *
@@ -437,14 +444,14 @@ class NotificationChannel extends CrudModel {
       logger.error(`Mail channel '${server.name}' uses the credential '${server.credential}', which is not found`);
       throw new Error(`Mail channel '${server.name}' uses the credential '${server.credential}', which is not found`);
     }
-    // step 2 : how it sends ; SMTP to its own server when it has one, else to Exchange Online's
+    // step 2 : how it sends ; SMTP only ever to Exchange Online's server, whatever server, port or
+    // TLS the channel still holds (a relay's, from before its credential was an entraid one)
     const smtp = server.send_through === 'smtp';
-    const ownServer = smtp && String(server.server || '').trim();
     return {
       mail_provider: smtp ? 'smtp_oauth2' : 'graph',
-      mail_server: smtp ? ownServer || OFFICE365_SMTP.server : '',
-      mail_port: smtp ? (ownServer && server.port) || OFFICE365_SMTP.port : null,
-      mail_secure: ownServer ? (server.secure ? 1 : 0) : OFFICE365_SMTP.secure,
+      mail_server: smtp ? OFFICE365_SMTP.server : '',
+      mail_port: smtp ? OFFICE365_SMTP.port : null,
+      mail_secure: OFFICE365_SMTP.secure,
       mail_username: '',
       mail_password: '',
       mail_from: server.from_address,

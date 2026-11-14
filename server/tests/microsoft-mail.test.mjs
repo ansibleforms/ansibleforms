@@ -420,6 +420,31 @@ describe("a mail channel with an entraid credential", () => {
     expect(smtp).toMatchObject({ mail_provider: "smtp_oauth2", mail_server: "smtp.office365.com", mail_port: 587, mail_secure: 0 });
   });
 
+  test("a relay switched to an entraid credential and SMTP keeps none of the relay's server, through the API or the seed", async () => {
+    // a relay : its own server, port and TLS, no credential
+    const relay = { id: 3, name: "relay", type: "mail", server: "relay.corp.local", port: 2525, secure: 1, credential: null, send_through: null, from_address: "noreply@contoso.com" };
+    channels = [relay];
+    for (const opts of [{}, { fromSeed: true }]) {
+      const data = { credential: "m365", send_through: "smtp" };
+      const saved = await NotificationChannel.update(data, 3, opts);
+      expect(saved).toMatchObject({ credential: "m365", send_through: "smtp", server: null, port: null, secure: 0 });
+    }
+    // a server declared or sent with the entraid credential : emptied too
+    const declared = { credential: "m365", send_through: "smtp", server: "relay.corp.local", port: 25 };
+    await NotificationChannel.update(declared, 3, { fromSeed: true });
+    expect(declared).toMatchObject({ server: null, port: null, secure: 0 });
+  });
+
+  test("its SMTP mail config is Exchange Online's, never a relay's server the channel still holds", async () => {
+    vi.spyOn(NotificationChannel, "resolveCredential").mockResolvedValue({ user: "client-9", password: "sec" });
+    const stale = { name: "m", credential: "m365", from_address: "noreply@contoso.com", send_through: "smtp", server: "relay.corp.local", port: 25, secure: 1 };
+    const config = await NotificationChannel.toMailConfig(stale);
+    expect(config).toMatchObject({ mail_provider: "smtp_oauth2", mail_server: "smtp.office365.com", mail_port: 587, mail_secure: 0 });
+    // and the sender connects to Exchange Online whatever server its config carries
+    expect(await Settings.maildo({ ...config, mail_server: "relay.corp.local", mail_port: 25, mail_secure: 1, entra: entraSecret }, "a@contoso.com", "s", "b")).toBe("<a@contoso.com@test>");
+    expect(transports[0]).toMatchObject({ host: "smtp.office365.com", port: 587, secure: false, requireTLS: true });
+  });
+
   test("an smtp credential's mail config : its server and login, as before", async () => {
     vi.spyOn(NotificationChannel, "resolveCredential").mockResolvedValue({ user: "u", password: "p" });
     const config = await NotificationChannel.toMailConfig({ name: "m", credential: "smtp-login", from_address: "af@example.com" });
