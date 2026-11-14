@@ -471,12 +471,18 @@ export function noCredentialsText(t, type) {
  * Args:
  *   t (function): the translation.
  *   type (string): the credential type.
+ *   awxAuth (string): an AWX, AAP or Ascender one's sign-in, token or password (awx_auth).
+ *   gitAuth (string): a git one's sign-in, token or password (git_auth).
  *
  * Returns:
  *   object: { user, password, passwordHelp, serverHelp } ; null where the default fits.
  */
-export function credentialLabels(t, type) {
-  const awx = ['awx', 'aap', 'ascender'].includes(type);
+export function credentialLabels(t, type, awxAuth = 'token', gitAuth = 'token') {
+  const awx = AWX_CREDENTIAL_TYPES.includes(type);
+  // an AWX, AAP or Ascender one : a token, or a user and its password (awx_auth)
+  const awxPassword = awx && awxAuth === 'password';
+  // a git one : its user, and a token or that user's password (git_auth)
+  const gitToken = type === 'git' && gitAuth !== 'password';
   return {
     user:
       {
@@ -484,27 +490,26 @@ export function credentialLabels(t, type) {
         ldap: t('settings.ldap.bindUserDn'),
         entraid: t('settings.oauth2.clientId'),
         oidc: t('settings.oauth2.clientId'),
-      }[type] || (awx || type === 'smtp' ? t('settings.credentials.userOptional') : null),
+      }[type] || null,
     password:
       {
-        ldap: t('settings.ldap.bindUserPassword'),
+        // its bind user's password : plain Password, the field above names the bind user
+        ldap: t('settings.fields.password'),
         entraid: t('settings.oauth2.clientSecret'),
         oidc: t('settings.oauth2.clientSecret'),
         vault: t('settings.fields.token'),
-        rte: t('settings.credentials.rteToken'),
+        rte: t('settings.fields.token'),
         semaphore: t('settings.credentials.apiToken'),
         rundeck: t('settings.credentials.apiToken'),
         jenkins: t('settings.credentials.apiToken'),
-        smtp: t('settings.credentials.passwordOptional'),
-      }[type] || (awx ? t('settings.credentials.tokenOrPassword') : null),
-    // an smtp one : both left empty for a mail server that takes mail without a login (a relay) ;
-    // an ssh one may log in with a private key instead
+      }[type] ||
+      (awx ? (awxPassword ? t('settings.fields.password') : t('settings.fields.token')) : null) ||
+      (gitToken ? t('settings.fields.token') : null),
+    // an smtp one : both left empty for a mail server that takes mail without a login (a relay)
     passwordHelp:
       {
         rte: t('settings.credentials.rteTokenHelp'),
-        smtp: t('settings.credentials.smtpLoginHelp'),
-        ssh: t('settings.credentials.sshPasswordHelp'),
-      }[type] || (awx ? t('settings.credentials.tokenOrPasswordHelp') : null),
+      }[type] || null,
     serverHelp: SERVER_CREDENTIAL_TYPES.includes(type)
       ? ['vault', 'cyberark'].includes(type)
         ? t('settings.credentials.serverHelp')
@@ -1806,8 +1811,38 @@ export default function getSettings(t) {
         login_written_note: _written,
         secret_overwrite,
         entra_auth,
+        ssh_auth,
+        awx_auth,
+        git_auth,
+        smtp_auth,
+        with_host,
+        optional_host,
+        optional_port,
         ...item
       }) => {
+        // a user and password or an api one : its host and port behind the switch, none when off
+        if (hasOptionalHost(item) && with_host !== undefined) {
+          item.host = with_host ? String(optional_host ?? '').trim() : '';
+          item.port = with_host && String(optional_port ?? '').trim() !== '' ? optional_port : null;
+        }
+        // a git one signing in with a token : no user kept
+        if (item.credential_type === 'git' && git_auth !== 'password' && git_auth !== undefined) item.user = '';
+        // an smtp relay : no login kept
+        if (item.credential_type === 'smtp' && smtp_auth === 'none') {
+          item.user = '';
+          item.password = '';
+        }
+        // an AWX, AAP or Ascender one signing in with a token : no user kept
+        if (AWX_CREDENTIAL_TYPES.includes(item.credential_type) && awx_auth !== 'password') item.user = '';
+        // an SSH one logs in with its password or with a private key, never both : the other kept
+        // empty (sshUsesKey)
+        if (item.credential_type === 'ssh') {
+          if (ssh_auth === 'key') delete item.password;
+          else {
+            delete item.client_key;
+            delete item.key_passphrase;
+          }
+        }
         // an Entra ID one signing in with its secret : no certificate kept
         if (item.credential_type === 'entraid' && entra_auth !== 'certificate') {
           item.client_cert = '';
@@ -1952,6 +1987,8 @@ export default function getSettings(t) {
           key: 'db_type',
           step: 'login',
           label: t('settings.credentials.databaseType'),
+          // in the dialog : its engine (MySQL, PostgreSQL ...) ; the database's name is the Database
+          dialogLabel: t('settings.credentials.databaseEngine'),
           type: 'select',
           sortable: false,
           hidden: true,
@@ -1968,10 +2005,9 @@ export default function getSettings(t) {
         {
           key: 'host',
           step: 'login',
-          dependency: 'credential_type',
-          // a user and password or an api one : optional, handed to the playbook and the
-          // expressions with the credential (issue #1326)
-          dependencyValues: HOST_CREDENTIAL_TYPES,
+          // where it connects : an ssh, a database, an smtp or an ldap one ; a user and password or
+          // an api one has its own, after its password, behind a switch (optional_host)
+          showWhen: (r) => HOST_CREDENTIAL_TYPES.includes(r.credential_type) && !hasOptionalHost(r),
           label: t('settings.fields.host'),
           // an smtp one's host is its mail server, an ldap one's its directory's servers (one per
           // input, tried in order) : both need it
@@ -1997,8 +2033,7 @@ export default function getSettings(t) {
         {
           key: 'port',
           step: 'login',
-          dependency: 'credential_type',
-          dependencyValues: HOST_CREDENTIAL_TYPES,
+          showWhen: (r) => HOST_CREDENTIAL_TYPES.includes(r.credential_type) && !hasOptionalHost(r),
           label: t('settings.fields.port'),
           dialogLabel: (r) => (r.credential_type === 'smtp' ? t('settings.mail.mailPort') : null),
           help: (r) =>
@@ -2085,16 +2120,94 @@ export default function getSettings(t) {
           dependencyValues: SERVER_CREDENTIAL_TYPES,
         },
         {
+          // an entraid or oidc credential's redirect URL, as registered with the client : empty, the
+          // app's address and the type's callback path (shown as its placeholder) ; before its
+          // client id (the user) and what it signs in with
+          key: 'redirect_uri',
+          step: 'login',
+          icon: 'link',
+          label: t('settings.oauth2.redirectUrl'),
+          help: t('settings.oauth2.redirectHelp'),
+          placeholder: (r, config) =>
+            ssoCallbackUrl(r.credential_type, config?.url) || ssoCallbackUrl(r.credential_type, SSO_EXAMPLE_BASE),
+          hidden: true,
+          noTable: true,
+          dependency: 'credential_type',
+          dependencyValues: ['entraid', 'oidc'],
+        },
+        {
+          // an AWX, AAP or Ascender one : what it signs in with, a token or a user and its
+          // password. Not stored : a user kept is the choice
+          key: 'awx_auth',
+          step: 'login',
+          // among the Login step's fields : its hints where their inputs start
+          alignHints: true,
+          label: t('settings.credentials.awxSignIn'),
+          type: 'radio',
+          options: awxAuthOptionList(t),
+          initial: (r) => (r?.user ? 'password' : 'token'),
+          hidden: true,
+          noTable: true,
+          // nothing to choose when the user and password are read from a secret store
+          showWhen: (r) => AWX_CREDENTIAL_TYPES.includes(r.credential_type) && !readFromStore(r),
+          dependencyValues: AWX_CREDENTIAL_TYPES,
+        },
+        {
+          // a git one : a token without a user (git sends one for it, the server's GIT_TOKEN_USER)
+          // or a user and its password. Not stored : a user kept is the choice
+          key: 'git_auth',
+          step: 'login',
+          // among the Login step's fields : its hints where their inputs start
+          alignHints: true,
+          label: t('settings.credentials.gitSignIn'),
+          type: 'radio',
+          options: gitAuthOptionList(t),
+          initial: (r) => (r?.user ? 'password' : 'token'),
+          hidden: true,
+          noTable: true,
+          // nothing to choose when the user and password are read from a secret store
+          showWhen: (r) => ['git'].includes(r.credential_type) && !readFromStore(r),
+          dependencyValues: ['git'],
+        },
+        {
+          // an smtp one : a mail server that takes mail without a login (a relay), or a user and
+          // its password. Not stored : a user kept is the choice
+          key: 'smtp_auth',
+          step: 'login',
+          // among the Login step's fields : its hints where their inputs start
+          alignHints: true,
+          label: t('settings.credentials.smtpSignIn'),
+          type: 'radio',
+          options: smtpAuthOptionList(t),
+          initial: (r) => (r?.user ? 'password' : 'none'),
+          hidden: true,
+          noTable: true,
+          // nothing to choose when the user and password are read from a secret store
+          showWhen: (r) => r.credential_type === 'smtp' && !readFromStore(r),
+          dependencyValues: ['smtp'],
+        },
+        {
           key: 'user',
           step: 'login',
           label: t('settings.fields.user'),
           // a cyberark credential's user is its AppID, an ldap one's the bind DN, an entraid or oidc
           // one's the client id, an AWX's optional (a token without one)
-          dialogLabel: (r) => credentialLabels(t, r.credential_type).user,
+          dialogLabel: (r) => credentialLabels(t, r.credential_type, r.awx_auth).user,
           help: (r) => (r.credential_type === 'cyberark' ? t('settings.secretStores.appIdHelp') : null),
           // a Vault, an RTE, a Semaphore and a Rundeck log in with a token only ; none typed when
           // the user and password are read from a secret store
-          showWhen: (r) => !TOKEN_CREDENTIAL_TYPES.includes(r.credential_type) && !readFromStore(r),
+          // an AWX, AAP or Ascender one signing in with a token has none
+          showWhen: (r) =>
+            !TOKEN_CREDENTIAL_TYPES.includes(r.credential_type) &&
+            !(AWX_CREDENTIAL_TYPES.includes(r.credential_type) && !awxUsesPassword(r)) &&
+            !smtpRelay(r) &&
+            !(r.credential_type === 'git' && r.git_auth !== 'password') &&
+            !readFromStore(r),
+          // an AWX, AAP, Ascender, smtp or git one signing in with a password : the user it signs
+          // in as
+          requiredWhen: (r) =>
+            (awxUsesPassword(r) || smtpUsesPassword(r) || (r.credential_type === 'git' && r.git_auth === 'password')) &&
+            !readFromStore(r),
           // no column : what it is depends on the type (a user, a bind DN, a client id), its page
           // shows it
           noTable: true,
@@ -2109,6 +2222,8 @@ export default function getSettings(t) {
           // kept is the choice
           key: 'entra_auth',
           step: 'login',
+          // among the Login step's fields : its hints where their inputs start
+          alignHints: true,
           label: t('settings.credentials.entraSignIn'),
           type: 'radio',
           options: entraAuthOptionList(t),
@@ -2117,6 +2232,22 @@ export default function getSettings(t) {
           noTable: true,
           dependency: 'credential_type',
           dependencyValues: ['entraid'],
+        },
+        {
+          // an SSH one : what it logs in with, its password or a private key (with an optional
+          // passphrase). Not stored : a private key kept is the choice
+          key: 'ssh_auth',
+          step: 'login',
+          // among the Login step's fields : its hints where their inputs start
+          alignHints: true,
+          label: t('settings.credentials.sshSignIn'),
+          type: 'radio',
+          options: sshAuthOptionList(t),
+          initial: (r) => (r?.client_key ? 'key' : 'password'),
+          hidden: true,
+          noTable: true,
+          dependency: 'credential_type',
+          dependencyValues: ['ssh'],
         },
         {
           key: 'password',
@@ -2132,11 +2263,27 @@ export default function getSettings(t) {
           hidden: true,
           // an ldap credential's password is the bind password, an entraid or oidc one's the client
           // secret, a runner's and a Vault's a token (an AWX's a token or its user's password)
-          dialogLabel: (r) => credentialLabels(t, r.credential_type).password,
-          help: (r) => credentialLabels(t, r.credential_type).passwordHelp,
+          dialogLabel: (r) => credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).password,
+          help: (r) => credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).passwordHelp,
           // a cyberark credential has a client key instead, and so has an entraid one signing in
           // with a certificate ; none typed when the user and password are read from a secret store
-          showWhen: (r) => r.credential_type !== 'cyberark' && !entraCertificate(r) && !readFromStore(r),
+          showWhen: (r) =>
+            r.credential_type !== 'cyberark' &&
+            !entraCertificate(r) &&
+            !sshUsesKey(r) &&
+            !smtpRelay(r) &&
+            !readFromStore(r),
+          // a new one that signs in with what is typed here : an AWX, AAP or Ascender one (its
+          // token or its user's password), an smtp one with a login, a git one (its token or
+          // password), an ssh one with its password ; an existing one keeps its stored one when
+          // left empty
+          requiredWhen: (r) =>
+            !r.id &&
+            !readFromStore(r) &&
+            (AWX_CREDENTIAL_TYPES.includes(r.credential_type) ||
+              smtpUsesPassword(r) ||
+              r.credential_type === 'git' ||
+              (r.credential_type === 'ssh' && !sshUsesKey(r))),
         },
         {
           // read from a secret store : said where the user and password would be, so the step
@@ -2166,19 +2313,41 @@ export default function getSettings(t) {
           }),
         },
         {
-          // an entraid or oidc credential's redirect URL, as registered with the client : empty,
-          // the app's address and the type's callback path (shown as its placeholder)
-          key: 'redirect_uri',
+          // a user and password or an api one : a host and a port handed to the playbook and the
+          // expressions with the credential (issue #1326), asked once this is on
+          key: 'with_host',
           step: 'login',
-          icon: 'link',
-          label: t('settings.oauth2.redirectUrl'),
-          help: t('settings.oauth2.redirectHelp'),
-          placeholder: (r, config) =>
-            ssoCallbackUrl(r.credential_type, config?.url) || ssoCallbackUrl(r.credential_type, SSO_EXAMPLE_BASE),
+          type: 'checkbox',
+          flush: true,
+          label: t('settings.credentials.addHostPort'),
+          help: t('settings.credentials.addHostPortHelp'),
+          initial: (r) => !!String(r?.host ?? '').trim(),
           hidden: true,
           noTable: true,
-          dependency: 'credential_type',
-          dependencyValues: ['entraid', 'oidc'],
+          showWhen: (r) => hasOptionalHost(r),
+        },
+        {
+          // its host, saved as host (beforeSave)
+          key: 'optional_host',
+          step: 'login',
+          icon: 'server',
+          label: t('settings.fields.host'),
+          initial: (r) => r?.host ?? '',
+          hidden: true,
+          noTable: true,
+          showWhen: (r) => hasOptionalHost(r) && !!r.with_host,
+        },
+        {
+          // its port, saved as port (beforeSave)
+          key: 'optional_port',
+          step: 'login',
+          type: 'number',
+          icon: 'arrows-alt-v',
+          label: t('settings.fields.port'),
+          initial: (r) => r?.port ?? '',
+          hidden: true,
+          noTable: true,
+          showWhen: (r) => hasOptionalHost(r) && !!r.with_host,
         },
         {
           // an ldap one with TLS : its servers' certificates not checked ; a server's (an api,
@@ -2257,8 +2426,10 @@ export default function getSettings(t) {
           // shown empty : the stored key is never sent back ; left empty, it stays
           initial: () => '',
           // a cyberark one's, an entraid one's signing in with a certificate, or an ssh one's
-          // private key
-          showWhen: (r) => ['cyberark', 'ssh'].includes(r.credential_type) || entraCertificate(r),
+          // private key when it logs in with one
+          showWhen: (r) => r.credential_type === 'cyberark' || sshUsesKey(r) || entraCertificate(r),
+          // a new ssh one logging in with a key : the key it logs in with
+          requiredWhen: (r) => sshUsesKey(r) && !r.id,
         },
         {
           // an ssh one's private key's passphrase : loaded into an ssh-agent for the job on the RTE
@@ -2274,8 +2445,8 @@ export default function getSettings(t) {
           required: false,
           // shown empty : the stored one is never sent back ; left empty, it stays
           initial: () => '',
-          dependency: 'credential_type',
-          dependencyValues: ['ssh'],
+          // only for an ssh one logging in with a private key
+          showWhen: (r) => sshUsesKey(r),
         },
         {
           key: 'secret_store',
@@ -3083,8 +3254,9 @@ export default function getSettings(t) {
         },
         {
           // where it sends and as whom : an smtp credential of Connections > Credentials (the mail
-          // server, its port and TLS, the login ; no user for a relay), or a New one ; none : the
-          // channel's own server below, without a login
+          // server, its port and TLS, the login, or No login for a relay) or an entraid one, or a
+          // New one. A new mail channel always names one ; one without (from before, or the
+          // upgrade's relay) keeps its own server, on its page
           key: 'credential',
           step: 'credentials',
           icon: 'key',
@@ -3103,41 +3275,7 @@ export default function getSettings(t) {
           choicesWhen: (c) => !c?.name || ['smtp', 'entraid'].includes(c.credential_type),
           hidden: true,
           showWhen: (i) => channelType(i) === 'mail',
-        },
-        {
-          // no credential : the mail server it sends through itself, without a login (a relay)
-          key: 'server',
-          step: 'credentials',
-          label: t('settings.mail.mailServer'),
-          help: t('settings.notificationChannels.serverHelp'),
-          placeholder: 'smtp.example.com',
-          icon: 'server',
-          noTable: true,
-          hidden: true,
-          showWhen: (i) => mailWithoutCredential(i),
-          requiredWhen: (i) => mailWithoutCredential(i),
-        },
-        {
-          key: 'port',
-          step: 'credentials',
-          type: 'number',
-          label: t('settings.mail.mailPort'),
-          help: t('settings.mail.mailPortHelp'),
-          placeholder: '25',
-          icon: 'arrows-alt-v',
-          noTable: true,
-          hidden: true,
-          showWhen: (i) => mailWithoutCredential(i),
-        },
-        {
-          key: 'secure',
-          step: 'credentials',
-          type: 'checkbox',
-          label: t('settings.mail.useTls'),
-          help: t('settings.mail.useTlsHelp'),
-          noTable: true,
-          hidden: true,
-          showWhen: (i) => mailWithoutCredential(i),
+          requiredWhen: (i) => channelType(i) === 'mail',
         },
         {
           // an entraid credential : how it sends, Microsoft Graph (the default) or SMTP with OAuth2
@@ -4242,6 +4380,163 @@ export const SEND_THROUGH = ['graph', 'smtp'];
 
 // what an Entra ID credential signs in with : its client secret (the default) or a certificate
 export const ENTRA_AUTH = ['secret', 'certificate'];
+
+// what an SSH credential logs in with : its password (the default) or a private key
+export const SSH_AUTH = ['password', 'key'];
+
+/**
+ * Whether a credential is a user and password or an api one, whose host and port are optional
+ * and asked behind a switch after its password.
+ *
+ * Args:
+ *   item (object): the credential.
+ *
+ * Returns:
+ *   boolean: true for such a credential.
+ */
+export function hasOptionalHost(item) {
+  return OPTIONAL_HOST_CREDENTIAL_TYPES.includes(item?.credential_type);
+}
+
+// what an smtp credential signs in with : no login (a relay, the default) or a user and its password
+export const SMTP_AUTH = ['none', 'password'];
+
+/**
+ * Whether a credential is an smtp one for a relay : no user nor password asked.
+ *
+ * Args:
+ *   item (object): the credential.
+ *
+ * Returns:
+ *   boolean: true for an smtp credential with No login chosen.
+ */
+export function smtpRelay(item) {
+  return item?.credential_type === 'smtp' && item?.smtp_auth === 'none';
+}
+
+/**
+ * Whether a credential is an smtp one that signs in with a user and its password.
+ *
+ * Args:
+ *   item (object): the credential.
+ *
+ * Returns:
+ *   boolean: true for an smtp credential with Password chosen.
+ */
+export function smtpUsesPassword(item) {
+  return item?.credential_type === 'smtp' && item?.smtp_auth === 'password';
+}
+
+/**
+ * What an smtp credential signs in with, as radio choices : no login or a user and its password,
+ * each its label and a few words. The smtp_auth field and the credential page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per SMTP_AUTH value, in its order.
+ */
+export function smtpAuthOptionList(t) {
+  return SMTP_AUTH.map((value) => ({
+    value,
+    label: t(`settings.credentials.smtpSignIn_${value}`),
+    hint: t(`settings.credentials.smtpSignInHint_${value}`),
+  }));
+}
+
+// what a git credential's user signs in with : a token (the default) or its password
+export const GIT_AUTH = ['token', 'password'];
+
+/**
+ * What a git credential signs in with, as radio choices : a token or its user's password, each its
+ * label and a few words. The git_auth field and the credential page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per GIT_AUTH value, in its order.
+ */
+export function gitAuthOptionList(t) {
+  return GIT_AUTH.map((value) => ({
+    value,
+    label: t(`settings.credentials.gitSignIn_${value}`),
+    hint: t(`settings.credentials.gitSignInHint_${value}`),
+  }));
+}
+
+// the credential types of an AWX, an AAP and an Ascender : a token, or a user and its password
+export const AWX_CREDENTIAL_TYPES = ['awx', 'aap', 'ascender'];
+
+// what an AWX, AAP or Ascender credential signs in with : a token (the default) or a user and its
+// password
+export const AWX_AUTH = ['token', 'password'];
+
+/**
+ * Whether a credential being made or edited is an AWX, AAP or Ascender one that signs in with a
+ * user and its password : its user is asked, not only a token.
+ *
+ * Args:
+ *   item (object): the credential.
+ *
+ * Returns:
+ *   boolean: true for such a credential with User and password chosen.
+ */
+export function awxUsesPassword(item) {
+  return AWX_CREDENTIAL_TYPES.includes(item?.credential_type) && item?.awx_auth === 'password';
+}
+
+/**
+ * What an AWX, AAP or Ascender credential signs in with, as radio choices : a token or a user and
+ * its password, each its label and a few words. The awx_auth field and the credential page both
+ * offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per AWX_AUTH value, in its order.
+ */
+export function awxAuthOptionList(t) {
+  return AWX_AUTH.map((value) => ({
+    value,
+    label: t(`settings.credentials.awxSignIn_${value}`),
+    hint: t(`settings.credentials.awxSignInHint_${value}`),
+  }));
+}
+
+/**
+ * Whether a credential being made or edited is an SSH one that logs in with a private key : its
+ * key and passphrase are asked, not its password.
+ *
+ * Args:
+ *   item (object): the credential.
+ *
+ * Returns:
+ *   boolean: true for an ssh credential with Private key chosen.
+ */
+export function sshUsesKey(item) {
+  return item?.credential_type === 'ssh' && item?.ssh_auth === 'key';
+}
+
+/**
+ * What an SSH credential logs in with, as radio choices : its password or a private key, each its
+ * label and a few words. The ssh_auth field and the credential page both offer these.
+ *
+ * Args:
+ *   t (function): the translation.
+ *
+ * Returns:
+ *   Array<object>: { value, label, hint } per SSH_AUTH value, in its order.
+ */
+export function sshAuthOptionList(t) {
+  return SSH_AUTH.map((value) => ({
+    value,
+    label: t(`settings.credentials.sshSignIn_${value}`),
+    hint: t(`settings.credentials.sshSignInHint_${value}`),
+  }));
+}
 
 /**
  * How a mail channel with an entraid credential sends, as radio choices : Microsoft Graph or SMTP

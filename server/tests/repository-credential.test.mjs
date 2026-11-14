@@ -36,7 +36,7 @@ vi.mock("../src/models/credential.model.v2.js", () => ({
   },
 }));
 
-const Repository = (await import("../src/models/repository.model.js")).default;
+const { default: Repository, GIT_TOKEN_USER } = await import("../src/models/repository.model.js");
 
 beforeEach(() => {
   lookups.length = 0;
@@ -70,8 +70,16 @@ describe("Repository.withCredential", () => {
     await assert.rejects(Repository.withCredential({ name: "infra", credential: "gone" }));
   });
 
-  test("fails when the credential has no user", async () => {
-    stored = { user: "", password: "x" };
+  test("a token without a user : git sends the token user with it", async () => {
+    stored = { user: "", password: "ghp_token" };
+    const out = await Repository.withCredential({ name: "infra", credential: "token" });
+    assert.equal(out.user, GIT_TOKEN_USER);
+    assert.equal(out.user, "oauth2");
+    assert.equal(out.password, "ghp_token");
+  });
+
+  test("fails when the credential has neither a user nor a password", async () => {
+    stored = { user: "", password: "" };
     await assert.rejects(Repository.withCredential({ name: "infra", credential: "half" }), /not found/);
   });
 

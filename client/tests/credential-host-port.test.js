@@ -19,16 +19,52 @@ const credentials = getSettings((key) => key).credentials;
 const field = (key) => credentials.fields.find((f) => f.key === key);
 
 describe("a credential's host and port", () => {
-  it('are asked of a user and password and an api credential, as of the ones that connect', () => {
-    for (const type of ['ssh', 'database', 'smtp', 'ldap', 'userpass', 'api']) {
-      expect(field('host').dependencyValues).toContain(type);
-      expect(field('port').dependencyValues).toContain(type);
+  it('the shared host and port : for the ones that connect, not behind a switch', () => {
+    for (const credential_type of ['ssh', 'database', 'smtp', 'ldap']) {
+      expect(field('host').showWhen({ credential_type })).toBe(true);
+      expect(field('port').showWhen({ credential_type })).toBe(true);
     }
     expect(HOST_CREDENTIAL_TYPES).toEqual(expect.arrayContaining(OPTIONAL_HOST_CREDENTIAL_TYPES));
-    // a git one, an SSO one or a runner's : none
-    for (const type of ['git', 'entraid', 'oidc', 'vault', 'awx']) {
-      expect(field('host').dependencyValues).not.toContain(type);
+    // a git one, an SSO one or a runner's : none ; a user and password or an api one : its own
+    for (const credential_type of ['git', 'entraid', 'oidc', 'vault', 'awx', 'userpass', 'api']) {
+      expect(field('host').showWhen({ credential_type })).toBe(false);
     }
+  });
+
+  it('a user and password or an api one : a switch after the password, then its host and port', () => {
+    const fields = credentials.fields.map((f) => f.key);
+    expect(fields.indexOf('with_host')).toBeGreaterThan(fields.indexOf('password'));
+    expect(fields.indexOf('optional_host')).toBe(fields.indexOf('with_host') + 1);
+    expect(fields.indexOf('optional_port')).toBe(fields.indexOf('with_host') + 2);
+    for (const credential_type of OPTIONAL_HOST_CREDENTIAL_TYPES) {
+      expect(field('with_host').showWhen({ credential_type })).toBe(true);
+      expect(field('optional_host').showWhen({ credential_type, with_host: false })).toBe(false);
+      expect(field('optional_host').showWhen({ credential_type, with_host: true })).toBe(true);
+      expect(field('optional_port').showWhen({ credential_type, with_host: true })).toBe(true);
+    }
+    expect(field('with_host').showWhen({ credential_type: 'ssh' })).toBe(false);
+    // on when a host is kept
+    expect(field('with_host').initial({ host: 'api.example.com' })).toBe(true);
+    expect(field('with_host').initial({})).toBe(false);
+  });
+
+  it('saved as host and port when on, none when off', () => {
+    const base = { name: 'api', credential_type: 'api', password: 'tok' };
+    const on = credentials.beforeSave({
+      ...base,
+      with_host: true,
+      optional_host: ' api.example.com ',
+      optional_port: 8443,
+    });
+    expect(on).toMatchObject({ host: 'api.example.com', port: 8443 });
+    expect(on).not.toHaveProperty('optional_host');
+    const off = credentials.beforeSave({
+      ...base,
+      with_host: false,
+      optional_host: 'api.example.com',
+      optional_port: 8443,
+    });
+    expect(off).toMatchObject({ host: '', port: null });
   });
 
   it('stay optional for a user and password and an api credential', () => {

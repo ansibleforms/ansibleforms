@@ -2,7 +2,7 @@
 // server (its user and password said optional), or a mail channel with no credential at all, then
 // sending through its own server, port and TLS.
 import { describe, it, expect } from 'vitest';
-import getSettings, { credentialLabels, mailWithoutCredential } from '@/config/settings';
+import getSettings, { credentialLabels, mailWithoutCredential, SMTP_AUTH } from '@/config/settings';
 
 const t = (key) => key;
 const settings = getSettings(t);
@@ -17,13 +17,26 @@ describe('an smtp credential without a login', () => {
     expect(credentialField('password').required).toBe(false);
   });
 
-  it('says so : optional labels and a note for a relay', () => {
-    const labels = credentialLabels(t, 'smtp');
-    expect(labels.user).toBe('settings.credentials.userOptional');
-    expect(labels.password).toBe('settings.credentials.passwordOptional');
-    expect(labels.passwordHelp).toBe('settings.credentials.smtpLoginHelp');
-    // the other types keep theirs
-    expect(credentialLabels(t, 'userpass')).toMatchObject({ user: null, password: null, passwordHelp: null });
+  it('asks No login or Password : a relay by default, a user kept meaning password', () => {
+    const choice = credentialField('smtp_auth');
+    expect(choice.type).toBe('radio');
+    expect(choice.alignHints).toBe(true);
+    expect(choice.options.map((o) => o.value)).toEqual(SMTP_AUTH);
+    expect(choice.initial({})).toBe('none');
+    expect(choice.initial({ user: 'mailer' })).toBe('password');
+  });
+
+  it('a relay : no user nor password asked or kept ; with a password, the user needed', () => {
+    const relay = { credential_type: 'smtp', smtp_auth: 'none', secret_source: 'local' };
+    const login = { credential_type: 'smtp', smtp_auth: 'password', secret_source: 'local' };
+    expect(credentialField('user').showWhen(relay)).toBe(false);
+    expect(credentialField('password').showWhen(relay)).toBe(false);
+    expect(credentialField('user').showWhen(login)).toBe(true);
+    expect(credentialField('user').requiredWhen(login)).toBe(true);
+    const saved = settings.credentials.beforeSave({ name: 'relay', host: 'mx', ...relay, user: 'x', password: 'y' });
+    expect(saved).toMatchObject({ user: '', password: '' });
+    // plain labels now : the choice says it
+    expect(credentialLabels(t, 'smtp')).toMatchObject({ user: null, password: null, passwordHelp: null });
     expect(credentialLabels(t, 'rte').passwordHelp).toBe('settings.credentials.rteTokenHelp');
   });
 });
@@ -36,18 +49,11 @@ describe('a mail channel without a credential', () => {
     expect(mailWithoutCredential({ type: 'slack' })).toBe(false);
   });
 
-  it('the credential is optional ; without one, its own server (needed), port and TLS are asked', () => {
-    expect(channelField('credential').required).toBeFalsy();
-    expect(channelField('credential').requiredWhen).toBeUndefined();
-    const relay = { type: 'mail', credential: '' };
-    const withLogin = { type: 'mail', credential: 'o365' };
-    for (const key of ['server', 'port', 'secure']) {
-      expect(channelField(key).step).toBe('credentials');
-      expect(channelField(key).showWhen(relay)).toBe(true);
-      expect(channelField(key).showWhen(withLogin)).toBe(false);
-      expect(channelField(key).showWhen({ type: 'webhook' })).toBe(false);
-    }
-    expect(channelField('server').requiredWhen(relay)).toBe(true);
-    expect(channelField('server').requiredWhen(withLogin)).toBe(false);
+  it('the wizard asks a mail channel only its credential, needed ; no server, port or TLS', () => {
+    const credential = channelField('credential');
+    expect(credential.step).toBe('credentials');
+    expect(credential.requiredWhen({ type: 'mail' })).toBe(true);
+    expect(credential.requiredWhen({ type: 'webhook' })).toBe(false);
+    for (const key of ['server', 'port', 'secure']) expect(channelField(key)).toBeUndefined();
   });
 });
