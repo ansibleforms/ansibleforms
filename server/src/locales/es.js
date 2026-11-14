@@ -218,6 +218,11 @@ export default {
     failedFindSettings: "Error al buscar la configuración",
     mailCheckFailed: "La verificación del correo ha fallado",
     mailSent: "Correo enviado con id {id}",
+    mailSentWithChannel: "Correo enviado con id {id} por el canal de correo {name}",
+    mailSettingsMoved:
+      "La configuración del correo se ha movido a Conexiones > Notificaciones: ahora el servidor de correo está en un canal de correo, así que los campos mail_* se ignoran y no se ha cambiado nada",
+    mailCheckNoChannel:
+      "No hay ningún canal de correo activo: añada uno en Conexiones > Notificaciones y envíe un correo de prueba con su botón Probar",
     syslogSent: "Mensaje de syslog enviado a {where}",
     syslogCheckFailed: "El envío del mensaje de syslog ha fallado",
     failedUpdateSettings: "Error al actualizar la configuración",

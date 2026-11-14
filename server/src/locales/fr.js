@@ -225,6 +225,11 @@ export default {
     failedFindSettings: "Echec de la recherche des parametres",
     mailCheckFailed: "Echec de la verification mail",
     mailSent: "Mail envoye avec l'id {id}",
+    mailSentWithChannel: "Mail envoye avec l'id {id} par le canal de mail {name}",
+    mailSettingsMoved:
+      "Les parametres de mail ont ete deplaces vers Connexions > Notifications : le serveur de mail est maintenant dans un canal de mail, les champs mail_* sont donc ignores et rien n'a ete modifie",
+    mailCheckNoChannel:
+      "Il n'y a aucun canal de mail actif : ajoutez-en un dans Connexions > Notifications et envoyez un mail de test avec son bouton Tester",
     syslogSent: "Message syslog envoye a {where}",
     syslogCheckFailed: "Echec du message syslog",
     failedUpdateSettings: "Echec de la mise a jour des parametres",

@@ -215,6 +215,11 @@ export default {
     failedFindSettings: "Falha ao encontrar as definições",
     mailCheckFailed: "A verificação do correio falhou",
     mailSent: "Correio enviado com o id {id}",
+    mailSentWithChannel: "Correio enviado com o id {id} pelo canal de correio {name}",
+    mailSettingsMoved:
+      "As definições de correio passaram para Ligações > Notificações: o servidor de correio está agora num canal de correio, por isso os campos mail_* são ignorados e nada foi alterado",
+    mailCheckNoChannel:
+      "Não há nenhum canal de correio ativo: adicione um em Ligações > Notificações e envie um correio de teste com o respetivo botão Testar",
     syslogSent: "Mensagem de syslog enviada para {where}",
     syslogCheckFailed: "O envio da mensagem de syslog falhou",
     failedUpdateSettings: "Falha ao atualizar as definições",

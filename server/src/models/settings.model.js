@@ -18,7 +18,9 @@ var Settings=function(settings){
     // partial update (e.g. only the url) never wipes other columns.
     // The mail_* fields of before 7.6 are not accepted any more : the mail goes through the
     // mail channels (Connections > Notifications), and the settings row has no mail columns.
-    // A client that still sends them is answered as before, they are simply left out.
+    // They are left out here ; PUT /settings (controllers/v2/settings.controller.js) drops them
+    // before its checks, logs a deprecation warning once, and answers a body of only mail_*
+    // fields with a 400 that says where the mail settings went.
     if(settings.url !== undefined){
       this.url = settings.url;
     }

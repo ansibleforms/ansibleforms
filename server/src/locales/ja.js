@@ -215,6 +215,11 @@ export default {
     failedFindSettings: "設定の検索に失敗しました",
     mailCheckFailed: "メールの確認に失敗しました",
     mailSent: "メールを送信しました (ID: {id})",
+    mailSentWithChannel: "メールチャネル {name} でメールを送信しました (ID: {id})",
+    mailSettingsMoved:
+      "メール設定は 接続 > 通知 に移動しました。メールサーバーは現在メールチャネルが保持するため、mail_* フィールドは無視され、何も変更されていません",
+    mailCheckNoChannel:
+      "有効なメールチャネルがありません。接続 > 通知 で追加し、そのテストボタンでテストメールを送信してください",
     syslogSent: "syslog メッセージを {where} に送信しました",
     syslogCheckFailed: "syslog メッセージの送信に失敗しました",
     failedUpdateSettings: "設定の更新に失敗しました",
