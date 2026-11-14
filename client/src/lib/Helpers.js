@@ -59,16 +59,51 @@ const Helpers = {
     const bytes = new TextEncoder().encode(`${username}:${password}`);
     return 'Basic ' + btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
   },
+  /**
+   * The details of a server error as one line of text : a text as it is, a list joined, an object
+   * as its keys and values (`missing: a, b ; waiting: c`). Appended as they came, an object read
+   * "[object Object]".
+   *
+   * Args:
+   *   details (*): the `details` of the server's answer.
+   *
+   * Returns:
+   *   string: the details as text ; '' when there are none.
+   */
+  formatErrorDetails(details) {
+    if (details === undefined || details === null || details === '') return '';
+    if (typeof details !== 'object') return String(details);
+    if (Array.isArray(details))
+      return details
+        .map((d) => Helpers.formatErrorDetails(d))
+        .filter(Boolean)
+        .join(', ');
+    return Object.entries(details)
+      .map(([key, value]) => [key, Helpers.formatErrorDetails(value)])
+      .filter(([, text]) => text)
+      .map(([key, text]) => `${key}: ${text}`)
+      .join(' ; ');
+  },
+  /**
+   * The message of a failed request : the server's own words (message or error) with its details,
+   * else the request's error, else the caller's fallback.
+   *
+   * Args:
+   *   err (Error): the axios error.
+   *   custom (string): the fallback message.
+   *
+   * Returns:
+   *   string: the message.
+   */
   parseAxiosResponseError(err, custom = 'An error occurred') {
-    // Parse Axios error
+    // Step 1 : the server answered : its message, and its details written out
     if (err.response) {
-      // The request was made and the server responded with a status
       const message = err.response.data?.message || err.response.data?.error || custom;
-      const details = err.response.data?.details;
+      const details = Helpers.formatErrorDetails(err.response.data?.details);
       return details ? `${message}: ${details}` : message;
-    } else {
-      return err.message || custom;
     }
+    // Step 2 : no answer : what the request says
+    return err.message || custom;
   },
   // Cookie helpers for simple client-side persistence
   setCookie(name, value, days = 365) {
