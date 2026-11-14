@@ -1804,60 +1804,26 @@ export default function getSettings(t) {
       // where the user and password are kept is not stored : a secret store (then the user and
       // password typed are not kept) or MySQL, the app's database (then no secret store)
       // the Login step's notes are something to read, never fields of the record
-      beforeSave: ({
-        secret_source,
-        secret_action,
-        login_from_store: _note,
-        login_written_note: _written,
-        secret_overwrite,
-        entra_auth,
-        ssh_auth,
-        awx_auth,
-        git_auth,
-        smtp_auth,
-        with_host,
-        optional_host,
-        optional_port,
-        ...item
-      }) => {
-        // a user and password or an api one : its host and port behind the switch, none when off
-        if (hasOptionalHost(item) && with_host !== undefined) {
-          item.host = with_host ? String(optional_host ?? '').trim() : '';
-          item.port = with_host && String(optional_port ?? '').trim() !== '' ? optional_port : null;
+      // a method, not an arrow : the dialog calls it on these settings, whose fields (this.fields)
+      // say what the final type shows
+      beforeSave(values) {
+        // Step 1 : a field the final type does not show is not saved - a host and port typed for
+        // an SSH one, then Git chosen ; a client key typed for a CyberArk one, then User and
+        // password. The same rules as the dialog's (credentialFieldShown)
+        const shown = { ...values };
+        for (const field of this?.fields || []) {
+          if (field.key in shown && !credentialFieldShown(field, values)) delete shown[field.key];
         }
-        // a git one signing in with a token : no user kept
-        if (item.credential_type === 'git' && git_auth !== 'password' && git_auth !== undefined) item.user = '';
-        // an smtp relay : no login kept
-        if (item.credential_type === 'smtp' && smtp_auth === 'none') {
-          item.user = '';
-          item.password = '';
-        }
-        // an AWX, AAP or Ascender one signing in with a token : no user kept
-        if (AWX_CREDENTIAL_TYPES.includes(item.credential_type) && awx_auth !== 'password') item.user = '';
-        // an SSH one logs in with its password or with a private key, never both : the other kept
-        // empty (sshUsesKey)
-        if (item.credential_type === 'ssh') {
-          if (ssh_auth === 'key') delete item.password;
-          else {
-            delete item.client_key;
-            delete item.key_passphrase;
-          }
-        }
-        // an Entra ID one signing in with its secret : no certificate kept
-        if (item.credential_type === 'entraid' && entra_auth !== 'certificate') {
-          item.client_cert = '';
-          item.client_key = null;
-        }
-        if (readFromStore({ ...item, secret_source, secret_action })) {
-          delete item.user;
-          delete item.password;
-          return item;
-        }
-        // typed here, written to the store on Save : the server writes them, then keeps the
-        // reference only (credential.controller.js writeTypedSecret)
-        if (writesToStore({ ...item, secret_source, secret_action }))
-          return { ...item, secret_write: true, secret_overwrite: !!secret_overwrite };
-        return { ...item, secret_store: '', secret_ref: '' };
+        return credentialSaved(shown);
+      },
+      // the dialog's values kept consistent as they change (AppAdminMulti settings.adjust) :
+      // written to a secret store, a sign-in with no password (a private key, an smtp relay, a
+      // certificate) is set back to its password, and a store that does not allow writing is
+      // replaced by the only one that does, or cleared
+      adjust: (item, lists) => {
+        const writing = writesToStore(item);
+        keepSignInWritable(item, writing);
+        keepWritableStore(item, lists?.secretstores, writing);
       },
       // a credential has its own page (pages/admin/credential.vue) : its row and Edit open it, New
       // the wizard
@@ -2179,6 +2145,8 @@ export default function getSettings(t) {
           label: t('settings.credentials.smtpSignIn'),
           type: 'radio',
           options: smtpAuthOptionList(t),
+          // written to a secret store, only the choice with a password (keepSignInWritable)
+          optionShown: (opt, r) => signInOffered('smtp_auth', opt.value, writesToStore(r)),
           initial: (r) => (r?.user ? 'password' : 'none'),
           hidden: true,
           noTable: true,
@@ -2227,6 +2195,8 @@ export default function getSettings(t) {
           label: t('settings.credentials.entraSignIn'),
           type: 'radio',
           options: entraAuthOptionList(t),
+          // written to a secret store, only the choice with a password (keepSignInWritable)
+          optionShown: (opt, r) => signInOffered('entra_auth', opt.value, writesToStore(r)),
           initial: (r) => (r?.client_cert ? 'certificate' : 'secret'),
           hidden: true,
           noTable: true,
@@ -2243,6 +2213,8 @@ export default function getSettings(t) {
           label: t('settings.credentials.sshSignIn'),
           type: 'radio',
           options: sshAuthOptionList(t),
+          // written to a secret store, only the choice with a password (keepSignInWritable)
+          optionShown: (opt, r) => signInOffered('ssh_auth', opt.value, writesToStore(r)),
           initial: (r) => (r?.client_key ? 'key' : 'password'),
           hidden: true,
           noTable: true,
@@ -4602,6 +4574,102 @@ export function secretActionOptionList(t) {
 }
 
 // ---------------------------------------------------------------------------
+// What a credential signs in with, kept consistent as it changes
+// ---------------------------------------------------------------------------
+
+// the sign-in choices with no password, per credential type : [the field, the choice without a
+// password, the one with] - an SSH one's private key, an smtp relay, an Entra ID one's certificate.
+// Written to a secret store, a credential writes its password : these are never offered then
+export const SIGN_IN_WITHOUT_PASSWORD = {
+  ssh: ['ssh_auth', 'key', 'password'],
+  smtp: ['smtp_auth', 'none', 'password'],
+  entraid: ['entra_auth', 'certificate', 'secret'],
+};
+
+/**
+ * Whether a sign-in choice is offered : one with no password (an SSH one's private key, an smtp
+ * relay, an Entra ID one's certificate) is not while the credential writes its password to a
+ * secret store (the store would refuse it : nothing to write).
+ *
+ * Args:
+ *   key (string): the sign-in field (ssh_auth, smtp_auth, entra_auth).
+ *   value (string): the choice.
+ *   writing (boolean): whether the credential writes its password to a secret store.
+ *
+ * Returns:
+ *   boolean: true when the choice is offered.
+ */
+export function signInOffered(key, value, writing) {
+  if (!writing) return true;
+  return !Object.values(SIGN_IN_WITHOUT_PASSWORD).some(([field, without]) => field === key && without === value);
+}
+
+/**
+ * Sets a credential's sign-in choice back to the one with a password when it writes its password
+ * to a secret store and its choice has none (signInOffered) : Write chosen after Private key, an
+ * smtp relay or a certificate.
+ *
+ * Args:
+ *   values (object): the credential being made or edited (changed in place).
+ *   writing (boolean): whether it writes its password to a secret store.
+ *
+ * Returns:
+ *   boolean: true when its choice was changed.
+ */
+export function keepSignInWritable(values, writing) {
+  const rule = SIGN_IN_WITHOUT_PASSWORD[values?.credential_type];
+  if (!writing || !rule) return false;
+  const [field, without, withPassword] = rule;
+  if (values[field] !== without) return false;
+  values[field] = withPassword;
+  return true;
+}
+
+/**
+ * Keeps a credential's secret store one that allows writing while it writes to one : a store that
+ * does not (chosen while it pointed to a secret) is replaced by the only one that does, or cleared.
+ * Nothing changes while the stores are not loaded yet.
+ *
+ * Args:
+ *   values (object): the credential being made or edited (changed in place).
+ *   stores (object[]): the secret stores ({ name, write_enabled }).
+ *   writing (boolean): whether it writes its password to a secret store.
+ *
+ * Returns:
+ *   boolean: true when its store was changed.
+ */
+export function keepWritableStore(values, stores, writing) {
+  if (!writing || !values?.secret_store || !Array.isArray(stores) || !stores.some((s) => s?.name)) return false;
+  // step 1 : the stores that allow writing (a number from the list, a boolean from a page)
+  const writable = stores.filter((s) => s?.name && !!Number(s.write_enabled));
+  if (writable.some((s) => s.name === values.secret_store)) return false;
+  // step 2 : the only one that does, or none chosen
+  values.secret_store = writable.length === 1 ? writable[0].name : '';
+  return true;
+}
+
+/**
+ * Whether the New credential dialog shows a field for a credential, as the dialog decides it
+ * (AppAdminMulti showField) : its own rule (showWhen), or the values of the field it follows
+ * (dependency). A field with no input (its id, a count) is left to the dialog.
+ *
+ * Args:
+ *   field (object): the field of the credentials' settings.
+ *   item (object): the credential being made.
+ *
+ * Returns:
+ *   boolean: true when the field is shown, so what it holds is saved.
+ */
+export function credentialFieldShown(field, item) {
+  if (field.noInput) return true;
+  if (typeof field.showWhen === 'function') return !!field.showWhen(item, {});
+  if (field.dependency && Array.isArray(field.dependencyValues)) {
+    return field.dependencyValues.includes(item?.[field.dependency]);
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // A CyberArk secret store's writes, through its PVWA
 // ---------------------------------------------------------------------------
 
@@ -4644,6 +4712,75 @@ function pvwaOf(store) {
     pvwa_auth: on ? store.pvwa_auth || 'cyberark' : '',
     platform_id: on ? String(store.platform_id || '').trim() : '',
   };
+}
+
+/**
+ * What the New credential dialog saves, from its values once the fields its type hides are left
+ * out (credentials' beforeSave) : the dialog's own choices taken out, a host and port behind
+ * their switch, what each sign-in keeps (a git or AWX token without a user, an smtp relay without
+ * a login, an SSH key or password, an Entra ID secret or certificate), then where the secret is
+ * kept (read from a store, written to one, or the app's database).
+ *
+ * Args:
+ *   values (object): the dialog's values, the hidden fields already left out.
+ *
+ * Returns:
+ *   object: the request body.
+ */
+function credentialSaved({
+  secret_source,
+  secret_action,
+  login_from_store: _note,
+  login_written_note: _written,
+  secret_overwrite,
+  entra_auth,
+  ssh_auth,
+  awx_auth,
+  git_auth,
+  smtp_auth,
+  with_host,
+  optional_host,
+  optional_port,
+  ...item
+}) {
+  // a user and password or an api one : its host and port behind the switch, none when off
+  if (hasOptionalHost(item) && with_host !== undefined) {
+    item.host = with_host ? String(optional_host ?? '').trim() : '';
+    item.port = with_host && String(optional_port ?? '').trim() !== '' ? optional_port : null;
+  }
+  // a git one signing in with a token : no user kept
+  if (item.credential_type === 'git' && git_auth !== 'password' && git_auth !== undefined) item.user = '';
+  // an smtp relay : no login kept
+  if (item.credential_type === 'smtp' && smtp_auth === 'none') {
+    item.user = '';
+    item.password = '';
+  }
+  // an AWX, AAP or Ascender one signing in with a token : no user kept
+  if (AWX_CREDENTIAL_TYPES.includes(item.credential_type) && awx_auth !== 'password') item.user = '';
+  // an SSH one logs in with its password or with a private key, never both : the other kept
+  // empty (sshUsesKey)
+  if (item.credential_type === 'ssh') {
+    if (ssh_auth === 'key') delete item.password;
+    else {
+      delete item.client_key;
+      delete item.key_passphrase;
+    }
+  }
+  // an Entra ID one signing in with its secret : no certificate kept
+  if (item.credential_type === 'entraid' && entra_auth !== 'certificate') {
+    item.client_cert = '';
+    item.client_key = null;
+  }
+  if (readFromStore({ ...item, secret_source, secret_action })) {
+    delete item.user;
+    delete item.password;
+    return item;
+  }
+  // typed here, written to the store on Save : the server writes them, then keeps the
+  // reference only (credential.controller.js writeTypedSecret)
+  if (writesToStore({ ...item, secret_source, secret_action }))
+    return { ...item, secret_write: true, secret_overwrite: !!secret_overwrite };
+  return { ...item, secret_store: '', secret_ref: '' };
 }
 
 /**

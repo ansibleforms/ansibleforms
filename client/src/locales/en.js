@@ -1862,6 +1862,7 @@ export default {
       sshSignInHint_key: 'A PEM or OpenSSH key, with an optional passphrase',
       sshKeyDropped: 'On Save, the stored private key and its passphrase are removed.',
       privateKeyRequired: 'Paste the private key it logs in with.',
+      signInSecretRequired: 'The sign-in method changed: type its new {field}.',
       entraSignIn: 'Sign in with',
       entraSignIn_secret: 'Secret',
       entraSignInHint_secret: "The app registration's secret: for SSO sign-in and mail",

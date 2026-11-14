@@ -24,6 +24,9 @@
 /*      fields : [{ title, text, items }]                         */
 /*  settings.beforeSave: (item) => object - what a create or an   */
 /*      update sends, from the dialog's values                    */
+/*  settings.adjust: (item, lists) => void - keeps the dialog's   */
+/*      values consistent as they change, in place (a choice no   */
+/*      longer offered set back : a credential's sign-in)         */
 /*  settings.defaultPicker: { key, groupBy, groups, title,        */
 /*      editLabel } - the default of each group chosen in a       */
 /*      dialog : groupBy (a key, or (row) => group) sorts the     */
@@ -36,6 +39,9 @@
 /*  field.type 'radio' with field.options [{ value, label, hint,  */
 /*      icon }] : one choice, radio buttons at the dialog's left  */
 /*      edge, each its icon (optional), label and a few words     */
+/*  field.optionShown: (option, item) => Boolean - a radio's      */
+/*      option offered only when true (settings.adjust sets back  */
+/*      a choice no longer offered)                               */
 /*  field.nested: a radio group that follows up the one above it  */
 /*      (AWX : which product) - indented, with its label as title */
 /*  field.flush: a switch at the dialog's left edge, its help the */
@@ -710,6 +716,21 @@ function choicesOf(field) {
   return typeof field.choicesWhen === 'function' ? all.filter((c) => field.choicesWhen(c, item.value || {})) : all;
 }
 
+/**
+ * Whether a radio's option is offered : all of them, unless its field.optionShown says otherwise
+ * (a credential written to a secret store : only the sign-in with a password).
+ *
+ * Args:
+ *   field (object): the radio field.
+ *   opt (object): the option ({ value, label, hint }).
+ *
+ * Returns:
+ *   boolean: true when the option is shown.
+ */
+function optionShown(field, opt) {
+  return typeof field.optionShown === 'function' ? !!field.optionShown(opt, item.value || {}) : true;
+}
+
 function showField(field) {
   // Only hide if noInput is set, not readonly
   if (field.noInput) return false;
@@ -779,6 +800,18 @@ fields.value.forEach((field) => {
     );
   }
 });
+
+// The dialog's values kept consistent as they change (settings.adjust) : a choice no longer
+// offered set back (a credential written to a secret store : its sign-in with a password, a store
+// that allows writing). Not while a record loads : what it holds is shown as it is
+watch(
+  [item, parentLists],
+  () => {
+    if (loadingItem.value || typeof props.settings.adjust !== 'function' || !item.value) return;
+    props.settings.adjust(item.value, parentLists.value || {});
+  },
+  { deep: true },
+);
 
 // Load config (AnsibleForms URL) on mount
 onMounted(async () => {
@@ -1878,6 +1911,7 @@ defineExpose({
           v-model="$v.item[field.key].$model"
           :options="field.options"
           :name="field.key"
+          :shown="(opt) => optionShown(field, opt)"
           :disabled="!!field.readonly"
           aligned
         />
@@ -1891,7 +1925,12 @@ defineExpose({
           <!-- a follow-up choice (nested) : under the option it follows, with its own title when it
                has one -->
           <div v-if="field.nested && field.label" class="af-radio-title">{{ field.label }}</div>
-          <div v-for="opt in field.options" :key="String(opt.value)" class="form-check af-short-check">
+          <div
+            v-for="opt in field.options"
+            v-show="optionShown(field, opt)"
+            :key="String(opt.value)"
+            class="form-check af-short-check"
+          >
             <input
               :id="'af-radio-' + field.key + '-' + opt.value"
               v-model="$v.item[field.key].$model"

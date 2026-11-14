@@ -1734,6 +1734,7 @@ export default {
       sshSignInHint_key: 'Klucz PEM lub OpenSSH, z opcjonalnym hasłem klucza',
       sshKeyDropped: 'Przy zapisie zapisany klucz prywatny i jego hasło zostaną usunięte.',
       privateKeyRequired: 'Wklej klucz prywatny, którym się loguje.',
+      signInSecretRequired: 'Metoda logowania się zmieniła: wpisz nowe pole {field}.',
       entraSignIn: 'Logowanie za pomocą',
       entraSignIn_secret: 'Sekret',
       entraSignInHint_secret: 'Sekret rejestracji aplikacji: do logowania SSO i poczty',

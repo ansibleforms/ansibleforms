@@ -1726,6 +1726,7 @@ export default {
       sshSignInHint_key: 'PEM または OpenSSH の鍵（パスフレーズは任意）',
       sshKeyDropped: '保存すると、保存済みの秘密鍵とパスフレーズは削除されます。',
       privateKeyRequired: 'ログインに使う秘密鍵を貼り付けてください。',
+      signInSecretRequired: 'ログイン方法が変わりました。新しい{field}を入力してください。',
       entraSignIn: 'サインイン方法',
       entraSignIn_secret: 'シークレット',
       entraSignInHint_secret: 'アプリ登録のシークレット：SSO サインインとメール用',

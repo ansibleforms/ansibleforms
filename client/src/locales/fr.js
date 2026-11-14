@@ -1889,6 +1889,7 @@ export default {
       sshSignInHint_key: 'Une clé PEM ou OpenSSH, avec une phrase secrète facultative',
       sshKeyDropped: "À l'enregistrement, la clé privée enregistrée et sa phrase secrète sont supprimées.",
       privateKeyRequired: 'Collez la clé privée avec laquelle il se connecte.',
+      signInSecretRequired: 'La méthode de connexion a changé : saisissez le nouveau champ {field}.',
       entraSignIn: 'Se connecter avec',
       entraSignIn_secret: 'Secret',
       entraSignInHint_secret: "Le secret de l'inscription d'application : connexion SSO et mail",
