@@ -1312,7 +1312,7 @@ export default {
       stepSchedule: 'Planification du pull',
       stepUsage: 'Utilisation',
       usageCategories: {
-        designer: 'Concepteur',
+        designer: 'Designer',
         jobs: 'Jobs',
         access: 'Accès',
         connections: 'Connexions',
@@ -1368,7 +1368,7 @@ export default {
         logo: "Le logo, sous controller_logo: dans l'un de ses fichiers YAML, l'image nommée par rapport à ce fichier",
         icon: "L'icône du site web, sous controller_icon: dans l'un de ses fichiers YAML, l'image nommée par rapport à ce fichier",
         name: "Le nom de l'application, sous controller_name: dans l'un de ses fichiers YAML",
-        links: "Les liens de l'en-tête et celui du concepteur, sous controller_links: dans l'un de ses fichiers YAML",
+        links: "Les liens de l'en-tête et celui du designer, sous controller_links: dans l'un de ses fichiers YAML",
         labels:
           "Les étiquettes à côté du logo, entrées d'une liste controller_labels: dans l'un de ses fichiers YAML, dans leur ordre",
         announcements: "Annonces, entrées d'une liste controller_announcements: dans l'un de ses fichiers YAML",

@@ -18,7 +18,11 @@ export default seedType({
   secrets: ["token", "client_key"],
   // what it is besides its name : a rename changing one of them is another store
   identity: ["type", "url"],
-  references: [{ field: "credential", type: "credentials" }],
+  // the credential it logs in with, and a CyberArk store's PVWA API credential (its writes)
+  references: [
+    { field: "credential", type: "credentials" },
+    { field: "pvwa_credential", type: "credentials" },
+  ],
   // secret_stores.description has no default in the table
   defaults: { description: "" },
 });

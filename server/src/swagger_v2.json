@@ -10768,7 +10768,7 @@
           "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
           "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
-          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (runners/<file>.yaml)" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : runners.yaml)" },
           "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
         }
       },
@@ -10778,7 +10778,7 @@
         "required": ["name"],
         "properties": {
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
-          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (syslog/<file>.yaml)" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : syslog.yaml)" },
           "name": { "type": "string", "example": "siem" },
           "description": { "type": "string" },
           "host": { "type": "string", "example": "syslog.example.com", "description": "Required unless the protocol is unix or unix-connect" },
@@ -10799,7 +10799,7 @@
         "required": ["name", "type"],
         "properties": {
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
-          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (notifications/<file>.yaml)" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : notifications.yaml)" },
           "name": { "type": "string", "example": "ops-slack" },
           "description": { "type": "string" },
           "type": { "type": "string", "enum": ["mail", "slack", "teams", "telegram", "webhook"], "description": "Set on create; it stays" },
@@ -10826,7 +10826,7 @@
         "type": "object",
         "properties": {
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
-          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "Its file in that repository (ldap/<file>.yaml)" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : ldap.yaml)" },
           "name": {
             "type": "string",
             "description": "letters, digits, - and _ ; 'default' keeps its members' short names (ldap/<group>, the bare username), any other's are ldap/<name>/<group> and <name>/<user>"

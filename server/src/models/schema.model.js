@@ -2306,9 +2306,9 @@ export async function splitConfigUsage() {
   if (!rows?.length) return null;
   // the configuration served from the database : no repository was read (models/form.model.js
   // getBaseConfig reads the database copy first, Settings.resolveConfigInDatabase)
-  const [settings] = await mysql.do("SELECT config_source, forms_yaml FROM AnsibleForms.`settings` limit 1");
+  const [settings] = await mysql.do("SELECT config_source, config_yaml FROM AnsibleForms.`settings` limit 1");
   const { default: Settings } = await import("./settings.model.js");
-  if (settings && Settings.resolveConfigInDatabase(settings) && String(settings.forms_yaml ?? "").trim()) {
+  if (settings && Settings.resolveConfigInDatabase(settings) && String(settings.config_yaml ?? "").trim()) {
     await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");
     const message =
       `The configuration is kept in the database: the Config usage of ${rows.map((r) => `'${r.name}'`).join(", ")} was not read ` +

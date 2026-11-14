@@ -1435,7 +1435,7 @@ export default {
         registered: 'registrat pel seu RTE',
         pending: "pendent d'aprovació",
         holder: 'conté els repositoris, mai al seu propi fitxer',
-        uriSecret: 'la seva uri conté un usuari o un token: doneu-li una credencial',
+        uriSecret: 'la seva uri conté un usuari o un token: dona-li una credencial',
         noSchedule: "no té cap cron, rrule ni hora d'execució vàlids",
         notWritten: 'no escrit: {error}',
       },
@@ -1553,7 +1553,7 @@ export default {
       launchOptionsHelp:
         "Els prompts del fitxer (limit, job_tags, inventory ...), enviats al job com aquestes extra vars. S'editen al fitxer.",
       deleteFileHint:
-        "El seu fitxer {file} també s'elimina del repositori {name}: feu push del repositori per treure'l de git.",
+        "El seu fitxer {file} també s'elimina del repositori {name}: fes push del repositori per treure'l de git.",
     },
     disclaimer: {
       description: 'Condicions que tothom accepta un cop, registrant qui ha acceptat quina versió i quan.',

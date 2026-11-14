@@ -35,7 +35,7 @@ vi.mock("../src/models/repo.model.js", () => {
   const folderOf = (name) => path.join(ROOT, name);
   return { default: { folderOf, isValidName: () => true }, repoFolder: folderOf };
 });
-vi.mock("../src/models/settings.model.js", () => ({ default: { findFormsYaml: async () => ({}), resolveConfigInDatabase: () => false } }));
+vi.mock("../src/models/settings.model.js", () => ({ default: { findConfigYaml: async () => ({}), resolveConfigInDatabase: () => false } }));
 // the warnings, recorded
 const warnings = [];
 vi.mock("./__mocks__/logger.js", async (importOriginal) => {

@@ -37,7 +37,7 @@ vi.mock("../src/models/repo.model.js", () => {
   const folderOf = (name) => path.join(ROOT, name);
   return { default: { folderOf, isValidName: () => true }, repoFolder: folderOf };
 });
-vi.mock("../src/models/settings.model.js", () => ({ default: { findFormsYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => "" } }));
+vi.mock("../src/models/settings.model.js", () => ({ default: { findConfigYaml: async () => ({}), resolveConfigInDatabase: () => false, getActiveConfig: async () => "" } }));
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 // the forms model's own import of the configuration ('./../../config/app.config.js') : the mock too
 vi.mock("../config/app.config.js", async () => await import("./__mocks__/app.config.js"));

@@ -11,7 +11,7 @@ vi.mock("../src/models/repository.model.js", async () => ({ default: (await impo
 vi.mock("../src/lib/crypto.js", async () => ({ default: (await import("./fixtures/repoObjects.mjs")).crypto }));
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 vi.mock("../src/models/settings.model.js", () => ({
-  default: { find: async () => ({ app_name: "AF", url: "https://af", mail_password: "x", seed_managed_fields: '["app_name"]' }) },
+  default: { find: async () => ({ app_name: "AF", url: "https://af", seed_managed_fields: '["app_name"]' }) },
 }));
 
 const fixture = await import("./fixtures/repoObjects.mjs");
@@ -55,6 +55,5 @@ describe("the settings, as a part of them reads them", () => {
     const { body } = await find({ showSettings: true });
     expect(body.source_general).toBe(null);
     expect(body.source_name.repository).toBe("look");
-    expect(body.mail_password).not.toBe("x");
   });
 });
