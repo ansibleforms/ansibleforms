@@ -20,13 +20,16 @@ const spawned = [];
 // an RTE with the OpenSSH client, faked : ssh-agent opens its socket, ssh-add loads the key, and
 // the agents started are kept to see that they were stopped (off : no ssh-agent on the RTE)
 const fakeOpenSsh = { on: false, agents: [] };
+// the arguments each ssh-agent was started with
+const agentArgs = [];
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     spawn: vi.fn((file, args, options) => {
       if (file === "ssh-agent" && fakeOpenSsh.on) {
-        // ssh-agent -D -a <socket> : the socket appears, and a SIGTERM stops it
+        // ssh-agent -D -t <seconds> -a <socket> : the socket appears, and a SIGTERM stops it
+        agentArgs.push(args);
         const agent = new EventEmitter();
         agent.exitCode = null;
         agent.signalCode = null;
@@ -36,7 +39,7 @@ vi.mock("child_process", async (importOriginal) => {
           setTimeout(() => agent.emit("exit", null, signal), 1);
           return true;
         });
-        fs.writeFileSync(args[2], "");
+        fs.writeFileSync(args[args.indexOf("-a") + 1], "");
         fakeOpenSsh.agents.push(agent);
         return agent;
       }
@@ -400,6 +403,36 @@ describe("an SSH credential with a private key as the ansible login", () => {
       assert.equal(fakeOpenSsh.agents.length, 1, "the job's agent was started");
       assert.equal(fakeOpenSsh.agents[0].kill.mock.calls.length, 1, "and stopped, with the key it held");
       assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key folder left behind");
+    });
+
+    test("the job's ssh-agent keeps the key for a bounded time (-t), should the RTE die mid-job", async () => {
+      credentialRows.sshkey.private_key_passphrase = "open sesame";
+      agentArgs.length = 0;
+      row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+      const done = runJob();
+      await vi.waitFor(() => assert.equal(spawned.length, 1), { timeout: 2000 });
+      child.emit("exit", 0);
+      assert.equal(await done, true);
+      const args = agentArgs[0];
+      const t = args.indexOf("-t");
+      assert.ok(t >= 0, "a lifetime is given");
+      assert.ok(Number(args[t + 1]) > 0 && Number(args[t + 1]) <= 86400, "of a day at most");
+    });
+
+    test("a database call failing at the end (the abort flag) still settles the run and stops the agent", async () => {
+      credentialRows.sshkey.private_key_passphrase = "open sesame";
+      vi.spyOn(Job, "isAbortRequested").mockRejectedValue(new Error("the database is gone"));
+      row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+      const done = runJob();
+      await vi.waitFor(() => assert.equal(spawned.length, 1), { timeout: 2000 });
+      // stopped by a signal : the exit handler asks the database whether it was an abort
+      child.signalCode = "SIGTERM";
+      child.emit("exit", null);
+      const ok = await Promise.race([done, new Promise((r) => setTimeout(() => r("unsettled"), 2000))]);
+      assert.equal(ok, false, "the run settles, as a failure");
+      assert.equal(fakeOpenSsh.agents.length, 1);
+      assert.equal(fakeOpenSsh.agents[0].kill.mock.calls.length, 1, "the agent is stopped, with the key it held");
+      assert.equal(fs.existsSync(path.join(dir, "he_extravars_11.json")), false, "no credentials left on disk");
     });
 
     test("a key without a passphrase : its file and folder are removed", async () => {

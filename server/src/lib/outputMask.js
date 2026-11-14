@@ -65,27 +65,70 @@ function spellings(secret) {
   return json === secret ? [secret] : [secret, json];
 }
 
-// a line of a multi-line secret this long or longer is masked on its own too
+// a line of a private key this long or longer is masked on its own too
 const MIN_SECRET_LINE_LENGTH = 16;
 
+// a private key, its armour (PEM or OpenSSH) first : -----BEGIN RSA PRIVATE KEY-----,
+// -----BEGIN OPENSSH PRIVATE KEY-----, -----BEGIN ENCRYPTED PRIVATE KEY-----
+const PRIVATE_KEY_ARMOUR = /^\s*-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/;
+
+// in any other multi-line secret, a piece of a line this long or longer, made of the characters
+// of base64, base64url or hex only, with letters and digits both, is masked on its own : a token,
+// a certificate's or a key's data. Field names and plain values ("type": "service_account",
+// server: https://host:6443) are made of shorter pieces and stay readable.
+const MIN_SECRET_TOKEN_LENGTH = 20;
+const TOKEN_CHARS = /[A-Za-z0-9+/=_-]+/g;
+
 /**
- * The lines of a multi-line secret (a private key) that are masked on their own : a playbook
- * that prints the key line by line, or a tool that wraps it, shows its lines apart. The
- * armour lines (-----BEGIN ... PRIVATE KEY-----) say nothing secret and are left out, and so
- * are lines too short to be worth masking.
+ * Whether a piece of a line looks like secret data : long enough, of base64 or hex characters,
+ * with letters and digits both (a word or a number alone is not a secret).
+ *
+ * Args:
+ *   token (string): the piece.
+ *
+ * Returns:
+ *   boolean: true when it is masked on its own.
+ */
+function secretLooking(token) {
+  return token.length >= MIN_SECRET_TOKEN_LENGTH && /[A-Za-z]/.test(token) && /[0-9]/.test(token);
+}
+
+/**
+ * The parts of a multi-line secret that are masked on their own, besides the whole secret :
+ * a playbook that prints it line by line, or a tool that wraps it, shows its lines apart.
+ *
+ * A private key (its PEM or OpenSSH armour in it) : each of its lines, as every line of it is
+ * secret. The armour lines (-----BEGIN ... PRIVATE KEY-----) say nothing secret and are left
+ * out, and so are lines too short to be worth masking.
+ *
+ * Any other multi-line secret (a service account's JSON, a kubeconfig) : only the pieces of its
+ * lines that look like secret data (secretLooking), never its whole lines. Masking every line
+ * hid harmless ones as well ("type": "service_account",) wherever a playbook printed them. A
+ * key inside it, as JSON writes it ("-----BEGIN PRIVATE KEY-----\nMIIE...\n"), gives its lines
+ * as pieces too, the \n escapes being where its lines end.
  *
  * Args:
  *   secret (string): the secret.
  *
  * Returns:
- *   string[]: its secret lines, trimmed ; none for a one-line secret.
+ *   string[]: its parts masked on their own, without duplicates ; none for a one-line secret.
  */
 export function secretLines(secret) {
   if (typeof secret !== "string" || !/[\r\n]/.test(secret)) return [];
-  return secret
-    .split(/\r?\n|\r/)
-    .map((line) => line.trim())
-    .filter((line) => line.length >= MIN_SECRET_LINE_LENGTH && !line.startsWith("-----"));
+  const lines = secret.split(/\r?\n|\r/).map((line) => line.trim());
+  // a private key : every line of it
+  if (PRIVATE_KEY_ARMOUR.test(secret)) {
+    return lines.filter((line) => line.length >= MIN_SECRET_LINE_LENGTH && !line.startsWith("-----"));
+  }
+  // anything else : the secret-looking pieces of its lines only
+  const pieces = new Set();
+  for (const line of lines) {
+    // a JSON \n escape ends a line of what it holds (a key in a service account's JSON)
+    for (const part of line.split(/\\[nr]/)) {
+      for (const token of part.match(TOKEN_CHARS) || []) if (secretLooking(token)) pieces.add(token);
+    }
+  }
+  return [...pieces];
 }
 
 /**
@@ -94,7 +137,8 @@ export function secretLines(secret) {
  * Args:
  *   jobId (number|string): the job.
  *   secrets (string[]): the secret values ; short and empty ones are left out, and a
- *     multi-line one (a private key) is masked line by line as well (secretLines).
+ *     multi-line one is masked in parts as well : a private key line by line, anything else
+ *     in its secret-looking pieces (secretLines).
  */
 export function registerJobSecrets(jobId, secrets) {
   if (jobId === undefined || jobId === null) return;
@@ -103,7 +147,7 @@ export function registerJobSecrets(jobId, secrets) {
   for (const s of secrets || []) {
     if (typeof s !== "string" || s.length < MIN_SECRET_LENGTH) continue;
     for (const spelling of spellings(s)) set.add(spelling);
-    // a multi-line one (a private key) : each of its lines as well
+    // a multi-line one : its lines (a private key) or its secret-looking pieces as well
     for (const line of secretLines(s)) set.add(line);
   }
   if (!set.size) return;

@@ -10,7 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-const { prepareSshKey, makeKeyFile, normalizeKey, SshKeyError } = await import("../src/rte/sshKey.js");
+const { prepareSshKey, makeKeyFile, normalizeKey, SshKeyError, checkAskpassRuns, startAgent, stopAgent, AGENT_KEY_LIFETIME_SECONDS } = await import("../src/rte/sshKey.js");
 
 const KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\r\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ\r\n-----END OPENSSH PRIVATE KEY-----";
 
@@ -153,4 +153,97 @@ describe.skipIf(!HAVE_OPENSSH)("a key with a passphrase, with the real ssh-agent
       fs.rmSync(made.dir, { recursive: true, force: true });
     }
   }, 20000);
+});
+
+/**
+ * A fake ssh-agent and ssh-add : the agent opens its socket, ssh-add ends as asked.
+ *
+ * Args:
+ *   addStatus (number): ssh-add's status.
+ *   addStderr (string): what ssh-add says.
+ *   seen (object): where the agent's arguments are kept.
+ *
+ * Returns:
+ *   function: a spawn.
+ */
+const fakeOpenSsh = (addStatus = 0, addStderr = "", seen = {}) => (file, a) => {
+  const p = new EventEmitter();
+  p.exitCode = null;
+  p.signalCode = null;
+  p.stdout = new EventEmitter();
+  p.stderr = new EventEmitter();
+  p.kill = (signal) => {
+    p.signalCode = signal;
+    setTimeout(() => p.emit("exit", null, signal), 1);
+    return true;
+  };
+  if (file === "ssh-agent") {
+    seen.agentArgs = a;
+    fs.writeFileSync(a[a.indexOf("-a") + 1], "");
+  } else {
+    setTimeout(() => {
+      if (addStderr) p.stderr.emit("data", addStderr);
+      p.emit("close", addStatus);
+    }, 5);
+  }
+  return p;
+};
+
+describe("the job's ssh-agent never outlives its job", () => {
+  test("its keys expire (-t) after a bounded time, should the RTE die before it stops the agent", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-test-agent-"));
+    const seen = {};
+    try {
+      const { agent } = await startAgent(dir, fakeOpenSsh(0, "", seen));
+      const args = seen.agentArgs;
+      expect(args[args.indexOf("-t") + 1]).toBe(String(AGENT_KEY_LIFETIME_SECONDS));
+      expect(AGENT_KEY_LIFETIME_SECONDS).toBeGreaterThan(0);
+      expect(AGENT_KEY_LIFETIME_SECONDS).toBeLessThanOrEqual(24 * 60 * 60);
+      await stopAgent(agent);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a temporary folder that runs no program (noexec)", () => {
+  // a spawnSync that cannot run the file : what a noexec mount gives
+  const noexec = () => ({ error: Object.assign(new Error("spawnSync EACCES"), { code: "EACCES" }), status: null });
+  // a spawnSync that ran the script
+  const ran = () => ({ status: 1 });
+
+  test("the askpass script is checked, and runs where the temporary folder allows it", () => {
+    const { dir } = makeKeyFile(12, KEY);
+    try {
+      const script = path.join(dir, "probe.sh");
+      fs.writeFileSync(script, "#!/bin/sh\nexit 1\n", { mode: 0o700 });
+      if (process.platform !== "win32") expect(() => checkAskpassRuns(dir, script)).not.toThrow();
+      expect(() => checkAskpassRuns(dir, script, noexec)).toThrow(SshKeyError);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("says noexec and TMPDIR instead of asking whether the passphrase is right, and leaves nothing behind", async () => {
+    const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_13_"));
+    const err = await prepareSshKey(13, KEY, "phrase", fakeOpenSsh(0), noexec).catch((e) => e);
+    expect(err).toBeInstanceOf(SshKeyError);
+    expect(err.message).toMatch(/noexec/);
+    expect(err.message).toMatch(/TMPDIR/);
+    expect(err.message).not.toMatch(/passphrase right/);
+    expect(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_13_"))).toEqual(before);
+  });
+
+  test("ssh-add failing to run the script says so too", async () => {
+    const stderr = "ssh_askpass: exec(/tmp/af_sshkey_14_x/askpass.sh): Permission denied\n";
+    const err = await prepareSshKey(14, KEY, "phrase", fakeOpenSsh(1, stderr), ran).catch((e) => e);
+    expect(err).toBeInstanceOf(SshKeyError);
+    expect(err.message).toMatch(/cannot be run \(Permission denied\).*noexec.*TMPDIR/);
+  });
+
+  test("a wrong passphrase is still said as one", async () => {
+    const err = await prepareSshKey(15, KEY, "phrase", fakeOpenSsh(1, "Bad passphrase, try again for /tmp/k:\n"), ran).catch((e) => e);
+    expect(err).toBeInstanceOf(SshKeyError);
+    expect(err.message).toMatch(/is the passphrase right\?/);
+  });
 });
