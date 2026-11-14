@@ -678,7 +678,7 @@ export default {
     allActions: 'Todas as ações',
     allOutcomes: 'Todos os resultados',
     reset: 'Repor a seleção',
-    resetHint: 'De novo todos os períodos, utilizadores, ações e resultados',
+    resetHint: 'De novo todos os períodos, utilizadores, ações e resultados, recentes primeiro',
     empty: 'Ainda não há entradas de auditoria',
     noEntriesFor: 'Não há entradas de auditoria para {period}.',
     emptyHint: 'O registo começa quando esta versão é instalada, por isso não contém nada anterior a isso.',

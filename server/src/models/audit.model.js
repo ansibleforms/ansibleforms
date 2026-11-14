@@ -260,6 +260,54 @@ Audit.where = function (filter = {}) {
   return { where, vars, limit: one(filter.limit), offset: one(filter.offset) };
 };
 
+// The columns a page may be sorted on, by the names the client sends : the only way a sort
+// reaches the SQL. The raw value is never put in the statement, only a column of this map. A
+// Map, so no inherited name (constructor, __proto__) can pass for a column.
+export const SORT_COLUMNS = new Map([
+  ['time', 'created_at'],
+  ['actor', 'actor'],
+  ['action', 'action'],
+  ['target', 'target'],
+  ['outcome', 'outcome'],
+  ['ip', 'ip'],
+]);
+
+/**
+ * Whether a sort and a direction are ones the read side takes : a column of SORT_COLUMNS (or
+ * none) and asc or desc (or none).
+ *
+ * Args:
+ *   sort (any): query.sort.
+ *   dir (any): query.dir.
+ *
+ * Returns:
+ *   boolean: true when both are.
+ */
+Audit.validSort = function (sort, dir) {
+  const okSort = sort === undefined || sort === '' || SORT_COLUMNS.has(sort);
+  const okDir = dir === undefined || dir === '' || dir === 'asc' || dir === 'desc';
+  return okSort && okDir;
+};
+
+/**
+ * The ORDER BY of a sort : its column, then id the same way, a unique tiebreaker so rows that
+ * share a value keep one order from page to page (none repeated, none skipped). No sort (or one
+ * that is no column, the controller refuses those first) is the newest first, as always.
+ *
+ * Args:
+ *   sort (any): a key of SORT_COLUMNS.
+ *   dir (any): 'asc' or 'desc' (desc otherwise).
+ *
+ * Returns:
+ *   string: the ORDER BY's columns, built from the map's names only.
+ */
+Audit.orderBy = function (sort, dir) {
+  const column = SORT_COLUMNS.get(sort) || null;
+  if (!column) return 'created_at DESC, id DESC';
+  const way = dir === 'asc' ? 'ASC' : 'DESC';
+  return `${column} ${way}, id ${way}`;
+};
+
 Audit.find = async function (filter = {}) {
   const { where, vars, limit: askedLimit, offset: askedOffset } = Audit.where(filter);
   const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
@@ -275,7 +323,7 @@ Audit.find = async function (filter = {}) {
   const counted = await mysql.do('SELECT COUNT(*) AS total FROM AnsibleForms.`audit`' + clause, vars);
   const records = await mysql.do(
     'SELECT id, created_at, actor, actor_type, ip, action, target_type, target, outcome, detail ' +
-    'FROM AnsibleForms.`audit`' + clause + ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
+    'FROM AnsibleForms.`audit`' + clause + ' ORDER BY ' + Audit.orderBy(filter.sort, filter.dir) + ' LIMIT ? OFFSET ?',
     [...vars, limit, offset]
   );
   return {
@@ -288,11 +336,11 @@ Audit.find = async function (filter = {}) {
 };
 
 /**
- * Every entry a filter selects, the newest first : the download (a CSV of them all). Streamed
- * from one query, never the table loaded whole : the reader paces it.
+ * Every entry a filter selects, in the order asked (newest first by default) : the download (a
+ * CSV of them all). Streamed from one query, never the table loaded whole : the reader paces it.
  *
  * Args:
- *   filter (object): the filter, as Audit.find's (limit and offset are not used).
+ *   filter (object): the filter and order, as Audit.find's (limit and offset are not used).
  *
  * Yields:
  *   object: an entry, detail as text (as stored).
@@ -302,7 +350,7 @@ Audit.stream = async function* (filter = {}) {
   const clause = where.length ? ' WHERE ' + where.join(' AND ') : '';
   yield* mysql.stream(
     'SELECT id, created_at, actor, actor_type, ip, action, target_type, target, outcome, detail ' +
-    'FROM AnsibleForms.`audit`' + clause + ' ORDER BY created_at DESC, id DESC',
+    'FROM AnsibleForms.`audit`' + clause + ' ORDER BY ' + Audit.orderBy(filter.sort, filter.dir),
     vars
   );
 };

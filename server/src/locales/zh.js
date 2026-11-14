@@ -59,6 +59,7 @@ export default {
   audit: {
     failedGet: "获取审计记录失败",
     invalidPeriod: "时间段的 from 和 to 必须是 ISO 日期，例如 2026-11-14T00:00:00Z",
+    invalidSort: "排序列为 time、actor、action、target、outcome 或 ip，dir 为 asc 或 desc",
   },
   health: {
     failedCheck: "检查系统健康状况失败",

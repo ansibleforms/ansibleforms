@@ -677,7 +677,7 @@ export default {
     allActions: 'Totes les accions',
     allOutcomes: 'Tots els resultats',
     reset: 'Restableix la selecció',
-    resetHint: 'Tots els períodes, usuaris, accions i resultats de nou',
+    resetHint: 'Tots els períodes, usuaris, accions i resultats de nou, els recents primer',
     empty: "Encara no hi ha entrades d'auditoria",
     noEntriesFor: "No hi ha entrades d'auditoria per a {period}.",
     emptyHint: "El registre comença quan s'instal·la aquesta versió, així que no conté res d'abans.",

@@ -65,6 +65,7 @@ export default {
   audit: {
     failedGet: "Audit-Protokoll konnte nicht geladen werden",
     invalidPeriod: "from und to des Zeitraums müssen ISO-Daten sein, etwa 2026-11-14T00:00:00Z",
+    invalidSort: "Sortieren nach time, actor, action, target, outcome oder ip, mit dir asc oder desc",
   },
   health: {
     failedCheck: "Systemzustand konnte nicht geprüft werden",

@@ -672,7 +672,7 @@ export default {
     allActions: 'すべての操作',
     allOutcomes: 'すべての結果',
     reset: '選択をリセット',
-    resetHint: 'すべての期間、ユーザー、操作、結果に戻します',
+    resetHint: 'すべての期間、ユーザー、操作、結果に戻し、新しい順にします',
     empty: '監査エントリはまだありません',
     noEntriesFor: '{period} の監査エントリはありません。',
     emptyHint: '記録はこのバージョンのインストール時から始まるため、それ以前の内容は含まれません。',
