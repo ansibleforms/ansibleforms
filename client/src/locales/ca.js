@@ -1717,7 +1717,7 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: "L'AppID, el certificat i la clau de client d'un magatzem CyberArk",
       clientKeyKeep: 'Si es deixa buida, es conserva la clau de client desada.',
-      addHostPort: 'Afegeix un host i un port',
+      addHostPort: 'Afegeix un amfitrió i un port',
       addHostPortHelp: 'Es passen amb la credencial al playbook i a les expressions.',
       smtpSignIn: 'Inicia la sessió amb',
       smtpSignIn_none: 'Sense inici de sessió',
