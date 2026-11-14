@@ -99,6 +99,10 @@ export default {
       "Ja tens una tasca desada anomenada '{name}': tria un altre nom",
     cantTouchDirectoryAdmin:
       "Només un admin pot bloquejar, tancar la sessió, oblidar o revocar els tokens d'un usuari que té el rol admin",
+    adminOptionAdminOnly:
+      "Només un admin pot treure una opció a un admin: '{option}' de {member}",
+    adminKeepsOwnAccess:
+      "Aquest desament desactivaria '{option}' per a vostè ({user}): un admin manté l'inici de sessió i la configuració",
     credentialNotFound:
       "No hi ha cap credencial anomenada '{name}'",
     repositoryCredentialType:

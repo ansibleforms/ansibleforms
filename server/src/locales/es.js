@@ -99,6 +99,10 @@ export default {
       "Ya tienes un trabajo guardado llamado '{name}': elige otro nombre",
     cantTouchDirectoryAdmin:
       "Solo un admin puede bloquear, cerrar la sesión, olvidar o revocar los tokens de un usuario con el rol admin",
+    adminOptionAdminOnly:
+      "Solo un admin puede quitar una opción a un admin: '{option}' de {member}",
+    adminKeepsOwnAccess:
+      "Este guardado desactivaría '{option}' para usted ({user}): un admin conserva el inicio de sesión y la configuración",
     credentialNotFound:
       "No hay ninguna credencial llamada '{name}'",
     repositoryCredentialType:

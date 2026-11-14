@@ -104,6 +104,10 @@ export default {
       "Vous avez déjà une tâche enregistrée nommée '{name}' : choisissez un autre nom",
     cantTouchDirectoryAdmin:
       "Seul un admin peut bloquer, déconnecter, oublier ou révoquer les jetons d'un utilisateur qui a le rôle admin",
+    adminOptionAdminOnly:
+      "Seul un admin peut retirer une option à un admin : '{option}' de {member}",
+    adminKeepsOwnAccess:
+      "Cet enregistrement désactiverait '{option}' pour vous ({user}) : un admin garde la connexion et les paramètres",
     credentialNotFound:
       "Aucun identifiant nommé '{name}'",
     repositoryCredentialType:

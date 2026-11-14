@@ -90,6 +90,10 @@ export default {
       "您已有名为 '{name}' 的已保存作业：请选择其他名称",
     cantTouchDirectoryAdmin:
       "只有 admin 可以封禁、注销、遗忘拥有 admin 角色的用户或撤销其令牌",
+    adminOptionAdminOnly:
+      "只有 admin 可以取消 admin 的选项：{member} 的 '{option}'",
+    adminKeepsOwnAccess:
+      "此次保存会为您 ({user}) 关闭 '{option}'：admin 必须保留登录和设置",
     credentialNotFound:
       "没有名为 '{name}' 的凭据",
     repositoryCredentialType:

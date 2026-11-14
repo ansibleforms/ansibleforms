@@ -94,6 +94,10 @@ export default {
       "You already have a stored job named '{name}': choose another name",
     cantTouchDirectoryAdmin:
       "Only an admin can block, sign out, forget or revoke the tokens of a user who has the admin role",
+    adminOptionAdminOnly:
+      "Only an admin can take an option away from an admin: '{option}' of {member}",
+    adminKeepsOwnAccess:
+      "This save would turn '{option}' off for you ({user}): an admin keeps the sign-in and the settings",
     credentialNotFound:
       "No credential named '{name}'",
     repositoryCredentialType:

@@ -309,11 +309,23 @@ class User extends CrudModel {
     return rows[0].groups || "";
   }
 
-  static async getRolesAndOptions(groups, user) {
+  /**
+   * The roles and the options a user gets from the roles of a configuration : what the sign-in
+   * gives them (getRolesAndOptions), without reading the configuration. Pure, so a check of a
+   * configuration about to be saved (lib/adminGrants.js) sees exactly what a sign-in would.
+   *
+   * Args:
+   *   configRoles (object[]): the roles of the configuration (config.yaml).
+   *   groups (string[]): the user's groups, as the sign-in matched them (type/name).
+   *   full_username (string): the user, as type/username.
+   *
+   * Returns:
+   *   {roles: string[], options: object}: the user's roles and options, defaults applied.
+   */
+  static rolesAndOptionsFrom(configRoles, groups, full_username) {
   var result = {};
   var roles = [];
   var options = {};
-  var full_username = `${user.type}/${user.username}`;
 
   // 'showExtravars' and 'showExtraVars' are the same permission spelled two ways :
   // the json schema and the roles editor write the lowercase 'v', the documentation
@@ -349,69 +361,80 @@ class User extends CrudModel {
     }
   }
 
+  // derive roles from the configuration's roles (none when it has no list of them)
+  const configured = Array.isArray(configRoles) ? configRoles : [];
+  configured.forEach(function (role) {
+
+    // the role's members as they are matched : entraid/<name> is azuread/<name> (memberRef)
+    const users = memberRefs(role.users);
+    const roleGroups = memberRefs(role.groups);
+
+    // if we match the user, we add the role
+    if(users.includes(full_username)){
+      addRoleAndOptions(role);
+    }
+
+    // if the role matches one of the user's groups, we add the role
+    groups.forEach(function (group) {
+      if (roleGroups.includes(group)) {
+        addRoleAndOptions(role);
+      }
+    });
+  });
+
+  // Collapse the two extravars spellings BEFORE the default merge : that merge
+  // only fills options nobody has an opinion about, and it can only see that
+  // through the key it is looking at. With mixed spellings (default role
+  // 'showExtravars: false', the user's own role 'showExtraVars: true') the default
+  // value used to land on the untouched lowercase key and the collapse then
+  // pulled the explicit 'true' down with it - the default role overruling the
+  // user's own roles, which is exactly what "we don't overwrite" forbids.
+  collapseExtravars(options);
+
+  // every user has the default role, and public its old name : a form listing either matches
+  logger.debug(`Adding the default role to ${full_username}`);
+  for (const name of EVERYONE_ROLES) if (!roles.includes(name)) roles.push(name);
+  // its options are everyone's defaults : they fill what none of the user's own roles set, they
+  // never overwrite
+  const everyone = everyoneEntry(configRoles);
+  if (everyone?.options) {
+    for (const [key, value] of Object.entries(everyone.options)) {
+      if (options[key] === undefined) {
+        logger.debug(`Adding default option ${key} = ${value}`);
+        options[key] = value;
+      }
+    }
+  }
+
+  result.roles = roles;
+  result.options = options;
+
+  // and once more after the merge, for the case where ONLY the default role has
+  // an opinion : it may have written a single spelling, which must still apply
+  // to both before the defaults below fill the other one with true
+  collapseExtravars(options);
+
+  // Apply defaults for undefined options
+  applyOptionDefaults(options, roles.includes("admin"));
+  // the Admin option of the roles (lib/adminRole.js) : whether the user is an admin, whichever
+  // role made it one - never the and of the roles' values, as the other options are
+  options.admin = roles.includes("admin");
+
+  return result;
+  }
+
+  static async getRolesAndOptions(groups, user) {
+  var roles = [];
+  var full_username = `${user.type}/${user.username}`;
+
   logger.debug(`Getting roles and options for ${full_username}`);
 
   try {
     const baseConfig = await Form.load(null, null, null, true);
-    // derive roles from forms
-    baseConfig.roles.forEach(function (role) {
-
-      // the role's members as they are matched : entraid/<name> is azuread/<name> (memberRef)
-      const users = memberRefs(role.users);
-      const roleGroups = memberRefs(role.groups);
-
-      // if we match the user, we add the role
-      if(users.includes(full_username)){
-        addRoleAndOptions(role);
-      }
-
-      // if the role matches one of the user's groups, we add the role
-      groups.forEach(function (group) {
-        if (roleGroups.includes(group)) {
-          addRoleAndOptions(role);
-        }
-      });
-    });
-
-    // Collapse the two extravars spellings BEFORE the default merge : that merge
-    // only fills options nobody has an opinion about, and it can only see that
-    // through the key it is looking at. With mixed spellings (default role
-    // 'showExtravars: false', the user's own role 'showExtraVars: true') the default
-    // value used to land on the untouched lowercase key and the collapse then
-    // pulled the explicit 'true' down with it - the default role overruling the
-    // user's own roles, which is exactly what "we don't overwrite" forbids.
-    collapseExtravars(options);
-
-    // every user has the default role, and public its old name : a form listing either matches
-    logger.debug(`Adding the default role to ${full_username}`);
-    for (const name of EVERYONE_ROLES) if (!roles.includes(name)) roles.push(name);
-    // its options are everyone's defaults : they fill what none of the user's own roles set, they
-    // never overwrite
-    const everyone = everyoneEntry(baseConfig.roles);
-    if (everyone?.options) {
-      for (const [key, value] of Object.entries(everyone.options)) {
-        if (options[key] === undefined) {
-          logger.debug(`Adding default option ${key} = ${value}`);
-          options[key] = value;
-        }
-      }
-    }
-
-    result.roles = roles;
-    result.options = options;
-
-    // and once more after the merge, for the case where ONLY the default role has
-    // an opinion : it may have written a single spelling, which must still apply
-    // to both before the defaults below fill the other one with true
-    collapseExtravars(options);
-
-    // Apply defaults for undefined options
-    applyOptionDefaults(options, roles.includes("admin"));
-    // the Admin option of the roles (lib/adminRole.js) : whether the user is an admin, whichever
-    // role made it one - never the and of the roles' values, as the other options are
-    options.admin = roles.includes("admin");
-
-    return result;
+    // a configuration without roles takes the fallback below, as it always did
+    if (!Array.isArray(baseConfig?.roles)) throw new Error("The configuration has no roles");
+    // the roles and options of the configuration's roles (rolesAndOptionsFrom)
+    return User.rolesAndOptionsFrom(baseConfig.roles, groups, full_username);
   } catch (e) {
     logger.error(e);
     // return temp role if needed
