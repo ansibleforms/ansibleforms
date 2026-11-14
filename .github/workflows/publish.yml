@@ -3,7 +3,8 @@ name: Publish
 # Builds and pushes the images, all with the same tags : the controller (ansibleforms,
 # docker/controller) and the runtime environment that runs its playbooks, in three layers -
 # ansibleforms-rte-base, ansibleforms-rte-core and ansibleforms-rte-full (docker/runner/rte-*).
-# Called by release.yml when a release is created and by rc.yml for a release candidate.
+# Called by release.yml when a release is created, by rc.yml for a release candidate and by
+# refresh-images.yml every week.
 # "Run workflow" re-publishes an existing release tag, for when a push failed half way. The
 # tags are the list in installation.md (Image tags) of ansibleforms/website - change that list
 # and this together, never one of them :
@@ -12,6 +13,14 @@ name: Publish
 #                        a release that takes latest takes latest-rc too, so a test server
 #                        on latest-rc is never behind latest
 #   rc 6.5.3-rc.551.1 -> 6.5.3-rc.551.1 and latest-rc
+#
+# Every image is multi-arch : linux/amd64 and linux/arm64 under the same tags. Each
+# architecture is built on a runner of its own (ubuntu-latest and ubuntu-24.04-arm, no
+# emulation) and pushed by digest only, without a tag. Once both have built all four images,
+# the merge job writes one manifest list per image under every tag. So a tag never moves to a
+# half-built set : when a build fails on either architecture, no tag moves at all.
+#
+#   prepare (tags, Dockerfiles) -> build amd64 + build arm64 (in parallel) -> merge (tags)
 #
 # Images go to GHCR only. Docker Hub (ansibleguy/ansibleforms) is no longer published to:
 # it keeps the releases it already has and gets no new version, of either line.
@@ -49,29 +58,50 @@ permissions:
   contents: read
   packages: write   # GHCR, through the automatic GITHUB_TOKEN - no secret needed
 
+# one publish per version at a time ; a newer rc run for the same pull request waits. For the
+# whole workflow, not one job : the builds and the merge of two runs never interleave
+concurrency:
+  group: publish-${{ inputs.version || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version || inputs.tag }}
+  REF: ${{ inputs.ref || inputs.tag }}
+  CHANNEL: ${{ inputs.channel || 'release' }}
+  REFRESH: ${{ inputs.refresh == true }}
+
 jobs:
-  publish:
-    name: Build and push
+  # ─── what to build and under which tags, worked out once for both architectures ───
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
-    # one publish per version at a time ; a newer rc run for the same pull request waits
-    concurrency:
-      group: publish-${{ inputs.version || inputs.tag }}
-      cancel-in-progress: false
-    env:
-      VERSION: ${{ inputs.version || inputs.tag }}
-      REF: ${{ inputs.ref || inputs.tag }}
-      CHANNEL: ${{ inputs.channel || 'release' }}
-      REFRESH: ${{ inputs.refresh == true }}
+    outputs:
+      build_time: ${{ steps.v.outputs.build_time }}
+      sha: ${{ steps.v.outputs.sha }}
+      sha_short: ${{ steps.v.outputs.sha_short }}
+      ghcr: ${{ steps.tags.outputs.ghcr }}
+      list: ${{ steps.tags.outputs.list }}
+      rte_base: ${{ steps.tags.outputs.rte_base }}
+      rte_core: ${{ steps.tags.outputs.rte_core }}
+      rte_full: ${{ steps.tags.outputs.rte_full }}
+      controller_file: ${{ steps.files.outputs.controller }}
+      rte_base_file: ${{ steps.files.outputs.rte_base }}
+      rte_core_file: ${{ steps.files.outputs.rte_core }}
+      rte_full_file: ${{ steps.files.outputs.rte_full }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
 
+      # The build time and the commit are read here, once : both architectures bake the same
+      # values into build-info.json, and build from the same commit even if REF is a branch
+      # that moves while the run is going
       - name: Read the build facts
         id: v
         run: |
           case "$CHANNEL" in release|rc) ;; *) echo "::error::unknown channel '$CHANNEL'"; exit 1 ;; esac
           echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           # short, not the full sha : scripts/generate-build-info.sh writes GIT_SHA verbatim into
           # build-info.json and the About dialog has always shown the short form
           echo "sha_short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
@@ -153,6 +183,28 @@ jobs:
           fi
           cat "$GITHUB_OUTPUT"
 
+  # ─── the four images for one architecture, on a runner of that architecture ───
+  # Pushed by digest only : no tag moves here. The digests go to the merge job as an artifact.
+  build:
+    name: Build (${{ matrix.arch }})
+    needs: prepare
+    strategy:
+      # one architecture failing is enough to publish nothing : the other one stops too
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      GHCR: ${{ needs.prepare.outputs.ghcr }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
@@ -163,84 +215,167 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # VERSION is baked into build-info.json, which /api/v2/version prefers over
-      # server/package.json - that is how a release candidate shows its own version
+      # server/package.json - that is how a release candidate shows its own version.
+      # TARGETARCH is set by buildx from the platform already ; it is passed as well because
+      # the Dockerfiles up to 7.5.0 declare it with a default (amd64), and a declared default
+      # wins over the platform's value - a refresh of such a tag would get the amd64 ytt.
+      # The layer cache has a scope per architecture, or the two runners would overwrite it.
       - name: Build and push
+        id: app
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ steps.files.outputs.controller }}
-          push: true
-          tags: ${{ steps.tags.outputs.list }}
+          file: ${{ needs.prepare.outputs.controller_file }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.GHCR }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            GIT_SHA=${{ steps.v.outputs.sha_short }}
-            BUILD_TIME=${{ steps.v.outputs.build_time }}
+            GIT_SHA=${{ needs.prepare.outputs.sha_short }}
+            BUILD_TIME=${{ needs.prepare.outputs.build_time }}
             VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=app
+            TARGETARCH=${{ matrix.arch }}
+          cache-from: type=gha,scope=app-${{ matrix.arch }}
           # a refresh builds every layer again : the apt packages and collections are the point
           no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=app
+          cache-to: type=gha,mode=max,scope=app-${{ matrix.arch }}
 
-      # The RTE in three layers, each FROM the one before, by the digest this run just pushed :
-      # never a stale layer under a new one
+      # The RTE in three layers, each FROM the one before, by the digest this job just pushed :
+      # never a stale layer under a new one, and always the layer of the same architecture
       - name: Build and push the RTE base
         id: rte_base
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ steps.files.outputs.rte_base }}
-          push: true
-          tags: ${{ steps.tags.outputs.rte_base }}
+          file: ${{ needs.prepare.outputs.rte_base_file }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.GHCR }}-rte-base,push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            GIT_SHA=${{ steps.v.outputs.sha_short }}
-            BUILD_TIME=${{ steps.v.outputs.build_time }}
+            GIT_SHA=${{ needs.prepare.outputs.sha_short }}
+            BUILD_TIME=${{ needs.prepare.outputs.build_time }}
             VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=rte-base
+          cache-from: type=gha,scope=rte-base-${{ matrix.arch }}
           # a refresh builds every layer again : the apt packages and collections are the point
           no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-base
+          cache-to: type=gha,mode=max,scope=rte-base-${{ matrix.arch }}
 
       - name: Build and push the RTE
         id: rte
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ steps.files.outputs.rte_core }}
-          push: true
-          tags: ${{ steps.tags.outputs.rte_core }}
+          file: ${{ needs.prepare.outputs.rte_core_file }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.GHCR }}-rte-core,push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            BASE_IMAGE=${{ steps.tags.outputs.ghcr }}-rte-base@${{ steps.rte_base.outputs.digest }}
+            BASE_IMAGE=${{ env.GHCR }}-rte-base@${{ steps.rte_base.outputs.digest }}
             VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=rte-core
+          cache-from: type=gha,scope=rte-core-${{ matrix.arch }}
           # a refresh builds every layer again : the apt packages and collections are the point
           no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-core
+          cache-to: type=gha,mode=max,scope=rte-core-${{ matrix.arch }}
 
       - name: Build and push the RTE (full)
+        id: rte_full
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ steps.files.outputs.rte_full }}
-          push: true
-          tags: ${{ steps.tags.outputs.rte_full }}
+          file: ${{ needs.prepare.outputs.rte_full_file }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.GHCR }}-rte-full,push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            BASE_IMAGE=${{ steps.tags.outputs.ghcr }}-rte-core@${{ steps.rte.outputs.digest }}
+            BASE_IMAGE=${{ env.GHCR }}-rte-core@${{ steps.rte.outputs.digest }}
             VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=rte-full
+            TARGETARCH=${{ matrix.arch }}
+          cache-from: type=gha,scope=rte-full-${{ matrix.arch }}
           # a refresh builds every layer again : the apt packages and collections are the point
           no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-full
+          cache-to: type=gha,mode=max,scope=rte-full-${{ matrix.arch }}
+
+      # one file per image, named after it, holding the digest of this architecture
+      - name: Keep the digests
+        env:
+          APP: ${{ steps.app.outputs.digest }}
+          RTE_BASE: ${{ steps.rte_base.outputs.digest }}
+          RTE_CORE: ${{ steps.rte.outputs.digest }}
+          RTE_FULL: ${{ steps.rte_full.outputs.digest }}
+        run: |
+          mkdir -p digests
+          echo "$APP" > digests/app
+          echo "$RTE_BASE" > digests/rte-base
+          echo "$RTE_CORE" > digests/rte-core
+          echo "$RTE_FULL" > digests/rte-full
+          head digests/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.arch }}
+          path: digests/*
+          if-no-files-found: error
+          # a re-run of a failed job uploads again under the same name
+          overwrite: true
+          retention-days: 1
+
+  # ─── the tags : one manifest list per image, naming the amd64 and the arm64 image ───
+  merge:
+    name: Tag the images
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      GHCR: ${{ needs.prepare.outputs.ghcr }}
+      APP_TAGS: ${{ needs.prepare.outputs.list }}
+      RTE_BASE_TAGS: ${{ needs.prepare.outputs.rte_base }}
+      RTE_CORE_TAGS: ${{ needs.prepare.outputs.rte_core }}
+      RTE_FULL_TAGS: ${{ needs.prepare.outputs.rte_full }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+    steps:
+      # each artifact in a folder of its own : digests/digests-amd64/app, ...
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digests-*
+          path: digests
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # imagetools copies nothing : the manifest list points at the images the build jobs
+      # pushed, in the same repository. Every tag of an image gets the same list.
+      - name: Create the manifest lists
+        run: |
+          set -euo pipefail
+          # $1 the repository, $2 its tags (comma separated), $3 the digest file
+          tag() {
+            args=()
+            for t in ${2//,/ }; do args+=(-t "$t"); done
+            docker buildx imagetools create "${args[@]}" \
+              "$1@$(cat "digests/digests-amd64/$3")" \
+              "$1@$(cat "digests/digests-arm64/$3")"
+            echo "::group::${2%%,*}"
+            docker buildx imagetools inspect "${2%%,*}"
+            echo "::endgroup::"
+          }
+          tag "$GHCR" "$APP_TAGS" app
+          tag "$GHCR-rte-base" "$RTE_BASE_TAGS" rte-base
+          tag "$GHCR-rte-core" "$RTE_CORE_TAGS" rte-core
+          tag "$GHCR-rte-full" "$RTE_FULL_TAGS" rte-full
 
       - name: Summary
         run: |
           {
             echo "### Published $VERSION ($CHANNEL$([ "$REFRESH" = "true" ] && echo ", refresh"))"
             echo ""
+            echo "linux/amd64 and linux/arm64, under every tag :"
+            echo ""
             echo '```'
-            echo "${{ steps.tags.outputs.list }}" | tr ',' '\n'
-            echo "${{ steps.tags.outputs.rte_base }}" | tr ',' '\n'
-            echo "${{ steps.tags.outputs.rte_core }}" | tr ',' '\n'
-            echo "${{ steps.tags.outputs.rte_full }}" | tr ',' '\n'
+            echo "$APP_TAGS" | tr ',' '\n'
+            echo "$RTE_BASE_TAGS" | tr ',' '\n'
+            echo "$RTE_CORE_TAGS" | tr ',' '\n'
+            echo "$RTE_FULL_TAGS" | tr ',' '\n'
             echo '```'
             echo ""
-            echo "from \`$(git rev-parse HEAD)\`"
+            echo "from \`$SHA\`"
           } >> "$GITHUB_STEP_SUMMARY"
