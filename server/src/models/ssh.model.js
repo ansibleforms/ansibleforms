@@ -16,6 +16,14 @@ var Ssh=function(ssh){
 };
 // generate new keys (used only once during startup of ansibleforms (in the init/index.js))
 Ssh.generate = function(force){
+  // the .ssh folder of the home path may not exist yet (a fresh install with HOME_PATH on a new
+  // volume, a home made without one) : made first, readable by this user only, as Ssh.update
+  // does - ssh-keygen does not make it, and the key was never made
+  try {
+    fs.mkdirSync(path.dirname(privateKeyPath()), { recursive: true, mode: 0o700 })
+  } catch (err) {
+    return Promise.reject(err)
+  }
   return ssh_keygen.keygen({
     path: privateKeyPath(),
     read: true,
