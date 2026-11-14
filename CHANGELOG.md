@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0](https://github.com/ansibleforms/ansibleforms/compare/7.5.0...7.6.0) (2026-11-14)
+
+
+### Added
+
+* a credential's login can be written to CyberArk on save ([#1319](https://github.com/ansibleforms/ansibleforms/issues/1319)) ([6c00568](https://github.com/ansibleforms/ansibleforms/commit/6c00568693c0684bcce9a1a072addee90f05c251))
+* a credential's login can be written to HashiCorp Vault on save ([#1318](https://github.com/ansibleforms/ansibleforms/issues/1318)) ([341529a](https://github.com/ansibleforms/ansibleforms/commit/341529ac8c79844ada3ded6090193e4b136b1266))
+* a list's readonlyColumns keep existing rows read only ([#1373](https://github.com/ansibleforms/ansibleforms/issues/1373)) ([8d80b79](https://github.com/ansibleforms/ansibleforms/commit/8d80b79622108f18dd3d369e5d508c49ee6b4b64)), closes [#1347](https://github.com/ansibleforms/ansibleforms/issues/1347)
+* a role's Admin option makes its users admins ([#1313](https://github.com/ansibleforms/ansibleforms/issues/1313)) ([0807ceb](https://github.com/ansibleforms/ansibleforms/commit/0807ceb6c92bd39bca36177e1619b1bffbda49ad))
+* an SSH credential can log in with a private key ([#1377](https://github.com/ansibleforms/ansibleforms/issues/1377)) ([3438406](https://github.com/ansibleforms/ansibleforms/commit/3438406054de5cf56b273d55ea15f7e9c905373a)), closes [#1345](https://github.com/ansibleforms/ansibleforms/issues/1345)
+* images are published for arm64 as well ([#1371](https://github.com/ansibleforms/ansibleforms/issues/1371)) ([957c0ca](https://github.com/ansibleforms/ansibleforms/commit/957c0ca41f34cb701aea93f248805e2713f79db0)), closes [#1369](https://github.com/ansibleforms/ansibleforms/issues/1369)
+* mail can be sent through Microsoft 365 with OAuth2 ([#1376](https://github.com/ansibleforms/ansibleforms/issues/1376)) ([88972c0](https://github.com/ansibleforms/ansibleforms/commit/88972c08c77e5aaa5d9f2e022a28cb40670e9f60)), closes [#1207](https://github.com/ansibleforms/ansibleforms/issues/1207)
+* user and password and API credentials can hold a host and port ([#1375](https://github.com/ansibleforms/ansibleforms/issues/1375)) ([f527344](https://github.com/ansibleforms/ansibleforms/commit/f527344d2632a852b3edf505cef46c714a2d8ad6)), closes [#1326](https://github.com/ansibleforms/ansibleforms/issues/1326)
+
+
+### Fixed
+
+* a mail channel can send without a login ([#1374](https://github.com/ansibleforms/ansibleforms/issues/1374)) ([b810114](https://github.com/ansibleforms/ansibleforms/commit/b8101149878a17a536d1e3bd63675dc715d6f014)), closes [#1325](https://github.com/ansibleforms/ansibleforms/issues/1325)
+* a new credential asks where its secret is kept first ([#1314](https://github.com/ansibleforms/ansibleforms/issues/1314)) ([3584ebf](https://github.com/ansibleforms/ansibleforms/commit/3584ebf9b4b671de512a285b7790d1bf5b538dd6))
+* a refused launch names the missing fields ([#1370](https://github.com/ansibleforms/ansibleforms/issues/1370)) ([3017f25](https://github.com/ansibleforms/ansibleforms/commit/3017f25bbc8f21c8aedfd509d83f985c19fad78a)), closes [#1327](https://github.com/ansibleforms/ansibleforms/issues/1327)
+* MCP launches and changes are audited ([#1324](https://github.com/ansibleforms/ansibleforms/issues/1324)) ([f92aa88](https://github.com/ansibleforms/ansibleforms/commit/f92aa88f4d66114366476a3199c5a02a7c5af6e1))
+* MySQL queries no longer log mysql2 warnings ([#1317](https://github.com/ansibleforms/ansibleforms/issues/1317)) ([c3157d9](https://github.com/ansibleforms/ansibleforms/commit/c3157d99df4c6706584a155aca1ce6ce2e554af5))
+* scheduled job launches are audited ([#1323](https://github.com/ansibleforms/ansibleforms/issues/1323)) ([f346571](https://github.com/ansibleforms/ansibleforms/commit/f346571b84d60755be4863ea4683fc7ce8cc79cd))
+* settings table names config_yaml, drops mail columns ([#1378](https://github.com/ansibleforms/ansibleforms/issues/1378)) ([dc59a71](https://github.com/ansibleforms/ansibleforms/commit/dc59a71ee1304e8c11de9d9562a6078269eace3a)), closes [#1328](https://github.com/ansibleforms/ansibleforms/issues/1328)
+* the app's SSH key is made when its home has no .ssh folder ([#1380](https://github.com/ansibleforms/ansibleforms/issues/1380)) ([2a09766](https://github.com/ansibleforms/ansibleforms/commit/2a0976698dfd07c8cb570e62dbd7615b26745490))
+* the stored jobs page opens for users who may store jobs ([#1372](https://github.com/ansibleforms/ansibleforms/issues/1372)) ([39b1120](https://github.com/ansibleforms/ansibleforms/commit/39b11207459253910eacf2e1f4a5af94ba966ac8)), closes [#1329](https://github.com/ansibleforms/ansibleforms/issues/1329)
+
+
+### Changed
+
+* finished jobs are kept 90 days by default ([#1320](https://github.com/ansibleforms/ansibleforms/issues/1320)) ([df3b1ba](https://github.com/ansibleforms/ansibleforms/commit/df3b1baec81814fd07a69836ca3c713aa54a4d35))
+* log files are kept 90 days by default ([#1321](https://github.com/ansibleforms/ansibleforms/issues/1321)) ([adc4f3a](https://github.com/ansibleforms/ansibleforms/commit/adc4f3a7bb8ac0ec4edd5a8330aa2a28440eeae5))
+* nightly backups are kept 30 days by default ([#1322](https://github.com/ansibleforms/ansibleforms/issues/1322)) ([9323677](https://github.com/ansibleforms/ansibleforms/commit/9323677fbfdc53defbcc564f84ca62c261a80474))
+
 ## [7.5.0](https://github.com/ansibleforms/ansibleforms/compare/7.4.2...7.5.0) (2026-11-01)
 
 
