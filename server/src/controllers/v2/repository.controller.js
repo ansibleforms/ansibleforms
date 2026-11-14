@@ -11,24 +11,27 @@ import { isAdminRequest } from '../../lib/adminGrants.js';
 import { designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
 
 /**
- * Whether a credential carries what git signs in with : a user, and a password (stored, or read
- * from a secret store). A token alone (an api or a runner's credential) is no git login.
+ * Whether a credential carries what git signs in with : a password or a token (stored, or read
+ * from a secret store), with or without a user. A git credential signing in with a token keeps no
+ * user : git then sends GIT_TOKEN_USER with it (models/repository.model.js withCredential). One
+ * written to a secret store (the dialog's Write to a secret store) keeps the reference only, its
+ * user and password both read from the store when it is used.
  *
  * Args:
  *   cred (object): the credential's row (findRowByName).
  *
  * Returns:
- *   boolean: true when it has a user and a password.
+ *   boolean: true when it has a password, or a secret store and a place in it to read one from.
  */
 function hasLogin(cred) {
   const filled = (v) => v !== null && v !== undefined && String(v).trim() !== '';
-  return filled(cred?.user) && (filled(cred?.password) || (filled(cred?.secret_store) && filled(cred?.secret_ref)));
+  return filled(cred?.password) || (filled(cred?.secret_store) && filled(cred?.secret_ref));
 }
 
 /**
  * Checks the credential a repository is given, and what moving a repository takes along. Git signs
- * in with a user and a password, so the credential must carry both, whatever its type (a git, a
- * userpass, a database login an admin chooses). A user who is not an admin may not name a
+ * in with a password or a token, a user with it or not, so the credential must carry one, whatever
+ * its type (a git, a userpass, a database login an admin chooses). A user who is not an admin may not name a
  * credential only an admin may (models/credential.model.v2.js isAdminGuarded : a runner's, a
  * connection's, a sign-in's), whose secret would otherwise be sent to an address of their choice,
  * and moving a repository to another address drops the credential and the password it keeps,
@@ -42,7 +45,7 @@ function hasLogin(cred) {
  *   Promise<{dropPassword: boolean}>: whether the update clears the repository's own password.
  *
  * Raises:
- *   Errors.BadRequestError: the credential does not exist, or lacks a user or a password.
+ *   Errors.BadRequestError: the credential does not exist, or has no password nor token.
  *   Errors.AccessDeniedError: the credential is an admin's.
  */
 async function guardRepositoryCredential(req, existing) {

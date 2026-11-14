@@ -109,7 +109,7 @@ export default {
     credentialNotFound:
       "Brak poświadczenia o nazwie '{name}'",
     repositoryCredentialType:
-      "Repozytorium loguje się użytkownikiem i hasłem: poświadczenie '{name}' nie ma obu",
+      "Repozytorium loguje się hasłem lub tokenem: poświadczenie '{name}' nie ma żadnego z nich",
     credentialSignInAdminOnly:
       "Tylko admin może dodać, zmienić lub usunąć poświadczenie używane przez logowanie (LDAP, Microsoft Entra ID lub OIDC)",
     credentialNotAllowed:

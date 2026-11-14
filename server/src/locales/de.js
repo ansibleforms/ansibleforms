@@ -108,7 +108,7 @@ export default {
     credentialNotFound:
       "Keine Zugangsdaten mit dem Namen '{name}'",
     repositoryCredentialType:
-      "Ein Repository meldet sich mit Benutzer und Passwort an: die Zugangsdaten '{name}' haben nicht beides",
+      "Ein Repository meldet sich mit einem Passwort oder Token an: die Zugangsdaten '{name}' haben keines",
     credentialSignInAdminOnly:
       "Nur ein Admin kann Zugangsdaten hinzufuegen, aendern oder loeschen, die eine Anmeldung verwendet (LDAP, Microsoft Entra ID oder OIDC)",
     credentialNotAllowed:

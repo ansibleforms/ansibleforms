@@ -104,7 +104,7 @@ export default {
     credentialNotFound:
       "Geen referentie met de naam '{name}'",
     repositoryCredentialType:
-      "Een repository meldt zich aan met een gebruiker en een wachtwoord: de referentie '{name}' heeft ze niet allebei",
+      "Een repository meldt zich aan met een wachtwoord of een token: de referentie '{name}' heeft geen van beide",
     credentialSignInAdminOnly:
       "Alleen een admin kan een referentie toevoegen, wijzigen of verwijderen die een aanmelding gebruikt (LDAP, Microsoft Entra ID of OIDC)",
     credentialNotAllowed:

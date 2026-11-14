@@ -111,7 +111,7 @@ export default {
     credentialNotFound:
       "Aucun identifiant nommé '{name}'",
     repositoryCredentialType:
-      "Un dépôt se connecte avec un utilisateur et un mot de passe : l'identifiant '{name}' n'a pas les deux",
+      "Un dépôt se connecte avec un mot de passe ou un jeton : l'identifiant '{name}' n'a ni l'un ni l'autre",
     credentialSignInAdminOnly:
       "Seul un admin peut ajouter, modifier ou supprimer un identifiant utilisé par une authentification (LDAP, Microsoft Entra ID ou OIDC)",
     credentialNotAllowed:
