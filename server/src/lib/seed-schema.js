@@ -279,6 +279,9 @@ export function seedHasMailSettings(doc) {
  *     holding the server, port, TLS and login, which the channel names
  *   - without one (a relay) : no credential, the channel holds the server, port and TLS itself
  *     and sends without a login
+ * Each declares the other's fields empty (a relay its credential, a login the channel's own
+ * server, port and TLS) : a seed update writes only the keys it declares, so a channel switched
+ * from one to the other would otherwise keep the old target.
  * The channel's is_active is not declared : the first mail channel made is the active one
  * (NotificationChannel.create), and an active channel made by hand stays it, as it was preferred
  * to the mail settings before.
@@ -340,11 +343,19 @@ export function foldMailSettingsIntoChannel(doc, reserved = {}, own = {}) {
     if (mail.mail_password !== undefined) cred.password = mail.mail_password;
     credentials.items.push(cred);
     item.credential = credential;
+    // its own server, port and TLS declared empty : a seed update writes only the keys it
+    // declares, so a channel that was a relay before (the seed without mail_username) would keep
+    // its own server next to the credential's
+    Object.assign(item, { server: "", port: "", secure: false });
   } else {
     // step 4 : a relay : the channel's own server, port and TLS, no login
     item.server = mail.mail_server;
     if (mail.mail_port !== undefined) item.port = mail.mail_port;
     if (mail.mail_secure !== undefined) item.secure = mail.mail_secure;
+    // its credential declared empty (none) : a seed update writes only the keys it declares, so
+    // a channel that had a login before (the seed with mail_username) would keep naming that
+    // credential, sending to its server as its user, or to nothing once the credential is pruned
+    item.credential = "";
   }
   // step 5 : the mail channel
   channels.items.push(item);

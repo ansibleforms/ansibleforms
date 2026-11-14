@@ -83,6 +83,19 @@ describe("an SSH credential's private key, on a write", () => {
     assert.equal(crypto.decrypt(out.key_passphrase), "my phrase");
     assert.equal("key_passphrase" in CrudModel.getFieldValues("credential", { key_passphrase: "**********" }, true), false);
   });
+
+  test("an empty key or passphrase keeps the stored one from the API, and clears it from the config seed", async () => {
+    const kept = await Credential.prepareUpdate({ client_key: "", key_passphrase: "" }, 1);
+    assert.equal("client_key" in kept, false);
+    assert.equal("key_passphrase" in kept, false);
+    // the seed writes what it declares : its empty one removes the stored one
+    const cleared = await Credential.prepareUpdate({ client_key: "", key_passphrase: "" }, 1, { fromSeed: true });
+    assert.equal(cleared.client_key, null);
+    assert.equal(cleared.key_passphrase, null);
+    const out = CrudModel.getFieldValues("credential", cleared, false);
+    assert.equal(out.client_key, null);
+    assert.equal(out.key_passphrase, null);
+  });
 });
 
 describe("an SSH credential's private key, resolved", () => {

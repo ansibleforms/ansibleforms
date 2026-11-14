@@ -1004,12 +1004,16 @@ Health.check = async function () {
     } else {
       // an SMTP server : its credential's, else its own (a relay)
       const mail = active
-        ? { ...(await NotificationChannel.withServer([active]).then(([c]) => ({ mail_server: c.server, mail_port: c.port, mail_secure: c.secure }))), mail_username: active.credential }
+        ? {
+            ...(await NotificationChannel.withServer([active]).then(([c]) => ({ mail_server: c.server, mail_port: c.port, mail_secure: c.secure }))),
+            // signed in : a credential with a login, never one holding only the server (a relay)
+            mail_login: await NotificationChannel.credentialLogsIn(active.credential),
+          }
         : null;
       add('mail', mail?.mail_server ? `${mail.mail_server}:${mail.mail_port || '?'}` : 'not configured', {
         // never the password, and the username only as a yes/no
         secure: mail?.mail_server ? !!mail.mail_secure : null,
-        authenticated: mail?.mail_server ? !!mail.mail_username : null,
+        authenticated: mail?.mail_server ? mail.mail_login : null,
         note: mail?.mail_server ? null : 'Approval requests and job notifications are sent by mail, so they go nowhere until this is set',
       });
     }

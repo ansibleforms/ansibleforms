@@ -53,7 +53,7 @@ vi.mock("../src/models/db.model.js", () => ({
 const { foldMailSettingsIntoChannel, seedHasMailSettings, validateSeed } = await import("../src/lib/seed-schema.js");
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const logger = (await import("../src/lib/logger.js")).default;
-const { applyConfigSeed, listSections, _resetSeedState } = await import("../src/lib/seed.js");
+const { applyConfigSeed, listSections, _resetSeedState, differs, buildRecord } = await import("../src/lib/seed.js");
 
 const MAIL = { mail_server: "smtp.example.com", mail_port: 587, mail_secure: true, mail_username: "mailer", mail_password: "pw", mail_from: "af@example.com" };
 
@@ -77,7 +77,7 @@ describe("the mail keys of the settings become a mail channel", () => {
       { name: "mail-login", description: "The mail server of the config seed's settings", credential_type: "smtp", host: "smtp.example.com", user: "mailer", port: 587, secure: true, password: "pw" },
     ]);
     expect(doc.notification_channels.items).toEqual([
-      { name: "default", description: "From the config seed's mail settings", type: "mail", from_address: "af@example.com", credential: "mail-login" },
+      { name: "default", description: "From the config seed's mail settings", type: "mail", from_address: "af@example.com", credential: "mail-login", server: "", port: "", secure: false },
     ]);
     // never is_active : the first mail channel is the active one, one made by hand stays it
     expect(doc.notification_channels.items[0].is_active).toBeUndefined();
@@ -88,7 +88,23 @@ describe("the mail keys of the settings become a mail channel", () => {
     expect(credential).toBe(null);
     expect(doc.credentials.items).toEqual([]);
     expect(doc.notification_channels.items[0]).toMatchObject({ name: "default", type: "mail", server: "smtp.example.com", port: 587, secure: true });
-    expect(doc.notification_channels.items[0].credential).toBeUndefined();
+    // its credential declared empty : a channel that had a login stops naming it
+    expect(doc.notification_channels.items[0].credential).toBe("");
+  });
+
+  test("switched between a login and a relay, the managed channel keeps no trace of the other", () => {
+    const relay = foldMailSettingsIntoChannel({ settings: { ...MAIL, mail_username: "", mail_password: "", url: "" } }).doc.notification_channels.items[0];
+    const login = foldMailSettingsIntoChannel({ settings: { ...MAIL, url: "" } }).doc.notification_channels.items[0];
+    const section = listSections.find((x) => x.key === "notification_channels");
+    // each as the seed writes it : the credential, or the own server, port and TLS, stored null
+    const asRelay = { ...relay, credential: null, secure: 1, managed: 1 };
+    const asLogin = { ...login, server: null, port: null, secure: 0, managed: 1 };
+    expect(differs(buildRecord(section, relay, false), asRelay)).toBe(false);
+    expect(differs(buildRecord(section, login, false), asLogin)).toBe(false);
+    // the seed now a relay, the channel still naming the login's credential : written again
+    expect(differs(buildRecord(section, relay, false), { ...asRelay, credential: "mail-login" })).toBe(true);
+    // the seed now a login, the channel still holding the relay's server : written again
+    expect(differs(buildRecord(section, login, false), { ...asLogin, server: "smtp.example.com", port: 587, secure: 1 })).toBe(true);
   });
 
   test("no mail server : the keys leave, nothing is declared", () => {

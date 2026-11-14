@@ -472,6 +472,24 @@ describe("a mail channel with an entraid credential", () => {
     expect(declared).toMatchObject({ server: null, port: null, secure: 0 });
   });
 
+  test("a seed declaring a server on such a channel : written once, then unchanged at every start", async () => {
+    const { applyListSection, listSections } = await import("../src/lib/seed.js");
+    const section = listSections.find((s) => s.key === "notification_channels");
+    // the channel as the seed's first apply left it : the declared server emptied by normalise
+    channels = [{ id: 4, name: "m365-mail", type: "mail", description: "", credential: "m365", send_through: "graph", from_address: "noreply@contoso.com", server: null, port: null, secure: 0, managed: 1 }];
+    const item = { name: "m365-mail", type: "mail", credential: "m365", from_address: "noreply@contoso.com", server: "relay.corp.local", port: 25, secure: true };
+    const summary = { created: [], updated: [], released: [], pruned: [], adopted: [], recloned: [], unchanged: 0 };
+    await applyListSection(section, { items: [item] }, summary);
+    expect(summary.updated).toEqual([]);
+    expect(summary.unchanged).toBe(1);
+    // the same server on a channel of an smtp credential, or none, is still compared
+    rows["smtp-login"] = { name: "smtp-login", credential_type: "smtp", host: "smtp.example.com" };
+    channels = [{ ...channels[0], credential: "smtp-login", send_through: null }];
+    const again = { ...summary, updated: [], unchanged: 0 };
+    await applyListSection(section, { items: [{ ...item, credential: "smtp-login" }] }, again);
+    expect(again.updated).toEqual(["notification channel:m365-mail"]);
+  });
+
   test("its SMTP mail config is Exchange Online's, never a relay's server the channel still holds", async () => {
     vi.spyOn(NotificationChannel, "resolveCredential").mockResolvedValue({ user: "client-9", password: "sec" });
     const stale = { name: "m", credential: "m365", from_address: "noreply@contoso.com", send_through: "smtp", server: "relay.corp.local", port: 25, secure: 1 };

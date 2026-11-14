@@ -147,6 +147,16 @@ const listSections = [
     defaults: { description: "" },
     create: (d) => NotificationChannel.create(d, seedOpts),
     update: (d, row) => NotificationChannel.update(d, row.id, seedOpts),
+    // a mail channel of an entraid credential (Microsoft 365) only sends to Microsoft : normalise
+    // empties a server, port or TLS of its own, the seed's too, so they are not compared, or a seed
+    // declaring them would rewrite the channel (and say "updated") at every start
+    compared: async (d, row) => {
+      const credential = d.credential === undefined ? row.credential : d.credential;
+      if ((row.type || d.type) !== "mail" || (await NotificationChannel.credentialType(credential)) !== "entraid") return d;
+      const rest = { ...d };
+      for (const key of ["server", "port", "secure"]) delete rest[key];
+      return rest;
+    },
     remove: (row) => NotificationChannel.delete(row.id, seedOpts),
   },
 ];
@@ -238,8 +248,10 @@ async function applyListSection(section, cfg, summary) {
     const existing = await CrudModel.findByName(section.modelName, item.name);
     if (existing) {
       const data = buildRecord(section, item, false);
-      // already managed and unchanged : leave the row alone entirely
-      if (existing.managed && !differs(data, existing)) {
+      // already managed and unchanged : leave the row alone entirely. Compared without the fields
+      // the section's model empties whatever is declared (section.compared), as they never match
+      const compared = section.compared ? await section.compared(data, existing) : data;
+      if (existing.managed && !differs(compared, existing)) {
         summary.unchanged++;
         continue;
       }

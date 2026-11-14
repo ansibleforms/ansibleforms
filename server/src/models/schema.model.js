@@ -1477,11 +1477,13 @@ export async function copyMailSettingsToServers() {
  *   s (object): the settings row, as stored (its mail_password encrypted).
  *   name (string): the channel's name, free already.
  *   query (function): the transaction's query function (mysql.transaction hands one over).
+ *   description (string): the channel's description ; the 7.6 move writes its own
+ *     (UPGRADE_MAIL_CHANNEL_DESCRIPTION), to find the channel it made again.
  *
  * Returns:
  *   Promise<string|null>: the credential made for the login, or null without a mail user.
  */
-async function insertMailSettingsChannel(s, name, query) {
+async function insertMailSettingsChannel(s, name, query, description = "From the mail settings") {
   let credential = null;
   if (s.mail_username) {
     // the password is copied as it is stored : the same key encrypts both tables ; a
@@ -1494,7 +1496,7 @@ async function insertMailSettingsChannel(s, name, query) {
   }
   await query(
     "INSERT INTO AnsibleForms.`notification_channels` (name, description, type, enabled, server, port, secure, from_address, credential, is_active) VALUES (?, ?, 'mail', 1, ?, ?, ?, ?, ?, 1)",
-    [name, "From the mail settings", s.mail_server, s.mail_port || null, s.mail_secure ? 1 : 0, s.mail_from || null, credential],
+    [name, description, s.mail_server, s.mail_port || null, s.mail_secure ? 1 : 0, s.mail_from || null, credential],
   );
   return credential;
 }
@@ -1518,6 +1520,11 @@ async function freeChannelName(name, query) {
   }
 }
 
+// the description of the mail channel the 7.6 move of the mail settings makes
+// (dropSettingsMailColumns) : how a run after a failure tells the channel it made, to mark it
+// managed on a seeded instance. The 7.3 copy (copyMailSettingsToServers) writes another
+const UPGRADE_MAIL_CHANNEL_DESCRIPTION = "Moved from the mail settings by the 7.6 upgrade";
+
 // the mail columns of the settings row, dropped in 7.6 (dropSettingsMailColumns), in the order
 // they are dropped : mail_server last, so a run that stops part way (a lock timeout) leaves the
 // server, and with it the mail settings still to move, for the next start
@@ -1537,7 +1544,9 @@ const SETTINGS_MAIL_COLUMNS = ["mail_port", "mail_secure", "mail_username", "mai
  *     login
  *   - the settings managed by the config seed : the channel and its credential are managed too,
  *     so the seed (whose mail keys declare those, lib/seed-schema.js foldMailSettingsIntoChannel)
- *     takes them over without a warning, and releases them when it no longer declares them
+ *     takes them over without a warning, and releases them when it no longer declares them.
+ *     Marked after the transaction, so every run marks the channel it made (by its description)
+ *     still unmanaged, and its credential : a run that stopped in between never leaves them so
  *   - an active mail channel already : it is what the mail went through, nothing to move
  * Then the six columns go, mail_server last. The channel and its credential are written in one
  * transaction, the drop only after it. Idempotent : nothing to do once all six are gone, and a
@@ -1571,19 +1580,29 @@ export async function dropSettingsMailColumns() {
       let credential = null;
       await mysql.transaction(async (query) => {
         name = await freeChannelName("default", query);
-        credential = await insertMailSettingsChannel(s, name, query);
+        credential = await insertMailSettingsChannel(s, name, query, UPGRADE_MAIL_CHANNEL_DESCRIPTION);
         // the one active mail channel : the others stop being it
         await query("UPDATE AnsibleForms.`notification_channels` SET is_active = 0 WHERE type = 'mail' AND name <> ?", [name]);
       });
       // its server into its credential, as for every mail channel of before 7.3
       await moveMailServersToCredentials();
-      // a seeded instance : the seed owns them, as it owned the mail settings
-      if (s.managed) {
-        const [channel] = await mysql.do("SELECT credential FROM AnsibleForms.`notification_channels` WHERE name = ?", [name]);
-        await mysql.do("UPDATE AnsibleForms.`notification_channels` SET managed = 1 WHERE name = ?", [name]);
-        if (channel?.credential) await mysql.do("UPDATE AnsibleForms.`credentials` SET managed = 1 WHERE name = ?", [channel.credential]);
-      }
       done.push(`moved the mail settings to the active mail channel '${name}'` + (credential ? `, its login to the credential '${credential}'` : ""));
+    }
+  }
+  // step 2b : a seeded instance : the seed owns the channel and its credential, as it owned the
+  // mail settings. Marked after the move (moveMailServersToCredentials skips a managed channel),
+  // so outside the transaction : a run that stopped in between (the move, or this) left them
+  // unmanaged, and the next one, finding the channel active, makes none. So every run marks the
+  // channels this step made (its description says so ; the 7.3 copy's has another) still
+  // unmanaged, and their credentials, the move already done at this start (patchVersion7 runs it
+  // before this step)
+  if (s?.managed && String(s.mail_server || "").trim()) {
+    const made = await mysql.do("SELECT name, credential FROM AnsibleForms.`notification_channels` WHERE type = 'mail' AND description = ? AND COALESCE(managed, 0) = 0", [
+      UPGRADE_MAIL_CHANNEL_DESCRIPTION,
+    ]);
+    for (const channel of made) {
+      await mysql.do("UPDATE AnsibleForms.`notification_channels` SET managed = 1 WHERE name = ?", [channel.name]);
+      if (channel.credential) await mysql.do("UPDATE AnsibleForms.`credentials` SET managed = 1 WHERE name = ?", [channel.credential]);
     }
   }
   // step 3 : every column still there goes, mail_server last
@@ -1619,7 +1638,8 @@ export async function dropSettingsMailColumns() {
  *   Promise<string|null>: what was done, or null when there was nothing to do.
  *
  * Raises:
- *   Error: the restore point of forms_yaml's config could not be written ; forms_yaml is kept.
+ *   Error: the restore point of forms_yaml's config could not be written, or its copy to an
+ *     empty config_yaml did not take (config_yaml written meanwhile) ; forms_yaml is kept.
  */
 export async function renameFormsYamlToConfigYaml() {
   // step 1 : nothing to rename
@@ -1633,8 +1653,15 @@ export async function renameFormsYamlToConfigYaml() {
   const configYaml = rows[0]?.config_yaml || "";
   const formsYaml = rows[0]?.forms_yaml || "";
   if (formsYaml.trim() && !configYaml.trim()) {
-    // step 4 : config_yaml empty : it takes forms_yaml's config
-    await mysql.do("UPDATE AnsibleForms.`settings` SET config_yaml = forms_yaml WHERE COALESCE(config_yaml, '') = '' AND COALESCE(forms_yaml, '') <> ''");
+    // step 4 : config_yaml empty : it takes forms_yaml's config. Empty as read here (whitespace
+    // only too, which trim() sees as empty and SQL's = '' does not) : the copy keys on the value
+    // read, not on its own idea of empty, or it copied nothing and forms_yaml was dropped with
+    // the config. Checked after : not copied (written since), the column stays for the next start
+    await mysql.do("UPDATE AnsibleForms.`settings` SET config_yaml = forms_yaml WHERE COALESCE(config_yaml, '') = ? AND COALESCE(forms_yaml, '') <> ''", [configYaml]);
+    const after = await mysql.do("SELECT config_yaml, forms_yaml FROM AnsibleForms.`settings` LIMIT 1");
+    if ((after[0]?.config_yaml || "") !== (after[0]?.forms_yaml || "")) {
+      throw new Error("The config of forms_yaml was not copied to config_yaml (the settings changed meanwhile): forms_yaml is kept, the next start tries again");
+    }
   } else if (formsYaml.trim() && formsYaml !== configYaml) {
     // step 4 : each its own : forms_yaml's kept as a restore point before its column goes
     const file = writeFormsYamlRestorePoint(formsYaml);

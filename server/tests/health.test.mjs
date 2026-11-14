@@ -719,12 +719,19 @@ describe("the mail row says where the active mail channel sends", () => {
    *   channel (object|null): the active mail channel, or null for none.
    *   credentialType (string|null): the type of the credential it names (smtp, entraid), or null.
    *   server (object|null): what withServer gives it : { server, port, secure }.
+   *   credentialRow (object|null): its credential's row ({ user, secret_store }) ; one with a user
+   *     by default.
    *
    * Returns:
    *   Promise<void>: once the spies are in place.
    */
-  async function activeChannel(channel, credentialType = null, server = null) {
+  async function activeChannel(channel, credentialType = null, server = null, credentialRow = { user: "mailer" }) {
     const { default: NotificationChannel } = await import("../src/models/notificationChannel.model.js");
+    const { default: CrudModel } = await import("../src/models/crud.model.js");
+    const findByName = CrudModel.findByName;
+    vi.spyOn(CrudModel, "findByName").mockImplementation(async (model, name) =>
+      model === "credential" && name === channel?.credential ? credentialRow : findByName.call(CrudModel, model, name),
+    );
     vi.spyOn(NotificationChannel, "findActive").mockResolvedValue(channel);
     vi.spyOn(NotificationChannel, "credentialType").mockResolvedValue(credentialType);
     vi.spyOn(NotificationChannel, "withServer").mockImplementation(async (list) => list.map((c) => ({ ...c, ...(server || {}) })));
@@ -761,5 +768,21 @@ describe("the mail row says where the active mail channel sends", () => {
     mail = infoOf(await Health.check(), "mail");
     assert.equal(mail.value, "not configured");
     assert.match(mail.detail.note, /go nowhere/);
+  });
+
+  test("an smtp credential holding only the server (a relay) does not sign in ; one reading a secret store does", async () => {
+    await activeChannel({ name: "relay", type: "mail", credential: "relay-smtp" }, "smtp", { server: "relay.example.com", port: 25, secure: 0 }, { user: "", secret_store: null });
+    let mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.value, "relay.example.com:25");
+    assert.equal(mail.detail.authenticated, false);
+    vi.restoreAllMocks();
+    await activeChannel({ name: "vault", type: "mail", credential: "vault-smtp" }, "smtp", { server: "smtp.example.com", port: 587, secure: 1 }, { user: null, secret_store: "vault" });
+    mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.detail.authenticated, true);
+    // a channel without a credential, its own server : no login either
+    vi.restoreAllMocks();
+    await activeChannel({ name: "own", type: "mail", credential: null, server: "relay.example.com", port: 25 });
+    mail = infoOf(await Health.check(), "mail");
+    assert.equal(mail.detail.authenticated, false);
   });
 });
