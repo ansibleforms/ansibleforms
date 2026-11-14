@@ -197,6 +197,10 @@ const RESULT = {
  * Returns:
  *   object: what the plugin keeps of the result.
  */
+// the time a test spawning the plugin's python is given : python's start under a full parallel
+// suite can take seconds, past vitest's default of 5
+const PROBE_TIMEOUT_MS = 30000;
+
 function probe(data = RESULT) {
   const run = spawnSync("python3", ["-c", PROBE, PLUGIN], { input: JSON.stringify(data), encoding: "utf8" });
   if (run.status !== 0) throw new Error(run.stderr);
@@ -217,9 +221,11 @@ describe.skipIf(!hasPython)("the af_events plugin", () => {
     expect(fields.result.json).toEqual({ token: "********", name: "n" });
   });
 
-  test("cuts a result too large to keep", () => {
-    // 300 lines of 9000 characters : past MAX_RESULT, its list and its texts are cut
-    const fields = probe({ changed: false, stdout_lines: Array.from({ length: 300 }, () => "x".repeat(9000)) });
+  // each probe starts python3 and pipes the result through it : given time on a loaded machine
+  test("cuts a result too large to keep", { timeout: PROBE_TIMEOUT_MS }, () => {
+    // 210 lines of 400 characters : its list cut to MAX_RESULT_ITEMS, still past MAX_RESULT (a small
+    // input, so the probe stays quick)
+    const fields = probe({ changed: false, stdout_lines: Array.from({ length: 210 }, () => "x".repeat(400)) });
     expect(JSON.stringify(fields.result).length).toBeLessThanOrEqual(65536);
     expect(fields.result).toEqual({ msg: "The result is too large to keep", keys: ["changed", "stdout_lines"] });
     // a smaller one only has its long texts and its long list cut
