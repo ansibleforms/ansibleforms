@@ -8,6 +8,7 @@ import { readSecret, mapPayloadToCredential, parseInlineSecret, VAULT_STORE_NAME
 import dbConfig from '../../config/db.config.js';
 import { stripTrailingSlashes } from '../lib/url.js';
 import { isMasked } from '../lib/secretMask.js';
+import { certificateProblem } from '../lib/microsoftMail.js';
 import { currentScope, assertCredentialAllowed, assertSecretStoreAllowed } from "../lib/resourceScope.js";
 
 class CredentialModel extends CrudModel {
@@ -171,17 +172,21 @@ class CredentialModel extends CrudModel {
    * An Entra ID credential's certificate and private key, when it signs in with a certificate
    * instead of its secret (mail through Microsoft 365, lib/microsoftMail.js) : the certificate a
    * PEM certificate, the key a PEM private key without a passphrase, and a new certificate comes
-   * with its key. The messages never hold the key.
+   * with its key. Each is also held to the rules the sender holds it to (microsoftMail.js
+   * certificateProblem) : an RSA key, and a certificate inside its validity dates, so one that
+   * cannot send is refused here instead of every mail failing. The messages never hold the key.
    *
    * Args:
    *   data (object): the record written (client_cert, client_key).
    *   creating (boolean): a create (a certificate then needs its key in the same write).
+   *   now (number): the time, in milliseconds (Date.now()).
    *
    * Raises:
-   *   BadRequestError: the certificate or the key does not read, a new certificate comes without
-   *     its key, or the two do not go together.
+   *   BadRequestError: the certificate or the key does not read, the key is not an RSA key, a new
+   *     certificate comes without its key, the two do not go together, or the certificate has
+   *     expired or is not valid yet.
    */
-  static checkEntraCertificate(data, creating = false) {
+  static checkEntraCertificate(data, creating = false, now = Date.now()) {
     const text = (v) => String(v ?? '').trim();
     // step 1 : what is written ; the key left out (or masked, removed by update) keeps the stored one
     const certPem = text(data.client_cert);
@@ -204,12 +209,22 @@ class CredentialModel extends CrudModel {
         throw new Errors.BadRequestError('The private key of a Microsoft Entra ID credential is a PEM private key without a passphrase (-----BEGIN PRIVATE KEY-----)');
       }
     }
-    // step 3 : a new certificate comes with its key, and they go together
+    // step 3 : a key the sender can sign with (an RSA one)
+    const keyProblem = certificateProblem(null, key, now);
+    if (keyProblem) {
+      throw new Errors.BadRequestError(`The private key of a Microsoft Entra ID credential ${keyProblem.reason}`);
+    }
+    // step 4 : a new certificate comes with its key, and they go together
     if (cert && !key && creating) {
       throw new Errors.BadRequestError("A Microsoft Entra ID credential that signs in with a certificate needs the certificate's private key too");
     }
     if (cert && key && !cert.checkPrivateKey(key)) {
       throw new Errors.BadRequestError('The private key does not belong to the certificate of this Microsoft Entra ID credential');
+    }
+    // step 5 : a certificate inside its validity dates
+    const certProblem = certificateProblem(cert, null, now);
+    if (certProblem) {
+      throw new Errors.BadRequestError(`The certificate of a Microsoft Entra ID credential ${certProblem.reason}`);
     }
   }
 
@@ -217,7 +232,9 @@ class CredentialModel extends CrudModel {
    * An Entra ID credential's certificate and private key on an update that changes only one of
    * them : the half sent is checked against the stored other half (checkEntraCertificate only
    * sees what a write sends, so a renewed certificate saved over a stored key of the old one was
-   * taken, and every mail failed at send time). A key sent empty or masked keeps the stored one
+   * taken, and every mail failed at send time). Both halves sent without the type are checked
+   * together when the stored type is entraid (requireTypeFields only checks them when the type is
+   * sent). A key sent empty or masked keeps the stored one
    * (update removed it from the record), a half sent as null is removed and leaves nothing to
    * check. Another type is left alone : a CyberArk or an SSH credential keeps its client key in
    * the same column. The messages never hold the key.
@@ -232,19 +249,27 @@ class CredentialModel extends CrudModel {
    *   Promise<void>: resolves when the pair goes together, or there is no pair to check.
    *
    * Raises:
-   *   BadRequestError: the half sent does not read, a new certificate meets no stored key, or the
-   *     half sent does not go with the stored other half.
+   *   BadRequestError: the half sent does not read or cannot sign in (checkEntraCertificate), a
+   *     new certificate meets no stored key, or the half sent does not go with the stored other
+   *     half.
    */
   static async checkEntraPairOnUpdate(data, id, current = null) {
     const text = (v) => String(v ?? '').trim();
-    // step 1 : only one half written with a value, the other one left out (kept as stored)
+    // step 1 : only one half written with a value, the other one left out (kept as stored) ; or
+    // both written without the type, which requireTypeFields does not see as an Entra ID one
     const certOnly = text(data.client_cert) !== '' && data.client_key === undefined;
     const keyOnly = text(data.client_key) !== '' && data.client_cert === undefined;
-    if (!certOnly && !keyOnly) return;
+    const bothUntyped = !data.credential_type && (text(data.client_cert) !== '' || text(data.client_key) !== '');
+    if (!certOnly && !keyOnly && !bothUntyped) return;
     // step 2 : an Entra ID credential's only, the type sent or the stored one
     const stored = current || (await this.findById(id));
     const type = data.credential_type || stored?.credential_type;
     if (type !== 'entraid') return;
+    // step 2b : both halves sent, untyped : checked together as a create checks them
+    if (!certOnly && !keyOnly) {
+      this.checkEntraCertificate(data, false);
+      return;
+    }
     // step 3 : the half sent reads (the same messages as a create)
     this.checkEntraCertificate({ client_cert: certOnly ? data.client_cert : '', client_key: keyOnly ? data.client_key : '' }, false);
     // step 4 : the stored other half, decrypted by findById ; one that does not read counts as none
