@@ -112,33 +112,34 @@ function assertSecretRefUnchanged(req, before) {
 }
 
 /**
- * Writes the user and password typed for a credential to the secret store it names, when the
- * request asks for it (secret_write, the dialog's Write to a secret store) : the store's write
- * rules apply (lib secrets/providers writeSecret : writing on, below its prefix, a secret there
- * replaced only with secret_overwrite). Once written, the request keeps only the reference : the
- * credential reads its secret from the store from then on, and keeps no password of its own.
- * An admin's, as choosing the secret a credential reads is (assertSecretRefUnchanged).
+ * Takes from the request the user and password typed for a credential to write to the secret store
+ * it names, when the request asks for it (secret_write, the dialog's Write to a secret store) :
+ * where (the store and the place in it) and what, checked, and the body left with the reference
+ * only, as the credential is saved once the secret is written (it reads its secret from the store
+ * from then on, and keeps no password of its own). Nothing is written here : the save's own checks
+ * run first (CredentialModel.assertSavable), then writeTypedSecret writes. An admin's, as choosing
+ * the secret a credential reads is (assertSecretRefUnchanged).
  *
  * Args:
- *   req (object): the request ; its body is changed in place.
+ *   req (object): the request ; its body is changed in place (secret_write and secret_overwrite
+ *     always taken out of it).
  *   before (object|null): the credential as it is, null on a create.
  *
  * Returns:
- *   Promise<void>: settles once written, or at once when no write is asked.
+ *   object|null: { store, ref, user, password, overwrite, name } to write, null when no write is
+ *     asked.
  *
  * Raises:
  *   Errors.AccessDeniedError: the user is not an admin.
- *   Errors.BadRequestError: no store, no reference or no password, or the store refuses writing
- *     there.
- *   Errors.ConflictError: a secret is there and secret_overwrite was not sent.
+ *   Errors.BadRequestError: no store, no reference or no password.
  */
-async function writeTypedSecret(req, before) {
+function planTypedSecret(req, before) {
   const body = req.body || {};
   const asked = body.secret_write;
   delete body.secret_write;
   const overwrite = !!body.secret_overwrite;
   delete body.secret_overwrite;
-  if (!asked) return;
+  if (!asked) return null;
   if (!isAdminRequest(req)) throw new Errors.AccessDeniedError(i18n.t(req, 'resources.credentialSecretRefAdminOnly'));
   const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
   // step 1 : where, and what - the password typed, never the mask sent back
@@ -150,19 +151,66 @@ async function writeTypedSecret(req, before) {
     throw new Errors.BadRequestError(i18n.t(req, 'resources.credentialWriteNeedsPassword'));
   }
   const user = text(body.user !== undefined ? body.user : before?.user);
-  // step 2 : written to the store (its rules, its refusals)
-  const done = await writeSecret(store, ref, { username: user, password: String(password) }, { overwrite });
   const name = text(body.name !== undefined ? body.name : before?.name);
+  // step 2 : the credential keeps the reference only, as it is checked and then saved
+  Object.assign(body, { secret_store: store, secret_ref: ref, user: '', password: '' });
+  return { store, ref, user, password: String(password), overwrite, name };
+}
+
+/**
+ * Writes a typed secret to its store (planTypedSecret), once the save of the credential has passed
+ * its checks : the store's write rules apply (lib secrets/providers writeSecret : writing on, below
+ * its prefix, a secret there replaced only with overwrite). Audited without the secret.
+ *
+ * Args:
+ *   req (object): the request (its user and address for the audit).
+ *   plan (object|null): what planTypedSecret took from the request, null when no write is asked.
+ *
+ * Returns:
+ *   Promise<void>: settles once written, or at once when there is nothing to write.
+ *
+ * Raises:
+ *   Errors.BadRequestError: the store refuses writing there.
+ *   Errors.ConflictError: a secret is there and overwrite was not asked.
+ */
+async function writeTypedSecret(req, plan) {
+  if (!plan) return;
+  const done = await writeSecret(plan.store, plan.ref, { username: plan.user, password: plan.password }, { overwrite: plan.overwrite });
   Audit.log({
     user: req.user?.user,
     ip: req.ip,
     action: 'credential.secret_write',
     targetType: 'credential',
-    target: name,
+    target: plan.name,
     detail: { store: done.store, ref: done.ref, replaced: done.replaced },
   });
-  // step 3 : the credential keeps the reference only
-  Object.assign(body, { secret_store: store, secret_ref: ref, user: '', password: '' });
+}
+
+/**
+ * Saves a credential whose typed secret was just written to its store. The save passed its checks
+ * before the write (CredentialModel.assertSavable), yet can still fail (another credential saved
+ * with the same name meanwhile, the database down) : the store then holds a secret no credential
+ * points to, which is logged with its store and place (never the secret) for an admin to remove.
+ *
+ * Args:
+ *   plan (object|null): what planTypedSecret took from the request, null when none was written.
+ *   save (function): the save, () => Promise.
+ *
+ * Returns:
+ *   Promise<any>: what the save answers.
+ *
+ * Raises:
+ *   Error: the save's error, as it is.
+ */
+async function saveAfterWrite(plan, save) {
+  try {
+    return await save();
+  } catch (err) {
+    if (plan) {
+      logger.error(`Credential '${plan.name}' was not saved after its secret was written to secret store '${plan.store}' at '${plan.ref}'${plan.overwrite ? ' (replacing the one there)' : ''}: ${err?.message || err}. Remove that secret from the store or save the credential again`);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -296,9 +344,12 @@ const credentialController = {
       await assertMayChange(req, req.body);
       // the secret it reads from a secret store : an admin's to choose
       assertSecretRefUnchanged(req, null);
-      // typed here and written to its secret store : the store first, the reference saved after
-      await writeTypedSecret(req, null);
-      const credential = await CredentialModel.create(req.body);
+      // typed here and written to its secret store : the save's checks first (nothing is written
+      // for a save that would be refused), then the store, then the reference saved
+      const plan = planTypedSecret(req, null);
+      if (plan) await CredentialModel.assertSavable(req.body, null);
+      await writeTypedSecret(req, plan);
+      const credential = await saveAfterWrite(plan, () => CredentialModel.create(req.body));
       res.json(RestResult.single({ message: i18n.t(req, 'success.created', { resource: 'Credential' }), id: credential }));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));
@@ -330,9 +381,12 @@ const credentialController = {
       // a new name leaves what names the old one pointing at nothing
       if (before && req.body?.name !== undefined && req.body.name !== before.name) await assertUnused(req, before.name);
       // typed here and written to its secret store (a new one, or a new password for the one it
-      // reads) : the store first, the reference saved after
-      await writeTypedSecret(req, before);
-      await CredentialModel.update(req.body, req.params.id);
+      // reads) : the save's checks first (nothing is written for a save that would be refused),
+      // then the store, then the reference saved
+      const plan = planTypedSecret(req, before);
+      if (plan) await CredentialModel.assertSavable(req.body, req.params.id);
+      await writeTypedSecret(req, plan);
+      await saveAfterWrite(plan, () => CredentialModel.update(req.body, req.params.id));
       if ([before?.credential_type, req.body?.credential_type].some((t) => SSO_TYPES.includes(t))) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.updated', { resource: 'Credential' }) }));
     } catch (err) {
