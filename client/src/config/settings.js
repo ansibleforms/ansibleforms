@@ -277,6 +277,28 @@ export function mailWithoutCredential(item) {
 }
 
 /**
+ * Whether a mail channel sends through its own server, port and TLS : without a credential (a
+ * relay), or with an smtp credential that holds no server (one made before credentials held it),
+ * whose login then signs in to the channel's own server. Its page shows and saves them only
+ * then ; a credential with its server, or an Entra ID one, is where the mail goes, and a
+ * credential not in the list (not loaded) leaves them as they are stored.
+ *
+ * Args:
+ *   item (object): the channel (or the one being edited).
+ *   credentials (object[]): the credentials, as the API lists them ({ name, credential_type,
+ *     host }).
+ *
+ * Returns:
+ *   boolean: true when the channel's own server is where it sends.
+ */
+export function mailOwnServer(item, credentials) {
+  if (channelType(item) !== 'mail') return false;
+  if (mailWithoutCredential(item)) return true;
+  const cred = (credentials || []).find((c) => c?.name === item.credential);
+  return !!cred && cred.credential_type === 'smtp' && !String(cred.host ?? '').trim();
+}
+
+/**
  * Where a channel sends, as the list shows it : a mail server's host and port, a webhook's host,
  * a Telegram chat ; a Slack or Teams webhook's address is a secret, so only its kind.
  *

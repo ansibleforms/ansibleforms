@@ -1648,8 +1648,7 @@ export default {
       sendThroughHint_graph: 'HTTPS naar Microsoft Graph: de app heeft de machtiging Mail.Send nodig',
       sendThrough_smtp: 'SMTP (OAuth2)',
       sendThroughHint_smtp: 'smtp.office365.com, poort 587: de mailbox heeft SMTP AUTH aan nodig',
-      serverHelp:
-        'De mailserver waarlangs het verzendt als er geen referentie gekozen is, zonder aanmelding (een relay).',
+      serverHelp: 'Eigen mailserver, zonder referentie (een relay) of als de referentie er geen heeft.',
       webhookUrl: 'Webhook',
       webhookUrlHelp_slack: 'Een inkomende Slack-webhook (Slack-app > Incoming Webhooks). Geheim, daarna verborgen.',
       webhookUrlHelp_teams: 'Een Teams Workflows-webhook (bij een webhookverzoek). Geheim, daarna verborgen.',

@@ -40,6 +40,30 @@ function channelTargetChanged(existing, data) {
 }
 
 /**
+ * Whether a mail channel's own server, port and TLS are not where it sends : the credential it
+ * keeps holds its server (an smtp one with a host), or sends to Microsoft only (an entraid one).
+ * The mail then goes to the credential's server whatever its own fields say, and the model empties
+ * them (models/notificationChannel.model.js normalise) : a write changing them, or sending them
+ * empty, moves the channel nowhere. Only a mail channel's : another type's target is its own.
+ *
+ * Args:
+ *   existing (object): the channel as it is.
+ *   data (object): the fields written.
+ *
+ * Returns:
+ *   Promise<boolean>: true when the channel's own server is not used.
+ */
+async function ownServerUnused(existing, data) {
+  if (existing.type !== "mail") return false;
+  // step 1 : the credential it keeps : the one written, else the stored one
+  const credential = data.credential === undefined ? existing.credential : data.credential;
+  if (!credential) return false;
+  // step 2 : Microsoft 365, or an smtp credential with its server
+  if ((await NotificationChannel.credentialType(credential)) === "entraid") return true;
+  return !!(await NotificationChannel.credentialServer(credential));
+}
+
+/**
  * Keeps a user who is not an admin from sending a credential's secret where they choose. A channel
  * posts its token (a webhook's bearer, a telegram bot's) or signs in with its login (mail) at an
  * address the user types : they may only name credentials that are not an admin's
@@ -73,7 +97,7 @@ async function guardChannelCredentials(req, existing) {
     }
   }
   // moved elsewhere : the credential it keeps stays behind
-  if (existing && channelTargetChanged(existing, data)) {
+  if (existing && channelTargetChanged(existing, data) && !(await ownServerUnused(existing, data))) {
     for (const k of CHANNEL_CREDENTIALS) {
       const kept = data[k] === undefined ? existing[k] : data[k];
       if (kept && kept === existing[k]) data[k] = "";

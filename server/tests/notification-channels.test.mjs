@@ -304,6 +304,17 @@ describe("a channel checked by its type", () => {
     await expect(NotificationChannel.update({ credential: "", server: "relay.example.com" }, 3)).resolves.toBeTruthy();
   });
 
+  test("mail with an smtp credential without a server (from before) : its own server is kept, as its page saves it", async () => {
+    rows.nohost = { name: "nohost", credential_type: "smtp", host: "", user: "mailer" };
+    channels = [{ id: 4, name: "old", type: "mail", credential: "nohost", server: "relay.example.com", port: 25, secure: 0 }];
+    // its page : the description changed, the own server, port and TLS sent as they are
+    const data = { description: "changed", credential: "nohost", server: "relay.example.com", port: "25", secure: 0 };
+    await expect(NotificationChannel.update(data, 4)).resolves.toBeTruthy();
+    expect(data).toMatchObject({ server: "relay.example.com", port: 25, credential: "nohost" });
+    // sent empty, as the page did before : refused, it has no server left
+    await expect(NotificationChannel.update({ credential: "nohost", server: "", port: "", secure: 0 }, 4)).rejects.toThrow(/needs its mail server/);
+  });
+
   test("mail with a credential that has its server: the channel's own server is emptied, not by the seed", async () => {
     rows.o365 = { name: "o365", credential_type: "smtp", host: "smtp.office365.com", port: 587, secure: 1 };
     const data = { name: "m", type: "mail", server: "typed.example.com", port: 25, secure: 1, credential: "o365" };

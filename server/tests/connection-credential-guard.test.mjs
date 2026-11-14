@@ -27,6 +27,9 @@ const creds = {
   // one saved with Write to a secret store : the row keeps the reference, its user and password
   // are in the store
   "store-written": { name: "store-written", credential_type: "git", user: "", password: "", secret_store: "vault", secret_ref: "git/bot" },
+  // mail logins : one holding its server, one from before credentials held it (the channel's own)
+  "mail-host": { name: "mail-host", credential_type: "smtp", host: "smtp.corp.local", user: "mailer", password: "enc" },
+  "mail-nohost": { name: "mail-nohost", credential_type: "smtp", host: "", user: "mailer", password: "enc" },
 };
 vi.mock("../src/models/credential.model.v2.js", () => ({
   default: {
@@ -47,10 +50,16 @@ const writes = [];
 const channels = {
   1: { id: 1, name: "hook", type: "webhook", url: "https://hooks.local/x", verify_tls: 1, token_credential: "hook-token" },
   2: { id: 2, name: "bot", type: "telegram", api_url: "", token_credential: "hook-token", chat_id: "1" },
+  // a mail channel of a credential with its server, its own server left from before
+  3: { id: 3, name: "mail", type: "mail", credential: "mail-host", server: "old.corp.local", port: 25, secure: 0 },
+  // a mail channel of a credential without a server : its own is where it sends
+  4: { id: 4, name: "old-mail", type: "mail", credential: "mail-nohost", server: "relay.corp.local", port: 25, secure: 0 },
 };
 vi.mock("../src/models/notificationChannel.model.js", () => ({
   default: {
     findById: async (id) => (channels[id] ? { ...channels[id] } : null),
+    credentialType: async (name) => creds[name]?.credential_type || null,
+    credentialServer: async (name) => (creds[name]?.host ? { server: creds[name].host, port: null, secure: 0 } : null),
     create: async (data) => { writes.push(["create", { ...data }]); return 5; },
     update: async (data, id) => { writes.push(["update", { ...data }, id]); return true; },
   },
@@ -125,6 +134,34 @@ describe("a notification channel", () => {
     await call(channelController.update, ops, { body: { url: "https://hooks.local/x ", token_credential: "hook-token" }, params: { id: "1" } });
     await call(channelController.update, admin, { body: { url: "https://new", token_credential: "hook-token" }, params: { id: "1" } });
     expect(writes.map((w) => w[1].token_credential)).toEqual(["hook-token", "hook-token"]);
+  });
+});
+
+describe("a mail channel", () => {
+  test("its credential holding the server : the own server sent empty (its page's save) keeps the credential", async () => {
+    const body = { description: "changed", credential: "mail-host", server: "", port: "", secure: 0 };
+    expect((await call(channelController.update, ops, { body, params: { id: "3" } })).status).toBeLessThan(300);
+    expect(writes[0][1].credential).toBe("mail-host");
+  });
+
+  test("its credential holding the server : another own server moves nothing, the mail goes to the credential's", async () => {
+    await call(channelController.update, ops, { body: { server: "evil.example.com", port: 2525 }, params: { id: "3" } });
+    expect(writes[0][1].credential).toBe(undefined);
+  });
+
+  test("its credential without a server : its own server saved as it is keeps the credential", async () => {
+    const body = { description: "changed", credential: "mail-nohost", server: "relay.corp.local", port: 25, secure: 0 };
+    await call(channelController.update, ops, { body, params: { id: "4" } });
+    expect(writes[0][1].credential).toBe("mail-nohost");
+  });
+
+  test("its credential without a server : another own server is a move, the credential is dropped", async () => {
+    await call(channelController.update, ops, { body: { server: "evil.example.com" }, params: { id: "4" } });
+    expect(writes[0][1].credential).toBe("");
+    // an admin's keeps it
+    writes.length = 0;
+    await call(channelController.update, admin, { body: { server: "evil.example.com" }, params: { id: "4" } });
+    expect(writes[0][1].credential).toBe(undefined);
   });
 });
 

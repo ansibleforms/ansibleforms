@@ -2,7 +2,7 @@
 // server (its user and password said optional), or a mail channel with no credential at all, then
 // sending through its own server, port and TLS.
 import { describe, it, expect } from 'vitest';
-import getSettings, { credentialLabels, mailWithoutCredential, SMTP_AUTH } from '@/config/settings';
+import getSettings, { credentialLabels, mailWithoutCredential, mailOwnServer, SMTP_AUTH } from '@/config/settings';
 
 const t = (key) => key;
 const settings = getSettings(t);
@@ -47,6 +47,22 @@ describe('a mail channel without a credential', () => {
     expect(mailWithoutCredential({ type: 'mail', credential: ' ' })).toBe(true);
     expect(mailWithoutCredential({ type: 'mail', credential: 'o365' })).toBe(false);
     expect(mailWithoutCredential({ type: 'slack' })).toBe(false);
+  });
+
+  it('its page shows and saves its own server without a credential, or with an smtp one without a server', () => {
+    const credentials = [
+      { name: 'smtp-login', credential_type: 'smtp', host: 'smtp.example.com' },
+      { name: 'old-login', credential_type: 'smtp', host: '' },
+      { name: 'o365', credential_type: 'entraid' },
+    ];
+    expect(mailOwnServer({ type: 'mail' }, credentials)).toBe(true);
+    expect(mailOwnServer({ type: 'mail', credential: 'old-login' }, credentials)).toBe(true);
+    // the credential's server is where it sends ; Microsoft 365 has none of its own
+    expect(mailOwnServer({ type: 'mail', credential: 'smtp-login' }, credentials)).toBe(false);
+    expect(mailOwnServer({ type: 'mail', credential: 'o365' }, credentials)).toBe(false);
+    // a credential not in the list (not loaded) : left as stored, never sent
+    expect(mailOwnServer({ type: 'mail', credential: 'unknown' }, credentials)).toBe(false);
+    expect(mailOwnServer({ type: 'webhook' }, credentials)).toBe(false);
   });
 
   it('the wizard asks a mail channel only its credential, needed ; no server, port or TLS', () => {

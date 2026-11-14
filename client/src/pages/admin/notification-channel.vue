@@ -41,7 +41,7 @@ import getSettings, {
   PAYLOAD_PLACEHOLDERS,
   channelType,
   channelAddress,
-  mailWithoutCredential,
+  mailOwnServer,
   noCredentialsText,
   credentialTypeOf,
   SEND_THROUGH,
@@ -138,6 +138,8 @@ const credentialsOf = (...credentialTypes) => [
   ...credentials.value.filter((c) => credentialTypes.includes(c.credential_type)).map((c) => ({ name: c.name })),
 ];
 // mail through Microsoft 365 : its credential an Entra ID one, then how it sends
+// its own server, port and TLS : without a credential, or with an smtp one that holds no server
+const ownServer = computed(() => mailOwnServer(edit.value, credentials.value));
 const throughMicrosoft = computed(
   () => type.value === 'mail' && credentialTypeOf(credentials.value, edit.value?.credential) === 'entraid',
 );
@@ -290,8 +292,8 @@ const tabFields = computed(() => {
   if (type.value === 'mail') {
     fields.credentials = [
       ['credential', nc('credential'), nc('helpCredential')],
-      // without a credential : its own server, port and TLS
-      ...(mailWithoutCredential(edit.value)
+      // without a credential, or its credential without a server : its own server, port and TLS
+      ...(ownServer.value
         ? [
             ['server', t('settings.mail.mailServer'), nc('serverHelp')],
             ['port', t('settings.mail.mailPort'), t('settings.mail.mailPortHelp')],
@@ -350,11 +352,17 @@ async function save() {
     if (typeof value === 'boolean') data[key] = value ? 1 : 0;
     else data[key] = typeof value === 'string' ? value.trim() : value;
   }
-  // mail with a credential : the server, port and TLS are the credential's, the channel keeps none
-  // of its own (the ones shown are the credential's)
-  if (type.value === 'mail' && !mailWithoutCredential(e)) Object.assign(data, { server: '', port: '', secure: 0 });
-  // without one : its own server, which it needs
-  if (type.value === 'mail' && mailWithoutCredential(e) && !data.server) {
+  // mail with a credential holding its server (or an Entra ID one) : the server, port and TLS are
+  // the credential's (the ones shown are its), never sent : the server empties the channel's own.
+  // Sending them empty read as moving the channel elsewhere, which drops its credential when the
+  // user is not an admin
+  if (type.value === 'mail' && !ownServer.value) {
+    delete data.server;
+    delete data.port;
+    delete data.secure;
+  }
+  // without one, or its credential without a server : its own server, which it needs
+  if (type.value === 'mail' && ownServer.value && !data.server) {
     toast.warning(t('settings.common.fieldRequired', { field: t('settings.mail.mailServer') }));
     return;
   }
@@ -684,7 +692,7 @@ onMounted(async () => {
                 :help="t('settings.notificationChannels.helpCredential')"
                 :label="t('settings.notificationChannels.credential')"
               />
-              <template v-if="mailWithoutCredential(edit)">
+              <template v-if="ownServer">
                 <BsInput
                   class="af-channel-field"
                   v-model="edit.server"
