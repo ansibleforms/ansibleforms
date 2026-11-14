@@ -59,9 +59,12 @@ const credentialItem = {
     credential_type: { type: "string", enum: ["userpass", "ssh", "git", "api", "database", "cyberark", "smtp", "ldap", "entraid", "oidc",
       "rte", "awx", "aap", "ascender", "semaphore", "rundeck", "jenkins", "vault"] },
     // a cyberark one's client certificate and key ; an entraid one's, signing in with them
-    // instead of its secret when it sends mail through Microsoft 365
+    // instead of its secret when it sends mail through Microsoft 365 ; an ssh one's private key is
+    // its client_key too (PEM or OpenSSH text, usually an env-var reference), and key_passphrase
+    // the key's passphrase
     client_cert: str,
     client_key: str,
+    key_passphrase: str,
     // an entraid credential's tenant, an oidc one's issuer ; an entraid or oidc one's redirect URL
     tenant_id: str,
     issuer: str,

@@ -497,11 +497,13 @@ export function credentialLabels(t, type) {
         jenkins: t('settings.credentials.apiToken'),
         smtp: t('settings.credentials.passwordOptional'),
       }[type] || (awx ? t('settings.credentials.tokenOrPassword') : null),
-    // an smtp one : both left empty for a mail server that takes mail without a login (a relay)
+    // an smtp one : both left empty for a mail server that takes mail without a login (a relay) ;
+    // an ssh one may log in with a private key instead
     passwordHelp:
       {
         rte: t('settings.credentials.rteTokenHelp'),
         smtp: t('settings.credentials.smtpLoginHelp'),
+        ssh: t('settings.credentials.sshPasswordHelp'),
       }[type] || (awx ? t('settings.credentials.tokenOrPasswordHelp') : null),
     serverHelp: SERVER_CREDENTIAL_TYPES.includes(type)
       ? ['vault', 'cyberark'].includes(type)
@@ -2247,19 +2249,48 @@ export default function getSettings(t) {
           showWhen: (r) => ((r.credential_type === 'ldap' && !!r.secure) || credentialServer(r)) && !r.ignore_certs,
         },
         {
+          // a cyberark credential's client key ; an ssh one's private key, which it logs in with
+          // (its password then optional)
           key: 'client_key',
           step: 'login',
           icon: 'key',
           type: 'textarea',
           label: t('settings.secretStores.clientKey'),
-          help: (r) => (r.id ? t('settings.credentials.clientKeyKeep') : t('settings.secretStores.clientKeyHelp')),
-          placeholder: '-----BEGIN PRIVATE KEY-----',
+          dialogLabel: (r) => (r.credential_type === 'ssh' ? t('settings.credentials.privateKey') : null),
+          help: (r) =>
+            r.credential_type === 'ssh'
+              ? r.id
+                ? t('settings.credentials.privateKeyKeep')
+                : t('settings.credentials.privateKeyHelp')
+              : r.id
+                ? t('settings.credentials.clientKeyKeep')
+                : t('settings.secretStores.clientKeyHelp'),
+          placeholder: (r) =>
+            r.credential_type === 'ssh' ? '-----BEGIN OPENSSH PRIVATE KEY-----' : '-----BEGIN PRIVATE KEY-----',
           hidden: true,
           noTable: true,
           // shown empty : the stored key is never sent back ; left empty, it stays
           initial: () => '',
-          // a cyberark one's, or an entraid one's signing in with a certificate
-          showWhen: (r) => r.credential_type === 'cyberark' || entraCertificate(r),
+          // a cyberark one's, an entraid one's signing in with a certificate, or an ssh one's
+          // private key
+          showWhen: (r) => ['cyberark', 'ssh'].includes(r.credential_type) || entraCertificate(r),
+        },
+        {
+          // an ssh one's private key's passphrase : loaded into an ssh-agent for the job on the RTE
+          key: 'key_passphrase',
+          step: 'login',
+          icon: 'lock',
+          type: 'password',
+          label: t('settings.credentials.keyPassphrase'),
+          help: (r) =>
+            r.id ? t('settings.credentials.keyPassphraseKeep') : t('settings.credentials.keyPassphraseHelp'),
+          hidden: true,
+          noTable: true,
+          required: false,
+          // shown empty : the stored one is never sent back ; left empty, it stays
+          initial: () => '',
+          dependency: 'credential_type',
+          dependencyValues: ['ssh'],
         },
         {
           key: 'secret_store',

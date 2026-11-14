@@ -65,9 +65,11 @@ CREATE TABLE `credentials` (
   `db_name` varchar(255) DEFAULT NULL,  
   `is_database` tinyint(4) DEFAULT 1,
   `credential_type` varchar(20) DEFAULT NULL,
-  -- a cyberark credential's client certificate and key (PEM)
+  -- a cyberark credential's client certificate and key (PEM) ; an ssh credential's private key
+  -- (PEM or OpenSSH) is its client_key too, and key_passphrase its passphrase (both encrypted)
   `client_cert` text DEFAULT NULL,
   `client_key` text DEFAULT NULL,
+  `key_passphrase` text DEFAULT NULL,
   -- an Entra ID credential's tenant (its user the client id, its password the client secret)
   `tenant_id` varchar(250) DEFAULT NULL,
   -- an Open ID credential's issuer (the provider's address)

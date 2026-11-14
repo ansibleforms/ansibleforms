@@ -27,6 +27,7 @@ import { playbookEnv } from "../lib/playbookEnv.js";
 import { createOutputBatcher } from "../lib/outputBatcher.js";
 import { resolveInventory } from "../lib/inventories.js";
 import { createEventTail } from "./events.js";
+import { prepareSshKey } from "./sshKey.js";
 
 // ─── the job's I/O ────────────────────────────────────────────────────────────
 
@@ -388,17 +389,21 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   const merged = { ...extravars, ...credentials };
   // define hiddenExtravars
   var hiddenExtravars = {};
+  // an SSH credential's private key and its passphrase : made ready just before the playbook
+  // starts (rte/sshKey.js), and cleaned up when it ends
+  let sshKey = null;
   try {
     if (ansibleCredentials) {
       // resolved by the app ; an error is why it could not read it
       const runCredential = secrets.ansible;
       if (!runCredential || runCredential.error) throw new Error(runCredential?.error || "the app sent no ansible credentials");
       hiddenExtravars.ansible_user = runCredential.user;
-      hiddenExtravars.ansible_password = runCredential.password;
-      registerJobSecrets(jobid, [runCredential.password]);
+      // a key without a password : no empty password next to it
+      if (!runCredential.privateKey || runCredential.password) hiddenExtravars.ansible_password = runCredential.password;
+      if (runCredential.privateKey) sshKey = { key: runCredential.privateKey, passphrase: runCredential.passphrase || "" };
+      // masked in the output : the password, the key (line by line too) and its passphrase
+      registerJobSecrets(jobid, [runCredential.password, runCredential.privateKey, runCredential.passphrase]);
     }
-    // a credential's password is never a template
-    hiddenExtravars = JSON.stringify(markUnsafe(hiddenExtravars));
   } catch (err) {
     logger.error("Failed to get ansible credentials: ", err);
     await currentIO().end(jobid, counter + 1, "stderr", "failed", "[ERROR]: Failed to get ansible credentials");
@@ -438,6 +443,23 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
       return false;
     }
   }
+  // the private key : in a file of the job's own, or in an ssh-agent of its own with a
+  // passphrase ; a key that cannot be used fails the job, saying why
+  let keyEnv = {};
+  if (sshKey) {
+    try {
+      const ready = await prepareSshKey(jobid, sshKey.key, sshKey.passphrase);
+      sshKey.cleanup = ready.cleanup;
+      Object.assign(hiddenExtravars, ready.extravars);
+      keyEnv = ready.env;
+    } catch (err) {
+      logger.error(`[Job ${jobid}] The private key cannot be used: ${err.message}`);
+      await currentIO().end(jobid, counter + 1, "stderr", "failed", `[ERROR]: The private key of the ansible credentials cannot be used: ${err.message}`);
+      return false;
+    }
+  }
+  // a credential's password is never a template
+  hiddenExtravars = JSON.stringify(markUnsafe(hiddenExtravars));
   const extravarsFileName = `extravars_${jobid}.json`;
   const hiddenExtravarsFileName = `he_${extravarsFileName}`;
   logger.debug(`Extravars File: ${extravarsFileName}`);
@@ -458,6 +480,8 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
     extravarsFileName: extravarsFileName,
     hiddenExtravarsFileName: hiddenExtravarsFileName,
     keepExtravars: keepExtravars,
+    // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase
+    env: keyEnv,
     // what set_stats gathers : written there by the artifacts plugin, stored on the job
     // (a private folder made when the playbook starts : makeArtifactsFile)
     artifactsFile: path.join(os.tmpdir(), `af_artifacts_${jobid}.json`),
@@ -478,6 +502,9 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   } catch (err) {
     logger.error("Ansible job failed: ", err);
     return false;
+  } finally {
+    // the key's folder and the job's ssh-agent, whatever the end (a failure, an abort)
+    if (sshKey?.cleanup) await sshKey.cleanup();
   }
 }
 
@@ -498,6 +525,8 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
   var hiddenExtravarsFileName = cmd.hiddenExtravarsFileName;
   var keepExtravars = cmd.keepExtravars;
   var task = cmd.task;
+  // added to the playbook's environment (the job's ssh-agent socket)
+  var extraEnv = cmd.env || {};
   var artifactsFile = cmd.artifactsFile;
   var artifactsDir = "";
   // the structured events : asked for by a playbook (cmd.events), their file made in a private
@@ -575,7 +604,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         // the RTE's environment without AnsibleForms' own variables : a playbook never reads
         // ENCRYPTION_SECRET, the database password or a token through lookup('env')
         // and, for a playbook, the artifacts plugin that writes what set_stats gathered
-        env: artifactsFile ? artifactsEnv(playbookEnv(), directory, artifactsFile, eventsFile) : playbookEnv(),
+        env: { ...(artifactsFile ? artifactsEnv(playbookEnv(), directory, artifactsFile, eventsFile) : playbookEnv()), ...extraEnv },
       });
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");

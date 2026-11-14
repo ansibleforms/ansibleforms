@@ -1757,7 +1757,7 @@ export default {
       stepType: 'Tipus',
       type: 'Tipus',
       type_ssh: 'SSH',
-      type_sshHint: 'Un usuari i una contrasenya per a SSH a un servidor',
+      type_sshHint: 'Un usuari amb una contrasenya o una clau privada per a SSH a un servidor',
       type_userpass: 'Usuari i contrasenya',
       type_userpassHint:
         "Un usuari i contrasenya per a qualsevol altre inici de sessió, com les credencials d'abans de la v7",
@@ -1781,6 +1781,15 @@ export default {
         'Un certificat i la seva clau privada: només per al correu a través de Microsoft 365',
       entraCertHelp:
         "El certificat PEM pujat al registre d'aplicació (Certificats i secrets); la seva clau privada a sota.",
+      privateKey: 'Clau privada',
+      privateKeyHelp:
+        'La clau privada PEM o OpenSSH amb què el playbook inicia la sessió. Es desa xifrada i no es torna a mostrar.',
+      privateKeyKeep: 'Si es deixa buida, es conserva la clau privada desada.',
+      keyPassphrase: 'Frase de pas',
+      keyPassphraseHelp: 'La frase de pas de la clau privada, si en té una. Es desa xifrada.',
+      keyPassphraseKeep: 'Si es deixa buida, es conserva la frase de pas desada.',
+      sshPasswordHelp: 'Opcional amb una clau privada.',
+      removeKey: 'Treure la clau privada desada i la seva frase de pas',
       server: 'Servidor',
       serverHelp: "L'adreça del magatzem de secrets per al qual serveix aquest accés.",
       optionalHostHelp: 'Opcional. Es passa amb les credencials al playbook i a les expressions, com a host.',
