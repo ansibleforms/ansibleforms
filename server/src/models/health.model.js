@@ -986,16 +986,33 @@ Health.check = async function () {
     // the active mail channel ; none : no mail is sent (the mail settings of before 7.6 became
     // a mail channel at the upgrade)
     const { default: NotificationChannel } = await import('./notificationChannel.model.js');
+    const { senderAddress, OFFICE365_SMTP } = await import('../lib/microsoftMail.js');
     const active = await NotificationChannel.findActive();
-    const mail = active
-      ? { ...(await NotificationChannel.withServer([active]).then(([c]) => ({ mail_server: c.server, mail_port: c.port, mail_secure: c.secure }))), mail_username: active.credential }
-      : null;
-    add('mail', mail?.mail_server ? `${mail.mail_server}:${mail.mail_port || '?'}` : 'not configured', {
-      // never the password, and the username only as a yes/no
-      secure: mail?.mail_server ? !!mail.mail_secure : null,
-      authenticated: mail?.mail_server ? !!mail.mail_username : null,
-      note: mail?.mail_server ? null : 'Approval requests and job notifications are sent by mail, so they go nowhere until this is set',
-    });
+    if (active && (await NotificationChannel.credentialType(active.credential)) === 'entraid') {
+      // Microsoft 365 (an entraid credential) : no server of its own ; through Microsoft Graph,
+      // or SMTP with OAuth2 to Exchange Online, as its sender mailbox, with the app's token
+      const sender = senderAddress(active.from_address);
+      const graph = active.send_through !== 'smtp';
+      add('mail', graph ? `Microsoft Graph as ${sender}` : `${OFFICE365_SMTP.server}:${OFFICE365_SMTP.port} (Microsoft 365) as ${sender}`, {
+        through: graph ? 'Microsoft Graph' : 'SMTP with OAuth2',
+        sender,
+        // HTTPS for Graph, STARTTLS for SMTP ; signed in with a token, never a password
+        secure: true,
+        authenticated: true,
+        note: null,
+      });
+    } else {
+      // an SMTP server : its credential's, else its own (a relay)
+      const mail = active
+        ? { ...(await NotificationChannel.withServer([active]).then(([c]) => ({ mail_server: c.server, mail_port: c.port, mail_secure: c.secure }))), mail_username: active.credential }
+        : null;
+      add('mail', mail?.mail_server ? `${mail.mail_server}:${mail.mail_port || '?'}` : 'not configured', {
+        // never the password, and the username only as a yes/no
+        secure: mail?.mail_server ? !!mail.mail_secure : null,
+        authenticated: mail?.mail_server ? !!mail.mail_username : null,
+        note: mail?.mail_server ? null : 'Approval requests and job notifications are sent by mail, so they go nowhere until this is set',
+      });
+    }
   } catch (e) {
     logger.debug(`Health info: mail settings unavailable: ${e.message || e}`);
   }
