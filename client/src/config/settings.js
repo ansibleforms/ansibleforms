@@ -1803,8 +1803,14 @@ export default function getSettings(t) {
         login_from_store: _note,
         login_written_note: _written,
         secret_overwrite,
+        entra_auth,
         ...item
       }) => {
+        // an Entra ID one signing in with its secret : no certificate kept
+        if (item.credential_type === 'entraid' && entra_auth !== 'certificate') {
+          item.client_cert = '';
+          item.client_key = null;
+        }
         if (readFromStore({ ...item, secret_source, secret_action })) {
           delete item.user;
           delete item.password;
@@ -2107,6 +2113,25 @@ export default function getSettings(t) {
           icon: 'user',
         },
         {
+          // an Entra ID one : what it signs in with, its client secret or a certificate (mail
+          // through Microsoft 365 ; the SSO sign-in needs the secret). Not stored : a certificate
+          // kept is the choice
+          key: 'entra_auth',
+          step: 'login',
+          label: t('settings.credentials.entraSignIn'),
+          type: 'radio',
+          options: ['secret', 'certificate'].map((value) => ({
+            value,
+            label: t(`settings.credentials.entraSignIn_${value}`),
+            hint: t(`settings.credentials.entraSignInHint_${value}`),
+          })),
+          initial: (r) => (r?.client_cert ? 'certificate' : 'secret'),
+          hidden: true,
+          noTable: true,
+          dependency: 'credential_type',
+          dependencyValues: ['entraid'],
+        },
+        {
           key: 'password',
           step: 'login',
           // shown when editing too, as ******** : left empty, the stored one stays
@@ -2122,9 +2147,9 @@ export default function getSettings(t) {
           // secret, a runner's and a Vault's a token (an AWX's a token or its user's password)
           dialogLabel: (r) => credentialLabels(t, r.credential_type).password,
           help: (r) => credentialLabels(t, r.credential_type).passwordHelp,
-          // a cyberark credential has a client key instead ; none typed when the user and password
-          // are read from a secret store
-          showWhen: (r) => r.credential_type !== 'cyberark' && !readFromStore(r),
+          // a cyberark credential has a client key instead, and so has an entraid one signing in
+          // with a certificate ; none typed when the user and password are read from a secret store
+          showWhen: (r) => r.credential_type !== 'cyberark' && !entraCertificate(r) && !readFromStore(r),
         },
         {
           // read from a secret store : said where the user and password would be, so the step
@@ -2185,19 +2210,27 @@ export default function getSettings(t) {
         },
         {
           // a cyberark credential : the client certificate and key its AppID may be restricted to ;
-          // an ldap one with its certificates checked : the client certificate its servers check
+          // an ldap one with its certificates checked : the client certificate its servers check ;
+          // an entraid one signing in with a certificate : the one uploaded to its app registration
           key: 'client_cert',
           step: 'login',
           icon: 'certificate',
           type: 'textarea',
           label: t('settings.secretStores.clientCert'),
-          dialogLabel: (r) => (r.credential_type === 'ldap' ? t('settings.fields.certificate') : null),
-          help: (r) => (r.credential_type === 'cyberark' ? t('settings.secretStores.clientCertHelp') : null),
+          dialogLabel: (r) =>
+            ['ldap', 'entraid'].includes(r.credential_type) ? t('settings.fields.certificate') : null,
+          help: (r) =>
+            ({
+              cyberark: t('settings.secretStores.clientCertHelp'),
+              entraid: t('settings.credentials.entraCertHelp'),
+            })[r.credential_type] || null,
           placeholder: '-----BEGIN CERTIFICATE-----',
           hidden: true,
           noTable: true,
           showWhen: (r) =>
-            r.credential_type === 'cyberark' || (r.credential_type === 'ldap' && !!r.secure && !r.ignore_certs),
+            r.credential_type === 'cyberark' ||
+            entraCertificate(r) ||
+            (r.credential_type === 'ldap' && !!r.secure && !r.ignore_certs),
         },
         {
           // an ldap one with its certificates checked, or a server's : the CA bundle they are
@@ -2225,8 +2258,8 @@ export default function getSettings(t) {
           noTable: true,
           // shown empty : the stored key is never sent back ; left empty, it stays
           initial: () => '',
-          dependency: 'credential_type',
-          dependencyValues: ['cyberark'],
+          // a cyberark one's, or an entraid one's signing in with a certificate
+          showWhen: (r) => r.credential_type === 'cyberark' || entraCertificate(r),
         },
         {
           key: 'secret_store',
@@ -3050,8 +3083,8 @@ export default function getSettings(t) {
           createWith: 'credentials',
           createLabel: t('settings.repositories.newCredential'),
           createDefaults: { credential_type: 'smtp' },
-          // the smtp credentials only
-          choicesWhen: (c) => !c?.name || c.credential_type === 'smtp',
+          // the smtp credentials, and the entraid ones (Microsoft 365 with OAuth2)
+          choicesWhen: (c) => !c?.name || ['smtp', 'entraid'].includes(c.credential_type),
           hidden: true,
           showWhen: (i) => channelType(i) === 'mail',
         },
@@ -3089,6 +3122,23 @@ export default function getSettings(t) {
           noTable: true,
           hidden: true,
           showWhen: (i) => mailWithoutCredential(i),
+        },
+        {
+          // an entraid credential : how it sends, Microsoft Graph (the default) or SMTP with OAuth2
+          key: 'send_through',
+          step: 'credentials',
+          label: t('settings.notificationChannels.sendThrough'),
+          type: 'radio',
+          options: SEND_THROUGH.map((value) => ({
+            value,
+            label: t(`settings.notificationChannels.sendThrough_${value}`),
+            hint: t(`settings.notificationChannels.sendThroughHint_${value}`),
+          })),
+          initial: (r) => (SEND_THROUGH.includes(r?.send_through) ? r.send_through : 'graph'),
+          hidden: true,
+          noTable: true,
+          showWhen: (i, lists) =>
+            channelType(i) === 'mail' && credentialTypeOf(lists?.credentials, i?.credential) === 'entraid',
         },
         // ─── slack, teams ───
         {
@@ -4138,6 +4188,41 @@ function readFromStore(item) {
     !STORE_LOGIN_TYPES.includes(item?.credential_type)
   );
 }
+
+/**
+ * Whether a credential being made is a Microsoft Entra ID one that signs in with a certificate
+ * (mail through Microsoft 365) instead of its client secret : its certificate and key are asked,
+ * not its secret.
+ *
+ * Args:
+ *   item (object): the credential being made.
+ *
+ * Returns:
+ *   boolean: true for an entraid credential with Certificate chosen.
+ */
+export function entraCertificate(item) {
+  return item?.credential_type === 'entraid' && item?.entra_auth === 'certificate';
+}
+
+/**
+ * The type of the credential a record names, from the credentials' list : how a mail channel
+ * sends follows it (an entraid one : through Microsoft 365).
+ *
+ * Args:
+ *   credentials (object[]): the credentials ({ name, credential_type }).
+ *   name (string): the credential's name.
+ *
+ * Returns:
+ *   string: its credential_type, '' without one.
+ */
+export function credentialTypeOf(credentials, name) {
+  if (!name) return '';
+  return (credentials || []).find((c) => c?.name === name)?.credential_type || '';
+}
+
+// how a mail channel with an entraid credential sends : Microsoft Graph (the default) or SMTP with
+// OAuth2 (models/notificationChannel.js send_through)
+export const SEND_THROUGH = ['graph', 'smtp'];
 
 // ---------------------------------------------------------------------------
 // A CyberArk secret store's writes, through its PVWA

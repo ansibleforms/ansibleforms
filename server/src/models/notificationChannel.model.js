@@ -3,7 +3,10 @@
 //             kept, one is active : the one the app sends its mail with. Its server, port, TLS and
 //             login are an smtp credential of Connections > Credentials (the user and password
 //             left empty for a relay) ; without a credential, its own server, port and TLS, and no
-//             login (a relay too). Its own are also used while its credential has no server.
+//             login (a relay too). Its own are also used while its credential has no server. Or
+//             Microsoft 365 with OAuth2 : an entraid credential (an app registration, its secret
+//             or its certificate), sending through Microsoft Graph or through SMTP with a token
+//             (send_through, lib/microsoftMail.js)
 //   slack     an incoming webhook of a Slack channel
 //   teams     a Microsoft Teams webhook (a Workflows webhook, or an incoming webhook)
 //   telegram  a bot posting in a chat : its token the password of an api credential
@@ -18,6 +21,7 @@ import Credential from './credential.model.v2.js';
 import Errors from '../lib/errors.js';
 import mysql from './db.model.js';
 import logger from '../lib/logger.js';
+import { SEND_THROUGH, OFFICE365_SMTP } from '../lib/microsoftMail.js';
 
 // the types a channel can be, in the order the wizard offers them
 export const CHANNEL_TYPES = ['mail', 'slack', 'teams', 'telegram', 'webhook'];
@@ -83,13 +87,13 @@ class NotificationChannel extends CrudModel {
   static modelName = 'notificationchannel';
 
   /**
-   * Checks a credential a channel names : it exists and is of the type it needs. Empty means
+   * Checks a credential a channel names : it exists and is of a type it takes. Empty means
    * none.
    *
    * Args:
    *   data (object): the fields being saved.
    *   key (string): credential or token_credential.
-   *   type (string): the credential type it needs (smtp, api).
+   *   type (string|string[]): the credential type(s) it takes (smtp or entraid for mail, api).
    *   what (string): the channel's type, for the message.
    *
    * Raises:
@@ -101,11 +105,28 @@ class NotificationChannel extends CrudModel {
       data[key] = null;
       return;
     }
+    const types = Array.isArray(type) ? type : [type];
     const cred = await CrudModel.findByName('credential', data[key]);
     if (!cred) throw new Errors.BadRequestError(`No credential named '${data[key]}'`);
-    if (cred.credential_type !== type) {
-      throw new Errors.BadRequestError(`A ${what} channel needs an ${type} credential: '${data[key]}' is not one`);
+    if (!types.includes(cred.credential_type)) {
+      throw new Errors.BadRequestError(`A ${what} channel needs an ${types.join(' or an ')} credential: '${data[key]}' is not one`);
     }
+  }
+
+  /**
+   * The type of the credential a channel names : smtp, entraid... ; null without one, or for one
+   * that does not exist.
+   *
+   * Args:
+   *   name (string): the credential's name.
+   *
+   * Returns:
+   *   Promise<string|null>: its credential_type.
+   */
+  static async credentialType(name) {
+    if (!name) return null;
+    const cred = await CrudModel.findByName('credential', name);
+    return cred?.credential_type || null;
   }
 
   /**
@@ -148,18 +169,38 @@ class NotificationChannel extends CrudModel {
       data.port = null;
     }
     if (type === 'mail') {
-      // step 1 : its credential, when it names one (none : a relay, its own server without a login)
-      await this.assertCredential(data, 'credential', 'smtp', 'mail');
-      // step 2 : where it sends : its credential's server, else its own
-      const credentialServer = await this.credentialServer(data.credential === undefined ? merged.credential : data.credential);
-      if (missing('server') && !credentialServer) {
-        throw new Errors.BadRequestError('A mail channel needs its mail server: an smtp credential with its server (host), or its own server');
-      }
-      // step 3 : a credential with its server is where it sends : the channel's own, typed before
-      // one was chosen, is emptied, never left to be moved into a credential at the next start
-      // (schema.model.js moveMailServersToCredentials). The seed writes what it declares.
-      if (credentialServer && !opts.fromSeed && String(merged.server ?? '').trim()) {
-        Object.assign(data, { server: null, port: null, secure: 0 });
+      // step 1 : its credential, when it names one (none : a relay, its own server without a
+      // login) : an smtp one, or an entraid one (Microsoft 365)
+      await this.assertCredential(data, 'credential', ['smtp', 'entraid'], 'mail');
+      const credentialName = data.credential === undefined ? merged.credential : data.credential;
+      if ((await this.credentialType(credentialName)) === 'entraid') {
+        // step 2 (Microsoft 365) : through Graph (the default) or SMTP with OAuth2, as the
+        // mailbox it names
+        if (data.send_through !== undefined && data.send_through !== null && data.send_through !== '') {
+          data.send_through = String(data.send_through).toLowerCase();
+          if (!SEND_THROUGH.includes(data.send_through)) {
+            throw new Errors.BadRequestError(`A mail channel sends through ${SEND_THROUGH.join(' or ')}: '${data.send_through}' is not one`);
+          }
+        } else if (data.send_through !== undefined || !merged.send_through) {
+          data.send_through = 'graph';
+        }
+        if (missing('from_address')) {
+          throw new Errors.BadRequestError('A mail channel sending through Microsoft 365 needs its sender address: the mailbox it sends as');
+        }
+      } else {
+        // step 2 : where it sends : its credential's server, else its own
+        const credentialServer = await this.credentialServer(credentialName);
+        if (missing('server') && !credentialServer) {
+          throw new Errors.BadRequestError('A mail channel needs its mail server: an smtp credential with its server (host), or its own server');
+        }
+        // step 3 : a credential with its server is where it sends : the channel's own, typed before
+        // one was chosen, is emptied, never left to be moved into a credential at the next start
+        // (schema.model.js moveMailServersToCredentials). The seed writes what it declares.
+        if (credentialServer && !opts.fromSeed && String(merged.server ?? '').trim()) {
+          Object.assign(data, { server: null, port: null, secure: 0 });
+        }
+        // step 4 : an smtp credential, or none, sends through its server : no choice kept
+        if (data.send_through !== undefined || (data.credential !== undefined && existing?.send_through)) data.send_through = null;
       }
     } else if (data.is_active) {
       // only mail has an active one
@@ -336,19 +377,20 @@ class NotificationChannel extends CrudModel {
    * A mail channel as the mail sender takes it (Settings.maildo) : the server, port and TLS of
    * its credential (its own, from before, while the credential has none), and the credential's
    * user and password (read from a secret store when the credential names one ; none for a
-   * relay).
+   * relay). With an entraid credential : Microsoft 365 (toMicrosoftMailConfig).
    *
    * Args:
    *   server (object): the mail channel.
    *
    * Returns:
    *   Promise<object>: mail_server, mail_port, mail_secure, mail_username, mail_password and
-   *     mail_from.
+   *     mail_from ; for Microsoft 365 mail_provider and entra too.
    *
    * Raises:
    *   Error: the credential it names does not exist.
    */
   static async toMailConfig(server) {
+    if ((await this.credentialType(server.credential)) === 'entraid') return this.toMicrosoftMailConfig(server);
     const own = (await this.credentialServer(server.credential)) || server;
     const config = {
       mail_server: own.server,
@@ -368,6 +410,53 @@ class NotificationChannel extends CrudModel {
       config.mail_password = cred.password;
     }
     return config;
+  }
+
+  /**
+   * A mail channel with an entraid credential, as the mail sender takes it : how it sends
+   * (mail_provider graph, or smtp_oauth2 to its own server, else smtp.office365.com:587 with
+   * STARTTLS), its sender, and the app registration it gets its token as (lib/microsoftMail.js) :
+   * the tenant, the client ID (the user, read from a secret store when the credential names one),
+   * the client secret (its password) or the certificate and its private key.
+   *
+   * Args:
+   *   server (object): the mail channel.
+   *
+   * Returns:
+   *   Promise<object>: mail_provider, mail_server, mail_port, mail_secure, mail_from and entra
+   *     ({ name, tenant_id, client_id, client_secret, client_cert, client_key }).
+   *
+   * Raises:
+   *   Error: the credential it names does not exist.
+   */
+  static async toMicrosoftMailConfig(server) {
+    // step 1 : the credential's row (tenant, certificate and key) and its login (client ID, secret)
+    const row = await CrudModel.findByName('credential', server.credential);
+    const cred = row ? await this.resolveCredential(server.credential) : null;
+    if (!row || !cred) {
+      logger.error(`Mail channel '${server.name}' uses the credential '${server.credential}', which is not found`);
+      throw new Error(`Mail channel '${server.name}' uses the credential '${server.credential}', which is not found`);
+    }
+    // step 2 : how it sends ; SMTP to its own server when it has one, else to Exchange Online's
+    const smtp = server.send_through === 'smtp';
+    const ownServer = smtp && String(server.server || '').trim();
+    return {
+      mail_provider: smtp ? 'smtp_oauth2' : 'graph',
+      mail_server: smtp ? ownServer || OFFICE365_SMTP.server : '',
+      mail_port: smtp ? (ownServer && server.port) || OFFICE365_SMTP.port : null,
+      mail_secure: ownServer ? (server.secure ? 1 : 0) : OFFICE365_SMTP.secure,
+      mail_username: '',
+      mail_password: '',
+      mail_from: server.from_address,
+      entra: {
+        name: server.credential,
+        tenant_id: row.tenant_id || '',
+        client_id: cred.user || '',
+        client_secret: cred.password || '',
+        client_cert: row.client_cert || '',
+        client_key: row.client_key || '',
+      },
+    };
   }
 
   /**

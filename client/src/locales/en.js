@@ -1678,7 +1678,12 @@ export default {
       addressChat: 'Chat {chat}',
       credential: 'Credential',
       helpCredential:
-        'An smtp credential of Connections > Credentials: the mail server, its port and TLS, and the login (no user for a relay). None: the mail server below, without a login.',
+        'An smtp credential of Connections > Credentials: the mail server, its port and TLS, and the login (no user for a relay). None: the mail server below, without a login. Or a Microsoft Entra ID credential, to send through Microsoft 365 with OAuth2.',
+      sendThrough: 'Send through',
+      sendThrough_graph: 'Microsoft Graph',
+      sendThroughHint_graph: 'HTTPS to Microsoft Graph: the app needs the Mail.Send permission',
+      sendThrough_smtp: 'SMTP (OAuth2)',
+      sendThroughHint_smtp: 'smtp.office365.com, port 587: the mailbox needs SMTP AUTH turned on',
       serverHelp: 'The mail server it sends through when no credential is chosen, without a login (a relay).',
       webhookUrl: 'Webhook address',
       webhookUrlHelp_slack:
@@ -1895,6 +1900,13 @@ export default {
       type_cyberark: 'CyberArk',
       type_cyberarkHint: 'The AppID, client certificate and key a CyberArk secret store logs in with',
       clientKeyKeep: 'Left empty, the stored client key stays.',
+      entraSignIn: 'Sign in with',
+      entraSignIn_secret: 'Client secret',
+      entraSignInHint_secret: "The app registration's secret: for SSO sign-in and mail",
+      entraSignIn_certificate: 'Certificate',
+      entraSignInHint_certificate: 'A certificate and its private key: for mail through Microsoft 365 only',
+      entraCertHelp:
+        'The PEM certificate uploaded to the app registration (Certificates & secrets); its private key below.',
       server: 'Server',
       serverHelp: 'The address of the secret store this login is for.',
       optionalHostHelp: 'Optional. Passed with the credential to the playbook and to expressions, as host.',
@@ -1935,7 +1947,8 @@ export default {
       type_ldap: 'LDAP',
       type_ldapHint: "An LDAP directory's servers, TLS and bind account: its bind DN and password",
       type_entraid: 'Microsoft Entra ID',
-      type_entraidHint: 'The app of a Microsoft Entra ID provider: its tenant ID, client ID and client secret',
+      type_entraidHint:
+        'The app of a Microsoft Entra ID provider or of Microsoft 365 mail: its tenant ID, client ID, and a secret or a certificate',
       type_oidc: 'Open ID',
       type_oidcHint: 'The client of an Open ID provider: its issuer, client ID and client secret',
     },

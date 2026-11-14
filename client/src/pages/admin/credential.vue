@@ -11,7 +11,8 @@
 /*                and password or an api one : an optional host   */
 /*                and port handed to the playbook), its user      */
 /*                and password (a CyberArk's AppID, client        */
-/*                certificate and key ; an Entra ID one's tenant) */
+/*                certificate and key ; an Entra ID one's tenant, */
+/*                its secret or a certificate and key, for mail)  */
 /*                ; the password masked : left empty kept, typed  */
 /*                replaced                                        */
 /*    Store       where the user and password are kept : the app's*/
@@ -66,6 +67,7 @@ const EDITED = [
   'user',
   'client_cert',
   'client_key',
+  'entra_auth',
   'tenant_id',
   'issuer',
   'redirect_uri',
@@ -112,6 +114,8 @@ function editable(record) {
     user: record.user ?? '',
     client_cert: record.client_cert ?? '',
     client_key: '',
+    // an Entra ID one : its client secret, or the certificate it keeps (mail through Microsoft 365)
+    entra_auth: record.client_cert ? 'certificate' : 'secret',
     tenant_id: record.tenant_id ?? '',
     issuer: record.issuer ?? '',
     redirect_uri: record.redirect_uri ?? '',
@@ -169,6 +173,20 @@ const secretRefLocked = computed(() => !appStore.isAdmin);
 const storeSourceLocked = computed(() => secretRefLocked.value && !credential.value?.secret_store);
 const type = computed(() => edit.value?.credential_type);
 const isCyberark = computed(() => type.value === 'cyberark');
+// an Entra ID one signing in with a certificate (mail through Microsoft 365) : its certificate and
+// key instead of its client secret
+const isEntra = computed(() => type.value === 'entraid');
+const entraCert = computed(() => isEntra.value && edit.value?.entra_auth === 'certificate');
+// a certificate and its key asked : a CyberArk one's, an Entra ID one's with Certificate chosen
+const hasClientKey = computed(() => isCyberark.value || entraCert.value);
+// Secret or Certificate, each its label and a few words
+const entraAuthOptions = computed(() =>
+  ['secret', 'certificate'].map((value) => ({
+    value,
+    label: t(`settings.credentials.entraSignIn_${value}`),
+    hint: t(`settings.credentials.entraSignInHint_${value}`),
+  })),
+);
 const isDatabase = computed(() => type.value === 'database');
 // a secret store's login never comes from a secret store (it would read a store to find it)
 const noStore = computed(() => ['cyberark', 'vault'].includes(type.value));
@@ -441,14 +459,18 @@ async function save() {
     // an Entra ID or Open ID one's redirect URL : empty, the app's address and the callback path
     data.redirect_uri = isSso.value ? e.redirect_uri.trim() : '';
     // its new password, typed in its Login tab
-    if (newPassword.value && !isCyberark.value) data.password = newPassword.value;
+    if (newPassword.value && !hasClientKey.value) data.password = newPassword.value;
   }
   // an ldap one's client certificate, checked by its servers
   if (isLdap.value) data.client_cert = e.client_cert;
-  if (isCyberark.value) {
+  if (hasClientKey.value) {
     data.client_cert = e.client_cert;
     // left empty, the stored key stays
     if (e.client_key.trim()) data.client_key = e.client_key;
+  } else if (isEntra.value && credential.value?.client_cert) {
+    // an Entra ID one back to its secret : its certificate and key dropped
+    data.client_cert = '';
+    data.client_key = null;
   }
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -549,20 +571,23 @@ const tabFields = computed(() => {
       typed && e.credential_type === 'entraid' && ['tenant_id', t('settings.oauth2.tenantId')],
       typed && e.credential_type === 'oidc' && ['issuer', t('settings.oauth2.issuer')],
       typed && hasUser.value && ['user', userLabel.value, isCyberark.value ? t('settings.secretStores.appIdHelp') : ''],
+      ...(typed && isEntra.value
+        ? entraAuthOptions.value.map((opt) => [`entra_auth-${opt.value}`, opt.label, opt.hint])
+        : []),
       typed &&
-        isCyberark.value && [
+        hasClientKey.value && [
           'client_cert',
-          t('settings.secretStores.clientCert'),
-          t('settings.secretStores.clientCertHelp'),
+          isEntra.value ? t('settings.fields.certificate') : t('settings.secretStores.clientCert'),
+          isEntra.value ? t('settings.credentials.entraCertHelp') : t('settings.secretStores.clientCertHelp'),
         ],
       typed &&
-        isCyberark.value && [
+        hasClientKey.value && [
           'client_key',
           t('settings.secretStores.clientKey'),
           t('settings.credentials.clientKeyKeep'),
         ],
       typed &&
-        !isCyberark.value && [
+        !hasClientKey.value && [
           'password',
           passwordLabel.value,
           labels.value.passwordHelp
@@ -973,7 +998,35 @@ onMounted(async () => {
                   :help="isCyberark ? t('settings.secretStores.appIdHelp') : ''"
                   :label="userLabel"
                 />
-                <template v-if="isCyberark">
+                <!-- an Entra ID one : its client secret, or a certificate (mail through Microsoft 365) -->
+                <div
+                  v-if="isEntra"
+                  v-show="entraAuthOptions.some((opt) => fieldShown(`entra_auth-${opt.value}`))"
+                  class="mb-3"
+                >
+                  <label class="form-label">{{ t('settings.credentials.entraSignIn') }}</label>
+                  <div
+                    v-for="opt in entraAuthOptions"
+                    v-show="fieldShown(`entra_auth-${opt.value}`)"
+                    :key="opt.value"
+                    class="form-check af-short-check"
+                  >
+                    <input
+                      :id="'af-entra-auth-' + opt.value"
+                      v-model="edit.entra_auth"
+                      class="form-check-input"
+                      type="radio"
+                      name="af-entra-auth"
+                      :value="opt.value"
+                      :disabled="readOnly"
+                    />
+                    <label class="form-check-label" :for="'af-entra-auth-' + opt.value">
+                      <span class="af-short-label">{{ opt.label }}</span>
+                      <span class="text-body-secondary small">{{ opt.hint }}</span>
+                    </label>
+                  </div>
+                </div>
+                <template v-if="hasClientKey">
                   <BsInput
                     class="af-credential-field"
                     v-model="edit.client_cert"
@@ -982,8 +1035,10 @@ onMounted(async () => {
                     icon="certificate"
                     placeholder="-----BEGIN CERTIFICATE-----"
                     :isFloating="false"
-                    :help="t('settings.secretStores.clientCertHelp')"
-                    :label="t('settings.secretStores.clientCert')"
+                    :help="
+                      isEntra ? t('settings.credentials.entraCertHelp') : t('settings.secretStores.clientCertHelp')
+                    "
+                    :label="isEntra ? t('settings.fields.certificate') : t('settings.secretStores.clientCert')"
                   />
                   <BsInput
                     class="af-credential-field"

@@ -107,12 +107,14 @@ CREATE TABLE `notification_channels` (
   -- mail : the one the app sends its mail with (approval requests, job notifications)
   `is_active` tinyint(4) DEFAULT 0,
   -- mail : its host, port, TLS and from address, and an smtp credential of Connections >
-  -- Credentials for the login (none for an open relay)
+  -- Credentials for the login (none for an open relay), or an entraid one for Microsoft 365
   `server` varchar(250) DEFAULT NULL,
   `port` int(11) DEFAULT NULL,
   `secure` tinyint(4) DEFAULT 0,
   `from_address` varchar(250) DEFAULT NULL,
   `credential` varchar(250) DEFAULT NULL,
+  -- mail with an entraid credential : Microsoft Graph or SMTP with OAuth2 (graph, smtp)
+  `send_through` varchar(20) DEFAULT NULL,
   -- slack, teams : the incoming webhook's address, a secret (encrypted, never shown)
   `webhook_url` text DEFAULT NULL,
   -- telegram : the chat it posts in, the Bot API's address (empty : api.telegram.org)

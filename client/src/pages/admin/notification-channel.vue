@@ -12,7 +12,9 @@
 /*    mail        Sender (the from address), Credentials (its     */
 /*                smtp credential : the mail server, its port and */
 /*                TLS, and the login ; none : its own server,     */
-/*                port and TLS, without a login)                  */
+/*                port and TLS, without a login ; or an Entra ID  */
+/*                one, then Send through : Microsoft Graph or     */
+/*                SMTP OAuth2)                                    */
 /*    slack/teams Webhook (its address, a secret)                 */
 /*    telegram    Bot (its token's credential, the chat, the Bot  */
 /*                API)                                            */
@@ -41,6 +43,8 @@ import getSettings, {
   channelAddress,
   mailWithoutCredential,
   noCredentialsText,
+  credentialTypeOf,
+  SEND_THROUGH,
 } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
@@ -62,7 +66,7 @@ const type = computed(() => channelType(channel.value));
 // the fields each type edits, besides its name and description ; mail's server, port and TLS its
 // own, used without a credential
 const EDITED_BY_TYPE = {
-  mail: ['from_address', 'credential', 'server', 'port', 'secure'],
+  mail: ['from_address', 'credential', 'server', 'port', 'secure', 'send_through'],
   slack: ['webhook_url'],
   teams: ['webhook_url'],
   telegram: ['token_credential', 'chat_id', 'api_url'],
@@ -97,6 +101,8 @@ function editable(record) {
     server: record.server ?? '',
     port: record.port ?? '',
     secure: !!record.secure,
+    // an Entra ID credential : Microsoft Graph (the default) or SMTP with OAuth2
+    send_through: SEND_THROUGH.includes(record.send_through) ? record.send_through : 'graph',
     // masked by the API : sent back as it is, it stays
     webhook_url: record.webhook_url ?? '',
     token_credential: record.token_credential ?? '',
@@ -123,12 +129,25 @@ useUnsavedGuard(
   () => save(),
 );
 
-// the credentials its logins and tokens are : smtp ones for mail, api ones for a token ; none first
+// the credentials its logins and tokens are : smtp and entraid ones for mail, api ones for a token ;
+// none first
 const credentials = ref([]);
-const credentialsOf = (credentialType) => [
+const credentialsOf = (...credentialTypes) => [
   { name: '' },
-  ...credentials.value.filter((c) => c.credential_type === credentialType).map((c) => ({ name: c.name })),
+  ...credentials.value.filter((c) => credentialTypes.includes(c.credential_type)).map((c) => ({ name: c.name })),
 ];
+// mail through Microsoft 365 : its credential an Entra ID one, then how it sends
+const throughMicrosoft = computed(
+  () => type.value === 'mail' && credentialTypeOf(credentials.value, edit.value?.credential) === 'entraid',
+);
+// Microsoft Graph or SMTP with OAuth2, each its label and a few words
+const sendThroughOptions = computed(() =>
+  SEND_THROUGH.map((value) => ({
+    value,
+    label: t(`settings.notificationChannels.sendThrough_${value}`),
+    hint: t(`settings.notificationChannels.sendThroughHint_${value}`),
+  })),
+);
 const METHODS = ['POST', 'PUT'].map((value) => ({ value, label: value }));
 
 /**
@@ -284,6 +303,10 @@ const tabFields = computed(() => {
             ['secure', t('settings.mail.useTls'), t('settings.mail.useTlsHelp')],
           ]
         : []),
+      // an Entra ID credential : how it sends
+      ...(throughMicrosoft.value
+        ? sendThroughOptions.value.map((o) => [`send_through-${o.value}`, o.label, o.hint])
+        : []),
     ];
     fields.sender = [['from_address', t('settings.mail.mailFrom'), t('settings.mail.mailFromHelp')]];
   } else if (type.value === 'slack' || type.value === 'teams') {
@@ -340,6 +363,8 @@ async function save() {
     toast.warning(t('settings.common.fieldRequired', { field: t('settings.mail.mailServer') }));
     return;
   }
+  // how it sends : an Entra ID credential's choice only (an smtp one sends through its server)
+  if (type.value === 'mail' && !throughMicrosoft.value) delete data.send_through;
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     await load();
@@ -657,7 +682,7 @@ onMounted(async () => {
                 type="select"
                 icon="key"
                 :isFloating="false"
-                :values="credentialsOf('smtp')"
+                :values="credentialsOf('smtp', 'entraid')"
                 :emptyText="noCredentialsText(t, 'smtp')"
                 valueKey="name"
                 labelKey="name"
@@ -699,6 +724,33 @@ onMounted(async () => {
                   <div class="form-text mt-1">{{ t('settings.mail.useTlsHelp') }}</div>
                 </div>
               </template>
+              <!-- an Entra ID credential : Send through, Microsoft Graph or SMTP with OAuth2 -->
+              <div
+                v-if="throughMicrosoft"
+                v-show="sendThroughOptions.some((o) => fieldShown(`send_through-${o.value}`))"
+                class="mb-3"
+              >
+                <label class="form-label">{{ t('settings.notificationChannels.sendThrough') }}</label>
+                <div
+                  v-for="opt in sendThroughOptions"
+                  v-show="fieldShown(`send_through-${opt.value}`)"
+                  :key="opt.value"
+                  class="form-check af-short-check"
+                >
+                  <input
+                    :id="'af-send-through-' + opt.value"
+                    v-model="edit.send_through"
+                    class="form-check-input"
+                    type="radio"
+                    name="af-send-through"
+                    :value="opt.value"
+                  />
+                  <label class="form-check-label" :for="'af-send-through-' + opt.value">
+                    <span class="af-short-label">{{ opt.label }}</span>
+                    <span class="text-body-secondary small">{{ opt.hint }}</span>
+                  </label>
+                </div>
+              </div>
             </template>
 
             <!-- mail : Sender, the from address -->
@@ -972,6 +1024,14 @@ onMounted(async () => {
 .af-channel-field :deep(.input-group),
 .af-channel-field :deep(textarea) {
   max-width: 40rem;
+}
+/* the radio buttons : their labels one width, so the grey hints line up, as in the dialog */
+.af-short-check {
+  margin-bottom: 0.6rem;
+}
+.af-short-label {
+  display: inline-block;
+  min-width: 12rem;
 }
 /* a JSON template reads as code */
 .af-channel-code :deep(textarea) {
