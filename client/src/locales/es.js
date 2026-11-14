@@ -3186,7 +3186,7 @@ export default {
   logs: {
     title: 'Registro del servidor',
     description:
-      'El registro propio del servidor AnsibleForms: inicios de sesión, cargas de la configuración, peticiones y errores. Las líneas más recientes están abajo.',
+      'El registro del servidor: sesiones, peticiones y errores. Últimas líneas de hoy, las nuevas abajo; Descargar: el día entero.',
     clear: 'Limpiar',
     clearHint: 'Vacía la vista, no el registro: solo se muestran las líneas escritas a partir de ahora',
     cleared: 'Limpio: las líneas nuevas aparecen aquí a medida que se escriben.',

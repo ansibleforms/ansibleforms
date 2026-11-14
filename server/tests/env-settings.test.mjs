@@ -214,3 +214,17 @@ describe("editing environment variables", () => {
     assert.equal(current.get("JOB_RETENTION_DAYS"), "20");
   });
 });
+
+describe("LOG_VIEW_LINES on the settings page", () => {
+  test("refuses what is not a whole number of at least 1, and applies a value at once", async () => {
+    const { default: logConfig } = await import("../config/log.config.js");
+    assert.match(Env.validate("LOG_VIEW_LINES", "0", { type: "number" }), /at least 1/);
+    assert.match(Env.validate("LOG_VIEW_LINES", "-3", { type: "number" }), /whole number|at least 1/);
+    assert.equal(Env.validate("LOG_VIEW_LINES", "250000", { type: "number" }), null);
+    assert.equal(Env.validate("LOG_VIEW_LINES", "", { type: "number" }), null);
+    assert.equal(Env.applyLive("LOG_VIEW_LINES", "2500", "1000"), true);
+    assert.equal(logConfig.viewLines, 2500);
+    Env.applyLive("LOG_VIEW_LINES", "", "1000");
+    assert.equal(logConfig.viewLines, 1000);
+  });
+});

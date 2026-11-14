@@ -14,9 +14,8 @@ const isLoading = ref(false);
 const firstRead = ref(false);
 const filter = ref('');
 const scroller = ref(null);
-// the last lines of the log : enough to look back through with the search, small enough to read
-// every 2 seconds, as the page follows the log ; the whole log is its download
-const LINES = 1000;
+// how many of the last lines it reads : the server's setting (LOG_VIEW_LINES, Settings > System >
+// General > Logging, 1000 by default), so none is asked here ; the whole log is its download
 
 // The filter is a REGEX, which is the useful thing for a log - but String.match compiles
 // its string argument, so a half typed one ('[', '(', '*', 'a{2,1}') threw a SyntaxError
@@ -36,7 +35,7 @@ const filterMatcher = computed(() => {
 });
 
 // Clear empties the view, never the log : the last line shown then is remembered, and only the
-// lines after it are shown from there on. Not among the lines read any more (more than LINES
+// lines after it are shown from there on. Not among the lines read any more (more than LOG_VIEW_LINES
 // were written since), every line read is newer. Reloading the page shows the last lines again.
 const clearedAfter = ref(null);
 
@@ -106,7 +105,7 @@ async function load(force = false) {
   if (!force && document.hidden) return schedulePoll();
   isLoading.value = true;
   try {
-    const result = await axios.get(`/api/v2/log?lines=${LINES}`);
+    const result = await axios.get('/api/v2/log');
     // followed down by useFollowOutput, or said by AppFollowButton while scrolled up
     if (result.data != '...' && result.data !== log.value) log.value = result.data;
     failures = 0;

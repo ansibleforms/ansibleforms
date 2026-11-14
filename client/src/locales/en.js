@@ -3152,7 +3152,7 @@ export default {
   logs: {
     title: 'Server log',
     description:
-      "The AnsibleForms server's own log: logins, configuration loads, requests and errors. The newest lines are at the bottom.",
+      "The server's own log: logins, requests and errors. Today's last lines, newest at the bottom; Download has the whole day.",
     clear: 'Clear',
     clearHint: 'Empties the view, not the log: only the lines written from now on are shown',
     cleared: 'Cleared: new lines show here as they are written.',

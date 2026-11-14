@@ -3184,7 +3184,7 @@ export default {
   logs: {
     title: 'Serverlog',
     description:
-      'Het eigen log van de AnsibleForms-server: aanmeldingen, het laden van de configuratie, verzoeken en fouten. De nieuwste regels staan onderaan.',
+      'Het serverlog: aanmeldingen, verzoeken en fouten. Laatste regels van vandaag, nieuwste onderaan; Downloaden: de hele dag.',
     clear: 'Wissen',
     clearHint: 'Wist de weergave, niet het log: alleen de regels die vanaf nu worden geschreven, worden getoond',
     cleared: 'Gewist: nieuwe regels verschijnen hier zodra ze worden geschreven.',
