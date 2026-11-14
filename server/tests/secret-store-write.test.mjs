@@ -223,6 +223,25 @@ describe("writing", () => {
     assert.deepEqual(writes, [{ path: "secret/data/ansibleforms/db", body: { data: LOGIN } }]);
   });
 
+  test("KV v2 : a path naming the metadata endpoint is refused (400), Vault never written", async () => {
+    await assert.rejects(Registry.writeSecret("vault", "secret/metadata/ansibleforms/db", LOGIN), (e) => {
+      assert.equal(e.status, 400);
+      assert.match(e.message, /secret\/metadata\/ansibleforms\/db names the metadata of a secret.*secret\/ansibleforms\/db/);
+      return true;
+    });
+    await assert.rejects(Registry.writeSecret("vault", "/secret/metadata/ansibleforms/db/", LOGIN, { overwrite: true }), (e) => e.status === 400);
+    assert.equal(writes.length, 0);
+    // the data path, as written or with data/, is written as before
+    await Registry.writeSecret("vault", "secret/data/ansibleforms/db", LOGIN);
+    assert.deepEqual(writes, [{ path: "secret/data/ansibleforms/db", body: { data: LOGIN } }]);
+  });
+
+  test("KV v1 : a folder named metadata is a folder, written as such", async () => {
+    storeRows.vault = vaultRow({ kv_version: 1, write_prefix: "secret/metadata" });
+    await Registry.writeSecret("vault", "secret/metadata/team/db", LOGIN);
+    assert.deepEqual(writes, [{ path: "secret/metadata/team/db", body: LOGIN }]);
+  });
+
   test("a dynamic engine's path is never written", async () => {
     storeRows.vault = vaultRow({ write_prefix: "database/creds" });
     mountTypes.database = "database";
