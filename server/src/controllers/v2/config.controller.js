@@ -549,9 +549,22 @@ const validate = function(req,res){
 // showSettings or allowScheduledJobs, the rights over every form's datasources and schedules (the
 // schedules list names every schedule's form), so the designer's role options designAllForms,
 // designAllPlaybooks and designAllWorkflows do not narrow it
+/**
+ * The names of the forms a dropdown picks from (a schedule's, a stored job's) : every form for a
+ * user of the settings or the schedules, only those their roles open for a user who may only
+ * store jobs (a stored job is only ever made of such a form). Subforms are left out : they are
+ * never launched on their own.
+ *
+ * Args:
+ *   req (object): the request, its user's options and roles.
+ *   res (object): the response : the list of { name }.
+ */
 const formNames = async function(req,res){
   try{
-    var formConfig = await Form.load(undefined,undefined,true)
+    const user = req?.user?.user || {}
+    const everyForm = !!(user.options?.showSettings || user.options?.allowScheduledJobs)
+    // Step 1 : every form, or only those the user's roles open
+    var formConfig = everyForm ? await Form.load(undefined,undefined,true) : await Form.load(user.roles || [])
     // loadFullConfig=true keeps subforms in the list, but they can't be launched
     // standalone, so exclude them from the schedules form dropdown
     const names = [...new Set((formConfig.forms || [])
