@@ -43,8 +43,13 @@ const TIMEOUT_MS = 15000;
 const ASSERTION_LIFETIME_S = 600;
 const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
-// the tokens got : cache key -> { token, expiresAt }
+// the tokens got : cache key -> { token, expiresAt } ; an entry past its use (within TOKEN_MARGIN_MS
+// of its end) is dropped at the next ask (pruneTokenCache), so a rotated secret or certificate
+// leaves nothing behind
 const tokenCache = new Map();
+// the token requests under way : cache key -> the promise of the token ; concurrent sends with no
+// token kept wait for the same request instead of each asking Entra ID (which throttles)
+const pendingTokens = new Map();
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -120,10 +125,42 @@ export function usesCertificate(entra) {
 }
 
 /**
- * Forgets the tokens got (a test starts clean).
+ * Forgets the tokens got and the requests under way (a test starts clean).
  */
 export function clearTokenCache() {
   tokenCache.clear();
+  pendingTokens.clear();
+}
+
+/**
+ * Drops the tokens kept that can no longer be used : within TOKEN_MARGIN_MS of their end, or past
+ * it. Run at every ask, so the cache holds at most the tokens still in use.
+ *
+ * Args:
+ *   now (number): the time, in milliseconds (Date.now()).
+ *
+ * Returns:
+ *   number: how many were dropped.
+ */
+export function pruneTokenCache(now = Date.now()) {
+  let dropped = 0;
+  for (const [key, entry] of tokenCache) {
+    if (entry.expiresAt - TOKEN_MARGIN_MS <= now) {
+      tokenCache.delete(key);
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
+/**
+ * How many tokens are kept (the tests see that expired ones are dropped).
+ *
+ * Returns:
+ *   number: the entries of the token cache.
+ */
+export function tokenCacheSize() {
+  return tokenCache.size;
 }
 
 // ─── certificate ──────────────────────────────────────────────────────────────
@@ -354,6 +391,8 @@ export function smtpError(err, from, name) {
 /**
  * An access token of an Entra ID credential's app registration (the client credentials grant) :
  * the one kept while it is valid for TOKEN_MARGIN_MS more, else a new one from the token endpoint.
+ * Concurrent asks for the same token share one request ; a failed request is not kept, the next
+ * ask tries again.
  *
  * Args:
  *   entra (object): the credential's sign-in : { name, tenant_id, client_id, client_secret,
@@ -383,9 +422,40 @@ export async function getAccessToken(entra, scope, { now = Date.now() } = {}) {
   const tokenUrl = tokenEndpoint(tenant);
   const proof = certificate ? `${entra.client_cert}\n${entra.client_key}` : String(entra.client_secret);
   const cacheKey = crypto.createHash("sha256").update([name, tokenUrl, clientId, scope, proof].join("\u0000")).digest("hex");
+  pruneTokenCache(now);
   const cached = tokenCache.get(cacheKey);
-  if (cached && cached.expiresAt - TOKEN_MARGIN_MS > now) return cached.token;
-  // step 3 : a new one, with the secret or a client assertion
+  if (cached) return cached.token;
+  // step 3 : a request already under way for this token : wait for it, never a second one
+  const pending = pendingTokens.get(cacheKey);
+  if (pending) return pending;
+  // step 4 : a new one, shared with whoever asks while it is under way ; forgotten once it is
+  // answered, kept in the cache only when it succeeded
+  const request = requestToken({ entra, name, clientId, scope, tokenUrl, certificate, cacheKey, now });
+  pendingTokens.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (pendingTokens.get(cacheKey) === request) pendingTokens.delete(cacheKey);
+  }
+}
+
+/**
+ * Asks the token endpoint for a new token (the client credentials grant, with the secret or a
+ * client assertion) and keeps it until shortly before it expires. Only getAccessToken calls it,
+ * once per cache key at a time.
+ *
+ * Args:
+ *   request (object): { entra, name, clientId, scope, tokenUrl, certificate, cacheKey, now } :
+ *     the credential's sign-in and what getAccessToken worked out from it.
+ *
+ * Returns:
+ *   Promise<string>: the access token.
+ *
+ * Raises:
+ *   Error: Entra ID refused, or gave no token (tokenError).
+ */
+async function requestToken({ entra, name, clientId, scope, tokenUrl, certificate, cacheKey, now }) {
+  // step 1 : the form, with the secret or a client assertion
   const form = new URLSearchParams({ client_id: clientId, scope, grant_type: "client_credentials" });
   if (certificate) {
     form.set("client_assertion_type", ASSERTION_TYPE);
@@ -404,7 +474,7 @@ export async function getAccessToken(entra, scope, { now = Date.now() } = {}) {
   }
   const token = res?.data?.access_token;
   if (!token) throw new Error(`Microsoft Entra ID gave the credential '${name}' no access token`);
-  // step 4 : kept until shortly before it expires
+  // step 2 : kept until shortly before it expires
   const lifetime = Number(res.data.expires_in) > 0 ? Number(res.data.expires_in) : 3599;
   tokenCache.set(cacheKey, { token, expiresAt: now + lifetime * 1000 });
   logger.debug(`Got a Microsoft Entra ID token for the credential '${name}' (${certificate ? "certificate" : "client secret"})`);

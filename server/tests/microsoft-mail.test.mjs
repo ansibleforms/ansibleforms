@@ -221,6 +221,43 @@ describe("the token", () => {
     expect(tokenRequests).toHaveLength(4);
   });
 
+  test("concurrent sends with no token kept ask Entra ID once, and all get that token", async () => {
+    const tokens = await Promise.all(Array.from({ length: 8 }, () => mail.getAccessToken(entraSecret, mail.scopeFor("graph"))));
+    expect(tokenRequests).toHaveLength(1);
+    expect(new Set(tokens)).toEqual(new Set(["TOKEN-" + issued]));
+    // a burst of mails through Graph : one token request, every mail sent
+    mail.clearTokenCache();
+    tokenRequests.length = 0;
+    const sent = await Promise.all(Array.from({ length: 5 }, (_, i) => Settings.maildo(graphConfig(), `user${i}@contoso.com`, "s", "<p>b</p>")));
+    expect(sent).toHaveLength(5);
+    expect(tokenRequests).toHaveLength(1);
+    expect(graphRequests).toHaveLength(5);
+  });
+
+  test("a failed token request is shared by whoever waits for it, and never kept", async () => {
+    tokenAnswer = { status: 400, body: { error: "invalid_client", error_description: "AADSTS7000215: Invalid client secret provided." } };
+    const results = await Promise.allSettled([mail.getAccessToken(entraSecret, "s"), mail.getAccessToken(entraSecret, "s"), mail.getAccessToken(entraSecret, "s")]);
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+    expect(tokenRequests).toHaveLength(1);
+    expect(mail.tokenCacheSize()).toBe(0);
+    // the next ask tries again
+    tokenAnswer = null;
+    expect(await mail.getAccessToken(entraSecret, "s")).toBe("TOKEN-" + issued);
+    expect(tokenRequests).toHaveLength(2);
+  });
+
+  test("a token past its use is dropped : a rotated secret leaves nothing behind", async () => {
+    const now = Date.now();
+    await mail.getAccessToken(entraSecret, mail.scopeFor("graph"), { now });
+    await mail.getAccessToken({ ...entraSecret, client_secret: "rotated" }, mail.scopeFor("graph"), { now });
+    expect(mail.tokenCacheSize()).toBe(2);
+    // an hour later both are past their use : dropped at the next ask, which keeps its own only
+    await mail.getAccessToken({ ...entraSecret, client_secret: "rotated-again" }, mail.scopeFor("graph"), { now: now + 60 * 60 * 1000 });
+    expect(mail.tokenCacheSize()).toBe(1);
+    expect(mail.pruneTokenCache(now + 2 * 60 * 60 * 1000)).toBe(1);
+    expect(mail.tokenCacheSize()).toBe(0);
+  });
+
   test("without a tenant, a client ID or a way to sign in : said, Entra ID never asked", async () => {
     await expect(mail.getAccessToken({ ...entraSecret, tenant_id: "" }, "s")).rejects.toThrow(/no tenant ID/);
     await expect(mail.getAccessToken({ ...entraSecret, client_id: "" }, "s")).rejects.toThrow(/no client ID/);
