@@ -1879,6 +1879,7 @@ export default {
       sshSignInHint_key: 'Een PEM- of OpenSSH-sleutel, met een optionele wachtwoordzin',
       sshKeyDropped: 'Bij Opslaan worden de opgeslagen privésleutel en de wachtwoordzin verwijderd.',
       privateKeyRequired: 'Plak de privésleutel waarmee het zich aanmeldt.',
+      signInSecretRequired: 'De aanmeldmethode is gewijzigd: vul het nieuwe veld {field} in.',
       entraSignIn: 'Aanmelden met',
       entraSignIn_secret: 'Geheim',
       entraSignInHint_secret: 'Het geheim van de app-registratie: voor SSO-aanmelding en mail',

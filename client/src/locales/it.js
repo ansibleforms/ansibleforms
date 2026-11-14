@@ -1880,6 +1880,7 @@ export default {
       sshSignInHint_key: 'Una chiave PEM o OpenSSH, con una passphrase facoltativa',
       sshKeyDropped: 'Al salvataggio, la chiave privata memorizzata e la sua passphrase vengono rimosse.',
       privateKeyRequired: 'Incolla la chiave privata con cui accede.',
+      signInSecretRequired: 'Il metodo di accesso è cambiato: inserisci il nuovo campo {field}.',
       entraSignIn: 'Accedi con',
       entraSignIn_secret: 'Segreto',
       entraSignInHint_secret: "Il segreto della registrazione dell'app: per l'accesso SSO e la posta",

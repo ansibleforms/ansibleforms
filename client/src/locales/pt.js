@@ -1741,6 +1741,7 @@ export default {
       sshSignInHint_key: 'Uma chave PEM ou OpenSSH, com uma frase-passe opcional',
       sshKeyDropped: 'Ao guardar, a chave privada guardada e a sua frase-passe são removidas.',
       privateKeyRequired: 'Cole a chave privada com que inicia sessão.',
+      signInSecretRequired: 'O método de início de sessão mudou: escreva o novo campo {field}.',
       entraSignIn: 'Iniciar sessão com',
       entraSignIn_secret: 'Segredo',
       entraSignInHint_secret: 'O segredo do registo da aplicação: para o início de sessão SSO e o correio',

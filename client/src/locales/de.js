@@ -1886,6 +1886,7 @@ export default {
       sshSignInHint_key: 'Ein PEM- oder OpenSSH-Schlüssel, mit optionaler Passphrase',
       sshKeyDropped: 'Beim Speichern werden der gespeicherte private Schlüssel und seine Passphrase entfernt.',
       privateKeyRequired: 'Fügen Sie den privaten Schlüssel ein, mit dem es sich anmeldet.',
+      signInSecretRequired: 'Die Anmeldemethode wurde geändert: Geben Sie das neue Feld {field} ein.',
       entraSignIn: 'Anmelden mit',
       entraSignIn_secret: 'Geheimnis',
       entraSignInHint_secret: 'Das Geheimnis der App-Registrierung: für die SSO-Anmeldung und Mail',

@@ -1744,6 +1744,7 @@ export default {
       sshSignInHint_key: 'Una clau PEM o OpenSSH, amb una frase de pas opcional',
       sshKeyDropped: "En desar, s'eliminen la clau privada desada i la seva frase de pas.",
       privateKeyRequired: 'Enganxa la clau privada amb què inicia la sessió.',
+      signInSecretRequired: "El mètode d'inici de sessió ha canviat: escriu el nou camp {field}.",
       entraSignIn: 'Inicia la sessió amb',
       entraSignIn_secret: 'Secret',
       entraSignInHint_secret: "El secret del registre d'aplicació: per a l'inici de sessió SSO i el correu",

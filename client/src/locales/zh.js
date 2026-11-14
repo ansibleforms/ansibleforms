@@ -1691,6 +1691,7 @@ export default {
       sshSignInHint_key: 'PEM 或 OpenSSH 私钥，可带可选的密码短语',
       sshKeyDropped: '保存时，将删除已保存的私钥及其密码短语。',
       privateKeyRequired: '请粘贴用于登录的私钥。',
+      signInSecretRequired: '登录方式已更改：请输入新的{field}。',
       entraSignIn: '登录方式',
       entraSignIn_secret: '密钥',
       entraSignInHint_secret: '应用注册的密钥：用于 SSO 登录和邮件',
