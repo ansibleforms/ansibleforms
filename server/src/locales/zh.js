@@ -58,6 +58,7 @@ export default {
   },
   audit: {
     failedGet: "获取审计记录失败",
+    invalidPeriod: "时间段的 from 和 to 必须是 ISO 日期，例如 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "检查系统健康状况失败",
@@ -219,6 +220,7 @@ export default {
     failedConvertLegacy: "转换 forms.yaml 失败",
     dbTypeNotSet: "未设置数据库类型",
     logNotFound: "未找到日志文件",
+    invalidLogDate: "日期必须是 YYYY-MM-DD 格式的真实日期",
     failedGetLog: "获取日志失败",
     failedLoadHelp: "加载帮助失败",
     fileUploadFailed: "文件上传失败",

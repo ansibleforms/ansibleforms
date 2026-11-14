@@ -62,6 +62,7 @@ export default {
   },
   audit: {
     failedGet: "監査証跡の取得に失敗しました",
+    invalidPeriod: "期間の from と to は 2026-11-14T00:00:00Z のような ISO 日付にしてください",
   },
   health: {
     failedCheck: "システムの状態確認に失敗しました",
@@ -237,6 +238,7 @@ export default {
     failedConvertLegacy: "forms.yaml の変換に失敗しました",
     dbTypeNotSet: "データベースの種類が設定されていません",
     logNotFound: "ログファイルが見つかりません",
+    invalidLogDate: "日付は YYYY-MM-DD 形式の実在する日にしてください",
     failedGetLog: "ログの取得に失敗しました",
     failedLoadHelp: "ヘルプの読み込みに失敗しました",
     fileUploadFailed: "ファイルのアップロードに失敗しました",

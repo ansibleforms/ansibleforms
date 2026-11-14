@@ -677,8 +677,9 @@ export default {
     allActions: 'Alle acties',
     allOutcomes: 'Alle resultaten',
     reset: 'Selectie herstellen',
-    resetHint: 'Weer alle gebruikers, alle acties en alle uitkomsten',
+    resetHint: 'Weer alle perioden, gebruikers, acties en uitkomsten',
     empty: 'Nog geen auditvermeldingen',
+    noEntriesFor: 'Geen auditvermeldingen voor {period}.',
     emptyHint: 'Het logboek begint bij de installatie van deze versie en bevat dus niets van daarvoor.',
     refresh: 'Vernieuwen',
     failedLoad: 'Kan het auditlogboek niet laden',
@@ -3184,11 +3185,10 @@ export default {
   logs: {
     title: 'Serverlog',
     description:
-      'Het serverlog: aanmeldingen, verzoeken en fouten. Laatste regels van vandaag, nieuwste onderaan; Downloaden: de hele dag.',
-    clear: 'Wissen',
-    clearHint: 'Wist de weergave, niet het log: alleen de regels die vanaf nu worden geschreven, worden getoond',
-    cleared: 'Gewist: nieuwe regels verschijnen hier zodra ze worden geschreven.',
+      'Het serverlog: aanmeldingen, verzoeken en fouten. Laatste regels van de gekozen dag, nieuwste onderaan; Downloaden: de hele dag.',
     download: 'Downloaden',
+    noLog: 'Geen serverlog voor {date}.',
+    resetHint: 'Weer het log van vandaag, dat nieuwe regels volgt, zonder zoekopdracht',
   },
   changePassword: {
     title: 'Wijzig uw wachtwoord',
@@ -3220,5 +3220,13 @@ export default {
     version: 'De REST API is {version} (API v1 is verwijderd in 7.0.0).',
     endpoint: 'Endpoint van de API-documentatie:',
     hint: 'Klik op de link hierboven of voer hem in uw browser in om de interactieve Swagger UI te openen.',
+  },
+  datePick: {
+    year: 'Jaar',
+    month: 'Maand',
+    day: 'Dag',
+    allYears: 'Alle jaren',
+    allMonths: 'Alle maanden',
+    allDays: 'Alle dagen',
   },
 };

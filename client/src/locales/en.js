@@ -670,8 +670,9 @@ export default {
     allActions: 'All actions',
     allOutcomes: 'All outcomes',
     reset: 'Reset selection',
-    resetHint: 'Every user, every action and every outcome again',
+    resetHint: 'Every period, user, action and outcome again',
     empty: 'No audit entries yet',
+    noEntriesFor: 'No audit entries for {period}.',
     emptyHint: 'The trail starts when this version is installed, so it holds nothing from before that.',
     refresh: 'Refresh',
     failedLoad: 'Failed to load the audit log',
@@ -3152,11 +3153,10 @@ export default {
   logs: {
     title: 'Server log',
     description:
-      "The server's own log: logins, requests and errors. Today's last lines, newest at the bottom; Download has the whole day.",
-    clear: 'Clear',
-    clearHint: 'Empties the view, not the log: only the lines written from now on are shown',
-    cleared: 'Cleared: new lines show here as they are written.',
+      "The server's own log: logins, requests and errors. The chosen day's last lines, newest at the bottom; Download has that whole day.",
     download: 'Download',
+    noLog: 'No server log for {date}.',
+    resetHint: "Today's log again, following its new lines, with no search",
   },
   changePassword: {
     title: 'Change your password',
@@ -3187,5 +3187,13 @@ export default {
     version: 'The REST API is {version} (API v1 was removed in 7.0.0).',
     endpoint: 'API Docs Endpoint:',
     hint: 'Click the link above or enter it in your browser to access the interactive Swagger UI.',
+  },
+  datePick: {
+    year: 'Year',
+    month: 'Month',
+    day: 'Day',
+    allYears: 'All years',
+    allMonths: 'All months',
+    allDays: 'All days',
   },
 };

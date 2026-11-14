@@ -675,8 +675,9 @@ export default {
     allActions: 'Wszystkie akcje',
     allOutcomes: 'Wszystkie wyniki',
     reset: 'Resetuj wybór',
-    resetHint: 'Znowu wszyscy użytkownicy, wszystkie akcje i wszystkie wyniki',
+    resetHint: 'Znowu wszystkie okresy, użytkownicy, akcje i wyniki',
     empty: 'Brak wpisów audytu',
+    noEntriesFor: 'Brak wpisów audytu za {period}.',
     emptyHint: 'Dziennik zaczyna się od instalacji tej wersji, więc nie zawiera niczego sprzed tego momentu.',
     refresh: 'Odśwież',
     failedLoad: 'Nie udało się wczytać dziennika audytu',
@@ -3175,11 +3176,10 @@ export default {
   logs: {
     title: 'Dziennik serwera',
     description:
-      'Dziennik serwera: logowania, żądania i błędy. Ostatnie wiersze z dzisiaj, najnowsze na dole; Pobierz daje cały dzień.',
-    clear: 'Wyczyść',
-    clearHint: 'Czyści widok, nie log: widoczne są tylko wiersze zapisane od teraz',
-    cleared: 'Wyczyszczono: nowe wiersze pojawiają się tutaj w miarę zapisywania.',
+      'Dziennik serwera: logowania, żądania i błędy. Ostatnie wiersze wybranego dnia, najnowsze na dole; Pobierz daje cały dzień.',
     download: 'Pobierz',
+    noLog: 'Brak dziennika serwera z dnia {date}.',
+    resetHint: 'Znowu dzisiejszy dziennik, z nowymi wierszami, bez wyszukiwania',
   },
   changePassword: {
     title: 'Zmień hasło',
@@ -3211,5 +3211,13 @@ export default {
     version: 'REST API to {version} (API v1 usunięto w wersji 7.0.0).',
     endpoint: 'Endpoint dokumentacji API:',
     hint: 'Kliknij powyższy link lub wpisz go w przeglądarce, aby otworzyć interaktywny Swagger UI.',
+  },
+  datePick: {
+    year: 'Rok',
+    month: 'Miesiąc',
+    day: 'Dzień',
+    allYears: 'Wszystkie lata',
+    allMonths: 'Wszystkie miesiące',
+    allDays: 'Wszystkie dni',
   },
 };

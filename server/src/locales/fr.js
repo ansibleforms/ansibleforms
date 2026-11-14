@@ -66,6 +66,7 @@ export default {
   },
   audit: {
     failedGet: "Échec de la récupération du journal d'audit",
+    invalidPeriod: "from et to de la période doivent être des dates ISO, comme 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Échec de la vérification de l'état du système",
@@ -247,6 +248,7 @@ export default {
     failedConvertLegacy: "Echec de la conversion de forms.yaml",
     dbTypeNotSet: "Type de base de donnees non defini",
     logNotFound: "Fichier journal introuvable",
+    invalidLogDate: "La date doit être un vrai jour, écrit AAAA-MM-JJ",
     failedGetLog: "Echec de la recuperation du journal",
     failedLoadHelp: "Echec du chargement de l'aide",
     fileUploadFailed: "Echec du televersement de fichier",

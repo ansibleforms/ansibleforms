@@ -677,8 +677,9 @@ export default {
     allActions: 'Totes les accions',
     allOutcomes: 'Tots els resultats',
     reset: 'Restableix la selecció',
-    resetHint: 'Tots els usuaris, totes les accions i tots els resultats de nou',
+    resetHint: 'Tots els períodes, usuaris, accions i resultats de nou',
     empty: "Encara no hi ha entrades d'auditoria",
+    noEntriesFor: "No hi ha entrades d'auditoria per a {period}.",
     emptyHint: "El registre comença quan s'instal·la aquesta versió, així que no conté res d'abans.",
     refresh: 'Actualitza',
     failedLoad: "No s'ha pogut carregar el registre d'auditoria",
@@ -3188,11 +3189,10 @@ export default {
   logs: {
     title: 'Registre del servidor',
     description:
-      "El registre del servidor: sessions, peticions i errors. Últimes línies d'avui, les noves a baix; Baixa: el dia sencer.",
-    clear: 'Neteja',
-    clearHint: "Buida la vista, no el registre: només es mostren les línies escrites a partir d'ara",
-    cleared: "Net: les línies noves apareixen aquí a mesura que s'escriuen.",
+      'El registre del servidor: sessions, peticions i errors. Últimes línies del dia triat, les noves a baix; Baixa: el dia sencer.',
     download: 'Baixa',
+    noLog: 'No hi ha registre del servidor del {date}.',
+    resetHint: "El registre d'avui de nou, seguint les línies noves, sense cerca",
   },
   changePassword: {
     title: 'Canvia la contrasenya',
@@ -3224,5 +3224,13 @@ export default {
     version: "L'API REST és la {version} (l'API v1 es va eliminar a la 7.0.0).",
     endpoint: "Endpoint de la documentació de l'API:",
     hint: "Fes clic a l'enllaç de dalt o introdueix-lo al navegador per obrir la interfície interactiva Swagger UI.",
+  },
+  datePick: {
+    year: 'Any',
+    month: 'Mes',
+    day: 'Dia',
+    allYears: 'Tots els anys',
+    allMonths: 'Tots els mesos',
+    allDays: 'Tots els dies',
   },
 };

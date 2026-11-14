@@ -62,6 +62,7 @@ export default {
   },
   audit: {
     failedGet: "No s'ha pogut obtenir el registre d'auditoria",
+    invalidPeriod: "from i to del període han de ser dates ISO, com 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "No s'ha pogut comprovar l'estat del sistema",
@@ -240,6 +241,7 @@ export default {
     failedConvertLegacy: "No s'ha pogut convertir forms.yaml",
     dbTypeNotSet: "No s'ha definit el tipus de base de dades",
     logNotFound: "No s'ha trobat el fitxer de registre",
+    invalidLogDate: "La data ha de ser un dia real, escrit AAAA-MM-DD",
     failedGetLog: "No s'ha pogut obtenir el registre",
     failedLoadHelp: "No s'ha pogut carregar l'ajuda",
     fileUploadFailed: "La pujada del fitxer ha fallat",

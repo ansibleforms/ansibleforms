@@ -10,6 +10,8 @@ const reads = [];
 vi.mock("../src/models/log.model.js", () => ({
   default: {
     getFileName: () => "/tmp/ansibleforms.2026-11-14.log",
+    today: () => "2026-11-14",
+    isDate: (value) => value === "2026-11-14",
     find: async (lines) => {
       reads.push(lines);
       return "line\n";
@@ -30,7 +32,7 @@ const { default: controller, linesToRead } = await import("../src/controllers/v2
  *   Promise<number>: the lines the model was asked to read.
  */
 async function ask(query) {
-  const res = { status: () => res, json: () => res };
+  const res = { status: () => res, json: () => res, set: () => res };
   await controller.get({ query }, res);
   return reads.at(-1);
 }

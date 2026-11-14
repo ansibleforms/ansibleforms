@@ -64,6 +64,7 @@ export default {
   },
   audit: {
     failedGet: "Kan het auditlogboek niet ophalen",
+    invalidPeriod: "from en to van de periode moeten ISO-datums zijn, zoals 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "Kan de systeemstatus niet controleren",
@@ -238,6 +239,7 @@ export default {
     failedConvertLegacy: "Kan forms.yaml niet converteren",
     dbTypeNotSet: "Database type niet ingesteld",
     logNotFound: "Logbestand niet gevonden",
+    invalidLogDate: "De datum moet een echte dag zijn, geschreven als JJJJ-MM-DD",
     failedGetLog: "Kan log niet ophalen",
     failedLoadHelp: "Kan hulp niet laden",
     fileUploadFailed: "Bestand uploaden mislukt",

@@ -62,6 +62,7 @@ export default {
   },
   audit: {
     failedGet: "No se pudo obtener el registro de auditoría",
+    invalidPeriod: "from y to del periodo deben ser fechas ISO, como 2026-11-14T00:00:00Z",
   },
   health: {
     failedCheck: "No se pudo comprobar el estado del sistema",
@@ -240,6 +241,7 @@ export default {
     failedConvertLegacy: "Error al convertir forms.yaml",
     dbTypeNotSet: "Tipo de base de datos no establecido",
     logNotFound: "Archivo de registro no encontrado",
+    invalidLogDate: "La fecha debe ser un día real, escrito AAAA-MM-DD",
     failedGetLog: "Error al obtener el registro",
     failedLoadHelp: "Error al cargar la ayuda",
     fileUploadFailed: "Error al subir el archivo",

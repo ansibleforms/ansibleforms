@@ -3,9 +3,11 @@ import logController from '../../controllers/v2/log.controller.js';
 
 const router = express.Router();
 
-// get a job
+// the last lines of a day's log (today by default)
 router.get('/', logController.get);
-// download a log file
+// the days that have a log file, the newest first
+router.get('/dates', logController.dates);
+// download a day's log file (today by default)
 router.get('/download', logController.download);
 
 export default router
