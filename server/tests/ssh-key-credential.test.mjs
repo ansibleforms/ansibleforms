@@ -146,6 +146,35 @@ describe("a private key in a job's output", () => {
     assert.deepEqual(secretLines("one-line-secret"), []);
   });
 
+  test("another multi-line secret : its secret-looking pieces, never its harmless lines", () => {
+    const keyBody = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7";
+    const sa = JSON.stringify(
+      {
+        type: "service_account",
+        project_id: "my-project",
+        private_key_id: "0123456789abcdef0123456789abcdef01234567",
+        private_key: `-----BEGIN PRIVATE KEY-----\n${keyBody}\n-----END PRIVATE KEY-----\n`,
+        client_email: "runner@my-project.iam.gserviceaccount.com",
+        token_uri: "https://oauth2.googleapis.com/token",
+      },
+      null,
+      2,
+    );
+    const parts = secretLines(sa);
+    assert.deepEqual(parts.sort(), ["0123456789abcdef0123456789abcdef01234567", keyBody].sort());
+    registerJobSecrets(78, [sa]);
+    try {
+      assert.equal(maskOutput(78, '  "type": "service_account",'), '  "type": "service_account",', "a harmless line stays");
+      assert.equal(maskOutput(78, '  "token_uri": "https://oauth2.googleapis.com/token"'), '  "token_uri": "https://oauth2.googleapis.com/token"');
+      assert.equal(maskOutput(78, `ok: ${keyBody}`), `ok: ${MASK}`, "the key in it, a line of it alone");
+      assert.equal(maskOutput(78, `out: ${sa}`), `out: ${MASK}`, "the whole secret, still");
+    } finally {
+      forgetJobSecrets(78);
+    }
+    const kubeconfig = "apiVersion: v1\nclusters:\n- cluster:\n    server: https://10.0.0.1:6443\n  name: prod\nusers:\n- user:\n    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQo=\n";
+    assert.deepEqual(secretLines(kubeconfig), ["LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQo="]);
+  });
+
   test("the whole key, a line of it and the passphrase are masked", () => {
     registerJobSecrets(77, [KEY, "open sesame"]);
     try {

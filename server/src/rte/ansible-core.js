@@ -779,8 +779,22 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
       child.stdout.on("data", (data) => output.add("stdout", data));
       child.stderr.on("data", (data) => output.add("stderr", data));
 
+      // the end of the run, whatever goes wrong in the handlers below : a database call that
+      // fails there (the abort flag, the end line) left the run unsettled, and the job's
+      // cleanup (its ssh-agent, its key) never came. The run is rejected instead, and the
+      // cleanup comes ; a run settled already stays as it was.
+      const endFailed = (err) => {
+        logger.error(`[Job ${jobid}] The end of the job could not be written: ${err?.message || err}`);
+        // the files holding the credentials and the private folders go, should the handler have
+        // failed before it removed them (each removal is quiet and done once)
+        removeExtravarsFiles();
+        removeEventsDir(eventsDir);
+        removeEventsDir(artifactsDir);
+        reject(err);
+      };
+
       // add exit eventlistener to the process to handle status update
-      child.on("exit", async function (data) {
+      const onExit = async function (data) {
         if (!settle()) return;
         // what the playbook wrote last, before the end line
         await output.flush();
@@ -851,9 +865,10 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
             resolve(true);
           }
         }
-      });
+      };
+      child.on("exit", (data) => onExit(data).catch(endFailed));
       // add error eventlistener to the process; set failed
-      child.on("error", async function (data) {
+      const onError = async function (data) {
         if (!settle()) return;
         await output.flush();
         if (events) await events.stop();
@@ -871,7 +886,8 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         
         await io.end(jobid, ++counter, "stderr", "failed", `${task} failed: ` + data);
         reject(data);
-      });
+      };
+      child.on("error", (data) => onError(data).catch(endFailed));
     } catch (e) {
       if (!settle()) return;
       removeExtravarsFiles();

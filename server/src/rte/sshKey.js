@@ -22,13 +22,19 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import logger from "../lib/logger.js";
 import { playbookEnv } from "../lib/playbookEnv.js";
 
 // how long ssh-agent may take to open its socket, and ssh-add to load the key
 const AGENT_START_MS = 5000;
 const ADD_TIMEOUT_MS = 30000;
+
+// how long the job's ssh-agent keeps the key (ssh-agent -t) : the job stops the agent when it
+// ends, but an RTE that dies mid-job (killed, out of memory) cannot, and the agent outlived it
+// holding the decrypted key. A playbook job has no time limit of its own, so the key expires
+// after a day : far longer than any job, and never for ever.
+export const AGENT_KEY_LIFETIME_SECONDS = 24 * 60 * 60;
 
 // the askpass script ssh-add runs for the passphrase : it answers once (a wrong passphrase is
 // not asked again for ever), from its environment, never from a file
@@ -134,7 +140,8 @@ function notAvailable(program) {
 
 /**
  * Starts an ssh-agent for the job, in the foreground (-D, so this process holds it and stops
- * it) with its socket in the job's private folder, and waits for the socket.
+ * it) with its socket in the job's private folder, and waits for the socket. The keys it is
+ * given expire after AGENT_KEY_LIFETIME_SECONDS (-t), should the job never get to stop it.
  *
  * Args:
  *   dir (string): the job's private folder.
@@ -148,10 +155,10 @@ function notAvailable(program) {
  */
 export async function startAgent(dir, spawnFn = spawn) {
   const socket = path.join(dir, "agent.sock");
-  // step 1 : the agent, without a shell, with the playbook's environment
+  // step 1 : the agent, without a shell, with the playbook's environment, its keys bounded in time
   let agent;
   try {
-    agent = spawnFn("ssh-agent", ["-D", "-a", socket], { stdio: ["ignore", "ignore", "pipe"], env: playbookEnv() });
+    agent = spawnFn("ssh-agent", ["-D", "-t", String(AGENT_KEY_LIFETIME_SECONDS), "-a", socket], { stdio: ["ignore", "ignore", "pipe"], env: playbookEnv() });
   } catch (e) {
     if (e?.code === "ENOENT") throw notAvailable("ssh-agent");
     throw new SshKeyError(`ssh-agent could not start: ${e.message}`);
@@ -215,6 +222,49 @@ export async function stopAgent(agent) {
 }
 
 /**
+ * The error a temporary folder that runs no program gives (mounted noexec), said the way an
+ * operator can act on : ssh-add could not run the askpass script, which said nothing else than
+ * "is the passphrase right?" before.
+ *
+ * Args:
+ *   dir (string): the job's private folder, under the temporary folder.
+ *   detail (string): what the system said (EACCES, Permission denied).
+ *
+ * Returns:
+ *   SshKeyError: the error.
+ */
+function cannotExecute(dir, detail) {
+  return new SshKeyError(
+    `the askpass script in ${path.dirname(dir)} cannot be run (${detail}): the temporary folder is likely mounted noexec. Set TMPDIR on the RTE to a folder that allows running programs`,
+  );
+}
+
+/**
+ * Checks that the askpass script can be run, before ssh-add needs it : run once with its "done"
+ * file already there (the script itself), it answers nothing and ends with status 1. A temporary
+ * folder mounted noexec refuses to run it (EACCES), and that is said as it is.
+ *
+ * Args:
+ *   dir (string): the job's private folder.
+ *   askpass (string): the script.
+ *   spawnSyncFn (function): spawnSync, or a test's.
+ *
+ * Returns:
+ *   void
+ *
+ * Raises:
+ *   SshKeyError: the script cannot be run (cannotExecute).
+ */
+export function checkAskpassRuns(dir, askpass, spawnSyncFn = spawnSync) {
+  const run = spawnSyncFn(askpass, [], { stdio: "ignore", env: { PATH: process.env.PATH || "", AF_ASKPASS_DONE: askpass }, timeout: 5000 });
+  const code = run?.error?.code;
+  if (code === "EACCES" || code === "EPERM") throw cannotExecute(dir, code);
+}
+
+// what ssh says when it cannot run the askpass program : ssh_askpass: exec(<file>): Permission denied
+const ASKPASS_EXEC_FAILED = /ssh_askpass: exec\(.*\): (Permission denied|Operation not permitted)/i;
+
+/**
  * Loads the key into the job's agent with ssh-add, its passphrase read from the askpass script
  * (SSH_ASKPASS with SSH_ASKPASS_REQUIRE=force ; detached, so without a terminal, for an
  * OpenSSH older than 8.4 that does not know force). The passphrase is in ssh-add's
@@ -226,14 +276,16 @@ export async function stopAgent(agent) {
  *   socket (string): the agent's socket.
  *   passphrase (string): the key's passphrase.
  *   spawnFn (function): spawn, or a test's.
+ *   spawnSyncFn (function): spawnSync, or a test's (checkAskpassRuns).
  *
  * Returns:
  *   Promise<void>: settles once the agent holds the key.
  *
  * Raises:
- *   SshKeyError: ssh-add is missing, the passphrase is wrong or the key cannot be read.
+ *   SshKeyError: ssh-add is missing, the askpass script cannot be run (a noexec temporary
+ *     folder), the passphrase is wrong or the key cannot be read.
  */
-export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn) {
+export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn, spawnSyncFn = spawnSync) {
   // step 1 : the askpass script, made as the key file (exclusively, readable by this user only)
   const askpass = path.join(dir, "askpass.sh");
   const fd = fs.openSync(askpass, "wx", 0o700);
@@ -243,6 +295,8 @@ export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn) 
     fs.closeSync(fd);
   }
   fs.chmodSync(askpass, 0o700);
+  // step 2 : the script can be run here (not a noexec temporary folder), else say so
+  checkAskpassRuns(dir, askpass, spawnSyncFn);
   const base = playbookEnv();
   const env = {
     ...base,
@@ -254,7 +308,7 @@ export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn) 
     AF_ASKPASS_DONE: path.join(dir, "askpass.done"),
     AF_KEY_PASSPHRASE: String(passphrase),
   };
-  // step 2 : ssh-add, without a shell, and stopped when it takes too long
+  // step 3 : ssh-add, without a shell, and stopped when it takes too long
   await new Promise((resolve, reject) => {
     let child;
     try {
@@ -291,6 +345,8 @@ export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn) 
       done = true;
       clearTimeout(timer);
       if (code === 0) resolve();
+      // the askpass script could not be run after all (the check passed, ssh's own exec did not)
+      else if (ASKPASS_EXEC_FAILED.test(stderr)) reject(cannotExecute(dir, stderr.match(ASKPASS_EXEC_FAILED)[1]));
       // its own words (Bad passphrase, invalid format...) : they never hold the passphrase
       else reject(new SshKeyError(`the private key could not be loaded into ssh-agent (is the passphrase right?)${stderr.trim() ? `: ${stderr.trim().split("\n").pop()}` : ""}`));
     });
@@ -309,16 +365,18 @@ export async function addKey(dir, keyFile, socket, passphrase, spawnFn = spawn) 
  *   privateKey (string): the private key (PEM or OpenSSH).
  *   passphrase (string): its passphrase, empty for none.
  *   spawnFn (function): spawn, or a test's.
+ *   spawnSyncFn (function): spawnSync, or a test's (the askpass check, checkAskpassRuns).
  *
  * Returns:
  *   Promise<{extravars: object, env: object, dir: string, cleanup: function}>: the hidden
  *     extravars and the environment to add to the playbook's, the folder, and the cleanup.
  *
  * Raises:
- *   SshKeyError: the key cannot be written, ssh-agent or ssh-add is missing, or the key does
- *     not load (a wrong passphrase).
+ *   SshKeyError: the key cannot be written, ssh-agent or ssh-add is missing, the askpass
+ *     script cannot be run (a noexec temporary folder), or the key does not load (a wrong
+ *     passphrase).
  */
-export async function prepareSshKey(jobid, privateKey, passphrase = "", spawnFn = spawn) {
+export async function prepareSshKey(jobid, privateKey, passphrase = "", spawnFn = spawn, spawnSyncFn = spawnSync) {
   // step 1 : the key, in the job's private folder
   let made;
   try {
@@ -341,7 +399,7 @@ export async function prepareSshKey(jobid, privateKey, passphrase = "", spawnFn 
   try {
     const started = await startAgent(dir, spawnFn);
     agent = started.agent;
-    await addKey(dir, file, started.socket, passphrase, spawnFn);
+    await addKey(dir, file, started.socket, passphrase, spawnFn, spawnSyncFn);
     // held by the agent now : no key on the disk while the playbook runs
     fs.rmSync(file, { force: true });
     return { extravars: {}, env: { SSH_AUTH_SOCK: started.socket }, dir, cleanup };
@@ -351,4 +409,4 @@ export async function prepareSshKey(jobid, privateKey, passphrase = "", spawnFn 
   }
 }
 
-export default { SshKeyError, normalizeKey, makeKeyFile, removeKeyDir, startAgent, stopAgent, addKey, prepareSshKey };
+export default { SshKeyError, AGENT_KEY_LIFETIME_SECONDS, normalizeKey, makeKeyFile, removeKeyDir, startAgent, stopAgent, checkAskpassRuns, addKey, prepareSshKey };
