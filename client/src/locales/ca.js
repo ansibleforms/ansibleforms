@@ -1749,6 +1749,7 @@ export default {
       entraSignInHint_secret: "El secret del registre d'aplicació: per a l'inici de sessió SSO i el correu",
       entraSignIn_certificate: 'Certificat',
       entraSignInHint_certificate: 'Un certificat i la seva clau privada: només per a correu de Microsoft 365',
+      entraCertSecretHelp: "Opcional: el secret del client per a l'SSO; el correu fa servir el certificat.",
       entraCertHelp: "El certificat PEM pujat al registre d'aplicació; la seva clau privada a sota.",
       privateKey: 'Clau privada',
       privateKeyHelp: 'La clau privada PEM o OpenSSH per iniciar sessió, desada xifrada, no es torna a mostrar.',

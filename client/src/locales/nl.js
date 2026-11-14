@@ -1884,6 +1884,7 @@ export default {
       entraSignInHint_secret: 'Het geheim van de app-registratie: voor SSO-aanmelding en mail',
       entraSignIn_certificate: 'Certificaat',
       entraSignInHint_certificate: 'Een certificaat en zijn privésleutel: alleen voor mail via Microsoft 365',
+      entraCertSecretHelp: 'Optioneel: het client secret voor aanmelden via SSO; mail gebruikt het certificaat.',
       entraCertHelp: 'Het PEM-certificaat geüpload naar de app-registratie; de privésleutel hieronder.',
       privateKey: 'Privésleutel',
       privateKeyHelp: 'De PEM- of OpenSSH-privésleutel voor de login, versleuteld, nooit meer getoond.',

@@ -319,10 +319,14 @@ const signInChanged = computed(() => {
   return edit.value[key] !== editable(credential.value)[key];
 });
 // its password (a secret, a token) typed here : not read from a store, nor replaced by a key
-const passwordShown = computed(() => !fromStore.value && !hasClientKey.value && !sshKey.value && !smtpRelay.value);
+// an Entra ID one signing in with a certificate : its client secret still, optional, for the SSO
+// sign-in (which always signs in with the secret ; mail uses the certificate)
+const passwordShown = computed(
+  () => !fromStore.value && (!hasClientKey.value || entraCert.value) && !sshKey.value && !smtpRelay.value,
+);
 // the sign-in changed : the new password needed (marked required, Save asks for it) ; an Entra ID
 // one changed to Certificate : its certificate and key
-const passwordRequired = computed(() => passwordShown.value && signInChanged.value);
+const passwordRequired = computed(() => passwordShown.value && signInChanged.value && !entraCert.value);
 const clientKeyRequired = computed(() => entraCert.value && signInChanged.value);
 const dirty = computed(
   () =>
@@ -582,7 +586,8 @@ async function save() {
   } else {
     Object.assign(data, { secret_store: '', secret_ref: '', user: hasUser.value ? e.user.trim() : '' });
     // its new password, typed in its Login tab
-    if (newPassword.value && !hasClientKey.value) data.password = newPassword.value;
+    // an Entra ID one with a certificate : its optional client secret, for the SSO sign-in
+    if (newPassword.value && (!hasClientKey.value || entraCert.value)) data.password = newPassword.value;
   }
   // an ldap one's client certificate, checked by its servers
   if (isLdap.value) data.client_cert = e.client_cert;
@@ -673,7 +678,8 @@ const passwordLabel = computed(() => labels.value.password || t('settings.fields
 // what its password says : left empty, the stored one is kept ; not once its sign-in changed
 // (nothing stored to keep : it is needed)
 const passwordHelp = computed(() => {
-  const own = labels.value.passwordHelp || '';
+  // an Entra ID one with a certificate : the secret only for the SSO sign-in
+  const own = entraCert.value ? t('settings.credentials.entraCertSecretHelp') : labels.value.passwordHelp || '';
   if (passwordRequired.value) return own;
   return own ? `${own} ${t('settings.common.passwordKeep')}` : t('settings.common.passwordKeep');
 });
@@ -1289,7 +1295,7 @@ onMounted(async () => {
               <!-- its password, masked : left empty, the stored one is kept ; typed, replaced ; an
                    SSH one logging in with a private key has none ; its sign-in changed, needed -->
               <BsInput
-                v-else-if="passwordShown"
+                v-if="passwordShown"
                 class="af-credential-field"
                 v-model="newPassword"
                 v-show="fieldShown('password')"

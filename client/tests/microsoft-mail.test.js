@@ -16,12 +16,14 @@ describe('an Entra ID credential : a secret or a certificate', () => {
     expect(auth.initial({ client_cert: '-----BEGIN CERTIFICATE-----' })).toBe('certificate');
   });
 
-  it('a certificate : its certificate and key asked, not its secret', () => {
+  it('a certificate : its certificate and key asked, its secret optional (for the SSO sign-in)', () => {
     const item = { credential_type: 'entraid', entra_auth: 'certificate' };
     expect(entraCertificate(item)).toBe(true);
     expect(credentialField('client_cert').showWhen(item)).toBe(true);
     expect(credentialField('client_key').showWhen(item)).toBe(true);
-    expect(credentialField('password').showWhen(item)).toBe(false);
+    expect(credentialField('password').showWhen(item)).toBe(true);
+    expect(credentialField('password').requiredWhen(item)).toBe(false);
+    expect(credentialField('password').help(item)).toBe('settings.credentials.entraCertSecretHelp');
     const secret = { credential_type: 'entraid', entra_auth: 'secret' };
     expect(credentialField('client_cert').showWhen(secret)).toBe(false);
     expect(credentialField('password').showWhen(secret)).toBe(true);
