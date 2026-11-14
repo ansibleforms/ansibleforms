@@ -362,6 +362,26 @@ export function assertWritablePath(store, ref) {
 }
 
 /**
+ * Refuses a dynamic engine's path (isDynamicRef) to a write and to the check before it : Vault
+ * makes those credentials itself, and a read of <mount>/creds/<role> issues a new account in the
+ * target system (a database user), so nothing there is ever read on a write's behalf either. Only
+ * the mount's engine type may be asked of Vault (sys/internal/ui/mounts), never the path itself.
+ *
+ * Args:
+ *   store (object): the secret store, its token decrypted.
+ *   ref (string): the path.
+ *
+ * Returns:
+ *   Promise<void>: settles when the path is not a dynamic engine's.
+ *
+ * Raises:
+ *   Error: the path is a dynamic secret engine's.
+ */
+async function assertNotDynamic(store, ref) {
+  if (await isDynamicRef(store, ref)) throw new Error(`Vault path ${ref} is a dynamic secret engine's: Vault makes those credentials itself, nothing is written there`);
+}
+
+/**
  * Whether a secret is at a path already : what a write that may not overwrite asks first.
  *
  * Args:
@@ -373,13 +393,15 @@ export function assertWritablePath(store, ref) {
  *
  * Raises:
  *   Errors.BadRequestError: the path names a KV v2 secret's metadata (assertWritablePath).
- *   Error: Vault refused or could not be reached.
+ *   Error: a dynamic engine's path (assertNotDynamic), or Vault refused or could not be reached.
  */
 async function exists(store, ref) {
   assertConfigured(store);
   assertSafeRef(ref);
   // the path checked is the one written : never the metadata endpoint
   assertWritablePath(store, ref);
+  // never a dynamic engine's : its read would issue a new account before the write is refused
+  await assertNotDynamic(store, ref);
   const apiPath = buildApiPath(ref, kvVersion(store), store.default_mount);
   try {
     const res = await axios.get(`${baseUrl(store)}/v1/${apiPath}`, { headers: headers(store), ...agentsFor(store), timeout: 10000 });
@@ -469,7 +491,7 @@ async function write(store, ref, payload) {
   assertSafeRef(ref);
   // a secret's data is written, never its metadata (Vault would answer 204 and store nothing)
   assertWritablePath(store, ref);
-  if (await isDynamicRef(store, ref)) throw new Error(`Vault path ${ref} is a dynamic secret engine's: Vault makes those credentials itself, nothing is written there`);
+  await assertNotDynamic(store, ref);
   const version = kvVersion(store);
   const apiPath = buildApiPath(ref, version, store.default_mount);
   // step 1 : the secret there now, so its other keys are written back (never logged)

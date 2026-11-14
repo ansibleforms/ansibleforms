@@ -37,6 +37,8 @@ vi.mock("../src/models/crud.model.js", () => ({
 // the fake Vault : the secrets by API path, the writes recorded, a status to answer writes with
 let secrets = {};
 const writes = [];
+// the paths read (GET), the mounts' engine type asked aside
+const reads = [];
 let writeStatus = 200;
 let readStatus = 200;
 let readErrors = ["1 error occurred:\n\t* permission denied\n\n"];
@@ -65,6 +67,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  reads.push(path);
   if (readStatus !== 200) {
     res.statusCode = readStatus;
     return res.end(JSON.stringify({ errors: readErrors }));
@@ -105,6 +108,7 @@ beforeEach(() => {
   storeRows = { vault: vaultRow() };
   secrets = {};
   writes.length = 0;
+  reads.length = 0;
   writeStatus = 200;
   readStatus = 200;
   readErrors = ["1 error occurred:\n\t* permission denied\n\n"];
@@ -246,6 +250,17 @@ describe("writing", () => {
     storeRows.vault = vaultRow({ write_prefix: "database/creds" });
     mountTypes.database = "database";
     await assert.rejects(Registry.writeSecret("vault", "database/creds/app", LOGIN), /dynamic secret engine/);
+    assert.equal(writes.length, 0);
+  });
+
+  test("KV v1 with a prefix over a dynamic mount : its creds path is never read either", async () => {
+    // a read of database/creds/app would make Vault issue a new database account
+    storeRows.vault = vaultRow({ kv_version: 1, write_prefix: "database" });
+    mountTypes.database = "database";
+    for (const overwrite of [false, true]) {
+      await assert.rejects(Registry.writeSecret("vault", "database/creds/app", LOGIN, { overwrite }), /dynamic secret engine/);
+    }
+    assert.deepEqual(reads, []);
     assert.equal(writes.length, 0);
   });
 
