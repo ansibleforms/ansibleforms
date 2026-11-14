@@ -153,7 +153,8 @@ const listSections = [
     compared: async (d, row) => {
       const credential = d.credential === undefined ? row.credential : d.credential;
       if ((row.type || d.type) !== "mail" || (await NotificationChannel.credentialType(credential)) !== "entraid") return d;
-      const { server, port, secure, ...rest } = d;
+      const rest = { ...d };
+      for (const key of ["server", "port", "secure"]) delete rest[key];
       return rest;
     },
     remove: (row) => NotificationChannel.delete(row.id, seedOpts),
