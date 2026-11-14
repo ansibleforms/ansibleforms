@@ -67,6 +67,7 @@ export default {
   audit: {
     failedGet: "Échec de la récupération du journal d'audit",
     invalidPeriod: "from et to de la période doivent être des dates ISO, comme 2026-11-14T00:00:00Z",
+    invalidSort: "Tri sur time, actor, action, target, outcome ou ip, avec dir asc ou desc",
   },
   health: {
     failedCheck: "Échec de la vérification de l'état du système",

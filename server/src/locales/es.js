@@ -63,6 +63,7 @@ export default {
   audit: {
     failedGet: "No se pudo obtener el registro de auditoría",
     invalidPeriod: "from y to del periodo deben ser fechas ISO, como 2026-11-14T00:00:00Z",
+    invalidSort: "Ordena por time, actor, action, target, outcome o ip, con dir asc o desc",
   },
   health: {
     failedCheck: "No se pudo comprobar el estado del sistema",

@@ -660,7 +660,7 @@ export default {
     allActions: '所有操作',
     allOutcomes: '所有结果',
     reset: '重置选择',
-    resetHint: '恢复为所有时段、用户、操作和结果',
+    resetHint: '恢复为所有时段、用户、操作和结果，最新的在前',
     empty: '暂无审计条目',
     noEntriesFor: '{period} 没有审计条目。',
     emptyHint: '审计记录从安装此版本时开始，因此不包含之前的任何内容。',

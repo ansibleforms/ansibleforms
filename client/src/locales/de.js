@@ -679,7 +679,7 @@ export default {
     allActions: 'Alle Aktionen',
     allOutcomes: 'Alle Ergebnisse',
     reset: 'Auswahl zurücksetzen',
-    resetHint: 'Wieder alle Zeiträume, Benutzer, Aktionen und Ergebnisse',
+    resetHint: 'Wieder alle Zeiträume, Benutzer, Aktionen und Ergebnisse, neueste zuerst',
     empty: 'Noch keine Audit-Einträge',
     noEntriesFor: 'Keine Audit-Einträge für {period}.',
     emptyHint: 'Das Protokoll beginnt mit der Installation dieser Version und enthält nichts von davor.',

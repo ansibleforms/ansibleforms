@@ -66,6 +66,7 @@ export default {
   audit: {
     failedGet: "Nie udało się pobrać dziennika audytu",
     invalidPeriod: "from i to okresu muszą być datami ISO, np. 2026-11-14T00:00:00Z",
+    invalidSort: "Sortuj wg time, actor, action, target, outcome lub ip, z dir asc lub desc",
   },
   health: {
     failedCheck: "Nie udało się sprawdzić stanu systemu",

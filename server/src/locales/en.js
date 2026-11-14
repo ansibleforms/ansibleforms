@@ -62,6 +62,7 @@ export default {
   audit: {
     failedGet: "Failed to get the audit trail",
     invalidPeriod: "The period's from and to must be ISO dates, such as 2026-11-14T00:00:00Z",
+    invalidSort: "Sort on time, actor, action, target, outcome or ip, with dir asc or desc",
   },
   health: {
     failedCheck: "Failed to check the system health",

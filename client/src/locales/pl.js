@@ -675,7 +675,7 @@ export default {
     allActions: 'Wszystkie akcje',
     allOutcomes: 'Wszystkie wyniki',
     reset: 'Resetuj wybór',
-    resetHint: 'Znowu wszystkie okresy, użytkownicy, akcje i wyniki',
+    resetHint: 'Znowu wszystkie okresy, użytkownicy, akcje i wyniki, najnowsze najpierw',
     empty: 'Brak wpisów audytu',
     noEntriesFor: 'Brak wpisów audytu za {period}.',
     emptyHint: 'Dziennik zaczyna się od instalacji tej wersji, więc nie zawiera niczego sprzed tego momentu.',

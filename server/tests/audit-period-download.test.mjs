@@ -1,7 +1,8 @@
 // The Audit log page picks a period (a year, a month or a day of the browser's calendar, sent as
-// the instants [from, to)) and downloads every entry its filters select as a CSV file. The
-// period is checked (a 400 otherwise), and the CSV quotes every cell and keeps a spreadsheet
-// from running one as a formula.
+// the instants [from, to)), sorts its columns on the server, and downloads every entry its
+// filters select as a CSV file. The period and the sort are checked (a 400 otherwise), the sort
+// reaches the SQL only through a whitelist with id as the tiebreaker, and the CSV quotes every
+// cell and keeps a spreadsheet from running one as a formula.
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { EventEmitter } from "events";
 
@@ -29,7 +30,7 @@ vi.mock("../src/models/db.model.js", () => ({
   },
 }));
 
-const { default: Audit } = await import("../src/models/audit.model.js");
+const { default: Audit, SORT_COLUMNS } = await import("../src/models/audit.model.js");
 const { default: controller, csvCell, downloadName, validInstant } = await import("../src/controllers/v2/audit.controller.js");
 
 /**
@@ -100,6 +101,37 @@ describe("the period", () => {
   });
 });
 
+describe("the sort", () => {
+  test("goes through the whitelist, with id the same way as the tiebreaker", async () => {
+    await Audit.find({ sort: "actor", dir: "asc" });
+    expect(selectOf().sql).toMatch(/ORDER BY actor ASC, id ASC LIMIT/);
+    queries = [];
+    await Audit.find({ sort: "time", dir: "desc" });
+    expect(selectOf().sql).toMatch(/ORDER BY created_at DESC, id DESC LIMIT/);
+  });
+
+  test("none is the newest first, as always", async () => {
+    await Audit.find({});
+    expect(selectOf().sql).toMatch(/ORDER BY created_at DESC, id DESC LIMIT/);
+  });
+
+  test("the model never puts an unknown column in the SQL", () => {
+    expect(Audit.orderBy("detail; DROP TABLE audit", "asc")).toBe("created_at DESC, id DESC");
+    expect(Audit.orderBy("constructor", "asc")).toBe("created_at DESC, id DESC");
+    expect(Audit.orderBy("ip", "sideways")).toBe("ip DESC, id DESC");
+    expect([...SORT_COLUMNS.keys()]).toEqual(["time", "actor", "action", "target", "outcome", "ip"]);
+  });
+
+  test("an unknown column or direction is refused with a 400, not ignored", async () => {
+    for (const query of [{ sort: "detail" }, { sort: "__proto__" }, { sort: "time", dir: "up" }, { sort: ["time", "ip"] }]) {
+      const res = response();
+      await controller.findAll({ query }, res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(queries).toHaveLength(0);
+  });
+});
+
 describe("the facets", () => {
   test("give the oldest entry's time, with one MIN query", async () => {
     oldest = new Date("2024-03-05T10:00:00Z");
@@ -114,7 +146,7 @@ describe("the facets", () => {
 });
 
 describe("GET /api/v2/audit/download", () => {
-  test("a CSV of every entry the filters select, the newest first", async () => {
+  test("a CSV of every entry the filters select, in the order asked", async () => {
     streamRows = [
       {
         id: 2,
@@ -130,13 +162,13 @@ describe("GET /api/v2/audit/download", () => {
     ];
     const res = response();
     await controller.download(
-      { query: { actor: "alice", outcome: "success", from: "2026-11-13T23:00:00.000Z", to: "2026-11-14T23:00:00.000Z", period: "2026-11-14" } },
+      { query: { actor: "alice", outcome: "success", from: "2026-11-13T23:00:00.000Z", to: "2026-11-14T23:00:00.000Z", sort: "target", dir: "asc", period: "2026-11-14" } },
       res
     );
     // the filters and the order : the page's own
     const q = queries[0];
     expect(q.sql).toMatch(/WHERE actor = \? AND outcome = \? AND created_at >= \? AND created_at < \?/);
-    expect(q.sql).toMatch(/ORDER BY created_at DESC, id DESC$/);
+    expect(q.sql).toMatch(/ORDER BY target ASC, id ASC$/);
     expect(q.sql).not.toMatch(/LIMIT/);
     expect(q.vars).toEqual(["alice", "success", "2026-11-13 23:00:00", "2026-11-14 23:00:00"]);
     // the headers
@@ -157,9 +189,12 @@ describe("GET /api/v2/audit/download", () => {
     expect(res.headers["Content-Disposition"]).toBe('attachment; filename="audit.csv"');
   });
 
-  test("a period that is not one is a 400, before any row", async () => {
-    const res = response();
+  test("a period or a sort that is not one is a 400, before any row", async () => {
+    let res = response();
     await controller.download({ query: { to: "tomorrow" } }, res);
+    expect(res.statusCode).toBe(400);
+    res = response();
+    await controller.download({ query: { sort: "password" } }, res);
     expect(res.statusCode).toBe(400);
     expect(queries).toHaveLength(0);
   });

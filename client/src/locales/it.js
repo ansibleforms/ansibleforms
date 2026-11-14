@@ -677,7 +677,7 @@ export default {
     allActions: 'Tutte le azioni',
     allOutcomes: 'Tutti gli esiti',
     reset: 'Reimposta la selezione',
-    resetHint: 'Di nuovo tutti i periodi, utenti, azioni ed esiti',
+    resetHint: 'Di nuovo tutti i periodi, utenti, azioni ed esiti, i più recenti prima',
     empty: 'Nessuna voce di audit',
     noEntriesFor: 'Nessuna voce di audit per {period}.',
     emptyHint: 'Il registro inizia con l’installazione di questa versione, quindi non contiene nulla di precedente.',

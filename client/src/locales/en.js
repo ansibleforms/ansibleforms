@@ -670,7 +670,7 @@ export default {
     allActions: 'All actions',
     allOutcomes: 'All outcomes',
     reset: 'Reset selection',
-    resetHint: 'Every period, user, action and outcome again',
+    resetHint: 'Every period, user, action and outcome again, newest first',
     empty: 'No audit entries yet',
     noEntriesFor: 'No audit entries for {period}.',
     emptyHint: 'The trail starts when this version is installed, so it holds nothing from before that.',

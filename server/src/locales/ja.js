@@ -63,6 +63,7 @@ export default {
   audit: {
     failedGet: "監査証跡の取得に失敗しました",
     invalidPeriod: "期間の from と to は 2026-11-14T00:00:00Z のような ISO 日付にしてください",
+    invalidSort: "並べ替えは time、actor、action、target、outcome、ip、dir は asc か desc",
   },
   health: {
     failedCheck: "システムの状態確認に失敗しました",

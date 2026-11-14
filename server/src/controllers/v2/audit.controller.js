@@ -32,21 +32,27 @@ export function validInstant(value) {
 }
 
 /**
- * The filter of a request, checked : the period's bounds must be ISO dates, or the request is
- * refused with a reason rather than read with a bound silently dropped.
+ * The filter and order of a request, checked : the period's bounds must be ISO dates and the
+ * sort a known column with asc or desc, or the request is refused with a reason. An unknown
+ * sort is refused rather than ignored : a script asking for a column that is not one would
+ * otherwise get the default order and believe it sorted.
  *
  * Args:
  *   req (object): the request ; its query's actor, actorType, action, targetType, target,
- *     outcome, from, to, limit and offset.
+ *     outcome, from, to, sort, dir, limit and offset.
  *
  * Returns:
  *   object: filter, the filter to read with ; or error, the translated reason (a 400).
  */
 export function readQuery(req) {
   const q = req.query || {};
-  // the period, [from, to)
+  // step 1 : the period, [from, to)
   if (!validInstant(q.from) || !validInstant(q.to)) {
     return { error: i18n.t(req, 'audit.invalidPeriod') };
+  }
+  // step 2 : the order, through the whitelist only
+  if (!Audit.validSort(q.sort, q.dir)) {
+    return { error: i18n.t(req, 'audit.invalidSort') };
   }
   return {
     filter: {
@@ -58,6 +64,8 @@ export function readQuery(req) {
       outcome: q.outcome,
       from: q.from,
       to: q.to,
+      sort: q.sort,
+      dir: q.dir,
       limit: q.limit,
       offset: q.offset,
     },
@@ -127,12 +135,12 @@ export function downloadName(period) {
 }
 
 /**
- * A page of the trail, filtered, the newest first.
+ * A page of the trail, filtered and sorted.
  *
  * Args:
- *   req (object): the request ; its query's filters, from and to (ISO, [from, to)), limit and
- *     offset.
- *   res (object): the response ; 400 for a period that is not one.
+ *   req (object): the request ; its query's filters, from and to (ISO, [from, to)), sort (a
+ *     column : time, actor, action, target, outcome, ip) and dir (asc, desc), limit, offset.
+ *   res (object): the response ; 400 for a period or a sort that is not one.
  */
 const findAll = async function (req, res) {
   const { filter, error } = readQuery(req);
@@ -146,14 +154,14 @@ const findAll = async function (req, res) {
 };
 
 /**
- * Every entry the filters select, the newest first, as a CSV file : a header row, then a
+ * Every entry the filters select, in the order asked, as a CSV file : a header row, then a
  * line per entry, UTF-8 with a byte order mark so a spreadsheet reads the accents. The rows are
  * streamed from the database and written as they come, the writing paced by the client.
  *
  * Args:
  *   req (object): the request ; the query of findAll (no limit or offset : all of them), and
  *     period (YYYY, YYYY-MM or YYYY-MM-DD), which only names the file.
- *   res (object): the response ; 400 for a period that is not one.
+ *   res (object): the response ; 400 for a period or a sort that is not one.
  */
 const download = async function (req, res) {
   const { filter, error } = readQuery(req);

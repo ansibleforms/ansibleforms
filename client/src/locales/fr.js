@@ -680,7 +680,7 @@ export default {
     allActions: 'Toutes les actions',
     allOutcomes: 'Tous les résultats',
     reset: 'Réinitialiser la sélection',
-    resetHint: 'De nouveau toutes les périodes, utilisateurs, actions et résultats',
+    resetHint: 'De nouveau toutes les périodes, utilisateurs, actions et résultats, récents en tête',
     empty: "Aucune entrée d'audit",
     noEntriesFor: "Aucune entrée d'audit pour {period}.",
     emptyHint: "Le journal démarre à l'installation de cette version, il ne contient rien d'antérieur.",

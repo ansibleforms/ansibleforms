@@ -46,6 +46,44 @@ const years = computed(() => {
   return yearRange([Number.isInteger(oldest) ? oldest : now, now]);
 });
 
+// ─── sorting ──────────────────────────────────────────────────────────────────
+// The headers sort as the Job history's do : a first click sorts up, the next one down, and so
+// on ; no column sorted is the newest first, as always. The table is paged on the server, so the
+// server sorts (sort, dir), on its whitelist of columns with the id as the tiebreaker, and the
+// download follows the same order.
+const sortKey = ref(null);
+const sortDir = ref(1); // 1 asc, -1 desc
+
+/**
+ * Sorts on a column : up on a first click, then the other way on each next one. Back to page 1.
+ *
+ * Args:
+ *   key (string): the column, as the server takes it : time, actor, action, target, outcome, ip.
+ */
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = -sortDir.value;
+  } else {
+    sortKey.value = key;
+    sortDir.value = 1;
+  }
+  applyFilters();
+}
+
+/**
+ * A column's aria-sort : how it is sorted, for a screen reader.
+ *
+ * Args:
+ *   key (string): the column.
+ *
+ * Returns:
+ *   string: ascending, descending or none.
+ */
+function ariaSort(key) {
+  if (sortKey.value !== key) return 'none';
+  return sortDir.value === 1 ? 'ascending' : 'descending';
+}
+
 // Null-prototype maps with explicit fallbacks. A plain object literal resolves
 // `constructor` and `__proto__` to inherited members, which are truthy - so a row with
 // outcome 'constructor' handed a function to t() and blanked the entire table. And an
@@ -117,11 +155,11 @@ async function onPageChange(slice, meta) {
 }
 
 /**
- * The filters and the period as the server takes them : the same for a page and for the
- * download, so the file holds what the table shows, all of it.
+ * The filters, the period and the order as the server takes them : the same for a page and for
+ * the download, so the file holds what the table shows, all of it.
  *
  * Returns:
- *   URLSearchParams: actor, action, outcome, from and to, those that are set.
+ *   URLSearchParams: actor, action, outcome, from and to, sort and dir, those that are set.
  */
 function filterParams() {
   const params = new URLSearchParams();
@@ -133,6 +171,10 @@ function filterParams() {
   if (range) {
     params.set('from', range.from);
     params.set('to', range.to);
+  }
+  if (sortKey.value) {
+    params.set('sort', sortKey.value);
+    params.set('dir', sortDir.value === 1 ? 'asc' : 'desc');
   }
   return params;
 }
@@ -190,7 +232,7 @@ async function onPeriod(value) {
 }
 
 /**
- * Downloads every entry the filters and the period select, the newest first, as a CSV file :
+ * Downloads every entry the filters and the period select, in the order shown, as a CSV file :
  * all of them, not only the page shown. Named after the period (audit-2026-11.csv).
  */
 async function download() {
@@ -216,16 +258,21 @@ async function applyFilters() {
   await load();
 }
 
-// the filters back to every period, user, action and outcome ; nothing to do when they are
-// already
+// the filters back to every period, user, action and outcome, the newest first ; nothing to do
+// when they are already
 const filtered = computed(
-  () => !!(filterActor.value || filterAction.value || filterOutcome.value) || period.value.year !== null,
+  () =>
+    !!(filterActor.value || filterAction.value || filterOutcome.value) ||
+    period.value.year !== null ||
+    sortKey.value !== null,
 );
 async function resetFilters() {
   filterActor.value = '';
   filterAction.value = '';
   filterOutcome.value = '';
   period.value = { year: null, month: null, day: null };
+  sortKey.value = null;
+  sortDir.value = 1;
   await applyFilters();
 }
 
@@ -323,14 +370,92 @@ onMounted(async () => {
                 <thead>
                   <tr>
                     <!-- the time in full, its zone included : its own width, never cut -->
-                    <th data-fit-keep>{{ t('audit.time') }}</th>
+                    <th
+                      class="is-clickable"
+                      data-fit-keep
+                      :aria-sort="ariaSort('time')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('time')"
+                    >
+                      {{ t('audit.time') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon v-if="sortKey === 'time'" :icon="sortDir === 1 ? 'sort-up' : 'sort-down'" />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
                     <!-- the row's detail unfolds : its caret after the time, as the jobs list's (styles/tables.scss) -->
                     <th class="af-expand-col"></th>
-                    <th>{{ t('audit.actor') }}</th>
-                    <th>{{ t('audit.action') }}</th>
-                    <th>{{ t('audit.target') }}</th>
-                    <th data-fit-keep="7rem">{{ t('audit.outcome') }}</th>
-                    <th data-fit-keep="10rem">{{ t('audit.ip') }}</th>
+                    <th
+                      class="is-clickable"
+                      :aria-sort="ariaSort('actor')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('actor')"
+                    >
+                      {{ t('audit.actor') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon v-if="sortKey === 'actor'" :icon="sortDir === 1 ? 'sort-up' : 'sort-down'" />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
+                    <th
+                      class="is-clickable"
+                      :aria-sort="ariaSort('action')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('action')"
+                    >
+                      {{ t('audit.action') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon
+                          v-if="sortKey === 'action'"
+                          :icon="sortDir === 1 ? 'sort-up' : 'sort-down'"
+                        />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
+                    <th
+                      class="is-clickable"
+                      :aria-sort="ariaSort('target')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('target')"
+                    >
+                      {{ t('audit.target') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon
+                          v-if="sortKey === 'target'"
+                          :icon="sortDir === 1 ? 'sort-up' : 'sort-down'"
+                        />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
+                    <th
+                      class="is-clickable"
+                      data-fit-keep="9rem"
+                      :aria-sort="ariaSort('outcome')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('outcome')"
+                    >
+                      {{ t('audit.outcome') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon
+                          v-if="sortKey === 'outcome'"
+                          :icon="sortDir === 1 ? 'sort-up' : 'sort-down'"
+                        />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
+                    <th
+                      class="is-clickable"
+                      data-fit-keep="10rem"
+                      :aria-sort="ariaSort('ip')"
+                      :style="{ userSelect: 'none', whiteSpace: 'nowrap' }"
+                      @click="toggleSort('ip')"
+                    >
+                      {{ t('audit.ip') }}
+                      <span class="text-muted ms-1" style="font-size: 0.7em">
+                        <font-awesome-icon v-if="sortKey === 'ip'" :icon="sortDir === 1 ? 'sort-up' : 'sort-down'" />
+                        <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                      </span>
+                    </th>
                     <th class="af-fit-spacer"></th>
                   </tr>
                 </thead>

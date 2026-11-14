@@ -3227,7 +3227,7 @@
           "audit"
         ],
         "summary": "Search the audit trail",
-        "description": "Newest first. Every filter is optional and exact, except target, which matches a substring. Requires settings access.",
+        "description": "Newest first unless sorted. Every filter is optional and exact, except target, which matches a substring. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3292,6 +3292,24 @@
               "format": "date-time"
             },
             "description": "The period's end, exclusive (the start of the next day, month or year): an ISO date or date-time; anything else is a 400"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["time", "actor", "action", "target", "outcome", "ip"]
+            },
+            "description": "The column to sort on, then id the same way; the newest first when left out. Another value is a 400"
+          },
+          {
+            "name": "dir",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            }
           },
           {
             "name": "limit",
@@ -3383,7 +3401,7 @@
             }
           },
           "400": {
-            "description": "The period's from or to is not an ISO date"
+            "description": "The period's from or to is not an ISO date, or the sort is not a known column with asc or desc"
           },
           "403": {
             "description": "Forbidden - no settings access"
@@ -3400,7 +3418,7 @@
           "audit"
         ],
         "summary": "Download the audit trail as CSV",
-        "description": "Every entry the filters select (no paging), newest first, as a CSV file in UTF-8 with a byte order mark: a header row, then time (ISO), actor, action, target, outcome, ip and detail (JSON text). Cells starting with = + - @ get a leading quote. Requires settings access.",
+        "description": "Every entry the filters select (no paging), in the order asked, as a CSV file in UTF-8 with a byte order mark: a header row, then time (ISO), actor, action, target, outcome, ip and detail (JSON text). Cells starting with = + - @ get a leading quote. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3414,6 +3432,8 @@
           { "name": "outcome", "in": "query", "schema": { "type": "string", "enum": ["success", "failure", "denied"] } },
           { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "The period's start, inclusive" },
           { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "The period's end, exclusive" },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["time", "actor", "action", "target", "outcome", "ip"] } },
+          { "name": "dir", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" } },
           {
             "name": "period",
             "in": "query",
@@ -3434,7 +3454,7 @@
             }
           },
           "400": {
-            "description": "The period's from or to is not an ISO date"
+            "description": "The period's from or to is not an ISO date, or the sort is not a known column with asc or desc"
           },
           "403": {
             "description": "Forbidden - no settings access"

@@ -65,6 +65,7 @@ export default {
   audit: {
     failedGet: "Kan het auditlogboek niet ophalen",
     invalidPeriod: "from en to van de periode moeten ISO-datums zijn, zoals 2026-11-14T00:00:00Z",
+    invalidSort: "Sorteer op time, actor, action, target, outcome of ip, met dir asc of desc",
   },
   health: {
     failedCheck: "Kan de systeemstatus niet controleren",
