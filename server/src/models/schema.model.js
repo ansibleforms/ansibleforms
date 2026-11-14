@@ -1518,8 +1518,10 @@ async function freeChannelName(name, query) {
   }
 }
 
-// the mail columns of the settings row, dropped in 7.6 (dropSettingsMailColumns)
-const SETTINGS_MAIL_COLUMNS = ["mail_server", "mail_port", "mail_secure", "mail_username", "mail_password", "mail_from"];
+// the mail columns of the settings row, dropped in 7.6 (dropSettingsMailColumns), in the order
+// they are dropped : mail_server last, so a run that stops part way (a lock timeout) leaves the
+// server, and with it the mail settings still to move, for the next start
+const SETTINGS_MAIL_COLUMNS = ["mail_port", "mail_secure", "mail_username", "mail_password", "mail_from", "mail_server"];
 
 /**
  * 7.6 : the mail columns of the settings row dropped, the mail goes through the mail channels
@@ -1537,9 +1539,11 @@ const SETTINGS_MAIL_COLUMNS = ["mail_server", "mail_port", "mail_secure", "mail_
  *     so the seed (whose mail keys declare those, lib/seed-schema.js foldMailSettingsIntoChannel)
  *     takes them over without a warning, and releases them when it no longer declares them
  *   - an active mail channel already : it is what the mail went through, nothing to move
- * Then the six columns go. The channel and its credential are written in one transaction, the
- * drop only after it. Idempotent : nothing to do once mail_server is gone, and a run again after
- * a failure part way finds the channel active and only drops what is left.
+ * Then the six columns go, mail_server last. The channel and its credential are written in one
+ * transaction, the drop only after it. Idempotent : nothing to do once all six are gone, and a
+ * run again after a failure part way (a drop that timed out on a lock) finds the channel active,
+ * or no mail server left to move, and drops every column still there : none is ever left behind
+ * holding the encrypted mail_password.
  *
  * Returns:
  *   Promise<string|null>: what was done, or null when there was nothing to do.
@@ -1548,11 +1552,17 @@ const SETTINGS_MAIL_COLUMNS = ["mail_server", "mail_port", "mail_secure", "mail_
  *   Error: a statement failed ; the columns left are kept, and the next start tries again.
  */
 export async function dropSettingsMailColumns() {
-  // step 1 : nothing to do once the columns are gone
-  if (!(await columnPresent("settings", "mail_server"))) return null;
+  // step 1 : nothing to do once every column is gone ; any one left (an earlier run that
+  // stopped part way) is work still to do
+  const present = [];
+  for (const column of SETTINGS_MAIL_COLUMNS) {
+    if (await columnPresent("settings", column)) present.push(column);
+  }
+  if (!present.length) return null;
   const done = [];
-  // step 2 : mail settings the app still sent with, as a mail channel
-  const rows = await mysql.do("SELECT * FROM AnsibleForms.`settings` LIMIT 1");
+  // step 2 : mail settings the app still sent with, as a mail channel ; only while mail_server
+  // is there (dropped last, so the settings are whole while it is)
+  const rows = present.includes("mail_server") ? await mysql.do("SELECT * FROM AnsibleForms.`settings` LIMIT 1") : [];
   const s = rows[0];
   if (s && String(s.mail_server || "").trim()) {
     const active = await mysql.do("SELECT COUNT(*) AS n FROM AnsibleForms.`notification_channels` WHERE type = 'mail' AND is_active = 1 AND enabled = 1");
@@ -1576,8 +1586,8 @@ export async function dropSettingsMailColumns() {
       done.push(`moved the mail settings to the active mail channel '${name}'` + (credential ? `, its login to the credential '${credential}'` : ""));
     }
   }
-  // step 3 : the columns go
-  for (const column of SETTINGS_MAIL_COLUMNS) {
+  // step 3 : every column still there goes, mail_server last
+  for (const column of present) {
     await dropColumn("settings", column);
   }
   const message = `Dropped the mail columns of the settings, the mail goes through the mail channels${done.length ? ` (${done.join(", ")})` : ""}`;

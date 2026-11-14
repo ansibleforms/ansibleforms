@@ -359,6 +359,26 @@ describe("the settings' mail columns are dropped, their mail settings kept as a 
     expect(db.channels.filter((c) => c.type === "mail").length).toBe(1);
     for (const c of MAIL) expect(db.columns.has(c)).toBe(false);
   });
+
+  test("a run that stopped part way through the drops (mail_server gone, a lock timeout on the next) : the next one drops the rest", async () => {
+    // mail_server and mail_port dropped, the others left (mail_password still holding the
+    // login, encrypted with the key of then)
+    setDb({ columns: ["mail_secure", "mail_username", "mail_password", "mail_from", "url"], row: { url: "", mail_secure: 1, mail_username: "mailer", mail_password: "enc-pw", mail_from: "af@example.com", managed: 0 } });
+    expect(await dropSettingsMailColumns()).toMatch(/Dropped the mail columns/);
+    for (const c of MAIL) expect(db.columns.has(c)).toBe(false);
+    // nothing to move without a server : no channel, no credential
+    expect(statements.some((s) => /^INSERT/.test(s.sql))).toBe(false);
+    // and again : nothing left to do
+    expect(await dropSettingsMailColumns()).toBe(null);
+  });
+
+  test("mail_server is dropped last : the columns a failed run leaves still say there is work to do", async () => {
+    setDb({ columns: [...MAIL, "url"], row: mailRow() });
+    await dropSettingsMailColumns();
+    const drops = statements.filter((s) => /DROP COLUMN/.test(s.sql)).map((s) => s.args[2]);
+    expect(drops).toHaveLength(MAIL.length);
+    expect(drops.at(-1)).toBe("mail_server");
+  });
 });
 
 // ---------------------------------------------------------------------------------------

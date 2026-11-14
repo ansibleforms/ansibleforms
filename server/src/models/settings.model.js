@@ -468,6 +468,12 @@ Settings.find = function () {
         delete res[0].env_label
         delete res[0].env_label_color
         delete res[0].env_label_show
+        // the mail columns of before 7.6 (the mail goes through the mail channels) : never in
+        // the answer, should an upgrade that stopped part way have left one (mail_password
+        // holds the login, encrypted)
+        for (const key of Object.keys(res[0])) {
+          if (key.startsWith('mail_')) delete res[0][key]
+        }
         return res[0]
       }else{
         logger.error("No settings record in the database, something is wrong")
