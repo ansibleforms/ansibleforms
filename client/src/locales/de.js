@@ -1932,6 +1932,8 @@ export default {
       clientKeyKeep: 'Leer gelassen bleibt der gespeicherte Client-Schlüssel.',
       server: 'Server',
       serverHelp: 'Die Adresse des Secret Stores, für den diese Anmeldung gilt.',
+      optionalHostHelp: 'Optional. Wird mit den Anmeldedaten als host an das Playbook und an Ausdrücke übergeben.',
+      optionalPortHelp: 'Optional. Wird mit den Anmeldedaten als port an das Playbook und an Ausdrücke übergeben.',
       noServer: 'Seine Anmeldeinformation hat keinen Server: Fügen Sie auf deren Seite einen hinzu.',
       noneOfType: 'Noch keine Zugangsdaten vom Typ {type}',
       type_rte: 'RTE',

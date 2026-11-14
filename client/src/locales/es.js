@@ -1928,6 +1928,8 @@ export default {
       clientKeyKeep: 'Si se deja vacía, se conserva la clave de cliente guardada.',
       server: 'Servidor',
       serverHelp: 'La dirección del almacén de secretos para el que sirve este acceso.',
+      optionalHostHelp: 'Opcional. Se pasa con las credenciales al playbook y a las expresiones, como host.',
+      optionalPortHelp: 'Opcional. Se pasa con las credenciales al playbook y a las expresiones, como port.',
       noServer: 'Su credencial no tiene servidor: añade uno en la página de la credencial.',
       noneOfType: 'Aún no hay credenciales de tipo {type}',
       type_rte: 'RTE',

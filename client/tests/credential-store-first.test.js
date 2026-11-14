@@ -16,8 +16,14 @@ describe('the New credential dialog', () => {
   });
 
   it('read from a secret store : no Login step for a plain login, kept for one with an address', () => {
-    expect(steps({ credential_type: 'userpass', secret_source: 'store' })).toEqual(['credential', 'type', 'store']);
     expect(steps({ credential_type: 'git', secret_source: 'store' })).toEqual(['credential', 'type', 'store']);
+    // a user and password one has its optional host and port to ask (#1326)
+    expect(steps({ credential_type: 'userpass', secret_source: 'store' })).toEqual([
+      'credential',
+      'type',
+      'store',
+      'login',
+    ]);
     // an SSH or a database login still asks where it connects
     expect(steps({ credential_type: 'ssh', secret_source: 'store' })).toEqual(['credential', 'type', 'store', 'login']);
     expect(steps({ credential_type: 'database', secret_source: 'store' })).toEqual([

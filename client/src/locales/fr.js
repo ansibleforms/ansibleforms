@@ -1934,6 +1934,8 @@ export default {
       clientKeyKeep: 'Laissée vide, la clé client enregistrée est conservée.',
       server: 'Serveur',
       serverHelp: "L'adresse du coffre de secrets pour lequel vaut cette connexion.",
+      optionalHostHelp: 'Facultatif. Transmis avec les identifiants au playbook et aux expressions, comme host.',
+      optionalPortHelp: 'Facultatif. Transmis avec les identifiants au playbook et aux expressions, comme port.',
       noServer: "Son identifiant n'a pas de serveur : ajoutez-en un sur la page de l'identifiant.",
       noneOfType: "Pas encore d'identifiants de type {type}",
       type_rte: 'RTE',

@@ -1745,6 +1745,8 @@ export default {
       clientKeyKeep: '空のままにすると、保存済みのクライアントキーが維持されます。',
       server: 'サーバー',
       serverHelp: 'このログインが使われるシークレットストアのアドレス。',
+      optionalHostHelp: '省略可。認証情報とともに host として playbook と式に渡されます。',
+      optionalPortHelp: '省略可。認証情報とともに port として playbook と式に渡されます。',
       noServer: '資格情報にサーバーがありません。資格情報のページで追加してください。',
       noneOfType: '種類 {type} の認証情報はまだありません',
       type_rte: 'RTE',

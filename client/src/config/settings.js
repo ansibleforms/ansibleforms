@@ -415,6 +415,11 @@ export const SERVER_CREDENTIAL_TYPES = [
   'rundeck',
   'jenkins',
 ];
+// the types that may carry a host and an optional port : those that connect there (ssh, a
+// database, a mail server, a directory) and those whose host and port are only handed to the
+// playbook and the expressions with the credential (a user and password, an api one)
+export const OPTIONAL_HOST_CREDENTIAL_TYPES = ['userpass', 'api'];
+export const HOST_CREDENTIAL_TYPES = ['ssh', 'database', 'smtp', 'ldap', ...OPTIONAL_HOST_CREDENTIAL_TYPES];
 // the types that log in with a token only : no user
 export const TOKEN_CREDENTIAL_TYPES = ['vault', 'rte', 'semaphore', 'rundeck'];
 // an example server of each : an awx one's with its API path (AAP 2.5+ behind its gateway)
@@ -1952,7 +1957,9 @@ export default function getSettings(t) {
           key: 'host',
           step: 'login',
           dependency: 'credential_type',
-          dependencyValues: ['ssh', 'database', 'smtp', 'ldap'],
+          // a user and password or an api one : optional, handed to the playbook and the
+          // expressions with the credential (issue #1326)
+          dependencyValues: HOST_CREDENTIAL_TYPES,
           label: t('settings.fields.host'),
           // an smtp one's host is its mail server, an ldap one's its directory's servers (one per
           // input, tried in order) : both need it
@@ -1960,7 +1967,9 @@ export default function getSettings(t) {
             ({ smtp: t('settings.mail.mailServer'), ldap: t('settings.ldap.servers') })[r.credential_type] || null,
           help: (r) =>
             ({ smtp: t('settings.mail.mailServerHelp'), ldap: t('settings.ldap.serversHelp') })[r.credential_type] ||
-            null,
+            (OPTIONAL_HOST_CREDENTIAL_TYPES.includes(r.credential_type)
+              ? t('settings.credentials.optionalHostHelp')
+              : null),
           placeholder: (r) => ({ smtp: 'smtp.example.com', ldap: 'dc1.corp.example' })[r.credential_type] || '',
           listWhen: (r) => r.credential_type === 'ldap',
           addLabel: t('settings.ldap.addServer'),
@@ -1977,10 +1986,15 @@ export default function getSettings(t) {
           key: 'port',
           step: 'login',
           dependency: 'credential_type',
-          dependencyValues: ['ssh', 'database', 'smtp', 'ldap'],
+          dependencyValues: HOST_CREDENTIAL_TYPES,
           label: t('settings.fields.port'),
           dialogLabel: (r) => (r.credential_type === 'smtp' ? t('settings.mail.mailPort') : null),
-          help: (r) => (r.credential_type === 'smtp' ? t('settings.mail.mailPortHelp') : null),
+          help: (r) =>
+            r.credential_type === 'smtp'
+              ? t('settings.mail.mailPortHelp')
+              : OPTIONAL_HOST_CREDENTIAL_TYPES.includes(r.credential_type)
+                ? t('settings.credentials.optionalPortHelp')
+                : null,
           noTable: true,
           type: 'number',
           sortable: true,

@@ -1896,6 +1896,8 @@ export default {
       clientKeyKeep: 'Left empty, the stored client key stays.',
       server: 'Server',
       serverHelp: 'The address of the secret store this login is for.',
+      optionalHostHelp: 'Optional. Passed with the credential to the playbook and to expressions, as host.',
+      optionalPortHelp: 'Optional. Passed with the credential to the playbook and to expressions, as port.',
       noServer: "Its credential has no server: add one on the credential's page.",
       noneOfType: 'No credentials of type {type} yet',
       type_rte: 'RTE',

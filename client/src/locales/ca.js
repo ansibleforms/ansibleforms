@@ -1770,6 +1770,8 @@ export default {
       clientKeyKeep: 'Si es deixa buida, es conserva la clau de client desada.',
       server: 'Servidor',
       serverHelp: "L'adreça del magatzem de secrets per al qual serveix aquest accés.",
+      optionalHostHelp: 'Opcional. Es passa amb les credencials al playbook i a les expressions, com a host.',
+      optionalPortHelp: 'Opcional. Es passa amb les credencials al playbook i a les expressions, com a port.',
       noServer: 'La seva credencial no té servidor: afegiu-ne un a la pàgina de la credencial.',
       noneOfType: 'Encara no hi ha credencials de tipus {type}',
       type_rte: 'RTE',
