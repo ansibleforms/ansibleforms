@@ -1681,6 +1681,34 @@ async function getJob(id, final, seq = pollSeq) {
 }
 
 // execute the form
+/**
+ * What a refused launch says : the server's message, and for form data it found incomplete the
+ * fields still missing and those still loading, by their labels (the server names them by name).
+ *
+ * Args:
+ *   err (Error): the axios error of the launch.
+ *
+ * Returns:
+ *   string: the message for the toast.
+ */
+function launchErrorText(err) {
+  const details = err.response?.data?.details;
+  const missing = Array.isArray(details?.missing) ? details.missing : [];
+  const waiting = Array.isArray(details?.waiting) ? details.waiting : [];
+  // any other answer : the shared reading, its details written out
+  if (!missing.length && !waiting.length) return Helpers.parseAxiosResponseError(err, t('form.launchFailed'));
+  // a field's label as the form shows it ; one built from placeholders, or none, by its name
+  const fields = currentForm.value?.fields || [];
+  const labelOf = (name) => {
+    const label = fields.find((f) => f?.name === name)?.label;
+    return typeof label === 'string' && label.trim() && !label.includes('$(') ? label : name;
+  };
+  const parts = [err.response?.data?.error || t('form.launchFailed')];
+  if (missing.length) parts.push(t('form.launchMissing', { fields: missing.map(labelOf).join(', ') }));
+  if (waiting.length) parts.push(t('form.launchWaiting', { fields: waiting.map(labelOf).join(', ') }));
+  return parts.join('. ');
+}
+
 async function launchForm(postdata) {
   // a preview (the designer's) runs nothing, stores nothing, schedules nothing
   if (isPreview.value) {
@@ -1710,7 +1738,7 @@ async function launchForm(postdata) {
   } catch (err) {
     if (seq !== pollSeq) return;
     status.value = 'failed';
-    toast.error(Helpers.parseAxiosResponseError(err, 'Failed to invoke job launch'));
+    toast.error(launchErrorText(err));
     if (err.response?.status != 401) {
       resetResult();
     }
