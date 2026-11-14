@@ -9,8 +9,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import https from "https";
-import { execFileSync } from "child_process";
 import { createHash } from "crypto";
+import { makeCertificate, CERTIFICATE_TIMEOUT_MS } from "./helpers/certificates.mjs";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
 process.env.DB_HOST ||= "127.0.0.1";
@@ -86,26 +86,23 @@ let keyA;
 let certB;
 
 /**
- * A self-signed certificate and its key, made with openssl.
- *
- * Args:
- *   name (string): the file names' prefix.
+ * A self-signed certificate and its key for rte.example, made with openssl.
  *
  * Returns:
  *   object: { cert, key } (PEM).
  */
-function makeCert(name) {
-  const key = path.join(dir, `${name}.key`);
-  const cert = path.join(dir, `${name}.pem`);
-  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=rte.example", "-addext", "subjectAltName=DNS:rte.example"], { stdio: "ignore" });
-  return { cert: fs.readFileSync(cert, "utf8"), key: fs.readFileSync(key, "utf8") };
+function makeCert() {
+  // valid from a day ago (tests/helpers/certificates.mjs) : never "not yet valid" on a clock
+  // stepped back
+  const { cert, key } = makeCertificate({ cn: "rte.example", san: "DNS:rte.example" });
+  return { cert, key };
 }
 
 beforeAll(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-rte-tls-"));
-  ({ cert: certA, key: keyA } = makeCert("a"));
-  ({ cert: certB } = makeCert("b"));
-});
+  ({ cert: certA, key: keyA } = makeCert());
+  ({ cert: certB } = makeCert());
+}, CERTIFICATE_TIMEOUT_MS);
 
 afterAll(() => {
   fs.rmSync(dir, { recursive: true, force: true });
@@ -357,18 +354,10 @@ describe("the app dialing a pinned RTE", () => {
   test("the pin adds to the usual authorities : a chain to them still passes, its name checked", async () => {
     // a private authority stands in for a public one (a proxy re-encrypting in front of the RTE) :
     // its leaf, made for 127.0.0.1, chains to it ; certA stays the pinned certificate
-    const caKey = path.join(dir, "ca.key");
-    const caPem = path.join(dir, "ca.pem");
-    execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", caKey, "-out", caPem, "-days", "2", "-subj", "/CN=test-ca"], { stdio: "ignore" });
-    const leafKey = path.join(dir, "leaf.key");
-    const leafCsr = path.join(dir, "leaf.csr");
-    const leafPem = path.join(dir, "leaf.pem");
-    const ext = path.join(dir, "leaf.ext");
-    fs.writeFileSync(ext, "subjectAltName=IP:127.0.0.1\n");
-    execFileSync("openssl", ["req", "-newkey", "rsa:2048", "-nodes", "-keyout", leafKey, "-out", leafCsr, "-subj", "/CN=proxy"], { stdio: "ignore" });
-    execFileSync("openssl", ["x509", "-req", "-in", leafCsr, "-CA", caPem, "-CAkey", caKey, "-CAcreateserial", "-out", leafPem, "-days", "2", "-extfile", ext], { stdio: "ignore" });
-    const ca = fs.readFileSync(caPem, "utf8");
-    const { server, port } = await tlsServer(fs.readFileSync(leafPem, "utf8"), fs.readFileSync(leafKey, "utf8"));
+    const authority = makeCertificate({ cn: "test-ca", isCa: true });
+    const leaf = makeCertificate({ cn: "proxy", san: "IP:127.0.0.1", ca: authority });
+    const ca = authority.cert;
+    const { server, port } = await tlsServer(leaf.cert, leaf.key);
     try {
       assert.equal(await get(port, getHttpsAgent({ ca_bundle: `${certA}\n${ca}` }, { pin: true })), "ok", "a chain and the right name");
       await assert.rejects(get(port, getHttpsAgent({ ca_bundle: certA }, { pin: true })), "no chain to a trusted authority, not pinned");
@@ -380,7 +369,9 @@ describe("the app dialing a pinned RTE", () => {
     const agent = getHttpsAgent({ ca_bundle: certA }, { pin: true });
     assert.ok(agent.options.ca.includes(tls.rootCertificates[0]), "the public roots stay trusted");
     assert.ok(agent.options.ca.includes(certA), "and the bundle");
-  });
+    // an authority and a leaf made with openssl in the test : longer than the usual 5 seconds on a
+    // loaded machine
+  }, CERTIFICATE_TIMEOUT_MS);
 
   test("the socket to an inbound runner is dialed pinned to its credential's certificate", async () => {
     const { WebSocketServer } = await import("ws");

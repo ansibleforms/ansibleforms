@@ -9,8 +9,8 @@ import https from "https";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { execFileSync } from "child_process";
 import WebSocket from "ws";
+import { makeCertificate, CERTIFICATE_TIMEOUT_MS } from "./helpers/certificates.mjs";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
 
@@ -110,10 +110,9 @@ describe("what a failed dial says", () => {
     // a self-signed certificate, checked
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-dial-"));
     try {
-      const key = path.join(dir, "key.pem");
-      const cert = path.join(dir, "cert.pem");
-      execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=app.example", "-addext", "subjectAltName=DNS:app.example"], { stdio: "ignore" });
-      const tlsServer = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) });
+      // valid from a day ago (tests/helpers/certificates.mjs) : refused for being self-signed only
+      const { cert, key } = makeCertificate({ cn: "app.example", san: "DNS:app.example" });
+      const tlsServer = https.createServer({ key, cert });
       await new Promise((r) => tlsServer.listen(0, "127.0.0.1", r));
       try {
         const url = `wss://127.0.0.1:${tlsServer.address().port}/api/v2/rte/socket`;
@@ -141,7 +140,9 @@ describe("what a failed dial says", () => {
     } finally {
       plain.close();
     }
-  });
+    // a certificate made with openssl in the test : longer than the usual 5 seconds on a loaded
+    // machine
+  }, CERTIFICATE_TIMEOUT_MS);
 });
 
 describe("how often the log says it", () => {
