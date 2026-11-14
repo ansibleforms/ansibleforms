@@ -287,23 +287,29 @@ async function mounts(store) {
 
 /**
  * A path as it is written below a mount, without KV v2's data/ : what a write prefix is compared
- * with (secret/ansibleforms/db, whatever the KV version).
+ * with (secret/ansibleforms/db). Only a KV v2 store has a data/ (or metadata/) API segment after
+ * its mount : on a KV v1 store a folder named data is a real folder, kept as written.
  *
  * Args:
  *   rawPath (string): the path (secret/foo, foo - the default mount's -, secret/data/foo).
  *   defaultMount (string): the store's default mount.
  *   bareIsMount (boolean): a path of one segment is a mount (a write prefix : secret, the whole
  *       mount), not a secret of the default mount.
+ *   version (number): the store's KV version (1, or 2 the default) : only 2 drops data/ and
+ *       metadata/.
  *
  * Returns:
- *   string: mount/path, without data/ or metadata/ and without a slash at either end.
+ *   string: mount/path, without a slash at either end, and on KV v2 without data/ or metadata/.
  */
-export function logicalPath(rawPath, defaultMount, bareIsMount = false) {
+export function logicalPath(rawPath, defaultMount, bareIsMount = false, version = 2) {
+  // 1. trim the path and its slashes : nothing left is no path
   let p = stripTrailingSlashes(stripLeadingSlashes(String(rawPath ?? "").trim()));
   if (!p) return "";
+  // 2. a bare name is a secret of the default mount (unless it is a mount itself)
   if (!p.includes("/") && !bareIsMount) p = `${defaultMount || "secret"}/${p}`;
+  // 3. KV v2 only : drop the API segment after the mount (KV v1 has none, data is a folder)
   const [mount, ...rest] = p.split("/");
-  if (rest[0] === "data" || rest[0] === "metadata") rest.shift();
+  if (version === 2 && (rest[0] === "data" || rest[0] === "metadata")) rest.shift();
   return [mount, ...rest].join("/");
 }
 
@@ -311,16 +317,18 @@ export function logicalPath(rawPath, defaultMount, bareIsMount = false) {
  * Whether a path is one the store may be written at : its write prefix, or below it.
  *
  * Args:
- *   store (object): the secret store (write_prefix, default_mount).
+ *   store (object): the secret store (write_prefix, default_mount, kv_version).
  *   ref (string): the path.
  *
  * Returns:
  *   boolean: true when the path is the prefix or below it ; false without a prefix.
  */
 export function withinWritePrefix(store, ref) {
-  // a prefix of one segment is a whole mount (secret), never secret/secret
-  const prefix = logicalPath(store?.write_prefix, store?.default_mount, true);
-  const path = logicalPath(ref, store?.default_mount);
+  // a prefix of one segment is a whole mount (secret), never secret/secret ; both sides are read
+  // with the store's KV version, so a KV v1 folder named data stays a folder on each side
+  const version = kvVersion(store || {});
+  const prefix = logicalPath(store?.write_prefix, store?.default_mount, true, version);
+  const path = logicalPath(ref, store?.default_mount, false, version);
   if (!prefix || !path) return false;
   return path === prefix || path.startsWith(`${prefix}/`);
 }

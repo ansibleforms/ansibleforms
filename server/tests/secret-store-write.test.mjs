@@ -130,6 +130,23 @@ describe("the write prefix", () => {
     assert.equal(withinWritePrefix({ write_prefix: "kv", default_mount: "secret" }, "secret/db"), false);
   });
 
+  test("a KV v1 folder named data is a folder, on both sides of the comparison", () => {
+    assert.equal(logicalPath("secret/data/team/db", "secret", false, 1), "secret/data/team/db");
+    assert.equal(logicalPath("secret/metadata/team", "secret", true, 1), "secret/metadata/team");
+    assert.equal(logicalPath("secret/data/team/db", "secret", false, 2), "secret/team/db");
+    const v1 = { write_prefix: "secret/data/team", default_mount: "secret", kv_version: 1 };
+    // the folder data/team and below it
+    assert.equal(withinWritePrefix(v1, "secret/data/team/prod-db"), true);
+    assert.equal(withinWritePrefix(v1, "secret/data/team"), true);
+    // secret/team is another folder on KV v1 : outside the prefix, whichever side has data/
+    assert.equal(withinWritePrefix(v1, "secret/team/prod-db"), false);
+    assert.equal(withinWritePrefix({ ...v1, write_prefix: "secret/team" }, "secret/data/team/prod-db"), false);
+    // the same prefix on KV v2 : data/ is the API segment, secret/team/prod-db is inside it
+    const v2 = { ...v1, kv_version: 2 };
+    assert.equal(withinWritePrefix(v2, "secret/team/prod-db"), true);
+    assert.equal(withinWritePrefix(v2, "secret/data/team/prod-db"), true);
+  });
+
   test("refused without writing on, without a prefix, or outside it - Vault never asked", async () => {
     storeRows.vault = vaultRow({ write_enabled: 0 });
     await assert.rejects(Registry.writeSecret("vault", "secret/ansibleforms/db", LOGIN), /does not allow writing/);
@@ -138,6 +155,14 @@ describe("the write prefix", () => {
     storeRows.vault = vaultRow();
     await assert.rejects(Registry.writeSecret("vault", "secret/teams/db", LOGIN), /outside what secret store 'vault' may write to/);
     assert.equal(writes.length, 0);
+  });
+
+  test("KV v1 with a prefix in a folder named data : only that folder is written", async () => {
+    storeRows.vault = vaultRow({ kv_version: 1, write_prefix: "secret/data/team" });
+    await assert.rejects(Registry.writeSecret("vault", "secret/team/prod-db", LOGIN), /outside what secret store 'vault' may write to/);
+    assert.equal(writes.length, 0);
+    await Registry.writeSecret("vault", "secret/data/team/prod-db", LOGIN);
+    assert.deepEqual(writes, [{ path: "secret/data/team/prod-db", body: LOGIN }]);
   });
 });
 
