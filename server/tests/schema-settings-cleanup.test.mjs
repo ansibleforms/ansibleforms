@@ -5,6 +5,9 @@
 // second time. The database is a small model of the settings table and the two tables the mail
 // moves into : every statement the patches send is answered from it.
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 process.env.LOG_PATH = process.env.LOG_PATH || "/tmp/ansibleforms-test-logs";
 process.env.DB_HOST ||= "127.0.0.1";
@@ -93,6 +96,9 @@ function answer(sql, args = []) {
     return { affectedRows: 1 };
   }
   if (/^SELECT \* FROM AnsibleForms\.`settings`/.test(sql)) return db.row ? [{ ...db.row }] : [];
+  if (/^SELECT config_yaml, forms_yaml FROM AnsibleForms\.`settings`/.test(sql)) {
+    return db.row ? [{ config_yaml: db.row.config_yaml ?? null, forms_yaml: db.row.forms_yaml ?? null }] : [];
+  }
   if (/^UPDATE AnsibleForms\.`settings` SET mail_server = ''/.test(sql)) {
     Object.assign(db.row, { mail_server: "", mail_username: "", mail_password: "" });
     return { affectedRows: 1 };
@@ -180,6 +186,8 @@ vi.mock("../src/models/db.model.js", () => {
 });
 
 const { renameFormsYamlToConfigYaml, dropSettingsMailColumns, patchVersion5, patchVersion7, SCHEMA_MANIFEST } = await import("../src/models/schema.model.js");
+const appConfig = (await import("./__mocks__/app.config.js")).default;
+const logger = (await import("./__mocks__/logger.js")).default;
 
 // the settings columns of 7.5, and its mail columns
 const MAIL = ["mail_server", "mail_port", "mail_secure", "mail_username", "mail_password", "mail_from"];
@@ -226,6 +234,52 @@ describe("forms_yaml is renamed config_yaml, its config kept", () => {
     const drop = statements.findIndex((s) => /DROP COLUMN/.test(s.sql));
     expect(copy).toBeGreaterThan(-1);
     expect(copy).toBeLessThan(drop);
+  });
+
+  test("both columns, each with its own config (saves of an older release since) : config_yaml kept, forms_yaml's a restore point, a warning naming it", async () => {
+    // the backups folder of the restore points (Form.backup) : a fresh one
+    const backups = fs.mkdtempSync(path.join(os.tmpdir(), "af-forms-yaml-"));
+    Object.assign(appConfig, { formsBackupPath: backups, configPath: "/app/persistent/config.yaml" });
+    const OLDER = "categories: []\nconstants:\n  greeting: saved on 7.5\n";
+    setDb({ columns: ["url", "config_yaml", "forms_yaml"], row: { config_yaml: CONFIG, forms_yaml: OLDER } });
+    const warning = vi.spyOn(logger, "warning");
+    try {
+      await renameFormsYamlToConfigYaml();
+      expect(db.row.config_yaml).toBe(CONFIG);
+      expect(db.columns.has("forms_yaml")).toBe(false);
+      // a database restore point, as Settings.importConfig writes them : listed on the backups
+      // page and restored into the database
+      const files = fs.readdirSync(backups);
+      expect(files).toHaveLength(1);
+      expect(files[0]).toMatch(/^config\.database\.yaml\.bak\.[0-9]{17}$/);
+      expect(fs.readFileSync(path.join(backups, files[0]), "utf8")).toBe(OLDER);
+      expect(warning.mock.calls.some(([m]) => String(m).includes(files[0]))).toBe(true);
+    } finally {
+      warning.mockRestore();
+      fs.rmSync(backups, { recursive: true, force: true });
+    }
+  });
+
+  test("both columns, the restore point cannot be written : forms_yaml is kept, the next start tries again", async () => {
+    // a backups path that is a file : no folder can be made under it
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "af-forms-yaml-")), "not-a-folder");
+    fs.writeFileSync(file, "");
+    Object.assign(appConfig, { formsBackupPath: file, configPath: "/app/persistent/config.yaml" });
+    setDb({ columns: ["url", "config_yaml", "forms_yaml"], row: { config_yaml: CONFIG, forms_yaml: "older" } });
+    await expect(renameFormsYamlToConfigYaml()).rejects.toThrow();
+    expect(db.columns.has("forms_yaml")).toBe(true);
+    expect(db.row.forms_yaml).toBe("older");
+    fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  });
+
+  test("both columns, the same config in each : no restore point, forms_yaml dropped", async () => {
+    const backups = fs.mkdtempSync(path.join(os.tmpdir(), "af-forms-yaml-"));
+    Object.assign(appConfig, { formsBackupPath: backups, configPath: "/app/persistent/config.yaml" });
+    setDb({ columns: ["url", "config_yaml", "forms_yaml"], row: { config_yaml: CONFIG, forms_yaml: CONFIG } });
+    await renameFormsYamlToConfigYaml();
+    expect(fs.readdirSync(backups)).toEqual([]);
+    expect(db.columns.has("forms_yaml")).toBe(false);
+    fs.rmSync(backups, { recursive: true, force: true });
   });
 
   test("the 5 patch renames before it adds : config_yaml is never added empty beside forms_yaml", async () => {
