@@ -1,6 +1,7 @@
 // The secret store providers. A provider is { type, read(store, ref), check(store), mounts?(store) },
 // and a provider that can write a credential's secret to its store adds exists(store, ref),
-// write(store, ref, payload) and withinWritePrefix(store, ref) ;
+// write(store, ref, payload) and withinWritePrefix(store, ref), and may add
+// findAndWrite(store, ref, payload, { overwrite }) to check and write in one session ;
 // adding a backend is one file here and one entry in PROVIDERS (and in the client's list in
 // client/src/config/settings.js).
 import vault from "./vault.js";
@@ -107,17 +108,36 @@ export async function writeSecret(storeName, ref, payload, opts = {}) {
     // a Vault's prefix is a path, a CyberArk's the safes it may write to
     throw new Errors.BadRequestError(`${path} is outside what secret store '${store.name}' may write to (${store.write_prefix})`);
   }
-  // step 2 : a secret there is replaced only when asked
-  const replaced = await provider.exists(store, path);
-  if (replaced && !opts.overwrite) {
-    const err = new Errors.ConflictError(`Secret store '${store.name}' has a secret at ${path} already: tick Overwrite to replace it`);
-    err.code = "secretExists";
-    throw err;
+  // step 2 : a store that checks and writes in one session (CyberArk : one PVWA logon) does both
+  if (provider.findAndWrite) {
+    const done = await provider.findAndWrite(store, path, payload, { overwrite: !!opts.overwrite });
+    if (!done.written) throw secretExistsError(store, path);
+    clearSecretCache();
+    return { store: store.name, ref: path, replaced: done.replaced };
   }
-  // step 3 : written, and no stale copy served afterwards
+  // step 3 : otherwise (Vault), a secret there is replaced only when asked
+  const replaced = await provider.exists(store, path);
+  if (replaced && !opts.overwrite) throw secretExistsError(store, path);
+  // step 4 : written, and no stale copy served afterwards
   await provider.write(store, path, payload);
   clearSecretCache();
   return { store: store.name, ref: path, replaced };
+}
+
+/**
+ * The refusal of a write over a secret already there, without overwrite.
+ *
+ * Args:
+ *   store (object): the secret store.
+ *   path (string): where the secret is.
+ *
+ * Returns:
+ *   Errors.ConflictError: status 409, code secretExists.
+ */
+function secretExistsError(store, path) {
+  const err = new Errors.ConflictError(`Secret store '${store.name}' has a secret at ${path} already: tick Overwrite to replace it`);
+  err.code = "secretExists";
+  return err;
 }
 
 /**
