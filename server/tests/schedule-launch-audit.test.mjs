@@ -80,4 +80,44 @@ describe("a scheduled launch in the audit log", () => {
     assert.equal(audited[0].outcome, "failure");
     assert.equal(audited[0].detail.error, "no job was created");
   });
+
+  test("a planned job that failed : by the user who planned it, not the schedule service", async () => {
+    row.owner = JSON.stringify({ username: "jdoe", type: "ldap", roles: ["public"], groups: [] });
+    launchImpl = async () => { throw new Error("form 'myform' not found"); };
+    await Schedule.launch(7);
+    const [e] = audited;
+    assert.equal(e.outcome, "failure");
+    assert.equal(e.user.username, "jdoe");
+    assert.equal(e.user.type, "ldap");
+    assert.equal(e.detail.planned, true);
+  });
+
+  test("a planned job that failed before its owner was read : still by its owner", async () => {
+    row.owner = JSON.stringify({ username: "jdoe", type: "ldap", roles: ["public"], groups: [] });
+    row.extra_vars = "- not a dictionary";
+    await Schedule.launch(7);
+    assert.equal(audited[0].user.username, "jdoe");
+    assert.equal(audited[0].outcome, "failure");
+  });
+
+  test("a planned job whose owner cannot be read : by the schedule service", async () => {
+    row.owner = "{not json";
+    await Schedule.launch(7);
+    assert.equal(audited[0].user.username, "Schedule Service");
+    assert.equal(audited[0].outcome, "failure");
+  });
+
+  test("a planned job its owner may no longer launch : denied, by its owner", async () => {
+    row.owner = JSON.stringify({ username: "jdoe", type: "ldap", roles: ["public"], groups: [] });
+    launchImpl = async () => {
+      const err = new Error("You do not have access to form 'myform'");
+      err.name = "AccessDeniedError";
+      throw err;
+    };
+    await Schedule.launch(7);
+    const [e] = audited;
+    assert.equal(e.outcome, "denied");
+    assert.equal(e.user.username, "jdoe");
+    assert.match(e.detail.error, /no(t)? .*access/i);
+  });
 });

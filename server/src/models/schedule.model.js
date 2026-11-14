@@ -44,6 +44,41 @@ function withNextRun(row) {
   return { ...row, next_run: next ? next.toISOString() : null };
 }
 
+/**
+ * The user a planned job was planned by (Schedule.plan), as its owner column records it, for the
+ * audit entry of a launch that failed : the failure is theirs, not the Schedule Service's.
+ *
+ * Args:
+ *   schedule (object): the schedule row (owner : the user, as JSON ; empty for a schedule).
+ *
+ * Returns:
+ *   object|null: the owner ; null for a schedule, or an owner that cannot be read.
+ */
+function plannedOwnerOf(schedule) {
+  if (!schedule?.owner) return null;
+  try {
+    const owner = JSON.parse(schedule.owner);
+    return owner && typeof owner === 'object' && owner.username ? owner : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a launch failed because it was refused (an AccessDeniedError from Job.launch : the
+ * owner's roles no longer allow the form), as the MCP entries tell a refusal (mcp/tools.js
+ * isRefusal), so the audit log says denied, not failure.
+ *
+ * Args:
+ *   err (Error): what the launch threw.
+ *
+ * Returns:
+ *   boolean: true for a refusal.
+ */
+function isLaunchRefusal(err) {
+  return err?.name === 'AccessDeniedError' || err?.name === 'ForbiddenError';
+}
+
 
 /**
  * Writes a scheduled launch to the audit log. No request launches it, so the audit middleware
@@ -53,9 +88,9 @@ function withNextRun(row) {
  *   schedule (object): the schedule row (id, name, owner).
  *   form (string): the form it launches.
  *   user (object|null): the user it ran as (a planned job's owner, or the schedule service) ;
- *       null when the launch failed before it was known.
+ *       null for the schedule service (a schedule, or an owner that cannot be read).
  *   planned (boolean): whether it is a job planned by a user (Schedule.plan).
- *   outcome (string): success or failure.
+ *   outcome (string): success, failure, or denied (the launch was refused).
  *   jobId (number|undefined): the job it started.
  *   error (string|undefined): why it failed.
  *
@@ -372,7 +407,9 @@ class Schedule extends CrudModel {
       logger.error("Errors in schedule launch: ", err);
       output = "Failed to launch: " + err.message;
       status = "failed";
-      await auditScheduledLaunch(schedule, schedule.form, null, !!schedule.owner, 'failure', undefined, err.message || String(err));
+      // as the user it would have run as : a planned job's owner when it can be read (else the
+      // Schedule Service) ; denied when the launch was refused, failure for anything else
+      await auditScheduledLaunch(schedule, schedule.form, plannedOwnerOf(schedule), !!schedule.owner, isLaunchRefusal(err) ? 'denied' : 'failure', undefined, err.message || String(err));
     }
     // A one-time schedule is deleted after its run, BEFORE anything sets it idle : idle, its
     // run_at passed and still enabled, it is exactly what the cron's every-minute check queues,
