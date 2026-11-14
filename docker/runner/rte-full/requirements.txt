@@ -3,7 +3,7 @@
 # `ansible` is the community package with its collections, at the version that requires
 # rte-core's ansible-core, so both images run the same engine. Dependabot proposes updates
 # (no majors : a new ansible major moves together with ansible-core in rte-core).
-ansible==14.5.0
+ansible==14.6.0
 beautifulsoup4==4.15.0
 boto3==1.43.127
 botocore==1.43.127
