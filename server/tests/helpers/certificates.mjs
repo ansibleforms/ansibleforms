@@ -72,6 +72,10 @@ function makeKey(file, keyType) {
  *       as `openssl req -x509` makes it, and one an authority signs is not.
  *     ca (object|undefined): the authority that signs it ({ certFile, keyFile } as this returns) ;
  *       self-signed when left out.
+ *     notBefore (Date|undefined): when it starts, a day ago by default (a later one makes a
+ *       certificate not valid yet).
+ *     notAfter (Date|undefined): when it ends, three days from now by default (an earlier one
+ *       makes an expired certificate).
  *
  * Returns:
  *   object: { cert, key, certFile, keyFile } : the PEM texts and where they were written.
@@ -79,7 +83,7 @@ function makeKey(file, keyType) {
  * Raises:
  *   Error: openssl is missing or refused.
  */
-export function makeCertificate({ cn, san, keyType = "ec", ca, isCa = !ca } = {}) {
+export function makeCertificate({ cn, san, keyType = "ec", ca, isCa = !ca, notBefore, notAfter } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "af-test-cert-"));
   const keyFile = path.join(dir, "key.pem");
   const csrFile = path.join(dir, "req.csr");
@@ -117,13 +121,15 @@ export function makeCertificate({ cn, san, keyType = "ec", ca, isCa = !ca } = {}
       "",
     ].join("\n"),
   );
-  // Step 3 : signed from a day ago, by its own key or by the authority's
+  // Step 3 : signed from a day ago (or the start asked for), by its own key or by the authority's
   const now = Date.now();
+  const start = notBefore || new Date(now - START_BEFORE_MS);
+  const end = notAfter || new Date(now + END_AFTER_MS);
   const signer = ca ? ["-cert", ca.certFile, "-keyfile", ca.keyFile] : ["-selfsign", "-keyfile", keyFile];
   openssl([
     "ca", "-batch", "-notext", "-config", configFile, "-extensions", "ext",
-    "-startdate", opensslTime(new Date(now - START_BEFORE_MS)),
-    "-enddate", opensslTime(new Date(now + END_AFTER_MS)),
+    "-startdate", opensslTime(start),
+    "-enddate", opensslTime(end),
     ...signer, "-in", csrFile, "-out", certFile,
   ]);
   return { cert: fs.readFileSync(certFile, "utf8"), key: fs.readFileSync(keyFile, "utf8"), certFile, keyFile };

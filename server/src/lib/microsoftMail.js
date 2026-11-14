@@ -166,6 +166,39 @@ export function tokenCacheSize() {
 // ─── certificate ──────────────────────────────────────────────────────────────
 
 /**
+ * What keeps a certificate or its private key from signing in to Microsoft Entra ID, beyond
+ * reading and going together : the key must be an RSA one (the client assertion is signed RS256),
+ * and the certificate must be inside its validity dates. One rule for the sender (readCertificate)
+ * and for the credential's save (models/credential.model.v2.js checkEntraCertificate), so a
+ * certificate that cannot send is refused when it is saved. Either half may be left out : only
+ * the half given is checked. The reason never holds the key.
+ *
+ * Args:
+ *   cert (X509Certificate|null): the certificate, or null to check the key only.
+ *   key (KeyObject|null): its private key, or null to check the certificate only.
+ *   now (number): the time, in milliseconds (Date.now()).
+ *
+ * Returns:
+ *   object|null: { part : "key" or "certificate", reason : the words that follow "The private
+ *     key of ..." or "The certificate of ..." }, or null when nothing is in the way.
+ */
+export function certificateProblem(cert, key, now = Date.now()) {
+  // step 1 : an RSA key, the only kind the RS256 client assertion is signed with
+  if (key && key.asymmetricKeyType !== "rsa") {
+    return { part: "key", reason: "is not an RSA key: Microsoft Entra ID signs in with an RSA certificate" };
+  }
+  // step 2 : a certificate that has not expired
+  if (cert && Date.parse(cert.validTo) < now) {
+    return { part: "certificate", reason: `expired on ${cert.validTo}: upload a new one to the app registration and to the credential` };
+  }
+  // step 3 : a certificate already valid
+  if (cert && Date.parse(cert.validFrom) > now) {
+    return { part: "certificate", reason: `is not valid before ${cert.validFrom}` };
+  }
+  return null;
+}
+
+/**
  * Reads a credential's certificate and private key, and checks that they go together and that the
  * certificate has not expired. The messages never hold the key.
  *
@@ -195,17 +228,18 @@ export function readCertificate(certPem, keyPem, name, now = Date.now()) {
   } catch {
     throw new Error(`The private key of the credential '${name}' does not read as a PEM private key without a passphrase (-----BEGIN PRIVATE KEY-----)`);
   }
-  if (key.asymmetricKeyType !== "rsa") {
-    throw new Error(`The private key of the credential '${name}' is not an RSA key: Microsoft Entra ID signs in with an RSA certificate`);
+  // the key's kind first, then the pair, then the certificate's dates (certificateProblem's rules,
+  // the ones a credential's save checks too)
+  const keyProblem = certificateProblem(null, key, now);
+  if (keyProblem) {
+    throw new Error(`The private key of the credential '${name}' ${keyProblem.reason}`);
   }
   if (!cert.checkPrivateKey(key)) {
     throw new Error(`The private key of the credential '${name}' does not belong to its certificate`);
   }
-  if (Date.parse(cert.validTo) < now) {
-    throw new Error(`The certificate of the credential '${name}' expired on ${cert.validTo}: upload a new one to the app registration and to the credential`);
-  }
-  if (Date.parse(cert.validFrom) > now) {
-    throw new Error(`The certificate of the credential '${name}' is not valid before ${cert.validFrom}`);
+  const certProblem = certificateProblem(cert, null, now);
+  if (certProblem) {
+    throw new Error(`The certificate of the credential '${name}' ${certProblem.reason}`);
   }
   return { cert, key };
 }
