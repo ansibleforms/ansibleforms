@@ -868,6 +868,23 @@ describe("the MCP audit entries", () => {
     expect(audit.mock.calls[1][0].outcome).toBe("failure");
   });
 
+  test("a refusal of the models (AccessDeniedError, no tool code) is denied, as describeError maps it", async () => {
+    const { default: Errors } = await import("../src/lib/errors.js");
+    const audit = vi.fn();
+    const h = createHandlers({ user, deps, policy: { audit } });
+    // a form outside the user's roles : Form.load refuses by the error's name
+    await expect(h.launchJob({ form: "Admin only", values: {} })).rejects.toBeTruthy();
+    expect(audit.mock.calls[0][0]).toMatchObject({ action: "mcp.job.launch", outcome: "denied" });
+    // Job.launch refusing with the model error class itself
+    deps.Job.launch = vi.fn(async () => { throw new Errors.AccessDeniedError("Not your form"); });
+    await expect(h.launchJob({ form: "Create volume", values: { cluster: "c1", name: "v1" } })).rejects.toBeInstanceOf(Errors.AccessDeniedError);
+    expect(audit.mock.calls[1][0]).toMatchObject({ action: "mcp.job.launch", outcome: "denied", detail: { error: "Not your form" } });
+    // any other model error stays a failure
+    deps.Job.launch = vi.fn(async () => { throw new Errors.ConflictError("Busy"); });
+    await expect(h.launchJob({ form: "Create volume", values: { cluster: "c1", name: "v1" } })).rejects.toBeTruthy();
+    expect(audit.mock.calls[2][0].outcome).toBe("failure");
+  });
+
   test("reading writes nothing, and without the hook (the chat assistant) nothing is wrapped", async () => {
     const audit = vi.fn();
     await createHandlers({ user, deps, policy: { audit } }).listForms();
