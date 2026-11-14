@@ -30,6 +30,9 @@ vi.mock("../src/models/settings.model.js", () => {
   return { default: Settings };
 });
 
+// no active mail channel : the masked password has nothing to stand for
+vi.mock("../src/models/notificationChannel.model.js", () => ({ default: { findActive: async () => null } }));
+
 const ldapController = (await import("../src/controllers/v2/ldap.controller.js")).default;
 const settingsController = (await import("../src/controllers/v2/settings.controller.js")).default;
 
@@ -68,8 +71,9 @@ describe("/ldap/check with the masked bind password", () => {
 describe("/settings/mailcheck with the masked mail password", () => {
   const masked = { ...storedSettings, mail_password: "**********", to: "a@b.c" };
 
-  // 7.6 : the settings hold no mail password any more, the mask stands for nothing
-  test("a masked password is refused, whatever server : there is no stored one", async () => {
+  // 7.6 : the settings hold no mail password any more, the mask stands for the active mail
+  // channel (tests/settings-old-mail-fields.test.mjs) ; without one it is refused
+  test("a masked password without an active mail channel is refused, whatever server", async () => {
     for (const body of [masked, { ...masked, mail_server: "evil.example.com" }]) {
       const res = await call(settingsController.mailcheck, { ...body });
       expect(res.statusCode).toBe(400);

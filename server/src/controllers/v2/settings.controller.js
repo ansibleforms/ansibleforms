@@ -66,27 +66,44 @@ const find = async function(req, res) {
 };
 
 /**
- * POST /api/v2/settings/mailcheck : sends a test mail with the mail server values of the body.
+ * POST /api/v2/settings/mailcheck : sends a test mail (deprecated since 7.6, removed in 8 : a
+ * mail channel is tested with its own Test button, POST /api/v2/notificationchannel/{id}/test).
  *
- * Since 7.6 the settings row holds no mail settings (the mail goes through the mail channels of
- * Connections > Notifications, whose own check tests a stored channel), so there is no stored
- * password either : the masked password is refused, the password has to be typed.
+ * Since 7.6 the settings row holds no mail settings : the mail goes through the mail channels of
+ * Connections > Notifications. A client of before still sends the stored values it read, with
+ * the password masked (or no server at all) : that stood for "the mail settings the app sends
+ * with", which is the active mail channel now, so the test goes through it, with its own server
+ * and login, never one the request names. Typed server values are tested as they were sent.
+ * Without an active mail channel the answer says where to add one and test it.
  *
  * Args:
- *   req (object): the request ; its body mail_server, mail_port, mail_secure, mail_username,
- *     mail_password, mail_from, to, and optionally subject and body.
+ *   req (object): the request ; its body to, optionally subject and body, and mail_server,
+ *     mail_port, mail_secure, mail_username, mail_password, mail_from.
  *   res (object): the response.
  *
  * Returns:
- *   Promise<void>: answers the message id, 400 for a masked password, 500 when sending fails.
+ *   Promise<void>: answers the message id, 400 for a masked password or no server without an
+ *     active mail channel, 500 when sending fails.
  */
 const mailcheck = async function(req, res) {
   try {
-    // step 1 : the masked password stood for the stored one, there is none any more
-    if (isMasked(req.body.mail_password)) {
-      return res.status(400).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), i18n.t(req, 'resources.storedPasswordOtherServer')));
+    // step 1 : the settings page sends no subject or body : the test mail is in the admin's language
+    const subject = req.body.subject || i18n.t(req, 'email.test.subject');
+    const body = req.body.body || i18n.t(req, 'email.test.body');
+    // step 2 : the masked password (or no server) stood for the stored mail settings : the
+    // active mail channel now
+    if (isMasked(req.body.mail_password) || !String(req.body.mail_server ?? '').trim()) {
+      warnMailSettingsOnce();
+      const { default: NotificationChannel } = await import('../../models/notificationChannel.model.js');
+      const active = await NotificationChannel.findActive();
+      if (!active) {
+        return res.status(400).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), i18n.t(req, 'resources.mailCheckNoChannel')));
+      }
+      const config = await NotificationChannel.toMailConfig(active);
+      const messageid = await Settings.maildo(config, req.body.to, subject, body);
+      return res.json(RestResult.single({ message: i18n.t(req, 'resources.mailSentWithChannel', { id: messageid, name: active.name }) }));
     }
-    // step 2 : the server values as they were sent, nothing else from the body
+    // step 3 : the server values as they were sent, nothing else from the body
     const config = {
       mail_server: req.body.mail_server,
       mail_port: req.body.mail_port,
@@ -95,15 +112,55 @@ const mailcheck = async function(req, res) {
       mail_password: req.body.mail_password,
       mail_from: req.body.mail_from,
     };
-    // step 3 : the settings page sends no subject or body : the test mail is in the admin's language
-    const subject = req.body.subject || i18n.t(req, 'email.test.subject');
-    const body = req.body.body || i18n.t(req, 'email.test.body');
     const messageid = await Settings.mailcheck(config, req.body.to, subject, body);
     res.json(RestResult.single({ message: i18n.t(req, 'resources.mailSent', { id: messageid }) }));
   } catch(err) {
     res.status(500).json(RestResult.error(i18n.t(req, 'resources.mailCheckFailed'), Helpers.getError(err)));
   }
 };
+
+// ------------------------------------------------------------------
+// the mail_* fields of before 7.6
+// ------------------------------------------------------------------
+
+// whether the deprecation warning was logged : once per process, not at every save
+let mailSettingsWarned = false;
+
+/**
+ * Logs, once per process, that a client still uses the mail settings of before 7.6 (the mail_*
+ * fields of PUT /api/v2/settings, or POST /api/v2/settings/mailcheck without its own server).
+ *
+ * Returns:
+ *   boolean: true when this call logged it, false when it was logged before.
+ */
+export function warnMailSettingsOnce() {
+  if (mailSettingsWarned) return false;
+  mailSettingsWarned = true;
+  logger.warning("The mail_* fields of /api/v2/settings and /api/v2/settings/mailcheck are deprecated since 7.6 and removed in 8: the mail goes through a mail channel (Connections > Notifications, /api/v2/notificationchannel)");
+  return true;
+}
+
+/**
+ * The body of a PUT /api/v2/settings without its mail_* fields : the settings row has no mail
+ * columns since 7.6, so they are ignored, before the section and seed checks and the empty
+ * record guard (a client of 7.5 that still sends them is neither refused for them nor told to
+ * provide fields).
+ *
+ * Args:
+ *   body (object): the request body.
+ *
+ * Returns:
+ *   object: { body, mailFields } : a copy without the mail_* fields, and their names.
+ */
+export function withoutMailFields(body) {
+  const rest = {};
+  const mailFields = [];
+  for (const [key, value] of Object.entries(body || {})) {
+    if (/^mail_/.test(key)) mailFields.push(key);
+    else rest[key] = value;
+  }
+  return { body: rest, mailFields };
+}
 
 // The only settings field the declarative config seed writes (see lib/seed.js
 // applySettings and the settingsSection in lib/seed-schema.js). Everything else on the
@@ -132,9 +189,19 @@ const update = async function(req, res) {
         res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
     }else{
         try {
+          // the mail_* fields of before 7.6 : ignored, a warning logged once ; a body of only
+          // them changes nothing and is told where the mail settings went
+          const { body, mailFields } = withoutMailFields(req.body);
+          if (mailFields.length) {
+            warnMailSettingsOnce();
+            if (Object.keys(body).length === 0) {
+              return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'),
+                `${i18n.t(req, 'resources.mailSettingsMoved')} (${mailFields.join(', ')})`));
+            }
+          }
           // a part of the settings on its own (lib/settingsSections.js) : only its fields change
           const writable = writableSettingsFields(req);
-          const outside = writable ? Object.keys(req.body).filter((key) => !writable.has(key)) : [];
+          const outside = writable ? Object.keys(body).filter((key) => !writable.has(key)) : [];
           if (outside.length) {
             return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'),
               `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`));
@@ -146,13 +213,13 @@ const update = async function(req, res) {
           // endpoint meant declaring `url` in a seed froze the theme picker, which
           // contradicts what the seed schema says it leaves alone.
           if (existingSettings?.managed) {
-            const blocked = seedManagedSettingChanges(req.body, existingSettings);
+            const blocked = seedManagedSettingChanges(body, existingSettings);
             if (blocked.length) {
               return res.status(403).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'),
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
           }
-          const record = new Settings(req.body);
+          const record = new Settings(body);
           // Guard against an effectively-empty record (no recognized fields),
           // which would produce invalid `UPDATE t set ?` SQL.
           if (Object.keys(record).length === 0) {

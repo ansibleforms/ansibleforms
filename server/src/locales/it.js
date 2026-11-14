@@ -213,6 +213,11 @@ export default {
     failedFindSettings: "Impossibile trovare le impostazioni",
     mailCheckFailed: "Verifica mail non riuscita",
     mailSent: "Mail inviata con id {id}",
+    mailSentWithChannel: "Mail inviata con id {id} tramite il canale mail {name}",
+    mailSettingsMoved:
+      "Le impostazioni della mail sono state spostate in Connessioni > Notifiche: ora il server di posta è in un canale mail, quindi i campi mail_* vengono ignorati e non è stato cambiato nulla",
+    mailCheckNoChannel:
+      "Non c'è nessun canale mail attivo: aggiungine uno in Connessioni > Notifiche e invia una mail di prova con il suo pulsante Prova",
     syslogSent: "Messaggio syslog inviato a {where}",
     syslogCheckFailed: "Invio del messaggio syslog non riuscito",
     failedUpdateSettings: "Impossibile aggiornare le impostazioni",

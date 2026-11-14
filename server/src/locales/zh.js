@@ -199,6 +199,11 @@ export default {
     failedFindSettings: "查找设置失败",
     mailCheckFailed: "邮件检查失败",
     mailSent: "邮件已发送，ID 为 {id}",
+    mailSentWithChannel: "已通过邮件通道 {name} 发送邮件，ID 为 {id}",
+    mailSettingsMoved:
+      "邮件设置已移至 连接 > 通知：邮件服务器现在由邮件通道保存，因此 mail_* 字段会被忽略，没有任何更改",
+    mailCheckNoChannel:
+      "没有已启用的邮件通道：请在 连接 > 通知 中添加一个，并用它的测试按钮发送测试邮件",
     syslogSent: "syslog 消息已发送到 {where}",
     syslogCheckFailed: "syslog 消息发送失败",
     failedUpdateSettings: "更新设置失败",

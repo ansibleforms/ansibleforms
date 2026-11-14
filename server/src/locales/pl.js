@@ -218,6 +218,11 @@ export default {
     failedFindSettings: "Nie udało się znaleźć ustawień",
     mailCheckFailed: "Sprawdzenie poczty nie powiodło się",
     mailSent: "Wysłano wiadomość o identyfikatorze {id}",
+    mailSentWithChannel: "Wysłano wiadomość o identyfikatorze {id} przez kanał pocztowy {name}",
+    mailSettingsMoved:
+      "Ustawienia poczty przeniesiono do Połączenia > Powiadomienia: serwer poczty jest teraz w kanale pocztowym, więc pola mail_* są pomijane i nic nie zmieniono",
+    mailCheckNoChannel:
+      "Nie ma aktywnego kanału pocztowego: dodaj go w Połączenia > Powiadomienia i wyślij wiadomość testową jego przyciskiem Testuj",
     syslogSent: "Wysłano komunikat syslog do {where}",
     syslogCheckFailed: "Wysłanie komunikatu syslog nie powiodło się",
     failedUpdateSettings: "Nie udało się zaktualizować ustawień",

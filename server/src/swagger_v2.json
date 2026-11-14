@@ -310,7 +310,7 @@
       "put": {
         "tags": ["settings"],
         "summary": "Update application settings",
-        "description": "Updates the settings row. Config CONTENT is deliberately not accepted here : it is written through PUT /settings/config, which validates it, honours the designer lock and the baseHash concurrency check, and writes a restore point. The mail_* fields of before 7.6 are ignored : the mail goes through the mail channels (/notificationchannel).",
+        "description": "Updates the settings row. Config CONTENT is deliberately not accepted here : it is written through PUT /settings/config, which validates it, honours the designer lock and the baseHash concurrency check, and writes a restore point. The mail_* fields of before 7.6 (deprecated, removed in 8) are ignored, with a warning in the log : the mail goes through the mail channels (/notificationchannel). They are never refused on their own account (a user limited to a settings section is not refused for them) ; a body of only mail_* fields changes nothing and answers 400 saying the mail settings moved to Connections > Notifications.",
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,
@@ -331,7 +331,8 @@
         },
         "responses": {
           "200": { "description": "Settings updated" },
-          "400": { "description": "Missing required fields" },
+          "400": { "description": "Missing required fields, or only mail_* fields (the mail settings moved to Connections > Notifications)" },
+          "403": { "description": "A field outside the caller's settings section (mail_* fields excepted), or one the config seed manages" },
           "500": { "description": "Failed to update settings" }
         }
       }
@@ -507,7 +508,8 @@
       "post": {
         "tags": ["settings"],
         "summary": "Test mail settings",
-        "description": "Sends a test email with the mail server values sent. Nothing is read from the settings, which hold no mail settings since 7.6 : a masked password is refused (400), type it. A stored mail channel is tested through its own check.",
+        "description": "Deprecated since 7.6, removed in 8 : test a mail channel with POST /notificationchannel/{id}/test. Sends a test email with the mail server values sent. The settings hold no mail settings since 7.6 : a masked password, or no mail_server, stands for the mail settings the app sends with, so the test goes through the active mail channel (its own server and login) ; without one it answers 400 saying to add one under Connections > Notifications.",
+        "deprecated": true,
         "security": [ { "bearerAuth": [] } ],
         "requestBody": {
           "required": true,
@@ -543,6 +545,7 @@
               }
             }
           },
+          "400": { "description": "A masked password or no mail_server, and no active mail channel" },
           "500": { "description": "Mail check failed" }
         }
       }

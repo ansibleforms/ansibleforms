@@ -218,6 +218,11 @@ export default {
     failedFindSettings: "No s'ha pogut trobar la configuració",
     mailCheckFailed: "La comprovació del correu ha fallat",
     mailSent: "Correu enviat amb l'id {id}",
+    mailSentWithChannel: "Correu enviat amb l'id {id} pel canal de correu {name}",
+    mailSettingsMoved:
+      "La configuració del correu s'ha mogut a Connexions > Notificacions: ara el servidor de correu és en un canal de correu, així que els camps mail_* s'ignoren i no s'ha canviat res",
+    mailCheckNoChannel:
+      "No hi ha cap canal de correu actiu: afegiu-ne un a Connexions > Notificacions i envieu un correu de prova amb el seu botó Prova",
     syslogSent: "Missatge de syslog enviat a {where}",
     syslogCheckFailed: "L'enviament del missatge de syslog ha fallat",
     failedUpdateSettings: "No s'ha pogut actualitzar la configuració",

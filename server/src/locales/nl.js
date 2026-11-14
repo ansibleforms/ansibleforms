@@ -216,6 +216,11 @@ export default {
     failedFindSettings: "Kan instellingen niet vinden",
     mailCheckFailed: "Mail controle mislukt",
     mailSent: "Mail verzonden met id {id}",
+    mailSentWithChannel: "Mail verzonden met id {id} via het mailkanaal {name}",
+    mailSettingsMoved:
+      "De mailinstellingen zijn verhuisd naar Verbindingen > Meldingen: de mailserver staat nu in een mailkanaal, dus de velden mail_* worden genegeerd en er is niets gewijzigd",
+    mailCheckNoChannel:
+      "Er is geen actief mailkanaal: voeg er een toe onder Verbindingen > Meldingen en verstuur een testmail met de knop Testen ervan",
     syslogSent: "Syslog-bericht verzonden naar {where}",
     syslogCheckFailed: "Syslog-bericht mislukt",
     failedUpdateSettings: "Kan instellingen niet bijwerken",

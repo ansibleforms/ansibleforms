@@ -222,6 +222,11 @@ export default {
     failedFindSettings: "Einstellungen konnten nicht gefunden werden",
     mailCheckFailed: "Mail-Pruefung fehlgeschlagen",
     mailSent: "Mail mit ID {id} gesendet",
+    mailSentWithChannel: "Mail mit ID {id} über den Mail-Kanal {name} gesendet",
+    mailSettingsMoved:
+      "Die Mail-Einstellungen sind nach Verbindungen > Benachrichtigungen umgezogen: Der Mailserver steht jetzt in einem Mail-Kanal, die Felder mail_* werden ignoriert und nichts wurde geändert",
+    mailCheckNoChannel:
+      "Es gibt keinen aktiven Mail-Kanal: Legen Sie unter Verbindungen > Benachrichtigungen einen an und senden Sie mit seiner Schaltfläche Testen eine Test-E-Mail",
     syslogSent: "Syslog-Nachricht an {where} gesendet",
     syslogCheckFailed: "Syslog-Nachricht fehlgeschlagen",
     failedUpdateSettings: "Einstellungen konnten nicht aktualisiert werden",

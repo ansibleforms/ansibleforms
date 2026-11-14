@@ -209,6 +209,11 @@ export default {
     failedFindSettings: "Failed to find settings",
     mailCheckFailed: "Mail check failed",
     mailSent: "Mail sent with id {id}",
+    mailSentWithChannel: "Mail sent with id {id} through the mail channel {name}",
+    mailSettingsMoved:
+      "The mail settings moved to Connections > Notifications: a mail channel holds the mail server now, so the mail_* fields are ignored and nothing was changed",
+    mailCheckNoChannel:
+      "There is no active mail channel: add one under Connections > Notifications and send a test mail with its Test button",
     syslogSent: "Syslog message sent to {where}",
     syslogCheckFailed: "Syslog message failed",
     failedUpdateSettings: "Failed to update settings",
