@@ -2905,6 +2905,9 @@
         short: Pass ansible_user and ansible_password to ansible playbook using stored credentials
         description: |
           Ansible allows to pass default ansible credentials in the form of 2 extravars ansible_user and ansible_password
+          **Note**: An SSH credential can carry a private key (PEM or OpenSSH) instead of, or next to, its password. The RTE writes the key to a private file for that job only and passes it as `ansible_ssh_private_key_file`, then removes it when the job ends. (Added in 7.6.0)
+          **Note**: A key with a passphrase is loaded into an `ssh-agent` started for that job only, and the playbook gets its socket as `SSH_AUTH_SOCK`. The RTE needs `ssh-agent` and `ssh-add` (the OpenSSH client, in the RTE images) ; without them the job fails, saying so.
+          **Note**: The key and its passphrase are never shown by the API and are masked in the job output. A form's `credentials` that names the SSH credential hands its key to the playbook as `private_key` (and `private_key_passphrase`).
       - name: playbookSubPath
         type: string
         with_types: ansible

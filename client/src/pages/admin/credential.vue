@@ -14,7 +14,8 @@
 /*                certificate and key ; an Entra ID one's tenant, */
 /*                its secret or a certificate and key, for mail)  */
 /*                ; the password masked : left empty kept, typed  */
-/*                replaced                                        */
+/*                replaced ; an SSH one's private key and its     */
+/*                passphrase, kept the same way                   */
 /*    Store       where the user and password are kept : the app's*/
 /*                database, or a secret store (not a CyberArk's)  */
 /*  Test connection (a database), Delete and Save top right. A    */
@@ -58,8 +59,9 @@ const credentialId = computed(() => String(route.params.id || ''));
 const credential = ref(null); // as saved
 const edit = ref(null); // as edited
 const secretStores = ref([]); // the stores a credential can read from
-// what this page edits : the password has its own dialog ; a CyberArk's client key is typed
-// on the Login tab, left empty to keep the stored one
+// what this page edits : the password has its own dialog ; a CyberArk's client key, and an SSH
+// one's private key and its passphrase, are typed on the Login tab, left empty to keep the stored
+// ones (or removed with remove_key)
 const EDITED = [
   'name',
   'description',
@@ -68,6 +70,8 @@ const EDITED = [
   'client_cert',
   'client_key',
   'entra_auth',
+  'key_passphrase',
+  'remove_key',
   'tenant_id',
   'issuer',
   'redirect_uri',
@@ -94,7 +98,8 @@ const DB_TYPES = [
 
 /**
  * The fields of a credential as this page edits them : its type (from is_database for an old
- * one), where its secret is kept, the client key always empty (the stored one is never sent).
+ * one), where its secret is kept, the client key (an SSH one's private key) and the key's
+ * passphrase always empty (the stored ones are never sent).
  *
  * Args:
  *   record (object): the credential.
@@ -116,6 +121,9 @@ function editable(record) {
     client_key: '',
     // an Entra ID one : its client secret, or the certificate it keeps (mail through Microsoft 365)
     entra_auth: record.client_cert ? 'certificate' : 'secret',
+    // an SSH one's passphrase, never sent back either ; the stored key and passphrase removed
+    key_passphrase: '',
+    remove_key: false,
     tenant_id: record.tenant_id ?? '',
     issuer: record.issuer ?? '',
     redirect_uri: record.redirect_uri ?? '',
@@ -187,6 +195,10 @@ const entraAuthOptions = computed(() =>
     hint: t(`settings.credentials.entraSignInHint_${value}`),
   })),
 );
+// an SSH one may log in with a private key (and its passphrase), kept in the app whatever reads
+// its user and password ; whether one is stored (the api sends it masked)
+const isSsh = computed(() => type.value === 'ssh');
+const keyStored = computed(() => !!credential.value?.client_key);
 const isDatabase = computed(() => type.value === 'database');
 // a secret store's login never comes from a secret store (it would read a store to find it)
 const noStore = computed(() => ['cyberark', 'vault'].includes(type.value));
@@ -472,6 +484,17 @@ async function save() {
     data.client_cert = '';
     data.client_key = null;
   }
+  // an SSH one's private key and its passphrase : left empty, the stored ones stay ; removed,
+  // both go
+  if (isSsh.value) {
+    if (e.remove_key) {
+      data.client_key = null;
+      data.key_passphrase = null;
+    } else {
+      if (e.client_key.trim()) data.client_key = e.client_key;
+      if (e.key_passphrase) data.key_passphrase = e.key_passphrase;
+    }
+  }
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     newPassword.value = '';
@@ -595,6 +618,18 @@ const tabFields = computed(() => {
             : t('settings.common.passwordKeep'),
         ],
       typed && isSso.value && ['redirect_uri', t('settings.oauth2.redirectUrl'), t('settings.oauth2.redirectHelp')],
+      // an SSH one's private key and its passphrase, whatever reads its user and password
+      isSsh.value && [
+        'private_key',
+        t('settings.credentials.privateKey'),
+        keyStored.value ? t('settings.credentials.privateKeyKeep') : t('settings.credentials.privateKeyHelp'),
+      ],
+      isSsh.value && [
+        'key_passphrase',
+        t('settings.credentials.keyPassphrase'),
+        keyStored.value ? t('settings.credentials.keyPassphraseKeep') : t('settings.credentials.keyPassphraseHelp'),
+      ],
+      isSsh.value && keyStored.value && ['remove_key', t('settings.credentials.removeKey')],
     ].filter(Boolean),
     store: [
       ['source-local', t('settings.credentials.secretLocal'), t('settings.credentials.secretLocalHint')],
@@ -1082,6 +1117,54 @@ onMounted(async () => {
                   :help="t('settings.oauth2.redirectHelp')"
                   :label="t('settings.oauth2.redirectUrl')"
                 />
+              </template>
+              <!-- an SSH one's private key and its passphrase : kept in the app (encrypted),
+                   whatever reads its user and password ; left empty, the stored ones stay -->
+              <template v-if="isSsh">
+                <BsInput
+                  class="af-credential-field"
+                  v-model="edit.client_key"
+                  v-show="fieldShown('private_key')"
+                  type="textarea"
+                  icon="key"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                  :isFloating="false"
+                  :disabled="readOnly || edit.remove_key"
+                  :help="
+                    keyStored ? t('settings.credentials.privateKeyKeep') : t('settings.credentials.privateKeyHelp')
+                  "
+                  :label="t('settings.credentials.privateKey')"
+                />
+                <BsInput
+                  class="af-credential-field"
+                  v-model="edit.key_passphrase"
+                  v-show="fieldShown('key_passphrase')"
+                  type="password"
+                  icon="lock"
+                  :placeholder="keyStored ? '**********' : ''"
+                  :isFloating="false"
+                  :disabled="readOnly || edit.remove_key"
+                  :help="
+                    keyStored
+                      ? t('settings.credentials.keyPassphraseKeep')
+                      : t('settings.credentials.keyPassphraseHelp')
+                  "
+                  :label="t('settings.credentials.keyPassphrase')"
+                />
+                <!-- the stored key and its passphrase removed on Save -->
+                <div v-if="keyStored" v-show="fieldShown('remove_key')" class="form-check form-switch mb-3">
+                  <input
+                    id="af-credential-remove-key"
+                    v-model="edit.remove_key"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :disabled="readOnly"
+                  />
+                  <label class="form-check-label" for="af-credential-remove-key">{{
+                    t('settings.credentials.removeKey')
+                  }}</label>
+                </div>
               </template>
             </template>
             <!-- Store : the app's database, or a secret store and the place in it -->

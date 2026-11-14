@@ -1921,7 +1921,7 @@ export default {
       stepType: 'Type',
       type: 'Type',
       type_ssh: 'SSH',
-      type_sshHint: 'Un utilisateur et un mot de passe pour SSH vers un serveur',
+      type_sshHint: 'Un utilisateur avec un mot de passe ou une clé privée pour SSH vers un serveur',
       type_userpass: 'Utilisateur et mot de passe',
       type_userpassHint:
         "Un utilisateur et un mot de passe pour toute autre connexion, comme les identifiants d'avant la v7",
@@ -1944,6 +1944,15 @@ export default {
       entraSignInHint_certificate: 'Un certificat et sa clé privée : pour le courrier par Microsoft 365 uniquement',
       entraCertHelp:
         "Le certificat PEM chargé dans l'inscription d'application (Certificats et secrets) ; sa clé privée ci-dessous.",
+      privateKey: 'Clé privée',
+      privateKeyHelp:
+        'La clé privée PEM ou OpenSSH avec laquelle le playbook se connecte. Enregistrée chiffrée, jamais réaffichée.',
+      privateKeyKeep: 'Laissée vide, la clé privée enregistrée est conservée.',
+      keyPassphrase: 'Phrase secrète',
+      keyPassphraseHelp: 'La phrase secrète de la clé privée, si elle en a une. Enregistrée chiffrée.',
+      keyPassphraseKeep: 'Laissée vide, la phrase secrète enregistrée est conservée.',
+      sshPasswordHelp: 'Facultatif avec une clé privée.',
+      removeKey: 'Supprimer la clé privée enregistrée et sa phrase secrète',
       server: 'Serveur',
       serverHelp: "L'adresse du coffre de secrets pour lequel vaut cette connexion.",
       optionalHostHelp: 'Facultatif. Transmis avec les identifiants au playbook et aux expressions, comme host.',

@@ -1915,7 +1915,7 @@ export default {
       stepType: 'Tipo',
       type: 'Tipo',
       type_ssh: 'SSH',
-      type_sshHint: 'Un usuario y una contraseña para SSH a un servidor',
+      type_sshHint: 'Un usuario con una contraseña o una clave privada para SSH a un servidor',
       type_userpass: 'Usuario y contraseña',
       type_userpassHint:
         'Un usuario y contraseña para cualquier otro inicio de sesión, como las credenciales anteriores a la v7',
@@ -1938,6 +1938,15 @@ export default {
       entraSignInHint_certificate: 'Un certificado y su clave privada: solo para el correo a través de Microsoft 365',
       entraCertHelp:
         'El certificado PEM subido al registro de aplicación (Certificados y secretos); su clave privada abajo.',
+      privateKey: 'Clave privada',
+      privateKeyHelp:
+        'La clave privada PEM u OpenSSH con la que el playbook inicia sesión. Se guarda cifrada y no se vuelve a mostrar.',
+      privateKeyKeep: 'Si se deja vacía, se conserva la clave privada guardada.',
+      keyPassphrase: 'Frase de contraseña',
+      keyPassphraseHelp: 'La frase de contraseña de la clave privada, si tiene una. Se guarda cifrada.',
+      keyPassphraseKeep: 'Si se deja vacía, se conserva la frase de contraseña guardada.',
+      sshPasswordHelp: 'Opcional con una clave privada.',
+      removeKey: 'Quitar la clave privada guardada y su frase de contraseña',
       server: 'Servidor',
       serverHelp: 'La dirección del almacén de secretos para el que sirve este acceso.',
       optionalHostHelp: 'Opcional. Se pasa con las credenciales al playbook y a las expresiones, como host.',

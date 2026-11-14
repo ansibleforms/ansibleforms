@@ -680,7 +680,7 @@ const SCHEMA_MANIFEST = {
                                'oauth2_providers.credential', 'credentials.tenant_id', 'credentials.issuer', 'credentials.redirect_uri',
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
                                'runners.credential', 'ldap.description', 'settings.disclaimer_version', 'announcements.enabled',
-                               'credentials.url', 'settings.encryption_check'] },
+                               'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase'] },
   },
 };
 
@@ -1252,6 +1252,8 @@ async function patchVersion7(messages, success, failed) {
   // a mail channel with an entraid credential sends through Microsoft 365 : Microsoft Graph or
   // SMTP with OAuth2 (graph, smtp) ; empty for an smtp credential
   await checkPromise(addColumn("notification_channels", "send_through", "varchar(20)", true, "NULL"), messages, success, failed);
+  // an ssh credential logs in with a private key too (client_key) : its passphrase, encrypted
+  await checkPromise(addColumn("credentials", "key_passphrase", "text", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

@@ -65,12 +65,36 @@ function spellings(secret) {
   return json === secret ? [secret] : [secret, json];
 }
 
+// a line of a multi-line secret this long or longer is masked on its own too
+const MIN_SECRET_LINE_LENGTH = 16;
+
+/**
+ * The lines of a multi-line secret (a private key) that are masked on their own : a playbook
+ * that prints the key line by line, or a tool that wraps it, shows its lines apart. The
+ * armour lines (-----BEGIN ... PRIVATE KEY-----) say nothing secret and are left out, and so
+ * are lines too short to be worth masking.
+ *
+ * Args:
+ *   secret (string): the secret.
+ *
+ * Returns:
+ *   string[]: its secret lines, trimmed ; none for a one-line secret.
+ */
+export function secretLines(secret) {
+  if (typeof secret !== "string" || !/[\r\n]/.test(secret)) return [];
+  return secret
+    .split(/\r?\n|\r/)
+    .map((line) => line.trim())
+    .filter((line) => line.length >= MIN_SECRET_LINE_LENGTH && !line.startsWith("-----"));
+}
+
 /**
  * Registers the secrets of a job, for maskOutput. Registering again adds to them.
  *
  * Args:
  *   jobId (number|string): the job.
- *   secrets (string[]): the secret values ; short and empty ones are left out.
+ *   secrets (string[]): the secret values ; short and empty ones are left out, and a
+ *     multi-line one (a private key) is masked line by line as well (secretLines).
  */
 export function registerJobSecrets(jobId, secrets) {
   if (jobId === undefined || jobId === null) return;
@@ -79,6 +103,8 @@ export function registerJobSecrets(jobId, secrets) {
   for (const s of secrets || []) {
     if (typeof s !== "string" || s.length < MIN_SECRET_LENGTH) continue;
     for (const spelling of spellings(s)) set.add(spelling);
+    // a multi-line one (a private key) : each of its lines as well
+    for (const line of secretLines(s)) set.add(line);
   }
   if (!set.size) return;
   if (!registry.has(key) && registry.size >= MAX_JOBS) registry.delete(registry.keys().next().value);
@@ -115,4 +141,4 @@ export function maskOutput(jobId, text) {
   return out;
 }
 
-export default { MASK, collectSecrets, registerJobSecrets, forgetJobSecrets, maskOutput };
+export default { MASK, collectSecrets, secretLines, registerJobSecrets, forgetJobSecrets, maskOutput };

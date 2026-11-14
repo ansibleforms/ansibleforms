@@ -44,9 +44,12 @@ const crudConfigs = {
       // what it is for : ssh, git, api or database (is_database follows it)
       { name: 'credential_type' },
       // a cyberark credential's client certificate and key (PEM) : how its AppID is restricted ;
-      // an entraid one's certificate and key, signing in with it instead of its secret (mail)
+      // an entraid one's certificate and key, signing in with it instead of its secret (mail) ;
+      // an ssh credential's private key (PEM or OpenSSH) is its client_key too
       { name: 'client_cert' },
       { name: 'client_key', isEncrypted: true },
+      // the passphrase of an ssh credential's private key
+      { name: 'key_passphrase', isEncrypted: true },
       // an entraid credential's tenant
       { name: 'tenant_id' },
       // an oidc credential's issuer ; an entraid or oidc one's redirect URL

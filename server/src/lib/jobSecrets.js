@@ -20,7 +20,8 @@ import Credential from "../models/credential.model.v2.js";
  * Returns:
  *   Promise<object>: {
  *     credentials: the resolved credential map (extravars.__credentials__ wins),
- *     ansible: { user, password } | { error } | null,
+ *     ansible: { user, password, privateKey?, passphrase? } | { error } | null (an SSH
+ *       credential's private key and its passphrase when it has them),
  *     vault: { password } | { error } | null,
  *   } ; an error is the reason a credential could not be read, for the job's output.
  */
@@ -32,6 +33,10 @@ export async function resolveJobSecrets(extravars = {}, creds = {}) {
     try {
       const c = await Credential.resolveCredential(extravars.__ansibleCredentials__);
       ansible = { user: c.user, password: c.password };
+      // an SSH credential's private key, and its passphrase : the RTE writes the key to a
+      // private file, or loads it into an ssh-agent of the job's own (rte/sshKey.js)
+      if (c.private_key) ansible.privateKey = c.private_key;
+      if (c.private_key && c.private_key_passphrase) ansible.passphrase = c.private_key_passphrase;
     } catch (err) {
       logger.error("Failed to get ansible credentials: ", err);
       ansible = { error: err.message || String(err) };

@@ -32,7 +32,8 @@ class CredentialModel extends CrudModel {
   // store logs in : its AppID (user), and a client certificate and key when the AppID is
   // restricted to one
   // userpass : a user and a password for any login (a REST API, a service...), the default ; ssh :
-  // one for SSH to a server, the login a workflow node's playbook connects with
+  // one for SSH to a server, the login a workflow node's playbook connects with (a password, a
+  // private key in client_key with its passphrase in key_passphrase, or both)
   // ldap : an LDAP directory's bind account (its user the bind DN) ; entraid and oidc : an SSO
   // provider's client (its user the client id, its password the client secret ; an entraid one its
   // tenant too, an oidc one its issuer), an entraid one also how mail is sent through Microsoft 365
@@ -345,16 +346,86 @@ class CredentialModel extends CrudModel {
     return data;
   }
 
+  // the first and last lines of an SSH credential's private key : a PEM one (-----BEGIN RSA PRIVATE
+  // KEY-----, -----BEGIN EC PRIVATE KEY-----, -----BEGIN PRIVATE KEY-----...) or an OpenSSH one
+  // (-----BEGIN OPENSSH PRIVATE KEY-----) ; the key type a few words at most
+  static PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY-----/;
+  static PRIVATE_KEY_END = /-----END [A-Z0-9 ]{0,40}PRIVATE KEY-----/;
+
+  /**
+   * Whether a text is a private key : its BEGIN line, some content, then its END line. The two
+   * lines are looked for one after the other : one pattern running from the first to the last
+   * over the whole key took quadratic time on a text made to look like one.
+   *
+   * Args:
+   *   text (string): the key as typed.
+   *
+   * Returns:
+   *   boolean: true when it reads as a PEM or OpenSSH private key.
+   */
+  static isPrivateKey(text) {
+    // Step 1 : its first line
+    const begin = this.PRIVATE_KEY_BEGIN.exec(text);
+    if (!begin) return false;
+    // Step 2 : its last line after it, with something between
+    const rest = text.slice(begin.index + begin[0].length);
+    const end = this.PRIVATE_KEY_END.exec(rest);
+    return !!end && rest.slice(0, end.index).trim() !== '';
+  }
+
+  /**
+   * Checks an SSH credential's private key and keeps its passphrase to it : the key
+   * (client_key, stored encrypted) must read as a PEM or an OpenSSH private key, and a type
+   * other than ssh keeps no passphrase (key_passphrase, stored encrypted). The key is stored
+   * as it was typed : the RTE writes it out with the line ends ssh wants (rte/sshKey.js), so
+   * the config seed still finds what it declared stored unchanged.
+   *
+   * Args:
+   *   data (object): the record written (changed in place).
+   *   creating (boolean): a create (the type and its fields are all there).
+   *
+   * Returns:
+   *   object: the record.
+   *
+   * Raises:
+   *   BadRequestError: an SSH credential whose private key is not one.
+   */
+  static checkSshKey(data, creating = false) {
+    // step 1 : a passphrase belongs to an ssh credential's key only
+    if (data.credential_type !== undefined && data.credential_type !== null && data.credential_type !== '' && data.credential_type !== 'ssh') {
+      if (creating || data.key_passphrase !== undefined) data.key_passphrase = null;
+      return data;
+    }
+    // step 2 : a key typed (not the mask, not emptied) must be a private key
+    const key = data.client_key;
+    if (data.credential_type === 'ssh' && typeof key === 'string' && key.trim() !== '' && !isMasked(key)) {
+      if (!this.isPrivateKey(key)) {
+        throw new Errors.BadRequestError("An SSH credential's private key is a PEM or OpenSSH private key, from -----BEGIN ... PRIVATE KEY----- to -----END ... PRIVATE KEY-----");
+      }
+    }
+    return data;
+  }
+
   // opts carries { fromSeed:true } for the declarative config seed only
   static async create(data, opts = {}) {
     this.guardRtePin(data, null, opts);
+    // an empty passphrase is none, and so is an ssh one's empty private key (a CyberArk or an
+    // Entra ID one's client key is written as it was sent)
+    if (data.key_passphrase === '') data.key_passphrase = null;
+    if (data.credential_type === 'ssh' && data.client_key === '') data.client_key = null;
+    this.checkSshKey(data, true);
     return super.create(this.modelName, this.requireTypeFields(this.mirrorType(this.mirrorVaultPath(this.normalizePort(data)), true), true, opts), opts);
   }
 
   static async update(data, id, opts = {}) {
-    // the api shows the client key masked ; the mask sent back means "unchanged", and an
-    // empty one too (the dialog leaves a secret empty to keep it)
-    if (isMasked(data.client_key) || data.client_key === '') delete data.client_key;
+    // the api shows the client key (a CyberArk or an Entra ID one's, an SSH one's private key) and
+    // an SSH key's
+    // passphrase masked ; the mask sent back means "unchanged", and an empty one too (the
+    // dialog leaves a secret empty to keep it). null removes it.
+    for (const key of ['client_key', 'key_passphrase']) {
+      if (isMasked(data[key]) || data[key] === '') delete data[key];
+    }
+    this.checkSshKey(data, false);
     // its type stays what it was made as (what uses it expects it : an SSO provider an entraid
     // one, a mail channel an smtp one) ; the config seed may change it
     if (!opts.fromSeed && data.credential_type !== undefined && data.credential_type !== null && data.credential_type !== '') {
@@ -494,6 +565,9 @@ class CredentialModel extends CrudModel {
       }
     }
     stripSecretSource(result);
+    // an SSH one's private key and its passphrase, decrypted ; the type and the stored columns
+    // never reach a playbook
+    overlaySshKey(result);
     return result;
   }
 
@@ -648,7 +722,9 @@ function assertInlineAllowed(spec, inline, scope = currentScope()) {
 }
 
 // an SSO credential its tenant (Entra ID) or issuer (Open ID) and its redirect URL too
-const ROW_SQL = "SELECT host,port,db_name,name,user,password,secure,db_type,is_database,vault_path,secret_store,secret_ref,tenant_id,issuer,redirect_uri FROM AnsibleForms.`credentials` WHERE name REGEXP ?";
+// and its type, its client key and the key's passphrase : an SSH one's private key
+// (overlaySshKey), never a CyberArk one's client key
+const ROW_SQL = "SELECT host,port,db_name,name,user,password,secure,db_type,is_database,vault_path,secret_store,secret_ref,tenant_id,issuer,redirect_uri,credential_type,client_key,key_passphrase FROM AnsibleForms.`credentials` WHERE name REGEXP ?";
 
 async function lookupRow(nameOrRegex, fallbackName) {
   let res = await mysql.do(ROW_SQL, nameOrRegex);
@@ -706,6 +782,41 @@ function shapeInlineSecret(name, payload) {
     is_database: 1,
     multipleStatements: true,
   };
+}
+
+/**
+ * An SSH credential's private key and its passphrase as a resolved credential carries them :
+ * private_key and private_key_passphrase, decrypted, when it has a key. The columns they are
+ * stored in (client_key, key_passphrase) and the type go : a CyberArk credential's client key
+ * never leaves the app this way, and a credential of any other type is resolved as before.
+ * Both names are secret keys to the output mask (lib/outputMask.js), so a playbook handed the
+ * credential in its credentials map never shows them in its output.
+ *
+ * Args:
+ *   result (object): the resolved credential, as lookupRow read it (changed in place).
+ *
+ * Returns:
+ *   object: the credential.
+ */
+function overlaySshKey(result) {
+  const isSsh = result.credential_type === "ssh";
+  const key = result.client_key;
+  const passphrase = result.key_passphrase;
+  delete result.credential_type;
+  delete result.client_key;
+  delete result.key_passphrase;
+  if (!isSsh || !key) return result;
+  try {
+    result.private_key = crypto.decrypt(key);
+    const phrase = passphrase ? crypto.decrypt(passphrase) : "";
+    if (phrase) result.private_key_passphrase = phrase;
+  } catch {
+    // never the key nor the passphrase in the log
+    logger.error("Failed to decrypt the private key.  Did the secretkey change ?");
+    delete result.private_key;
+    delete result.private_key_passphrase;
+  }
+  return result;
 }
 
 // a playbook receives the credential as an extra var : where it came from is not its business

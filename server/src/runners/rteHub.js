@@ -1254,7 +1254,8 @@ async function jobFileHashes(inventoryRepos) {
  *   Promise<void>
  */
 async function registerMask(jobId, form, extravars, secrets) {
-  const extra = [secrets?.ansible?.password, secrets?.vault?.password].filter((v) => typeof v === "string" && v);
+  // and an SSH login's private key and its passphrase (each line of the key masked too)
+  const extra = [secrets?.ansible?.password, secrets?.ansible?.privateKey, secrets?.ansible?.passphrase, secrets?.vault?.password].filter((v) => typeof v === "string" && v);
   await Job.registerOutputSecrets(jobId, { form, extravars, credentials: secrets?.credentials || {}, extra });
   masked.add(jobId);
 }

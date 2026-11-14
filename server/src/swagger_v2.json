@@ -7182,6 +7182,8 @@
           "is_database": { "type": "boolean", "description": "Is this a database credential?", "example": true },
           "used_by_count": { "type": "integer", "readOnly": true, "description": "In the list : how many secret stores, notification channels, repositories, LDAP directories, SSO providers and chat settings use it" },
           "credential_type": { "type": "string", "enum": ["userpass", "ssh", "git", "api", "database", "cyberark", "smtp", "ldap", "entraid", "oidc"], "description": "What the credential is for ; is_database follows it", "example": "git" },
+          "client_key": { "type": "string", "description": "A cyberark credential's client key, or an ssh credential's private key (PEM or OpenSSH). Stored encrypted, always returned masked ; the mask or an empty value sent back keeps it, null removes it" },
+          "key_passphrase": { "type": "string", "description": "The passphrase of an ssh credential's private key. Stored encrypted, always returned masked ; the mask or an empty value sent back keeps it, null removes it" },
           "tenant_id": { "type": "string", "description": "An entraid credential's tenant (its user is the client ID, its password the client secret)" },
           "issuer": { "type": "string", "description": "An oidc credential's issuer, the provider's address (its user is the client ID, its password the client secret)", "example": "https://accounts.google.com" },
           "redirect_uri": { "type": "string", "description": "An entraid or oidc credential's redirect URL, as registered with its client. Empty : the app's URL setting and the type's callback path (/api/v2/auth/entraid/callback, /api/v2/auth/oidc/callback)", "example": "https://forms.example.com/api/v2/auth/entraid/callback" },

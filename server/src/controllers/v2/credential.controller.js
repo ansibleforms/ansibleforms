@@ -251,7 +251,9 @@ const credentialController = {
         if (credential && credential.password) {
           credential.password = SECRET_MASK;
         }
+        // its client key (a CyberArk one's, an SSH one's private key) and the key's passphrase too
         if (credential && credential.client_key) credential.client_key = SECRET_MASK;
+        if (credential && credential.key_passphrase) credential.key_passphrase = SECRET_MASK;
         res.json(RestResult.single(credential));
       } else {
         // how many records use each (used_by_count), as its Used by tab lists them ; a count that
@@ -279,6 +281,7 @@ const credentialController = {
           // Mask passwords before returning to API
           password: masked(c.password),
           client_key: masked(c.client_key),
+          key_passphrase: masked(c.key_passphrase),
           used_by_count: usage.get(c.name) || 0,
         }));
         res.json(RestResult.list(credentials));
@@ -308,6 +311,7 @@ const credentialController = {
       // Mask password before returning to API
       credential.password = SECRET_MASK;
       if (credential.client_key) credential.client_key = SECRET_MASK;
+      if (credential.key_passphrase) credential.key_passphrase = SECRET_MASK;
       res.json(RestResult.single(credential));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));

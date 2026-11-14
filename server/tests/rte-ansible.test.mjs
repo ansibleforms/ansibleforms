@@ -22,6 +22,8 @@ vi.mock("child_process", async (importOriginal) => {
   return {
     ...actual,
     spawn: vi.fn((file, args, options) => {
+      // an RTE without the OpenSSH client : no ssh-agent to load a key with a passphrase into
+      if (file === "ssh-agent") throw Object.assign(new Error("spawn ssh-agent ENOENT"), { code: "ENOENT" });
       child = new EventEmitter();
       child.pid = 5151;
       child.signalCode = null;
@@ -244,6 +246,71 @@ describe("a playbook job runs from its jobs row", () => {
     await runToEnd(() => runJob());
     const after = outputs.slice(1).map((o) => o.order);
     assert.ok(after.every((n) => n > 4), "every new line comes after the existing ones");
+  });
+});
+
+describe("an SSH credential with a private key as the ansible login", () => {
+  const KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAAB\n-----END OPENSSH PRIVATE KEY-----\n";
+  beforeEach(() => {
+    credentialRows.sshkey = { name: "sshkey", user: "deploy", password: "", private_key: KEY };
+  });
+  afterEach(() => {
+    delete credentialRows.sshkey;
+  });
+
+  test("the key is in a private file while the playbook runs, passed as ansible_ssh_private_key_file", async () => {
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+    const done = runJob();
+    await new Promise((r) => setTimeout(r, 20));
+    const hidden = spawned[0].hidden;
+    const file = hidden.ansible_ssh_private_key_file;
+    assert.deepEqual(Object.keys(hidden).sort(), ["ansible_ssh_private_key_file", "ansible_user"], "no empty password next to the key");
+    assert.equal(fs.readFileSync(file, "utf8"), KEY);
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
+    assert.equal(JSON.stringify(spawned[0].extravars).includes("PRIVATE KEY"), false, "never in the plain extravars");
+    child.emit("exit", 0);
+    assert.equal(await done, true);
+    assert.equal(fs.existsSync(path.dirname(file)), false, "its folder removed at the end");
+  });
+
+  test("a failed playbook removes the key too", async () => {
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+    const ok = await runToEnd(() => runJob(), 2);
+    assert.equal(ok, false);
+    assert.equal(fs.existsSync(path.dirname(spawned[0].hidden.ansible_ssh_private_key_file)), false);
+  });
+
+  test("a password with the key is passed as well", async () => {
+    credentialRows.sshkey.password = "sudo-pass";
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+    await runToEnd(() => runJob());
+    assert.equal(spawned[0].hidden.ansible_password, "sudo-pass");
+  });
+
+  test("the key never reaches the output, whole or line by line", async () => {
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+    const done = runJob();
+    await new Promise((r) => setTimeout(r, 20));
+    child.stdout.emit("data", `key: ${JSON.stringify(KEY)}\nline: ${KEY.split("\n")[1]}\n`);
+    await new Promise((r) => setTimeout(r, 10));
+    child.emit("exit", 0);
+    await done;
+    const text = outputs.map((o) => o.output).join("");
+    assert.equal(text.includes("b3BlbnNzaC1rZXkt"), false, text);
+    assert.ok(text.includes('key: "********"'), text);
+  });
+
+  test("a passphrase without ssh-agent on the RTE fails the job, saying so, and runs nothing", async () => {
+    credentialRows.sshkey.private_key_passphrase = "open sesame";
+    const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_"));
+    row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+    const ok = await runJob();
+    assert.equal(ok, false);
+    assert.equal(spawned.length, 0, "no playbook ran");
+    assert.equal(jobRow.status, "failed");
+    assert.ok(outputs.some((o) => /ssh-agent is not available on this RTE/.test(o.output)), JSON.stringify(outputs));
+    assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key left behind");
   });
 });
 
