@@ -17,11 +17,38 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || "test";
 
 let child;
 const spawned = [];
+// an RTE with the OpenSSH client, faked : ssh-agent opens its socket, ssh-add loads the key, and
+// the agents started are kept to see that they were stopped (off : no ssh-agent on the RTE)
+const fakeOpenSsh = { on: false, agents: [] };
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     spawn: vi.fn((file, args, options) => {
+      if (file === "ssh-agent" && fakeOpenSsh.on) {
+        // ssh-agent -D -a <socket> : the socket appears, and a SIGTERM stops it
+        const agent = new EventEmitter();
+        agent.exitCode = null;
+        agent.signalCode = null;
+        agent.stderr = Object.assign(new EventEmitter(), { setEncoding() {} });
+        agent.kill = vi.fn((signal) => {
+          agent.signalCode = signal;
+          setTimeout(() => agent.emit("exit", null, signal), 1);
+          return true;
+        });
+        fs.writeFileSync(args[2], "");
+        fakeOpenSsh.agents.push(agent);
+        return agent;
+      }
+      if (file === "ssh-add" && fakeOpenSsh.on) {
+        // the key loads : ssh-add ends with status 0
+        const add = new EventEmitter();
+        add.stdout = new EventEmitter();
+        add.stderr = Object.assign(new EventEmitter(), { setEncoding() {} });
+        add.kill = () => true;
+        setTimeout(() => add.emit("close", 0), 1);
+        return add;
+      }
       // an RTE without the OpenSSH client : no ssh-agent to load a key with a passphrase into
       if (file === "ssh-agent") throw Object.assign(new Error("spawn ssh-agent ENOENT"), { code: "ENOENT" });
       child = new EventEmitter();
@@ -311,6 +338,39 @@ describe("an SSH credential with a private key as the ansible login", () => {
     assert.equal(jobRow.status, "failed");
     assert.ok(outputs.some((o) => /ssh-agent is not available on this RTE/.test(o.output)), JSON.stringify(outputs));
     assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key left behind");
+  });
+
+  describe("a step that fails after the key is ready, before the playbook starts", () => {
+    beforeEach(() => {
+      fakeOpenSsh.on = true;
+      fakeOpenSsh.agents.length = 0;
+    });
+    afterEach(() => {
+      fakeOpenSsh.on = false;
+      fakeOpenSsh.agents.length = 0;
+    });
+
+    test("a key with a passphrase : the job's ssh-agent is stopped and its folder removed", async () => {
+      credentialRows.sshkey.private_key_passphrase = "open sesame";
+      const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_"));
+      // the playbook's folder cannot be found : the step right after the key is made ready
+      vi.spyOn(Repository, "getAnsiblePath").mockRejectedValue(new Error("the playbooks repository is gone"));
+      row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+      await assert.rejects(runJob(), /the playbooks repository is gone/);
+      assert.equal(spawned.length, 0, "no playbook ran");
+      assert.equal(fakeOpenSsh.agents.length, 1, "the job's agent was started");
+      assert.equal(fakeOpenSsh.agents[0].kill.mock.calls.length, 1, "and stopped, with the key it held");
+      assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key folder left behind");
+    });
+
+    test("a key without a passphrase : its file and folder are removed", async () => {
+      const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_"));
+      vi.spyOn(Repository, "getAnsiblePath").mockRejectedValue(new Error("the playbooks repository is gone"));
+      row({ __playbook__: "site.yml", __ansibleCredentials__: "sshkey" });
+      await assert.rejects(runJob(), /the playbooks repository is gone/);
+      assert.equal(spawned.length, 0, "no playbook ran");
+      assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key folder left behind");
+    });
   });
 });
 

@@ -376,6 +376,25 @@ export function markUnsafe(value) {
   return value;
 }
 
+/**
+ * Runs a job's playbook with its credentials : the ansible login (and its private key), the
+ * vault password and the inventories, then ansible-playbook itself. A private key is made ready
+ * (rte/sshKey.js) before the playbook's folder and arguments, and cleaned up whatever happens
+ * after that : the playbook's end, its failure, an abort, or an error before it started.
+ *
+ * Args:
+ *   ev (object): the job's extravars.
+ *   secrets (object): the job's secrets as the app resolved them : { credentials, ansible, vault }.
+ *   jobid (number): the job.
+ *   counter (number): the last output order of the job.
+ *
+ * Returns:
+ *   Promise<boolean>: true when the playbook succeeded, false otherwise (the job row says why).
+ *
+ * Raises:
+ *   Error: a step before the playbook starts failed (its folder could not be found, its
+ *     arguments could not be built) ; the private key is cleaned up first.
+ */
 async function launchPlaybook(ev, secrets, jobid, counter) {
   const credentials = secrets.credentials || {};
   // we make a copy, we don't want to mutate the original
@@ -446,64 +465,70 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   // the private key : in a file of the job's own, or in an ssh-agent of its own with a
   // passphrase ; a key that cannot be used fails the job, saying why
   let keyEnv = {};
-  if (sshKey) {
+  // from the moment the key is ready, every way out goes through the cleanup below : a step
+  // that throws before the playbook starts (its folder, its arguments) as well as the end of
+  // the playbook, so the job's ssh-agent never keeps the decrypted key once the job is over
+  try {
+    if (sshKey) {
+      try {
+        const ready = await prepareSshKey(jobid, sshKey.key, sshKey.passphrase);
+        sshKey.cleanup = ready.cleanup;
+        Object.assign(hiddenExtravars, ready.extravars);
+        keyEnv = ready.env;
+      } catch (err) {
+        logger.error(`[Job ${jobid}] The private key cannot be used: ${err.message}`);
+        await currentIO().end(jobid, counter + 1, "stderr", "failed", `[ERROR]: The private key of the ansible credentials cannot be used: ${err.message}`);
+        return false;
+      }
+    }
+    // a credential's password is never a template
+    hiddenExtravars = JSON.stringify(markUnsafe(hiddenExtravars));
+    const extravarsFileName = `extravars_${jobid}.json`;
+    const hiddenExtravarsFileName = `he_${extravarsFileName}`;
+    logger.debug(`Extravars File: ${extravarsFileName}`);
+    const directory = await resolvePlaybookDirectory(playbookSubPath, jobid);
+    // its name (deploy) as its file (deploy.yml) : a form may name it either way
+    playbook = playbookFile(directory, playbook);
+    extravars.__playbook__ = playbook;
+    const { args, inventory } = buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword });
+    var cmdObj = {
+      directory,
+      file: "ansible-playbook",
+      args: args,
+      stdin: vaultPassword,
+      description: "Running playbook",
+      task: "Playbook",
+      extravars: JSON.stringify(merged.__allowJinjaInExtravars__ === true ? merged : markUnsafe(merged)),
+      hiddenExtravars: hiddenExtravars,
+      extravarsFileName: extravarsFileName,
+      hiddenExtravarsFileName: hiddenExtravarsFileName,
+      keepExtravars: keepExtravars,
+      // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase
+      env: keyEnv,
+      // what set_stats gathers : written there by the artifacts plugin, stored on the job
+      // (a private folder made when the playbook starts : makeArtifactsFile)
+      artifactsFile: path.join(os.tmpdir(), `af_artifacts_${jobid}.json`),
+      // and the structured events (af_events) : one JSON line each, sent on as they come, in a
+      // private folder made when the playbook starts (makeEventsFile) ; a host's whole result with
+      // them, whatever the playbook's verbosity, as on AWX
+      events: true,
+    };
+
+    logger.notice("Running from directory: " + cmdObj.directory);
+    logger.notice("Running playbook: " + playbook);
+    // the keys only : the values include the resolved credentials
+    logger.debug("extravars: " + Object.keys(merged).join(", "));
+    logger.debug("inventory: " + inventory);
     try {
-      const ready = await prepareSshKey(jobid, sshKey.key, sshKey.passphrase);
-      sshKey.cleanup = ready.cleanup;
-      Object.assign(hiddenExtravars, ready.extravars);
-      keyEnv = ready.env;
+      await executeCommand(cmdObj, jobid, counter);
+      return true;
     } catch (err) {
-      logger.error(`[Job ${jobid}] The private key cannot be used: ${err.message}`);
-      await currentIO().end(jobid, counter + 1, "stderr", "failed", `[ERROR]: The private key of the ansible credentials cannot be used: ${err.message}`);
+      logger.error("Ansible job failed: ", err);
       return false;
     }
-  }
-  // a credential's password is never a template
-  hiddenExtravars = JSON.stringify(markUnsafe(hiddenExtravars));
-  const extravarsFileName = `extravars_${jobid}.json`;
-  const hiddenExtravarsFileName = `he_${extravarsFileName}`;
-  logger.debug(`Extravars File: ${extravarsFileName}`);
-  const directory = await resolvePlaybookDirectory(playbookSubPath, jobid);
-  // its name (deploy) as its file (deploy.yml) : a form may name it either way
-  playbook = playbookFile(directory, playbook);
-  extravars.__playbook__ = playbook;
-  const { args, inventory } = buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword });
-  var cmdObj = {
-    directory,
-    file: "ansible-playbook",
-    args: args,
-    stdin: vaultPassword,
-    description: "Running playbook",
-    task: "Playbook",
-    extravars: JSON.stringify(merged.__allowJinjaInExtravars__ === true ? merged : markUnsafe(merged)),
-    hiddenExtravars: hiddenExtravars,
-    extravarsFileName: extravarsFileName,
-    hiddenExtravarsFileName: hiddenExtravarsFileName,
-    keepExtravars: keepExtravars,
-    // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase
-    env: keyEnv,
-    // what set_stats gathers : written there by the artifacts plugin, stored on the job
-    // (a private folder made when the playbook starts : makeArtifactsFile)
-    artifactsFile: path.join(os.tmpdir(), `af_artifacts_${jobid}.json`),
-    // and the structured events (af_events) : one JSON line each, sent on as they come, in a
-    // private folder made when the playbook starts (makeEventsFile) ; a host's whole result with
-    // them, whatever the playbook's verbosity, as on AWX
-    events: true,
-  };
-
-  logger.notice("Running from directory: " + cmdObj.directory);
-  logger.notice("Running playbook: " + playbook);
-  // the keys only : the values include the resolved credentials
-  logger.debug("extravars: " + Object.keys(merged).join(", "));
-  logger.debug("inventory: " + inventory);
-  try {
-    await executeCommand(cmdObj, jobid, counter);
-    return true;
-  } catch (err) {
-    logger.error("Ansible job failed: ", err);
-    return false;
   } finally {
-    // the key's folder and the job's ssh-agent, whatever the end (a failure, an abort)
+    // the key's folder and the job's ssh-agent, whatever the end (a failure, an abort, or an
+    // error before the playbook started)
     if (sshKey?.cleanup) await sshKey.cleanup();
   }
 }
