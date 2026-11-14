@@ -58,7 +58,7 @@ const filterOutput = ref(true); // flag to show/hide filter output
 // Edit stack for nested subform editing.
 //
 // Each entry represents a subform currently being edited:
-//   { id, title, subtitle, subform, snapshot, draft, onSave }
+//   { id, title, subtitle, subform, snapshot, draft, readonlyFields, onSave }
 // - `snapshot` is a deep clone of the row at the time editing began and is
 //   passed to <AppForm :initialData>. The edited value comes back via the
 //   `@save` event and is forwarded to the list field's `onSave` callback.
@@ -76,7 +76,7 @@ let nextEditId = 1;
 // form is shown. Drives the title, breadcrumbs and help block in the template.
 const activeEntry = computed(() => editStack[editStack.length - 1]);
 
-function pushEdit({ title, subtitle, subform, row, parentData, onSave }) {
+function pushEdit({ title, subtitle, subform, row, parentData, readonlyFields, onSave }) {
   const id = `edit-${nextEditId++}`;
   const snapshot = row ? JSON.parse(JSON.stringify(row)) : {};
   const entry = reactive({
@@ -87,6 +87,8 @@ function pushEdit({ title, subtitle, subform, row, parentData, onSave }) {
     snapshot,
     parentData: parentData ? Helpers.safeDeepClone(parentData) : null,
     draft: {},
+    // the subform fields this row keeps read only (a list's readonlyColumns, existing rows only)
+    readonlyFields: Array.isArray(readonlyFields) ? [...readonlyFields] : [],
     onSave,
   });
   editStack.push(entry);
@@ -2322,6 +2324,7 @@ onBeforeUnmount(() => {
                   :rootFormName="currentForm?.name || ''"
                   :initialData="entry.snapshot"
                   :parentData="entry.parentData"
+                  :readonlyFields="entry.readonlyFields"
                   v-model="entry.draft"
                   @save="(val) => saveEdit(entry.id, val)"
                   @cancel="popEdit(entry.id)"

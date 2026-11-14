@@ -424,6 +424,55 @@ const Helpers = {
     });
   },
 
+  /**
+   * The subform fields a list keeps read only in the row being edited.
+   *
+   * A `list` field's `readonlyColumns` names subform fields that cannot change on a
+   * row the list already holds, like the `readonlyColumns` of the old `table` field.
+   * A NEW row is still filled in completely, so adding a row gets none of them.
+   *
+   * Args:
+   *   field (Object): the list field definition (its `readonlyColumns`, if any).
+   *   isAdd (boolean): true when the editor adds a new row, false for an existing one.
+   *
+   * Returns:
+   *   Array<string>: the names of the read-only subform fields, empty when there are none.
+   */
+  readonlyColumnsFor(field, isAdd) {
+    // 1. a new row is filled in completely
+    if (isAdd) return [];
+    // 2. only the names, a stray non-string entry is ignored
+    const names = Array.isArray(field?.readonlyColumns) ? field.readonlyColumns : [];
+    return names.filter((name) => typeof name === 'string' && name !== '');
+  },
+
+  /**
+   * Put the read-only columns of an edited row back as they were.
+   *
+   * The editor shows those fields disabled, but an expression, a query or a default
+   * can still change their value while the row is open. The saved row therefore takes
+   * each read-only column from the row as it was when editing began. A column the row
+   * did not have is left as the editor gave it.
+   *
+   * Args:
+   *   raw (Object): the row values the editor is about to save (not changed).
+   *   original (Object): the row as it was when editing began.
+   *   names (Array<string>): the read-only column names (see readonlyColumnsFor).
+   *
+   * Returns:
+   *   Object: a copy of `raw` with the read-only columns restored from `original`.
+   */
+  keepReadonlyColumns(raw, original, names) {
+    // 1. nothing to keep : the row as it is
+    const kept = { ...(raw || {}) };
+    if (!Array.isArray(names) || names.length === 0 || !original || typeof original !== 'object') return kept;
+    // 2. each read-only column the row had, as it had it (a copy, never shared)
+    for (const name of names) {
+      if (Object.prototype.hasOwnProperty.call(original, name)) kept[name] = this.deepClone(original[name]);
+    }
+    return kept;
+  },
+
   // Apply subform modeling transformation to raw data after loading from YAML.
   // Builds __output__ property so modeled structure is immediately visible.
   // Handles both single objects (yaml+subform) and arrays (list fields).

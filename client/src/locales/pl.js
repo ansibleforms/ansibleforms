@@ -2547,6 +2547,7 @@ export default {
       filterColumns: 'Kolumny, po których można filtrować',
       allowDelete: 'Wiersze można usuwać',
       allowInsert: 'Wiersze można dodawać',
+      readonlyColumns: 'Kolumny, które w istniejących wierszach pozostają tylko do odczytu',
       deleteMarker: 'Oznacza usunięte wiersze we własnym polu',
       insertMarker: 'Oznacza dodane wiersze we własnym polu',
       updateMarker: 'Oznacza zmienione wiersze we własnym polu',
@@ -3170,6 +3171,7 @@ export default {
     unevaluated:
       'Pole {fields} nie zostało obliczone... | Pola {fields} nie zostały obliczone... | Pól {fields} nie obliczono...',
     itemCount: '{n} element | {n} elementy | {n} elementów',
+    readonlyColumn: 'Nie można zmienić w istniejącym wierszu',
     copiedToClipboard: 'Skopiowano do schowka',
     copiedYamlToClipboard: 'Skopiowano zamodelowany YAML do schowka',
     subformOutput: 'Wynik podformularza',

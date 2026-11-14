@@ -132,6 +132,13 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  // Names of the subform fields shown but not editable, in subform mode : the
+  // `readonlyColumns` of the list whose EXISTING row is being edited (a new row
+  // gets none). Their values are saved as they were in `initialData`.
+  readonlyFields: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 // Edit stack injected from the parent form page (provided by form.vue).
@@ -1557,9 +1564,27 @@ function handleSubformSave() {
   if (!validateForm()) {
     return;
   }
-  const raw = stripSubformInternals(form.value);
+  // the read-only columns of an existing row are saved as they were, whatever an
+  // expression, a query or a default made of them while the row was open
+  const raw = Helpers.keepReadonlyColumns(stripSubformInternals(form.value), props.initialData, props.readonlyFields);
   const built = Helpers.buildFormOutput(props.currentForm.fields, raw, { subforms: props.subforms || [] });
   emit('save', { ...raw, __output__: built });
+}
+
+/**
+ * Whether a field is read only in this subform pane.
+ *
+ * Only a list's `readonlyColumns` make a field read only here, and only while an
+ * existing row is edited (see the `readonlyFields` prop).
+ *
+ * Args:
+ *   name (string): the field name.
+ *
+ * Returns:
+ *   boolean: true when the field is shown but cannot be changed.
+ */
+function isReadonlyField(name) {
+  return props.mode === 'subform' && Array.isArray(props.readonlyFields) && props.readonlyFields.includes(name);
 }
 
 // Build the output object for a subform row emitted to the parent list.
@@ -2481,7 +2506,14 @@ defineExpose({
               </div>
 
               <!-- ALL OTHER FIELD TYPES -->
-              <div v-else class="mt-3">
+              <!-- a list's readonlyColumns on an existing row : shown, but inert (no click, no
+                   focus, no typing) and dimmed like a disabled input -->
+              <div
+                v-else
+                class="mt-3"
+                :class="{ 'af-field-readonly': isReadonlyField(field.name) }"
+                :inert="isReadonlyField(field.name)"
+              >
                 <div class="d-flex">
                   <!-- FIELD LABEL -->
                   <label
@@ -2492,8 +2524,14 @@ defineExpose({
                         ? fieldLabels[field.name].value
                         : fieldLabels[field.name]
                     }}
-                    <span v-if="field.required" class="text-danger">*</span></label
-                  >
+                    <span v-if="field.required" class="text-danger">*</span>
+                    <span
+                      v-if="isReadonlyField(field.name)"
+                      class="ms-1 text-body-secondary"
+                      :title="t('form.readonlyColumn')"
+                      :aria-label="t('form.readonlyColumn')"
+                      ><font-awesome-icon icon="lock" size="xs" /></span
+                  ></label>
 
                   <!-- FIELD DEBUG BUTTONS -->
                   <div>
@@ -2958,6 +2996,17 @@ defineExpose({
    field's own margin again */
 .af-form-group > .row:not(:empty) ~ .row > .col > .mt-3 {
   margin-top: 1rem !important;
+}
+/* a list's read-only column on an existing row : its inputs look disabled (the wrapper is
+   inert, so they cannot be reached either) */
+.af-field-readonly :deep(.form-control),
+.af-field-readonly :deep(.form-select),
+.af-field-readonly :deep(.input-group-text) {
+  background-color: var(--bs-secondary-bg);
+  opacity: 1;
+}
+.af-field-readonly :deep(.form-check-input) {
+  opacity: 0.5;
 }
 .limit-height {
   max-height: 300px;
