@@ -213,6 +213,66 @@ class CredentialModel extends CrudModel {
     }
   }
 
+  /**
+   * An Entra ID credential's certificate and private key on an update that changes only one of
+   * them : the half sent is checked against the stored other half (checkEntraCertificate only
+   * sees what a write sends, so a renewed certificate saved over a stored key of the old one was
+   * taken, and every mail failed at send time). A key sent empty or masked keeps the stored one
+   * (update removed it from the record), a half sent as null is removed and leaves nothing to
+   * check. Another type is left alone : a CyberArk or an SSH credential keeps its client key in
+   * the same column. The messages never hold the key.
+   *
+   * Args:
+   *   data (object): the record written, the masked or empty key already removed.
+   *   id (number|string): the credential's id.
+   *   current (object|null): the stored credential when the caller already read it (findById,
+   *     its key decrypted), or null to read it here.
+   *
+   * Returns:
+   *   Promise<void>: resolves when the pair goes together, or there is no pair to check.
+   *
+   * Raises:
+   *   BadRequestError: the half sent does not read, a new certificate meets no stored key, or the
+   *     half sent does not go with the stored other half.
+   */
+  static async checkEntraPairOnUpdate(data, id, current = null) {
+    const text = (v) => String(v ?? '').trim();
+    // step 1 : only one half written with a value, the other one left out (kept as stored)
+    const certOnly = text(data.client_cert) !== '' && data.client_key === undefined;
+    const keyOnly = text(data.client_key) !== '' && data.client_cert === undefined;
+    if (!certOnly && !keyOnly) return;
+    // step 2 : an Entra ID credential's only, the type sent or the stored one
+    const stored = current || (await this.findById(id));
+    const type = data.credential_type || stored?.credential_type;
+    if (type !== 'entraid') return;
+    // step 3 : the half sent reads (the same messages as a create)
+    this.checkEntraCertificate({ client_cert: certOnly ? data.client_cert : '', client_key: keyOnly ? data.client_key : '' }, false);
+    // step 4 : the stored other half, decrypted by findById ; one that does not read counts as none
+    const readOrNull = (read) => {
+      try {
+        return read();
+      } catch {
+        return null;
+      }
+    };
+    const cert = readOrNull(() => new X509Certificate(text(certOnly ? data.client_cert : stored?.client_cert)));
+    const key = readOrNull(() => createPrivateKey(text(keyOnly ? data.client_key : stored?.client_key)));
+    // step 5 : a new certificate needs a key to sign with ; a new key without a stored
+    // certificate waits for one (the certificate's write checks the pair)
+    if (certOnly && !key) {
+      throw new Errors.BadRequestError("A Microsoft Entra ID credential that signs in with a certificate needs the certificate's private key too: upload the matching private key with the certificate");
+    }
+    if (!cert || !key) return;
+    // step 6 : the two go together
+    if (!cert.checkPrivateKey(key)) {
+      throw new Errors.BadRequestError(
+        certOnly
+          ? 'The new certificate does not belong to the stored private key of this Microsoft Entra ID credential: upload the matching private key with the certificate'
+          : 'The new private key does not belong to the stored certificate of this Microsoft Entra ID credential: upload the matching certificate with the private key',
+      );
+    }
+  }
+
   // the types that carry the address of the one server they log in to (Credential.url) : a
   // runner's and a secret store's
   static URL_TYPES = ['rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'cyberark'];
@@ -428,12 +488,15 @@ class CredentialModel extends CrudModel {
     this.checkSshKey(data, false);
     // its type stays what it was made as (what uses it expects it : an SSO provider an entraid
     // one, a mail channel an smtp one) ; the config seed may change it
+    let current = null;
     if (!opts.fromSeed && data.credential_type !== undefined && data.credential_type !== null && data.credential_type !== '') {
-      const current = await this.findById(id);
+      current = await this.findById(id);
       if (current?.credential_type && data.credential_type !== current.credential_type) {
         throw new Errors.BadRequestError(`A credential keeps the type it was made as: '${current.name}' is ${current.credential_type}. Make a new credential for another type`);
       }
     }
+    // an Entra ID credential's new certificate (or key) goes with its stored key (or certificate)
+    await this.checkEntraPairOnUpdate(data, id, current);
     // the RTE's pin : the hub's to write ; a changed ca_bundle is the writer's from now on
     const stored = !opts.fromRte && data.ca_bundle !== undefined ? await this.findById(id) : null;
     this.guardRtePin(data, stored, opts);
