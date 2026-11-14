@@ -1917,6 +1917,8 @@ export default {
       clientKeyKeep: 'Lasciata vuota, la chiave client salvata resta.',
       server: 'Server',
       serverHelp: "L'indirizzo dell'archivio di segreti per cui vale questo accesso.",
+      optionalHostHelp: 'Facoltativo. Passato con le credenziali al playbook e alle espressioni, come host.',
+      optionalPortHelp: 'Facoltativo. Passato con le credenziali al playbook e alle espressioni, come port.',
       noServer: 'La sua credenziale non ha un server: aggiungilo nella pagina della credenziale.',
       noneOfType: 'Ancora nessuna credenziale di tipo {type}',
       type_rte: 'RTE',

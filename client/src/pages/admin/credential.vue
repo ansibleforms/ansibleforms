@@ -7,7 +7,9 @@
 /*    Details     its name and description                        */
 /*    Type        what it is for (SSH, Git, LDAP, SSO ...)        */
 /*    Login       where it connects (SSH, a database : the host   */
-/*                and port, a database's type and name), its user */
+/*                and port, a database's type and name ; a user   */
+/*                and password or an api one : an optional host   */
+/*                and port handed to the playbook), its user      */
 /*                and password (a CyberArk's AppID, client        */
 /*                certificate and key ; an Entra ID one's tenant) */
 /*                ; the password masked : left empty kept, typed  */
@@ -31,6 +33,8 @@ import {
   CREDENTIAL_TYPES,
   SERVER_CREDENTIAL_TYPES,
   TOKEN_CREDENTIAL_TYPES,
+  HOST_CREDENTIAL_TYPES,
+  OPTIONAL_HOST_CREDENTIAL_TYPES,
   CREDENTIAL_SERVER_EXAMPLE,
   credentialLabels,
   secretRefText,
@@ -344,7 +348,10 @@ const shownTab = computed(() => {
 // an SSH, a database or an smtp credential connects somewhere : its host and port in its Login
 // tab (an smtp one's the mail server, and its TLS)
 // an ldap one's its directory's servers (in failover order), TLS and certificates
-const hasConnection = computed(() => ['ssh', 'database', 'smtp', 'ldap'].includes(type.value));
+// a user and password or an api one : an optional host and port, handed to the playbook and the
+// expressions with the credential (issue #1326)
+const hasConnection = computed(() => HOST_CREDENTIAL_TYPES.includes(type.value));
+const optionalHost = computed(() => OPTIONAL_HOST_CREDENTIAL_TYPES.includes(type.value));
 const isSmtp = computed(() => type.value === 'smtp');
 const isLdap = computed(() => type.value === 'ldap');
 /**
@@ -507,12 +514,20 @@ const tabFields = computed(() => {
         !isLdap.value && [
           'host',
           isSmtp.value ? t('settings.mail.mailServer') : t('settings.fields.host'),
-          isSmtp.value ? t('settings.mail.mailServerHelp') : '',
+          isSmtp.value
+            ? t('settings.mail.mailServerHelp')
+            : optionalHost.value
+              ? t('settings.credentials.optionalHostHelp')
+              : '',
         ],
       conn && [
         'port',
         isSmtp.value ? t('settings.mail.mailPort') : t('settings.fields.port'),
-        isSmtp.value ? t('settings.mail.mailPortHelp') : '',
+        isSmtp.value
+          ? t('settings.mail.mailPortHelp')
+          : optionalHost.value
+            ? t('settings.credentials.optionalPortHelp')
+            : '',
       ],
       conn &&
         (isSmtp.value || isLdap.value) && [
@@ -740,7 +755,8 @@ onMounted(async () => {
                 </h6>
               </template>
               <!-- where it connects (SSH, a database, a mail server) : a database's type, the host
-                   and port, a database's name, a mail server's TLS ; then the user and password -->
+                   and port, a database's name, a mail server's TLS ; a user and password or an api
+                   one's optional host and port ; then the user and password -->
               <template v-if="hasConnection">
                 <BsInput
                   v-if="isDatabase"
@@ -778,7 +794,13 @@ onMounted(async () => {
                   :placeholder="isSmtp ? 'smtp.example.com' : ''"
                   :isFloating="false"
                   :required="isSmtp"
-                  :help="isSmtp ? t('settings.mail.mailServerHelp') : ''"
+                  :help="
+                    isSmtp
+                      ? t('settings.mail.mailServerHelp')
+                      : optionalHost
+                        ? t('settings.credentials.optionalHostHelp')
+                        : ''
+                  "
                   :label="isSmtp ? t('settings.mail.mailServer') : t('settings.fields.host')"
                 />
                 <BsInput
@@ -788,7 +810,13 @@ onMounted(async () => {
                   type="number"
                   icon="arrows-alt-v"
                   :isFloating="false"
-                  :help="isSmtp ? t('settings.mail.mailPortHelp') : ''"
+                  :help="
+                    isSmtp
+                      ? t('settings.mail.mailPortHelp')
+                      : optionalHost
+                        ? t('settings.credentials.optionalPortHelp')
+                        : ''
+                  "
                   :label="isSmtp ? t('settings.mail.mailPort') : t('settings.fields.port')"
                 />
                 <!-- an smtp or an ldap one : TLS -->

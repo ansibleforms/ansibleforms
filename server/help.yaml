@@ -2857,6 +2857,7 @@
           **Note**: The credential can be a regex
           **Note**: A second, fallback, credential kan be passed using a comma  
           **Note**: The value `__self__` sends the connection of AnsibleForms' own database (host, port, user and password).  
+          **Note**: Each credential reaches the playbook as an object with its `user` and `password`, and its `host` and `port` when it has them: an SSH, database, mail or LDAP credential, or a user and password or API credential given an optional host and port (`cred_vm.host`, `cred_vm.port`).  
           **Note**: A value can also read a secret store directly, without a stored credential: `vault:<path>` reads the store named `vault`, `secret:<store>:<ref>` any store. The role property `secretStores` limits the stores a user may read this way.  
           **Note**: On a `workflow` form, these credentials reach every playbook node of the workflow (a nested workflow's too), under the names given here, as a multistep form's reach its steps. A node's own credentials reach its playbook under their own name, and win a name both use.
         examples:

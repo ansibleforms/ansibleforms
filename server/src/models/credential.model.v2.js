@@ -75,8 +75,10 @@ class CredentialModel extends CrudModel {
 
   /**
    * A credential's port as its column takes it : a whole number, or none. A credential without a
-   * host (an api, a git or an smtp one) sends it empty, and MySQL refused '' for the int column
-   * ("Incorrect integer value: '' for column 'port'") - saving a type change failed.
+   * host (a git one, or a user and password or an api one left without its optional host and port)
+   * sends it empty, and MySQL refused '' for the int column ("Incorrect integer value: '' for
+   * column 'port'") - saving a type change failed. Any type may store a host and a port : a user
+   * and password or an api one's are only handed to the playbook and the expressions with it.
    *
    * Args:
    *   data (object): the record written.

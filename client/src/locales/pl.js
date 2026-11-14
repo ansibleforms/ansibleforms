@@ -1760,6 +1760,8 @@ export default {
       clientKeyKeep: 'Pozostawiony pusty, zapisany klucz klienta zostaje.',
       server: 'Serwer',
       serverHelp: 'Adres magazynu sekretów, do którego służy to logowanie.',
+      optionalHostHelp: 'Opcjonalny. Przekazywany z poświadczeniami do playbooka i wyrażeń jako host.',
+      optionalPortHelp: 'Opcjonalny. Przekazywany z poświadczeniami do playbooka i wyrażeń jako port.',
       noServer: 'Jego poświadczenie nie ma serwera: dodaj go na stronie poświadczenia.',
       noneOfType: 'Brak jeszcze poświadczeń typu {type}',
       type_rte: 'RTE',

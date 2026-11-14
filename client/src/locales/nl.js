@@ -1919,6 +1919,8 @@ export default {
       clientKeyKeep: 'Leeg gelaten blijft de opgeslagen clientsleutel.',
       server: 'Server',
       serverHelp: 'Het adres van de secret store waarvoor deze login geldt.',
+      optionalHostHelp: 'Optioneel. Wordt met de referentie als host aan het playbook en aan expressies doorgegeven.',
+      optionalPortHelp: 'Optioneel. Wordt met de referentie als port aan het playbook en aan expressies doorgegeven.',
       noServer: 'Zijn referentie heeft geen server: voeg er een toe op de pagina van de referentie.',
       noneOfType: 'Nog geen referenties van type {type}',
       type_rte: 'RTE',

@@ -1768,6 +1768,8 @@ export default {
       clientKeyKeep: 'Deixada vazia, a chave de cliente guardada mantém-se.',
       server: 'Servidor',
       serverHelp: 'O endereço do cofre de segredos para o qual vale este acesso.',
+      optionalHostHelp: 'Opcional. Passado com as credenciais ao playbook e às expressões, como host.',
+      optionalPortHelp: 'Opcional. Passado com as credenciais ao playbook e às expressões, como port.',
       noServer: 'A sua credencial não tem servidor: adicione um na página da credencial.',
       noneOfType: 'Ainda não há credenciais do tipo {type}',
       type_rte: 'RTE',
