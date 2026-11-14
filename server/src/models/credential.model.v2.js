@@ -316,9 +316,10 @@ class CredentialModel extends CrudModel {
    * Whether a credential is an admin's to change and to name : one a connection takes its address
    * from (URL_TYPES), one a sign-in reads (SIGNIN_TYPES), one that reads its password from a
    * secret store (secret_store, or the deprecated vault_path : only an admin chooses which secret,
-   * controllers/v2/credential.controller.js assertSecretRefUnchanged), or one a runner names,
-   * whatever its type. A user with only connections access may not point a notification channel or
-   * a repository at it : both would hand its secret to a server of their choosing.
+   * controllers/v2/credential.controller.js assertSecretRefUnchanged), or one a runner names or a
+   * CyberArk secret store writes with (its PVWA API user, storesWritingWith), whatever its type. A
+   * user with only connections access may not point a notification channel or a repository at it :
+   * both would hand its secret to a server of their choosing.
    *
    * Args:
    *   record (object|null): the credential ({ name, credential_type, secret_store, vault_path }).
@@ -333,7 +334,12 @@ class CredentialModel extends CrudModel {
     // a secret an admin chose to read from a secret store : named elsewhere by a connections user,
     // it would be sent to the address of their webhook or repository
     if (String(record.secret_store || '').trim() || String(record.vault_path || '').trim()) return true;
-    return !!(record.name && (await this.runnersUsing(record.name)).length);
+    if (!record.name) return false;
+    // one a runner signs in with, whatever its type
+    if ((await this.runnersUsing(record.name)).length) return true;
+    // the PVWA API user a CyberArk store writes as : named in a repository or a webhook of a
+    // connections user, its user and password would be sent to the server of their choosing
+    return (await this.storesWritingWith(record.name)).length > 0;
   }
 
   /**
@@ -667,7 +673,7 @@ class CredentialModel extends CrudModel {
 
   /**
    * How many records use each credential, as its page's Used by tab lists them : the secret
-   * stores, notification channels (a login or a token), repositories, LDAP directories, SSO
+   * stores (the credential they read with, and a CyberArk store's PVWA API user), notification channels (a login or a token), repositories, LDAP directories, SSO
    * providers, runners, databases and the chat assistant that name it. The forms and the
    * designer's workflows are counted by the caller (lib/formLinks.js formCredentials, models/workflowRun.js
    * workflowCredentials), as they live in files, not in a table.
@@ -679,6 +685,7 @@ class CredentialModel extends CrudModel {
     const rows = await mysql.do(
       "SELECT name, COUNT(*) AS n FROM (" +
         "SELECT credential AS name FROM AnsibleForms.`secret_stores` " +
+        "UNION ALL SELECT pvwa_credential FROM AnsibleForms.`secret_stores` " +
         "UNION ALL SELECT credential FROM AnsibleForms.`notification_channels` " +
         "UNION ALL SELECT token_credential FROM AnsibleForms.`notification_channels` " +
         "UNION ALL SELECT credential FROM AnsibleForms.`repositories` " +
@@ -720,6 +727,23 @@ class CredentialModel extends CrudModel {
   static async runnersUsing(name) {
     if (!name) return [];
     const rows = await mysql.do("SELECT name FROM AnsibleForms.`runners` WHERE credential = ?", [name]);
+    return (rows || []).map((r) => r.name);
+  }
+
+  /**
+   * The secret stores that write with a credential : a CyberArk store's PVWA API user
+   * (secret_stores.pvwa_credential, secrets/providers/cyberark_ccp.js). Whoever changes it, or
+   * names it elsewhere, holds the account every write to that vault goes through.
+   *
+   * Args:
+   *   name (string): the credential's name.
+   *
+   * Returns:
+   *   Promise<string[]>: the names of the secret stores that write with it, empty when none.
+   */
+  static async storesWritingWith(name) {
+    if (!name) return [];
+    const rows = await mysql.do("SELECT name FROM AnsibleForms.`secret_stores` WHERE pvwa_credential = ?", [name]);
     return (rows || []).map((r) => r.name);
   }
 

@@ -20,6 +20,8 @@ vi.mock("../src/models/db.model.js", () => ({
     do: async (sql, rec) => {
       if (/^UPDATE/.test(sql)) { updates.push(rec); return { affectedRows: 1 }; }
       if (/runners/.test(sql)) return rec?.[0] === "runner-token" ? [{ name: "rte1" }] : [];
+      // the CyberArk stores that write with a credential : none here
+      if (/secret_stores/.test(sql)) return [];
       if (/credentials/.test(sql)) return creds[rec?.[0]] ? [structuredClone(creds[rec[0]])] : [];
       return row ? [structuredClone(row)] : [];
     },

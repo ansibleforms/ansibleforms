@@ -36,9 +36,9 @@ async function reloadSso() {
 }
 
 /**
- * Refuses a change of a credential a connection takes its address from, or a runner signs in with,
- * to anyone but an admin : the same rule as a change of the runner itself
- * (controllers/v2/runner.controller.js assertAdmin). Since 7.3 a runner, a secret store and the
+ * Refuses a change of a credential a connection takes its address from, a runner signs in with, or
+ * a CyberArk secret store writes with (its PVWA API user), to anyone but an admin : the same rule
+ * as a change of the runner itself (controllers/v2/runner.controller.js assertAdmin). Since 7.3 a runner, a secret store and the
  * other connections take their URL and token from their credential : a user with only connections
  * access who could point one at another server would receive every secret sent through it,
  * although the runner itself is closed to them.
@@ -53,7 +53,7 @@ async function reloadSso() {
  *
  * Raises:
  *   Errors.AccessDeniedError: the user is not an admin and the credential carries an address, a
- *     sign-in reads it (ldap, entraid, oidc) or a runner names it.
+ *     sign-in reads it (ldap, entraid, oidc), a runner names it or a secret store writes with it.
  */
 async function assertMayChange(req, ...records) {
   if (isAdminRequest(req)) return;
@@ -65,10 +65,12 @@ async function assertMayChange(req, ...records) {
   }
   // a type that carries the address of the one server it logs in to (a runner's, a secret store's)
   let guarded = present.some((r) => CredentialModel.URL_TYPES.includes(r.credential_type));
-  // or one a runner names, whatever its type (a deprecated api or userpass one)
+  // or one a runner names, whatever its type (a deprecated api or userpass one), or the PVWA API
+  // user a CyberArk secret store writes with : its user and password reach every write to that vault
   for (const r of present) {
     if (guarded) break;
     if (r.name && (await CredentialModel.runnersUsing(r.name)).length) guarded = true;
+    else if (r.name && (await CredentialModel.storesWritingWith(r.name)).length) guarded = true;
   }
   if (guarded) throw new Errors.AccessDeniedError(i18n.t(req, 'resources.credentialAdminOnly'));
 }
