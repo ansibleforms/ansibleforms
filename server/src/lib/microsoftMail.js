@@ -470,12 +470,13 @@ export async function sendThroughGraph(config, to, subject, html) {
 }
 
 /**
- * Sends a mail with SMTP and OAuth2 (XOAUTH2) : the channel's server, else smtp.office365.com:587
- * with STARTTLS, signed in as the sender mailbox with the app's token.
+ * Sends a mail with SMTP and OAuth2 (XOAUTH2) : always to smtp.office365.com:587 with STARTTLS,
+ * signed in as the sender mailbox with the app's token. The token is Exchange Online's : it is
+ * never handed to another server, whatever mail_server the config carries.
  *
  * Args:
- *   config (object): the mail config (toMailConfig) : mail_server, mail_port, mail_secure,
- *     mail_from and entra.
+ *   config (object): the mail config (toMailConfig) : mail_from and entra (its mail_server,
+ *     mail_port and mail_secure are not used).
  *   to (string|string[]): the recipients.
  *   subject (string): the subject.
  *   html (string): the body (HTML).
@@ -491,10 +492,11 @@ export async function sendThroughSmtp(config, to, subject, html) {
   const name = config.entra?.name || "";
   if (!from) throw new Error("A mail channel sending through SMTP with OAuth2 needs its sender address (the mailbox it signs in to)");
   const accessToken = await getAccessToken(config.entra, scopeFor("smtp"));
-  const secure = !!config.mail_secure;
+  // Exchange Online's server only : a server of the channel's own would get the token
+  const secure = !!OFFICE365_SMTP.secure;
   const transporter = nodemailer.createTransport({
-    host: config.mail_server || OFFICE365_SMTP.server,
-    port: config.mail_port || OFFICE365_SMTP.port,
+    host: OFFICE365_SMTP.server,
+    port: OFFICE365_SMTP.port,
     secure,
     // port 587 : STARTTLS, never a login in clear
     requireTLS: !secure,
