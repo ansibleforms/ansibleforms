@@ -93,9 +93,8 @@ var app_config = {
   // How long finished jobs and their output are kept. Job output is longtext and
   // nothing pruned it before, so this is the table that grows without limit on a
   // busy instance.
-  // DEFAULT 0 = keep for ever, ON PURPOSE : upgrading must never silently delete
-  // job history somebody was relying on. Opting in is a deliberate choice, and the
-  // health page reports the size so it is a visible one.
+  // DEFAULT 90 days since 7.6.0. Set to 0 to disable the sweep and keep every job;
+  // the health page reports the size so the growth stays visible.
   jobRetentionDays: parseInt(process.env.JOB_RETENTION_DAYS || "90", 10),
   // Serve the MCP server for AI agents on /api/v2/mcp. Off by default : it is a new way
   // in, and an operator should opt in to it.
