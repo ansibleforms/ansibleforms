@@ -4220,7 +4220,7 @@
                   A `list` field shows a table of rows where each row is edited through a separate **subform** pane.  
                   The subform itself is a top-level form of type `subform`, referenced by name via the `subform` property.  
                   Subforms can be nested (a list field inside a subform) and can be reused across multiple forms (e.g. a single `Address` subform shared by customers, suppliers, ...).  
-                  Use the `columns` property to pick which subform fields appear in the table. Other properties (`allowInsert`, `allowDelete`, `insertMarker`, `deleteMarker`, `updateMarker`) control how rows are added, removed and marked as changed.
+                  Use the `columns` property to pick which subform fields appear in the table. Other properties (`allowInsert`, `allowDelete`, `insertMarker`, `deleteMarker`, `updateMarker`) control how rows are added, removed and marked as changed. `readonlyColumns` keeps chosen subform fields read only on existing rows, while new rows still fill them in.
 
                   **Pre-population.** A list can be seeded with rows in three ways:
 
@@ -5466,7 +5466,31 @@
             default: true
             short: Allow table/list insert
             description: |
-              A table or list can be used to modify existing data.  If new data is not allowed, set this property to false.  
+              A table or list can be used to modify existing data.  If new data is not allowed, set this property to false.
+          - name: readonlyColumns
+            type: array
+            group: interaction
+            with_types: list
+            version: 7.6.0
+            short: Subform fields that existing rows keep read only
+            description: |
+              The names of the subform fields that cannot be changed on a row the list already holds,
+              like the `readonlyColumns` of the old `table` field.
+              When editing an existing row, those fields are shown but disabled, and the row keeps their values as they were.
+              When adding a new row, they can be filled in like any other field.
+              Validation still applies to them.
+              The property sits on the `list` field, not on the subform, so the same subform can be read only in one list
+              and fully editable in another.
+            examples:
+            - name: Street and city fixed once an address exists
+              code: |
+                - name: addresses
+                  type: list
+                  label: Addresses
+                  subform: Address
+                  readonlyColumns:
+                    - street
+                    - city
           - name: allowDelete
             type: boolean
             group: interaction

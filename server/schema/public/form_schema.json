@@ -2031,6 +2031,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -2140,6 +2143,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -2289,6 +2295,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -2407,6 +2416,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -2535,6 +2547,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -2631,6 +2646,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -2719,6 +2737,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -2818,6 +2839,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -2906,6 +2930,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -3003,6 +3030,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -3097,6 +3127,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -3221,6 +3254,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -3365,6 +3401,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -3640,6 +3679,9 @@
                   "allowInsert": {
                     "not": {}
                   },
+                  "readonlyColumns": {
+                    "not": {}
+                  },
                   "deleteMarker": {
                     "not": {}
                   },
@@ -3752,6 +3794,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -3867,6 +3912,9 @@
                     "not": {}
                   },
                   "allowInsert": {
+                    "not": {}
+                  },
+                  "readonlyColumns": {
                     "not": {}
                   },
                   "deleteMarker": {
@@ -4206,6 +4254,12 @@
               },
               "allowInsert": {
                 "type": "boolean"
+              },
+              "readonlyColumns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               },
               "deleteMarker": {
                 "type": "string"
@@ -6521,6 +6575,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -6630,6 +6687,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -6779,6 +6839,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -6897,6 +6960,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -7025,6 +7091,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -7121,6 +7190,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -7209,6 +7281,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -7308,6 +7383,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -7396,6 +7474,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -7493,6 +7574,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -7587,6 +7671,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -7711,6 +7798,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -7855,6 +7945,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -8130,6 +8223,9 @@
                     "allowInsert": {
                       "not": {}
                     },
+                    "readonlyColumns": {
+                      "not": {}
+                    },
                     "deleteMarker": {
                       "not": {}
                     },
@@ -8242,6 +8338,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -8357,6 +8456,9 @@
                       "not": {}
                     },
                     "allowInsert": {
+                      "not": {}
+                    },
+                    "readonlyColumns": {
                       "not": {}
                     },
                     "deleteMarker": {
@@ -8696,6 +8798,12 @@
                 },
                 "allowInsert": {
                   "type": "boolean"
+                },
+                "readonlyColumns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 "deleteMarker": {
                   "type": "string"

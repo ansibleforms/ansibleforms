@@ -58,7 +58,7 @@ replaces each item and how to move over while still on 6.5.
 | `forms.yaml`, forms in the base config | `config.yaml` + one file per form in `forms/` | 6.0.0 |
 | `FORMS_PATH` | `CONFIG_PATH` + `FORMS_FOLDER_PATH` | 6.0.0 |
 | `ENABLE_FORMS_YAML_IN_DATABASE` | `ENABLE_CONFIG_IN_DATABASE` | 6.0.0 |
-| the `table` field type (`tableFields`, `insertColumns`, `readonlyColumns`, `tableTitleAdd/Edit`) | a `list` field with a `subform` | 6.2.0 |
+| the `table` field type (`tableFields`, `insertColumns`, `readonlyColumns`, `tableTitleAdd/Edit`) | a `list` field with a `subform` (its own `readonlyColumns` since 7.6.0) | 6.2.0 |
 | API v1 (`/api/v1/*`) | API v2 | 6.2.x |
 | `disableRelaunch` | `allowRelaunch: false` | 6.3.0 |
 | `noOutput` | `output: false` | 6.3.0 |

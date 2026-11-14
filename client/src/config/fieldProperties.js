@@ -184,6 +184,11 @@ export const fieldProperties = [
     kind: 'switch',
   },
   {
+    key: 'readonlyColumns',
+    kind: 'yaml',
+    init: [],
+  },
+  {
     key: 'deleteMarker',
     kind: 'text',
   },

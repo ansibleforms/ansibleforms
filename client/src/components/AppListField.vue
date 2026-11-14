@@ -7,7 +7,9 @@
 /*  stack to the root page via `provide('formEditStack')`.        */
 /*                                                                */
 /*  @props:                                                       */
-/*      field: Object         (the parent list field definition)  */
+/*      field: Object         (the parent list field definition,  */
+/*                             its readonlyColumns locked on      */
+/*                             existing rows)                     */
 /*      subform: Object       (target subform definition)         */
 /*      subforms: Array       (all subforms inlined by server)    */
 /*      constants: Object     (form constants, pass-through)      */
@@ -251,6 +253,9 @@ function openEditor({ row, index }) {
     row: row ? (({ __output__: _, ...rest }) => rest)(row) : defaultRow(),
     // De parentFormData bevat de wizard context -> hier gebruiken we de veilige kloon!
     parentData: Helpers.safeDeepClone(props.parentFormData),
+    // The list's readonlyColumns : shown but not editable on a row the list already
+    // holds, filled in freely on a new row (like the old table field's readonlyColumns).
+    readonlyFields: Helpers.readonlyColumnsFor(props.field, isAdd),
 
     onSave: (value) => applySave(value, index),
   });
