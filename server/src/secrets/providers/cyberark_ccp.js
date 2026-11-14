@@ -269,8 +269,19 @@ async function withPvwa(store, work) {
   }
 }
 
+// the accounts asked per page of a search (the PVWA's most ; it answers 50 without a limit)
+export const ACCOUNT_PAGE_SIZE = 1000;
+// the pages of one search read at most before giving up (50 000 accounts at 1000 a page)
+export const ACCOUNT_MAX_PAGES = 50;
+
 /**
  * The account a reference names, as the PVWA lists it : the one of that name in that safe.
+ *
+ * The search is a keyword search (any account whose name, address, user name, ... contains the
+ * name), answered a page at a time : every page is read, offset after offset, until the account
+ * is found or the results end, so an account beyond the first page is never taken as missing (a
+ * new one would then be posted and refused as a duplicate). A search longer than
+ * ACCOUNT_MAX_PAGES pages is refused rather than read as "no account".
  *
  * Args:
  *   call (function): the PVWA request (withPvwa).
@@ -278,16 +289,39 @@ async function withPvwa(store, work) {
  *
  * Returns:
  *   Promise<object|null>: the account ({ id, name, userName, ... }), null when there is none.
+ *
+ * Raises:
+ *   Error: the PVWA refused the search, or it did not end within ACCOUNT_MAX_PAGES pages.
  */
 async function findAccount(call, target) {
-  let res;
-  try {
-    res = await call("get", `Accounts?search=${encodeURIComponent(target.object)}&filter=${encodeURIComponent(`safeName eq ${target.safe}`)}`);
-  } catch (e) {
-    throw new Error(`CyberArk PVWA could not list the accounts of safe ${target.safe} (${pvwaError(e)})`, { cause: e });
+  const search = `search=${encodeURIComponent(target.object)}&filter=${encodeURIComponent(`safeName eq ${target.safe}`)}`;
+  const isTarget = (a) => String(a?.name || "").toLowerCase() === target.object.toLowerCase() && String(a?.safeName || target.safe).toLowerCase() === target.safe.toLowerCase();
+  let offset = 0;
+  for (let page = 0; page < ACCOUNT_MAX_PAGES; page++) {
+    // step 1 : the next page of the search
+    let res;
+    try {
+      res = await call("get", `Accounts?${search}&offset=${offset}&limit=${ACCOUNT_PAGE_SIZE}`);
+    } catch (e) {
+      throw new Error(`CyberArk PVWA could not list the accounts of safe ${target.safe} (${pvwaError(e)})`, { cause: e });
+    }
+    const list = Array.isArray(res?.data?.value) ? res.data.value : [];
+    // step 2 : the account, when this page has it
+    const found = list.find(isTarget);
+    if (found) return found;
+    // step 3 : the end of the results : an empty page, the total reached, or (without a total)
+    // no next page announced ; the PVWA may answer fewer than asked, so the offset moves by
+    // what it answered
+    if (!list.length) return null;
+    offset += list.length;
+    const count = res?.data?.count;
+    if (typeof count === "number") {
+      if (offset >= count) return null;
+    } else if (!res?.data?.nextLink) {
+      return null;
+    }
   }
-  const list = Array.isArray(res?.data?.value) ? res.data.value : [];
-  return list.find((a) => String(a?.name || "").toLowerCase() === target.object.toLowerCase() && String(a?.safeName || target.safe).toLowerCase() === target.safe.toLowerCase()) || null;
+  throw new Error(`CyberArk PVWA search for ${target.object} in safe ${target.safe} returned too many accounts (more than ${ACCOUNT_MAX_PAGES} pages): the account could not be checked`);
 }
 
 /**

@@ -38,10 +38,13 @@ vi.mock("../src/models/crud.model.js", () => ({
   },
 }));
 
-// the fake PVWA : its accounts, the requests it got, what the logon answers
+// the fake PVWA : its accounts, the requests it got, what the logon answers, the most accounts it
+// answers in one page (the real one : 50 without a limit, 1000 at most), and an endless search
 let accounts = [];
 const calls = [];
 let logonStatus = 200;
+let maxLimit = 1000;
+let endless = false;
 const server = http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
@@ -57,7 +60,17 @@ const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url.startsWith("/PasswordVault/API/Accounts?")) {
       const q = new URL(req.url, "http://x").searchParams;
       const safe = q.get("filter").replace(/^safeName eq /, "");
-      return res.end(JSON.stringify({ value: accounts.filter((a) => a.safeName === safe && a.name.includes(q.get("search"))) }));
+      // a keyword search : every account whose name contains it, a page at a time
+      const offset = parseInt(q.get("offset") || "0", 10);
+      const limit = Math.min(parseInt(q.get("limit") || "50", 10), maxLimit);
+      if (endless) {
+        const value = Array.from({ length: limit }, (_, i) => ({ id: `x_${offset + i}`, name: `${q.get("search")}-${offset + i}`, safeName: safe }));
+        return res.end(JSON.stringify({ value, count: 1000000, nextLink: `api/accounts?offset=${offset + limit}&limit=${limit}` }));
+      }
+      const all = accounts.filter((a) => a.safeName === safe && a.name.includes(q.get("search")));
+      const value = all.slice(offset, offset + limit);
+      const more = offset + value.length < all.length;
+      return res.end(JSON.stringify({ value, count: all.length, ...(more ? { nextLink: `api/accounts?offset=${offset + limit}&limit=${limit}` } : {}) }));
     }
     if (req.method === "POST" && req.url === "/PasswordVault/API/Accounts") {
       accounts.push({ id: `${accounts.length + 1}_1`, ...data });
@@ -104,6 +117,8 @@ beforeEach(() => {
   accounts = [];
   calls.length = 0;
   logonStatus = 200;
+  maxLimit = 1000;
+  endless = false;
   Registry.clearSecretCache();
 });
 
@@ -157,6 +172,41 @@ describe("writing", () => {
     assert.deepEqual(update.data, { ChangeEntireGroup: false, NewCredentials: "s3cret!" });
     assert.equal(logons(), 1);
     assert.equal(searches(), 1);
+    assert.equal(logoffs(), 1);
+  });
+
+  test("an account beyond the search's first page : found, refused without overwrite, updated with it", async () => {
+    // seven accounts the keyword matches, three a page : the exact one on the third page
+    maxLimit = 3;
+    accounts = [1, 2, 3, 4, 5, 6].map((i) => ({ id: `${i}_1`, name: `srv01-root-${i}`, safeName: "Linux", userName: "other" }));
+    accounts.push({ id: "77_7", name: "srv01-root", safeName: "Linux", userName: "old" });
+    await assert.rejects(Registry.writeSecret("cyberark", REF, LOGIN), (e) => e.status === 409 && e.code === "secretExists");
+    assert.equal(searches(), 3);
+    calls.length = 0;
+    const done = await Registry.writeSecret("cyberark", REF, LOGIN, { overwrite: true });
+    assert.equal(done.replaced, true);
+    // no duplicate created : the one there updated
+    assert.ok(!calls.some((c) => c.method === "POST" && c.url === "/PasswordVault/API/Accounts"));
+    assert.ok(calls.some((c) => c.url === "/PasswordVault/API/Accounts/77_7/Password/Update"));
+    assert.equal(logons(), 1);
+    assert.equal(logoffs(), 1);
+  });
+
+  test("no account of that name on any page : a new one, after the last page", async () => {
+    maxLimit = 3;
+    accounts = [1, 2, 3, 4, 5].map((i) => ({ id: `${i}_1`, name: `srv01-root-${i}`, safeName: "Linux", userName: "other" }));
+    const done = await Registry.writeSecret("cyberark", REF, LOGIN);
+    assert.equal(done.replaced, false);
+    assert.equal(searches(), 2);
+    assert.ok(calls.some((c) => c.method === "POST" && c.url === "/PasswordVault/API/Accounts"));
+  });
+
+  test("a search that never ends : stopped after a bounded number of pages, nothing written", async () => {
+    endless = true;
+    maxLimit = 2;
+    await assert.rejects(Registry.writeSecret("cyberark", REF, LOGIN, { overwrite: true }), /search for srv01-root in safe Linux returned too many accounts/);
+    assert.ok(searches() <= 100);
+    assert.ok(!calls.some((c) => c.method === "POST" && c.url === "/PasswordVault/API/Accounts"));
     assert.equal(logoffs(), 1);
   });
 
