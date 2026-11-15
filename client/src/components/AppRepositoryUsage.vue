@@ -101,7 +101,7 @@ function setAll(category, on) {
 }
 
 /**
- * A type's grey note : the repository that has it, when another one does.
+ * Which repository holds a type, when another one does : the start of its tooltip (titleOf).
  *
  * Args:
  *   type (object): the type.
@@ -157,7 +157,8 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
           <span class="af-usage-count">({{ shownCount(category) }})</span></label
         >
       </div>
-      <!-- its types, one per row ; one that cannot be ticked greyed, why beside its name -->
+      <!-- its types, one per row ; one another repository holds shown ticked and disabled (the
+           checkbox's disabled blue), which one in its tooltip -->
       <div class="af-usage-types">
         <div
           v-for="type in typesOf(category)"
@@ -171,13 +172,12 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
             :id="'af-usage-' + type.flag"
             class="form-check-input"
             type="checkbox"
-            :checked="flagOn(modelValue[type.flag])"
+            :checked="flagOn(modelValue[type.flag]) || !available(type, modelValue, others)"
             :disabled="readonly || !available(type, modelValue, others)"
             @change="setType(type, $event.target.checked)"
           />
           <label class="form-check-label" :for="'af-usage-' + type.flag">
             <span class="af-short-label">{{ usageLabel(t, type.key) }}</span>
-            <span v-if="noteOf(type)" class="af-usage-note">{{ noteOf(type) }}</span>
             <span class="text-body-secondary small">{{ usageHint(t, type.key) }}</span>
           </label>
         </div>
@@ -212,9 +212,4 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
   margin-bottom: 0;
 }
 /* why it cannot be ticked, beside its name, small and slanted */
-.af-usage-note {
-  margin-right: 0.6rem;
-  font-size: 0.8rem;
-  font-style: italic;
-}
 </style>
