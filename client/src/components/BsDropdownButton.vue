@@ -14,6 +14,8 @@
 /*            icon: String - Action icon              */
 /*            roleOption: String - Required role opt  */
 /*            divider: Boolean - Show divider after   */
+/*            hint: String - Optional muted line      */
+/*                  under the label (one line)        */
 /*          }]                                        */
 /*                                                    */
 /*  @emit:                                            */
@@ -126,6 +128,11 @@ function handleActionClick(actionKey) {
           <a class="dropdown-item" href="#" @click.prevent="handleActionClick(action.key)">
             <FaIcon v-if="action.icon" :icon="action.icon" class="me-2" />
             {{ action.label }}
+            <!-- an optional hint : one muted line under the label, aligned with it (an entry
+                 without one renders exactly as before) -->
+            <small v-if="action.hint" class="af-dropdown-hint" :class="{ 'af-dropdown-hint-icon': action.icon }">{{
+              action.hint
+            }}</small>
           </a>
         </li>
         <li v-if="action.divider && index < visibleActions.length - 1">
@@ -135,3 +142,15 @@ function handleActionClick(actionKey) {
     </ul>
   </div>
 </template>
+<style scoped>
+/* an action's hint : under its label, muted, on one line */
+.af-dropdown-hint {
+  display: block;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+}
+/* under the label, past the icon (its fixed width and the me-2 after it) */
+.af-dropdown-hint-icon {
+  padding-left: 1.75em;
+}
+</style>

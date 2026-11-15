@@ -281,6 +281,8 @@ export default {
     approved: "La tasca {id} s'ha aprovat",
     rejected: "La tasca {id} s'ha rebutjat",
     relaunched: "La tasca s'ha tornat a llançar amb l'id de tasca {id}",
+    relaunchedFailedHosts: "La tasca {id} torna a llançar els {count} hosts fallits",
+    noFailedHosts: "Aquesta tasca no té hosts fallits per tornar a llançar",
     failedRetrieveRawData:
       "No s'han pogut obtenir les dades en brut del formulari",
   },

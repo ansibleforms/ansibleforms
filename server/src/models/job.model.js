@@ -34,6 +34,7 @@ import { NODE_DEAD_SECONDS } from "../lib/nodes.js";
 import { SOCKET_MODES, queueMinutes } from "../rte/socket/protocol.js";
 import { runWorkflow } from "./workflowRun.js";
 import { jobTypeOf } from "../lib/jobTypes.js";
+import { hostsFromEvents, hostsFromRecap, ranHostsFromRecap, rerunDiffers, rerunLimit, fallbackLimit } from "../lib/failedHosts.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +102,8 @@ function pushForminfoToExtravars(formObj, extravars, creds = {}) {
  * allowVerboseMode before this runs.
  */
 const CLIENT_SETTABLE_RESERVED = new Set(["__verbose__"]);
+// the most lines a re-run's first output says of where it comes from (relaunchOriginLines)
+const MAX_ORIGIN_LINES = 5;
 
 /**
  * The reserved keys the FORM declares as fields of its own.
@@ -1526,6 +1529,16 @@ Job.launch = async function ({
 
   logger.debug(`Job id ${jobid} is created`);
   extravars["__jobid__"] = jobid;
+
+  // a re-run of another job (Job.relaunch with failedHostsOnly) : its first output line says
+  // of which job and on which hosts, before the approval or the runner writes anything
+  // (at most a few lines : what it re-runs, and the names it left out)
+  const origin = relaunchOriginLines(extravars).slice(0, MAX_ORIGIN_LINES);
+  let order = 0;
+  for (const line of origin) {
+    order += 1;
+    await Job.printJobOutput(line, order > 1 ? "stderr" : "stdout", jobid, order).catch((err) => logger.error(`Job ${jobid}: could not say where it comes from`, err));
+  }
   
   // Store raw form data in database if provided (exclude sensitive/irrelevant fields). An empty
   // one is stored too (a form with no fields, or only constants and passwords, sends {}) : its
@@ -1824,7 +1837,7 @@ function wizardRelaunchData(formObj, stored, values) {
  *   masked), credentials, payloadHash, warnings } - nothing is launched
  * @param {string} [args.expectedPayloadHash]  refuse when the payload differs (payload_mismatch)
  */
-Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = false, preview = false, expectedPayloadHash }) {
+Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = false, preview = false, expectedPayloadHash, failedHostsOnly = false }) {
   const job = await Job.findById(user, id, true); // not log-safe : the stored passwords are needed
   const formConfig = await Form.load(user?.roles, job.form);
   const formObj = formConfig.forms?.[0];
@@ -1836,6 +1849,10 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
     throw new Errors.AccessDeniedError(`You do not have permission to run jobs in verbose mode.`);
   }
   const changed = !!values && Object.keys(values).length > 0;
+  // a re-run on the failed hosts : the same relaunch, its limit restricted to them (the
+  // extravars the server adds after the launch validation, so never taken for form output)
+  const rerun = failedHostsOnly && !preview ? await rerunExtravars(job) : null;
+  const serverExtravars = rerun?.extravars || {};
 
   // no changes, and the form is not enforced : a replay of the job as it ran - its stored
   // extravars, on the server, as a relaunch always was (passwords included, they never leave
@@ -1857,8 +1874,8 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
       const masked = safeParse(Helpers.logSafe(JSON.stringify(byDefinition)), {}, `masked extravars id=${id}`);
       return { form: job.form, replayed: true, extravars: masked, credentials, payloadHash, warnings: [] };
     }
-    const replayed = await replayJob(user, job, verbose);
-    return { ...replayed, replayed: true, payloadHash, warnings: [] };
+    const replayed = await replayJob(user, job, verbose, serverExtravars);
+    return { ...replayed, replayed: true, payloadHash, warnings: [], ...(rerun ? { failedHosts: rerun.hosts } : {}) };
   }
 
   // otherwise through the form engine : resolved, validated, the extravars built here
@@ -1930,18 +1947,35 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
   if (verbose) extravars.__verbose__ = true;
   logger.notice(`Relaunching job ${id} with form ${job.form}, with ${Object.keys(values || {}).length} changed field(s)`);
   const launched = await Job.launch({
-    form: job.form, user, credentials, extravars, rawFormData, fromClient: true, validated: true,
+    form: job.form, user, credentials, extravars, rawFormData, fromClient: true, validated: true, serverExtravars,
   });
   await Job.sendEventNotification(id, 'relaunch', user);
-  return { ...launched, payloadHash, warnings: result.warnings };
+  return { ...launched, payloadHash, warnings: result.warnings, ...(rerun ? { failedHosts: rerun.hosts } : {}) };
 };
 
 /**
  * Relaunch a job as it ran. A form under launch validation 'enforce' goes through the form
  * engine instead (relaunchWithValues without changes) : its stored extravars are not
  * trusted as they are, and a password field it shows makes it refuse.
+ *
+ * Args:
+ *   user (object): who relaunches it.
+ *   id (number): the job.
+ *   verbose (boolean): run it verbose (allowVerboseMode).
+ *   options (object): { failedHostsOnly } : re-run it on the hosts it failed on only (an ended
+ *     playbook job, or an AWX, AAP or Ascender template job) - the same relaunch, its limit
+ *     restricted to them (rerunExtravars).
+ *
+ * Returns:
+ *   Promise<object>: { id } of the new job, with failedHosts for a re-run on them.
+ *
+ * Raises:
+ *   AccessDeniedError: the user may not relaunch it.
+ *   BadRequestError: failedHostsOnly for a job that has no failed hosts, or cannot be re-run on
+ *     them (code NO_FAILED_HOSTS).
+ *   ConflictError: the job is still running.
  */
-Job.relaunch = async function (user, id, verbose) {
+Job.relaunch = async function (user, id, verbose, { failedHostsOnly = false } = {}) {
   const job = await Job.findById(user, id, true);
   const formConfig = await Form.load(user?.roles, job.form);
   const formObj = formConfig.forms?.[0];
@@ -1950,13 +1984,27 @@ Job.relaunch = async function (user, id, verbose) {
   }
   assertRelaunchable(job, formObj, user);
   if (launchValidationMode(formObj) === 'enforce') {
-    return Job.relaunchWithValues({ user, id, values: {}, verbose });
+    return Job.relaunchWithValues({ user, id, values: {}, verbose, failedHostsOnly });
   }
-  return replayJob(user, job, verbose);
+  if (!failedHostsOnly) return replayJob(user, job, verbose);
+  const rerun = await rerunExtravars(job);
+  const launched = await replayJob(user, job, verbose, rerun.extravars);
+  return { ...launched, failedHosts: rerun.hosts };
 };
 
-/** the replay itself : the stored extravars, credentials and raw form data, launched again */
-async function replayJob(user, job, verbose) {
+/**
+ * The replay itself : the stored extravars, credentials and raw form data, launched again.
+ *
+ * Args:
+ *   user (object): who relaunches it.
+ *   job (object): the job (findById, not log safe).
+ *   verbose (boolean): run it verbose.
+ *   serverExtravars (object): what the server adds (a re-run's limit, rerunExtravars).
+ *
+ * Returns:
+ *   Promise<object>: { id } of the new job.
+ */
+async function replayJob(user, job, verbose, serverExtravars = {}) {
   const id = job.id;
   var extravars = {};
   var credentials = {};
@@ -1964,6 +2012,9 @@ async function replayJob(user, job, verbose) {
   if (job.extravars) {
     extravars = safeParse(job.extravars, {}, `job.extravars id=${id}`);
   }
+  // a replay of a re-run is a relaunch of that job : it runs on the same hosts (its limit is
+  // kept), it is no re-run of the job before it
+  delete extravars["__relaunchOf__"];
   // The stored extravars carry whatever the ORIGINAL launch used, __verbose__ included, so
   // a user without allowVerboseMode could relaunch a verbose job (or any job in 'approve',
   // which findById exposes to everyone) and get -vvv output. The controller checks the
@@ -1990,7 +2041,8 @@ async function replayJob(user, job, verbose) {
       credentials,
       extravars,
       rawFormData,
-      replay: true
+      replay: true,
+      serverExtravars,
     });
     // Send relaunch notification
     await Job.sendEventNotification(id, 'relaunch', user);
@@ -2001,6 +2053,211 @@ async function replayJob(user, job, verbose) {
     );
   }
 }
+
+// ─── a re-run on the failed hosts ─────────────────────────────────────────────
+
+// the runner kinds whose jobs re-run on their failed hosts : an RTE, through a limit file ;
+// AWX, AAP and Ascender, through their own relaunch (`hosts: failed`)
+const FAILED_HOSTS_KINDS = new Set(["awx", "aap", "ascender"]);
+
+/**
+ * The hosts a job failed on (failed tasks, or unreachable), when it can be re-run on them : an
+ * ended playbook job (its events, else the PLAY RECAP of its output), or an ended AWX, AAP or
+ * Ascender job template job (its job host summaries, else its stored events). A workflow, a
+ * multistep, a step of one, a Jenkins, Semaphore or Rundeck job : none.
+ *
+ * Args:
+ *   job (object): the job row (job_type, status, runner, runner_kind, awx_id, awx_workflow,
+ *     parent_id, abort_requested).
+ *
+ * Returns:
+ *   Promise<string[]|null>: the hosts, sorted ([] when none failed) ; null when the job cannot be
+ *     re-run on its failed hosts at all.
+ */
+Job.failedHostsOf = async function (job) {
+  if (!job || job.parent_id) return null;
+  if (job.status === "running" || job.status === "approve" || job.abort_requested) return null;
+  const isPlaybook = job.job_type === "ansible";
+  const awxWorkflow = job.awx_workflow && (typeof job.awx_workflow === "object" || String(job.awx_workflow) !== "null");
+  const isTemplate = job.job_type === "awx" && FAILED_HOSTS_KINDS.has(job.runner_kind) && !!job.awx_id && !awxWorkflow;
+  if (!isPlaybook && !isTemplate) return null;
+  // an AWX job : its job host summaries, as AWX's own relaunch picks the hosts
+  if (isTemplate) {
+    try {
+      const runner = job.runner ? await Runner.findByName(job.runner) : null;
+      if (runner) {
+        const { default: Awx } = await import("../runners/awx/api.js");
+        return await Awx.failedHosts(runner, job.awx_id);
+      }
+    } catch (err) {
+      logger.warning(`Job ${job.id}: could not read its failed hosts from ${job.runner_kind}, taking its stored events (${err.message})`);
+    }
+  }
+  // the events that say a host failed, and the recap's counts (lib/failedHosts.js)
+  const rows = await mysql.do(
+    "SELECT `order`, type, host, data FROM AnsibleForms.`job_events` WHERE job_id=? AND type IN ('stats','failed','unreachable','ignored') ORDER BY `order`",
+    [job.id]
+  );
+  if (rows?.length) {
+    return hostsFromEvents(rows.map((r) => ({ ...r, data: r.type === "stats" ? safeParse(r.data, null, `job_events stats id=${job.id}`) : null })));
+  }
+  // a job from before the events : its PLAY RECAP lines, from the last record that holds one
+  if (!isPlaybook) return [];
+  const recap = await mysql.do(
+    "SELECT output FROM AnsibleForms.`job_output` WHERE job_id=? AND `order` >= (SELECT COALESCE(MAX(`order`), 0) FROM AnsibleForms.`job_output` WHERE job_id=? AND output LIKE '%PLAY RECAP%') ORDER BY `order`",
+    [job.id, job.id]
+  );
+  return hostsFromRecap((recap || []).map((r) => r.output).join("\n"));
+};
+
+/**
+ * Every host an ended job ran on, failed or not : its recap's hosts (the `stats` event), else the
+ * hosts its events name, else its PLAY RECAP lines ; for an AWX, AAP or Ascender job, how many
+ * its job host summaries count. Tells a job that failed on some hosts from one that failed on all
+ * it had (lib/failedHosts.js rerunDiffers).
+ *
+ * Args:
+ *   job (object): the job (id, job_type, runner, runner_kind, awx_id).
+ *
+ * Returns:
+ *   Promise<string[]|number|null>: the hosts, or their count (AWX), null when not known.
+ */
+Job.ranHostsOf = async function (job) {
+  try {
+    if (job.job_type === "awx") {
+      const runner = job.runner ? await Runner.findByName(job.runner) : null;
+      if (!runner || !job.awx_id) return null;
+      const { default: Awx } = await import("../runners/awx/api.js");
+      return await Awx.hostCount(runner, job.awx_id);
+    }
+    // the last recap of its events : every host it counted
+    const stats = await mysql.do(
+      "SELECT data FROM AnsibleForms.`job_events` WHERE job_id=? AND type='stats' ORDER BY `order` DESC LIMIT 1",
+      [job.id]
+    );
+    if (stats?.length) {
+      const data = safeParse(stats[0].data, null, `job_events stats id=${job.id}`);
+      if (data && typeof data === "object") {
+        return Object.entries(data).filter(([, c]) => c && typeof c === "object").map(([h]) => h);
+      }
+    }
+    // no recap event : the hosts its events name
+    const named = await mysql.do(
+      "SELECT DISTINCT host FROM AnsibleForms.`job_events` WHERE job_id=? AND host IS NOT NULL AND host <> ''",
+      [job.id]
+    );
+    if (named?.length) return named.map((r) => r.host);
+    // a job from before the events : its PLAY RECAP lines
+    const recap = await mysql.do(
+      "SELECT output FROM AnsibleForms.`job_output` WHERE job_id=? AND `order` >= (SELECT COALESCE(MAX(`order`), 0) FROM AnsibleForms.`job_output` WHERE job_id=? AND output LIKE '%PLAY RECAP%') ORDER BY `order`",
+      [job.id, job.id]
+    );
+    const hosts = ranHostsFromRecap((recap || []).map((r) => r.output).join("\n"));
+    return hosts.length ? hosts : null;
+  } catch (err) {
+    logger.warning(`Job ${job.id}: could not read the hosts it ran on (${err.message})`);
+    return null;
+  }
+};
+
+/**
+ * What a job can be relaunched as, for the job page's Relaunch menu : its failed hosts when it
+ * can be re-run on them. Read when the job has ended ; nothing for a user who may not relaunch it.
+ *
+ * Args:
+ *   user (object): who asks.
+ *   id (number): the job.
+ *
+ * Returns:
+ *   Promise<object>: { failedHosts : the host names, or null when there is no such choice }.
+ *
+ * Raises:
+ *   AccessDeniedError: the user may not see the job, or may not relaunch it.
+ *   NotFoundError: there is no such job, or its form is gone.
+ */
+Job.relaunchOptions = async function (user, id) {
+  await Job.checkExists(id);
+  const rows = await mysql.do(
+    "SELECT id, form, status, user, user_type, job_type, runner, runner_kind, awx_id, awx_workflow, parent_id, abort_requested FROM AnsibleForms.`jobs` WHERE id=?",
+    [id]
+  );
+  const job = rows?.[0];
+  if (!job) throw new Errors.NotFoundError(`Job ${id} not found`);
+  const formConfig = await Form.load(user?.roles, job.form);
+  const formObj = formConfig.forms?.[0];
+  if (!formObj) throw new Errors.NotFoundError(`Form '${job.form}' not found or you don't have access to it`);
+  // the same rule as the relaunch itself : the owner, or who manages every job
+  assertRelaunchable(job, formObj, user);
+  const hosts = await Job.failedHostsOf(job);
+  // a re-run on the failed hosts that is a full relaunch (one host, or every host failed) is no
+  // choice of its own : none offered
+  const all = hosts?.length ? await Job.ranHostsOf(job) : null;
+  return { failedHosts: rerunDiffers(hosts, all) ? hosts : null };
+};
+
+/**
+ * The extravars a re-run on the failed hosts adds to the relaunch : the hosts (__limitHosts__,
+ * which the RTE writes to its limit file), the job's own limit as lines of that file
+ * (__limitWithin__), the limit an RTE of an earlier release runs with instead (__limit__), and
+ * where the job comes from (__relaunchOf__ : the job, and for AWX its job to relaunch, on the
+ * runner it ran on).
+ *
+ * Args:
+ *   job (object): the job re-run (its stored extravars a JSON text).
+ *
+ * Returns:
+ *   Promise<object>: { extravars, hosts }.
+ *
+ * Raises:
+ *   BadRequestError: the job cannot be re-run on its failed hosts, or none failed (code
+ *     NO_FAILED_HOSTS).
+ */
+async function rerunExtravars(job) {
+  const failed = await Job.failedHostsOf(job);
+  if (!failed?.length) {
+    throw Object.assign(new Errors.BadRequestError(`Job ${job.id} has no failed hosts to re-run`), { code: "NO_FAILED_HOSTS" });
+  }
+  const stored = safeParse(job.extravars, {}, `job.extravars id=${job.id}`) || {};
+  // a re-run of a re-run : within the hosts and the limit of the one before
+  const previous = Array.isArray(stored.__limitHosts__) ? stored.__limitHosts__ : null;
+  const limit = previous ? stored.__limitWithin__ || [] : stored.__limit__ || "";
+  const { hosts, within, skipped } = rerunLimit(failed, limit, previous);
+  if (!hosts.length) {
+    throw Object.assign(new Errors.BadRequestError(`Job ${job.id} has no failed hosts that can be re-run${skipped.length ? `: ${skipped.join(", ")} read as patterns` : ""}`), { code: "NO_FAILED_HOSTS" });
+  }
+  const awx = job.job_type === "awx";
+  const extravars = {
+    __limitHosts__: hosts,
+    __limitWithin__: within,
+    __limit__: fallbackLimit(hosts, within),
+    __relaunchOf__: { id: Number(job.id), scope: "failedHosts", ...(skipped.length ? { skipped } : {}), ...(awx ? { awxId: job.awx_id } : {}) },
+  };
+  // an AWX job is relaunched where it ran : that AWX knows its job
+  if (awx && job.runner) extravars.__runner__ = job.runner;
+  return { extravars, hosts };
+}
+
+/**
+ * The output lines a re-run starts with : of which job it is a re-run, and on which hosts ; and
+ * the failed hosts left out (their names are patterns to ansible).
+ *
+ * Args:
+ *   extravars (object): the new job's extravars.
+ *
+ * Returns:
+ *   string[]: the lines, none for a job that is no re-run.
+ */
+function relaunchOriginLines(extravars) {
+  const origin = extravars?.__relaunchOf__;
+  if (!origin || typeof origin !== "object" || origin.scope !== "failedHosts") return [];
+  const hosts = Array.isArray(extravars.__limitHosts__) ? extravars.__limitHosts__ : [];
+  const lines = [`ok: [Re-run of job ${origin.id} on its ${hosts.length} failed host(s): ${hosts.join(", ")}]`];
+  if (Array.isArray(origin.skipped) && origin.skipped.length) {
+    lines.push(`[WARNING]: not re-run, ansible reads their names as patterns: ${origin.skipped.join(", ")}`);
+  }
+  return lines;
+}
+
 Job.approve = async function (user, id) {
   const job = await Job.findById(user, id, true);
 
@@ -2890,4 +3147,4 @@ for (const fn of CHANGES_A_JOB) {
 // Ansible stuff
 export default Job;
 // named export for the tests
-export { Multistep, scopeOfUser, assertLaunchScope, stripReservedExtravars, stripUndeclaredCredentials, filterRawFormDataOf, setUserExtravars, guardLaunch, launchValidationMode, pushForminfoToExtravars };
+export { Multistep, scopeOfUser, assertLaunchScope, stripReservedExtravars, stripUndeclaredCredentials, filterRawFormDataOf, setUserExtravars, guardLaunch, launchValidationMode, pushForminfoToExtravars, relaunchOriginLines };

@@ -270,6 +270,8 @@ export default {
     approved: "Job {id} has been approved",
     rejected: "Job {id} has been rejected",
     relaunched: "Job has been relaunched with job id {id}",
+    relaunchedFailedHosts: "Job {id} re-runs the {count} failed host(s)",
+    noFailedHosts: "This job has no failed hosts to re-run",
     failedRetrieveRawData: "Failed to retrieve raw form data",
   },
   email: {

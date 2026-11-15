@@ -46,6 +46,12 @@ const getJob = async function(req, res) {
     restData.subjobs = (job.subjobs || "").split(",").filter(x => x != "").map(x => parseInt(x))
     // on an AWX, AAP or Ascender : the job's address there, and its workflow nodes'
     await addRunnerJobLinks(restData)
+    // an ended job : what its Relaunch offers besides a full relaunch (as GET .../relaunch-options),
+    // read with it, so the job page draws its Relaunch with its other buttons ; null when this user
+    // may not relaunch it or the choices cannot be read
+    if (!['running', 'approve'].includes(restData.status)) {
+      restData.relaunchOptions = await Promise.resolve().then(() => Job.relaunchOptions(user, req.params.id)).catch(() => null)
+    }
     res.status(200).json(RestResultv2.single(restData));
   } catch (err) {
     if (err.name === 'NotFoundError') {
@@ -269,14 +275,22 @@ const relaunchJob = async function(req, res) {
     // without one : replay the job as it ran
     const values = (req.body && typeof req.body.values === 'object' && req.body.values !== null && !Array.isArray(req.body.values))
       ? req.body.values : null;
+    // `failedHostsOnly: true` : the same relaunch, on the hosts the job failed on only
+    const failedHostsOnly = req.body?.failedHostsOnly === true;
     try{
       const job = values
-        ? await Job.relaunchWithValues({ user, id: jobid, values, verbose })
-        : await Job.relaunch(user, jobid, verbose);
-      res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'jobs.relaunched', { id: job.id }), id: job.id }));
+        ? await Job.relaunchWithValues({ user, id: jobid, values, verbose, failedHostsOnly })
+        : await Job.relaunch(user, jobid, verbose, { failedHostsOnly });
+      const message = job.failedHosts
+        ? i18n.t(req, 'jobs.relaunchedFailedHosts', { id: job.id, count: job.failedHosts.length })
+        : i18n.t(req, 'jobs.relaunched', { id: job.id });
+      res.status(200).json(RestResultv2.single({ message, id: job.id, ...(job.failedHosts ? { failedHosts: job.failedHosts } : {}) }));
     } catch(err) {
       if (err.name === 'ValidationError') {
         res.status(422).json(RestResultv2.error(i18n.t(req, 'jobs.invalidFormData'), err.details || err.message));
+      } else if (err.code === 'NO_FAILED_HOSTS') {
+        // said in the caller's language, the model's reason as the details
+        res.status(400).json(RestResultv2.error(i18n.t(req, 'jobs.noFailedHosts'), err.message));
       } else if (err.name === 'BadRequestError') {
         res.status(400).json(RestResultv2.error(err.message));
       } else if (err.name === 'NotFoundError') {
@@ -288,6 +302,32 @@ const relaunchJob = async function(req, res) {
       } else {
         logger.error(`Error relaunching job: ${err.toString()}`);
         res.status(500).json(RestResultv2.error(i18n.t(req, 'jobs.failedRelaunch'), publicMessage(req, err)));
+      }
+    }
+};
+/**
+ * GET /api/v2/job/:id/relaunch-options : what the job page's Relaunch offers besides a full
+ * relaunch - the hosts an ended job failed on, when it can be re-run on them.
+ *
+ * Args:
+ *   req (object): the request (params.id, the user).
+ *   res (object): the response : { failedHosts: string[]|null }.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+const getRelaunchOptions = async function(req, res) {
+    const user = req?.user?.user || {};
+    try {
+      res.status(200).json(RestResultv2.single(await Job.relaunchOptions(user, req.params.id)));
+    } catch (err) {
+      if (err.name === 'NotFoundError') {
+        res.status(404).json(RestResultv2.error(err.message));
+      } else if (err.name === 'AccessDeniedError' || err.name === 'ForbiddenError') {
+        res.status(403).json(RestResultv2.error(err.message));
+      } else {
+        logger.error(`Error reading the relaunch options of job ${req.params.id}: ${err.toString()}`);
+        res.status(500).json(RestResultv2.error(i18n.t(req, 'jobs.failedRetrieve'), publicMessage(req, err)));
       }
     }
 };
@@ -372,6 +412,7 @@ export default {
   deleteJob,
   launch,
   relaunchJob,
+  getRelaunchOptions,
   approveJob,
   rejectJob
 };

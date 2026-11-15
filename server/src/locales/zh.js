@@ -258,6 +258,8 @@ export default {
     approved: "作业 {id} 已获批准",
     rejected: "作业 {id} 已被拒绝",
     relaunched: "作业已重新运行，新作业 ID 为 {id}",
+    relaunchedFailedHosts: "作业 {id} 将重新运行 {count} 台失败的主机",
+    noFailedHosts: "此作业没有可重新运行的失败主机",
     failedRetrieveRawData: "获取原始表单数据失败",
   },
   email: {

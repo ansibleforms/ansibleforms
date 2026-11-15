@@ -277,6 +277,8 @@ export default {
     approved: "Job {id} is goedgekeurd",
     rejected: "Job {id} is afgewezen",
     relaunched: "Job is herstart met job id {id}",
+    relaunchedFailedHosts: "Job {id} herstart de {count} mislukte hosts",
+    noFailedHosts: "Deze job heeft geen mislukte hosts om te herstarten",
     failedRetrieveRawData: "Kan ruwe formuliergegevens niet ophalen",
   },
   email: {

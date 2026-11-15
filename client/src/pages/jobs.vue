@@ -23,6 +23,7 @@ import { jobTypeLabel, jobTypeName, hasArtifacts } from '@/lib/jobTypes';
 import { useNodeOutput } from '@/composables/useNodeOutput';
 import { mayApprove, mayDecide } from '@/lib/jobNotifications';
 import { useRefreshing } from '@/composables/useRefreshing';
+import { relaunchActions, relaunchBody } from '@/lib/relaunchMenu';
 
 // INIT
 
@@ -78,6 +79,15 @@ const showRelaunch = ref(false);
 const reviewJob = ref(null);
 const relaunchVerbose = ref(false);
 const relaunchWithEdit = ref(false);
+// what the relaunch asked in the dialog is : 'all' a full relaunch, 'failedHosts' on the failed
+// hosts only (the Relaunch menu, lib/relaunchMenu.js)
+const relaunchScope = ref('all');
+// the job page's relaunch choices besides a full relaunch (GET /api/v2/job/:id/relaunch-options),
+// read once the job has ended ; null : none, the plain Relaunch button
+const relaunchOptions = ref(null);
+// the job whose relaunch choices were read (answered or failed) : until then no Relaunch is shown,
+// so the button and its caret appear together, never the plain button first and the caret after
+const relaunchOptionsFor = ref(null);
 const tempJobId = ref(null);
 // the left menu's status filter : null shows every job ; /jobs/<status> opens the page on one
 // (/jobs/running ; the approvals bell in the header links to /jobs/approval)
@@ -562,6 +572,10 @@ const jobHosts = computed(() => {
   const j = job.value;
   if (!j || (j.job_type && j.job_type != 'ansible')) return null;
   const list = (v) => (Array.isArray(v) ? v.join(', ') : String(v ?? '').trim());
+  // a re-run on the failed hosts : those hosts (its __limit__ is only an older RTE's)
+  if (Array.isArray(j.extravars?.__limitHosts__) && j.extravars.__limitHosts__.length) {
+    return { value: list(j.extravars.__limitHosts__), note: t('jobs.failedHostsNote') };
+  }
   const limit = list(j.extravars?.__limit__);
   if (limit) return { value: limit, note: '' };
   const inventory = list(j.extravars?.__inventory__);
@@ -885,7 +899,7 @@ async function reloadDecided(id) {
     if (isJobPage.value) router.push({ path: listPath.value, query: route.query }).catch(() => {});
   }
 }
-async function jobAction(id, action, method = 'post', uri_suffix = '') {
+async function jobAction(id, action, method = 'post', uri_suffix = '', body = {}) {
   try {
     jobId.value = id;
     var result;
@@ -895,7 +909,7 @@ async function jobAction(id, action, method = 'post', uri_suffix = '') {
         result = await axios.get(uri);
         break;
       case 'post':
-        result = await axios.post(uri, {});
+        result = await axios.post(uri, body);
         break;
       case 'delete':
         result = await axios.delete(uri);
@@ -1024,11 +1038,76 @@ async function deleteJob(id) {
 async function abortJob(id) {
   await jobAction(id, 'abort', 'post', '/abort');
 }
-// relaunch a job (direct relaunch)
-async function relaunchJob(id, verbose = false) {
+// relaunch a job (direct relaunch) ; scope 'failedHosts' : on its failed hosts only
+async function relaunchJob(id, verbose = false, scope = 'all') {
   relaunchVerbose.value = false;
-  await jobAction(id, 'relaunch', 'post', `/relaunch?verbose=${verbose}`);
+  relaunchScope.value = 'all';
+  await jobAction(id, 'relaunch', 'post', `/relaunch?verbose=${verbose}`, relaunchBody(scope));
 }
+/**
+ * Opens the relaunch dialog for the job of the page : the Relaunch button, its main part, or an
+ * entry of its menu.
+ *
+ * Args:
+ *   scope (string): 'all' a full relaunch, 'failedHosts' the failed hosts only.
+ */
+function askRelaunch(scope = 'all') {
+  tempJobId.value = job.value?.id;
+  relaunchScope.value = scope;
+  relaunchWithEdit.value = false;
+  showRelaunch.value = true;
+}
+// the Relaunch menu's entries : none without a second choice (the plain button then)
+const relaunchMenu = computed(() => relaunchActions(relaunchOptions.value, t));
+// the failed hosts the dialog names for a relaunch on them
+const relaunchHosts = computed(() => relaunchOptions.value?.failedHosts || []);
+// the job page's relaunch choices : read when its job has ended and may be relaunched by this user
+// (the profile's permissions among the sources : read as soon as they are known, not at the job's
+// next refresh a second later ; and once at once, for a page opened on a job already read)
+watch(
+  () => [
+    isJobPage.value,
+    job.value?.id,
+    job.value?.status,
+    job.value?.end,
+    canRelaunchJobs.value,
+    store?.profile?.username,
+  ],
+  async ([page, id, status], [, oldId] = []) => {
+    // another job : its choices are read anew, nothing shown until then ; the same job read again
+    // (its status or end changed) keeps what it shows until the new answer
+    if (String(id) !== String(oldId)) {
+      relaunchOptions.value = null;
+      relaunchOptionsFor.value = null;
+    }
+    if (!page || !id || status === 'running' || status === 'approve') return;
+    if (!canRelaunchJobs.value || !canManage(job.value)) return;
+    // read with the job (GET /api/v2/job/:id carries them for an ended job) : shown at once, with
+    // the page's other buttons
+    if (job.value && 'relaunchOptions' in job.value) {
+      relaunchOptions.value = job.value.relaunchOptions || null;
+      relaunchOptionsFor.value = String(id);
+      return;
+    }
+    let options = null;
+    try {
+      const result = await axios.get(`/api/v2/job/${id}/relaunch-options`);
+      options = result.data || null;
+    } catch {
+      // no choice besides a full relaunch : the plain button
+    }
+    // the job still shown : an answer for one left meanwhile is dropped
+    if (String(job.value?.id) !== String(id)) return;
+    relaunchOptions.value = options;
+    relaunchOptionsFor.value = String(id);
+  },
+  { immediate: true },
+);
+// where a job came from : a re-run of another job (its __relaunchOf__), for its facts
+const relaunchOrigin = computed(() => {
+  const origin = job.value?.extravars?.__relaunchOf__;
+  return origin && typeof origin === 'object' && origin.id ? origin : null;
+});
 // edit and relaunch - navigate to form with pre-filled data
 async function editAndRelaunchJob(id) {
   relaunchWithEdit.value = false;
@@ -1126,7 +1205,7 @@ onMounted(async () => {
        a single pane, so it must not be trapped in one inner scroller -->
   <div class="flex-shrink-0">
     <!-- Modal - delete verify -->
-    <BsModal v-if="showDelete" @close="showDelete = false" icon="trash">
+    <BsModal v-if="showDelete" size="lg" @close="showDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
@@ -1146,7 +1225,7 @@ onMounted(async () => {
       >
     </BsModal>
     <!-- Modal - the ticked jobs deleted together -->
-    <BsModal v-if="showBulkDelete" @close="showBulkDelete = false" icon="trash">
+    <BsModal v-if="showBulkDelete" size="lg" @close="showBulkDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteSelected', { count: selected.size }) }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
@@ -1181,7 +1260,14 @@ onMounted(async () => {
     <BsModal v-if="showRelaunch" @close="showRelaunch = false" icon="redo">
       <template #title> {{ t('jobs.relaunchJob') }} {{ tempJobId }} </template>
       <template #default>
-        <p class="mt-3 fs-6 user-select-none">
+        <!-- on the failed hosts only : how many, and which -->
+        <template v-if="relaunchScope === 'failedHosts'">
+          <p class="mt-3 fs-6 user-select-none">
+            {{ t('jobs.relaunchFailedLead', { id: tempJobId, count: relaunchHosts.length }) }}
+          </p>
+          <p class="font-monospace small text-break">{{ relaunchHosts.join(', ') }}</p>
+        </template>
+        <p v-else class="mt-3 fs-6 user-select-none">
           {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong
           >:
         </p>
@@ -1193,7 +1279,9 @@ onMounted(async () => {
           :isSwitch="true"
           :inline="true"
         />
+        <!-- editing the values relaunches the form on all its hosts : not for the failed ones -->
         <BsCheckbox
+          v-if="relaunchScope !== 'failedHosts'"
           v-model="relaunchWithEdit"
           :label="t('jobs.relaunchEdit')"
           class="mt-2"
@@ -1206,7 +1294,7 @@ onMounted(async () => {
           v-if="!relaunchWithEdit"
           icon="redo"
           @click="
-            relaunchJob(tempJobId, relaunchVerbose);
+            relaunchJob(tempJobId, relaunchVerbose, relaunchScope);
             showRelaunch = false;
           "
           >{{ t('jobs.relaunch') }}</BsButton
@@ -1313,16 +1401,35 @@ onMounted(async () => {
           />
           <div v-if="isJobPage" class="d-flex justify-content-end align-items-center gap-2">
             <template v-if="job">
-              <BsButton
-                v-if="job.status != 'running' && job.status != 'approve' && canRelaunchJobs && canManage(job)"
-                icon="redo"
-                cssClass="text-nowrap"
-                @click="
-                  tempJobId = job.id;
-                  showRelaunch = true;
+              <!-- shown once its choices are read, so the button and its caret come together -->
+              <template
+                v-if="
+                  job.status != 'running' &&
+                  job.status != 'approve' &&
+                  canRelaunchJobs &&
+                  canManage(job) &&
+                  relaunchOptionsFor === String(job.id)
                 "
-                >{{ t('jobs.relaunchJob') }}</BsButton
               >
+                <!-- a second choice (the failed hosts) : the split button the form's Submit is, its
+                     main part a full relaunch ; none : the plain Relaunch button -->
+                <!-- outline-primary : the plain Relaunch's look (BsButton), only a caret more -->
+                <BsDropdownButton
+                  v-if="relaunchMenu.length"
+                  colorClass="outline-primary"
+                  icon="redo"
+                  :label="t('jobs.relaunchJob')"
+                  cssClass="text-nowrap"
+                  :actions="relaunchMenu"
+                  :fullWidth="false"
+                  :menuEnd="true"
+                  @click="askRelaunch('all')"
+                  @action="askRelaunch"
+                />
+                <BsButton v-else icon="redo" cssClass="text-nowrap" @click="askRelaunch('all')">{{
+                  t('jobs.relaunchJob')
+                }}</BsButton>
+              </template>
               <BsButton
                 v-if="job.status == 'running' && !job.abort_requested && canManage(job)"
                 icon="ban"
@@ -1539,6 +1646,7 @@ onMounted(async () => {
                             href="#"
                             @click.prevent="
                               tempJobId = j.id;
+                              relaunchScope = 'all';
                               showRelaunch = true;
                             "
                             ><font-awesome-icon icon="redo" class="me-2" />{{ t('jobs.relaunch') }}</a
@@ -1727,6 +1835,17 @@ onMounted(async () => {
                 <div class="af-job-fact">
                   <dt><FaIcon icon="stopwatch" />{{ t('jobs.duration') }}</dt>
                   <dd class="af-job-duration">{{ jobDuration }}</dd>
+                </div>
+                <!-- a re-run of another job : which one, and on what -->
+                <div v-if="relaunchOrigin" class="af-job-fact">
+                  <dt><FaIcon icon="redo" />{{ t('jobs.relaunchOf') }}</dt>
+                  <dd class="af-job-fact-split">
+                    <span class="af-job-fact-text"
+                      ><a href="#" @click.prevent="getJob(relaunchOrigin.id)">#{{ relaunchOrigin.id }}</a></span
+                    ><span v-if="relaunchOrigin.scope === 'failedHosts'" class="af-job-fact-note">{{
+                      t('jobs.failedHostsNote')
+                    }}</span>
+                  </dd>
                 </div>
                 <div v-if="job.job_type == 'multistep' && job.subjobs?.length" class="af-job-fact">
                   <dt><FaIcon icon="layer-group" />{{ t('jobs.steps') }}</dt>

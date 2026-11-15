@@ -288,6 +288,8 @@ export default {
     approved: "La tache {id} a ete approuvee",
     rejected: "La tache {id} a ete rejetee",
     relaunched: "La tache a ete relancee avec l'id {id}",
+    relaunchedFailedHosts: "La tache {id} relance les {count} hotes en echec",
+    noFailedHosts: "Cette tache n'a aucun hote en echec a relancer",
     failedRetrieveRawData:
       "Echec de la recuperation des donnees brutes du formulaire",
   },

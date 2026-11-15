@@ -11,7 +11,8 @@ let launched;
 vi.mock("../src/models/job.model.js", () => ({
   default: {
     launch: async (args) => { launched = args; return { id: 7 }; },
-    findById: async () => ({ id: 7, extravars: JSON.stringify({ who: "Mirko" }), credentials: "{}", approval: "{}", notifications: "{}", subjobs: "" }),
+    relaunchOptions: async () => ({ failedHosts: ["web02"] }),
+    findById: async () => ({ id: 7, status: "failed", extravars: JSON.stringify({ who: "Mirko" }), credentials: "{}", approval: "{}", notifications: "{}", subjobs: "" }),
   },
 }));
 
@@ -43,5 +44,7 @@ describe("payload and extravars", () => {
     const job = r.body?.data?.output ?? r.body;
     expect(job.extravars).toEqual({ who: "Mirko" });
     expect(job.payload).toEqual(job.extravars);
+    // an ended job carries what its Relaunch offers, so the page draws it with its other buttons
+    expect(job.relaunchOptions).toEqual({ failedHosts: ["web02"] });
   });
 });

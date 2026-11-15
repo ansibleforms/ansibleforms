@@ -277,6 +277,8 @@ export default {
     approved: "ジョブ {id} は承認されました",
     rejected: "ジョブ {id} は却下されました",
     relaunched: "ジョブはジョブ ID {id} で再起動されました",
+    relaunchedFailedHosts: "ジョブ {id} が失敗した {count} 台のホストを再実行します",
+    noFailedHosts: "このジョブには再実行する失敗ホストがありません",
     failedRetrieveRawData: "フォームの生データの取得に失敗しました",
   },
   email: {

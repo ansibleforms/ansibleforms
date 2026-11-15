@@ -280,6 +280,8 @@ export default {
     approved: "El trabajo {id} ha sido aprobado",
     rejected: "El trabajo {id} ha sido rechazado",
     relaunched: "El trabajo ha sido relanzado con el id {id}",
+    relaunchedFailedHosts: "El trabajo {id} relanza los {count} hosts fallidos",
+    noFailedHosts: "Este trabajo no tiene hosts fallidos que relanzar",
     failedRetrieveRawData:
       "Error al recuperar los datos sin procesar del formulario",
   },
