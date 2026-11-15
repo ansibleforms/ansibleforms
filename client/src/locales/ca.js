@@ -1317,6 +1317,7 @@ export default {
         appearance: 'Aparença',
         system: 'Sistema',
       },
+      usageHeldBy: 'Ja el gestiona el repositori "{name}"',
       usageCategoryAll: '{category}: tots els tipus que es poden marcar',
       usageTypes: {
         forms: 'Formularis',
@@ -2128,7 +2129,8 @@ export default {
       overridesRte: "Substitueix {env} definida a l'RTE ({value}).",
       socketConnected: 'Connectat',
       socketDisconnected: 'No connectat',
-      socketDisconnectedHint: "Cap socket amb aquest RTE: comprova que s'executa, la seva adreça o CONTROLLER_URL i el token.",
+      socketDisconnectedHint:
+        "Cap socket amb aquest RTE: comprova que s'executa, la seva adreça o CONTROLLER_URL i el token.",
       socketHint: 'Node del controlador {node}, RTE {version}, {running} de {max} tasques en execució',
       joinTokenValid_1: '1 hora',
       joinTokenValid_24: '1 dia',

@@ -212,7 +212,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
     expect(component).toContain(':indeterminate.prop="categoryState(category, modelValue, others).indeterminate"');
     // a single list, one type per row, spaced and lined up as the Type tabs' options
     expect(component).toContain('class="form-check af-short-check"');
-    expect(component).toContain('<span class="af-short-label">');
+    expect(component).toContain('<span class="af-short-label"');
     expect(component).not.toContain('grid-template-columns');
     expect(read('components/AppAdminMulti.vue')).toMatch(
       /<AppRepositoryUsage\s+v-if="showField\(field\) && field.type === 'usage'"/,

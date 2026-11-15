@@ -1308,6 +1308,7 @@ export default {
         appearance: '外観',
         system: 'システム',
       },
+      usageHeldBy: 'リポジトリ「{name}」で管理済み',
       usageCategoryAll: '{category}：チェックできるすべての種類',
       usageTypes: {
         forms: 'フォーム',

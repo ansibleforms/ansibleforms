@@ -1315,6 +1315,7 @@ export default {
         appearance: 'Aspetto',
         system: 'Sistema',
       },
+      usageHeldBy: 'Già gestito dal repository "{name}"',
       usageCategoryAll: '{category}: tutti i tipi che si possono spuntare',
       usageTypes: {
         forms: 'Moduli',

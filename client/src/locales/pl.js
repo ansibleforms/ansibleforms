@@ -1311,6 +1311,7 @@ export default {
         appearance: 'Wygląd',
         system: 'System',
       },
+      usageHeldBy: 'Już zarządzane przez repozytorium „{name}”',
       usageCategoryAll: '{category}: wszystkie typy, które można zaznaczyć',
       usageTypes: {
         forms: 'Formularze',
@@ -2114,7 +2115,8 @@ export default {
       overridesRte: 'Zastępuje {env} ustawioną na RTE ({value}).',
       socketConnected: 'Połączony',
       socketDisconnected: 'Niepołączony',
-      socketDisconnectedHint: 'Brak gniazda do tego RTE: sprawdź, czy działa, jego adres lub CONTROLLER_URL oraz token.',
+      socketDisconnectedHint:
+        'Brak gniazda do tego RTE: sprawdź, czy działa, jego adres lub CONTROLLER_URL oraz token.',
       socketHint: 'Węzeł kontrolera {node}, RTE {version}, uruchomione zadania: {running} z {max}',
       joinTokenValid_1: '1 godzinę',
       joinTokenValid_24: '1 dzień',

@@ -1319,6 +1319,7 @@ export default {
         appearance: 'Apparence',
         system: 'Système',
       },
+      usageHeldBy: 'Déjà géré par le dépôt « {name} »',
       usageCategoryAll: '{category} : tous les types qui peuvent être cochés',
       usageTypes: {
         forms: 'Formulaires',
@@ -1643,7 +1644,8 @@ export default {
       overridesRte: 'Remplace {env} défini sur le RTE ({value}).',
       socketConnected: 'Connecté',
       socketDisconnected: 'Non connecté',
-      socketDisconnectedHint: "Aucun socket vers ce RTE : vérifiez qu'il tourne, son adresse ou CONTROLLER_URL, et son jeton.",
+      socketDisconnectedHint:
+        "Aucun socket vers ce RTE : vérifiez qu'il tourne, son adresse ou CONTROLLER_URL, et son jeton.",
       socketHint: 'Nœud du contrôleur {node}, RTE {version}, {running} sur {max} jobs en cours',
       joinTokenValid_1: '1 heure',
       joinTokenValid_24: '1 jour',
@@ -1958,7 +1960,8 @@ export default {
     },
     knownhosts: {
       label: 'Hôte connu',
-      description: "Serveurs auxquels le contrôleur fait confiance en SSH ; l'hôte d'un dépôt est ajouté à son premier clonage.",
+      description:
+        "Serveurs auxquels le contrôleur fait confiance en SSH ; l'hôte d'un dépôt est ajouté à son premier clonage.",
       showEntry: "Copier l'hôte dans le presse-papiers",
       hostEntry: "Entree d'hote",
     },

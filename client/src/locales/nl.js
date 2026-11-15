@@ -1315,6 +1315,7 @@ export default {
         appearance: 'Uiterlijk',
         system: 'Systeem',
       },
+      usageHeldBy: 'Al beheerd door de repository "{name}"',
       usageCategoryAll: '{category}: elk type dat aangevinkt kan worden',
       usageTypes: {
         forms: 'Formulieren',
@@ -1634,7 +1635,8 @@ export default {
       overridesRte: 'Overschrijft {env} op de RTE ({value}).',
       socketConnected: 'Verbonden',
       socketDisconnected: 'Niet verbonden',
-      socketDisconnectedHint: 'Geen socket naar deze RTE: controleer of hij draait, zijn adres of CONTROLLER_URL en token.',
+      socketDisconnectedHint:
+        'Geen socket naar deze RTE: controleer of hij draait, zijn adres of CONTROLLER_URL en token.',
       socketHint: 'Controller-node {node}, RTE {version}, {running} van {max} jobs actief',
       joinTokenValid_1: '1 uur',
       joinTokenValid_24: '1 dag',

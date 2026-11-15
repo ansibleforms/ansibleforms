@@ -111,7 +111,7 @@ function setAll(category, on) {
  */
 function noteOf(type) {
   const other = takenBy(type, props.modelValue, props.others);
-  return other ? t('settings.common.takenBy', { name: other }) : '';
+  return other ? t('settings.repositories.usageHeldBy', { name: other }) : '';
 }
 
 /**
@@ -157,16 +157,15 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
           <span class="af-usage-count">({{ shownCount(category) }})</span></label
         >
       </div>
-      <!-- its types, one per row ; one another repository holds shown ticked and disabled (the
-           checkbox's disabled blue), which one in its tooltip -->
+      <!-- its types, one per row ; one another repository holds : its checkbox ticked in grey and
+           disabled, its name and sentence as any other's, which one in its tooltip -->
       <div class="af-usage-types">
         <div
           v-for="type in typesOf(category)"
           v-show="typeShown(type)"
           :key="type.key"
           class="form-check af-short-check"
-          :class="{ 'af-taken': !available(type, modelValue, others) }"
-          :title="titleOf(type)"
+          :class="{ 'af-usage-held': !available(type, modelValue, others) }"
         >
           <input
             :id="'af-usage-' + type.flag"
@@ -176,9 +175,14 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
             :disabled="readonly || !available(type, modelValue, others)"
             @change="setType(type, $event.target.checked)"
           />
+          <!-- over a held type's disabled checkbox : its tooltip (a disabled input shows none in
+               every browser) -->
+          <span v-if="noteOf(type)" class="af-usage-held-hit" :title="noteOf(type)"></span>
           <label class="form-check-label" :for="'af-usage-' + type.flag">
-            <span class="af-short-label">{{ usageLabel(t, type.key) }}</span>
-            <span class="text-body-secondary small">{{ usageHint(t, type.key) }}</span>
+            <!-- the tooltips on the words only, not on the row's whole width : the name says which
+                 repository holds it, when another one does ; the sentence that too, else what it holds -->
+            <span class="af-short-label" :title="noteOf(type) || null">{{ usageLabel(t, type.key) }}</span>
+            <span class="text-body-secondary small" :title="titleOf(type)">{{ usageHint(t, type.key) }}</span>
           </label>
         </div>
       </div>
@@ -187,6 +191,28 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
 </template>
 
 <style scoped>
+/* the area over a held type's checkbox that carries its tooltip : the checkbox's place */
+.af-usage-held {
+  position: relative;
+}
+.af-usage-held-hit {
+  position: absolute;
+  left: 0;
+  top: 0.25em;
+  width: 1em;
+  height: 1em;
+}
+/* a type another repository holds : only its checkbox disabled, its name and sentence read as
+   any other's (Bootstrap dims the label of a disabled input) */
+.af-usage-held .form-check-input:disabled ~ .form-check-label {
+  opacity: 1;
+}
+/* its checkbox ticked in grey, not the theme's blue : the tick is another repository's */
+.af-usage-held .form-check-input:checked:disabled {
+  background-color: var(--bs-gray-400);
+  border-color: var(--bs-gray-400);
+  opacity: 1;
+}
 /* the number of types after a heading's name : its weight and colour the text's, not the name's */
 .af-usage-count {
   font-weight: normal;

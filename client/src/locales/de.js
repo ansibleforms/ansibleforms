@@ -1320,6 +1320,7 @@ export default {
         appearance: 'Erscheinungsbild',
         system: 'System',
       },
+      usageHeldBy: 'Bereits vom Repository „{name}“ verwaltet',
       usageCategoryAll: '{category}: alle Typen, die angehakt werden können',
       usageTypes: {
         forms: 'Formulare',
@@ -1643,7 +1644,8 @@ export default {
       overridesRte: 'Überschreibt {env} auf dem RTE ({value}).',
       socketConnected: 'Verbunden',
       socketDisconnected: 'Nicht verbunden',
-      socketDisconnectedHint: 'Kein Socket zu dieser RTE: prüfen Sie, ob sie läuft, Adresse oder CONTROLLER_URL und Token.',
+      socketDisconnectedHint:
+        'Kein Socket zu dieser RTE: prüfen Sie, ob sie läuft, Adresse oder CONTROLLER_URL und Token.',
       socketHint: 'Controller-Knoten {node}, RTE {version}, {running} von {max} Jobs laufen',
       joinTokenValid_1: '1 Stunde',
       joinTokenValid_24: '1 Tag',

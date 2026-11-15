@@ -1317,6 +1317,7 @@ export default {
         appearance: 'Aparência',
         system: 'Sistema',
       },
+      usageHeldBy: 'Já gerido pelo repositório "{name}"',
       usageCategoryAll: '{category}: todos os tipos que podem ser marcados',
       usageTypes: {
         forms: 'Formulários',
@@ -2125,7 +2126,8 @@ export default {
       overridesRte: 'Substitui {env} definida no RTE ({value}).',
       socketConnected: 'Ligado',
       socketDisconnected: 'Não ligado',
-      socketDisconnectedHint: 'Sem socket para este RTE: verifique se corre, o seu endereço ou CONTROLLER_URL e o token.',
+      socketDisconnectedHint:
+        'Sem socket para este RTE: verifique se corre, o seu endereço ou CONTROLLER_URL e o token.',
       socketHint: 'Nó do controlador {node}, RTE {version}, {running} de {max} tarefas em execução',
       joinTokenValid_1: '1 hora',
       joinTokenValid_24: '1 dia',

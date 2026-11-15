@@ -1306,6 +1306,7 @@ export default {
         appearance: 'Appearance',
         system: 'System',
       },
+      usageHeldBy: 'Already managed by the "{name}" repository',
       usageCategoryAll: '{category}: every type that can be ticked',
       usageTypes: {
         forms: 'Forms',
@@ -1615,7 +1616,8 @@ export default {
       overridesRte: 'Overrides {env} set on the RTE ({value}).',
       socketConnected: 'Connected',
       socketDisconnected: 'Not connected',
-      socketDisconnectedHint: 'No socket to this RTE: check that it runs, its address or CONTROLLER_URL, and its token.',
+      socketDisconnectedHint:
+        'No socket to this RTE: check that it runs, its address or CONTROLLER_URL, and its token.',
       socketHint: 'Controller node {node}, RTE {version}, {running} of {max} jobs running',
       joinTokenValid_1: '1 hour',
       joinTokenValid_24: '1 day',

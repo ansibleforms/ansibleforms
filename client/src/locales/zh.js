@@ -1284,6 +1284,7 @@ export default {
         appearance: '外观',
         system: '系统',
       },
+      usageHeldBy: '已由仓库“{name}”管理',
       usageCategoryAll: '{category}：所有可勾选的类型',
       usageTypes: {
         forms: '表单',
