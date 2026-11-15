@@ -1394,6 +1394,23 @@ async function guardLaunch({ form, formConfig, formObj, user, rawFormData, extra
   logger.warning(`Launch validation would refuse form '${form}' for ${user?.username || 'unknown'} (launch validation 'log'): ${why}`);
 }
 
+/**
+ * Whether a launch brought the form's values (the browser's rawFormData) to store with its job :
+ * any object, an empty one included (a form with no fields, or only constants and passwords, sends
+ * {}). Stored, the job can be relaunched under launch validation 'enforce' ; a launch without them
+ * (the API, a schedule) stores none. Before, an empty one stored nothing, and such a job could not
+ * be relaunched at all.
+ *
+ * Args:
+ *   rawFormData (any): the launch's rawFormData.
+ *
+ * Returns:
+ *   boolean: true when there are form values to store.
+ */
+export function hasRawFormData(rawFormData) {
+  return !!rawFormData && typeof rawFormData === 'object' && !Array.isArray(rawFormData);
+}
+
 Job.launch = async function ({
   form,
   formObj = null,
@@ -1510,8 +1527,10 @@ Job.launch = async function ({
   logger.debug(`Job id ${jobid} is created`);
   extravars["__jobid__"] = jobid;
   
-  // Store raw form data in database if provided (exclude sensitive/irrelevant fields)
-  if (rawFormData && Object.keys(rawFormData).length > 0) {
+  // Store raw form data in database if provided (exclude sensitive/irrelevant fields). An empty
+  // one is stored too (a form with no fields, or only constants and passwords, sends {}) : its
+  // form name alone is what a relaunch under launch validation 'enforce' is built from
+  if (hasRawFormData(rawFormData)) {
     try {
       const filteredRawFormData = {};
       

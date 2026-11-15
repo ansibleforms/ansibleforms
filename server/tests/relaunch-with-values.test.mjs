@@ -275,3 +275,25 @@ describe("a job launched by a schedule", () => {
     expect(Job.launch).not.toHaveBeenCalled();
   });
 });
+
+describe("a form with no fields", () => {
+  test("stores its form values, empty ones included, so its job can be relaunched", async () => {
+    const { hasRawFormData } = await import("../src/models/job.model.js");
+    expect(hasRawFormData({})).toBe(true);
+    expect(hasRawFormData({ host: "prod-1" })).toBe(true);
+    for (const none of [undefined, null, "", [], "x"]) expect(hasRawFormData(none)).toBe(false);
+  });
+
+  test("its job, under enforce, relaunches through the engine ; one with nothing stored is refused", async () => {
+    const empty = { name: "Patch all", launchValidation: "enforce", fields: [] };
+    Form.load.mockResolvedValue({ constants: {}, forms: [structuredClone(empty)] });
+    const job = (raw) => ({ ...storedJob(), form: "Patch all", extravars: JSON.stringify({}), raw_form_data: raw });
+    // stored now : its form name alone
+    Job.findById = vi.fn(async () => job(JSON.stringify({ __form__: "Patch all" })));
+    await Job.relaunch(user, 42, false);
+    expect(Job.launch.mock.calls[0][0]).toMatchObject({ form: "Patch all", validated: true });
+    // stored nothing (a job of before the fix) : refused, saying why
+    Job.findById = vi.fn(async () => job(null));
+    await expect(Job.relaunch(user, 42, false)).rejects.toMatchObject({ code: "no_form_data" });
+  });
+});
