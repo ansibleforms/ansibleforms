@@ -83,8 +83,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
     z-index: 1061;
   }
   /* its header (the name, extravars, artifacts, run time) stays in place : only the part
-     under it scrolls, its scrollbar starting under the header */
-  .modal-body {
+     under it scrolls, its scrollbar starting under the header. Its own body only : a dialog
+     opened from its output (a host's Task result) keeps its padding */
+  > .modal > .modal-dialog > .modal-content > .modal-body {
     padding: 0;
     overflow: hidden;
     display: flex;
