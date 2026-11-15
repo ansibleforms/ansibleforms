@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
+// the node's link : Font Awesome's external link (a square with an arrow), drawn as a path in the graph
+import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { workflowEdges, conditionText } from '@/lib/workflowEdges';
 
 /******************************************************************/
@@ -22,6 +24,8 @@ import { workflowEdges, conditionText } from '@/lib/workflowEdges';
 /*                                                                */
 /******************************************************************/
 
+// its path, in a 512 x 512 box (the icon's own)
+const LINK_ICON = faArrowUpRightFromSquare.icon[4];
 const props = defineProps({
   workflow: {
     type: Object,
@@ -697,9 +701,16 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
                 >
                   <title>{{ t('jobs.openInRunner', { id: n.job, product }) }}</title>
                   <rect :x="n.x + NODE_W - 26" :y="n.y + NODE_H - 24" width="20" height="20" fill="transparent" />
-                  <text :x="n.x + NODE_W - 10" :y="n.y + NODE_H - 9" text-anchor="end" class="awx-node-link-text">
-                    ↗
-                  </text>
+                  <svg
+                    :x="n.x + NODE_W - 22"
+                    :y="n.y + NODE_H - 20"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 512 512"
+                    class="awx-node-link-text"
+                  >
+                    <path :d="LINK_ICON" />
+                  </svg>
                 </a>
               </g>
               <!-- the hovered node's card : its whole name, over it (the last drawn, so on top) -->
@@ -727,15 +738,17 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
                   <template v-if="card.elapsed > 0">· {{ Math.round(card.elapsed) }}s</template>
                 </text>
                 <!-- the node's link, drawn where it is under the card : the click passes through to it -->
-                <text
+                <svg
                   v-if="card.ui_url"
-                  :x="card.x + NODE_W - 10"
-                  :y="card.y + NODE_H - 9"
-                  text-anchor="end"
+                  :x="card.x + NODE_W - 22"
+                  :y="card.y + NODE_H - 20"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 512 512"
                   class="awx-node-link-text"
                 >
-                  ↗
-                </text>
+                  <path :d="LINK_ICON" />
+                </svg>
               </g>
               <!-- the hovered conditional link's card : when it is taken -->
               <text ref="linkMeasure" class="awx-cond-text awx-measure" x="0" y="0">{{ linkText(hoveredLink) }}</text>
