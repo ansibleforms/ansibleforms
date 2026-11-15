@@ -66,6 +66,17 @@ const typeShown = (type) => !props.shown || props.shown(type.flag);
 const categoryShown = (category) => typesOf(category).some(typeShown);
 
 /**
+ * How many types a heading holds, of those shown (the page's filter) : the number after its name.
+ *
+ * Args:
+ *   category (string): the category.
+ *
+ * Returns:
+ *   number: the types shown.
+ */
+const shownCount = (category) => typesOf(category).filter(typeShown).length;
+
+/**
  * Ticks or unticks one type.
  *
  * Args:
@@ -140,9 +151,11 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
           "
           @change="setAll(category, $event.target.checked)"
         />
-        <label class="form-check-label" :for="'af-usage-all-' + category">{{
-          t(`settings.repositories.usageCategories.${category}`)
-        }}</label>
+        <!-- its name, and how many types it holds (those the filter shows) -->
+        <label class="form-check-label" :for="'af-usage-all-' + category"
+          >{{ t(`settings.repositories.usageCategories.${category}`) }}
+          <span class="af-usage-count">({{ shownCount(category) }})</span></label
+        >
       </div>
       <!-- its types, one per row ; one that cannot be ticked greyed, why beside its name -->
       <div class="af-usage-types">
@@ -174,6 +187,11 @@ const titleOf = (type) => noteOf(type) || usageHint(t, type.key);
 </template>
 
 <style scoped>
+/* the number of types after a heading's name : its weight and colour the text's, not the name's */
+.af-usage-count {
+  font-weight: normal;
+  color: var(--bs-secondary-color);
+}
 /* a heading, then its types under it, one per row as the Type tabs' options (.af-short-check,
    .af-short-label, .af-taken : global), a little apart from the next heading */
 .af-usage-group + .af-usage-group {
