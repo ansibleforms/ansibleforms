@@ -25,6 +25,8 @@ router.delete('/:id', jobControllerv2.deleteJob);
 router.post('/', jobControllerv2.launch);
 // abort a job
 router.post('/:id/abort/', jobControllerv2.abortJob);
+// what a relaunch can be besides a full one (the failed hosts of an ended job)
+router.get('/:id/relaunch-options', jobControllerv2.getRelaunchOptions);
 // relaunch a job
 router.post('/:id/relaunch/', jobControllerv2.relaunchJob);
 // approve a job

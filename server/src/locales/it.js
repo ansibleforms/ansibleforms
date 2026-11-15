@@ -274,6 +274,8 @@ export default {
     approved: "Il job {id} e stato approvato",
     rejected: "Il job {id} e stato rifiutato",
     relaunched: "Il job e stato riavviato con id {id}",
+    relaunchedFailedHosts: "Il job {id} riavvia i {count} host non riusciti",
+    noFailedHosts: "Questo job non ha host non riusciti da riavviare",
     failedRetrieveRawData: "Recupero dati grezzi modulo non riuscito",
   },
   email: {

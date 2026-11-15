@@ -281,6 +281,8 @@ export default {
     approved: "Zadanie {id} zostało zatwierdzone",
     rejected: "Zadanie {id} zostało odrzucone",
     relaunched: "Zadanie zostało ponownie uruchomione z identyfikatorem {id}",
+    relaunchedFailedHosts: "Zadanie {id} ponownie uruchamia {count} nieudanych hostów",
+    noFailedHosts: "To zadanie nie ma nieudanych hostów do ponownego uruchomienia",
     failedRetrieveRawData: "Nie udało się pobrać surowych danych formularza",
   },
   email: {

@@ -28,6 +28,7 @@ import { createOutputBatcher } from "../lib/outputBatcher.js";
 import { resolveInventory } from "../lib/inventories.js";
 import { createEventTail } from "./events.js";
 import { prepareSshKey } from "./sshKey.js";
+import { isLiteralHost, limitFileContent } from "../lib/failedHosts.js";
 
 // ─── the job's I/O ────────────────────────────────────────────────────────────
 
@@ -326,10 +327,37 @@ export function playbookFile(directory, playbook) {
 }
 
 /**
+ * The hosts a re-run on the failed hosts of a job is limited to (Job.relaunch with
+ * failedHostsOnly) : __limitHosts__, the names that are literal hosts only (lib/failedHosts.js
+ * isLiteralHost), and __limitWithin__, the job's own limit as `&x` and `!x` lines.
+ *
+ * Args:
+ *   extravars (object): the job's extravars.
+ *
+ * Returns:
+ *   object|null: { hosts, within } ; null for a job that is no such re-run.
+ */
+export function rerunHosts(extravars) {
+  if (!Array.isArray(extravars?.__limitHosts__)) return null;
+  const hosts = extravars.__limitHosts__.filter(isLiteralHost);
+  const within = (Array.isArray(extravars.__limitWithin__) ? extravars.__limitWithin__ : []).filter((l) => typeof l === "string" && /^[&!]\S+$/.test(l));
+  return { hosts, within };
+}
+
+/**
  * The ansible-playbook arguments for a job's extravars. No shell runs them, so no value
  * needs quoting ; the vault password is not among them (it goes in on stdin).
+ *
+ * Args:
+ *   extravars (object): the job's extravars.
+ *   files (object): { extravarsFileName, hiddenExtravarsFileName, vaultPassword, limitFileName } :
+ *     limitFileName the file a re-run's hosts are written to (rerunHosts), passed as
+ *     `--limit @file` instead of __limit__.
+ *
+ * Returns:
+ *   object: { args, inventory }.
  */
-export function buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword = "" }) {
+export function buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword = "", limitFileName = "" }) {
   // ansible can have multiple inventories : one -i per entry. A list used to be passed joined
   // as well (-i a,b), which ansible reads as a HOST list - adding hosts named after the files
   const inventory = [];
@@ -378,7 +406,12 @@ export function buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravars
   } else if (verbosity) {
     args.push(`-${"v".repeat(verbosity)}`);
   }
-  if (limit) {
+  // a re-run on the failed hosts : its hosts in a file, one per line, never as a comma string
+  // (a name with a comma or a colon would be split into patterns) ; __limit__ is then only what
+  // an RTE of an earlier release runs it with (lib/failedHosts.js fallbackLimit)
+  if (limitFileName && rerunHosts(extravars)) {
+    args.push("--limit", `@${limitFileName}`);
+  } else if (limit) {
     args.push("--limit", arg(limit));
   }
   args.push(arg(extravars?.__playbook__));
@@ -555,7 +588,15 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
     // its name (deploy) as its file (deploy.yml) : a form may name it either way
     playbook = playbookFile(directory, playbook);
     extravars.__playbook__ = playbook;
-    const { args, inventory } = buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword });
+    // a re-run on the failed hosts : no host left to write (every name was a pattern) fails
+    // the job, rather than run it on every host of its inventory
+    const rerun = rerunHosts(extravars);
+    if (rerun && !rerun.hosts.length) {
+      await currentIO().end(jobid, counter + 1, "stderr", "failed", "[ERROR]: none of the failed hosts can be re-run: their names are read by ansible as patterns");
+      return false;
+    }
+    const limitFileName = rerun ? `limit_${jobid}.txt` : "";
+    const { args, inventory } = buildAnsibleArgs(extravars, { extravarsFileName, hiddenExtravarsFileName, vaultPassword, limitFileName });
     var cmdObj = {
       directory,
       file: "ansible-playbook",
@@ -568,6 +609,10 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
       extravarsFileName: extravarsFileName,
       hiddenExtravarsFileName: hiddenExtravarsFileName,
       keepExtravars: keepExtravars,
+      // a re-run on the failed hosts : its limit file (written private next to the extravars
+      // files, removed with them) and its lines
+      limitFileName,
+      limitContent: rerun ? limitFileContent(rerun.hosts, rerun.within) : "",
       // the job's ssh-agent (SSH_AUTH_SOCK), when its private key has a passphrase, and the
       // job's own folder for its ssh connections (ANSIBLE_SSH_CONTROL_PATH_DIR)
       env: { ...keyEnv, ANSIBLE_SSH_CONTROL_PATH_DIR: controlPathDir },
@@ -617,6 +662,9 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
   var extravarsFileName = cmd.extravarsFileName;
   var hiddenExtravarsFileName = cmd.hiddenExtravarsFileName;
   var keepExtravars = cmd.keepExtravars;
+  // a re-run's limit file (launchPlaybook) : its name and its lines
+  var limitFileName = cmd.limitFileName || "";
+  var limitContent = cmd.limitContent || "";
   var task = cmd.task;
   // added to the playbook's environment (the job's ssh-agent socket)
   var extraEnv = cmd.env || {};
@@ -638,8 +686,10 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
   // the extravars files hold the resolved credentials : removed on every way out, once
   var filepath;
   var he_filepath;
+  // and a re-run's limit file : removed with them, never kept
+  var limitpath;
   const removeExtravarsFiles = () => {
-    for (const [file, keep] of [[filepath, keepExtravars], [he_filepath, false]]) {
+    for (const [file, keep] of [[filepath, keepExtravars], [he_filepath, false], [limitpath, false]]) {
       if (!file || keep) continue;
       try {
         fs.unlinkSync(file);
@@ -649,6 +699,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
     }
     filepath = undefined;
     he_filepath = undefined;
+    limitpath = undefined;
   };
 
   // execute the procces
@@ -680,6 +731,11 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         );
         he_filepath = path.join(directory, hiddenExtravarsFileName);
         writePrivateFile(he_filepath, hiddenExtravars);
+        // a re-run on the failed hosts : its hosts, one per line, readable by this user only
+        if (limitFileName) {
+          limitpath = path.join(directory, limitFileName);
+          writePrivateFile(limitpath, limitContent);
+        }
       } else {
         logger.warning("No filename was given");
       }

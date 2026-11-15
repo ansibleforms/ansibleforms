@@ -284,6 +284,8 @@ export default {
     approved: "Job {id} wurde freigegeben",
     rejected: "Job {id} wurde abgelehnt",
     relaunched: "Job wurde mit Job-ID {id} neu gestartet",
+    relaunchedFailedHosts: "Job {id} startet die {count} fehlgeschlagenen Hosts neu",
+    noFailedHosts: "Dieser Job hat keine fehlgeschlagenen Hosts zum Neustarten",
     failedRetrieveRawData: "Rohe Formulardaten konnten nicht geladen werden",
   },
   email: {

@@ -2188,16 +2188,31 @@
         "requestBody": {
           "required": false,
           "content": { "application/json": { "schema": { "type": "object", "properties": {
-            "values": { "type": "object", "additionalProperties": true, "description": "Only the fields to change, as raw field values, keyed by field name" }
+            "values": { "type": "object", "additionalProperties": true, "description": "Only the fields to change, as raw field values, keyed by field name" },
+            "failedHostsOnly": { "type": "boolean", "description": "Re-run the job on the hosts it failed on only (failed tasks or unreachable) : the same relaunch, validation, approval and permissions. A playbook job runs with its limit restricted to those hosts (within its own limit), passed to ansible-playbook as a limit file ; an AWX, AAP or Ascender job template job is relaunched through that product's API with hosts: failed. Refused (400) for a job without failed hosts, a workflow or multistep job, and a Jenkins, Semaphore or Rundeck job. The answer lists them as failedHosts." }
           } } } }
         },
         "responses": {
-          "200": { "description": "Job relaunched ; the new job id" },
-          "400": { "description": "A wizard form, a password field the form shows (relaunch through the check), or stored form data of another form" },
+          "200": { "description": "Job relaunched ; the new job id, and failedHosts for a re-run on them" },
+          "400": { "description": "A wizard form, a password field the form shows (relaunch through the check), stored form data of another form, or failedHostsOnly for a job without failed hosts to re-run" },
           "403": { "description": "Relaunch or verbose mode not allowed" },
           "404": { "description": "Job or form not found, or no stored form data (relaunch with values)" },
           "409": { "description": "The job is still running" },
           "422": { "description": "The changed values break the form's rules ; details list the failing fields and rows" }
+        }
+      }
+    },
+    "/job/{id}/relaunch-options": {
+      "get": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["job"],
+        "summary": "What a job can be relaunched as besides a full relaunch",
+        "description": "For an ended job : failedHosts, the hosts it failed on (failed tasks or unreachable) when it can be re-run on them with failedHostsOnly, else null. A playbook job's come from its events, else the PLAY RECAP of its output ; an AWX, AAP or Ascender job template job's from its job host summaries. Only for who may relaunch the job.",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "{ failedHosts: string[] | null }" },
+          "403": { "description": "Relaunch not allowed" },
+          "404": { "description": "Job or form not found" }
         }
       }
     },

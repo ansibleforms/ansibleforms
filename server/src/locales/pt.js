@@ -277,6 +277,8 @@ export default {
     approved: "A tarefa {id} foi aprovada",
     rejected: "A tarefa {id} foi rejeitada",
     relaunched: "A tarefa foi relançada com o id de tarefa {id}",
+    relaunchedFailedHosts: "A tarefa {id} relança os {count} hosts com falha",
+    noFailedHosts: "Esta tarefa não tem hosts com falha para relançar",
     failedRetrieveRawData: "Falha ao obter os dados em bruto do formulário",
   },
   email: {

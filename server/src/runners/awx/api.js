@@ -184,6 +184,19 @@ Awx.launch = async function (
   var template = extravars?.__template__;
 
   var awxCredentials = extravars?.__awxCredentials__ || [];
+  // a re-run of a job on its failed hosts (Job.relaunch with failedHostsOnly) : AWX's own
+  // relaunch of that job, on the hosts it says failed, rather than the template again
+  const rerun = extravars?.__relaunchOf__;
+  if (rerun?.scope === "failedHosts" && rerun.awxId) {
+    try {
+      await Awx.relaunchFailedHosts(awx, rerun.awxId, jobid, ++counter);
+      return true;
+    } catch (err) {
+      message = `failed to relaunch AWX job ${rerun.awxId} on its failed hosts\n${err.message}`;
+      if (!err.jobEnded) await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", message);
+      throw jobEnded(new Errors.ApiError(message));
+    }
+  }
   try {
     const jobTemplate = await Awx.findJobTemplateByName(awx, template);
     logger.debug("Found jobtemplate, id = " + jobTemplate.id);
@@ -425,6 +438,109 @@ Awx.launchTemplate = async function (
       throw new Errors.ApiError(message);
     }
   }
+};
+
+/**
+ * The relaunch body that re-runs an AWX, AAP or Ascender job on the hosts it failed on : its
+ * relaunch endpoint (POST /jobs/<id>/relaunch/) with `hosts: failed`, which takes the hosts its
+ * job host summaries mark failed (a failed task, or unreachable).
+ *
+ * Returns:
+ *   object: the body.
+ */
+export function failedHostsRelaunchBody() {
+  return { hosts: "failed" };
+}
+
+/**
+ * Re-runs an AWX job on its failed hosts (Job.relaunch with failedHostsOnly) : AWX's relaunch of
+ * that job with `hosts: failed`, its extra vars, inventory and credentials as they were. The new
+ * AWX job is then followed as a launched template's is.
+ *
+ * Args:
+ *   awx (object): the runner the job ran on.
+ *   awxId (number): the AWX job re-run.
+ *   jobid (number): our job.
+ *   counter (number): the next output order.
+ *
+ * Returns:
+ *   Promise<boolean>: the tracker's end (Awx.trackJob).
+ *
+ * Raises:
+ *   ApiError: AWX refused the relaunch (the job ended as failed, saying why).
+ */
+Awx.relaunchFailedHosts = async function (awx, awxId, jobid, counter) {
+  const url = `${awx.uri}${apiPrefix(awx)}/jobs/${encodeURIComponent(awxId)}/relaunch/`;
+  logger.notice(`Relaunching AWX job ${awxId} on its failed hosts`);
+  let job;
+  try {
+    ({ data: job } = await axios.post(url, failedHostsRelaunchBody(), getAuthorization(awx)));
+  } catch (error) {
+    const why = error.response ? yaml.stringify(error.response.data) : String(error.message || error);
+    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `Failed to relaunch AWX job ${awxId} on its failed hosts. ${why}`);
+    throw jobEnded(new Errors.ApiError(`AWX refused the relaunch of job ${awxId}: ${why}`));
+  }
+  if (!job?.id) {
+    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `AWX did not relaunch job ${awxId}`);
+    throw jobEnded(new Errors.ApiError(`AWX did not relaunch job ${awxId}`));
+  }
+  // step 2 : known on the job as a launched template is, its link kept, then followed
+  await Job.update({ awx_id: job.id }, jobid);
+  await rememberRunnerJobUrl(jobid);
+  await Job.printJobOutput(`ok: [Relaunched job ${awxId} on its failed hosts with jobid ${job.id}]`, "stdout", jobid, ++counter);
+  return Awx.trackJob(awx, job, jobid, counter + 1);
+};
+
+/**
+ * The hosts an AWX, AAP or Ascender job failed on : its job host summaries with `failed`
+ * (AWX sets it for a host with failures or unreachable, its `dark` count), page after page.
+ *
+ * Args:
+ *   awx (object): the runner the job ran on.
+ *   awxId (number): the AWX job.
+ *
+ * Returns:
+ *   Promise<string[]>: the host names, sorted, each once.
+ *
+ * Raises:
+ *   Error: AWX did not answer (the caller falls back on the stored events).
+ */
+Awx.failedHosts = async function (awx, awxId) {
+  const hosts = new Set();
+  let next = `${apiPrefix(awx)}/jobs/${encodeURIComponent(awxId)}/job_host_summaries/?failed=true&page_size=200`;
+  // a page at a time : at most 50 (10000 hosts)
+  for (let page = 0; next && page < 50; page++) {
+    // the first link is ours, the next ones AWX's own (root relative, its API path included)
+    const url = page === 0 ? `${awx.uri}${next}` : `${serverOf(awx)}${next}`;
+    const { data } = await axios.get(url, getAuthorization(awx));
+    for (const r of data?.results || []) {
+      if (Number(r.failures) > 0 || Number(r.dark) > 0 || r.failed) {
+        const name = r.host_name || r.summary_fields?.host?.name;
+        if (name) hosts.add(String(name));
+      }
+    }
+    next = data?.next || null;
+  }
+  return [...hosts].sort();
+};
+
+/**
+ * How many hosts an AWX, AAP or Ascender job ran on : the count of its job host summaries.
+ *
+ * Args:
+ *   awx (object): the runner the job ran on.
+ *   awxId (number): the AWX job.
+ *
+ * Returns:
+ *   Promise<number|null>: the count, null when AWX does not say.
+ *
+ * Raises:
+ *   Error: AWX did not answer.
+ */
+Awx.hostCount = async function (awx, awxId) {
+  const url = `${awx.uri}${apiPrefix(awx)}/jobs/${encodeURIComponent(awxId)}/job_host_summaries/?page_size=1`;
+  const { data } = await axios.get(url, getAuthorization(awx));
+  return Number.isFinite(Number(data?.count)) ? Number(data.count) : null;
 };
 
 // what a tracker returns when it stopped because another node follows the job now

@@ -65,7 +65,11 @@ vi.mock("child_process", async (importOriginal) => {
       // and their modes, and the ssh connections folder as it is while the playbook runs
       const mode = (name) => fs.statSync(path.join(options.cwd, name)).mode & 0o777;
       const cpDir = options.env?.ANSIBLE_SSH_CONTROL_PATH_DIR;
+      // a re-run's limit file, as it is while the playbook runs
+      const limitPath = path.join(options.cwd, "limit_11.txt");
+      const limitFile = fs.existsSync(limitPath) ? { content: fs.readFileSync(limitPath, "utf8"), mode: fs.statSync(limitPath).mode & 0o777 } : null;
       spawned.push({
+        limitFile,
         file, args, options, extravars: read("extravars_11.json"), hidden: read("he_extravars_11.json"),
         modes: { extravars: mode("extravars_11.json"), hidden: mode("he_extravars_11.json") },
         cpDirMode: cpDir && fs.existsSync(cpDir) ? fs.statSync(cpDir).mode & 0o777 : null,
@@ -315,6 +319,25 @@ describe("the files and the ssh connections of a job are its own", () => {
     row({ __playbook__: "site.yml", __playbookSubPath__: "not/mounted" });
     assert.equal(await runJob(), false);
     assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_cp_11_")), before);
+  });
+});
+
+describe("a re-run on the failed hosts of a job", () => {
+  test("its hosts are in a private limit file while the playbook runs, removed at its end", async () => {
+    row({ __playbook__: "site.yml", __limit__: "web,07,db:01,&webservers,", __limitHosts__: ["web,07", "db:01"], __limitWithin__: ["&webservers"] });
+    await runToEnd(() => runJob());
+    const { args, limitFile } = spawned[0];
+    assert.deepEqual(args.slice(args.indexOf("--limit"), args.indexOf("--limit") + 2), ["--limit", "@limit_11.txt"]);
+    assert.equal(limitFile.content, "web,07\ndb:01\n&webservers\n");
+    if (process.platform !== "win32") assert.equal(limitFile.mode, 0o600);
+    assert.equal(fs.existsSync(path.join(dir, "limit_11.txt")), false, "removed with the extravars files");
+  });
+
+  test("no host that can be written : the job fails, it never runs on every host", async () => {
+    row({ __playbook__: "site.yml", __limit__: "!all,", __limitHosts__: ["web*"] });
+    assert.equal(await runJob(), false);
+    assert.equal(spawned.length, 0);
+    assert.ok(outputs.some((o) => /none of the failed hosts can be re-run/.test(o.output)));
   });
 });
 
