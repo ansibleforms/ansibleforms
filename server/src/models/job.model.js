@@ -32,7 +32,8 @@ import { stripTrailingSlashes } from "../lib/url.js";
 import { nodeId } from "../lib/role.js";
 import { NODE_DEAD_SECONDS } from "../lib/nodes.js";
 import { SOCKET_MODES, queueMinutes } from "../rte/socket/protocol.js";
-import { runWorkflow } from "./workflowRun.js";
+import { runWorkflow, findWorkflow } from "./workflowRun.js";
+import { workflowHash, fromFailedNodeCheck } from "../lib/workflowRelaunch.js";
 import { jobTypeOf } from "../lib/jobTypes.js";
 import { hostsFromEvents, hostsFromRecap, ranHostsFromRecap, rerunDiffers, rerunLimit, fallbackLimit } from "../lib/failedHosts.js";
 
@@ -1837,7 +1838,7 @@ function wizardRelaunchData(formObj, stored, values) {
  *   masked), credentials, payloadHash, warnings } - nothing is launched
  * @param {string} [args.expectedPayloadHash]  refuse when the payload differs (payload_mismatch)
  */
-Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = false, preview = false, expectedPayloadHash, failedHostsOnly = false }) {
+Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = false, preview = false, expectedPayloadHash, failedHostsOnly = false, fromFailedNode = false }) {
   const job = await Job.findById(user, id, true); // not log-safe : the stored passwords are needed
   const formConfig = await Form.load(user?.roles, job.form);
   const formObj = formConfig.forms?.[0];
@@ -1851,7 +1852,8 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
   const changed = !!values && Object.keys(values).length > 0;
   // a re-run on the failed hosts : the same relaunch, its limit restricted to them (the
   // extravars the server adds after the launch validation, so never taken for form output)
-  const rerun = failedHostsOnly && !preview ? await rerunExtravars(job) : null;
+  // or a workflow relaunched from its failed node : the nodes that succeeded carried over
+  const rerun = preview ? null : await relaunchExtras(job, formObj, { failedHostsOnly, fromFailedNode });
   const serverExtravars = rerun?.extravars || {};
 
   // no changes, and the form is not enforced : a replay of the job as it ran - its stored
@@ -1875,7 +1877,7 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
       return { form: job.form, replayed: true, extravars: masked, credentials, payloadHash, warnings: [] };
     }
     const replayed = await replayJob(user, job, verbose, serverExtravars);
-    return { ...replayed, replayed: true, payloadHash, warnings: [], ...(rerun ? { failedHosts: rerun.hosts } : {}) };
+    return { ...replayed, replayed: true, payloadHash, warnings: [], ...(rerun?.answer || {}) };
   }
 
   // otherwise through the form engine : resolved, validated, the extravars built here
@@ -1950,7 +1952,7 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
     form: job.form, user, credentials, extravars, rawFormData, fromClient: true, validated: true, serverExtravars,
   });
   await Job.sendEventNotification(id, 'relaunch', user);
-  return { ...launched, payloadHash, warnings: result.warnings, ...(rerun ? { failedHosts: rerun.hosts } : {}) };
+  return { ...launched, payloadHash, warnings: result.warnings, ...(rerun?.answer || {}) };
 };
 
 /**
@@ -1967,15 +1969,17 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
  *     restricted to them (rerunExtravars).
  *
  * Returns:
- *   Promise<object>: { id } of the new job, with failedHosts for a re-run on them.
+ *   Promise<object>: { id } of the new job, with failedHosts for a re-run on them, or
+ *     fromFailedNode.
  *
  * Raises:
  *   AccessDeniedError: the user may not relaunch it.
  *   BadRequestError: failedHostsOnly for a job that has no failed hosts, or cannot be re-run on
- *     them (code NO_FAILED_HOSTS).
+ *     them (code NO_FAILED_HOSTS) ; fromFailedNode for a job that cannot be relaunched from it
+ *     (code NOT_FROM_FAILED_NODE).
  *   ConflictError: the job is still running.
  */
-Job.relaunch = async function (user, id, verbose, { failedHostsOnly = false } = {}) {
+Job.relaunch = async function (user, id, verbose, { failedHostsOnly = false, fromFailedNode = false } = {}) {
   const job = await Job.findById(user, id, true);
   const formConfig = await Form.load(user?.roles, job.form);
   const formObj = formConfig.forms?.[0];
@@ -1984,12 +1988,12 @@ Job.relaunch = async function (user, id, verbose, { failedHostsOnly = false } = 
   }
   assertRelaunchable(job, formObj, user);
   if (launchValidationMode(formObj) === 'enforce') {
-    return Job.relaunchWithValues({ user, id, values: {}, verbose, failedHostsOnly });
+    return Job.relaunchWithValues({ user, id, values: {}, verbose, failedHostsOnly, fromFailedNode });
   }
-  if (!failedHostsOnly) return replayJob(user, job, verbose);
-  const rerun = await rerunExtravars(job);
+  const rerun = await relaunchExtras(job, formObj, { failedHostsOnly, fromFailedNode });
+  if (!rerun) return replayJob(user, job, verbose);
   const launched = await replayJob(user, job, verbose, rerun.extravars);
-  return { ...launched, failedHosts: rerun.hosts };
+  return { ...launched, ...rerun.answer };
 };
 
 /**
@@ -2053,6 +2057,88 @@ async function replayJob(user, job, verbose, serverExtravars = {}) {
     );
   }
 }
+
+// ─── what a relaunch adds ─────────────────────────────────────────────────────
+
+/**
+ * What a relaunch adds to the job it launches : a re-run on the failed hosts (rerunExtravars),
+ * or a workflow relaunched from its failed node (__relaunchOf__ with scope failedNode : the run
+ * carries the nodes that succeeded over, models/workflowRun.js ; an Ascender workflow job is
+ * relaunched with Ascender's own `nodes: failed`, on the runner it ran on).
+ *
+ * Args:
+ *   job (object): the job relaunched.
+ *   formObj (object): its form.
+ *   options (object): { failedHostsOnly, fromFailedNode } - one of them at most.
+ *
+ * Returns:
+ *   Promise<object|null>: { extravars (what the server adds), answer (what the call answers
+ *     beside the id) } ; null for a plain relaunch.
+ *
+ * Raises:
+ *   BadRequestError: both asked ; failedHostsOnly without failed hosts (NO_FAILED_HOSTS) ;
+ *     fromFailedNode for a job that cannot be relaunched from it (NOT_FROM_FAILED_NODE).
+ */
+async function relaunchExtras(job, formObj, { failedHostsOnly = false, fromFailedNode = false } = {}) {
+  if (failedHostsOnly && fromFailedNode) {
+    throw new Errors.BadRequestError("Relaunch on the failed hosts or from the failed node, not both");
+  }
+  if (failedHostsOnly) {
+    const rerun = await rerunExtravars(job);
+    return { extravars: rerun.extravars, answer: { failedHosts: rerun.hosts } };
+  }
+  if (!fromFailedNode) return null;
+  const check = await Job.fromFailedNodeOf(job, formObj);
+  if (!check?.ok) {
+    throw Object.assign(
+      new Errors.BadRequestError(`Job ${job.id} cannot be relaunched from its failed node (${check?.reason || "not a workflow job"})`),
+      { code: "NOT_FROM_FAILED_NODE", reason: check?.reason || "unsupported" }
+    );
+  }
+  const ascender = job.job_type === "awx";
+  const extravars = { __relaunchOf__: { id: Number(job.id), scope: "failedNode", ...(ascender ? { awxId: job.awx_id } : {}) } };
+  // an Ascender workflow job is relaunched where it ran : that Ascender knows its job
+  if (ascender && job.runner) extravars.__runner__ = job.runner;
+  return { extravars, answer: { fromFailedNode: true } };
+}
+
+/**
+ * Whether a workflow job can be relaunched from its failed node : one of the designer's
+ * workflows that failed, kept its nodes, and runs the same workflow now (lib/workflowRelaunch.js
+ * fromFailedNodeCheck) ; or an Ascender workflow job that failed with a node that succeeded
+ * (Ascender carries it over itself). A multistep, an AWX or AAP workflow job, a nested
+ * workflow's own job : none.
+ *
+ * Args:
+ *   job (object): the job (job_type, status, parent_id, runner_kind, awx_id, awx_workflow).
+ *   formObj (object): its form (workflow : the workflow it runs).
+ *
+ * Returns:
+ *   Promise<object|null>: { ok, reason } ; null when the job is no such workflow job at all.
+ */
+Job.fromFailedNodeOf = async function (job, formObj) {
+  if (!job || job.parent_id) return null;
+  // an Ascender workflow job : its graph says whether a node failed and one succeeded
+  if (job.job_type === "awx") {
+    const graph = typeof job.awx_workflow === "string" ? safeParse(job.awx_workflow, null, `job.awx_workflow id=${job.id}`) : job.awx_workflow;
+    if (job.runner_kind !== "ascender" || !job.awx_id || !Array.isArray(graph?.nodes)) return null;
+    if (job.status !== "failed") return { ok: false, reason: "not_failed" };
+    if (!graph.nodes.some((n) => ["failed", "error", "canceled"].includes(n.status))) return { ok: false, reason: "no_failed_node" };
+    if (!graph.nodes.some((n) => n.status === "successful")) return { ok: false, reason: "nothing_carried" };
+    return { ok: true, reason: "" };
+  }
+  if (job.job_type !== "workflow") return null;
+  const hashThen = (await mysql.do("SELECT workflow_hash FROM AnsibleForms.`jobs` WHERE id=?", [job.id]))?.[0]?.workflow_hash || null;
+  const rows = await mysql.do("SELECT node, status, elapsed, node_job_id, carried, artifacts FROM AnsibleForms.`workflow_node_runs` WHERE job_id=?", [job.id]);
+  // the workflow as the form names it now : unreadable (gone, two of that name) is a change
+  let hashNow = null;
+  try {
+    hashNow = workflowHash((await findWorkflow(formObj?.workflow)).workflow);
+  } catch (err) {
+    logger.debug(`Job ${job.id}: its workflow cannot be read now (${err.message})`);
+  }
+  return fromFailedNodeCheck({ status: job.status, rows, hashThen, hashNow });
+};
 
 // ─── a re-run on the failed hosts ─────────────────────────────────────────────
 
@@ -2162,14 +2248,15 @@ Job.ranHostsOf = async function (job) {
 
 /**
  * What a job can be relaunched as, for the job page's Relaunch menu : its failed hosts when it
- * can be re-run on them. Read when the job has ended ; nothing for a user who may not relaunch it.
+ * can be re-run on them, and for a workflow job whether it can be relaunched from its failed node. Read when the job has ended ; nothing for a user who may not relaunch it.
  *
  * Args:
  *   user (object): who asks.
  *   id (number): the job.
  *
  * Returns:
- *   Promise<object>: { failedHosts : the host names, or null when there is no such choice }.
+ *   Promise<object>: { failedHosts : the host names, or null when there is no such choice ;
+ *     fromFailedNode : whether a workflow job can be relaunched from its failed node }.
  *
  * Raises:
  *   AccessDeniedError: the user may not see the job, or may not relaunch it.
@@ -2192,7 +2279,10 @@ Job.relaunchOptions = async function (user, id) {
   // a re-run on the failed hosts that is a full relaunch (one host, or every host failed) is no
   // choice of its own : none offered
   const all = hosts?.length ? await Job.ranHostsOf(job) : null;
-  return { failedHosts: rerunDiffers(hosts, all) ? hosts : null };
+  // a workflow job : whether it can be relaunched from its failed node (an ended one only)
+  const ended = job.status !== "running" && job.status !== "approve" && !job.abort_requested;
+  const fromNode = ended ? await Job.fromFailedNodeOf(job, formObj) : null;
+  return { failedHosts: rerunDiffers(hosts, all) ? hosts : null, fromFailedNode: !!fromNode?.ok };
 };
 
 /**

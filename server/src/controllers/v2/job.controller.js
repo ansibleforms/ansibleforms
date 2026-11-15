@@ -277,13 +277,18 @@ const relaunchJob = async function(req, res) {
       ? req.body.values : null;
     // `failedHostsOnly: true` : the same relaunch, on the hosts the job failed on only
     const failedHostsOnly = req.body?.failedHostsOnly === true;
+    // `fromFailedNode: true` : a failed workflow job from its failed node, the nodes that
+    // succeeded carried over
+    const fromFailedNode = req.body?.fromFailedNode === true;
     try{
       const job = values
-        ? await Job.relaunchWithValues({ user, id: jobid, values, verbose, failedHostsOnly })
-        : await Job.relaunch(user, jobid, verbose, { failedHostsOnly });
+        ? await Job.relaunchWithValues({ user, id: jobid, values, verbose, failedHostsOnly, fromFailedNode })
+        : await Job.relaunch(user, jobid, verbose, { failedHostsOnly, fromFailedNode });
       const message = job.failedHosts
         ? i18n.t(req, 'jobs.relaunchedFailedHosts', { id: job.id, count: job.failedHosts.length })
-        : i18n.t(req, 'jobs.relaunched', { id: job.id });
+        : job.fromFailedNode
+          ? i18n.t(req, 'jobs.relaunchedFromFailedNode', { id: job.id })
+          : i18n.t(req, 'jobs.relaunched', { id: job.id });
       res.status(200).json(RestResultv2.single({ message, id: job.id, ...(job.failedHosts ? { failedHosts: job.failedHosts } : {}) }));
     } catch(err) {
       if (err.name === 'ValidationError') {
@@ -291,6 +296,9 @@ const relaunchJob = async function(req, res) {
       } else if (err.code === 'NO_FAILED_HOSTS') {
         // said in the caller's language, the model's reason as the details
         res.status(400).json(RestResultv2.error(i18n.t(req, 'jobs.noFailedHosts'), err.message));
+      } else if (err.code === 'NOT_FROM_FAILED_NODE') {
+        // the workflow changed since, it did not fail, it kept no nodes ... : the reason as the details
+        res.status(400).json(RestResultv2.error(i18n.t(req, err.reason === 'changed' ? 'jobs.workflowChanged' : 'jobs.cannotRelaunchFromFailedNode'), err.message));
       } else if (err.name === 'BadRequestError') {
         res.status(400).json(RestResultv2.error(err.message));
       } else if (err.name === 'NotFoundError') {
@@ -307,11 +315,12 @@ const relaunchJob = async function(req, res) {
 };
 /**
  * GET /api/v2/job/:id/relaunch-options : what the job page's Relaunch offers besides a full
- * relaunch - the hosts an ended job failed on, when it can be re-run on them.
+ * relaunch - the hosts an ended job failed on, when it can be re-run on them ; whether a failed
+ * workflow job can be relaunched from its failed node.
  *
  * Args:
  *   req (object): the request (params.id, the user).
- *   res (object): the response : { failedHosts: string[]|null }.
+ *   res (object): the response : { failedHosts: string[]|null, fromFailedNode: boolean }.
  *
  * Returns:
  *   Promise<void>

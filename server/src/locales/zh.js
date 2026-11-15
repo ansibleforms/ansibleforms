@@ -260,6 +260,9 @@ export default {
     relaunched: "作业已重新运行，新作业 ID 为 {id}",
     relaunchedFailedHosts: "作业 {id} 将重新运行 {count} 台失败的主机",
     noFailedHosts: "此作业没有可重新运行的失败主机",
+    relaunchedFromFailedNode: "作业 {id} 将从失败的节点重新运行工作流",
+    cannotRelaunchFromFailedNode: "此作业无法从失败的节点重新运行",
+    workflowChanged: "此作业运行后工作流已更改：请从第一个节点重新运行",
     failedRetrieveRawData: "获取原始表单数据失败",
   },
   email: {

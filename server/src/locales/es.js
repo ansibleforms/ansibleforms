@@ -282,6 +282,9 @@ export default {
     relaunched: "El trabajo ha sido relanzado con el id {id}",
     relaunchedFailedHosts: "El trabajo {id} relanza los {count} hosts fallidos",
     noFailedHosts: "Este trabajo no tiene hosts fallidos que relanzar",
+    relaunchedFromFailedNode: "El trabajo {id} relanza el flujo de trabajo desde su nodo fallido",
+    cannotRelaunchFromFailedNode: "Este trabajo no se puede relanzar desde su nodo fallido",
+    workflowChanged: "El flujo de trabajo cambió desde que se ejecutó este trabajo: relánzalo desde su primer nodo",
     failedRetrieveRawData:
       "Error al recuperar los datos sin procesar del formulario",
   },

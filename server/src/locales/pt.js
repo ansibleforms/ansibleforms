@@ -279,6 +279,9 @@ export default {
     relaunched: "A tarefa foi relançada com o id de tarefa {id}",
     relaunchedFailedHosts: "A tarefa {id} relança os {count} hosts com falha",
     noFailedHosts: "Esta tarefa não tem hosts com falha para relançar",
+    relaunchedFromFailedNode: "A tarefa {id} relança o fluxo de trabalho a partir do nó com falha",
+    cannotRelaunchFromFailedNode: "Esta tarefa não pode ser relançada a partir do nó com falha",
+    workflowChanged: "O fluxo de trabalho mudou desde que esta tarefa correu: relance-a a partir do primeiro nó",
     failedRetrieveRawData: "Falha ao obter os dados em bruto do formulário",
   },
   email: {

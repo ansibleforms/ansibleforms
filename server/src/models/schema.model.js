@@ -620,7 +620,7 @@ const SCHEMA_MANIFEST = {
              'settings', 'repositories', 'schedule', 'audit', 'chat_settings', 'secret_stores', 'runners',
              'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
              'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-             'runner_leases', 'runner_join_tokens', 'job_events', 'databases'],
+             'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs'],
   },
   patches: {
     patchVersion4: { columns: ['ldap.groups_search_base', 'ldap.groups_attribute', 'ldap.group_class',
@@ -659,8 +659,8 @@ const SCHEMA_MANIFEST = {
     // between them, the designer lock, and the node that follows a job
     patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
                               'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-                              'runner_leases', 'runner_join_tokens', 'job_events', 'databases'],
-                     columns: ['job_events.result', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
+                              'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs'],
+                     columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
                                'repositories.use_for_workflows', 'repositories.use_for_inventories',
@@ -1254,6 +1254,11 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("notification_channels", "send_through", "varchar(20)", true, "NULL"), messages, success, failed);
   // an ssh credential logs in with a private key too (client_key) : its passphrase, encrypted
   await checkPromise(addColumn("credentials", "key_passphrase", "text", true, "NULL"), messages, success, failed);
+  // a workflow job's nodes as they ended, and the hash of the workflow it ran : a relaunch from
+  // its failed node carries the others over while the workflow is the same (models/workflowRun.js)
+  const nodeRuns = fs.readFileSync(`${__dirname}/../db/create_workflow_node_runs_table.sql`);
+  await checkPromise(addTable("workflow_node_runs", nodeRuns.toString()), messages, success, failed);
+  await checkPromise(addColumn("jobs", "workflow_hash", "varchar(80)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

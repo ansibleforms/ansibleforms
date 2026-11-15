@@ -279,6 +279,9 @@ export default {
     relaunched: "ジョブはジョブ ID {id} で再起動されました",
     relaunchedFailedHosts: "ジョブ {id} が失敗した {count} 台のホストを再実行します",
     noFailedHosts: "このジョブには再実行する失敗ホストがありません",
+    relaunchedFromFailedNode: "ジョブ {id} が失敗したノードからワークフローを再起動します",
+    cannotRelaunchFromFailedNode: "このジョブは失敗したノードから再起動できません",
+    workflowChanged: "このジョブの実行後にワークフローが変更されました: 最初のノードから再起動してください",
     failedRetrieveRawData: "フォームの生データの取得に失敗しました",
   },
   email: {

@@ -283,6 +283,9 @@ export default {
     relaunched: "La tasca s'ha tornat a llançar amb l'id de tasca {id}",
     relaunchedFailedHosts: "La tasca {id} torna a llançar els {count} hosts fallits",
     noFailedHosts: "Aquesta tasca no té hosts fallits per tornar a llançar",
+    relaunchedFromFailedNode: "La tasca {id} torna a llançar el flux de treball des del node fallit",
+    cannotRelaunchFromFailedNode: "Aquesta tasca no es pot tornar a llançar des del node fallit",
+    workflowChanged: "El flux de treball ha canviat des que es va executar la tasca: torna-la a llançar des del primer node",
     failedRetrieveRawData:
       "No s'han pogut obtenir les dades en brut del formulari",
   },

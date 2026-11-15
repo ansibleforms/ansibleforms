@@ -276,6 +276,9 @@ export default {
     relaunched: "Il job e stato riavviato con id {id}",
     relaunchedFailedHosts: "Il job {id} riavvia i {count} host non riusciti",
     noFailedHosts: "Questo job non ha host non riusciti da riavviare",
+    relaunchedFromFailedNode: "Il job {id} riavvia il workflow dal suo nodo non riuscito",
+    cannotRelaunchFromFailedNode: "Questo job non puo essere riavviato dal suo nodo non riuscito",
+    workflowChanged: "Il workflow e cambiato da quando il job e stato eseguito: riavvialo dal primo nodo",
     failedRetrieveRawData: "Recupero dati grezzi modulo non riuscito",
   },
   email: {
