@@ -22,6 +22,10 @@
 //     workflow's extra_vars and the form's values. The workflow job keeps them all, as its own.
 //   - It failed when a node failed and nothing handled it (AWX's rule) ; an abort stops it : the
 //     running jobs are aborted, nothing more starts.
+//   - Each node is kept as it ended (workflow_node_runs : its status, its job, what it passes
+//     on), with the hash of the workflow (jobs.workflow_hash) : a relaunch from the failed node
+//     (lib/workflowRelaunch.js) carries the nodes that succeeded over - they run nothing and pass on
+//     what they passed on then - and starts at the failed one(s), while the workflow is the same.
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -31,6 +35,7 @@ import Errors from "../lib/errors.js";
 import Runner from "./runner.model.js";
 import { workflowsOf, workflowErrors, nextStep, workflowFailed, varsOf, ancestorArtifacts } from "../lib/workflowDefs.js";
 import { workflowSummaryLines } from "../lib/workflowSummary.js";
+import { workflowHash, carriedNodes } from "../lib/workflowRelaunch.js";
 
 // how often the run looks at its jobs, its approval and an abort
 const TICK_MS = 1000;
@@ -446,6 +451,30 @@ async function credentialTypes(workflow) {
 // ─── the run ──────────────────────────────────────────────────────────────────
 
 /**
+ * The nodes a relaunch from the failed node of a job carries over (lib/workflowRelaunch.js), once
+ * the workflow is known to be the one that job ran.
+ *
+ * Args:
+ *   jobId (number): the job relaunched.
+ *   hash (string): the workflow's hash now (workflowHash).
+ *
+ * Returns:
+ *   Promise<Map>: identifier -> { status, elapsed, artifacts, job } (carriedNodes).
+ *
+ * Raises:
+ *   Error: the workflow changed since that job ran, or the job kept no nodes.
+ */
+export async function previousRun(jobId, hash) {
+  const then = (await mysql.do("SELECT workflow_hash FROM AnsibleForms.`jobs` WHERE id=?", [jobId]))?.[0]?.workflow_hash;
+  if (!then || then !== hash) {
+    throw new Error(`the workflow changed since job ${jobId} ran: relaunch it from its first node`);
+  }
+  const rows = await mysql.do("SELECT node, status, elapsed, node_job_id, carried, artifacts FROM AnsibleForms.`workflow_node_runs` WHERE job_id=?", [jobId]);
+  if (!rows?.length) throw new Error(`job ${jobId} kept no workflow nodes: relaunch it from its first node`);
+  return carriedNodes(rows);
+}
+
+/**
  * Whether a workflow job is still its loop's to drive, from its status as stored : running,
  * waiting on an approval node, rejected on the node it waits on (the loop runs on : only the
  * node failed) or aborted (the loop ends it as such). Anything else - abandoned by a sweep,
@@ -501,12 +530,37 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
   }
   const { workflow, file } = found;
   const nodes = workflow.nodes;
+  // the workflow it runs, as a hash : a relaunch from its failed node compares it (lib/workflowRelaunch.js)
+  const hash = workflowHash(workflow);
+  await Job.update({ workflow_hash: hash }, jobid).catch((e) => logger.warning(`Workflow job ${jobid}: its workflow's hash was not kept (${e.message})`));
+  // a relaunch from the failed node of another job : the nodes that succeeded there, carried over
+  let carried = new Map();
+  const origin = extravars?.__relaunchOf__;
+  if (origin && typeof origin === "object" && origin.scope === "failedNode") {
+    try {
+      carried = await previousRun(Number(origin.id), hash);
+    } catch (e) {
+      await end("failed", `[ERROR]: ${e.message}`);
+      return;
+    }
+  }
   const types = await credentialTypes(workflow).catch(() => new Map());
   await print(`ok: [Running workflow ${workflow.name} from ${path.basename(file)}]`);
+  if (carried.size) {
+    await print(`ok: [Relaunch of job ${origin.id} from its failed node: ${carried.size} node(s) carried over]`);
+  }
 
   // ─── its state, and its graph as an AWX workflow's ───
-  // artifacts : what a node passes on to the nodes after it (what came to it, and its job's)
-  const state = new Map(nodes.map((n) => [n.identifier, { status: "pending", doNotRun: false, job: null, started: 0, elapsed: 0, artifacts: {} }]));
+  // artifacts : what a node passes on to the nodes after it (what came to it, and its job's) ;
+  // carried : a node carried over from the run relaunched (it runs nothing, its status, time and
+  // artifacts are that run's)
+  const state = new Map(
+    nodes.map((n) => {
+      const c = carried.get(n.identifier);
+      if (c) return [n.identifier, { status: "successful", doNotRun: false, job: null, started: 0, elapsed: c.elapsed, artifacts: { ...c.artifacts }, carried: true }];
+      return [n.identifier, { status: "pending", doNotRun: false, job: null, started: 0, elapsed: 0, artifacts: {}, carried: false }];
+    }),
+  );
   allArtifacts = () => Object.assign({}, ...nodes.map((n) => state.get(n.identifier).artifacts));
   const ids = new Map(nodes.map((n, i) => [n.identifier, i + 1]));
   let wfStatus = "running";
@@ -526,6 +580,8 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
           elapsed: s.elapsed,
           job: s.job,
           do_not_run: s.doNotRun,
+          // carried over from the run relaunched : the graph shows it greyed, from the previous run
+          ...(s.carried ? { carried: true } : {}),
           success_nodes: n.success.map((id) => ids.get(id)),
           failure_nodes: n.failure.map((id) => ids.get(id)),
           always_nodes: n.always.map((id) => ids.get(id)),
@@ -538,6 +594,38 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
     }
   };
   await saveGraph();
+
+  // ─── each node as it ended, kept for a relaunch from the failed node ───
+  /**
+   * Keeps a node as it is now (workflow_node_runs) : its status, time, job and what it passes on.
+   * A failure is logged, never a reason to stop the workflow.
+   *
+   * Args:
+   *   identifier (string): the node.
+   *
+   * Returns:
+   *   Promise<void>
+   */
+  const keepNode = async (identifier) => {
+    const s = state.get(identifier);
+    try {
+      await mysql.do(
+        "INSERT INTO AnsibleForms.`workflow_node_runs` (job_id, node, status, elapsed, node_job_id, carried, artifacts) VALUES (?, ?, ?, ?, ?, ?, ?) " +
+          "ON DUPLICATE KEY UPDATE status=VALUES(status), elapsed=VALUES(elapsed), node_job_id=VALUES(node_job_id), carried=VALUES(carried), artifacts=VALUES(artifacts)",
+        [jobid, identifier, s.status, s.elapsed || 0, s.job || null, s.carried ? 1 : 0, JSON.stringify(s.artifacts || {})],
+      );
+    } catch (e) {
+      logger.warning(`Workflow job ${jobid}: node ${identifier} was not kept (${e.message})`);
+    }
+  };
+  // the carried nodes : kept as such, and said once each under a banner of their own (the graph
+  // opens nothing for them : they ran no job here)
+  for (const n of nodes) {
+    if (!state.get(n.identifier).carried) continue;
+    await keepNode(n.identifier);
+    const head = `WORKFLOW NODE [${n.identifier}] (successful) #${ids.get(n.identifier)} carried over`;
+    await print(`${head} ${"*".repeat(Math.max(5, 79 - head.length))}\nok: [carried over from job ${origin.id}]`);
+  }
 
   // ─── the approval the workflow job waits on (one at a time ; others queue) ───
   const approvals = [];
@@ -610,6 +698,7 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
     await print(`${head} ${"*".repeat(Math.max(5, 79 - head.length))}`);
     for (const l of lines) await print(l.output, l.output_type || "stdout");
     await saveGraph();
+    await keepNode(node.identifier);
   };
 
   // ─── a node runs ───

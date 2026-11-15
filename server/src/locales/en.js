@@ -272,6 +272,9 @@ export default {
     relaunched: "Job has been relaunched with job id {id}",
     relaunchedFailedHosts: "Job {id} re-runs the {count} failed host(s)",
     noFailedHosts: "This job has no failed hosts to re-run",
+    relaunchedFromFailedNode: "Job {id} relaunches the workflow from its failed node",
+    cannotRelaunchFromFailedNode: "This job cannot be relaunched from its failed node",
+    workflowChanged: "The workflow changed since this job ran: relaunch it from its first node",
     failedRetrieveRawData: "Failed to retrieve raw form data",
   },
   email: {

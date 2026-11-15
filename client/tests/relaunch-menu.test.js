@@ -7,6 +7,8 @@ import { relaunchActions, relaunchBody } from '@/lib/relaunchMenu';
 const EN = {
   'jobs.relaunchFailedHosts': 'On failed hosts ({count})',
   'jobs.relaunchAllHosts': 'On all hosts',
+  'jobs.relaunchFromFirstNode': 'From the first node',
+  'jobs.relaunchFromFailedNode': 'From the failed node',
 };
 const t = (key, args = {}) => (EN[key] || key).replace(/\{(\w+)\}/g, (_, k) => String(args[k]));
 
@@ -25,8 +27,20 @@ describe('the Relaunch menu', () => {
     expect(actions[1].hint).toBeUndefined();
   });
 
-  test('the call : failedHostsOnly for the failed hosts, nothing else for a full relaunch', () => {
+  test('a failed workflow job : from its first node, or from its failed node, without a hint', () => {
+    const actions = relaunchActions({ failedHosts: null, fromFailedNode: true }, t);
+    expect(actions.map((a) => [a.key, a.label])).toEqual([
+      ['all', 'From the first node'],
+      ['failedNode', 'From the failed node'],
+    ]);
+    expect(actions[1].hint).toBeUndefined();
+    // not applicable (not failed, the workflow changed, a multistep) : the plain button
+    expect(relaunchActions({ failedHosts: null, fromFailedNode: false }, t)).toEqual([]);
+  });
+
+  test('the call : failedHostsOnly, fromFailedNode, nothing else for a full relaunch', () => {
     expect(relaunchBody('failedHosts')).toEqual({ failedHostsOnly: true });
+    expect(relaunchBody('failedNode')).toEqual({ fromFailedNode: true });
     expect(relaunchBody('all')).toEqual({});
   });
 });

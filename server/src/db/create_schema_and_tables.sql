@@ -368,6 +368,9 @@ CREATE TABLE `jobs` (
   `runner_job_url` varchar(1000) DEFAULT NULL,
   `job_log` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `tracker` varchar(250) DEFAULT NULL,
+  -- a workflow job of the designer's : the hash of the workflow it ran, so a relaunch from its
+  -- failed node runs only while the workflow is the same (models/workflowRun.js)
+  `workflow_hash` varchar(80) DEFAULT NULL,
   PRIMARY KEY (`id`),
   -- the retention sweep selects on (parent_id, status, end) ; without this it full
   -- scans the largest table in the schema on every batch. Keep in sync with the
@@ -759,6 +762,28 @@ CREATE TABLE `job_events` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_job_events_order` (`job_id`, `order`),
   CONSTRAINT `FK_job_events_jobs` FOREIGN KEY (`job_id`) REFERENCES `jobs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- a workflow job's nodes as they ended : their status and what they pass on, so a relaunch
+-- from the failed node carries the others over (models/workflowRun.js)
+-- (keep in sync with src/db/create_workflow_node_runs_table.sql ; it references jobs, created above)
+DROP TABLE IF EXISTS `workflow_node_runs`;
+CREATE TABLE `workflow_node_runs` (
+  `job_id` int(11) NOT NULL,
+  -- the node's identifier in its workflow (the designer's workflow file)
+  `node` varchar(250) NOT NULL,
+  -- successful, failed, canceled, skipped (or pending / running while the workflow runs)
+  `status` varchar(20) NOT NULL,
+  -- seconds the node ran, in the run that ran it
+  `elapsed` decimal(12,3) DEFAULT NULL,
+  -- the node's own job (a child of the workflow job), when it had one
+  `node_job_id` int(11) DEFAULT NULL,
+  -- 1 : carried over from the run this one relaunched from its failed node (it did not run)
+  `carried` tinyint(4) NOT NULL DEFAULT 0,
+  -- what the node passes on to the nodes after it (set_stats artifacts) : JSON
+  `artifacts` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`job_id`, `node`),
+  CONSTRAINT `FK_workflow_node_runs_jobs` FOREIGN KEY (`job_id`) REFERENCES `jobs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- enable foreign key checks

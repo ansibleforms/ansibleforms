@@ -290,6 +290,9 @@ export default {
     relaunched: "La tache a ete relancee avec l'id {id}",
     relaunchedFailedHosts: "La tache {id} relance les {count} hotes en echec",
     noFailedHosts: "Cette tache n'a aucun hote en echec a relancer",
+    relaunchedFromFailedNode: "La tache {id} relance le workflow depuis son noeud en echec",
+    cannotRelaunchFromFailedNode: "Cette tache ne peut pas etre relancee depuis son noeud en echec",
+    workflowChanged: "Le workflow a change depuis cette tache : relancez-la depuis son premier noeud",
     failedRetrieveRawData:
       "Echec de la recuperation des donnees brutes du formulaire",
   },

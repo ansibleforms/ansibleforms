@@ -279,6 +279,9 @@ export default {
     relaunched: "Job is herstart met job id {id}",
     relaunchedFailedHosts: "Job {id} herstart de {count} mislukte hosts",
     noFailedHosts: "Deze job heeft geen mislukte hosts om te herstarten",
+    relaunchedFromFailedNode: "Job {id} herstart de workflow vanaf zijn mislukte knooppunt",
+    cannotRelaunchFromFailedNode: "Deze job kan niet vanaf zijn mislukte knooppunt herstart worden",
+    workflowChanged: "De workflow is gewijzigd sinds deze job liep: herstart hem vanaf het eerste knooppunt",
     failedRetrieveRawData: "Kan ruwe formuliergegevens niet ophalen",
   },
   email: {

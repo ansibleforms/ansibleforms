@@ -286,6 +286,9 @@ export default {
     relaunched: "Job wurde mit Job-ID {id} neu gestartet",
     relaunchedFailedHosts: "Job {id} startet die {count} fehlgeschlagenen Hosts neu",
     noFailedHosts: "Dieser Job hat keine fehlgeschlagenen Hosts zum Neustarten",
+    relaunchedFromFailedNode: "Job {id} startet den Workflow ab seinem fehlgeschlagenen Knoten neu",
+    cannotRelaunchFromFailedNode: "Dieser Job kann nicht ab seinem fehlgeschlagenen Knoten neu gestartet werden",
+    workflowChanged: "Der Workflow hat sich seit diesem Job geändert: ab dem ersten Knoten neu starten",
     failedRetrieveRawData: "Rohe Formulardaten konnten nicht geladen werden",
   },
   email: {

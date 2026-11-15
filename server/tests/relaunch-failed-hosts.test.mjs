@@ -215,9 +215,9 @@ describe("POST /api/v2/job/:id/relaunch with failedHostsOnly", () => {
 
   test("the relaunch options : the failed hosts for who may relaunch, none for other runners", async () => {
     db.job = playbookJob();
-    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: ["web07", "web19"] });
+    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: ["web07", "web19"], fromFailedNode: false });
     db.job = playbookJob({ job_type: "awx", runner_kind: "jenkins", awx_id: 3 });
-    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: null });
+    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: null, fromFailedNode: false });
     db.job = playbookJob({ user: "bob" });
     await expect(Job.relaunchOptions(user, 42)).rejects.toMatchObject({ name: "AccessDeniedError" });
   });
@@ -227,13 +227,13 @@ describe("POST /api/v2/job/:id/relaunch with failedHostsOnly", () => {
     // its only host failed : a re-run on it is the full relaunch
     db.job = playbookJob();
     db.events = stats({ web01: { failures: 1, ok: 2 } });
-    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: null });
+    expect(await Job.relaunchOptions(user, 42)).toMatchObject({ failedHosts: null });
     // every host failed : the same
     db.events = stats({ web01: { failures: 1 }, web02: { unreachable: 1 } });
-    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: null });
+    expect(await Job.relaunchOptions(user, 42)).toMatchObject({ failedHosts: null });
     // one of two failed : a choice of its own
     db.events = stats({ web01: { failures: 0, ok: 3 }, web02: { failures: 1 } });
-    expect(await Job.relaunchOptions(user, 42)).toEqual({ failedHosts: ["web02"] });
+    expect(await Job.relaunchOptions(user, 42)).toMatchObject({ failedHosts: ["web02"] });
   });
 
   test("a re-run differs from a full relaunch only when some, not all, hosts failed", () => {

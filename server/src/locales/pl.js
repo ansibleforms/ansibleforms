@@ -283,6 +283,9 @@ export default {
     relaunched: "Zadanie zostało ponownie uruchomione z identyfikatorem {id}",
     relaunchedFailedHosts: "Zadanie {id} ponownie uruchamia {count} nieudanych hostów",
     noFailedHosts: "To zadanie nie ma nieudanych hostów do ponownego uruchomienia",
+    relaunchedFromFailedNode: "Zadanie {id} uruchamia ponownie przepływ pracy od nieudanego węzła",
+    cannotRelaunchFromFailedNode: "Tego zadania nie można ponownie uruchomić od nieudanego węzła",
+    workflowChanged: "Przepływ pracy zmienił się od uruchomienia tego zadania: uruchom je od pierwszego węzła",
     failedRetrieveRawData: "Nie udało się pobrać surowych danych formularza",
   },
   email: {

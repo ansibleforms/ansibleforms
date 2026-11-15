@@ -284,12 +284,16 @@ function toggle(i) {
  *   line (object): the head line, with its index and its section's end.
  *
  * Returns:
- *   object: { name, kind, status, elapsed } - kind 'node' or 'summary' ; elapsed in
- *   seconds from the workflow's graph, or null.
+ *   object: { name, kind, status, elapsed, attempt, carried } - kind 'node' or 'summary' ;
+ *   elapsed in seconds from the workflow's graph, or null ; attempt { n, of } for a node with
+ *   retries (WORKFLOW NODE [name] (failed) #12 attempt 1 of 3), else null ; carried for a node
+ *   carried over from the previous run (... #12 carried over).
  */
 function headerOf(line) {
   const text = plain(line.html);
-  const m = text.match(/^WORKFLOW( NODE)? \[(.*)\] \(([^)]*)\)(?: #(\d+))?/);
+  const m = text.match(
+    /^WORKFLOW( NODE)? \[(.*)\] \(([^)]*)\)(?: #(\d+))?(?: attempt (\d+) of (\d+)| (carried over))?/,
+  );
   if (m) {
     // the summary at the end (WORKFLOW, not WORKFLOW NODE) : the whole workflow
     const summary = !m[1];
@@ -306,10 +310,13 @@ function headerOf(line) {
       kind: summary ? 'summary' : 'node',
       // AWX's words as the app's own (its pills' labels) : successful a success, canceled aborted
       status: { successful: 'success', canceled: 'aborted' }[m[3]] ?? m[3],
-      elapsed: graphNode?.elapsed > 0 ? graphNode.elapsed : null,
+      // an attempt's own block has no time of the graph's (the graph's is the last attempt's)
+      elapsed: graphNode?.elapsed > 0 && !m[5] ? graphNode.elapsed : null,
+      attempt: m[5] ? { n: Number(m[5]), of: Number(m[6]) } : null,
+      carried: !!m[7],
     };
   }
-  return { id: null, name: text, kind: 'node', status: '', elapsed: null };
+  return { id: null, name: text, kind: 'node', status: '', elapsed: null, attempt: null, carried: false };
 }
 
 /**
@@ -380,16 +387,21 @@ function expandAll() {
 function nodeOutput(node) {
   // a node of the graph ({ id, name }) : by its id when the output carries ids, else by name
   const wanted = typeof node === 'object' && node ? node : { id: null, name: node };
-  const head = lines.value.find((l) => {
+  // every block of it : a node with retries has one per attempt (attempt 1 of 3 ...), each shown
+  const heads = lines.value.filter((l) => {
     if (l.level !== 1 || !/^WORKFLOW NODE \[/.test(plain(l.html))) return false;
     const h = headerOf(l);
     return h.id !== null && wanted.id != null ? h.id === Number(wanted.id) : h.name === wanted.name;
   });
-  if (!head) return null;
-  const i = lines.value.indexOf(head);
-  return lines.value
-    .slice(i, head.end)
-    .map((l) => l.html)
+  if (!heads.length) return null;
+  return heads
+    .map((head) => {
+      const i = lines.value.indexOf(head);
+      return lines.value
+        .slice(i, head.end)
+        .map((l) => l.html)
+        .join('<br>');
+    })
     .join('<br>');
 }
 
@@ -673,7 +685,8 @@ function copyLog() {
         <span class="af-node-meta">
           <!-- a workflow node : its extravars and its artifacts (always offered, {} when none),
                then a bar, then its numbers -->
-          <template v-if="jobId && group.node.kind === 'node' && group.node.graphId != null">
+          <!-- not for a node carried over from the previous run : it ran no job in this one -->
+          <template v-if="jobId && group.node.kind === 'node' && group.node.graphId != null && !group.node.carried">
             <span class="af-node-tools">
               <button
                 v-if="store.profile.options?.showExtraVars"
@@ -704,6 +717,13 @@ function copyLog() {
               aria-hidden="true"
             ></span>
           </template>
+          <!-- which attempt of a node with retries, or that it was carried over from the previous run -->
+          <span v-if="group.node.attempt"
+            ><FaIcon icon="redo" />{{
+              t('workflow.attempt', { n: group.node.attempt.n, of: group.node.attempt.of })
+            }}</span
+          >
+          <span v-if="group.node.carried"><FaIcon icon="redo" />{{ t('workflow.fromPreviousRun') }}</span>
           <span v-if="group.node.elapsed"><FaIcon icon="stopwatch" />{{ shortDuration(group.node.elapsed) }}</span>
           <span><FaIcon icon="list-ol" />{{ group.node.count }}</span>
           <button

@@ -186,13 +186,15 @@ Awx.launch = async function (
   var awxCredentials = extravars?.__awxCredentials__ || [];
   // a re-run of a job on its failed hosts (Job.relaunch with failedHostsOnly) : AWX's own
   // relaunch of that job, on the hosts it says failed, rather than the template again
+  // an Ascender workflow job relaunched from its failed nodes : the same, with `nodes: failed`
   const rerun = extravars?.__relaunchOf__;
-  if (rerun?.scope === "failedHosts" && rerun.awxId) {
+  if ((rerun?.scope === "failedHosts" || rerun?.scope === "failedNode") && rerun.awxId) {
     try {
-      await Awx.relaunchFailedHosts(awx, rerun.awxId, jobid, ++counter);
+      if (rerun.scope === "failedHosts") await Awx.relaunchFailedHosts(awx, rerun.awxId, jobid, ++counter);
+      else await Awx.relaunchFromFailedNodes(awx, rerun.awxId, jobid, ++counter);
       return true;
     } catch (err) {
-      message = `failed to relaunch AWX job ${rerun.awxId} on its failed hosts\n${err.message}`;
+      message = `failed to relaunch job ${rerun.awxId} ${rerun.scope === "failedHosts" ? "on its failed hosts" : "from its failed nodes"}\n${err.message}`;
       if (!err.jobEnded) await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", message);
       throw jobEnded(new Errors.ApiError(message));
     }
@@ -453,9 +455,68 @@ export function failedHostsRelaunchBody() {
 }
 
 /**
+ * The relaunch body that re-runs an Ascender workflow job from its failed nodes : its workflow
+ * job relaunch endpoint (POST /workflow_jobs/<id>/relaunch/) with `nodes: failed`, which carries
+ * the nodes that succeeded over (prior_run_succeeded) and runs the others again. Read from
+ * Ascender's own source (ascender/api/views/workflow.py WorkflowJobRelaunch.post) ; AWX and AAP
+ * have no such field.
+ *
+ * Returns:
+ *   object: the body.
+ */
+export function failedNodesRelaunchBody() {
+  return { nodes: "failed" };
+}
+
+/**
+ * Relaunches a job on AWX, AAP or Ascender through its own relaunch endpoint, and follows the
+ * new one as a launched template's job : on its failed hosts (a job, `hosts: failed`), or an
+ * Ascender workflow job from its failed nodes (`nodes: failed`).
+ *
+ * Args:
+ *   awx (object): the runner the job ran on.
+ *   relaunch (object): { awxId (the AWX job relaunched), workflow (a workflow job), body (the
+ *     relaunch body), what (how the output says it : "on its failed hosts") }.
+ *   jobid (number): our job.
+ *   counter (number): the next output order.
+ *
+ * Returns:
+ *   Promise<any>: the tracker's end (Awx.trackJob, a workflow's included).
+ *
+ * Raises:
+ *   ApiError: the product refused the relaunch (the job ended as failed, saying why).
+ */
+Awx.relaunchJob = async function (awx, { awxId, workflow = false, body, what }, jobid, counter) {
+  const path = workflow ? "workflow_jobs" : "jobs";
+  const url = `${awx.uri}${apiPrefix(awx)}/${path}/${encodeURIComponent(awxId)}/relaunch/`;
+  logger.notice(`Relaunching AWX ${workflow ? "workflow job" : "job"} ${awxId} ${what}`);
+  let job;
+  try {
+    ({ data: job } = await axios.post(url, body, getAuthorization(awx)));
+  } catch (error) {
+    const why = error.response ? yaml.stringify(error.response.data) : String(error.message || error);
+    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `Failed to relaunch job ${awxId} ${what}. ${why}`);
+    throw jobEnded(new Errors.ApiError(`The relaunch of job ${awxId} was refused: ${why}`));
+  }
+  if (!job?.id) {
+    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `Job ${awxId} was not relaunched`);
+    throw jobEnded(new Errors.ApiError(`Job ${awxId} was not relaunched`));
+  }
+  // step 2 : known on the job as a launched template is (a workflow with its empty graph, filled
+  // by the tracker), its link kept, then followed
+  const launched = { awx_id: job.id };
+  if (workflow || job.type === "workflow_job" || job.related?.workflow_nodes) {
+    launched.awx_workflow = JSON.stringify({ id: job.id, name: job.name || "", status: job.status, nodes: [] });
+  }
+  await Job.update(launched, jobid);
+  await rememberRunnerJobUrl(jobid);
+  await Job.printJobOutput(`ok: [Relaunched job ${awxId} ${what} with jobid ${job.id}]`, "stdout", jobid, ++counter);
+  return Awx.trackJob(awx, job, jobid, counter + 1);
+};
+
+/**
  * Re-runs an AWX job on its failed hosts (Job.relaunch with failedHostsOnly) : AWX's relaunch of
- * that job with `hosts: failed`, its extra vars, inventory and credentials as they were. The new
- * AWX job is then followed as a launched template's is.
+ * that job with `hosts: failed`, its extra vars, inventory and credentials as they were.
  *
  * Args:
  *   awx (object): the runner the job ran on.
@@ -469,26 +530,28 @@ export function failedHostsRelaunchBody() {
  * Raises:
  *   ApiError: AWX refused the relaunch (the job ended as failed, saying why).
  */
-Awx.relaunchFailedHosts = async function (awx, awxId, jobid, counter) {
-  const url = `${awx.uri}${apiPrefix(awx)}/jobs/${encodeURIComponent(awxId)}/relaunch/`;
-  logger.notice(`Relaunching AWX job ${awxId} on its failed hosts`);
-  let job;
-  try {
-    ({ data: job } = await axios.post(url, failedHostsRelaunchBody(), getAuthorization(awx)));
-  } catch (error) {
-    const why = error.response ? yaml.stringify(error.response.data) : String(error.message || error);
-    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `Failed to relaunch AWX job ${awxId} on its failed hosts. ${why}`);
-    throw jobEnded(new Errors.ApiError(`AWX refused the relaunch of job ${awxId}: ${why}`));
-  }
-  if (!job?.id) {
-    await Job.endJobStatus(jobid, counter + 1, "stderr", "failed", `AWX did not relaunch job ${awxId}`);
-    throw jobEnded(new Errors.ApiError(`AWX did not relaunch job ${awxId}`));
-  }
-  // step 2 : known on the job as a launched template is, its link kept, then followed
-  await Job.update({ awx_id: job.id }, jobid);
-  await rememberRunnerJobUrl(jobid);
-  await Job.printJobOutput(`ok: [Relaunched job ${awxId} on its failed hosts with jobid ${job.id}]`, "stdout", jobid, ++counter);
-  return Awx.trackJob(awx, job, jobid, counter + 1);
+Awx.relaunchFailedHosts = function (awx, awxId, jobid, counter) {
+  return Awx.relaunchJob(awx, { awxId, body: failedHostsRelaunchBody(), what: "on its failed hosts" }, jobid, counter);
+};
+
+/**
+ * Relaunches an Ascender workflow job from its failed nodes (Job.relaunch with fromFailedNode) :
+ * the nodes that succeeded are carried over, the failed ones and what follows them run again.
+ *
+ * Args:
+ *   awx (object): the runner the workflow job ran on (an Ascender).
+ *   awxId (number): the workflow job relaunched.
+ *   jobid (number): our job.
+ *   counter (number): the next output order.
+ *
+ * Returns:
+ *   Promise<any>: the tracker's end (Awx.trackWorkflowJob).
+ *
+ * Raises:
+ *   ApiError: Ascender refused the relaunch (the job ended as failed, saying why).
+ */
+Awx.relaunchFromFailedNodes = function (awx, awxId, jobid, counter) {
+  return Awx.relaunchJob(awx, { awxId, workflow: true, body: failedNodesRelaunchBody(), what: "from its failed nodes" }, jobid, counter);
 };
 
 /**
@@ -824,11 +887,115 @@ Awx.trackJob = async function (
 };
 // format a workflow (node) status line ; Helpers.formatOutput() colors these by status
 // a node's line carries its id (#42) : two nodes of one name (one template run twice) stay apart
-function workflowStatusLine(prefix, name, status, banner = false, id = null) {
-  var line = `${prefix} [${name}] (${status})${id ? ` #${id}` : ""}`;
+// and, after it, what else the banner says of it : which attempt it is (attempt 2 of 3, an
+// Ascender node with retries), or that it was carried over from the run this one relaunched
+function workflowStatusLine(prefix, name, status, banner = false, id = null, suffix = "") {
+  var line = `${prefix} [${name}] (${status})${id ? ` #${id}` : ""}${suffix ? ` ${suffix}` : ""}`;
   if (banner) line += " " + "*".repeat(Math.max(5, 79 - line.length));
   return line;
 }
+/**
+ * A node of an AWX, AAP or Ascender workflow job, simplified to what the output and the graph
+ * need. Ascender's own fields (#1082) : a node with automatic retries (max_retries) says how many
+ * it made (retry_attempts) and the jobs of its earlier attempts (retried_jobs) ; its failed job
+ * while a retry is still to come is `retrying`, not failed. A node carried over by a relaunch from
+ * the failed nodes (prior_run_succeeded) has no job : it is successful, in the time it took in the
+ * run it comes from (prior_run_elapsed), and marked carried ; one forced as successful says so,
+ * and why (forced_success_reason).
+ *
+ * Args:
+ *   n (object): the node, as the api returned it.
+ *   running (boolean): the workflow job has not ended (a failed attempt may still be retried).
+ *
+ * Returns:
+ *   object: the node as the graph stores it.
+ */
+export function workflowNodeOf(n, running = true) {
+  const jobStatus = n.summary_fields?.job?.status;
+  const carried = !!n.prior_run_succeeded;
+  let status = jobStatus || (carried ? "successful" : n.do_not_run ? "skipped" : "pending");
+  const maxRetries = Number(n.max_retries) || 0;
+  const attempts = Number(n.retry_attempts) || 0;
+  const type = n.summary_fields?.job?.type || n.summary_fields?.unified_job_template?.unified_job_type || "job";
+  // a failed attempt with a retry still to come (Ascender's retry_pending) : not failed yet
+  if (running && maxRetries > attempts && (status === "failed" || status === "error") && type !== "workflow_approval") status = "retrying";
+  const node = {
+    id: n.id,
+    name: n.summary_fields?.job?.name || n.summary_fields?.unified_job_template?.name || `node ${n.id}`,
+    type,
+    status,
+    // the job's own status, whatever the graph shows (an attempt waiting for its retry failed)
+    job_status: jobStatus || null,
+    elapsed: (carried && !n.job ? Number(n.prior_run_elapsed) : n.summary_fields?.job?.elapsed) || 0,
+    job: n.job,
+    job_url: n.related?.job,
+    success_nodes: n.success_nodes || [],
+    failure_nodes: n.failure_nodes || [],
+    always_nodes: n.always_nodes || [],
+    // Ascender's conditional links : taken on the parent's outcome (trigger) when an artifact of
+    // it matches ; AWX and AAP have none
+    condition_edges: conditionEdges(n),
+    do_not_run: n.do_not_run || false,
+  };
+  // Ascender's retries, carried over and forced nodes : only where there are some
+  if (maxRetries > 0) {
+    node.max_retries = maxRetries;
+    node.retry_attempts = attempts;
+    node.retried_jobs = (Array.isArray(n.retried_jobs) ? n.retried_jobs : []).map(Number).filter(Boolean).sort((a, b) => a - b);
+  }
+  if (carried) node.carried = true;
+  if (n.forced_success) {
+    node.forced_success = true;
+    node.forced_success_reason = String(n.forced_success_reason || "");
+  }
+  return node;
+}
+
+/**
+ * The attempts of a workflow node whose output a job prints : one per job it ran (its earlier
+ * attempts' jobs, then its job), each with its number among the attempts it may make. A node
+ * without retries has one, its job.
+ *
+ * Args:
+ *   node (object): the node (workflowNodeOf).
+ *
+ * Returns:
+ *   object[]: [{ job (its id), attempt (from 1), of (how many it may make, 0 : no retries),
+ *     current (its job now), key (what the printed output is tracked by), total (how many
+ *     attempts it made so far) }].
+ */
+export function nodeAttempts(node) {
+  const retried = Array.isArray(node?.retried_jobs) ? node.retried_jobs : [];
+  const jobs = [...retried.filter((id) => id !== node.job), ...(node?.job ? [node.job] : [])];
+  const of = Number(node?.max_retries) > 0 ? Number(node.max_retries) + 1 : 0;
+  return jobs.map((job, i) => ({
+    job,
+    attempt: i + 1,
+    of,
+    current: job === node.job,
+    key: of ? `${node.id}:${i + 1}` : String(node.id),
+    // how many attempts it made so far : one only, its banner names no attempt
+    total: jobs.length,
+  }));
+}
+
+/**
+ * What a node's banner says of its attempt : "attempt 2 of 3" once the node was retried (the
+ * attempt after the first, or the first when a retry followed it) ; nothing for a node without
+ * retries, or one whose first attempt is its only one (it succeeded, or none followed yet).
+ *
+ * Args:
+ *   a (object): the attempt (nodeAttempts).
+ *
+ * Returns:
+ *   string: the words, '' for none.
+ */
+export function attemptLabel(a) {
+  if (!a?.of) return "";
+  if (a.attempt > 1 || Number(a.total) > 1) return `attempt ${a.attempt} of ${a.of}`;
+  return "";
+}
+
 // get the nodes of an awx workflow job, simplified to what we need for output and visualization
 Awx.getWorkflowNodes = async function (awx, job) {
   const awxConfig = awx;
@@ -843,29 +1010,9 @@ Awx.getWorkflowNodes = async function (awx, job) {
     results = results.concat(axiosResult.data?.results || []);
     url = axiosResult.data?.next;
   }
-  return results.map((n) => ({
-    id: n.id,
-    name:
-      n.summary_fields?.job?.name ||
-      n.summary_fields?.unified_job_template?.name ||
-      `node ${n.id}`,
-    type:
-      n.summary_fields?.job?.type ||
-      n.summary_fields?.unified_job_template?.unified_job_type ||
-      "job",
-    status:
-      n.summary_fields?.job?.status || (n.do_not_run ? "skipped" : "pending"),
-    elapsed: n.summary_fields?.job?.elapsed || 0,
-    job: n.job,
-    job_url: n.related?.job,
-    success_nodes: n.success_nodes || [],
-    failure_nodes: n.failure_nodes || [],
-    always_nodes: n.always_nodes || [],
-    // Ascender's conditional links : taken on the parent's outcome (trigger) when an artifact of
-    // it matches ; AWX and AAP have none
-    condition_edges: conditionEdges(n),
-    do_not_run: n.do_not_run || false,
-  }));
+  // a workflow that ended retries nothing more : a failed attempt is then failed
+  const running = !job.finished && !["successful", "failed", "error", "canceled"].includes(job.status);
+  return results.map((n) => workflowNodeOf(n, running));
 };
 /**
  * The conditional links of an Ascender workflow node : one per child, with what takes it. A
@@ -938,6 +1085,10 @@ Awx.trackWorkflowJob = async function (
   const awxConfig = awx;
   if (!awxConfig) throw new Errors.ApiError("No AWX runner given");
   const axiosConfig = getAuthorization(awxConfig);
+  // what the output holds already, by attempt (nodeAttempts' key : a node's id, or its id and the
+  // attempt when it has retries ; a carried node's id and "carried") - each attempt of a node is
+  // a job of its own, printed once in a block of its own (#1082)
+  const printed = new Set((printedNodeIds || []).map(String));
   // AWX failing to answer, in a row (contactTolerance)
   const contact = contactTolerance();
   for (;;) {
@@ -961,51 +1112,69 @@ Awx.trackWorkflowJob = async function (
       if (workflowJson != previousWorkflowJson) {
         await Job.update({ awx_workflow: workflowJson }, jobid);
       }
-      // dump the output of the nodes that just finished (in completion order)
+      // a node carried over from the run this one relaunched (Ascender's relaunch from the
+      // failed nodes) : said once, under a banner of its own - it ran no job here
+      for (const node of nodes.filter((n) => n.carried && !n.job && !printed.has(`${n.id}:carried`))) {
+        const banner = workflowStatusLine("WORKFLOW NODE", node.name, node.status, true, node.id, "carried over");
+        const why = node.forced_success ? `, forced as successful: ${node.forced_success_reason || "no reason given"}` : "";
+        await Job.printJobOutput(`${banner}\nok: [carried over from the previous run${why}]`, "stdout", jobid, ++counter);
+        printed.add(`${node.id}:carried`);
+      }
+      // dump the output of the attempts that just finished (in completion order) : every job a
+      // node ran, an earlier attempt superseded by a retry included
       const finishedStatuses = ["successful", "failed", "error", "canceled"];
-      const finishedNodes = nodes.filter(
-        (n) =>
-          n.job &&
-          finishedStatuses.includes(n.status) &&
-          !printedNodeIds.includes(n.id)
-      );
-      for (const node of finishedNodes) {
-        var nodeOutput = "";
-        // the node's job, once read : its events are stored after its output
-        var child = null;
-        try {
-          // get the child job (job, project_update, workflow_approval, ...) and grab its output
-          const childResult = await axios.get(
-            serverOf(awxConfig) + node.job_url,
-            axiosConfig
+      for (const node of nodes) {
+        for (const a of nodeAttempts(node)) {
+          if (printed.has(a.key)) continue;
+          // its job now : printed once it has ended (a failed one waiting for its retry too) ;
+          // an earlier attempt has ended by definition
+          if (a.current && !finishedStatuses.includes(node.job_status || node.status)) continue;
+          var nodeOutput = "";
+          // the attempt's job, once read : its events are stored after its output
+          var child = null;
+          // its status as its job says it (an earlier attempt failed, whatever the node is now)
+          var attemptStatus = a.current ? node.job_status || node.status : "failed";
+          try {
+            // get the child job (job, project_update, workflow_approval, ...) and grab its output ;
+            // an earlier attempt's job is of the same kind, at the same place but its id
+            const url = a.current
+              ? serverOf(awxConfig) + node.job_url
+              : node.job_url
+                ? serverOf(awxConfig) + String(node.job_url).replace(/\/\d+\/?$/, `/${a.job}/`)
+                : `${awxConfig.uri}${apiPrefix(awxConfig)}/jobs/${a.job}/`;
+            const childResult = await axios.get(url, axiosConfig);
+            // its output and (below) its events : once AWX has saved all of them (it reports
+            // the node as ended a moment before it has saved its last events)
+            const final = await Awx.finalJobRead(awx, jobid, childResult.data);
+            child = final.job;
+            nodeOutput = final.output || "";
+            if (child?.status && finishedStatuses.includes(child.status)) attemptStatus = child.status;
+          } catch (e) {
+            logger.warning(
+              `Failed to get output of workflow node ${node.name} (job ${a.job}): ${e.message}`
+            );
+          }
+          const banner = workflowStatusLine(
+            "WORKFLOW NODE",
+            node.name,
+            attemptStatus,
+            true,
+            node.id,
+            // which attempt, only once it was retried : a node that succeeded at its first attempt
+            // reads as one without retries
+            attemptLabel(a)
           );
-          // its output and (below) its events : once AWX has saved all of them (it reports
-          // the node as ended a moment before it has saved its last events)
-          const final = await Awx.finalJobRead(awx, jobid, childResult.data);
-          child = final.job;
-          nodeOutput = final.output || "";
-        } catch (e) {
-          logger.warning(
-            `Failed to get output of workflow node ${node.name}: ${e.message}`
+          await Job.printJobOutput(
+            `${banner}\n${nodeOutput}`.trim(),
+            "stdout",
+            jobid,
+            ++counter
           );
+          printed.add(a.key);
+          // its events, after the nodes' before it : in the order of the output, so its lines
+          // pair with them
+          await Awx.storeNodeEvents(awx, jobid, child);
         }
-        const banner = workflowStatusLine(
-          "WORKFLOW NODE",
-          node.name,
-          node.status,
-          true,
-          node.id
-        );
-        await Job.printJobOutput(
-          `${banner}\n${nodeOutput}`.trim(),
-          "stdout",
-          jobid,
-          ++counter
-        );
-        printedNodeIds.push(node.id);
-        // its events, after the nodes' before it : in the order of the output, so its lines
-        // pair with them
-        await Awx.storeNodeEvents(awx, jobid, child);
       }
       // check for abort request
       const abort_requested = await Job.isAbortRequested(jobid);
@@ -1128,8 +1297,31 @@ Awx.findRemoteJob = async function (awx, awxId, isWorkflow = false) {
 };
 
 /**
- * The ids of the workflow nodes whose output a job holds already : their banner, written once
- * per finished node by trackWorkflowJob (WORKFLOW NODE [name] (status) #id ****).
+ * What a job's output holds already of its workflow's nodes : their banners, written once per
+ * attempt by trackWorkflowJob (WORKFLOW NODE [name] (status) #id ****, with `attempt 2 of 3` for
+ * a node with retries, `carried over` for a node carried over from the run relaunched), as
+ * nodeAttempts keys them : so a workflow followed again prints only what it did not.
+ *
+ * Args:
+ *   rows (object[]): the job's output rows ({ output }).
+ *
+ * Returns:
+ *   string[]: the keys (a node's id ; its id and attempt, "12:2" ; its id and "carried").
+ */
+export function printedWorkflowKeys(rows) {
+  const keys = new Set();
+  for (const row of rows || []) {
+    const re = /^WORKFLOW NODE \[.*\] \(\w+\) #(\d+)(?: attempt (\d+) of \d+| (carried over))? \*{5,}$/gm;
+    let m;
+    while ((m = re.exec(String(row?.output || ""))) !== null) {
+      keys.add(m[2] ? `${m[1]}:${m[2]}` : m[3] ? `${m[1]}:carried` : m[1]);
+    }
+  }
+  return [...keys];
+}
+
+/**
+ * The ids of the workflow nodes whose output a job holds (a banner of theirs, whatever attempt).
  *
  * Args:
  *   rows (object[]): the job's output rows ({ output }).
@@ -1140,7 +1332,7 @@ Awx.findRemoteJob = async function (awx, awxId, isWorkflow = false) {
 export function printedWorkflowNodeIds(rows) {
   const ids = new Set();
   for (const row of rows || []) {
-    const re = /^WORKFLOW NODE \[.*\] \(\w+\) #(\d+) \*{5,}$/gm;
+    const re = /^WORKFLOW NODE \[.*\] \(\w+\) #(\d+)(?: attempt \d+ of \d+| carried over)? \*{5,}$/gm;
     let m;
     while ((m = re.exec(String(row?.output || ""))) !== null) ids.add(Number(m[1]));
   }
@@ -1182,7 +1374,7 @@ Awx.resume = async function (awx, row) {
     ++counter
   );
   if (workflow) {
-    return Awx.trackWorkflowJob(awx, remote, jobid, counter + 1, printedWorkflowNodeIds(rows), row.awx_workflow || "");
+    return Awx.trackWorkflowJob(awx, remote, jobid, counter + 1, printedWorkflowKeys(rows), row.awx_workflow || "");
   }
   return Awx.trackJob(awx, remote, jobid, counter + 1);
 };

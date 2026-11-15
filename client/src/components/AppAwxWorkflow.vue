@@ -13,14 +13,21 @@ import { workflowEdges, conditionText } from '@/lib/workflowEdges';
 /*  (green=successful, red=failed, ...) and the links are         */
 /*  painted by relation (success, failure, always) ; Ascender's   */
 /*  conditional links are dashed, in their trigger's color, a     */
-/*  diamond on them showing their condition when hovered          */
+/*  diamond on them showing their condition when hovered. A node  */
+/*  carried over from the run a relaunch from the failed node     */
+/*  relaunched is greyed, "from the previous run" ; one forced as */
+/*  successful (Ascender) says so, its reason in its hover card ; */
+/*  a node with retries (Ascender) shows how many it made, and    */
+/*  one waiting for its retry is retrying, not failed (#1082)     */
 /*                                                                */
 /*  @props:                                                       */
 /*      workflow: Object                                          */
 /*        { id, name, status, nodes: [                            */
 /*            { id, name, type, status, elapsed,                  */
 /*              success_nodes, failure_nodes, always_nodes,       */
-/*              condition_edges } ] }                             */
+/*              condition_edges, carried, forced_success,         */
+/*              forced_success_reason, max_retries,               */
+/*              retry_attempts } ] }                              */
 /*                                                                */
 /******************************************************************/
 
@@ -216,6 +223,8 @@ const statusColors = {
   error: 'var(--bs-danger)',
   unreachable: 'var(--bs-danger)',
   running: 'var(--bs-primary)',
+  // a failed attempt waiting for its retry (Ascender) : still under way
+  retrying: 'var(--bs-primary)',
   canceled: 'var(--bs-warning)',
 };
 // link colors by relation type
@@ -228,6 +237,80 @@ const edgeColors = {
 
 function statusColor(status) {
   return statusColors[status] || 'var(--bs-secondary)';
+}
+
+/**
+ * A node's color : its status's, grey for a node carried over from the previous run (it did not
+ * run in this one).
+ *
+ * Args:
+ *   n (object): the node.
+ *
+ * Returns:
+ *   string: a CSS color.
+ */
+function nodeColor(n) {
+  return n?.carried ? 'var(--bs-secondary)' : statusColor(n?.status);
+}
+
+/**
+ * What a node's second line says before its time : its status ; forced as successful, or carried
+ * over from the previous run, that instead (one line, the node's width).
+ *
+ * Args:
+ *   n (object): the node.
+ *
+ * Returns:
+ *   string: the text.
+ */
+function nodeStatusText(n) {
+  if (n?.forced_success) return t('workflow.forcedSuccess');
+  if (n?.carried) return t('workflow.fromPreviousRun');
+  return n?.status || '';
+}
+
+/**
+ * A node's status line under its name : its status and its time, joined by " · " as one text
+ * (separate template parts lost the space before the dot). Its retries are drawn apart, at the
+ * right (retriesX).
+ *
+ * Args:
+ *   n (object): the node.
+ *
+ * Returns:
+ *   string: e.g. "failed · 5s".
+ */
+function statusLine(n) {
+  return [nodeStatusText(n), n?.elapsed > 0 ? `${Math.round(n.elapsed)}s` : ''].filter(Boolean).join(' · ');
+}
+
+/**
+ * Where a node's retries (↻ 2/2) end, on its status line : at its right, before its link to the
+ * product when it has one.
+ *
+ * Args:
+ *   n (object): the node.
+ *   x (number): the node's left edge.
+ *
+ * Returns:
+ *   number: the x the text ends at (text-anchor end).
+ */
+function retriesX(n, x) {
+  return x + NODE_W - (n?.ui_url ? 34 : 10);
+}
+
+/**
+ * How many retries a node with retries made, of how many it may (Ascender's retry_attempts and
+ * max_retries) : ↻ 1/2 ; '' for a node without retries, or one not retried (it succeeded at once).
+ *
+ * Args:
+ *   n (object): the node.
+ *
+ * Returns:
+ *   string: the text.
+ */
+function retriesText(n) {
+  return n?.max_retries > 0 && n.retry_attempts > 0 ? `↻ ${n.retry_attempts}/${n.max_retries}` : '';
 }
 
 // a smooth bezier link between 2 points
@@ -262,14 +345,31 @@ const related = computed(() => {
 });
 // the hidden text the name is measured with, and the card's width
 const measure = ref(null);
+// and the reason a node was forced as successful, on a line of its own under its status
+const reasonMeasure = ref(null);
 const cardWidth = ref(NODE_W);
 const CARD_PAD = 26 + 14; // the name's left offset (the status dot before it), and room after it
+// the card's height : a line more for a forced node's reason
+const REASON_H = 18;
 watch(focused, async (n) => {
   if (!n) return;
   await nextTick();
   const nameWidth = measure.value?.getComputedTextLength?.() || 0;
-  cardWidth.value = Math.max(NODE_W, Math.ceil(nameWidth) + CARD_PAD);
+  const reasonWidth = n.forced_success ? reasonMeasure.value?.getComputedTextLength?.() || 0 : 0;
+  cardWidth.value = Math.max(NODE_W, Math.ceil(Math.max(nameWidth, reasonWidth)) + CARD_PAD);
 });
+/**
+ * The reason line of a forced node's card.
+ *
+ * Args:
+ *   n (object): the node.
+ *
+ * Returns:
+ *   string: the reason, '' for a node not forced.
+ */
+function reasonText(n) {
+  return n?.forced_success ? t('workflow.forcedReason', { reason: n.forced_success_reason || '–' }) : '';
+}
 // the card where the node is, moved left as far as it must to stay inside the graph
 const card = computed(() => {
   const n = focused.value;
@@ -434,7 +534,7 @@ const following = ref(true);
 const isRunning = computed(() => props.workflow?.status === 'running');
 const runningRight = computed(() => {
   if (!isRunning.value) return null;
-  const running = graph.value.nodes.filter((n) => n.status === 'running');
+  const running = graph.value.nodes.filter((n) => n.status === 'running' || n.status === 'retrying');
   return running.length ? Math.max(...running.map((n) => n.x)) : null;
 });
 // a slide the graph makes itself : its scroll events are not the reader's
@@ -663,7 +763,11 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
                 v-for="n in graph.nodes"
                 :key="n.id"
                 class="awx-node"
-                :class="{ 'awx-node-open': hasOutput(n), 'awx-node-faded': related && !related.nodes.has(n.id) }"
+                :class="{
+                  'awx-node-open': hasOutput(n),
+                  'awx-node-faded': related && !related.nodes.has(n.id),
+                  'awx-node-carried': n.carried,
+                }"
                 @click="openNode(n)"
                 @mouseenter="hovered = n"
                 @mouseleave="hovered = null"
@@ -675,20 +779,32 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
                   :height="NODE_H"
                   rx="6"
                   class="awx-node-rect"
-                  :style="{ stroke: statusColor(n.status) }"
+                  :style="{ stroke: nodeColor(n) }"
                   :stroke-dasharray="n.status == 'skipped' || n.do_not_run ? '4 3' : null"
                 />
                 <circle
                   :cx="n.x + 14"
                   :cy="n.y + NODE_H / 2"
                   r="5"
-                  :fill="statusColor(n.status)"
-                  :class="{ 'awx-pulse': n.status == 'running' }"
+                  :fill="nodeColor(n)"
+                  :class="{ 'awx-pulse': n.status == 'running' || n.status == 'retrying' }"
                 />
                 <text :x="n.x + 26" :y="n.y + 22" class="awx-node-name">{{ truncate(n.name) }}</text>
-                <text :x="n.x + 26" :y="n.y + 40" class="awx-node-status" :style="{ fill: statusColor(n.status) }">
-                  {{ n.status }}
-                  <template v-if="n.elapsed > 0">· {{ Math.round(n.elapsed) }}s</template>
+                <!-- its status (or that it comes from the previous run, or was forced), its time, and
+                     the retries it made of the ones it may -->
+                <text :x="n.x + 26" :y="n.y + 40" class="awx-node-status" :style="{ fill: nodeColor(n) }">
+                  {{ statusLine(n) }}
+                </text>
+                <!-- the retries it made of the ones it may : at the right of its status line -->
+                <text
+                  v-if="retriesText(n)"
+                  :x="retriesX(n, n.x)"
+                  :y="n.y + 40"
+                  text-anchor="end"
+                  class="awx-node-status"
+                  :style="{ fill: nodeColor(n) }"
+                >
+                  {{ retriesText(n) }}
                 </text>
                 <!-- its job in the product it ran on (a click on the node opens its output here) -->
                 <a
@@ -715,27 +831,37 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
               </g>
               <!-- the hovered node's card : its whole name, over it (the last drawn, so on top) -->
               <text ref="measure" class="awx-node-name awx-measure" x="0" y="0">{{ focused?.name }}</text>
+              <text ref="reasonMeasure" class="awx-node-status awx-measure" x="0" y="0">{{ reasonText(focused) }}</text>
               <g v-if="card" class="awx-node-card">
                 <rect
                   :x="card.cx"
                   :y="card.y"
                   :width="card.w"
-                  :height="NODE_H"
+                  :height="NODE_H + (card.forced_success ? REASON_H : 0)"
                   rx="6"
                   class="awx-node-rect"
-                  :style="{ stroke: statusColor(card.status) }"
+                  :style="{ stroke: nodeColor(card) }"
                   :stroke-dasharray="card.status == 'skipped' || card.do_not_run ? '4 3' : null"
                 />
-                <circle :cx="card.cx + 14" :cy="card.y + NODE_H / 2" r="5" :fill="statusColor(card.status)" />
+                <circle :cx="card.cx + 14" :cy="card.y + NODE_H / 2" r="5" :fill="nodeColor(card)" />
                 <text :x="card.cx + 26" :y="card.y + 22" class="awx-node-name">{{ card.name }}</text>
+                <text :x="card.cx + 26" :y="card.y + 40" class="awx-node-status" :style="{ fill: nodeColor(card) }">
+                  {{ statusLine(card) }}
+                </text>
+                <!-- the retries it made of the ones it may : at the right of its status line -->
                 <text
-                  :x="card.cx + 26"
+                  v-if="retriesText(card)"
+                  :x="retriesX(card, card.x)"
                   :y="card.y + 40"
+                  text-anchor="end"
                   class="awx-node-status"
-                  :style="{ fill: statusColor(card.status) }"
+                  :style="{ fill: nodeColor(card) }"
                 >
-                  {{ card.status }}
-                  <template v-if="card.elapsed > 0">· {{ Math.round(card.elapsed) }}s</template>
+                  {{ retriesText(card) }}
+                </text>
+                <!-- forced as successful : why, as whoever relaunched it said -->
+                <text v-if="card.forced_success" :x="card.cx + 26" :y="card.y + 40 + REASON_H" class="awx-node-status">
+                  {{ reasonText(card) }}
                 </text>
                 <!-- the node's link, drawn where it is under the card : the click passes through to it -->
                 <svg
@@ -794,6 +920,14 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
 }
 .awx-node-faded {
   opacity: 0.45;
+}
+/* a node carried over from the previous run : greyed, it did not run in this one */
+.awx-node-carried {
+  opacity: 0.6;
+}
+/* and faded as the others when another node is in focus */
+.awx-node-carried.awx-node-faded {
+  opacity: 0.3;
 }
 @media (prefers-reduced-motion: reduce) {
   .awx-link,

@@ -80,7 +80,7 @@ const reviewJob = ref(null);
 const relaunchVerbose = ref(false);
 const relaunchWithEdit = ref(false);
 // what the relaunch asked in the dialog is : 'all' a full relaunch, 'failedHosts' on the failed
-// hosts only (the Relaunch menu, lib/relaunchMenu.js)
+// hosts only, 'failedNode' a workflow from its failed node (the Relaunch menu, lib/relaunchMenu.js)
 const relaunchScope = ref('all');
 // the job page's relaunch choices besides a full relaunch (GET /api/v2/job/:id/relaunch-options),
 // read once the job has ended ; null : none, the plain Relaunch button
@@ -1049,7 +1049,8 @@ async function relaunchJob(id, verbose = false, scope = 'all') {
  * entry of its menu.
  *
  * Args:
- *   scope (string): 'all' a full relaunch, 'failedHosts' the failed hosts only.
+ *   scope (string): 'all' a full relaunch, 'failedHosts' the failed hosts only, 'failedNode' a
+ *     workflow from its failed node.
  */
 function askRelaunch(scope = 'all') {
   tempJobId.value = job.value?.id;
@@ -1267,6 +1268,10 @@ onMounted(async () => {
           </p>
           <p class="font-monospace small text-break">{{ relaunchHosts.join(', ') }}</p>
         </template>
+        <!-- a workflow from its failed node : what it keeps -->
+        <p v-else-if="relaunchScope === 'failedNode'" class="mt-3 fs-6 user-select-none">
+          {{ t('jobs.relaunchFailedNodeLead', { id: tempJobId }) }}
+        </p>
         <p v-else class="mt-3 fs-6 user-select-none">
           {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong
           >:
@@ -1279,9 +1284,9 @@ onMounted(async () => {
           :isSwitch="true"
           :inline="true"
         />
-        <!-- editing the values relaunches the form on all its hosts : not for the failed ones -->
+        <!-- editing the values relaunches the form as a whole : not for the failed hosts or node -->
         <BsCheckbox
-          v-if="relaunchScope !== 'failedHosts'"
+          v-if="relaunchScope === 'all'"
           v-model="relaunchWithEdit"
           :label="t('jobs.relaunchEdit')"
           class="mt-2"
@@ -1844,6 +1849,9 @@ onMounted(async () => {
                       ><a href="#" @click.prevent="getJob(relaunchOrigin.id)">#{{ relaunchOrigin.id }}</a></span
                     ><span v-if="relaunchOrigin.scope === 'failedHosts'" class="af-job-fact-note">{{
                       t('jobs.failedHostsNote')
+                    }}</span
+                    ><span v-else-if="relaunchOrigin.scope === 'failedNode'" class="af-job-fact-note">{{
+                      t('jobs.failedNodeNote')
                     }}</span>
                   </dd>
                 </div>
