@@ -3331,14 +3331,6 @@ export default {
     noLog: 'Brak dziennika serwera z dnia {date}.',
     resetHint: 'Znowu dzisiejszy dziennik, z nowymi wierszami, bez wyszukiwania',
   },
-  datePick: {
-    year: 'Rok',
-    month: 'Miesiąc',
-    day: 'Dzień',
-    allYears: 'Wszystkie lata',
-    allMonths: 'Wszystkie miesiące',
-    allDays: 'Wszystkie dni',
-  },
   changePassword: {
     title: 'Zmień hasło',
     defaultPassword: 'Zalogowano się domyślnym hasłem, które jest publiczne. Wybierz inne, aby kontynuować.',
@@ -3369,5 +3361,13 @@ export default {
     version: 'REST API to {version} (API v1 usunięto w wersji 7.0.0).',
     endpoint: 'Endpoint dokumentacji API:',
     hint: 'Kliknij powyższy link lub wpisz go w przeglądarce, aby otworzyć interaktywny Swagger UI.',
+  },
+  datePick: {
+    year: 'Rok',
+    month: 'Miesiąc',
+    day: 'Dzień',
+    allYears: 'Wszystkie lata',
+    allMonths: 'Wszystkie miesiące',
+    allDays: 'Wszystkie dni',
   },
 };

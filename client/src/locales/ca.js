@@ -3348,14 +3348,6 @@ export default {
     noLog: 'No hi ha registre del servidor del {date}.',
     resetHint: "El registre d'avui de nou, seguint les línies noves, sense cerca",
   },
-  datePick: {
-    year: 'Any',
-    month: 'Mes',
-    day: 'Dia',
-    allYears: 'Tots els anys',
-    allMonths: 'Tots els mesos',
-    allDays: 'Tots els dies',
-  },
   changePassword: {
     title: 'Canvia la contrasenya',
     defaultPassword:
@@ -3386,5 +3378,13 @@ export default {
     version: "L'API REST és la {version} (l'API v1 es va eliminar a la 7.0.0).",
     endpoint: "Endpoint de la documentació de l'API:",
     hint: "Fes clic a l'enllaç de dalt o introdueix-lo al navegador per obrir la interfície interactiva Swagger UI.",
+  },
+  datePick: {
+    year: 'Any',
+    month: 'Mes',
+    day: 'Dia',
+    allYears: 'Tots els anys',
+    allMonths: 'Tots els mesos',
+    allDays: 'Tots els dies',
   },
 };

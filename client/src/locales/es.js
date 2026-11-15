@@ -3347,14 +3347,6 @@ export default {
     noLog: 'No hay registro del servidor del {date}.',
     resetHint: 'De nuevo el registro de hoy, siguiendo sus líneas nuevas, sin búsqueda',
   },
-  datePick: {
-    year: 'Año',
-    month: 'Mes',
-    day: 'Día',
-    allYears: 'Todos los años',
-    allMonths: 'Todos los meses',
-    allDays: 'Todos los días',
-  },
   changePassword: {
     title: 'Cambia tu contraseña',
     defaultPassword: 'Has iniciado sesión con la contraseña predeterminada, que es pública. Elige otra para continuar.',
@@ -3385,5 +3377,13 @@ export default {
     version: 'La API REST es la {version} (la API v1 se eliminó en la 7.0.0).',
     endpoint: 'Endpoint de la documentación de la API:',
     hint: 'Haz clic en el enlace de arriba o introdúcelo en el navegador para abrir la interfaz interactiva Swagger UI.',
+  },
+  datePick: {
+    year: 'Año',
+    month: 'Mes',
+    day: 'Día',
+    allYears: 'Todos los años',
+    allMonths: 'Todos los meses',
+    allDays: 'Todos los días',
   },
 };

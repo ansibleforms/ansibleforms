@@ -3364,14 +3364,6 @@ export default {
     noLog: 'Kein Serverprotokoll für {date}.',
     resetHint: 'Wieder das heutige Protokoll, mit neuen Zeilen, ohne Suche',
   },
-  datePick: {
-    year: 'Jahr',
-    month: 'Monat',
-    day: 'Tag',
-    allYears: 'Alle Jahre',
-    allMonths: 'Alle Monate',
-    allDays: 'Alle Tage',
-  },
   changePassword: {
     title: 'Ändern Sie Ihr Passwort',
     defaultPassword:
@@ -3403,5 +3395,13 @@ export default {
     version: 'Die REST-API ist {version} (API v1 wurde in 7.0.0 entfernt).',
     endpoint: 'Endpunkt der API-Dokumentation:',
     hint: 'Klicken Sie auf den Link oben oder geben Sie ihn im Browser ein, um die interaktive Swagger UI zu öffnen.',
+  },
+  datePick: {
+    year: 'Jahr',
+    month: 'Monat',
+    day: 'Tag',
+    allYears: 'Alle Jahre',
+    allMonths: 'Alle Monate',
+    allDays: 'Alle Tage',
   },
 };

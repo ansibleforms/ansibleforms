@@ -3304,14 +3304,6 @@ export default {
     noLog: '{date} のサーバーログはありません。',
     resetHint: '今日のログに戻り、新しい行を追い、検索を消します',
   },
-  datePick: {
-    year: '年',
-    month: '月',
-    day: '日',
-    allYears: 'すべての年',
-    allMonths: 'すべての月',
-    allDays: 'すべての日',
-  },
   changePassword: {
     title: 'パスワードを変更してください',
     defaultPassword: '公開されている既定のパスワードでサインインしました。続行するには別のパスワードを選んでください。',
@@ -3340,5 +3332,13 @@ export default {
     version: 'REST API は {version} です (API v1 は 7.0.0 で削除されました)。',
     endpoint: 'API ドキュメントのエンドポイント:',
     hint: '上のリンクをクリックするか、ブラウザーに入力して、対話型の Swagger UI を開いてください。',
+  },
+  datePick: {
+    year: '年',
+    month: '月',
+    day: '日',
+    allYears: 'すべての年',
+    allMonths: 'すべての月',
+    allDays: 'すべての日',
   },
 };

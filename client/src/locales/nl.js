@@ -3341,14 +3341,6 @@ export default {
     noLog: 'Geen serverlog voor {date}.',
     resetHint: 'Weer het log van vandaag, dat nieuwe regels volgt, zonder zoekopdracht',
   },
-  datePick: {
-    year: 'Jaar',
-    month: 'Maand',
-    day: 'Dag',
-    allYears: 'Alle jaren',
-    allMonths: 'Alle maanden',
-    allDays: 'Alle dagen',
-  },
   changePassword: {
     title: 'Wijzig uw wachtwoord',
     defaultPassword: 'U bent aangemeld met het standaardwachtwoord, dat openbaar is. Kies een ander om verder te gaan.',
@@ -3379,5 +3371,13 @@ export default {
     version: 'De REST API is {version} (API v1 is verwijderd in 7.0.0).',
     endpoint: 'Endpoint van de API-documentatie:',
     hint: 'Klik op de link hierboven of voer hem in uw browser in om de interactieve Swagger UI te openen.',
+  },
+  datePick: {
+    year: 'Jaar',
+    month: 'Maand',
+    day: 'Dag',
+    allYears: 'Alle jaren',
+    allMonths: 'Alle maanden',
+    allDays: 'Alle dagen',
   },
 };

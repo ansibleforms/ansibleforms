@@ -3220,14 +3220,6 @@ export default {
     noLog: '{date} 没有服务器日志。',
     resetHint: '回到今天的日志，跟随新行，并清除搜索',
   },
-  datePick: {
-    year: '年',
-    month: '月',
-    day: '日',
-    allYears: '所有年份',
-    allMonths: '所有月份',
-    allDays: '所有日期',
-  },
   changePassword: {
     title: '请修改密码',
     defaultPassword: '您使用公开的默认密码登录。请选择另一个密码以继续。',
@@ -3256,5 +3248,13 @@ export default {
     version: 'REST API 为 {version}（API v1 已在 7.0.0 中移除）。',
     endpoint: 'API 文档端点：',
     hint: '点击上面的链接或在浏览器中输入它，即可打开交互式 Swagger UI。',
+  },
+  datePick: {
+    year: '年',
+    month: '月',
+    day: '日',
+    allYears: '所有年份',
+    allMonths: '所有月份',
+    allDays: '所有日期',
   },
 };

@@ -3306,14 +3306,6 @@ export default {
     noLog: 'No server log for {date}.',
     resetHint: "Today's log again, following its new lines, with no search",
   },
-  datePick: {
-    year: 'Year',
-    month: 'Month',
-    day: 'Day',
-    allYears: 'All years',
-    allMonths: 'All months',
-    allDays: 'All days',
-  },
   changePassword: {
     title: 'Change your password',
     defaultPassword: 'You signed in with the default password, which is public. Choose another one to continue.',
@@ -3343,5 +3335,13 @@ export default {
     version: 'The REST API is {version} (API v1 was removed in 7.0.0).',
     endpoint: 'API Docs Endpoint:',
     hint: 'Click the link above or enter it in your browser to access the interactive Swagger UI.',
+  },
+  datePick: {
+    year: 'Year',
+    month: 'Month',
+    day: 'Day',
+    allYears: 'All years',
+    allMonths: 'All months',
+    allDays: 'All days',
   },
 };
