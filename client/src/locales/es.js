@@ -1808,6 +1808,7 @@ export default {
         'Los valores del formulario, tal como los guardó su botón Guardar. Abrir en el formulario los rellena.',
       valuesHelpNew: 'Los valores del formulario, en YAML: nombres de campo y sus valores.',
       lastUsed: 'Último uso',
+      tabRuns: 'Ejecuciones',
     },
     knownhosts: {
       label: 'Host conocido',

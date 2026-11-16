@@ -1024,12 +1024,18 @@ Job.assertReadable = async function (user, id) {
 };
 Job.findAll = async function (user, records, filter = {}) {
   logger.info("Finding all jobs");
-  // narrowed to one user's jobs (user and user_type) or one runner's (a settings page's Jobs
-  // tab) ; within what the caller may see either way
+  // narrowed to one user's jobs (user and user_type), one runner's (a settings page's Jobs tab)
+  // or one stored job's (its Runs tab) ; within what the caller may see either way
   const where = [];
   const vars = [];
   if (filter.user) { where.push("user=? AND user_type=?"); vars.push(String(filter.user), String(filter.userType || "local")); }
   if (filter.runner) { where.push("runner=?"); vars.push(String(filter.runner)); }
+  // the jobs launched from one stored job (its page's Runs tab) ; an id that is no number, none
+  if (filter.storedJob !== undefined && filter.storedJob !== null && filter.storedJob !== "") {
+    const storedJob = Number(filter.storedJob);
+    if (Number.isInteger(storedJob) && storedJob > 0) { where.push("stored_job_id=?"); vars.push(storedJob); }
+    else where.push("1=0");
+  }
   const narrowed = where.length ? where.join(" AND ") : "1=1";
   var query;
   if (seesAllJobs(user)) {

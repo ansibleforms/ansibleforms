@@ -1788,6 +1788,7 @@ export default {
       valuesHelp: "The form's values, as the form's Store button saved them. Open in form fills them in.",
       valuesHelpNew: "The form's values, as YAML: field names and their values.",
       lastUsed: 'Last used',
+      tabRuns: 'Runs',
     },
     knownhosts: {
       label: 'Known host',

@@ -1812,6 +1812,7 @@ export default {
         'Die Werte des Formulars, wie sein Speichern-Knopf sie gesichert hat. Im Formular öffnen füllt sie aus.',
       valuesHelpNew: 'Die Werte des Formulars als YAML: Feldnamen und ihre Werte.',
       lastUsed: 'Zuletzt verwendet',
+      tabRuns: 'Läufe',
     },
     knownhosts: {
       label: 'Bekannter Host',

@@ -1804,6 +1804,7 @@ export default {
       valuesHelp: 'De waarden van het formulier, zoals de Opslaan-knop ze bewaarde. Openen in formulier vult ze in.',
       valuesHelpNew: 'De waarden van het formulier, in YAML: veldnamen en hun waarden.',
       lastUsed: 'Laatst gebruikt',
+      tabRuns: 'Uitvoeringen',
     },
     knownhosts: {
       label: 'Known host',

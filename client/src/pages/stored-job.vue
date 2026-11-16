@@ -7,9 +7,10 @@
 /*    Details  its name and description, the form it is for, its */
 /*             owner, when it was stored, last used and expires   */
 /*    Values   the form's values, as YAML, editable               */
+/*    Runs     the jobs launched from it, the latest first        */
 /*  Open in form (the form, these values filled in) and Delete    */
 /*  top right, beside Save. The search of the title line narrows  */
-/*  both tabs at once.                                            */
+/*  every tab at once.                                            */
 /*                                                                */
 /******************************************************************/
 import { ref, computed, onMounted } from 'vue';
@@ -26,6 +27,9 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { formPath } from '@/lib/formsPath';
 import { recordButtons } from '@/lib/recordButtons';
 import { useAppStore } from '@/stores/app';
+import Time from '@/lib/Time';
+import { durationSeconds, formatDuration } from '@/lib/jobTime';
+import { tableMatches } from '@/lib/recordSearch';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -118,10 +122,47 @@ async function load() {
   loaded.value = true;
 }
 
+// ─── Runs ─────────────────────────────────────────────────────────────────────
+// the jobs launched from it (jobs.stored_job_id), the latest first : only the ones this user may
+// see, the server's jobs list narrowed to this stored job ; a row opens the job
+const RUNS_SHOWN = 100;
+const runs = ref([]);
+const runColumns = computed(() => [
+  { key: 'id', label: t('settings.linked.job'), keep: true, class: 'text-end', value: (j) => `#${j.id}` },
+  // who launched it : a shared stored job is launched by other users too
+  { key: 'user', label: t('jobs.launchedBy') },
+  { key: 'status', label: t('settings.linked.status'), keep: true },
+  // its times as the jobs page shows them (the server sends them in its own zone)
+  { key: 'start', label: t('jobs.startTime'), keep: true, value: (j) => j.start && Time.format(j.start) },
+  { key: 'end', label: t('jobs.endTime'), keep: true, value: (j) => j.end && Time.format(j.end) },
+  // how long it ran, as the jobs page says it (a running one : until the tab was loaded), to the
+  // right as a number
+  {
+    key: 'duration',
+    label: t('jobs.duration'),
+    keep: true,
+    class: 'text-end',
+    value: (j) => formatDuration(durationSeconds(j)),
+  },
+]);
+
+/**
+ * Loads the jobs launched from the stored job ; refused or failing, the tab stays empty.
+ */
+async function loadRuns() {
+  try {
+    const res = await axios.get(`/api/v2/job/?stored_job=${encodeURIComponent(storedId.value)}&records=${RUNS_SHOWN}`);
+    runs.value = (res.data.records || res.data || []).filter((j) => !j.parent_id);
+  } catch {
+    runs.value = [];
+  }
+}
+
 // ─── tabs ─────────────────────────────────────────────────────────────────────
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'values', label: t('settings.storedJobs.tabValues'), icon: 'code' },
+  { key: 'runs', label: t('settings.storedJobs.tabRuns'), icon: 'history', count: runs.value.length },
 ]);
 const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
@@ -178,13 +219,17 @@ const tabFields = computed(() => ({
     ['expiresAt', t('settings.fields.expiresAt'), t('settings.storedJobs.neverExpires')],
   ],
   values: [['values', t('settings.storedJobs.tabValues'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
+  // the table : its name, or a row with the word in a cell it shows (runsMatch)
+  runs: [['runs', t('settings.storedJobs.tabRuns')]],
 }));
+// the Runs table keeps a row with the word : the tab then shows, with only those rows
+const runsMatch = computed(() => tableMatches(search.value, runs.value, runColumns.value));
 // the fields that match, per tab
 const shownFields = computed(() =>
   Object.fromEntries(
     Object.entries(tabFields.value).map(([tab, fields]) => [
       tab,
-      fields.filter(([, ...texts]) => matches(...texts)).map(([key]) => key),
+      fields.filter(([key, ...texts]) => matches(...texts) || (key === 'runs' && runsMatch.value)).map(([key]) => key),
     ]),
   ),
 );
@@ -260,6 +305,8 @@ onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
   await load();
+  // its runs, once it is known to be there
+  if (stored.value) await loadRuns();
 });
 </script>
 <template>
@@ -301,6 +348,7 @@ onMounted(async () => {
               >
                 <FaIcon :icon="tab.icon" class="me-1" />
                 {{ tab.label }}
+                <span v-if="tab.count !== undefined" class="badge af-tab-count ms-1">{{ tab.count }}</span>
               </a>
             </li>
           </ul>
@@ -447,6 +495,28 @@ onMounted(async () => {
               />
               <div v-if="valuesError" class="invalid-feedback d-block mt-n2">{{ valuesError }}</div>
             </template>
+            <!-- Runs : the jobs launched from it, the latest first ; a row opens the job -->
+            <template v-if="tabShown('runs')">
+              <template v-if="searching && searchHead('runs')">
+                <hr v-if="!searchHead('runs').first" class="mt-4 mb-0 af-search-line" />
+                <h6
+                  class="fw-bold text-body-secondary af-search-tab"
+                  :class="{ 'af-search-first': searchHead('runs').first }"
+                >
+                  <FaIcon :icon="searchHead('runs').tab.icon" class="me-1" />{{ searchHead('runs').tab.label }}
+                </h6>
+              </template>
+              <AppLinkedTable
+                :search="search"
+                :exportName="`${stored.name}-runs`"
+                :columns="runColumns"
+                :rows="runs"
+                :to="(j) => `/jobs/${j.id}`"
+                :empty="t('settings.linked.noJob')"
+              >
+                <template #cell-status="{ row }"><AppStatusPill :status="row.status" /></template>
+              </AppLinkedTable>
+            </template>
             <div v-if="searching && !shownTabs.length" class="text-body-secondary fst-italic">
               {{ t('settings.settingsPage.searchNone') }}
             </div>
@@ -475,6 +545,12 @@ onMounted(async () => {
 .af-stored-field :deep(.input-group),
 .af-stored-field {
   max-width: 40rem;
+}
+/* the count of a tab : small and grey, as the menus' badges */
+.af-tab-count {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
 }
 /* the tab ends a little above the card's edge, as every record's page (24px in all) */
 .af-stored-tab {

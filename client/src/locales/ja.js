@@ -1652,6 +1652,7 @@ export default {
       valuesHelp: 'フォームの保存ボタンで保存された値です。「フォームで開く」で入力されます。',
       valuesHelpNew: 'フォームの値（YAML）：フィールド名とその値。',
       lastUsed: '最終使用',
+      tabRuns: '実行履歴',
     },
     knownhosts: {
       label: '既知のホスト',
