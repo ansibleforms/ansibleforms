@@ -29,7 +29,6 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import Helpers from '@/lib/Helpers';
-import { reloadKeepingEdits } from '@/lib/keepEdits';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -46,6 +45,9 @@ const edit = ref(null); // as edited
 // its client is its credential's (Connections > Credentials) : a client id of its own, from before
 // credentials, is kept on the record and shown, not edited
 const EDITED = ['name', 'description', 'credential', 'groupfilter'];
+// its switches, edited as the rest and saved with Save : sent only when turned (turned on, each
+// makes the others stop, oauth2.model)
+const SWITCHES = ['enable', 'auto_login'];
 // the sso credentials of Connections > Credentials, none first : its own client id and secret
 const credentials = ref([{ name: '' }]);
 async function loadCredentials() {
@@ -59,8 +61,17 @@ async function loadCredentials() {
 
 const TYPES = { azuread: 'Microsoft Entra ID', oidc: 'Open ID' };
 
+/**
+ * The switches turned and not saved yet.
+ *
+ * Returns:
+ *   string[]: their keys (enable, auto_login).
+ */
+const turnedSwitches = () => SWITCHES.filter((k) => !!edit.value[k] !== !!Number(provider.value[k]));
 const dirty = computed(
-  () => !!provider.value && EDITED.some((k) => (edit.value[k] ?? '') !== (provider.value[k] ?? '')),
+  () =>
+    !!provider.value &&
+    (EDITED.some((k) => (edit.value[k] ?? '') !== (provider.value[k] ?? '')) || turnedSwitches().length > 0),
 );
 
 // leaving with the provider changed and unsaved asks first
@@ -78,7 +89,12 @@ async function load() {
     const res = await axios.get(`/api/v2/oauth2/${encodeURIComponent(providerId.value)}`);
     const record = res.data.records ? res.data.records[0] : res.data;
     provider.value = record || null;
-    edit.value = record ? Object.fromEntries(EDITED.map((k) => [k, record[k] ?? ''])) : null;
+    edit.value = record
+      ? {
+          ...Object.fromEntries(EDITED.map((k) => [k, record[k] ?? ''])),
+          ...Object.fromEntries(SWITCHES.map((k) => [k, !!Number(record[k])])),
+        }
+      : null;
   } catch {
     provider.value = null;
   }
@@ -117,10 +133,11 @@ async function onCredentialCreated(name) {
 
 // ─── its switches ─────────────────────────────────────────────────────────────
 // Enabled (its type's login button signs in with it : turning it on turns the others of its type
-// off) ; Skip the login page (an enabled provider only)
+// off) ; Skip the login page (an enabled provider only) ; both as edited, saved with Save
 const switches = computed(() => {
   const p = provider.value;
-  if (!p) return [];
+  const e = edit.value;
+  if (!p || !e) return [];
   const type = TYPES[p.provider] || p.provider;
   return [
     { key: 'enable', label: t('settings.oauth2.active'), help: t('settings.oauth2.activeHelp', { type }) },
@@ -128,7 +145,7 @@ const switches = computed(() => {
       key: 'auto_login',
       label: t('settings.oauth2.autoLogin'),
       help: t('settings.oauth2.autoLoginHelp'),
-      disabled: !p.enable && !p.auto_login,
+      disabled: !e.enable && !e.auto_login,
     },
   ];
 });
@@ -203,7 +220,9 @@ const shownNotes = (key) => tabNotes(key).filter((note) => matches(note.title, n
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
- * Saves the fields of every tab.
+ * Saves the fields of every tab, and its switches when turned : Enabled (its type's login button
+ * signs in with it : the others of its type stop being it, oauth2.model) and Skip the login page
+ * (the others stop).
  */
 async function save() {
   if (!edit.value.name.trim()) {
@@ -213,24 +232,11 @@ async function save() {
   const data = Object.fromEntries(
     EDITED.map((k) => [k, typeof edit.value[k] === 'string' ? edit.value[k].trim() : edit.value[k]]),
   );
+  for (const k of turnedSwitches()) data[k] = edit.value[k] ? 1 : 0;
   if (await update(data)) {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     await load();
   }
-}
-
-/**
- * One of its switches, saved at once : Enabled (its type's login button signs in with it : the
- * others of its type stop being it, oauth2.model) and Skip the login page (the others stop).
- *
- * Args:
- *   key (string): enable or auto_login.
- *   on (boolean): the switch's new state.
- */
-async function setSwitch(key, on) {
-  await update({ [key]: on ? 1 : 0, provider: provider.value.provider });
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
 }
 
 // Delete asks first
@@ -352,7 +358,7 @@ onMounted(async () => {
               :isFloating="false"
               :label="t('settings.fields.description')"
             />
-            <!-- its switches, as LDAP's, each saved at once : whether its type's login button signs in
+            <!-- its switches, as LDAP's, saved with Save : whether its type's login button signs in
                  with it, whether the login page is skipped for it -->
             <div v-for="sw in switches" v-show="fieldShown(sw.key)" :key="sw.key" class="mb-3 af-provider-switch">
               <label class="form-label fw-bold d-block" :for="'af-provider-' + sw.key">{{ sw.label }}</label>
@@ -362,9 +368,8 @@ onMounted(async () => {
                   class="form-check-input"
                   type="checkbox"
                   role="switch"
-                  :checked="!!provider[sw.key]"
+                  v-model="edit[sw.key]"
                   :disabled="sw.disabled"
-                  @change="setSwitch(sw.key, $event.target.checked)"
                 />
               </div>
               <div class="form-text">{{ sw.help }}</div>

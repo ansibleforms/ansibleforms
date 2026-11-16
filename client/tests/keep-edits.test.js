@@ -1,5 +1,5 @@
-// A record read again after its switch saved at once (lib/keepEdits.js) : the words typed and
-// not saved yet stay on the form, the fields just saved come from the record.
+// A record read again after something saved at once, Approve or Ask again (lib/keepEdits.js) :
+// the words typed and not saved yet stay on the form, the fields just saved come from the record.
 import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import { reloadKeepingEdits } from '@/lib/keepEdits';

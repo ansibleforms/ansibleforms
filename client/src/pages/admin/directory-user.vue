@@ -12,10 +12,10 @@
 /*  Roles - the roles it has, and how                             */
 /*  Forms, Jobs, Stored jobs, Schedules, Activity - as a local    */
 /*          user's (composables/useUserLinks.js)                  */
-/*  Its Sign-in switch in Details (off : blocked, asked first) ;  */
-/*  End sessions and Forget top right ; the search on the title   */
-/*  line narrows every tab at once (API tokens aside : its table  */
-/*  keeps its own search).                                        */
+/*  Its Sign-in switch in Details, saved with Save (off :         */
+/*  blocked, asked first) ; End sessions, Forget and Save top     */
+/*  right ; the search on the title line narrows every tab at     */
+/*  once (API tokens aside : its table keeps its own search).     */
 /*                                                                */
 /******************************************************************/
 import { ref, computed, onMounted, watch, useId } from 'vue';
@@ -35,6 +35,7 @@ import { useRoleMembership } from '@/composables/useRoleMembership';
 import { useFormLinks } from '@/composables/useFormLinks';
 import { useUserLinks } from '@/composables/useUserLinks';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -55,6 +56,16 @@ const apiPath = computed(
   () => `/api/v2/directory/users/${encodeURIComponent(source.value)}/${encodeURIComponent(username.value)}`,
 );
 
+// its Sign-in switch as edited : saved with Save, as every record page's switches
+const signIn = ref(true);
+const dirty = computed(() => !!user.value && signIn.value === !!user.value.blocked);
+// leaving with it turned and unsaved asks first
+useUnsavedGuard(
+  dirty,
+  () => t('settings.common.unsavedChanges'),
+  () => save(),
+);
+
 /**
  * Loads the user's record ; none when it was neither seen nor named by a role.
  */
@@ -65,6 +76,7 @@ async function load() {
   } catch {
     user.value = null;
   }
+  signIn.value = !user.value?.blocked;
   loaded.value = true;
 }
 
@@ -288,7 +300,8 @@ const tabMatches = computed(() => ({
 }));
 
 // ─── actions ──────────────────────────────────────────────────────────────────
-// Block asks first (its sessions end at once) ; Forget asks first ; Allow and End sessions do not
+// Save blocking asks first (its sessions end at once) ; Forget asks first ; Save allowing and End
+// sessions do not
 const confirming = ref(null); // 'block' or 'forget' while its dialog is open
 
 /**
@@ -315,38 +328,36 @@ async function act(method, path, body, done) {
 }
 
 /**
- * Blocks or allows the user's sign-in.
+ * Saves the Sign-in switch (POST <user>/block) : turned on, allows the user ; turned off, asks
+ * first (its sessions end), then blocks it.
  *
  * Args:
- *   blocked (boolean): true to block.
+ *   confirmed (boolean): true once the block was confirmed in its dialog.
+ *
+ * Returns:
+ *   Promise<boolean>: whether it was saved (false while the dialog asks).
  */
-async function setBlocked(blocked) {
+async function save(confirmed = false) {
+  if (!dirty.value) return true;
+  const blocked = !signIn.value;
+  // step 1 : blocking asks first
+  if (blocked && !confirmed) {
+    confirming.value = 'block';
+    return false;
+  }
   confirming.value = null;
+  // step 2 : saved, then read again
   const name = user.value.username;
   const done = blocked ? t('settings.directory.nowBlocked', { name }) : t('settings.directory.nowAllowed', { name });
   try {
     await setSignInBlocked({ source: source.value, username: user.value.username }, blocked);
     toast.success(done);
     await load();
+    return true;
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err));
+    return false;
   }
-}
-
-/**
- * The Sign-in switch turned : on allows at once ; off asks first (its sessions end), the switch
- * staying on until confirmed.
- *
- * Args:
- *   event (Event): the switch's change.
- */
-function onSignInSwitch(event) {
-  if (event.target.checked) {
-    setBlocked(false);
-    return;
-  }
-  event.target.checked = true;
-  confirming.value = 'block';
 }
 
 /**
@@ -406,7 +417,7 @@ onMounted(async () => {
   <AppBlockSignInDialog
     v-if="confirming === 'block'"
     :name="user?.username || username"
-    @confirm="setBlocked(true)"
+    @confirm="save(true)"
     @close="confirming = null"
   />
   <BsModal v-if="confirming === 'forget'" size="md" @close="confirming = null" icon="eraser">
@@ -495,25 +506,18 @@ onMounted(async () => {
               :disabled="true"
               :label="d.label"
             />
-            <!-- Sign-in : allowed, or blocked by an admin ; saved at once, as a runner's Default -->
+            <!-- Sign-in : allowed, or blocked by an admin ; saved with Save, as a runner's Default -->
             <div v-show="fieldShown('signIn')" class="mb-0">
               <label class="form-label fw-bold d-block" for="af-sign-in">{{
                 t('settings.directory.allowSignIn')
               }}</label>
               <div class="form-check form-switch mb-0">
-                <input
-                  id="af-sign-in"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  :checked="!user.blocked"
-                  @change="onSignInSwitch"
-                />
+                <input id="af-sign-in" class="form-check-input" type="checkbox" role="switch" v-model="signIn" />
               </div>
               <!-- On, then Off on its own line -->
               <div class="form-text af-help-lines">
                 {{
-                  user.blocked
+                  !signIn
                     ? t('settings.directory.blockedNote')
                     : t('settings.directory.signInHelp', { source: sourceName })
                 }}
@@ -669,11 +673,12 @@ onMounted(async () => {
         <BsButton icon="eraser" :disabled="user.blocked || !user.seen" @click="confirming = 'forget'">{{
           t('settings.directory.forget')
         }}</BsButton>
+        <BsButton icon="save" :disabled="!dirty" @click="save()">{{ t('settings.common.save') }}</BsButton>
       </template>
       <!-- the record loading : its buttons as grey placeholders, so the title line keeps its
            height and nothing moves when they come -->
       <template v-else-if="!loaded" #actions>
-        <AppSkeleton shape="buttons" :widths="[130, 100]" />
+        <AppSkeleton shape="buttons" :widths="[130, 100, 80]" />
       </template>
     </AppSettings>
   </AppSettingsPage>

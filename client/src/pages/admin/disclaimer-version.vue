@@ -6,7 +6,7 @@
 /*  url -                                                         */
 /*    Details      its title, text and checkbox label, and        */
 /*                 whether it is enabled (the one users accept :  */
-/*                 on, the others are off ; saved at once)        */
+/*                 on, the others are off ; saved with Save)      */
 /*    Acceptances  who accepted it, when, from where ; Ask again  */
 /*                 on a row or the rows ticked                    */
 /*  Preview, Delete and Save top right ; a changed text asks : a  */
@@ -38,7 +38,12 @@ const versionId = computed(() => String(route.params.id || ''));
 const record = ref(null); // as saved
 const edit = ref(null); // as edited
 const WORDS = ['title', 'text', 'checkbox_label'];
-const dirty = computed(() => !!record.value && WORDS.some((k) => (edit.value[k] ?? '') !== (record.value[k] ?? '')));
+// its words changed, or its switch : both saved with Save, the switch through Enable
+const wordsDirty = computed(
+  () => !!record.value && WORDS.some((k) => (edit.value[k] ?? '') !== (record.value[k] ?? '')),
+);
+const enabledDirty = computed(() => !!record.value && !!edit.value.enabled !== !!Number(record.value.enabled));
+const dirty = computed(() => wordsDirty.value || enabledDirty.value);
 useUnsavedGuard(
   dirty,
   () => t('settings.common.unsavedChanges'),
@@ -52,7 +57,9 @@ async function load() {
   try {
     const res = await axios.get(`/api/v2/disclaimerversion/${encodeURIComponent(versionId.value)}`);
     record.value = res.data?.version ? res.data : null;
-    edit.value = record.value ? Object.fromEntries(WORDS.map((k) => [k, record.value[k] ?? ''])) : null;
+    edit.value = record.value
+      ? { ...Object.fromEntries(WORDS.map((k) => [k, record.value[k] ?? ''])), enabled: !!Number(record.value.enabled) }
+      : null;
   } catch {
     record.value = null;
   }
@@ -60,28 +67,12 @@ async function load() {
   loaded.value = true;
 }
 
-// ─── its switch : enabled, the one users accept ───────────────────────────────
-/**
- * Enables it (the others off, who accepted it not asked again) or disables it (no disclaimer),
- * saved at once.
- *
- * Args:
- *   on (boolean): the switch's new state.
- */
-async function setEnabled(on) {
-  try {
-    await axios.post(`/api/v2/disclaimerversion/${encodeURIComponent(versionId.value)}/enable`, { enabled: on });
-  } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
-}
-
 // ─── Save : a correction, or everyone again ───────────────────────────────────
 const askAgainOpen = ref(false);
 /**
- * Saves its words ; changed after people accepted it, asks first whether they accept again.
+ * Saves its words ; changed after people accepted it, asks first whether they accept again. Its
+ * switch turned, then saved through Enable : on, it is the one users accept (the others off, who
+ * accepted it not asked again) ; off, no disclaimer.
  *
  * Args:
  *   askAgain (boolean|null): the answer, null when not asked yet.
@@ -95,16 +86,25 @@ async function save(askAgain = null) {
     toast.warning(t('settings.disclaimer.missing'));
     return false;
   }
-  if (askAgain === null && record.value.acceptances > 0) {
+  if (wordsDirty.value && askAgain === null && record.value.acceptances > 0) {
     askAgainOpen.value = true;
     return false;
   }
   askAgainOpen.value = false;
   try {
-    await axios.put(`/api/v2/disclaimerversion/${encodeURIComponent(versionId.value)}`, {
-      ...edit.value,
-      askAgain: !!askAgain,
-    });
+    // step 1 : its words, when changed
+    if (wordsDirty.value) {
+      await axios.put(`/api/v2/disclaimerversion/${encodeURIComponent(versionId.value)}`, {
+        ...Object.fromEntries(WORDS.map((k) => [k, edit.value[k]])),
+        askAgain: !!askAgain,
+      });
+    }
+    // step 2 : its switch, when turned (on, the others are off on the server)
+    if (enabledDirty.value) {
+      await axios.post(`/api/v2/disclaimerversion/${encodeURIComponent(versionId.value)}/enable`, {
+        enabled: !!edit.value.enabled,
+      });
+    }
     toast.success(t('settings.common.nameUpdated', { name: edit.value.title }));
     await load();
     return true;
@@ -337,7 +337,7 @@ onMounted(async () => {
             :help="t('settings.disclaimer.checkboxHelp')"
             :label="t('settings.disclaimer.checkbox')"
           />
-          <!-- whether users accept it : a switch, as an SSO provider's, saved at once -->
+          <!-- whether users accept it : a switch, as an SSO provider's, saved with Save -->
           <div v-show="fieldShown('enabled')" class="mb-0">
             <label class="form-label fw-bold d-block" for="af-disclaimer-enabled">{{
               t('settings.disclaimer.versionEnabled')
@@ -348,8 +348,7 @@ onMounted(async () => {
                 class="form-check-input"
                 type="checkbox"
                 role="switch"
-                :checked="!!record.enabled"
-                @change="setEnabled($event.target.checked)"
+                v-model="edit.enabled"
               />
             </div>
             <div class="form-text">{{ t('settings.disclaimer.enabledHelpVersion') }}</div>

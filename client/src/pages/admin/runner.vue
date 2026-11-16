@@ -5,7 +5,8 @@
 /*  runners' list : the steps of its dialog as tabs, the tab kept */
 /*  in the url -                                                  */
 /*    Details         its registration, name, description,        */
-/*                    whether it is the default of its kind       */
+/*                    whether it is the default of its kind and   */
+/*                    whether it takes jobs (saved with Save)     */
 /*    Type            RTE, AWX, AAP, Ascender, Semaphore, Rundeck,*/
 /*                    Jenkins                                     */
 /*    RTE             an RTE's mode and connection ; in a socket  */
@@ -68,6 +69,9 @@ const EDITED = [
   'rte_cache_mb',
   'rte_files',
   'rte_drain_seconds',
+  // its switches, saved with Save as the rest
+  'is_default',
+  'enabled',
 ];
 // how an RTE talks to the app (RTE_MODE) : outbound, inbound or database (deprecated)
 const RTE_MODES = ['outbound', 'inbound', 'database'];
@@ -111,6 +115,9 @@ function editable(record) {
     rte_cache_mb: record.rte_cache_mb ?? '',
     rte_files: record.rte_files ?? '',
     rte_drain_seconds: record.rte_drain_seconds ?? '',
+    // Default : turned on only (another made the default turns it off) ; Enabled : on when unset
+    is_default: !!Number(record.is_default),
+    enabled: record.enabled === undefined || record.enabled === null || !!Number(record.enabled),
   };
 }
 
@@ -379,7 +386,9 @@ const tabMatch = (key) =>
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
- * Saves the fields of every tab, its kind stored as a type and a flavour, as the dialog does.
+ * Saves the fields of every tab, its kind stored as a type and a flavour, as the dialog does, and
+ * its switches : Enabled, and Default when turned on (the one before stops being it, on the
+ * server).
  */
 async function save() {
   const e = edit.value;
@@ -397,7 +406,10 @@ async function save() {
     credential: e.credential || null,
     // an RTE's mode ; none for the other kinds
     rte_mode: e.kind === 'rte' ? e.rte_mode || 'outbound' : null,
+    enabled: e.enabled ? 1 : 0,
   };
+  // made the default here : sent only then (never unmade here)
+  if (e.is_default && !Number(runner.value.is_default)) data.is_default = 1;
   // an RTE's settings : a whole number, transfer or local, or empty for the default
   if (e.kind === 'rte') {
     for (const f of RTE_NUMBERS) data[f.column] = String(e[f.column] ?? '').trim() === '' ? null : Number(e[f.column]);
@@ -407,17 +419,6 @@ async function save() {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     await load();
   }
-}
-
-/**
- * Makes it the default of its kind, saved at once : the one before stops being it.
- */
-async function makeDefault() {
-  if (await update({ is_default: 1 })) {
-    toast.success(t('settings.common.nameUpdated', { name: runner.value.name }));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
 }
 
 // an RTE's mode as plain words : Outbound, Inbound, or Database (deprecated) for one from before 7.3
@@ -516,20 +517,6 @@ async function decide(what) {
   } finally {
     deciding.value = false;
   }
-}
-
-/**
- * Turns it on or off, saved at once : turned off, no job goes to it.
- *
- * Args:
- *   on (boolean): on or off.
- */
-async function setEnabled(on) {
-  if (await update({ enabled: on ? 1 : 0 })) {
-    toast.success(t('settings.common.nameUpdated', { name: runner.value.name }));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
 }
 
 // Test connection : one at a time
@@ -700,16 +687,15 @@ onMounted(async () => {
                 <label class="form-label fw-bold d-block" for="af-runner-default">{{
                   t('settings.runners.isDefault')
                 }}</label>
-                <!-- turned on, saved at once ; turned off by making another the default -->
+                <!-- turned on, saved with Save ; turned off by making another the default -->
                 <div class="form-check form-switch mb-0">
                   <input
                     id="af-runner-default"
                     class="form-check-input"
                     type="checkbox"
                     role="switch"
-                    :checked="!!runner.is_default"
-                    :disabled="!!runner.is_default"
-                    @change="makeDefault()"
+                    v-model="edit.is_default"
+                    :disabled="!!Number(runner.is_default)"
                   />
                 </div>
                 <div class="form-text">{{ t('settings.runners.defaultHelp', { forms: defaultFor }) }}</div>
@@ -718,16 +704,15 @@ onMounted(async () => {
                 <label class="form-label fw-bold d-block" for="af-runner-enabled">{{
                   t('settings.runners.enabled')
                 }}</label>
-                <!-- saved at once, as the default -->
+                <!-- saved with Save, as the default ; turned off, no job goes to it -->
                 <div class="form-check form-switch mb-0">
                   <input
                     id="af-runner-enabled"
                     class="form-check-input"
                     type="checkbox"
                     role="switch"
-                    :checked="runner.enabled === undefined || runner.enabled === null || !!Number(runner.enabled)"
+                    v-model="edit.enabled"
                     :disabled="readOnly"
-                    @change="setEnabled($event.target.checked)"
                   />
                 </div>
                 <div class="form-text">{{ t('settings.runners.enabledHelp') }}</div>
