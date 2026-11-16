@@ -228,12 +228,6 @@ const details = computed(() =>
     ? [
         { key: 'username', icon: 'user', label: t('settings.fields.username'), value: user.value.username },
         {
-          key: 'signInSource',
-          icon: 'right-to-bracket',
-          label: t('settings.directory.source'),
-          value: sourceName.value,
-        },
-        {
           key: 'name',
           icon: 'id-card',
           label: t('settings.directory.displayName'),
@@ -250,6 +244,13 @@ const details = computed(() =>
               },
             ]
           : []),
+        // where it signs in from : after its names and its description, as every record page's Details
+        {
+          key: 'signInSource',
+          icon: 'right-to-bracket',
+          label: t('settings.directory.source'),
+          value: sourceName.value,
+        },
         { key: 'email', icon: 'envelope', label: t('settings.fields.email'), value: user.value.email || '–' },
         {
           key: 'first',
