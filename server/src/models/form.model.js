@@ -2066,7 +2066,7 @@ Form.save = async function(data, options = {}){
             }
           }
           kept = formsToKeep(onDisk, savedNames)
-          if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load, so the designer never had it`)
+          if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load or is a skipped duplicate, so the designer never had it`)
         }
         logger.debug(`saving ${forms.length==1 ? `single form '${forms[0].name}'` : `forms ${forms.map(x => x.name)}`} to '${target}'`)
         // ensure parent directory exists for nested paths
@@ -2100,6 +2100,13 @@ Form.save = async function(data, options = {}){
               logger.warning(`Not removing '${existing}' from '${dirEntry.path}': it could not be parsed, so it was never loaded and cannot have been deleted here`)
               continue
             }
+            // a skipped copy of a form name another forms folder defines first : the designer
+            // never had it either, so it cannot have been deleted in it, like a form that does
+            // not load
+            const skippedThere = skipped.get(path.resolve(fullPath))
+            if (skippedThere?.size) {
+              for (const f of onDisk.forms) if (f.name && skippedThere.has(f.name)) f.notLoaded = true
+            }
             // a form the designer never received cannot have been deleted in it. Such a file
             // stays as it is when nothing else in it was deleted, and is written again without
             // the deleted forms only : the forms that do not load stay, and so does a form
@@ -2110,7 +2117,7 @@ Form.save = async function(data, options = {}){
                 logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${existing}' : the designer never had it ; the other forms of the file were deleted`)
                 fs.writeFileSync(fullPath, kept.map(k => k.text).join(""))
               } else {
-                logger.warning(`Not removing '${existing}' from '${dirEntry.path}': its forms do not load, so the designer never had them`)
+                logger.warning(`Not removing '${existing}' from '${dirEntry.path}': its forms do not load or are skipped duplicates, so the designer never had them`)
               }
               continue
             }
