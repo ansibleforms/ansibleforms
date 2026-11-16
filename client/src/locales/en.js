@@ -1243,7 +1243,6 @@ export default {
       announcementEnable: 'Enable',
       announcementDisable: 'Disable',
       announcementNotFound: 'No announcement {id}.',
-      announcementNameHelp: 'Its key in a repository file; made from the message when empty.',
       announcementMissing: 'Enter a message.',
     },
     users: {

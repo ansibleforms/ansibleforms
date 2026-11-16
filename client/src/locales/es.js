@@ -1254,7 +1254,6 @@ export default {
       announcementEnable: 'Habilitar',
       announcementDisable: 'Deshabilitar',
       announcementNotFound: 'No hay ningún anuncio {id}.',
-      announcementNameHelp: 'Su clave en un archivo del repositorio; se toma del mensaje si está vacía.',
       announcementMissing: 'Escribe un mensaje.',
     },
     users: {

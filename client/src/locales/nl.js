@@ -1251,7 +1251,6 @@ export default {
       announcementEnable: 'Inschakelen',
       announcementDisable: 'Uitschakelen',
       announcementNotFound: 'Geen aankondiging {id}.',
-      announcementNameHelp: 'Zijn sleutel in een repositorybestand; uit het bericht gemaakt als leeg.',
       announcementMissing: 'Voer een bericht in.',
     },
     users: {

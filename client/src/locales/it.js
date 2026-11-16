@@ -1251,7 +1251,6 @@ export default {
       announcementEnable: 'Abilita',
       announcementDisable: 'Disabilita',
       announcementNotFound: 'Nessun annuncio {id}.',
-      announcementNameHelp: 'La sua chiave in un file del repository; ricavata dal messaggio se vuota.',
       announcementMissing: 'Inserisci un messaggio.',
     },
     users: {

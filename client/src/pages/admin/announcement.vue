@@ -31,7 +31,7 @@ const announcementId = computed(() => String(route.params.id || ''));
 const record = ref(null); // as saved
 const edit = ref(null); // as edited
 // its switch among them : shown or not, saved with Save as the rest
-const FIELDS = ['name', 'message', 'level', 'start_at', 'end_at', 'enabled'];
+const FIELDS = ['message', 'level', 'start_at', 'end_at', 'enabled'];
 // its types, as the list's wizard offers them
 const LEVELS = computed(() =>
   ['info', 'warning', 'danger'].map((value) => ({ value, label: t(`settings.interface.banner_${value}`) })),
@@ -96,8 +96,6 @@ async function save() {
   }
   try {
     await axios.put(`/api/v2/announcement/${encodeURIComponent(announcementId.value)}`, {
-      // its name : the key a repository finds it by, made from its message while it has none
-      name: edit.value.name || null,
       message: edit.value.message,
       level: edit.value.level,
       start_at: edit.value.start_at || null,
@@ -161,7 +159,6 @@ const shownFields = computed(() =>
   matchingKeys([
     // one kept in a repository : where it comes from
     ...repositorySourceFields(t, record.value),
-    ['name', t('settings.fields.name'), t('settings.interface.announcementNameHelp')],
     ['message', t('settings.interface.banner'), t('settings.interface.bannerHelp')],
     ['level', t('settings.interface.bannerLevel'), t('settings.interface.bannerLevelHelp')],
     ['start', t('settings.interface.bannerStart'), t('settings.interface.bannerStartHelp')],
@@ -244,16 +241,6 @@ onMounted(async () => {
           </h6>
           <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
           <AppRepositorySource v-show="fieldShown('source')" :record="record" />
-          <!-- its name first, as every record page's Details : the key a repository finds it by -->
-          <BsInput
-            v-show="fieldShown('name')"
-            class="af-announcement-field"
-            v-model="edit.name"
-            icon="heading"
-            :isFloating="false"
-            :help="t('settings.interface.announcementNameHelp')"
-            :label="t('settings.fields.name')"
-          />
           <BsInput
             v-show="fieldShown('message')"
             class="af-announcement-field"

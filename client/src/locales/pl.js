@@ -1248,7 +1248,6 @@ export default {
       announcementEnable: 'Włącz',
       announcementDisable: 'Wyłącz',
       announcementNotFound: 'Brak ogłoszenia {id}.',
-      announcementNameHelp: 'Jego klucz w pliku repozytorium; pusty jest tworzony z wiadomości.',
       announcementMissing: 'Wpisz wiadomość.',
     },
     users: {

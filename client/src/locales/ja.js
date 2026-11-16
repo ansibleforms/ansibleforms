@@ -1245,7 +1245,6 @@ export default {
       announcementEnable: '有効にする',
       announcementDisable: '無効にする',
       announcementNotFound: 'お知らせ {id} はありません。',
-      announcementNameHelp: 'リポジトリのファイルでのキー。空のときはメッセージから作られます。',
       announcementMissing: 'メッセージを入力してください。',
     },
     users: {
