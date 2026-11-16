@@ -2180,7 +2180,11 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "List all jobs",
-        "parameters": [ { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false } ],
+        "description": "The jobs the caller may see (every job for an admin, or with showAllJobLogs or manageAllJobs ; else their own and the ones awaiting an approval they may give), the newest first.",
+        "parameters": [
+          { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false },
+          { "name": "stored_job", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs launched from this stored job (POST /job with its storedJobId), among the ones the caller may see" }
+        ],
         "responses": { "200": { "description": "Job list" } }
       },
       "post": {
@@ -2214,7 +2218,7 @@
         "tags": ["job"],
         "summary": "Get job by ID",
         "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
-        "responses": { "200": { "description": "Job object" }, "404": { "description": "Not found" } }
+        "responses": { "200": { "description": "Job object. Its storedJob is { id, name } of the stored job it was launched from (POST /job with a storedJobId), when the caller may read that stored job (as GET /stored-jobs/{id}); null otherwise, or once that stored job is deleted" }, "404": { "description": "Not found" } }
       },
       "delete": {
         "security": [ { "bearerAuth": [] } ],
@@ -2324,7 +2328,7 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "Relaunch job by ID, as it ran or with some fields changed",
-        "description": "Without a body the job is replayed with the extravars it ran with. With a body holding `values`, the values the job was launched with are taken, `values` is laid over them, and the result goes through the form engine again - resolved, validated and the extravars built by the server - as a new launch by the caller. Uploads of the original are reused. Without a body, or for a form under launch validation 'enforce', see the Launch validation page : a relaunch that goes through the check is refused (400) for a password field the form shows, since passwords are never stored with the field values ; one its dependencies hide does not count. Only for the job's owner, an admin or a user who sees every job. Needs the form to allow relaunch and the allowJobRelaunch role option.",
+        "description": "Without a body the job is replayed with the extravars it ran with. With a body holding `values`, the values the job was launched with are taken, `values` is laid over them, and the result goes through the form engine again - resolved, validated and the extravars built by the server - as a new launch by the caller. Uploads of the original are reused. Without a body, or for a form under launch validation 'enforce', see the Launch validation page : a relaunch that goes through the check is refused (400) for a password field the form shows, since passwords are never stored with the field values ; one its dependencies hide does not count. Only for the job's owner, an admin or a user who sees every job. Needs the form to allow relaunch and the allowJobRelaunch role option. A job launched from a stored job passes it on : the new job names it (storedJob) and its last_used_at is set, when the caller may read that stored job (as GET /stored-jobs/{id}) ; one deleted since is skipped.",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "verbose", "in": "query", "required": false, "schema": { "type": "boolean" }, "description": "Verbose ansible output (needs the allowVerboseMode role option)" }
@@ -4118,6 +4122,10 @@
                     "logTz": {
                       "type": "string",
                       "description": "Application timezone (LOG_TZ)"
+                    },
+                    "storedJobUnusedDays": {
+                      "type": "integer",
+                      "description": "STORED_JOB_UNUSED_DAYS : a stored job unused for this many days is removed, and the most a stored job's own unused_days may be ; 0 never removes one"
                     }
                   }
                 }
@@ -10324,7 +10332,7 @@
           "schedule"
         ],
         "summary": "Update a schedule by ID",
-        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed.",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, stored_job_id, state, output, last_run and queue_id cannot be changed.",
         "parameters": [
           {
             "name": "id",
@@ -10463,7 +10471,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job list or single stored job"
+            "description": "Stored job list or single stored job, each with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
           },
           "403": {
             "description": "No allowStoredJobs"
@@ -10496,7 +10504,7 @@
             "description": "Stored job created; data is { id }"
           },
           "400": {
-            "description": "Missing required field, a value too long, or a visibility other than private or shared"
+            "description": "Missing required field, a value too long, a visibility other than private or shared, or unused_days not allowed (see StoredJob)"
           },
           "403": {
             "description": "No allowStoredJobs, or sharing without allowStoredJobsShare or on a form that does not allow it"
@@ -10531,7 +10539,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job"
+            "description": "Stored job, with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -10551,7 +10559,7 @@
           "storedjob"
         ],
         "summary": "Update a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it. unused_days follows the rule of the StoredJob schema.",
         "parameters": [
           {
             "name": "id",
@@ -10575,6 +10583,9 @@
         "responses": {
           "200": {
             "description": "Stored job updated"
+          },
+          "400": {
+            "description": "A visibility other than private or shared, or unused_days not allowed (see StoredJob)"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -11005,7 +11016,8 @@
           "credentials": { "type": "object", "description": "Credentials for the job.", "example": { "vcenter": "VCENTER_CRED" } },
           "notifications": { "type": "object", "description": "Notification settings for the job.", "example": { "email": "user@example.com" } },
           "job_type": { "type": "string", "description": "Type of job (e.g., ansible, awx, multistep).", "example": "ansible" },
-          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" }
+          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" },
+          "storedJobId": { "type": "integer", "description": "The stored job the values came from (the form opened with ?storedJob=<id>) : its last_used_at is set to now, and the job names it (storedJob in GET /job/{id}). Ignored unless the caller may read it (as GET /stored-jobs/{id}) and it is of this form.", "example": 12 }
         },
         "required": ["formName"]
       },
@@ -11223,6 +11235,10 @@
           },
           "raw_form_data": {
             "description": "Create of a planned run only: the raw field values (object or JSON string), checked by launch validation"
+          },
+          "stored_job_id": {
+            "type": "integer",
+            "description": "Create of a planned run only: the stored job the values came from. Kept when the caller may read it (as GET /stored-jobs/{id}) and it is of this form; its last_used_at is set when the run fires. Ignored for a schedule"
           }
         },
         "description": "Fields owner, state, output, last_run and queue_id are ignored on write."
@@ -11254,9 +11270,21 @@
             "type": "string",
             "enum": ["private", "shared"],
             "description": "private (default): only the owner. shared: also the users with the allowStoredJobsViewAll role option, who can load it but not change it"
+          },
+          "unused_days": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Removed once no job was launched from it for this many days, counted from its last_used_at (or its created_at, never used). null (or left out) follows STORED_JOB_UNUSED_DAYS. While that setting is above 0 it must be from 1 to the setting (400 otherwise) ; with the setting 0 any whole number of at least 1. null (or left out) always follows the setting, which still removes it. The days that count are the shorter of the two ; expires_at keeps working, whichever comes first removes it"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When a job was last launched from it (POST /job with its storedJobId, the MCP launch_job, a planned run from it when it fires, or a relaunch of a job launched from it) ; null until then. Set by the server only"
           }
         },
-        "description": "Only these fields are written; id, username (always the caller) and created_at are ignored. name, form_name and form_data are required on create."
+        "description": "Only these fields are written; id, username (always the caller), created_at and last_used_at are ignored. name, form_name and form_data are required on create."
       }
     }
   }

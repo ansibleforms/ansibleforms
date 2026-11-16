@@ -691,9 +691,10 @@ const SCHEMA_MANIFEST = {
                                'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file', 'databases.repository', 'databases.repo_file',
                                'groups.repository', 'groups.repo_file', 'users.repository', 'users.repo_file',
                                'directory_users.repository', 'directory_users.repo_file', 'directory_users.description',
-                               'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
-                               'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file',
-                               'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
+                               'stored_jobs.last_used_at',
+                               'schedule.stored_job_id',
+                               'jobs.stored_job_id',
+                               'stored_jobs.unused_days'],
                      indexes: ['jobs.idx_jobs_stored_job'] },
   },
 };
