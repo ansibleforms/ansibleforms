@@ -18,7 +18,7 @@
 /*  keeps its own search).                                        */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, useId } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
@@ -190,8 +190,8 @@ const otherTabs = computed(() => [
   { key: 'tokens', label: t('apiTokens.tab'), icon: 'code', count: tokenCount.value },
 ]);
 // the API tokens table's controls on the title line, its pager under the card
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
+const pagerId = `af-pager-${useId()}`;
 const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
 // the title : Users › <name>, each step a link, and the open tab last

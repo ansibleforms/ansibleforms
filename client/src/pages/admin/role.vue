@@ -9,7 +9,7 @@
 /*  follows its new name.                                         */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, useId } from 'vue';
 import BsDataTable from '@/components/BsDataTable.vue';
 import { useRoute, useRouter } from 'vue-router';
 import Profile from '@/lib/Profile';
@@ -106,8 +106,8 @@ const roleForms = computed(() => (role.value ? formsOfRoles([roleName.value]) : 
 // each a table as every list : Select all, the columns and the export on the title line (the
 // search is the page's), the pager under the card. Its users : those named in it (ticked to remove them), then
 // those it gets through a local group (read only, From group says which)
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
+const pagerId = `af-pager-${useId()}`;
 const describe = (kind, member) =>
   (member.provider === 'local' ? localDescriptions.value[kind]?.[member.name] : '') || '';
 const userRows = computed(() =>
