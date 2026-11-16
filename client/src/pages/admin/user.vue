@@ -20,7 +20,7 @@
 /*  once (API tokens aside : its table keeps its own search).     */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, useId } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
@@ -334,8 +334,8 @@ async function saveDetails() {
 const addingGroup = ref(null); // the group id picked, null while the dialog is closed
 // the API tokens table's controls (its search, Select all, columns, export) on the title line,
 // its pager under the card, as every list
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
+const pagerId = `af-pager-${useId()}`;
 // none : an en dash, as the other empty cells
 const groupColumns = computed(() => [
   { key: 'name', label: t('settings.fields.name') },

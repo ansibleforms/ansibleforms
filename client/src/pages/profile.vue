@@ -13,7 +13,7 @@
 /*                                                                */
 /******************************************************************/
 
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, useId } from 'vue';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
@@ -278,8 +278,8 @@ const tokenExample = computed(
 );
 
 // where the token list's toolbar goes (the title line)
-const tokenToolsId = `af-token-tools-${Math.random().toString(36).slice(2, 10)}`;
-const tokenPagerId = `af-token-pager-${Math.random().toString(36).slice(2, 10)}`;
+const tokenToolsId = `af-token-tools-${useId()}`;
+const tokenPagerId = `af-token-pager-${useId()}`;
 // the New token wizard : its steps, the one shown, the furthest reached
 const tokenDialog = ref(false);
 const tokenStep = ref(0);

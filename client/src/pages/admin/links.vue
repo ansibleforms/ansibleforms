@@ -141,7 +141,9 @@ const {
  *   string: 8 letters and digits.
  */
 function newId() {
-  return Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+  // from the browser's cryptographic generator : saved in the links file, so unique, never guessed
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 }
 
 /**

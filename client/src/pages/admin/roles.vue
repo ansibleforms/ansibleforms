@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, useId } from 'vue';
 import { useRouter } from 'vue-router';
 import Profile from '@/lib/Profile';
 import { useI18n } from 'vue-i18n';
@@ -115,9 +115,9 @@ async function createRole() {
 // ─── the table ────────────────────────────────────────────────────────────────
 // the app's data table, as the other lists : a checkbox per role, Select all and Delete for the
 // selection, the search and the columns on the title line, a row's menu ; a row opens its role
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
 // and where its pager goes, under the card
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const pagerId = `af-pager-${useId()}`;
 const selectedIds = ref(new Set());
 const escapeHtml = (v) =>
   String(v ?? '')

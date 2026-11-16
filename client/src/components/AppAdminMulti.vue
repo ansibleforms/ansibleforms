@@ -107,7 +107,7 @@
 /*                                                                */
 /******************************************************************/
 
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, useId } from 'vue';
 import { watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useCellPopovers } from '@/composables/useCellPopovers';
@@ -129,9 +129,9 @@ import { askConfirm } from '@/lib/confirmPrompt';
 // INIT
 
 // where the table's toolbar goes on the title line (one per instance)
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
 // and where its pager goes, under the card (one per instance)
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const pagerId = `af-pager-${useId()}`;
 const { t, locale } = useI18n();
 const router = useRouter();
 const emit = defineEmits([

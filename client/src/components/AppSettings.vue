@@ -42,7 +42,7 @@
 /*  filters, columns), the buttons act on it.                     */
 /*                                                                */
 /******************************************************************/
-import { computed, provide } from 'vue';
+import { computed, provide, useId } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { sectionOf } from '@/lib/sections';
@@ -53,10 +53,10 @@ const route = useRoute();
 const { t } = useI18n();
 
 // under the card : where the pager of a table in it goes (AppTablePager), as a list's
-const pagerId = `af-card-pager-${Math.random().toString(36).slice(2, 10)}`;
+const pagerId = `af-card-pager-${useId()}`;
 provide('afPagerTo', `#${pagerId}`);
 // on the title line : where the controls of a table in it go (AppLinkedTable), as a list's
-const toolbarId = `af-card-tools-${Math.random().toString(36).slice(2, 10)}`;
+const toolbarId = `af-card-tools-${useId()}`;
 provide('afToolbarTo', `#${toolbarId}`);
 
 const props = defineProps({

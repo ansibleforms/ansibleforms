@@ -13,7 +13,7 @@
 /*  users (the server refuses).                                   */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, useId } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
@@ -192,8 +192,8 @@ const selectedUsers = ref(new Set()); // the user rows ticked (their id)
 // the Users table's controls (Select all, columns, export ; its search is the page's) on the
 // title line, its pager under the card, as every list ; none : an en dash, as the other empty
 // cells
-const toolsId = `af-tools-${Math.random().toString(36).slice(2, 10)}`;
-const pagerId = `af-pager-${Math.random().toString(36).slice(2, 10)}`;
+const toolsId = `af-tools-${useId()}`;
+const pagerId = `af-pager-${useId()}`;
 const userColumns = computed(() => [
   { key: 'username', label: t('settings.fields.username'), filterable: true },
   { key: 'description', label: t('settings.fields.description'), filterable: true },
