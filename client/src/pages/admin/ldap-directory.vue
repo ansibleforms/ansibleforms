@@ -40,6 +40,8 @@ const settings = computed(() => ({
   type: `ldapdirectory/${directoryId.value}`,
   recordTitle: 'name',
   parentCrumbs: [{ title: t('sidebar.ldap'), icon: 'address-book', to: '/settings/ldap' }],
+  // every tab's fields 40rem wide, as on every record page (a database's, a runner's)
+  wideTabs: ['details', 'credentials', 'users', 'groups'],
 }));
 // the page in tabs : on or off and where it stands, its credential (the servers and the binding),
 // the users, the groups

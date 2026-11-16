@@ -1080,7 +1080,6 @@ export default function getSettings(t) {
           icon: 'info-circle',
           label: t('settings.fields.description'),
           placeholder: t('settings.fields.description'),
-          required: true,
         },
         {
           key: 'branch',
@@ -1967,7 +1966,6 @@ export default function getSettings(t) {
           key: 'description',
           label: t('settings.fields.description'),
           sortable: false,
-          required: true,
           filterable: false,
           icon: 'info-circle',
         },
@@ -2557,14 +2555,6 @@ export default function getSettings(t) {
         { name: 'delete', title: t('common.delete'), icon: 'trash', showWhen: (item) => item.name !== LDAP_DEFAULT },
       ],
       fields: [
-        {
-          key: 'enable',
-          tab: 'details',
-          label: t('settings.ldap.enabled'),
-          help: t('settings.ldap.enableLdapHelp'),
-          type: 'checkbox',
-          isToggle: true,
-        },
         // the directory : its name prefixes its members (but the default one's) ; its place in the
         // lookup order is its place in the list (Move up, Move down)
         {
@@ -2585,6 +2575,16 @@ export default function getSettings(t) {
           icon: 'info-circle',
           line: 1,
           label: t('settings.fields.description'),
+        },
+        // on or off : a switch after its name and description, as on every record page
+        {
+          key: 'enable',
+          tab: 'details',
+          line: 2,
+          label: t('settings.ldap.enabled'),
+          help: t('settings.ldap.enableLdapHelp'),
+          type: 'checkbox',
+          isToggle: true,
         },
         {
           key: 'search_base',
