@@ -5,7 +5,13 @@ import { slugOf, slugMatches, findBySlug } from '@/lib/formsPath';
 import { DESIGNER_TABS } from '@/config/designerTabs';
 import { designerViews } from '@/config/designerViews';
 import getSettings from '@/config/settings';
-import { EXPLORER_WIDTH, explorerWidthAfterDrag, explorerFolded, explorerColumns } from '@/config/fileExplorer';
+import {
+  EXPLORER_WIDTH,
+  explorerWidthAfterDrag,
+  explorerFolded,
+  explorerColumns,
+  firstExplorerFile,
+} from '@/config/fileExplorer';
 import Lock from '@/lib/Lock';
 import { useAppStore } from '@/stores/app';
 import { useLiveEvent } from '@/composables/useLiveEvent';
@@ -2344,7 +2350,11 @@ async function loadBackups() {
 }
 
 function selectDefaultForm() {
-  currentForm.value = idmapping.value[0]?.id || null;
+  // the first form the explorer lists, as every section opens on its first item
+  // (config/fileExplorer.js firstExplorerFile) : the first file's, its folders first
+  const firstSource = firstExplorerFile(files.value.map((source) => source || ''));
+  currentForm.value =
+    idmapping.value.find((m) => (m.source || '') === firstSource)?.id || idmapping.value[0]?.id || null;
   // the form the address names (/designer/forms/<form>)
   const slug = addressOf(route.params).form;
   // its exact name first, then the first of that slug, then its 7.2 address (a bookmark)
