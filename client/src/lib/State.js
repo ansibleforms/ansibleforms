@@ -100,6 +100,8 @@ var State = {
     const store = useAppStore();
     store.chatEnabled = !!data.chatEnabled;
     store.designerEnabled = data.designerEnabled !== false;
+    // the days a stored job may stay unused (STORED_JOB_UNUSED_DAYS) : 0, never removed
+    store.storedJobUnusedDays = Number(data.storedJobUnusedDays) || 0;
     store.appName = data.appName || null;
     store.labels = Array.isArray(data.labels) ? data.labels : [];
     store.announcements = Array.isArray(data.announcements) ? data.announcements : [];

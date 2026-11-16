@@ -133,6 +133,8 @@ export default {
     storedJobVisibilityInvalid: "Une tache enregistree est privee ou partagee",
     storedJobShareDenied: "Vous n'avez pas la permission de partager des taches enregistrees",
     storedJobShareFormDisabled: "Le formulaire '{form}' ne permet pas de partager ses taches enregistrees",
+    storedJobUnusedDaysInvalid: "Les jours sans utilisation doivent être un nombre entier d'au moins 1",
+    storedJobUnusedDaysTooLong: "Les jours sans utilisation ne peuvent dépasser {days}",
     oauth2Added: "Fournisseur OAuth2 ajoute",
     secretStoreAdded: "Coffre de secrets ajoute",
     secretStoreNotFound: "Coffre de secrets introuvable",

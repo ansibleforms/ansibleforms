@@ -645,6 +645,31 @@
       however old it is.
       Defaults to 90 days since 7.6.0; before, the default 0 kept everything. Set 0 to keep
       every job for ever.
+  - name: STORED_JOB_UNUSED_DAYS
+    version: 7.7.0
+    type: number
+    allowed: a whole number where 0 never removes them
+    short: Remove stored jobs unused for N days
+    hint: Stored jobs no job was launched from for this many days are removed (0 never).
+    default: "0"
+    description: |
+      Removes the stored jobs no job was launched from for this many days, counted from their
+      last use (Last used on the stored jobs page) or, for one never used, from when it was
+      stored. The daily cleanup at 4:00 AM that removes the stored jobs past their expiry date
+      removes these too, whichever comes first. 0, the default, never removes a stored job for
+      being unused.
+
+      A use is a launch from the form filled from the stored job (opened from it, or Load), a
+      Run later from it when that run fires, a relaunch of a job launched from it, and the MCP
+      `launch_job` or `plan_job` with it. The runs of a schedule do not count, even of one made
+      from a stored job: a schedule keeps its own copy of the values.
+
+      Each stored job says when it is removed (Removed, in the Store dialog and on its page):
+      never, on a date, or when unused for some days of its own (`unused_days` in the API and
+      the MCP `store_job`). While this is above 0, never is not offered, its own days are at most
+      this many and the Store dialog starts at them, and one removed on a date is still removed
+      once unused for this many days. With 0 any number of days is allowed. Lowering it later
+      shortens the stored jobs that asked for more. Takes effect at once, without a restart.
   - name: ENTRA_AUTHORITY_URI
     version: 7.3.0
     type: string
@@ -924,7 +949,8 @@
       and so does a `plan_job` from one when its run fires (not when it is planned), and a
       relaunch of a job launched from one (the new job names it too, when the user who
       relaunches may see it). A `create_schedule` does not: a schedule keeps its own copy of the
-      values.
+      values. `store_job` takes `unused_days`, the days it may stay unused before it is removed,
+      at most `STORED_JOB_UNUSED_DAYS` when that is set.
   - name: MCP_READ_ONLY
     version: 7.0.0
     type: boolean

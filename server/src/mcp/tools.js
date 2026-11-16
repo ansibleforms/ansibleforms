@@ -9,6 +9,7 @@ import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
 import yaml from 'yaml';
 import { ownerOf as storedJobOwner, seesShared, storedFormDataFor } from '../lib/storedJobScope.js';
+import { settingDays, effectiveUnusedDays, unusedDaysRefusal, unusedDaysValue } from '../lib/storedJobExpiry.js';
 
 /**
  * The MCP tools. Deliberately technical : they expose the form flow a browser goes through
@@ -83,7 +84,8 @@ function publicResolution(res) {
  * @param {object} args.deps  { Form, Job, Expression, Query, resolveFormQuery } ; for the
  *   schedules also { Schedule, cron (the cron service : add and remove a schedule's task),
  *   appTimezone (async : the app's display zone, Settings > Appearance) } ; for the stored jobs
- *   { StoredJobs : findAll, findById, create, delete on the stored_jobs table }
+ *   { StoredJobs : findAll, findById, create, delete on the stored_jobs table, and
+ *   unusedDaysSetting (the STORED_JOB_UNUSED_DAYS setting ; none, 0) }
  * @param {object} [args.policy]  the MCP settings, from the MCP router only (the chat
  *   assistant has its own rules) : `readOnly` refuses launch_job and relaunch_job,
  *   `chatFormsOnly` offers only the forms offered in the chat (enableForChat)
@@ -280,6 +282,11 @@ export function createHandlers({ user, deps, policy = {} }) {
     return row;
   }
 
+  /** The days a stored job may stay unused (STORED_JOB_UNUSED_DAYS) ; 0, never. */
+  function unusedSetting() {
+    return settingDays(StoredJobs?.unusedDaysSetting ? StoredJobs.unusedDaysSetting() : 0);
+  }
+
   /** A stored job as the list shows it : what and when, not its values. */
   function storedSummary(row) {
     const expires = row.expires_at ? new Date(row.expires_at) : null;
@@ -295,6 +302,10 @@ export function createHandlers({ user, deps, policy = {} }) {
       expired: !!expires && expires.getTime() < Date.now(),
       // when a job was last launched from it (lib/storedJobUse.js) ; none until the first one
       lastUsedAt: row.last_used_at ? new Date(row.last_used_at).toISOString() : null,
+      // its own days unused before it is removed (none : the setting's), and the days that count
+      // (lib/storedJobExpiry.js) ; null, never for being unused
+      unusedDays: row.unused_days ?? null,
+      removedWhenUnusedDays: effectiveUnusedDays(unusedSetting(), row.unused_days),
     };
   }
 
@@ -881,10 +892,19 @@ export function createHandlers({ user, deps, policy = {} }) {
       return { ...storedSummary(row), values: parseJson(await Job.maskExtravars(row.form_name, JSON.stringify(values)), {}) };
     },
 
-    async storeJob({ form, name, values, skipped, description, expires_at: expiresAt }) {
+    async storeJob({ form, name, values, skipped, description, expires_at: expiresAt, unused_days: unusedDays }) {
       refuseWhenReadOnly('jobs cannot be stored through it');
       if (!mayStore) throw new ToolError('You do not have permission to use stored jobs (the allowStoredJobs role option)', 'access_denied');
       if (!String(name ?? '').trim()) throw new ToolError('A stored job needs a name', 'invalid_request');
+      // its own days unused before it is removed : at most the setting's, as the Store dialog
+      // (lib/storedJobExpiry.js) ; none given, it follows the setting
+      const max = unusedSetting();
+      const refusal = unusedDaysRefusal(max, unusedDays);
+      if (refusal) {
+        throw new ToolError(max > 0
+          ? `unused_days must be a whole number from 1 to ${max} (the setting removes stored jobs unused for ${max} days)`
+          : 'unused_days must be a whole number of at least 1', 'invalid_request', { max: max || null });
+      }
       const loaded = await loadForm(form);
       const { formObj } = loaded;
       // the values as the form reads them (a choice as its whole option record, so Load in the
@@ -904,6 +924,7 @@ export function createHandlers({ user, deps, policy = {} }) {
           username: me,
           form_data: JSON.stringify(kept),
           expires_at: expires ? expires.toISOString() : null,
+          ...(unusedDays !== undefined ? { unused_days: unusedDaysValue(unusedDays) } : {}),
         });
       } catch (err) {
         if (err?.code === 'ER_DUP_ENTRY' || /Duplicate entry/i.test(err?.message || '')) {
@@ -917,6 +938,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       if (other.length) warnings.push(`Not stored (constants and reserved fields): ${other.join(', ')}`);
       return {
         id, name: storedName, form: formObj.name, expiresAt: expires ? expires.toISOString() : null,
+        unusedDays: unusedDaysValue(unusedDays) ?? null, removedWhenUnusedDays: effectiveUnusedDays(max, unusedDays),
         stored: storedNames, leftOut: { passwords, unknown, other }, warnings,
       };
     },
@@ -1295,7 +1317,8 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       description: 'Save values of a form under a name, as the Store dialog does, to launch from later (yours or '
         + 'the user\'s in the browser, with Load). Password fields are not stored ; the answer says which '
         + 'fields were left out. A wizard form stores its values per step, with the optional steps skipped. '
-        + '`expires_at` (optional) is ISO 8601 with its offset or Z.',
+        + '`expires_at` (optional) is ISO 8601 with its offset or Z. `unused_days` (optional) removes it once no job '
+        + 'was launched from it for that many days: at most the server\'s setting, when it has one ; none follows the setting.',
       inputSchema: {
         form: z.string().describe('Form name'),
         name: z.string().min(1).max(255).describe('A name, unique among your stored jobs of this form'),
@@ -1303,6 +1326,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
         skipped: skippedSchema,
         description: z.string().optional().describe('What these values are for'),
         expires_at: z.string().optional().describe('When it expires: ISO 8601 with its offset or Z ; none, it does not'),
+        unused_days: z.number().int().positive().optional().describe('Removed once unused for this many days, at most the server\'s setting ; none follows the setting'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     }, wrap((a) => handlers.storeJob(a)));

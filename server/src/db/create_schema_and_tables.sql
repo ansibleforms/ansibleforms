@@ -565,6 +565,8 @@ CREATE TABLE `stored_jobs` (
   `visibility` VARCHAR(10) NOT NULL DEFAULT 'private',
   -- when a job was last launched from it (lib/storedJobUse.js) ; NULL until the first one
   `last_used_at` DATETIME DEFAULT NULL,
+  -- removed once unused for this many days (lib/storedJobExpiry.js) ; NULL follows the setting
+  `unused_days` INT DEFAULT NULL,
   UNIQUE KEY `uk_user_form_name` (`username`, `form_name`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

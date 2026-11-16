@@ -96,6 +96,10 @@ var app_config = {
   // DEFAULT 90 days since 7.6.0. Set to 0 to disable the sweep and keep every job;
   // the health page reports the size so the growth stays visible.
   jobRetentionDays: parseInt(process.env.JOB_RETENTION_DAYS || "90", 10),
+  // How long a stored job may stay unused (no job launched from it) before the daily cleanup
+  // removes it. DEFAULT 0 : never, so nothing changes on an upgrade. A stored job may ask for
+  // fewer days of its own, never more (lib/storedJobExpiry.js).
+  storedJobUnusedDays: parseInt(process.env.STORED_JOB_UNUSED_DAYS || "0", 10),
   // Serve the MCP server for AI agents on /api/v2/mcp. Off by default : it is a new way
   // in, and an operator should opt in to it.
   enableMcp: (process.env.ENABLE_MCP ?? 0) == 1,

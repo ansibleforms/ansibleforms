@@ -3973,6 +3973,10 @@
                     "logTz": {
                       "type": "string",
                       "description": "Application timezone (LOG_TZ)"
+                    },
+                    "storedJobUnusedDays": {
+                      "type": "integer",
+                      "description": "STORED_JOB_UNUSED_DAYS : a stored job unused for this many days is removed, and the most a stored job's own unused_days may be ; 0 never removes one"
                     }
                   }
                 }
@@ -6885,7 +6889,7 @@
             "description": "Stored job created; data is { id }"
           },
           "400": {
-            "description": "Missing required field, a value too long, or a visibility other than private or shared"
+            "description": "Missing required field, a value too long, a visibility other than private or shared, or unused_days not allowed (see StoredJob)"
           },
           "403": {
             "description": "No allowStoredJobs, or sharing without allowStoredJobsShare or on a form that does not allow it"
@@ -6940,7 +6944,7 @@
           "storedjob"
         ],
         "summary": "Update a stored job by ID",
-        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it.",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it. unused_days follows the rule of the StoredJob schema.",
         "parameters": [
           {
             "name": "id",
@@ -6964,6 +6968,9 @@
         "responses": {
           "200": {
             "description": "Stored job updated"
+          },
+          "400": {
+            "description": "A visibility other than private or shared, or unused_days not allowed (see StoredJob)"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -7619,6 +7626,12 @@
             "type": "string",
             "enum": ["private", "shared"],
             "description": "private (default): only the owner. shared: also the users with the allowStoredJobsViewAll role option, who can load it but not change it"
+          },
+          "unused_days": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Removed once no job was launched from it for this many days, counted from its last_used_at (or its created_at, never used). null (or left out) follows STORED_JOB_UNUSED_DAYS. While that setting is above 0 it must be from 1 to the setting (400 otherwise) ; with the setting 0 any whole number of at least 1. null (or left out) always follows the setting, which still removes it. The days that count are the shorter of the two ; expires_at keeps working, whichever comes first removes it"
           },
           "last_used_at": {
             "type": "string",

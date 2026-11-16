@@ -68,6 +68,8 @@ export const ENV_EDIT_DISABLED_REASON =
 // captured at import changes nothing while the page reports "applied now".
 const LIVE = {
   JOB_RETENTION_DAYS: { key: 'jobRetentionDays', parse: v => parseInt(v, 10) || 0 },
+  // the stored jobs cleanup and the stored jobs routes read it on each run and each save
+  STORED_JOB_UNUSED_DAYS: { key: 'storedJobUnusedDays', parse: v => parseInt(v, 10) || 0 },
   AUDIT_RETENTION_DAYS: { key: 'auditRetentionDays', parse: v => parseInt(v, 10) || 0 },
   NIGHTLY_BACKUP_RETENTION: { key: 'nightlyBackupRetention', parse: v => parseInt(v, 10) || 0 },
   // upload.controller builds its multer limits on each upload ; the same fallback as app.config

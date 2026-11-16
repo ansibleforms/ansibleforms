@@ -119,6 +119,8 @@ export default {
     storedJobVisibilityInvalid: "保存的作业只能是私有或共享",
     storedJobShareDenied: "您无权共享保存的作业",
     storedJobShareFormDisabled: "表单 '{form}' 不允许共享其保存的作业",
+    storedJobUnusedDaysInvalid: "未使用天数必须是至少为 1 的整数",
+    storedJobUnusedDaysTooLong: "未使用天数最多为 {days}",
     oauth2Added: "OAuth2 提供商已添加",
     runnerAdded: "运行器已添加",
     joinTokenMade: "已创建加入令牌：请立即复制，之后不再显示",

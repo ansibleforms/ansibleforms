@@ -46,6 +46,9 @@ const StoredJobs = {
   findById: (id) => CrudModel.findById('stored_jobs', id),
   create: (data) => CrudModel.create('stored_jobs', data),
   delete: (id) => CrudModel.delete('stored_jobs', id),
+  // the days a stored job may stay unused (STORED_JOB_UNUSED_DAYS), read at each call : a setting
+  // changed on the settings page applies at once
+  unusedDaysSetting: () => appConfig.storedJobUnusedDays,
 };
 const deps = { Form, Job, Expression, Query, resolveFormQuery, Schedule, cron: cronService, appTimezone, StoredJobs };
 

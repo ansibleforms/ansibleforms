@@ -10,5 +10,6 @@ CREATE TABLE `stored_jobs` (
   `expires_at` DATETIME DEFAULT NULL,
   `visibility` VARCHAR(10) NOT NULL DEFAULT 'private',
   `last_used_at` DATETIME DEFAULT NULL,
+  `unused_days` INT DEFAULT NULL,
   UNIQUE KEY `uk_user_form_name` (`username`, `form_name`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

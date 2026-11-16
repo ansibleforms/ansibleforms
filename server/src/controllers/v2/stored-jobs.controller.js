@@ -6,6 +6,8 @@ import i18n from "../../lib/i18n.js";
 import { publicError } from "./publicError.js";
 import Form from "../../models/form.model.js";
 import { ownerOf, seesShared, storedJobFor, visibilityRefusal } from "../../lib/storedJobScope.js";
+import { settingDays, unusedDaysRefusal, unusedDaysValue } from "../../lib/storedJobExpiry.js";
+import appConfig from "../../../config/app.config.js";
 
 // The columns a caller may write. Everything else in the body is dropped :
 //  - id : the row key. On create a chosen id is inserted as is, and on update it moves the
@@ -17,7 +19,8 @@ import { ownerOf, seesShared, storedJobFor, visibilityRefusal } from "../../lib/
 //    not fake a use.
 // expires_at stays : the Store dialog lets the user pick when the stored job expires.
 // visibility stays : private or shared, checked by assertVisibility before it is written.
-const WRITABLE = ['name', 'description', 'form_name', 'form_data', 'expires_at', 'visibility'];
+// unused_days stays : the days it may stay unused, checked by assertUnusedDays before it is written.
+const WRITABLE = ['name', 'description', 'form_name', 'form_data', 'expires_at', 'visibility', 'unused_days'];
 function pickWritable(body) {
   const data = {};
   for (const key of WRITABLE) {
@@ -80,6 +83,29 @@ async function assertVisibility(req, data, formName) {
   if (refusal === 'formDisabled') throw new Errors.AccessDeniedError(i18n.t(req, 'resources.storedJobShareFormDisabled', { form: String(formName) }));
 }
 
+/**
+ * Refuses days of its own a stored job may not get (storedJobExpiry.unusedDaysRefusal), then
+ * writes them as the column stores them : a whole number of at least 1, at most the setting's
+ * (STORED_JOB_UNUSED_DAYS) ; none only while the setting is 0. Read on each save, so a setting
+ * changed on the settings page applies at once. Nothing to check when the write leaves them alone.
+ *
+ * Args:
+ *   req (object): the request (its language).
+ *   data (object): the columns written ; its unused_days is replaced by the value stored.
+ *
+ * Raises:
+ *   BadRequestError: days that are not a whole number of at least 1, more than the setting's,
+ *     or none while the setting removes unused stored jobs.
+ */
+function assertUnusedDays(req, data) {
+  if (data.unused_days === undefined) return;
+  const setting = appConfig.storedJobUnusedDays;
+  const refusal = unusedDaysRefusal(setting, data.unused_days);
+  if (refusal === 'invalid') throw new Errors.BadRequestError(i18n.t(req, 'resources.storedJobUnusedDaysInvalid'));
+  if (refusal === 'tooLong') throw new Errors.BadRequestError(i18n.t(req, 'resources.storedJobUnusedDaysTooLong', { days: settingDays(setting) }));
+  data.unused_days = unusedDaysValue(data.unused_days);
+}
+
 const stored_jobsController = {
   async find(req, res) {
     try {
@@ -125,6 +151,8 @@ const stored_jobsController = {
         username: ownerOf(req.user.user)
       };
       await assertVisibility(req, data, data.form_name);
+      // its own days unused before it is removed : at most the setting's
+      assertUnusedDays(req, data);
       const id = await CrudModel.create('stored_jobs', data);
       return res.status(201).json(RestResult.single(i18n.t(req, 'resources.storedJobAdded'), { id }));
     } catch (err) {
@@ -166,6 +194,8 @@ const stored_jobsController = {
       // Don't allow changing the id, the owner or the creation time
       const data = pickWritable(req.body);
       await assertVisibility(req, data, data.form_name ?? existing.form_name);
+      // its own days unused before it is removed : at most the setting's
+      assertUnusedDays(req, data);
       
       // a body with nothing writable left (only an id, say) changes nothing ; sent on it
       // would be an UPDATE without columns, a syntax error

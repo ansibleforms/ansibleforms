@@ -415,7 +415,10 @@ function updateTempValue() {
   // a moment is written from the moment itself : a wall clock in the hour the browser skips in
   // spring cannot be held in a local Date (02:30 UTC would show as 03:30)
   if (isMoment.value) {
-    tempValue.value = Time.wallText(momentOf(value), zone.value);
+    // its zone after it, as the empty field's placeholder says it (the time means nothing
+    // without it) ; a typed text has it taken off before it is read (handleTempInput)
+    const moment = momentOf(value);
+    tempValue.value = `${Time.wallText(moment, zone.value)} ${Time.zoneLabel(moment, zone.value)}`;
     return;
   }
 
@@ -442,10 +445,26 @@ function updateTempValue() {
   }
 }
 
+/**
+ * A moment's text without the zone written after it : the wall clock alone, as it is read.
+ *
+ * Args:
+ *   text (string): the field's text (2026-11-16 16:44 UTC).
+ *
+ * Returns:
+ *   string: the text without its zone (2026-11-16 16:44).
+ */
+function withoutZone(text) {
+  return String(text || '')
+    .trim()
+    .replace(/^(\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2})\s+\S.*$/, '$1');
+}
+
 function handleTempInput(event) {
   // Parse the temp input and update pickerModel (local time)
-  const inputStr = event.target.value;
-  tempValue.value = inputStr;
+  tempValue.value = event.target.value;
+  // a moment's text ends with its zone (YYYY-MM-DD HH:mm UTC) : read without it
+  const inputStr = isMoment.value ? withoutZone(event.target.value) : event.target.value;
 
   if (!inputStr) {
     pickerModel.value = null;

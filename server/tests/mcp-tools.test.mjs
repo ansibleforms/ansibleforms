@@ -691,6 +691,26 @@ describe("MCP stored jobs", () => {
     expect(noZone.structuredContent.code).toBe("invalid_request");
   });
 
+  test("store_job takes unused_days, at most the setting ; the list says the days that count (#1437)", async () => {
+    deps.StoredJobs.unusedDaysSetting = () => 30;
+    const client = await connect(storer);
+    const longer = await client.callTool({ name: "store_job", arguments: { form: "Create volume", name: "w", values: {}, unused_days: 40 } });
+    expect(longer.structuredContent).toMatchObject({ code: "invalid_request", max: 30 });
+    expect(deps.StoredJobs.create).not.toHaveBeenCalled();
+    const r = await call(client, "store_job", { form: "Create volume", name: "w", values: {}, unused_days: 10 });
+    expect(deps.StoredJobs.create.mock.calls[0][0]).toMatchObject({ unused_days: 10 });
+    expect(r.data).toMatchObject({ unusedDays: 10, removedWhenUnusedDays: 10 });
+    // left out : the setting's days count
+    const plain = await call(client, "store_job", { form: "Create volume", name: "x", values: {} });
+    expect(deps.StoredJobs.create.mock.calls[1][0].unused_days).toBeUndefined();
+    expect(plain.data).toMatchObject({ unusedDays: null, removedWhenUnusedDays: 30 });
+    const listed = (await call(client, "list_stored_jobs")).data.storedJobs.find((j) => j.name === "w");
+    expect(listed).toMatchObject({ unusedDays: 10, removedWhenUnusedDays: 10 });
+    // without a setting : none counts, never removed for being unused
+    deps.StoredJobs.unusedDaysSetting = () => 0;
+    expect((await call(client, "list_stored_jobs")).data.storedJobs.find((j) => j.name === "x")).toMatchObject({ removedWhenUnusedDays: null });
+  });
+
   test("launch_job from a stored job: its values with the given ones over them, a gone field left out and said", async () => {
     const client = await connect(storer);
     const resolved = await call(client, "resolve_field", { form: "Create volume", storedJob: { id: 1 }, values: { name: "v1-override" } });
