@@ -35,7 +35,7 @@ vi.mock("../src/models/settings.model.js", () => ({ default: { findConfigYaml: a
 vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"));
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
-const { default: Form } = await import("../src/models/form.model.js");
+const { default: Form, duplicateNotice } = await import("../src/models/form.model.js");
 const { designsAllForms, duplicateShown, designerConfig, designerSave, fileVisibility, designerListing, assertFileShown, assertWorkflowFileShown, designerGitOutput, designerRepositories } = await import("../src/lib/designerForms.js");
 const { default: ansibleConfig } = await import("../config/ansible.config.js");
 const { default: ProjectFiles } = await import("../src/models/projectFiles.model.js");
@@ -461,16 +461,19 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     assert.equal(created.message, there.message.replace("x.yaml", "team.yml"));
   });
 
-  test("git outputs : the lines naming files left out", async () => {
+  test("git outputs : the lines naming files and the duplicates naming a hidden form left out", async () => {
     const push = "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\n create mode 100644 team.yml\n delete mode 100644 old.yml\n rename a.yml => b.yml (100%)\nTo origin";
     assert.equal(designerGitOutput(push, user), "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\nTo origin");
     assert.equal(designerGitOutput(push, everything), push);
-    // a repository's stored pull and push outputs, as the user reads them
-    const pull = "Updating 1..2\n forms/team.yaml | 3 ++-\n 1 file changed";
-    const [row] = designerRepositories([{ name: "forms", pull_output: pull, push_output: push }], limited);
+    // a repository's stored pull and push outputs, as the user reads them ; a form name defined
+    // twice, one copy the team's : its line left out of the pull output (a line stored by an
+    // earlier pull too : only those naming forms the user reaches now are kept)
+    const d = { notice: duplicateNotice("Team deploy", { place: "forms/forms/deploy.yaml" }, { place: "staging/dup.yaml" }) };
+    const pull = `Updating 1..2\n forms/team.yaml | 3 ++-\n 1 file changed\nWarning: ${d.notice}`;
+    const [row] = await designerRepositories([{ name: "forms", pull_output: pull, push_output: push }], limited);
     assert.equal(row.pull_output, "Updating 1..2\n 1 file changed");
     assert.doesNotMatch(row.push_output, /team\.yml/);
-    assert.equal(designerRepositories([{ pull_output: pull }], everything)[0].pull_output, pull);
+    assert.equal((await designerRepositories([{ pull_output: pull }], everything))[0].pull_output, pull);
   });
 });
 
@@ -478,10 +481,11 @@ describe("a form name defined twice : its warning only to a designer who reaches
   test("the loader's warning left out of the designer's config when a copy is hidden", async () => {
     // a second copy of the user's form, the team's
     fs.writeFileSync(path.join(ROOT, "forms", "forms", "zz-copy.yaml"), YAML.stringify(form("Ops deploy", ["team"])));
-    const warning = Form.duplicateWarning("Ops deploy");
-    assert.ok((await load()).warnings.includes(warning), "the loader warns");
     const [d] = await Form.duplicates();
-    assert.deepEqual(d, { name: "Ops deploy", used: { roles: ["ops"] }, skipped: { roles: ["team"] }, notice: warning });
+    const warning = d.notice;
+    assert.ok((await load()).warnings.includes(warning), "the loader warns");
+    assert.equal(d.name, "Ops deploy");
+    assert.deepEqual([d.used.roles, d.skipped.roles], [["ops"], ["team"]]);
     assert.equal(duplicateShown(d, limited), false);
     assert.equal(duplicateShown(d, everything), true);
     assert.equal(duplicateShown({ ...d, skipped: { roles: ["default"] } }, limited), true);
@@ -499,7 +503,7 @@ describe("the routes outside the designer's config name nothing hidden from a li
   test("the forms list and a form opened : the user's forms as for everyone, no warning naming a hidden form", async () => {
     // a copy of the team's form read first : the loader warns of the second, whoever it belongs to
     fs.writeFileSync(path.join(ROOT, "forms", "forms", "a-copy.yaml"), YAML.stringify(form("Team deploy", ["team"])));
-    const warning = Form.duplicateWarning("Team deploy");
+    const warning = (await Form.duplicates()).find((d) => d.name === "Team deploy").notice;
     const list = await call(configController.findList, { user: { user: limited } });
     assert.deepEqual(names(list.body.forms).sort(), ["Everyone", "Ops deploy"]);
     assert.doesNotMatch(named(list), /Team deploy/);

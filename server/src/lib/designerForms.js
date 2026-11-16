@@ -38,8 +38,9 @@
 // without designAllForms the form files are in none of them either (Form.formsFileTest).
 //
 // The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
-// the lines naming files ; the load's warning of a form name defined twice is left out unless both
-// copies are theirs.
+// the lines naming files, and the form names defined twice they are not told of ; the load's warning
+// of a form name defined twice (the forms list, the designer, a repository's page) is left out unless
+// both copies are theirs.
 //
 // A designer some forms, playbooks or workflows are hidden from adds no expression nor query the
 // server runs to a form (assertServerCodeKept), and runs no raw expression either
@@ -70,6 +71,8 @@ const PLACEMENT = ["source", "repository", "readOnly"];
 // the lines of git's output naming a file : a commit's summary (a file made, removed, renamed,
 // copied, its mode changed) and a pull's diffstat ( forms/deploy.yaml | 3 ++)
 const GIT_FILE_LINE = /^\s*(create mode|delete mode|rename |copy |mode change )|^\s\S.*\s\|\s+(\d+ ?[+-]*|Bin \d+ -> \d+ bytes)\s*$/;
+// a pull output's line of a form name defined twice (Form.duplicateLines)
+const DUPLICATE_LINE = /^Warning: Form '.*' is defined twice: /;
 
 /**
  * Whether a user designs every form : the role option designAllForms (on unless a role turns it
@@ -174,8 +177,8 @@ export function designerScope(forms, user, unloaded = []) {
 }
 
 /**
- * Whether a "skipping duplicate form" warning (Form.duplicates) may be shown to a user : both
- * copies reached by their roles, or every form designed.
+ * Whether a "defined twice" warning (Form.duplicates) may be shown to a user : both copies reached
+ * by their roles, or every form designed.
  *
  * Args:
  *   duplicate (object): { used: { roles }, skipped: { roles } }.
@@ -219,8 +222,8 @@ export async function designerConfig(config, user, unloaded = []) {
 }
 
 /**
- * A load's warnings as a user reads them : without the "skipping duplicate form" warnings naming a
- * form hidden from them (duplicateShown). The forms list (GET /api/v2/config/formlist) is filtered
+ * A load's warnings as a user reads them : without the "defined twice" warnings naming a form
+ * hidden from them (duplicateShown). The forms list (GET /api/v2/config/formlist) is filtered
  * by the user's roles already, but the loader warns of every name defined twice, whoever it
  * belongs to.
  *
@@ -653,18 +656,29 @@ export function designerGitOutput(output, user) {
 
 /**
  * Repositories as a user reads them : their pull and push outputs without the lines naming files
- * (designerGitOutput) - the outputs are stored once, for every reader, so they are filtered here.
+ * (designerGitOutput), and without the form names defined twice they are not told of
+ * (duplicateShown) - the outputs are stored once, for every reader, so they are filtered here.
  *
  * Args:
  *   rows (object[]): the repositories.
  *   user (object): the signed-in user.
  *
  * Returns:
- *   object[]: the repositories (the same ones when they design everything).
+ *   Promise<object[]>: the repositories (the same ones when they design everything).
  */
-export function designerRepositories(rows, user) {
+export async function designerRepositories(rows, user) {
   if (designsEverything(user)) return rows;
-  return (rows || []).map((r) => (r ? { ...r, pull_output: designerGitOutput(r.pull_output, user), push_output: designerGitOutput(r.push_output, user) } : r));
+  // the duplicate lines they may read : those of now, naming no form hidden from them (a line
+  // stored by an earlier pull too : one no longer true is left out)
+  const shownLines = designsAllForms(user)
+    ? null
+    : new Set((await Form.duplicates().catch(() => [])).filter((d) => duplicateShown(d, user)).map((d) => `Warning: ${d.notice}`));
+  const clean = (text) => {
+    if (typeof text !== "string") return text;
+    const lines = designerGitOutput(text, user).split("\n");
+    return (shownLines ? lines.filter((line) => !DUPLICATE_LINE.test(line) || shownLines.has(line)) : lines).join("\n");
+  };
+  return (rows || []).map((r) => (r ? { ...r, pull_output: clean(r.pull_output), push_output: clean(r.push_output) } : r));
 }
 
 export default {

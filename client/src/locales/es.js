@@ -1344,6 +1344,7 @@ export default {
       showPullOutput: 'Mostrar salida del último pull',
       showPushOutput: 'Mostrar salida del último push',
       notFound: "No hay ningún repositorio con el id '{id}'.",
+      formDuplicate: "El formulario '{name}' está definido dos veces: se usa {used}, se omite {skipped}",
       ownUser: 'Todavía tiene su propio usuario ({user}): elige una credencial para reemplazarlo.',
       pull: 'Pull',
       pullAll: 'Pull de todos',

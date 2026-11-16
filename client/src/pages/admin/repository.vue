@@ -521,6 +521,12 @@ onMounted(async () => {
                 <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
               </h6>
             </template>
+            <!-- a form name it shares with another forms repository : the copy used, the one skipped -->
+            <div v-for="d in repo.formDuplicates || []" :key="d.skipped.place" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{
+                t('settings.repositories.formDuplicate', { name: d.name, used: d.used.place, skipped: d.skipped.place })
+              }}
+            </div>
             <!-- where it stands : its pull, push and head, each a field of the column, read only -->
             <div v-show="fieldShown('pull')" class="mb-3">
               <div class="form-label fw-bold">{{ t('settings.fields.pull') }}</div>

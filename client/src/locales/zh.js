@@ -1310,6 +1310,7 @@ export default {
       showPullOutput: '显示上次拉取的输出',
       showPushOutput: '显示上次推送的输出',
       notFound: "没有 ID 为 '{id}' 的仓库。",
+      formDuplicate: "表单 '{name}' 被定义了两次：使用 {used}，跳过 {skipped}",
       ownUser: '它仍有自己的用户 ({user})：请选择一个凭据来替换它。',
       pull: '拉取',
       pullAll: '全部拉取',

@@ -1342,6 +1342,7 @@ export default {
       showPullOutput: 'Uitvoer van laatste pull tonen',
       showPushOutput: 'Uitvoer van laatste push tonen',
       notFound: "Er is geen repository met id '{id}'.",
+      formDuplicate: "Formulier '{name}' is twee keer gedefinieerd: {used} wordt gebruikt, {skipped} overgeslagen",
       ownUser: 'Het heeft nog een eigen gebruiker ({user}): kies een referentie om die te vervangen.',
       pull: 'Pull',
       pullAll: 'Alles pullen',

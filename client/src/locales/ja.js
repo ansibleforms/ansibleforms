@@ -1334,6 +1334,7 @@ export default {
       showPullOutput: '前回のプルの出力を表示',
       showPushOutput: '前回のプッシュの出力を表示',
       notFound: "ID '{id}' のリポジトリはありません。",
+      formDuplicate: "フォーム '{name}' が 2 回定義されています: {used} を使用、{skipped} はスキップ",
       ownUser: 'まだ独自のユーザー ({user}) があります：置き換える認証情報を選択してください。',
       pull: 'プル',
       pullAll: 'すべてプル',

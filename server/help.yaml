@@ -6406,10 +6406,14 @@
       - Enable the "Use for forms" switch on each repository you want to load forms from
       - Each repository can contain a `forms/` directory with form YAML files
       - All forms from all repositories are merged together automatically
-      - Forms with duplicate names will trigger a warning (first one wins)
+      - A form name defined in two repositories resolves to the copy of the repository added first; the warning
+        names both copies, for example `Form 'Deploy' is defined twice: forms-ops/forms/deploy.yaml is used,
+        forms-team/forms/deploy.yaml is skipped`. It shows with the forms' load warnings, in the pull output of
+        each repository involved and on each one's page. The designer refuses a new form whose name another
+        forms repository already defines
       
       **Configuration File Discovery:**
-      - AnsibleForms will use the FIRST config.yaml (or config.yaml) found across all form repositories
+      - AnsibleForms will use the FIRST config.yaml found across all form repositories, in the order they were added
       - If multiple config files are found, a warning is logged
       - You can have a single central config repository for shared categories/roles/constants
       - Or use the local `persistent/config.yaml` file (checked if no repository config found)
@@ -6418,7 +6422,7 @@
       - Keep config.yaml in only ONE repository or use the local persistent/config.yaml
       - Organize forms by team/project using separate repositories
       - Use unique form names across all repositories to avoid conflicts
-      - Repository order matters: forms are loaded in database order
+      - Repository order matters: forms are loaded in the order the repositories were added
       
       **Example Setup:**
       ```
