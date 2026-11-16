@@ -859,8 +859,6 @@ class Repository extends CrudModel {
       output = await Repo.clone(repo.uri, name, branch, Repository.gitAuth(repo))
       if (repo.use_for_forms) {
         output += await Repository.seedFormsRepo(name)
-        // a form name it shares with another forms repository : which copy is used, which skipped
-        output += await (await formModel()).duplicateLines(name)
       }
       // its object types read into their tables, still under the claim ; its first clone takes
       // the app's objects of each, a clone into a missing tree (or a reset) reads them as cloned
