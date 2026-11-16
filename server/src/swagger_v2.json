@@ -6709,7 +6709,7 @@
           "schedule"
         ],
         "summary": "Update a schedule by ID",
-        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed.",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, stored_job_id, state, output, last_run and queue_id cannot be changed.",
         "parameters": [
           {
             "name": "id",
@@ -6848,7 +6848,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job list or single stored job"
+            "description": "Stored job list or single stored job, each with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
           },
           "403": {
             "description": "No allowStoredJobs"
@@ -6916,7 +6916,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored job"
+            "description": "Stored job, with its created_at, expires_at and last_used_at (when a job was last launched from it, null until then)"
           },
           "403": {
             "description": "No allowStoredJobs, or another user's stored job"
@@ -7376,7 +7376,8 @@
           "credentials": { "type": "object", "description": "Credentials for the job.", "example": { "vcenter": "VCENTER_CRED" } },
           "notifications": { "type": "object", "description": "Notification settings for the job.", "example": { "email": "user@example.com" } },
           "job_type": { "type": "string", "description": "Type of job (e.g., ansible, awx, multistep).", "example": "ansible" },
-          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" }
+          "target": { "type": "string", "description": "Target resource for the job.", "example": "vm1" },
+          "storedJobId": { "type": "integer", "description": "The stored job the values came from (the form opened with ?storedJob=<id>) : its last_used_at is set to now. Ignored unless the caller may read it (as GET /stored-jobs/{id}) and it is of this form.", "example": 12 }
         },
         "required": ["formName"]
       },
@@ -7579,6 +7580,10 @@
           },
           "raw_form_data": {
             "description": "Create of a planned run only: the raw field values (object or JSON string), checked by launch validation"
+          },
+          "stored_job_id": {
+            "type": "integer",
+            "description": "Create of a planned run only: the stored job the values came from. Kept when the caller may read it (as GET /stored-jobs/{id}) and it is of this form; its last_used_at is set when the run fires. Ignored for a schedule"
           }
         },
         "description": "Fields owner, state, output, last_run and queue_id are ignored on write."
@@ -7610,9 +7615,15 @@
             "type": "string",
             "enum": ["private", "shared"],
             "description": "private (default): only the owner. shared: also the users with the allowStoredJobsViewAll role option, who can load it but not change it"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When a job was last launched from it (POST /job with its storedJobId, the MCP launch_job, or a planned run from it when it fires) ; null until then. Set by the server only"
           }
         },
-        "description": "Only these fields are written; id, username (always the caller) and created_at are ignored. name, form_name and form_data are required on create."
+        "description": "Only these fields are written; id, username (always the caller), created_at and last_used_at are ignored. name, form_name and form_data are required on create."
       }
     }
   }

@@ -1804,12 +1804,14 @@ export default {
       valuesNotMap: 'Die Werte müssen eine Zuordnung von Feldnamen und Werten sein.',
       notFound: "Es gibt keinen gespeicherten Job mit der ID '{id}'.",
       nameRequired: 'Ein Name ist erforderlich.',
+      ownerHelp: 'Der Benutzer, der ihn gespeichert hat; nur er kann ihn ändern oder löschen.',
       formHelp: 'Das Formular, für das diese Werte sind.',
       owner: 'Benutzer',
       neverExpires: 'Läuft nie ab',
       valuesHelp:
         'Die Werte des Formulars, wie sein Speichern-Knopf sie gesichert hat. Im Formular öffnen füllt sie aus.',
       valuesHelpNew: 'Die Werte des Formulars als YAML: Feldnamen und ihre Werte.',
+      lastUsed: 'Zuletzt verwendet',
     },
     knownhosts: {
       label: 'Bekannter Host',

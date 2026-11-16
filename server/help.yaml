@@ -919,7 +919,10 @@
       `get_stored_job`, `store_job` (values saved under a name, as the Store dialog does,
       password fields left out) and `delete_stored_job`, for the user's own (everyone's for a
       settings user). `resolve_field`, `launch_job` and `plan_job` take a `storedJob` to start
-      from its values, as Load does, with the values given laid over them.
+      from its values, as Load does, with the values given laid over them. A `launch_job` from a
+      stored job records when it was last used (`lastUsedAt`), as a launch from the form does,
+      and so does a `plan_job` from one when its run fires (not when it is planned). A
+      `create_schedule` does not: a schedule keeps its own copy of the values.
   - name: MCP_READ_ONLY
     version: 7.0.0
     type: boolean

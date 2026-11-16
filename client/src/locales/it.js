@@ -1799,11 +1799,13 @@ export default {
       valuesNotMap: 'I valori devono essere una mappa di nomi di campo e valori.',
       notFound: "Non esiste alcun job salvato con l'id '{id}'.",
       nameRequired: 'Un nome è obbligatorio.',
+      ownerHelp: "L'utente che l'ha salvato; solo lui può modificarlo o eliminarlo.",
       formHelp: 'Il modulo a cui sono destinati questi valori.',
       owner: 'Utente',
       neverExpires: 'Non scade mai',
       valuesHelp: 'I valori del modulo, come li ha salvati il suo pulsante Salva. Apri nel modulo li compila.',
       valuesHelpNew: 'I valori del modulo, in YAML: nomi dei campi e i loro valori.',
+      lastUsed: 'Ultimo uso',
     },
     knownhosts: {
       label: 'Host conosciuto',

@@ -1782,6 +1782,18 @@ export default function getSettings(t) {
           // in the user's zone, with its name : the raw value is a UTC ISO string ; none, never
           render: (v) => (v ? Helpers.formatServerDate(v) : escapeHtml(t('admin.storedJobs.never'))),
         },
+        {
+          // when a job was last launched from it (set by the server) : sorted on, the ones no one
+          // uses stand out ; none yet, an en dash
+          key: 'last_used_at',
+          noInput: true,
+          sortable: true,
+          filterable: false,
+          icon: 'clock-rotate-left',
+          label: t('settings.storedJobs.lastUsed'),
+          type: 'datetime',
+          render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
+        },
       ],
     },
     knownhosts: {

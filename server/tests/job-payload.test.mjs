@@ -33,6 +33,13 @@ describe("payload and extravars", () => {
     expect(launched.extravars).toEqual({ who: "b" });
   });
 
+  test("the stored job the form was filled from is handed to the launch, none without one (#1437)", async () => {
+    await controller.launch({ body: { formName: "f", extravars: {}, storedJobId: 12 }, user }, res());
+    expect(launched.storedJobId).toBe(12);
+    await controller.launch({ body: { formName: "f", extravars: {} }, user }, res());
+    expect(launched.storedJobId).toBeNull();
+  });
+
   test("both sent: extravars wins", async () => {
     await controller.launch({ body: { formName: "f", extravars: { who: "a" }, payload: { who: "b" } }, user }, res());
     expect(launched.extravars).toEqual({ who: "a" });

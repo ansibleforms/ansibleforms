@@ -1806,12 +1806,14 @@ export default {
       valuesNotMap: 'Les valeurs doivent être une table de noms de champs et de valeurs.',
       notFound: "Aucun job enregistré avec l'id '{id}'.",
       nameRequired: 'Un nom est obligatoire.',
+      ownerHelp: "L'utilisateur qui l'a enregistré ; lui seul peut le modifier ou le supprimer.",
       formHelp: 'Le formulaire auquel ces valeurs sont destinées.',
       owner: 'Utilisateur',
       neverExpires: "N'expire jamais",
       valuesHelp:
         'Les valeurs du formulaire, telles que son bouton Enregistrer les a sauvegardées. Ouvrir dans le formulaire les remplit.',
       valuesHelpNew: 'Les valeurs du formulaire, en YAML : noms des champs et leurs valeurs.',
+      lastUsed: 'Dernière utilisation',
     },
     knownhosts: {
       label: 'Hôte connu',

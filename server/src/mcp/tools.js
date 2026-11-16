@@ -293,6 +293,8 @@ export function createHandlers({ user, deps, policy = {} }) {
       createdAt: row.created_at ?? null,
       expiresAt: expires ? expires.toISOString() : null,
       expired: !!expires && expires.getTime() < Date.now(),
+      // when a job was last launched from it (lib/storedJobUse.js) ; none until the first one
+      lastUsedAt: row.last_used_at ? new Date(row.last_used_at).toISOString() : null,
     };
   }
 
@@ -314,7 +316,8 @@ export function createHandlers({ user, deps, policy = {} }) {
    * and `skipped` given as true or false overrides the stored skips.
    *
    * Returns:
-   *   Promise<object>: { values, skipped, warnings } - `skipped` for a wizard only.
+   *   Promise<object>: { values, skipped, warnings, storedJobId } - `skipped` for a wizard only,
+   *   `storedJobId` the stored job started from (none without one), for its last use.
    */
   async function overStored(form, values, storedJob, skipped, loaded) {
     if (!storedJob) return { values: values || {}, skipped, warnings: [] };
@@ -334,7 +337,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     if (isWizard(formObj)) {
       const over = wizardOverStored(formObj, row, data, values, skipped);
       if (over.stale.length) warnings.push(`Stored job '${row.name}' has values for steps or fields the form no longer has, left out: ${over.stale.join(', ')}`);
-      return { values: over.drafts, skipped: over.skipped, warnings };
+      return { values: over.drafts, skipped: over.skipped, warnings, storedJobId: row.id };
     }
     if (data.__wizard__ === true) {
       throw new ToolError(`Stored job ${row.id} holds the step drafts of a wizard, and '${form}' is no longer one ; store it again from the form`, 'invalid_request');
@@ -343,7 +346,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     const stale = Object.keys(data).filter((k) => !known.has(k));
     const kept = Object.fromEntries(Object.entries(data).filter(([k]) => known.has(k)));
     if (stale.length) warnings.push(`Stored job '${row.name}' has values for fields the form no longer has, left out: ${stale.join(', ')}`);
-    return { values: { ...kept, ...(values || {}) }, warnings };
+    return { values: { ...kept, ...(values || {}) }, warnings, storedJobId: row.id };
   }
 
   /**
@@ -621,12 +624,13 @@ export function createHandlers({ user, deps, policy = {} }) {
    * from the confirmed one.
    *
    * Returns:
-   *   Promise<object>: { formObj, extravars, credentials, payloadHash, rawFormData, warnings }.
+   *   Promise<object>: { formObj, extravars, credentials, payloadHash, rawFormData, warnings,
+   *   storedJobId } - `storedJobId` the stored job started from, none without one.
    */
   async function readyToLaunch({ form, values: given, skipped: givenSkips, storedJob, verbose, expectedPayloadHash }) {
     const loaded = await loadForm(form);
     const { formConfig, formObj } = loaded;
-    const { values, skipped, warnings: storedWarnings } = await overStored(form, given, storedJob, givenSkips, loaded);
+    const { values, skipped, warnings: storedWarnings, storedJobId } = await overStored(form, given, storedJob, givenSkips, loaded);
     // a stored job can change between what was shown and the launch : the confirmed payload is
     // the one launched, or none
     if (storedJob && !expectedPayloadHash) {
@@ -639,7 +643,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     if (verbose && !user?.options?.allowVerboseMode) {
       throw new ToolError('You do not have permission to run jobs in verbose mode', 'access_denied');
     }
-    if (isWizard(formObj)) return readyWizard({ loaded, values, skipped, storedWarnings, verbose, expectedPayloadHash });
+    if (isWizard(formObj)) return { ...(await readyWizard({ loaded, values, skipped, storedWarnings, verbose, expectedPayloadHash })), storedJobId };
     const res = await resolveForm({
       form: formObj,
       constants: formConfig.constants || {},
@@ -664,7 +668,7 @@ export function createHandlers({ user, deps, policy = {} }) {
         'payload_mismatch', { expectedPayloadHash, payloadHash });
     }
     if (verbose) extravars.__verbose__ = true;
-    return { formObj, extravars, credentials, payloadHash, rawFormData: filterRawFormData(res._fields, res._values), warnings: [...(res.warnings || []), ...storedWarnings] };
+    return { formObj, extravars, credentials, payloadHash, rawFormData: filterRawFormData(res._fields, res._values), warnings: [...(res.warnings || []), ...storedWarnings], storedJobId };
   }
 
   /** readyToLaunch for a wizard : its steps resolved in order, their output merged. */
@@ -758,6 +762,8 @@ export function createHandlers({ user, deps, policy = {} }) {
         fromClient: true,
         // resolved and validated above ; the REST launch guard need not do it again
         validated: true,
+        // started from a stored job : Job.launch records its last use (lib/storedJobUse.js)
+        ...(ready.storedJobId ? { storedJobId: ready.storedJobId } : {}),
       });
       return { id: job?.id, form: ready.formObj.name, payloadHash: ready.payloadHash, warnings: ready.warnings };
     },
@@ -776,6 +782,9 @@ export function createHandlers({ user, deps, policy = {} }) {
         run_at: when.toISOString(),
         extra_vars: yaml.stringify(ready.extravars),
         raw_form_data: ready.rawFormData,
+        // started from a stored job : its last use is recorded when the run fires
+        // (Schedule.launch, lib/storedJobUse.js), not now
+        ...(ready.storedJobId ? { stored_job_id: ready.storedJobId } : {}),
       }));
       const row = await registered(id);
       return { id: row.id, name: row.name, form: ready.formObj.name, ...(await bothClocks(when)), payloadHash: ready.payloadHash, warnings: ready.warnings };
@@ -1262,7 +1271,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       title: 'List stored jobs',
       description: 'The stored jobs you may see (values saved under a name with Store on a form): your own and the ones '
         + 'other users shared with you, or everyone\'s for a settings user. Name, description, form, owner when not '
-        + 'yours, created and expiry ; not the values - get_stored_job has them. One marked `usable` (your own or a '
+        + 'yours, created, expiry and last used (lastUsedAt, set by each launch_job from it and each plan_job run from it when it fires) ; not the values - get_stored_job has them. One marked `usable` (your own or a '
         + 'shared one, of a form you may launch) can be passed as '
         + '`storedJob` to resolve_field, launch_job or plan_job to start from it.',
       inputSchema: { form: z.string().optional().describe('Only the stored jobs of this form') },

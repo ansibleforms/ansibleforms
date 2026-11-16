@@ -232,6 +232,9 @@ const launch = async function(req, res) {
         var rawFormData = req.body.rawFormData || {}
         // the uploads of the form's file fields, as POST /api/v2/job/upload returned them
         var files = (req.body.files && typeof req.body.files === 'object') ? req.body.files : {}
+        // the stored job the form was filled from (opened with ?storedJob=<id>, or Load) : checked
+        // by Job.launch, which records its last use (lib/storedJobUse.js)
+        var storedJobId = req.body.storedJobId ?? null
         // new in 4.0.16, awxCreds are extracted from form and extravars
         var user = req?.user?.user || {}
         // check permission for verbose mode
@@ -240,7 +243,7 @@ const launch = async function(req, res) {
           return false;
         }
         try{
-          const job = await Job.launch({ form, user, credentials: creds, extravars, rawFormData, files, fromClient: true });
+          const job = await Job.launch({ form, user, credentials: creds, extravars, rawFormData, files, fromClient: true, storedJobId });
           res.status(200).json(RestResultv2.single(job));
         }catch(err){
           // LAUNCH_VALIDATION=enforce : the field values break the form's rules

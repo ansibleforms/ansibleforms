@@ -1653,11 +1653,13 @@ export default {
       valuesNotMap: 'Wartości muszą być mapą nazw pól i wartości.',
       notFound: "Nie ma zapisanego zadania o id '{id}'.",
       nameRequired: 'Nazwa jest wymagana.',
+      ownerHelp: 'Użytkownik, który go zapisał; tylko on może go zmienić lub usunąć.',
       formHelp: 'Formularz, do którego należą te wartości.',
       owner: 'Użytkownik',
       neverExpires: 'Nigdy nie wygasa',
       valuesHelp: 'Wartości formularza zapisane jego przyciskiem Zapisz. Otwórz w formularzu je wypełnia.',
       valuesHelpNew: 'Wartości formularza w YAML: nazwy pól i ich wartości.',
+      lastUsed: 'Ostatnio użyte',
     },
     knownhosts: {
       label: 'Znany host',

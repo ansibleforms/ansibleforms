@@ -680,7 +680,8 @@ const SCHEMA_MANIFEST = {
                                'oauth2_providers.credential', 'credentials.tenant_id', 'credentials.issuer', 'credentials.redirect_uri',
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
                                'runners.credential', 'ldap.description', 'settings.disclaimer_version', 'announcements.enabled',
-                               'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase'] },
+                               'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
+                               'stored_jobs.last_used_at', 'schedule.stored_job_id'] },
   },
 };
 
@@ -1259,6 +1260,12 @@ async function patchVersion7(messages, success, failed) {
   const nodeRuns = fs.readFileSync(`${__dirname}/../db/create_workflow_node_runs_table.sql`);
   await checkPromise(addTable("workflow_node_runs", nodeRuns.toString()), messages, success, failed);
   await checkPromise(addColumn("jobs", "workflow_hash", "varchar(80)", true, "NULL"), messages, success, failed);
+  // when a job was last launched from a stored job (lib/storedJobUse.js) : NULL until the first
+  // one, also for the stored jobs from before
+  await checkPromise(addColumn("stored_jobs", "last_used_at", "datetime", true, "NULL"), messages, success, failed);
+  // the stored job a planned job ("Run later") was planned from : its last use is written when
+  // the run fires (lib/storedJobUse.js) ; NULL for a schedule, and for the planned jobs from before
+  await checkPromise(addColumn("schedule", "stored_job_id", "int(11)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

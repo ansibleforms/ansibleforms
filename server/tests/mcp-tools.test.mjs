@@ -705,6 +705,43 @@ describe("MCP stored jobs", () => {
     expect(r.data.warnings.join(" ")).toContain("left out: gone");
   });
 
+  test("launch_job names the stored job it started from, for its last use ; list_stored_jobs shows it (#1437)", async () => {
+    rows.get(1).last_used_at = "2026-11-01T10:00:00.000Z";
+    const client = await connect(storer);
+    const listed = await call(client, "list_stored_jobs");
+    expect(listed.data.storedJobs[0]).toMatchObject({ id: 1, lastUsedAt: "2026-11-01T10:00:00.000Z" });
+    rows.get(1).last_used_at = null;
+    expect((await call(client, "list_stored_jobs")).data.storedJobs[0].lastUsedAt).toBeNull();
+    const resolved = await call(client, "resolve_field", { form: "Create volume", storedJob: { id: 1 } });
+    await call(client, "launch_job", { form: "Create volume", storedJob: { id: 1 }, expectedPayloadHash: resolved.data.payloadHash });
+    expect(deps.Job.launch.mock.calls[0][0].storedJobId).toBe(1);
+    // a launch without one names none
+    const plain = await call(client, "resolve_field", { form: "Create volume", values: { cluster: "c1", name: "v1" } });
+    await call(client, "launch_job", { form: "Create volume", values: { cluster: "c1", name: "v1" }, expectedPayloadHash: plain.data.payloadHash });
+    expect(deps.Job.launch.mock.calls[1][0].storedJobId).toBeUndefined();
+  });
+
+  test("plan_job keeps the stored job it started from with the planned run, for its last use when it fires (#1437)", async () => {
+    const plans = [];
+    deps.Schedule = {
+      plan: vi.fn(async (_u, data) => { plans.push(data); return 20 + plans.length; }),
+      findById: vi.fn(async (id) => ({ id, name: plans[id - 21].name, one_time_run: 1, run_at: plans[id - 21].run_at })),
+    };
+    deps.cron = { addSchedule: vi.fn(), removeSchedule: vi.fn() };
+    deps.appTimezone = vi.fn(async () => "Europe/Madrid");
+    const client = await connect({ ...storer, options: { allowStoredJobs: true, allowPlannedJobs: true } });
+    const runAt = new Date(Date.now() + 3600e3).toISOString();
+    const resolved = await call(client, "resolve_field", { form: "Create volume", storedJob: { id: 1 } });
+    await call(client, "plan_job", { form: "Create volume", storedJob: { id: 1 }, run_at: runAt, name: "later", expectedPayloadHash: resolved.data.payloadHash });
+    expect(plans[0].stored_job_id).toBe(1);
+    // planning is no launch : nothing ran, so no last use yet
+    expect(deps.Job.launch).not.toHaveBeenCalled();
+    // a plan without one names none
+    const plain = await call(client, "resolve_field", { form: "Create volume", values: { cluster: "c1", name: "v1" } });
+    await call(client, "plan_job", { form: "Create volume", values: { cluster: "c1", name: "v1" }, run_at: runAt, name: "plain", expectedPayloadHash: plain.data.payloadHash });
+    expect(plans[1].stored_job_id).toBeUndefined();
+  });
+
   test("a stored job of another user, or of another form, is not a start", async () => {
     const h = createHandlers({ user: storer, deps });
     await expect(h.launchJob({ form: "Create volume", storedJob: { id: 2 }, expectedPayloadHash: "x" })).rejects.toMatchObject({ code: "not_found" });

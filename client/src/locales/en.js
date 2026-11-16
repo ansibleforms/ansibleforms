@@ -1781,11 +1781,13 @@ export default {
       valuesNotMap: 'The values must be a map of field names and values.',
       notFound: "There is no stored job with the id '{id}'.",
       nameRequired: 'A name is required.',
+      ownerHelp: 'The user who stored it; only this user can change or delete it.',
       formHelp: 'The form these values are for.',
       owner: 'User',
       neverExpires: 'Never expires',
       valuesHelp: "The form's values, as the form's Store button saved them. Open in form fills them in.",
       valuesHelpNew: "The form's values, as YAML: field names and their values.",
+      lastUsed: 'Last used',
     },
     knownhosts: {
       label: 'Known host',

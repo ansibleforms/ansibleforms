@@ -1797,11 +1797,13 @@ export default {
       valuesNotMap: 'De waarden moeten een map van veldnamen en waarden zijn.',
       notFound: "Er is geen opgeslagen job met id '{id}'.",
       nameRequired: 'Een naam is verplicht.',
+      ownerHelp: 'De gebruiker die hem opsloeg; alleen die kan hem wijzigen of verwijderen.',
       formHelp: 'Het formulier waarvoor deze waarden zijn.',
       owner: 'Gebruiker',
       neverExpires: 'Verloopt nooit',
       valuesHelp: 'De waarden van het formulier, zoals de Opslaan-knop ze bewaarde. Openen in formulier vult ze in.',
       valuesHelpNew: 'De waarden van het formulier, in YAML: veldnamen en hun waarden.',
+      lastUsed: 'Laatst gebruikt',
     },
     knownhosts: {
       label: 'Known host',
