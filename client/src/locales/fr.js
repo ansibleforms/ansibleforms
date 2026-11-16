@@ -1255,6 +1255,7 @@ export default {
       announcementEnable: 'Activer',
       announcementDisable: 'Désactiver',
       announcementNotFound: 'Aucune annonce {id}.',
+      announcementNameHelp: 'Sa clé dans un fichier de dépôt ; tirée du message si elle est vide.',
       announcementMissing: 'Saisissez un message.',
     },
     users: {

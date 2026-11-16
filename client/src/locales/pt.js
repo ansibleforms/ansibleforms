@@ -1253,6 +1253,7 @@ export default {
       announcementEnable: 'Ativar',
       announcementDisable: 'Desativar',
       announcementNotFound: 'Nenhum anúncio {id}.',
+      announcementNameHelp: 'A sua chave num ficheiro do repositório; tirada da mensagem se vazia.',
       announcementMissing: 'Introduza uma mensagem.',
     },
     users: {

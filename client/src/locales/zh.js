@@ -1222,6 +1222,7 @@ export default {
       announcementEnable: '启用',
       announcementDisable: '停用',
       announcementNotFound: '没有公告 {id}。',
+      announcementNameHelp: '它在仓库文件中的键；为空时由消息生成。',
       announcementMissing: '请输入消息。',
     },
     users: {

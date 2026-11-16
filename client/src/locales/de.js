@@ -1256,6 +1256,7 @@ export default {
       announcementEnable: 'Aktivieren',
       announcementDisable: 'Deaktivieren',
       announcementNotFound: 'Keine Ankündigung {id}.',
+      announcementNameHelp: 'Sein Schlüssel in einer Repository-Datei; leer aus der Nachricht gebildet.',
       announcementMissing: 'Geben Sie eine Nachricht ein.',
     },
     users: {

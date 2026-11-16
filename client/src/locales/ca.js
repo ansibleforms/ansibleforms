@@ -1253,6 +1253,7 @@ export default {
       announcementEnable: 'Activa',
       announcementDisable: 'Desactiva',
       announcementNotFound: 'No hi ha cap anunci {id}.',
+      announcementNameHelp: 'La seva clau en un fitxer del repositori; es fa del missatge si és buida.',
       announcementMissing: 'Introdueix un missatge.',
     },
     users: {

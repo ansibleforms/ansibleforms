@@ -491,6 +491,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a schedules repository's file ; nothing for the app's own -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="schedule" />
               <BsInput
                 class="af-schedule-field"
                 v-model="edit.name"
@@ -500,6 +502,14 @@ onMounted(async () => {
                 :required="true"
                 :help="t('settings.repositories.helpName')"
                 :label="t('settings.fields.name')"
+              />
+              <BsInput
+                class="af-schedule-field"
+                v-model="edit.description"
+                v-show="fieldShown('description')"
+                icon="info-circle"
+                :isFloating="false"
+                :label="t('settings.fields.description')"
               />
               <BsInput
                 class="af-schedule-field"
@@ -515,7 +525,7 @@ onMounted(async () => {
                 :label="t('settings.fields.form')"
               />
               <!-- where it stands : each a field of the column, read only, as a repository's status ; after
-                   its name and form, as every record page's Details -->
+                   its name, description and form, as every record page's Details -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
                 <span v-html="statusPill(t, schedule.status)"></span>
@@ -546,16 +556,6 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.schedules.nextRun') }}</div>
                 <span>{{ schedule.next_run ? Helpers.formatServerDate(schedule.next_run) : '–' }}</span>
               </div>
-              <!-- where it comes from : a schedules repository's file ; nothing for the app's own -->
-              <AppRepositorySource v-show="fieldShown('source')" :record="schedule" />
-              <BsInput
-                class="af-schedule-field"
-                v-model="edit.description"
-                v-show="fieldShown('description')"
-                icon="info-circle"
-                :isFloating="false"
-                :label="t('settings.fields.description')"
-              />
               <div v-show="fieldShown('enabled')" class="form-check form-switch mb-3">
                 <input
                   id="af-schedule-enabled"
