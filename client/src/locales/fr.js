@@ -1814,6 +1814,7 @@ export default {
         'Les valeurs du formulaire, telles que son bouton Enregistrer les a sauvegardées. Ouvrir dans le formulaire les remplit.',
       valuesHelpNew: 'Les valeurs du formulaire, en YAML : noms des champs et leurs valeurs.',
       lastUsed: 'Dernière utilisation',
+      tabRuns: 'Exécutions',
     },
     knownhosts: {
       label: 'Hôte connu',

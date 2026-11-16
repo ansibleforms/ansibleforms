@@ -1806,6 +1806,7 @@ export default {
       valuesHelp: 'I valori del modulo, come li ha salvati il suo pulsante Salva. Apri nel modulo li compila.',
       valuesHelpNew: 'I valori del modulo, in YAML: nomi dei campi e i loro valori.',
       lastUsed: 'Ultimo uso',
+      tabRuns: 'Esecuzioni',
     },
     knownhosts: {
       label: 'Host conosciuto',

@@ -1660,6 +1660,7 @@ export default {
       valuesHelp: 'Wartości formularza zapisane jego przyciskiem Zapisz. Otwórz w formularzu je wypełnia.',
       valuesHelpNew: 'Wartości formularza w YAML: nazwy pól i ich wartości.',
       lastUsed: 'Ostatnio użyte',
+      tabRuns: 'Uruchomienia',
     },
     knownhosts: {
       label: 'Znany host',

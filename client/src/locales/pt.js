@@ -1666,6 +1666,7 @@ export default {
       valuesHelp: 'Os valores do formulário, tal como o seu botão Guardar os guardou. Abrir no formulário preenche-os.',
       valuesHelpNew: 'Os valores do formulário, em YAML: nomes dos campos e os seus valores.',
       lastUsed: 'Última utilização',
+      tabRuns: 'Execuções',
     },
     knownhosts: {
       label: 'Host conhecido',

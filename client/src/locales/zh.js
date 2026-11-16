@@ -1618,6 +1618,7 @@ export default {
       valuesHelp: '表单的值，由表单的存储按钮保存。“在表单中打开”会将其填入。',
       valuesHelpNew: '表单的值（YAML）：字段名及其值。',
       lastUsed: '最后使用',
+      tabRuns: '运行记录',
     },
     knownhosts: {
       label: '已知主机',

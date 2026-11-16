@@ -1669,6 +1669,7 @@ export default {
       valuesHelp: 'Els valors del formulari, tal com els va desar el seu botó Desa. Obre al formulari els omple.',
       valuesHelpNew: 'Els valors del formulari, en YAML: noms dels camps i els seus valors.',
       lastUsed: 'Últim ús',
+      tabRuns: 'Execucions',
     },
     knownhosts: {
       label: 'Amfitrió conegut',

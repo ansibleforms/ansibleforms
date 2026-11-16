@@ -2036,7 +2036,11 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "List all jobs",
-        "parameters": [ { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false } ],
+        "description": "The jobs the caller may see (every job for an admin, or with showAllJobLogs or manageAllJobs ; else their own and the ones awaiting an approval they may give), the newest first.",
+        "parameters": [
+          { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false },
+          { "name": "stored_job", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs launched from this stored job (POST /job with its storedJobId), among the ones the caller may see" }
+        ],
         "responses": { "200": { "description": "Job list" } }
       },
       "post": {

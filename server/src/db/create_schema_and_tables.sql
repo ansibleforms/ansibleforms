@@ -378,7 +378,10 @@ CREATE TABLE `jobs` (
   -- the retention sweep selects on (parent_id, status, end) ; without this it full
   -- scans the largest table in the schema on every batch. Keep in sync with the
   -- patch in schema.model.js that adds it to an existing install.
-  KEY `idx_jobs_retention` (`parent_id`, `status`, `end`)
+  KEY `idx_jobs_retention` (`parent_id`, `status`, `end`),
+  -- a stored job's Runs tab selects its jobs on it (Job.findAll) ; the same patch adds it to an
+  -- existing install
+  KEY `idx_jobs_stored_job` (`stored_job_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8;
 CREATE TABLE `job_output` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
