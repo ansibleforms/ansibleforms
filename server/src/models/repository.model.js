@@ -112,6 +112,20 @@ function removeEmptyFolders(dir, keepSelf = false) {
   return empty
 }
 
+/**
+ * Repositories in the order they were added : by id, whatever order the rows come in - where
+ * several of one usage are read in turn and the first one wins (the playbooks).
+ *
+ * Args:
+ *   rows (object[]): the repositories ({ id, name, ... }).
+ *
+ * Returns:
+ *   object[]: a sorted copy.
+ */
+export function sortedById(rows) {
+  return [...(rows || [])].sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0))
+}
+
 class Repository extends CrudModel {
   static modelName = 'repositories';
 
@@ -514,9 +528,21 @@ class Repository extends CrudModel {
     return formsPaths
   }
 
+  /**
+   * The repositories used for playbooks, the one used first : in the order they were added (the
+   * first one's playbooks, as 7.3 took them) - for the app and for an RTE that has its own clones
+   * (runners/rteHub.js), the same one.
+   *
+   * Returns:
+   *   Promise<object[]>: [{ id, name }] ; none when no repository is used for playbooks.
+   */
+  static async playbooksRepositories() {
+    return sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_playbooks ORDER BY id"))
+  }
+
   static async getAnsiblePath() {
   try{
-    var repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_playbooks")
+    var repositories = await Repository.playbooksRepositories()
     
     if(repositories.length === 0){
       return ""
