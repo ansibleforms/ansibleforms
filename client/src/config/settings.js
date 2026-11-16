@@ -2994,14 +2994,15 @@ export default function getSettings(t) {
           noTable: true,
         },
         {
-          // an RTE's mode (RTE_MODE on the RTE) : outbound, inbound, or database (deprecated), in the
-          // order of their names ; a new one outbound, one from before 7.3 database
+          // a runner's mode (RTE_MODE on it) : outbound or inbound, in the order of their names ; the
+          // wizard only makes new runners, so not database (deprecated, removed in 8.0.0), which a
+          // runner from before 7.3 keeps and its page still shows
           key: 'rte_mode',
           step: 'mode',
           label: t('settings.runners.rteMode'),
           help: t('settings.runners.rteModeHelp'),
           type: 'radio',
-          options: ['outbound', 'inbound', 'database']
+          options: ['outbound', 'inbound']
             .map((value) => ({
               value,
               label: t(`settings.runners.rteMode_${value}`),
