@@ -5,7 +5,8 @@
 /*  stored jobs' list : form values saved to run again, in tabs,  */
 /*  the tab kept in the url -                                     */
 /*    Details  its name and description, the form it is for, its */
-/*             owner, when it was stored, last used and expires   */
+/*             owner, when it was stored and last used, and when  */
+/*             it is removed : unused for some days, or expired   */
 /*    Values   the form's values, as YAML, editable               */
 /*    Runs     the jobs launched from it, the latest first        */
 /*  Open in form (the form, these values filled in) and Delete    */
@@ -30,6 +31,7 @@ import { useAppStore } from '@/stores/app';
 import Time from '@/lib/Time';
 import { durationSeconds, formatDuration } from '@/lib/jobTime';
 import { tableMatches } from '@/lib/recordSearch';
+import { unusedDaysWarning, removalOf, removalError, removalPayload } from '@/lib/storedJobUnused';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -44,7 +46,7 @@ const canShare = computed(() => !!store.profile?.options?.allowStoredJobsShare);
 const storedId = computed(() => String(route.params.id || ''));
 const stored = ref(null); // as saved
 const edit = ref(null); // as edited
-const EDITED = ['name', 'description', 'shared', 'never_expires', 'expires_at', 'values'];
+const EDITED = ['name', 'description', 'shared', 'removal', 'values'];
 
 /**
  * The form's values as YAML, for the editor : the stored JSON read back.
@@ -78,14 +80,16 @@ function editable(record) {
     name: record.name ?? '',
     description: record.description ?? '',
     shared: record.visibility === 'shared',
-    never_expires: !record.expires_at,
-    expires_at: record.expires_at ?? '',
+    // when it is removed : never, on a date or when unused for some days (AppStoredJobRemoval)
+    removal: removalOf(record, store.storedJobUnusedDays),
     values: toYaml(record.form_data),
   };
 }
 
 const dirty = computed(
-  () => !!stored.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(stored.value)[k] ?? '')),
+  () =>
+    !!stored.value &&
+    EDITED.some((k) => JSON.stringify(edit.value[k] ?? '') !== JSON.stringify(editable(stored.value)[k] ?? '')),
 );
 // leaving with the stored job changed and unsaved asks first
 useUnsavedGuard(
@@ -216,7 +220,13 @@ const tabFields = computed(() => ({
       t('settings.storedJobs.lastUsed'),
       stored.value?.last_used_at ? Helpers.formatServerDate(stored.value.last_used_at) : '',
     ],
-    ['expiresAt', t('settings.fields.expiresAt'), t('settings.storedJobs.neverExpires')],
+    [
+      'removal',
+      t('settings.storedJobs.removed'),
+      t('settings.storedJobs.removedNever'),
+      t('settings.storedJobs.removedOnDate'),
+      t('settings.storedJobs.removedWhenUnused'),
+    ],
   ],
   values: [['values', t('settings.storedJobs.tabValues'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
@@ -261,12 +271,27 @@ async function save() {
     toast.warning(valuesError.value);
     return;
   }
+  // when it is removed : a date to pick, or days at most the setting's - checked only when
+  // changed, so a setting lowered since never refuses a save of the other fields (the server
+  // checks them too)
+  const removalChanged = JSON.stringify(e.removal) !== JSON.stringify(editable(stored.value).removal);
+  const why = removalChanged ? removalError(e.removal, store.storedJobUnusedDays) : null;
+  if (why) {
+    toast.warning(
+      why === 'dateRequired'
+        ? t('settings.storedJobs.removedDateRequired')
+        : unusedDaysWarning(store.storedJobUnusedDays, t),
+    );
+    return;
+  }
+  const removal = removalPayload(e.removal);
   const data = {
     name: e.name.trim(),
     description: e.description.trim(),
     visibility: e.shared ? 'shared' : 'private',
-    expires_at: e.never_expires ? null : e.expires_at || null,
+    expires_at: removal.expires_at,
     form_data: JSON.stringify(YAML.parse(e.values || '{}') || {}),
+    ...(removalChanged ? { unused_days: removal.unused_days } : {}),
   };
   try {
     await axios.put(`/api/v2/stored-jobs/${encodeURIComponent(storedId.value)}`, data);
@@ -445,33 +470,15 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.storedJobs.lastUsed') }}</div>
                 <span>{{ stored.last_used_at ? Helpers.formatServerDate(stored.last_used_at) : '–' }}</span>
               </div>
-              <!-- when it expires : never, or a date -->
-              <!-- the tab's last field : no margin under it (the tab's own padding ends it), and
-                   the switch's only above the date it opens -->
-              <div v-show="fieldShown('expiresAt')" class="mb-0">
-                <div class="form-label fw-bold">{{ t('settings.fields.expiresAt') }}</div>
-                <div class="form-check form-switch" :class="edit.never_expires ? 'mb-0' : 'mb-2'">
-                  <input
-                    id="af-stored-never"
-                    v-model="edit.never_expires"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                  />
-                  <label class="form-check-label" for="af-stored-never">{{
-                    t('settings.storedJobs.neverExpires')
-                  }}</label>
-                </div>
-                <div v-if="!edit.never_expires" class="af-stored-field">
-                  <BsDateTime
-                    v-model="edit.expires_at"
-                    icon="calendar"
-                    dateType="datetime"
-                    :convertToUtc="true"
-                    teleport
-                  />
-                </div>
-              </div>
+              <!-- when it is removed : never, on a date or when unused for some days ; the tab's last
+                   field, no margin under it (the tab's own padding ends it) -->
+              <AppStoredJobRemoval
+                v-show="fieldShown('removal')"
+                v-model="edit.removal"
+                class="af-stored-field mb-0"
+                labelClass="form-label fw-bold"
+                :setting="store.storedJobUnusedDays"
+              />
             </template>
             <!-- Values : the form's values, as YAML -->
             <template v-if="tabShown('values')">

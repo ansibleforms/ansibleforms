@@ -6,6 +6,7 @@ import appConfig from "../../../config/app.config.js";
 import ChatSettings from "../../models/chatSettings.model.js";
 import { onLive } from "../../lib/liveEvents.js";
 import { isRunning } from "../../models/announcement.model.js";
+import { settingDays } from "../../lib/storedJobExpiry.js";
 const router = express.Router();
 
 // /config is an unauthenticated bootstrap endpoint the SPA hits on every load,
@@ -113,6 +114,9 @@ router.get("/config", async (req, res) => {
     formsView: defaults.formsView,
     timezone: defaults.timezone,
     dateFormat: defaults.dateFormat,
+    // STORED_JOB_UNUSED_DAYS : the Store dialog starts a stored job's days unused at it, and
+    // offers no more (lib/storedJobExpiry.js) ; 0 never removes one
+    storedJobUnusedDays: settingDays(appConfig.storedJobUnusedDays),
   });
 });
 

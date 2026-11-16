@@ -123,6 +123,8 @@ export default {
     storedJobVisibilityInvalid: "A stored job is private or shared",
     storedJobShareDenied: "You do not have permission to share stored jobs",
     storedJobShareFormDisabled: "Form '{form}' does not allow sharing its stored jobs",
+    storedJobUnusedDaysInvalid: "The unused days must be a whole number of at least 1",
+    storedJobUnusedDaysTooLong: "The unused days can be {days} at most",
     oauth2Added: "OAuth2 provider added",
     secretStoreAdded: "Secret store added",
     secretStoreNotFound: "Secret store not found",

@@ -20,6 +20,7 @@ import YAML from 'yaml';
 import { useFollowOutput } from '@/composables/useFollowOutput';
 import Time from '@/lib/Time';
 import { storedJobOfLoad, withStoredJob, withPlannedStoredJob } from '@/lib/storedJobLaunch';
+import { unusedDaysWarning, removalOf, removalError, removalPayload } from '@/lib/storedJobUnused';
 
 // use
 const route = useRoute();
@@ -563,7 +564,7 @@ const showStoreOffcanvas = ref(false);
 const storeForm = ref({
   name: '',
   description: '',
-  expires_at: null,
+  removal: { mode: 'never', expires_at: '', unused_days: '' },
   shared: false,
 });
 const storeSubmitting = ref(false);
@@ -1464,11 +1465,12 @@ function openStoreOffcanvas() {
     toast.info(t('designer.previewNotRun'));
     return;
   }
-  // Reset store form
+  // Reset store form : removed never, or when unused for the setting's days (STORED_JOB_UNUSED_DAYS)
   storeForm.value = {
     name: '',
     description: '',
-    expires_at: null,
+    // never, or with a setting its days (AppStoredJobRemoval)
+    removal: removalOf({}, store.storedJobUnusedDays),
     shared: false,
   };
 
@@ -1486,6 +1488,16 @@ async function createStoredJob() {
     toast.warning(t('form.nameRequired'));
     return;
   }
+  // when it is removed : a date to pick, or days at most the setting's (the server checks it too)
+  const why = removalError(storeForm.value.removal, store.storedJobUnusedDays);
+  if (why) {
+    toast.warning(
+      why === 'dateRequired'
+        ? t('settings.storedJobs.removedDateRequired')
+        : unusedDaysWarning(store.storedJobUnusedDays, t),
+    );
+    return;
+  }
 
   const ctx = storeCtx.value || buildMainStoreCtx();
   storeSubmitting.value = true;
@@ -1496,7 +1508,7 @@ async function createStoredJob() {
       description: storeForm.value.description || '',
       form_name: ctx.formName,
       form_data: JSON.stringify(ctx.getData()),
-      expires_at: storeForm.value.expires_at || null,
+      ...removalPayload(storeForm.value.removal),
       visibility: canShareStored.value && storeForm.value.shared ? 'shared' : 'private',
     };
 
@@ -2662,17 +2674,13 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">{{ t('form.expiresAt') }}</label>
-        <BsDateTime
-          v-model="storeForm.expires_at"
-          icon="calendar"
-          dateType="datetime"
-          :convertToUtc="true"
-          teleport
-          :disabled="storeSubmitting"
-        />
-      </div>
+      <!-- when it is removed : never, on a date or when unused for some days -->
+      <AppStoredJobRemoval
+        v-model="storeForm.removal"
+        class="mb-3"
+        :setting="store.storedJobUnusedDays"
+        :disabled="storeSubmitting"
+      />
 
       <!-- shared : the users with allowStoredJobsViewAll can load it too ; it stays yours -->
       <div v-if="canShareStored" class="mb-3">

@@ -128,6 +128,8 @@ export default {
     storedJobVisibilityInvalid: "Un trabajo almacenado es privado o compartido",
     storedJobShareDenied: "No tienes permiso para compartir trabajos almacenados",
     storedJobShareFormDisabled: "El formulario '{form}' no permite compartir sus trabajos almacenados",
+    storedJobUnusedDaysInvalid: "Los días sin uso deben ser un número entero de al menos 1",
+    storedJobUnusedDaysTooLong: "Los días sin uso pueden ser {days} como máximo",
     oauth2Added: "Proveedor OAuth2 añadido",
     secretStoreAdded: "Almacén de secretos añadido",
     secretStoreNotFound: "Almacén de secretos no encontrado",

@@ -125,6 +125,8 @@ export default {
     storedJobVisibilityInvalid: "保存済みジョブは非公開または共有のいずれかです",
     storedJobShareDenied: "保存済みジョブを共有する権限がありません",
     storedJobShareFormDisabled: "フォーム '{form}' では保存済みジョブを共有できません",
+    storedJobUnusedDaysInvalid: "未使用日数は 1 以上の整数にしてください",
+    storedJobUnusedDaysTooLong: "未使用日数は最大 {days} です",
     oauth2Added: "OAuth2 プロバイダーを追加しました",
     runnerAdded: "ランナーを追加しました",
     joinTokenMade: "参加トークンを作成しました。今すぐコピーしてください。再表示されません",

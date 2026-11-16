@@ -21,6 +21,8 @@ import { nodeId } from '../lib/role.js';
 import { purgeRevocations } from '../lib/tokenRevocation.js';
 import ApiToken from '../models/apiToken.model.js';
 import { resumeAbandoned } from '../lib/jobResume.js';
+// the stored jobs cleanup's query : expired, or unused for longer than their days
+import { cleanupQuery } from '../lib/storedJobExpiry.js';
 
 // the cron registry is re-read from the database this often even without a change notice
 // (lib/epochs.js), in case one was missed
@@ -586,13 +588,13 @@ class CronService {
     }, async () => {
       logger.info('Running stored jobs cleanup');
       try {
-        const result = await mysql.do(
-          "DELETE FROM AnsibleForms.stored_jobs WHERE expires_at IS NOT NULL AND expires_at < NOW()",
-          undefined,
-          true
-        );
+        // past their expiry date, or unused for longer than their days : the shorter of
+        // STORED_JOB_UNUSED_DAYS (read now, it applies without a restart) and their own
+        // (lib/storedJobExpiry.js) ; whichever comes first
+        const { sql, params } = cleanupQuery(appConfig.storedJobUnusedDays);
+        const result = await mysql.do(sql, params, true);
         if (result.affectedRows > 0) {
-          logger.info(`Cleaned up ${result.affectedRows} expired stored job(s)`);
+          logger.info(`Cleaned up ${result.affectedRows} expired or unused stored job(s)`);
         }
       } catch (err) {
         logger.error('Failed to cleanup expired stored jobs:', err);

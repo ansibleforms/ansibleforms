@@ -124,6 +124,8 @@ export default {
     storedJobVisibilityInvalid: "Un job salvato è privato o condiviso",
     storedJobShareDenied: "Non hai il permesso di condividere i job salvati",
     storedJobShareFormDisabled: "Il modulo '{form}' non consente di condividere i suoi job salvati",
+    storedJobUnusedDaysInvalid: "I giorni senza uso devono essere un numero intero di almeno 1",
+    storedJobUnusedDaysTooLong: "I giorni senza uso possono essere al massimo {days}",
     oauth2Added: "Provider OAuth2 aggiunto",
     secretStoreAdded: "Archivio segreti aggiunto",
     secretStoreNotFound: "Archivio segreti non trovato",

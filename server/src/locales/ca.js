@@ -128,6 +128,8 @@ export default {
     storedJobVisibilityInvalid: "Una tasca desada és privada o compartida",
     storedJobShareDenied: "No tens permís per compartir tasques desades",
     storedJobShareFormDisabled: "El formulari '{form}' no permet compartir les seves tasques desades",
+    storedJobUnusedDaysInvalid: "Els dies sense ús han de ser un nombre enter d'almenys 1",
+    storedJobUnusedDaysTooLong: "Els dies sense ús poden ser {days} com a màxim",
     oauth2Added: "Proveïdor OAuth2 afegit",
     runnerAdded: "Runner afegit",
     joinTokenMade: "Token d'unió creat: copia'l ara, no es tornarà a mostrar",

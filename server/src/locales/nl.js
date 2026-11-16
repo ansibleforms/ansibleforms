@@ -126,6 +126,8 @@ export default {
     storedJobVisibilityInvalid: "Opgeslagen invoer is privé of gedeeld",
     storedJobShareDenied: "U heeft geen toestemming om opgeslagen invoer te delen",
     storedJobShareFormDisabled: "Formulier '{form}' staat het delen van opgeslagen invoer niet toe",
+    storedJobUnusedDaysInvalid: "De dagen zonder gebruik moeten een geheel getal van minstens 1 zijn",
+    storedJobUnusedDaysTooLong: "De dagen zonder gebruik mogen hoogstens {days} zijn",
     oauth2Added: "OAuth2 provider toegevoegd",
     secretStoreAdded: "Secret store toegevoegd",
     secretStoreNotFound: "Secret store niet gevonden",

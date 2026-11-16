@@ -131,6 +131,8 @@ export default {
     storedJobVisibilityInvalid: "Zapisane zadanie jest prywatne lub udostępnione",
     storedJobShareDenied: "Nie masz uprawnień do udostępniania zapisanych zadań",
     storedJobShareFormDisabled: "Formularz '{form}' nie pozwala udostępniać swoich zapisanych zadań",
+    storedJobUnusedDaysInvalid: "Dni bez użycia muszą być liczbą całkowitą co najmniej 1",
+    storedJobUnusedDaysTooLong: "Dni bez użycia mogą wynosić najwyżej {days}",
     oauth2Added: "Dodano dostawcę OAuth2",
     runnerAdded: "Dodano runner",
     joinTokenMade: "Utworzono token dołączenia: skopiuj go teraz, nie zostanie pokazany ponownie",

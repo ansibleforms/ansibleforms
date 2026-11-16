@@ -76,6 +76,9 @@ export const useAppStore = defineStore('app', () => {
   const schemaData = ref(null);
   const chatEnabled = ref(false); // ENABLE_CHAT and a configured provider (/api/v2/app/config)
   const designerEnabled = ref(true); // SHOW_DESIGNER : the designer there at all (/api/v2/app/config)
+  // STORED_JOB_UNUSED_DAYS (/api/v2/app/config) : the most days a stored job may stay unused, and
+  // what the Store dialog starts at ; 0 never removes one (lib/storedJobUnused.js)
+  const storedJobUnusedDays = ref(0);
   const appConfigLoaded = ref(false); // /api/v2/app/config read at least once (State.loadAppConfig)
   // Settings > Appearance (/api/v2/app/config) : the name in the browser tab and on
   // the sign-in page, the label beside the logo and its colour, the announcements under the
@@ -125,6 +128,7 @@ export const useAppStore = defineStore('app', () => {
     schemaData,
     chatEnabled,
     designerEnabled,
+    storedJobUnusedDays,
     appConfigLoaded,
     appName,
     labels,

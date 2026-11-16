@@ -681,7 +681,7 @@ const SCHEMA_MANIFEST = {
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
                                'runners.credential', 'ldap.description', 'settings.disclaimer_version', 'announcements.enabled',
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
-                               'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id'],
+                               'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
                      indexes: ['jobs.idx_jobs_stored_job'] },
   },
 };
@@ -1272,6 +1272,9 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("jobs", "stored_job_id", "int(11)", true, "NULL"), messages, success, failed);
   // a stored job's Runs tab selects its jobs on it : without an index, a scan of the jobs
   await checkPromise(addIndex("jobs", "idx_jobs_stored_job", ["stored_job_id"]), messages, success, failed);
+  // a stored job removed once unused for this many days (lib/storedJobExpiry.js) : NULL follows
+  // the setting (STORED_JOB_UNUSED_DAYS), also for the stored jobs from before
+  await checkPromise(addColumn("stored_jobs", "unused_days", "int(11)", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

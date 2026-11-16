@@ -62,6 +62,7 @@ const envGroupOrder = [
     icon: 'clock-rotate-left',
     exact: [
       'JOB_RETENTION_DAYS',
+      'STORED_JOB_UNUSED_DAYS',
       'AUDIT_RETENTION_DAYS',
       'LOG_RETENTION_DAYS',
       'NIGHTLY_BACKUP_RETENTION',

@@ -125,6 +125,8 @@ export default {
     storedJobVisibilityInvalid: "Uma tarefa guardada é privada ou partilhada",
     storedJobShareDenied: "Não tem permissão para partilhar tarefas guardadas",
     storedJobShareFormDisabled: "O formulário '{form}' não permite partilhar as suas tarefas guardadas",
+    storedJobUnusedDaysInvalid: "Os dias sem uso devem ser um número inteiro de pelo menos 1",
+    storedJobUnusedDaysTooLong: "Os dias sem uso podem ser no máximo {days}",
     oauth2Added: "Fornecedor OAuth2 adicionado",
     runnerAdded: "Runner adicionado",
     joinTokenMade: "Token de adesão criado: copie-o agora, não voltará a ser mostrado",

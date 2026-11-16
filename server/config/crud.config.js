@@ -396,7 +396,10 @@ const crudConfigs = {
       { name: 'visibility' },
       // when a job was last launched from it : set by the launch only (lib/storedJobUse.js),
       // never from a request body (the controller drops it) ; none until the first one
-      { name: 'last_used_at', isDatetime: true }
+      { name: 'last_used_at', isDatetime: true },
+      // removed once unused for this many days, at most the setting's (lib/storedJobExpiry.js) ;
+      // none follows the setting (STORED_JOB_UNUSED_DAYS)
+      { name: 'unused_days' }
     ],
     allowCache: false
   }
