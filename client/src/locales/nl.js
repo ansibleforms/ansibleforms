@@ -2922,7 +2922,7 @@ export default {
     failedHostsNote: 'mislukte hosts',
     relaunchFromFirstNode: 'Vanaf het eerste knooppunt',
     relaunchFromFailedNode: 'Vanaf het mislukte knooppunt',
-    relaunchFailedNodeLead: 'Job {id} herstarten vanaf zijn mislukte knooppunt, de knooppunten ervoor blijven:',
+    relaunchFailedNodeLead: 'Job {id} alleen vanaf zijn mislukte knooppunt herstarten:',
     failedNodeNote: 'mislukt knooppunt',
     reviewApproval: 'Goedkeuring beoordelen',
     reviewLead: 'Deze job wacht op je goedkeuring voordat hij wordt uitgevoerd:',

@@ -1765,7 +1765,7 @@ defineExpose({
     <BsModal v-if="rowToDelete" @close="rowToDelete = null" icon="trash">
       <template #title> {{ t('designer.visualDeleteField') }} </template>
       <template #default>
-        <p class="mt-3 fs-6 user-select-none">
+        <p class="py-3 fs-6 user-select-none">
           {{ t('designer.deleteConfirm') }} <strong>{{ rowToDelete.name || '?' }}</strong>?
         </p>
       </template>

@@ -2922,7 +2922,7 @@ export default {
     failedHostsNote: 'host falliti',
     relaunchFromFirstNode: 'Dal primo nodo',
     relaunchFromFailedNode: 'Dal nodo fallito',
-    relaunchFailedNodeLead: 'Rilancia il job {id} dal suo nodo fallito, mantenendo i nodi precedenti:',
+    relaunchFailedNodeLead: 'Rilancia il job {id} solo dal suo nodo fallito:',
     failedNodeNote: 'nodo fallito',
     reviewApproval: 'Esamina approvazione',
     reviewLead: 'Questo job attende la tua approvazione prima di essere eseguito:',

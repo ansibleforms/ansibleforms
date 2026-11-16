@@ -1206,10 +1206,10 @@ onMounted(async () => {
        a single pane, so it must not be trapped in one inner scroller -->
   <div class="flex-shrink-0">
     <!-- Modal - delete verify -->
-    <BsModal v-if="showDelete" size="lg" @close="showDelete = false" icon="trash">
+    <BsModal v-if="showDelete" size="md" @close="showDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
-        ><p class="mt-3 fs-6 user-select-none">
+        ><p class="py-3 fs-6 user-select-none">
           {{ t('jobs.deleteConfirm') }} <strong>{{ tempJobId }}</strong>?
         </p></template
       >
@@ -1228,7 +1228,7 @@ onMounted(async () => {
     <BsModal v-if="showBulkDelete" size="lg" @close="showBulkDelete = false" icon="trash">
       <template #title> {{ t('jobs.deleteSelected', { count: selected.size }) }} </template>
       <template #default
-        ><p class="mt-3 fs-6 user-select-none">
+        ><p class="py-3 fs-6 user-select-none">
           {{ t('jobs.deleteSelectedConfirm', { count: selected.size }) }}
         </p></template
       >
@@ -1240,7 +1240,7 @@ onMounted(async () => {
     <BsModal v-if="showAbort" @close="showAbort = false" icon="ban">
       <template #title> {{ t('jobs.abortJob') }} {{ tempJobId }} </template>
       <template #default
-        ><p class="mt-3 fs-6 user-select-none">
+        ><p class="py-3 fs-6 user-select-none">
           {{ t('jobs.abortConfirm') }} <strong>{{ tempJobId }}</strong>?
         </p></template
       >
@@ -1256,40 +1256,41 @@ onMounted(async () => {
       >
     </BsModal>
     <!-- Modal - relaunch verify -->
-    <BsModal v-if="showRelaunch" @close="showRelaunch = false" icon="redo">
+    <BsModal v-if="showRelaunch" size="md" @close="showRelaunch = false" icon="redo">
       <template #title> {{ t('jobs.relaunchJob') }} {{ tempJobId }} </template>
       <template #default>
-        <!-- on the failed hosts only : how many, and which -->
-        <template v-if="relaunchScope === 'failedHosts'">
-          <p class="mt-3 fs-6 user-select-none">
-            {{ t('jobs.relaunchFailedLead', { id: tempJobId, count: relaunchHosts.length }) }}
+        <!-- its body : as much space under it as above it, whichever lines it shows -->
+        <div class="af-relaunch-body">
+          <!-- on the failed hosts only : how many, and which -->
+          <template v-if="relaunchScope === 'failedHosts'">
+            <p class="fs-6 user-select-none">
+              {{ t('jobs.relaunchFailedLead', { id: tempJobId, count: relaunchHosts.length }) }}
+            </p>
+            <p class="font-monospace small text-break">{{ relaunchHosts.join(', ') }}</p>
+          </template>
+          <!-- a workflow from its failed node : what it keeps -->
+          <p v-else-if="relaunchScope === 'failedNode'" class="fs-6 user-select-none">
+            {{ t('jobs.relaunchFailedNodeLead', { id: tempJobId }) }}
           </p>
-          <p class="font-monospace small text-break">{{ relaunchHosts.join(', ') }}</p>
-        </template>
-        <!-- a workflow from its failed node : what it keeps -->
-        <p v-else-if="relaunchScope === 'failedNode'" class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.relaunchFailedNodeLead', { id: tempJobId }) }}
-        </p>
-        <p v-else class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong>:
-        </p>
-        <BsCheckbox
-          v-if="store.profile.options?.allowVerboseMode"
-          v-model="relaunchVerbose"
-          :label="t('jobs.relaunchVerbose')"
-          class="mt-2"
-          :isSwitch="true"
-          :inline="true"
-        />
-        <!-- editing the values relaunches the form as a whole : not for the failed hosts or node -->
-        <BsCheckbox
-          v-if="relaunchScope === 'all'"
-          v-model="relaunchWithEdit"
-          :label="t('jobs.relaunchEdit')"
-          class="mt-2"
-          :isSwitch="true"
-          :inline="true"
-        />
+          <p v-else class="fs-6 user-select-none">
+            {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong>:
+          </p>
+          <BsCheckbox
+            v-if="store.profile.options?.allowVerboseMode"
+            v-model="relaunchVerbose"
+            :label="t('jobs.relaunchVerbose')"
+            class="mt-2"
+            :isSwitch="true"
+          />
+          <!-- editing the values relaunches the form as a whole : not for the failed hosts or node -->
+          <BsCheckbox
+            v-if="relaunchScope === 'all'"
+            v-model="relaunchWithEdit"
+            :label="t('jobs.relaunchEdit')"
+            class="mt-2"
+            :isSwitch="true"
+          />
+        </div>
       </template>
       <template #footer>
         <BsButton
@@ -2095,6 +2096,14 @@ onMounted(async () => {
   </div>
 </template>
 <style scoped lang="scss">
+/* the relaunch dialog's body : 1rem above and below it, as the other dialogs' sentence (py-3), its
+   last line without a margin of its own, whichever lines it shows */
+.af-relaunch-body {
+  padding: 1rem 0;
+}
+.af-relaunch-body > :last-child {
+  margin-bottom: 0;
+}
 /* the output box keeps 16px under it for what follows it (the log file, the form page's
    buttons) ; last in the job's card it would double the card's own padding */
 .af-job-output :deep(.ansible:last-child) {

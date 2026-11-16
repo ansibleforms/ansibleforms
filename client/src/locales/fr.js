@@ -2930,7 +2930,7 @@ export default {
     failedHostsNote: 'hôtes en échec',
     relaunchFromFirstNode: 'Depuis le premier nœud',
     relaunchFromFailedNode: 'Depuis le nœud en échec',
-    relaunchFailedNodeLead: "Relancer le job {id} depuis son nœud en échec, en gardant les nœuds d'avant :",
+    relaunchFailedNodeLead: 'Relancer le job {id} depuis son nœud en échec uniquement :',
     failedNodeNote: 'nœud en échec',
     reviewApproval: "Examiner l'approbation",
     reviewLead: "Ce job attend votre approbation avant de s'exécuter :",

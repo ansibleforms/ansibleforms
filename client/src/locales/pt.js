@@ -2923,7 +2923,7 @@ export default {
     failedHostsNote: 'hosts com falha',
     relaunchFromFirstNode: 'A partir do primeiro nó',
     relaunchFromFailedNode: 'A partir do nó com falha',
-    relaunchFailedNodeLead: 'Relançar a tarefa {id} a partir do nó com falha, mantendo os nós anteriores:',
+    relaunchFailedNodeLead: 'Relançar a tarefa {id} só a partir do nó com falha:',
     failedNodeNote: 'nó com falha',
     reviewApproval: 'Rever aprovação',
     reviewLead: 'Esta tarefa aguarda a sua aprovação antes de ser executada:',

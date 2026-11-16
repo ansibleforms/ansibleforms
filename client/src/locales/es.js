@@ -2925,7 +2925,7 @@ export default {
     failedHostsNote: 'hosts fallidos',
     relaunchFromFirstNode: 'Desde el primer nodo',
     relaunchFromFailedNode: 'Desde el nodo fallido',
-    relaunchFailedNodeLead: 'Relanzar el trabajo {id} desde su nodo fallido, conservando los nodos anteriores:',
+    relaunchFailedNodeLead: 'Relanzar el trabajo {id} solo desde su nodo fallido:',
     failedNodeNote: 'nodo fallido',
     reviewApproval: 'Revisar aprobación',
     reviewLead: 'Este trabajo espera su aprobación antes de ejecutarse:',
