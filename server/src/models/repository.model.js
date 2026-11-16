@@ -113,8 +113,20 @@ function removeEmptyFolders(dir, keepSelf = false) {
 }
 
 /**
+ * The forms model, loaded when first needed : it imports this model, so a static import would be
+ * a cycle.
+ *
+ * Returns:
+ *   Promise<object>: the Form model.
+ */
+async function formModel() {
+  return (await import("./form.model.js")).default
+}
+
+/**
  * Repositories in the order they were added : by id, whatever order the rows come in - where
- * several of one usage are read in turn and the first one wins (the playbooks).
+ * several of one usage are read in turn and the first one wins (the playbooks, the forms folders
+ * - and with them a form name defined twice - and the first config.yaml of a forms repository).
  *
  * Args:
  *   rows (object[]): the repositories ({ id, name, ... }).
@@ -450,8 +462,9 @@ class Repository extends CrudModel {
       return ""
     }
     
-    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility)
-    var repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms")
+    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility) ;
+    // in the order they were added : the first one holding a config.yaml wins, the same one every time
+    var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
   }
   
   if(repositories.length === 0){
@@ -499,7 +512,10 @@ class Repository extends CrudModel {
     //
     // Failing loudly is the only honest answer, and it is the rule this codebase already
     // applies to health.model's authenticationFacts.
-    const repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_forms")
+    //
+    // In the order they were added (sortedById) : a form name defined in two of them resolves to
+    // the first one's copy, every time - the query had no ORDER BY, so it was the database's.
+    const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
 
     return repositories.map(repo => {
       const repoPath = Repo.folderOf(repo.name)
@@ -670,6 +686,8 @@ class Repository extends CrudModel {
       output = await Repo.clone(repo.uri, name, branch, Repository.gitAuth(repo))
       if (repo.use_for_forms) {
         output += await Repository.seedFormsRepo(name)
+        // a form name it shares with another forms repository : which copy is used, which skipped
+        output += await (await formModel()).duplicateLines(name)
       }
       status = "success"
     } catch (e) {
@@ -737,6 +755,8 @@ class Repository extends CrudModel {
       // its credential : what the pull signs in with, and the password masked in the output
       if (pullRepo) pullRepo = await Repository.withCredential(pullRepo).catch(() => pullRepo)
       output = await Repo.pull(name, Repository.gitAuth(pullRepo), pullRepo?.uri)
+      // a form name it shares with another forms repository : which copy is used, which skipped
+      if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -776,7 +796,8 @@ class Repository extends CrudModel {
 
   static async findFormsRepositories() {
     try {
-      return await mysql.do("SELECT name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms")
+      // in the order they were added, as the forms folders are read (getFormsFolders)
+      return sortedById(await mysql.do("SELECT id,name,status,head FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
     } catch (e) {
       logger.error("Failed to get forms repositories: ", e)
       return []

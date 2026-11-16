@@ -482,7 +482,9 @@ const save = async function(req,res){
       // the designer writes the whole document, so the previous one has to be read
       // before the save to get a role delta out of it
       var previousConfig = await Settings.getActiveConfig().catch(() => '')
-      var forms = await Form.save(newConfig)
+      // a name another forms repository holds said taken without where, to a designer limited to
+      // some forms (a copy may be one hidden from them)
+      var forms = await Form.save(newConfig, { conceal: !designsAllForms(user) })
       if(forms) {
         // read back what was actually written rather than re-serializing req.body :
         // the stored document is what the recorded hash has to describe

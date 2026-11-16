@@ -385,14 +385,15 @@ describe("forms live in files only (7.0.0)", () => {
   // designer save never writes a form into the base config again. Both must say so rather
   // than lose a form silently.
   const src = readFileSync(path.join(here, "../src/models/form.model.js"), "latin1");
-  const load = src.slice(src.indexOf("const unvalidatedBase = await getBaseConfig();"), src.indexOf("// read extra form files"));
+  const load = src.slice(src.indexOf("const unvalidatedBase = await getBaseConfig();"), src.indexOf("// the first copy of each name"));
   // the whole of Form.save : up to the function that follows it
   const save = src.slice(src.indexOf("Form.save = async function"), src.indexOf("Form.backupRoles = function"));
 
   test("a forms section in the base config is reported, and none of it is loaded", () => {
     assert.match(load, /unvalidatedBase\.forms/);
     assert.match(load, /error\("The base config has a 'forms' section/);
-    assert.match(load, /var unvalidatedForms = \[\];/);
+    // the forms are the files' only
+    assert.match(load, /var unvalidatedForms = entries\.map\(\(e\) => e\.form\);/);
   });
 
   test("the save refuses a form without a file, and writes the base config without forms", () => {
@@ -422,15 +423,15 @@ describe("a form name resolves to one definition on every path", () => {
   });
 
   test("the name is claimed before the role check", () => {
-    const claim = loop.indexOf("existingFormNames.push(f.name)");
+    const claim = loop.indexOf("firstOf.set(f.name, entry)");
     const role = loop.indexOf("if(!checkFormRole(f,userRoles))");
     assert.ok(claim > -1 && role > -1);
     assert.ok(claim < role, "claiming after the role check makes the list and the loader disagree");
   });
 
   test("the duplicate check still comes first of all", () => {
-    const dup = loop.indexOf("existingFormNames.includes(f.name)");
-    assert.ok(dup > -1 && dup < loop.indexOf("existingFormNames.push(f.name)"));
+    const dup = loop.indexOf("firstOf.has(f.name)");
+    assert.ok(dup > -1 && dup < loop.indexOf("firstOf.set(f.name, entry)"));
   });
 });
 

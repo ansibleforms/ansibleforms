@@ -1345,6 +1345,7 @@ export default {
       showPullOutput: 'Afficher la sortie du dernier pull',
       showPushOutput: 'Afficher la sortie du dernier push',
       notFound: "Aucun dépôt avec l'id '{id}'.",
+      formDuplicate: "Le formulaire '{name}' est défini deux fois : {used} est utilisé, {skipped} ignoré",
       ownUser: 'Il a encore son propre utilisateur ({user}) : choisissez un identifiant pour le remplacer.',
       pull: 'Pull',
       pullAll: 'Tout puller',

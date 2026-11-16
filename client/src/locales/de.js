@@ -1347,6 +1347,7 @@ export default {
       showPullOutput: 'Ausgabe des letzten Pulls anzeigen',
       showPushOutput: 'Ausgabe des letzten Pushs anzeigen',
       notFound: "Es gibt kein Repository mit der ID '{id}'.",
+      formDuplicate: "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} übersprungen",
       ownUser: 'Es hat noch einen eigenen Benutzer ({user}): wählen Sie Anmeldedaten, um ihn zu ersetzen.',
       pull: 'Pull',
       pullAll: 'Alle pullen',

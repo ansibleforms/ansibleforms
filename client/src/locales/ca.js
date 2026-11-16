@@ -1343,6 +1343,7 @@ export default {
       showPullOutput: "Mostra la sortida de l'últim pull",
       showPushOutput: "Mostra la sortida de l'últim push",
       notFound: "No hi ha cap repositori amb l'id '{id}'.",
+      formDuplicate: "El formulari '{name}' està definit dues vegades: s'utilitza {used}, s'omet {skipped}",
       ownUser: 'Encara té el seu propi usuari ({user}): tria una credencial per substituir-lo.',
       pull: 'Pull',
       pullAll: 'Pull de tots',

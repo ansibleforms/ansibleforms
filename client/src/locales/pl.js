@@ -1337,6 +1337,7 @@ export default {
       showPullOutput: 'Pokaż wynik ostatniego pull',
       showPushOutput: 'Pokaż wynik ostatniego push',
       notFound: "Nie ma repozytorium o id '{id}'.",
+      formDuplicate: "Formularz '{name}' jest zdefiniowany dwukrotnie: używany {used}, pominięty {skipped}",
       ownUser: 'Ma jeszcze własnego użytkownika ({user}): wybierz poświadczenie, aby go zastąpić.',
       pull: 'Pull',
       pullAll: 'Pull wszystkich',

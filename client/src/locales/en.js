@@ -1332,6 +1332,7 @@ export default {
       showPullOutput: 'Show last pull output',
       showPushOutput: 'Show last push output',
       notFound: "There is no repository with the id '{id}'.",
+      formDuplicate: "Form '{name}' is defined twice: {used} is used, {skipped} is skipped",
       ownUser: 'It still has its own user ({user}): choose a credential to replace it.',
       pull: 'Pull',
       pullAll: 'Pull all',
