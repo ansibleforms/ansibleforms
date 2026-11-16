@@ -49,7 +49,7 @@ vi.mock("../src/models/form.model.js", () => ({
   },
 }));
 
-const { storedJobOfLaunch, markStoredJobUsed, seesStoredJob } = await import("../src/lib/storedJobUse.js");
+const { storedJobOfLaunch, markStoredJobUsed, seesStoredJob, storedJobOfJob } = await import("../src/lib/storedJobUse.js");
 const mysql = (await import("../src/models/db.model.js")).default;
 const Job = (await import("../src/models/job.model.js")).default;
 
@@ -128,15 +128,92 @@ describe("a launch", () => {
   /** The stored jobs the launch wrote a last use for. */
   const marked = () => queries.filter((q) => /last_used_at = NOW\(\)/.test(q.sql)).map((q) => q.params[0]);
 
-  test("from a stored job the user sees : its last use written, after the job is created", async () => {
+  test("from a stored job the user sees : the job keeps it, and its last use is written", async () => {
     const job = await Job.launch({ form: "Demo", user: bob, extravars: {}, storedJobId: 1 });
     expect(job.id).toBe(70);
     expect(marked()).toEqual([1]);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBe(1);
   });
 
-  test("from one the user does not see, or none : the job runs, nothing is written", async () => {
+  test("from one the user does not see, or none : the job runs without one, nothing is written", async () => {
     expect((await Job.launch({ form: "Demo", user: bob, extravars: {}, storedJobId: 2 })).id).toBe(70);
     expect((await Job.launch({ form: "Demo", user: bob, extravars: {} })).id).toBe(70);
+    expect(marked()).toEqual([]);
+    for (const [record] of Job.create.mock.calls) expect(record.stored_job_id).toBeUndefined();
+  });
+});
+
+describe("the stored job a job page names", () => {
+  test("its id and name to a viewer who sees it : the owner, a settings user", async () => {
+    expect(await storedJobOfJob(bob, 1)).toEqual({ id: 1, name: "mine" });
+    expect(await storedJobOfJob(admin, 2)).toEqual({ id: 2, name: "eve's" });
+  });
+
+  test("a shared one : to a viewer with allowStoredJobsViewAll, on a form that shares", async () => {
+    expect(await storedJobOfJob(viewer, 3)).toEqual({ id: 3, name: "shared" });
+    expect(await storedJobOfJob(viewer, 4)).toBeNull();
+    expect(await storedJobOfJob(bob, 3)).toBeNull();
+  });
+
+  test("none to anyone else, without allowStoredJobs, or once it is deleted ; none without one", async () => {
+    expect(await storedJobOfJob(viewer, 2)).toBeNull();
+    expect(await storedJobOfJob({ ...bob, options: {} }, 1)).toBeNull();
+    expect(await storedJobOfJob(bob, 99)).toBeNull();
+    expect(await storedJobOfJob(bob, null)).toBeNull();
+  });
+});
+
+// a relaunch of a job launched from a stored job is a launch from it too : the job relaunched
+// names it (jobs.stored_job_id), checked again as the relauncher
+describe("a relaunch", () => {
+  const relauncher = (user) => ({ ...user, options: { ...user.options, allowJobRelaunch: true } });
+  /** The job relaunched : bob's, of form Demo, from stored job `storedJobId` unless none. */
+  const ran = (storedJobId, owner = "bob") => ({
+    id: 60, form: "Demo", status: "success", user: owner, user_type: "local", extravars: "{}", credentials: "{}",
+    raw_form_data: JSON.stringify({ __form__: "Demo" }), ...(storedJobId ? { stored_job_id: storedJobId } : {}),
+  });
+  const marked = () => queries.filter((q) => /last_used_at = NOW\(\)/.test(q.sql)).map((q) => q.params[0]);
+
+  beforeEach(() => {
+    Job.create = vi.fn(async () => 71);
+    // the relaunch waits for its own notification ; the run never goes past its launch one
+    Job.sendEventNotification = vi.fn((_id, event) => (event === "relaunch" ? Promise.resolve() : new Promise(() => {})));
+  });
+
+  test("as it ran : the new job inherits the stored job, whose last use is written", async () => {
+    Job.findById = vi.fn(async () => ran(1));
+    expect((await Job.relaunch(relauncher(bob), 60, false)).id).toBe(71);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBe(1);
+    expect(marked()).toEqual([1]);
+  });
+
+  test("with values changed : the same", async () => {
+    Job.findById = vi.fn(async () => ran(1));
+    expect((await Job.relaunchWithValues({ user: relauncher(bob), id: 60, values: { extra: "x" } })).id).toBe(71);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBe(1);
+    expect(marked()).toEqual([1]);
+  });
+
+  test("a stored job deleted since : skipped, the relaunch goes on without one", async () => {
+    Job.findById = vi.fn(async () => ran(99));
+    expect((await Job.relaunch(relauncher(bob), 60, false)).id).toBe(71);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBeUndefined();
+    expect(marked()).toEqual([]);
+  });
+
+  test("one the relauncher does not see : skipped, even when the job's owner did", async () => {
+    // eve's own private stored job, relaunched by a settings-less user who manages all jobs
+    Job.findById = vi.fn(async () => ran(2, "eve"));
+    const manager = { ...relauncher(bob), roles: ["admin"] };
+    expect((await Job.relaunch(manager, 60, false)).id).toBe(71);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBeUndefined();
+    expect(marked()).toEqual([]);
+  });
+
+  test("of a job from no stored job : none", async () => {
+    Job.findById = vi.fn(async () => ran(null));
+    await Job.relaunch(relauncher(bob), 60, false);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBeUndefined();
     expect(marked()).toEqual([]);
   });
 });

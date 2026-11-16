@@ -3,6 +3,7 @@ import Job from '../../models/job.model.js';
 import JobEvent from '../../models/jobEvent.model.js';
 import { workflowNodeData } from '../../lib/workflowNodeData.js';
 import { addRunnerJobLinks } from '../../lib/runnerJobLinks.js';
+import { storedJobOfJob } from '../../lib/storedJobUse.js';
 import RestResultv2 from '../../models/restResult.model.v2.js';
 import logger from "../../lib/logger.js";
 import stream from 'stream';
@@ -44,6 +45,10 @@ const getJob = async function(req, res) {
     restData.approval = JSON.parse(job.approval || "{}")
     restData.notifications = JSON.parse(job.notifications || "{}")
     restData.subjobs = (job.subjobs || "").split(",").filter(x => x != "").map(x => parseInt(x))
+    // the stored job it was launched from : its id and name when this user sees it, else none
+    // (one deleted since included) ; its bare id is not handed out (lib/storedJobUse.js)
+    restData.storedJob = await storedJobOfJob(user, job.stored_job_id)
+    delete restData.stored_job_id
     // on an AWX, AAP or Ascender : the job's address there, and its workflow nodes'
     await addRunnerJobLinks(restData)
     // an ended job : what its Relaunch offers besides a full relaunch (as GET .../relaunch-options),

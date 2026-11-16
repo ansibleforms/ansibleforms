@@ -1855,6 +1855,14 @@ onMounted(async () => {
                     }}</span>
                   </dd>
                 </div>
+                <!-- launched from a stored job : its name, a link to its page ; none when this user
+                     does not see it, or it was deleted since (the server sends none then) -->
+                <div v-if="job.storedJob" class="af-job-fact">
+                  <dt><FaIcon icon="floppy-disk" />{{ t('settings.storedJobs.label') }}</dt>
+                  <dd :title="job.storedJob.name">
+                    <router-link :to="`/jobs/stored/${job.storedJob.id}`">{{ job.storedJob.name }}</router-link>
+                  </dd>
+                </div>
                 <div v-if="job.job_type == 'multistep' && job.subjobs?.length" class="af-job-fact">
                   <dt><FaIcon icon="layer-group" />{{ t('jobs.steps') }}</dt>
                   <dd>{{ job.subjobs.length }}</dd>

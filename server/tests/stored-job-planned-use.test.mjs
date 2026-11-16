@@ -5,7 +5,8 @@
 // when the planner sees that stored job and it is of the form planned (lib/storedJobUse.js), and
 // Schedule.launch names it to Job.launch when the run fires : the stored job's last use is
 // written then, not when the run is planned. A schedule (admin-level, recurring or one-time)
-// keeps its own copy of the values : it names no stored job, and its runs are no uses.
+// keeps its own copy of the values : it names no stored job, and its runs are no uses. The job a
+// planned run starts names the stored job (jobs.stored_job_id) ; a schedule's names none.
 import { test, describe, vi, beforeEach, expect } from "vitest";
 
 process.env.DB_HOST ||= "127.0.0.1";
@@ -143,11 +144,12 @@ describe("the planned run, when it fires", () => {
     }];
   }
 
-  test("writes the last use of the stored job it was planned from", async () => {
+  test("writes the last use of the stored job it was planned from, and its job names it", async () => {
     queue({ stored_job_id: 1 });
     await Schedule.launch(5);
     expect(Job.create).toHaveBeenCalledTimes(1);
     expect(marked()).toEqual([1]);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBe(1);
   });
 
   test("a stored job deleted, or no longer seen, since : skipped, the run goes on", async () => {
@@ -157,6 +159,7 @@ describe("the planned run, when it fires", () => {
     await Schedule.launch(5);
     expect(Job.create).toHaveBeenCalledTimes(2);
     expect(marked()).toEqual([]);
+    for (const [record] of Job.create.mock.calls) expect(record.stored_job_id).toBeUndefined();
   });
 
   test("a schedule's run is no use, even with a stored job in its row", async () => {
@@ -165,6 +168,7 @@ describe("the planned run, when it fires", () => {
     await Schedule.launch(5);
     expect(Job.create).toHaveBeenCalledTimes(1);
     expect(marked()).toEqual([]);
+    expect(Job.create.mock.calls[0][0].stored_job_id).toBeUndefined();
   });
 
   test("the stored job's id is not handed to the playbook in the schedule's record", async () => {
