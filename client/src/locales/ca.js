@@ -1662,11 +1662,13 @@ export default {
       valuesNotMap: 'Els valors han de ser un mapa de noms de camp i valors.',
       notFound: "No hi ha cap tasca desada amb l'id '{id}'.",
       nameRequired: 'Cal un nom.',
+      ownerHelp: "L'usuari que el va desar; només ell el pot canviar o eliminar.",
       formHelp: 'El formulari al qual corresponen aquests valors.',
       owner: 'Usuari',
       neverExpires: 'No caduca mai',
       valuesHelp: 'Els valors del formulari, tal com els va desar el seu botó Desa. Obre al formulari els omple.',
       valuesHelpNew: 'Els valors del formulari, en YAML: noms dels camps i els seus valors.',
+      lastUsed: 'Últim ús',
     },
     knownhosts: {
       label: 'Amfitrió conegut',

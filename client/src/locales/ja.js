@@ -1645,11 +1645,13 @@ export default {
       valuesNotMap: '値はフィールド名と値のマップである必要があります。',
       notFound: "ID '{id}' の保存したジョブはありません。",
       nameRequired: '名前は必須です。',
+      ownerHelp: '保存したユーザー。変更や削除ができるのはこのユーザーだけです。',
       formHelp: 'これらの値の対象となるフォーム。',
       owner: 'ユーザー',
       neverExpires: '期限なし',
       valuesHelp: 'フォームの保存ボタンで保存された値です。「フォームで開く」で入力されます。',
       valuesHelpNew: 'フォームの値（YAML）：フィールド名とその値。',
+      lastUsed: '最終使用',
     },
     knownhosts: {
       label: '既知のホスト',

@@ -514,6 +514,9 @@ CREATE TABLE `schedule` (
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- the stored job a planned job's values came from (lib/storedJobUse.js) : its last use is
+  -- written when the run fires ; NULL for a schedule, which keeps its own copy of the values
+  `stored_job_id` int(11) DEFAULT NULL,
   UNIQUE KEY `uk_schedule_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -554,6 +557,8 @@ CREATE TABLE `stored_jobs` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `expires_at` DATETIME DEFAULT NULL,
   `visibility` VARCHAR(10) NOT NULL DEFAULT 'private',
+  -- when a job was last launched from it (lib/storedJobUse.js) ; NULL until the first one
+  `last_used_at` DATETIME DEFAULT NULL,
   UNIQUE KEY `uk_user_form_name` (`username`, `form_name`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

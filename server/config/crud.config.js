@@ -372,7 +372,11 @@ const crudConfigs = {
       // a planned run's raw field values (Schedule.plan), for the launch validation when it
       // fires. Missing here, it was dropped on insert and never read back, and a planned run
       // of a form under 'enforce' failed with "no rawFormData was sent" (#1063)
-      { name: 'raw_form_data' }
+      { name: 'raw_form_data' },
+      // the stored job a planned run's values came from (Schedule.plan, checked by
+      // lib/storedJobUse.js) : its last use is written when the run fires. Set ONLY by
+      // Schedule.plan, never by a schedule's create or update (a schedule keeps its own copy)
+      { name: 'stored_job_id' }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -389,7 +393,10 @@ const crudConfigs = {
       { name: 'created_at', isDatetime: true },
       { name: 'expires_at', isDatetime: true },
       // private or shared (lib/storedJobScope.js)
-      { name: 'visibility' }
+      { name: 'visibility' },
+      // when a job was last launched from it : set by the launch only (lib/storedJobUse.js),
+      // never from a request body (the controller drops it) ; none until the first one
+      { name: 'last_used_at', isDatetime: true }
     ],
     allowCache: false
   }

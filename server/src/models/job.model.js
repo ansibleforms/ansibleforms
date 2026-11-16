@@ -36,6 +36,7 @@ import { runWorkflow, findWorkflow } from "./workflowRun.js";
 import { workflowHash, fromFailedNodeCheck } from "../lib/workflowRelaunch.js";
 import { jobTypeOf } from "../lib/jobTypes.js";
 import { hostsFromEvents, hostsFromRecap, ranHostsFromRecap, rerunDiffers, rerunLimit, fallbackLimit } from "../lib/failedHosts.js";
+import { storedJobOfLaunch, markStoredJobUsed } from "../lib/storedJobUse.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1441,7 +1442,12 @@ Job.launch = async function ({
   // Set ONLY by the schedule : extravars the SERVER adds (the schedule's own record), merged
   // after the launch validation, so they are neither checked as form output nor replaced
   // by the extravars the server builds under 'enforce'.
-  serverExtravars = {}
+  serverExtravars = {},
+  // Set ONLY by the launch controller (the form opened with ?storedJob=<id>), the MCP
+  // launch_job (a storedJob) and a planned run as it fires (Schedule.launch, from the stored
+  // job it was planned from ; never a schedule's) : the stored job the values came from,
+  // checked below (lib/storedJobUse.js) before its last use is recorded.
+  storedJobId = null
 }) {
   let creds = credentials; // Alias for backward compatibility internally
 
@@ -1492,6 +1498,10 @@ Job.launch = async function ({
   // the credentials and the runner this job would use, as the user's roles allow them
   await assertLaunchScope(user, jobTypeOf(formObj.type), extravars, creds, formObj.type);
 
+  // the stored job this launch came from, when the user sees it and it is of this form ; a
+  // step of a multistep never names one, its parent job does
+  const fromStoredJob = isStep ? null : await storedJobOfLaunch(user, storedJobId, form, formObj);
+
   // we have form and we have access
   var notifications = formObj.notifications || {};
   // a template form (or awx, its old name) runs an awx job
@@ -1530,6 +1540,9 @@ Job.launch = async function ({
 
   logger.debug(`Job id ${jobid} is created`);
   extravars["__jobid__"] = jobid;
+
+  // launched from a stored job : it was used just now (stored_jobs.last_used_at)
+  if (fromStoredJob) await markStoredJobUsed(fromStoredJob, jobid);
 
   // a re-run of another job (Job.relaunch with failedHostsOnly) : its first output line says
   // of which job and on which hosts, before the approval or the runner writes anything

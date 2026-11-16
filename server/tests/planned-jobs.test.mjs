@@ -329,9 +329,10 @@ describe("POST /api/v2/schedule", () => {
 // the schedule's CRUD fields : what plan() writes must reach the table, and be read back when
 // the run fires (the other tests mock CrudModel.create, which hid that it was dropped)
 describe("the schedule record", () => {
-  test("keeps the owner and the raw form data on insert and update", () => {
-    const row = { name: "n", owner: "{}", raw_form_data: '{"username":"x"}' };
+  test("keeps the owner, the raw form data and the stored job on insert and update", () => {
+    const row = { name: "n", owner: "{}", raw_form_data: '{"username":"x"}', stored_job_id: 3 };
     assert.deepEqual(CrudModel.getFieldValues("schedule", { ...row }), row);
     assert.match(CrudModel.getSelectFields("schedule"), /\braw_form_data\b/);
+    assert.match(CrudModel.getSelectFields("schedule"), /\bstored_job_id\b/);
   });
 });

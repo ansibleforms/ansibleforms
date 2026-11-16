@@ -1659,11 +1659,13 @@ export default {
       valuesNotMap: 'Os valores têm de ser um mapa de nomes de campo e valores.',
       notFound: "Não existe nenhuma tarefa guardada com o id '{id}'.",
       nameRequired: 'É necessário um nome.',
+      ownerHelp: 'O utilizador que o guardou; só ele o pode alterar ou eliminar.',
       formHelp: 'O formulário a que estes valores se destinam.',
       owner: 'Utilizador',
       neverExpires: 'Nunca expira',
       valuesHelp: 'Os valores do formulário, tal como o seu botão Guardar os guardou. Abrir no formulário preenche-os.',
       valuesHelpNew: 'Os valores do formulário, em YAML: nomes dos campos e os seus valores.',
+      lastUsed: 'Última utilização',
     },
     knownhosts: {
       label: 'Host conhecido',

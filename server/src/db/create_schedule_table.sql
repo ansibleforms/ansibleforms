@@ -21,5 +21,7 @@ CREATE TABLE `schedule` (
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- the stored job a planned job's values came from ; NULL for a schedule
+  `stored_job_id` int(11) DEFAULT NULL,
   UNIQUE KEY `uk_schedule_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

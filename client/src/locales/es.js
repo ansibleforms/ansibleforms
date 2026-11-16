@@ -1800,12 +1800,14 @@ export default {
       valuesNotMap: 'Los valores deben ser un mapa de nombres de campo y valores.',
       notFound: "No hay ningún job guardado con el id '{id}'.",
       nameRequired: 'Se necesita un nombre.',
+      ownerHelp: 'El usuario que lo guardó; solo él puede cambiarlo o eliminarlo.',
       formHelp: 'El formulario al que corresponden estos valores.',
       owner: 'Usuario',
       neverExpires: 'No caduca nunca',
       valuesHelp:
         'Los valores del formulario, tal como los guardó su botón Guardar. Abrir en el formulario los rellena.',
       valuesHelpNew: 'Los valores del formulario, en YAML: nombres de campo y sus valores.',
+      lastUsed: 'Último uso',
     },
     knownhosts: {
       label: 'Host conocido',

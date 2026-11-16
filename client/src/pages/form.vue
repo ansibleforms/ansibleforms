@@ -19,6 +19,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import YAML from 'yaml';
 import { useFollowOutput } from '@/composables/useFollowOutput';
 import Time from '@/lib/Time';
+import { storedJobOfLoad, withStoredJob, withPlannedStoredJob } from '@/lib/storedJobLaunch';
 
 // use
 const route = useRoute();
@@ -542,6 +543,9 @@ const pauseJsonOutput = ref(false); // flag to pause jsonoutput interval
 const fileProgress = ref({}); // holds the progress of file uploads
 const status = ref(''); // status of form
 const initialFormData = ref({}); // holds initial data for pre-filling the form
+// the stored job the form's values came from (?storedJob=<id>, or Load) : the launch names it, so
+// the server records its last use (lib/storedJobLaunch.js) ; none for a form filled by hand
+const launchStoredJobId = ref(null);
 
 // Schedule off-canvas state
 const showScheduleOffcanvas = ref(false);
@@ -1431,7 +1435,12 @@ async function createSchedule() {
       scheduleData.run_at = scheduleForm.value.run_at;
     }
 
-    await axios.post('/api/v2/schedule', scheduleData);
+    // Run later from a stored job : named, its last use is recorded when the run fires ; a
+    // Schedule names none, it keeps its own copy of the values
+    await axios.post(
+      '/api/v2/schedule',
+      withPlannedStoredJob(scheduleData, launchStoredJobId.value, scheduleData.planned),
+    );
 
     const successMessage =
       scheduleAction.value === 'schedule'
@@ -1539,6 +1548,9 @@ async function loadStoredJob(storedJob) {
     const parsedData = JSON.parse(storedJob.form_data);
     const ctx = storeCtx.value || buildMainStoreCtx();
     ctx.onLoad(parsedData);
+    // loaded into the whole form : the launch comes from this stored job (a subform's tab keeps
+    // the one the form had)
+    if (ctx.scope === 'form') launchStoredJobId.value = storedJobOfLoad(ctx.scope, storedJob);
 
     closeLoadOffcanvas();
     toast.success(t('form.storedJobLoaded', { name: storedJob.name }));
@@ -1727,7 +1739,8 @@ async function launchForm(postdata) {
   const seq = ++pollSeq;
   try {
     status.value = 'running';
-    const result = await axios.post(`/api/v2/job/`, postdata);
+    // filled from a stored job : named, for its last use
+    const result = await axios.post(`/api/v2/job/`, withStoredJob(postdata, launchStoredJobId.value));
     // reset or left while the launch was answered : nothing to follow on this page
     if (seq !== pollSeq) return;
     jobId.value = result.data.id;
@@ -1777,6 +1790,8 @@ async function formNameOf(slug) {
 async function loadForm(seq = loadSeq) {
   // a newer load started while this one was waiting : drop this one's results
   const stale = () => seq !== loadSeq;
+  // a form (re)loaded starts from no stored job : only ?storedJob=<id> below, or Load, names one
+  launchStoredJobId.value = null;
   const slug = route.params.slug;
   if (!slug) {
     console.error('No form name provided in the URL');
@@ -1908,6 +1923,8 @@ async function loadForm(seq = loadSeq) {
         const stored = res.data?.records ? res.data.records[0] : res.data;
         if (stored?.form_data) {
           buildMainStoreCtx().onLoad(JSON.parse(stored.form_data));
+          // the launch that follows comes from it
+          launchStoredJobId.value = storedJobOfLoad('form', stored);
           toast.success(t('form.storedJobLoaded', { name: stored.name }));
         }
       } catch (err) {

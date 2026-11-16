@@ -1611,11 +1611,13 @@ export default {
       valuesNotMap: '值必须是字段名与值的映射。',
       notFound: "没有 ID 为 '{id}' 的已存储作业。",
       nameRequired: '名称为必填项。',
+      ownerHelp: '保存它的用户；只有该用户可以更改或删除它。',
       formHelp: '这些值所属的表单。',
       owner: '用户',
       neverExpires: '永不过期',
       valuesHelp: '表单的值，由表单的存储按钮保存。“在表单中打开”会将其填入。',
       valuesHelpNew: '表单的值（YAML）：字段名及其值。',
+      lastUsed: '最后使用',
     },
     knownhosts: {
       label: '已知主机',

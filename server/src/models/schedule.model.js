@@ -14,6 +14,7 @@ const LAUNCH_MAX_MINUTES = 10;
 import Form from './form.model.js';
 import Errors from '../lib/errors.js';
 import Audit from './audit.model.js';
+import { storedJobOfLaunch } from '../lib/storedJobUse.js';
 
 /**
  * Adds when a schedule runs next (next_run, an ISO string or null) : its cron's next occurrence,
@@ -130,6 +131,10 @@ class Schedule extends CrudModel {
     // nor its raw form data : an admin-level schedule runs with its own extra vars, the form's
     // values are only kept for a planned run (plan), which is checked against them when it fires
     delete data.raw_form_data
+    // nor a stored job : a schedule made from a stored job keeps its own copy of the values (its
+    // extra vars), edited apart from the stored job, so its runs are no uses of that stored job
+    // and do not keep it from expiring. Only a planned run (plan) names one.
+    delete data.stored_job_id
     // a new schedule waits for its time : idle, not without a state
     data.state = 'idle'
     return super.create(this.modelName, data);
@@ -152,7 +157,11 @@ class Schedule extends CrudModel {
    *   - only the fields below are taken from the request - not status, state, output,
    *     queue_id, and above all not owner ;
    *   - `owner` records the user, and launch() runs the job AS that user, through the
-   *     same reserved-key strip and launch validation as a launch from the browser.
+   *     same reserved-key strip and launch validation as a launch from the browser ;
+   *   - `stored_job_id`, the stored job the values came from (the form opened with
+   *     ?storedJob=<id>, or Load), is kept only when this user sees it and it is of this form
+   *     (lib/storedJobUse.js) ; launch() names it to Job.launch, which checks it again and
+   *     records its last use when the run fires, not now.
    *
    * @param {object} user the authenticated user (req.user.user)
    * @param {object} data the request body
@@ -214,6 +223,10 @@ class Schedule extends CrudModel {
       throw new Errors.BadRequestError("Raw form data is not a valid dictionary.");
     }
     await guardLaunch({ form: formName, formConfig, formObj: formConfig.forms[0], user, rawFormData, extravars: structuredClone(extravars) });
+    // the stored job the values came from : kept when this user may use it for this form, else
+    // dropped (logged by storedJobOfLaunch) and the run is planned without one. Its last use is
+    // not written here : planning is no launch, the run counts when it fires (launch below).
+    const storedJobId = await storedJobOfLaunch(user, data.stored_job_id, formName, formConfig.forms[0]);
     // the identity the job will run as : the user object of the token, as it is now - the
     // same object a launch from the browser puts in `ansibleforms_user`, so a playbook sees
     // the same fields either way (displayName, the oid of an Entra ID user...). It is the
@@ -232,6 +245,8 @@ class Schedule extends CrudModel {
       // nothing the form does not declare
       raw_form_data: Object.keys(rawFormData).length ? JSON.stringify(filterRawFormDataOf(formConfig.forms[0], rawFormData)) : null,
       owner: JSON.stringify(owner),
+      // the stored job it was planned from, checked above ; none without one
+      stored_job_id: storedJobId,
       // it waits for its time : idle
       state: 'idle',
     });
@@ -248,6 +263,8 @@ class Schedule extends CrudModel {
     // admin-level schedule. Nor the values it was planned with, checked when it was planned
     delete data.owner
     delete data.raw_form_data
+    // nor the stored job it was planned from : set by plan() alone (a schedule never has one)
+    delete data.stored_job_id
     logger.info(`Updating schedule ${(data.name) ? data.name : id}`);
     return super.update(this.modelName, data, id);
   }
@@ -375,6 +392,7 @@ class Schedule extends CrudModel {
       delete scheduleInfo.cron;
       delete scheduleInfo.extra_vars;
       delete scheduleInfo.raw_form_data;
+      delete scheduleInfo.stored_job_id;
       // a planned job's raw field values, for the launch validation (Schedule.plan)
       let rawFormData = {};
       if (planned && schedule.raw_form_data) {
@@ -393,7 +411,13 @@ class Schedule extends CrudModel {
       // the reserved-key strip and launch validation a launch from the browser gets.
       // Job.launch loads the form with the owner's roles, so a role taken off the form
       // since the planning is honoured too.
-      const launched = await Job.launch({ form, user, extravars, rawFormData, fromClient: planned, serverExtravars: { schedule: scheduleInfo } });
+      //
+      // A planned run names the stored job it was planned from : Job.launch checks it again, as
+      // the owner (it may have been deleted, or unshared, since), and records its last use now
+      // that the run fires. A schedule names none, even one made from a stored job : it keeps
+      // its own copy of the values, so its runs are no uses of that stored job.
+      const storedJobId = planned ? (schedule.stored_job_id ?? null) : null;
+      const launched = await Job.launch({ form, user, extravars, rawFormData, fromClient: planned, serverExtravars: { schedule: scheduleInfo }, storedJobId });
       if (launched?.id) {
         output = `The schedule started job ${launched.id}.\nThis says the job was launched, not that it succeeded - open that job to see how it ended.`;
       } else {

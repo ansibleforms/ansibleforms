@@ -13,6 +13,8 @@ import { ownerOf, seesShared, storedJobFor, visibilityRefusal } from "../../lib/
 //    (id 2147483647), after which every new stored job of every user fails as a duplicate key.
 //  - username : the owner, always taken from the logged in user.
 //  - created_at : set by the database, a caller must not backdate or postdate it.
+//  - last_used_at : set by a launch from the stored job (lib/storedJobUse.js), a caller must
+//    not fake a use.
 // expires_at stays : the Store dialog lets the user pick when the stored job expires.
 // visibility stays : private or shared, checked by assertVisibility before it is written.
 const WRITABLE = ['name', 'description', 'form_name', 'form_data', 'expires_at', 'visibility'];

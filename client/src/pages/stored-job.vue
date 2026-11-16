@@ -5,7 +5,7 @@
 /*  stored jobs' list : form values saved to run again, in tabs,  */
 /*  the tab kept in the url -                                     */
 /*    Details  its name and description, the form it is for, its */
-/*             owner, when it was stored and when it expires      */
+/*             owner, when it was stored, last used and expires   */
 /*    Values   the form's values, as YAML, editable               */
 /*  Open in form (the form, these values filled in) and Delete    */
 /*  top right, beside Save. The search of the title line narrows  */
@@ -163,12 +163,17 @@ const tabFields = computed(() => ({
     ['name', t('settings.fields.name')],
     ['description', t('settings.fields.description')],
     ['form', t('settings.fields.form'), t('settings.storedJobs.formHelp'), stored.value?.form_name],
-    ['owner', t('settings.storedJobs.owner'), stored.value?.username],
+    ['owner', t('settings.storedJobs.owner'), t('settings.storedJobs.ownerHelp'), stored.value?.username],
     ['shared', t('form.shareStoredJob'), t('form.shareStoredJobHelp')],
     [
       'createdAt',
       t('settings.fields.createdAt'),
       stored.value?.created_at ? Helpers.formatServerDate(stored.value.created_at) : '',
+    ],
+    [
+      'lastUsed',
+      t('settings.storedJobs.lastUsed'),
+      stored.value?.last_used_at ? Helpers.formatServerDate(stored.value.last_used_at) : '',
     ],
     ['expiresAt', t('settings.fields.expiresAt'), t('settings.storedJobs.neverExpires')],
   ],
@@ -365,6 +370,7 @@ onMounted(async () => {
                 icon="user"
                 :isFloating="false"
                 :disabled="true"
+                :help="t('settings.storedJobs.ownerHelp')"
                 :label="t('settings.storedJobs.owner')"
               />
               <!-- shared with the users who see shared stored jobs : with allowStoredJobsShare, or
@@ -385,6 +391,11 @@ onMounted(async () => {
               <div v-show="fieldShown('createdAt')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.fields.createdAt') }}</div>
                 <span>{{ stored.created_at ? Helpers.formatServerDate(stored.created_at) : '–' }}</span>
+              </div>
+              <!-- when a job was last launched from it : read only, set by the server ; none yet, a dash -->
+              <div v-show="fieldShown('lastUsed')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.storedJobs.lastUsed') }}</div>
+                <span>{{ stored.last_used_at ? Helpers.formatServerDate(stored.last_used_at) : '–' }}</span>
               </div>
               <!-- when it expires : never, or a date -->
               <!-- the tab's last field : no margin under it (the tab's own padding ends it), and
