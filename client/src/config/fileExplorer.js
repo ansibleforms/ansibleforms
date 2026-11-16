@@ -85,3 +85,27 @@ export function firstExplorerFile(paths, accept = () => true) {
   };
   return [...(paths || [])].filter(accept).sort(before)[0] ?? null;
 }
+
+/**
+ * Opens a section on the first item its explorer lists, the one way every Designer section does
+ * it (the files, the forms) : nothing when an item is open already, else the first
+ * item by firstExplorerFile, opened through the section's own open - which fills every tab (its
+ * YAML, its Visual, its Preview), whichever one shows.
+ *
+ * Args:
+ *   opts (object): {
+ *     isOpen (function): whether an item is open already,
+ *     paths (string[]): the items' paths as the explorer lists them,
+ *     accept (function): which ones may open (optional),
+ *     open (function): (path) => opens one (may be async),
+ *   }.
+ *
+ * Returns:
+ *   Promise<string|null>: the path opened, or null.
+ */
+export async function openFirstExplorerItem({ isOpen, paths, accept, open }) {
+  if (isOpen()) return null;
+  const first = firstExplorerFile(paths, accept);
+  if (first) await open(first);
+  return first;
+}

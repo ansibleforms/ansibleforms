@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { firstExplorerFile } from '../src/config/fileExplorer';
+import { firstExplorerFile, openFirstExplorerItem } from '../src/config/fileExplorer';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (f) => readFileSync(path.join(here, '..', 'src', f), 'utf8');
@@ -16,9 +16,16 @@ describe('the first item a section opens on', () => {
     expect(firstExplorerFile([])).toBe(null);
   });
 
-  it('the files and the forms both ask the same helper', () => {
-    for (const f of ['components/AppProjectFiles.vue', 'pages/designer.vue']) {
-      expect(read(f), f).toContain('firstExplorerFile(');
-    }
+  it('the files open it through the same helper, the forms pick it with it', () => {
+    expect(read('components/AppProjectFiles.vue')).toContain('openFirstExplorerItem(');
+    expect(read('pages/designer.vue')).toContain('firstExplorerFile(');
+  });
+
+  it('opens nothing over an item open already, else the first through the section own open', async () => {
+    const opened = [];
+    const open = (p) => opened.push(p);
+    expect(await openFirstExplorerItem({ isOpen: () => true, paths: ['a.yaml'], open })).toBe(null);
+    expect(await openFirstExplorerItem({ isOpen: () => false, paths: ['b.yaml', 'a.yaml'], open })).toBe('a.yaml');
+    expect(opened).toEqual(['a.yaml']);
   });
 });
