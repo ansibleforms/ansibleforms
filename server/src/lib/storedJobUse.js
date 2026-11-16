@@ -17,8 +17,15 @@
 // findById : the allowStoredJobs role option, then their own, a shared one, or any for a
 // settings user), and it must hold values of the form launched. An id that fails any of these
 // is dropped with a warning in the log : the launch itself goes on, as it would without one.
+//
+// The job keeps it too (jobs.stored_job_id), and its page names the stored job (storedJobOfJob),
+// only to a viewer who sees that stored job by the same rules ; a stored job deleted since is
+// named to no one. A planned run's job gets it as the run fires. A relaunch names the stored job
+// of the job it relaunches : checked again as the relauncher, its new job inherits it and the
+// stored job's last use is written, or, deleted or hidden since, it is skipped.
 
 import CrudModel from '../models/crud.model.js';
+import Form from '../models/form.model.js';
 import mysql from '../models/db.model.js';
 import logger from './logger.js';
 import { ownerOf, seesShared } from './storedJobScope.js';
@@ -98,6 +105,36 @@ export async function storedJobOfLaunch(user, storedJobId, form, formObj) {
     return null;
   }
   return id;
+}
+
+/**
+ * The stored job a job was launched from, as its page names it : { id, name } when the viewer
+ * sees it (seesStoredJob, with the allowStoredJobs role option), null otherwise - none, deleted
+ * since, or not the viewer's to see. Never throws : a stored job that cannot be read is none.
+ *
+ * Args:
+ *   user (object): the viewer, with its roles and options.
+ *   storedJobId (number|null): the job's stored_job_id.
+ *
+ * Returns:
+ *   Promise<object|null>: { id, name }, or null.
+ */
+export async function storedJobOfJob(user, storedJobId) {
+  if (!storedJobId || !user?.options?.allowStoredJobs) return null;
+  try {
+    const row = await CrudModel.findById('stored_jobs', storedJobId);
+    if (!row) return null;
+    // the form only matters for another user's shared one : as this viewer may open it
+    const formObj =
+      row.visibility === 'shared' && row.username !== ownerOf(user) && !user?.options?.showSettings
+        ? (await Form.load(user?.roles, row.form_name))?.forms?.[0]
+        : undefined;
+    return seesStoredJob(user, row, formObj) ? { id: row.id, name: row.name } : null;
+  } catch (err) {
+    // deleted since the job ran : named to no one, and not worth a line in the log
+    if (err?.name !== 'NotFoundError') logger.warning(`Could not read stored job ${storedJobId}: ${err?.message || err}`);
+    return null;
+  }
 }
 
 /**

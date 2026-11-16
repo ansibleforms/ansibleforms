@@ -371,6 +371,9 @@ CREATE TABLE `jobs` (
   -- a workflow job of the designer's : the hash of the workflow it ran, so a relaunch from its
   -- failed node runs only while the workflow is the same (models/workflowRun.js)
   `workflow_hash` varchar(80) DEFAULT NULL,
+  -- the stored job it was launched from (lib/storedJobUse.js) ; NULL when none. No foreign key :
+  -- a stored job deleted later leaves its id, and the job page then names none
+  `stored_job_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   -- the retention sweep selects on (parent_id, status, end) ; without this it full
   -- scans the largest table in the schema on every batch. Keep in sync with the

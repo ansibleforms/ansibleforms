@@ -359,6 +359,8 @@ var Job = function (job) {
     this.extravars = job.extravars;
     this.credentials = job.credentials;
     this.notifications = job.notifications;
+    // the stored job it was launched from (lib/storedJobUse.js), only when there is one
+    if (job.stored_job_id) this.stored_job_id = job.stored_job_id;
   }
   if (job.step && job.step != "") {
     // allow single step update
@@ -1206,13 +1208,13 @@ Job.findById = async function (user, id, asText, logSafe = false) {
   
   if (seesAllJobs(user)) {
     query =
-      "SELECT j.id,j.form,j.target,j.status,CONVERT_TZ(j.start, 'UTC', ?) AS start,CONVERT_TZ(j.end, 'UTC', ?) AS end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=?;";
+      "SELECT j.id,j.form,j.target,j.status,CONVERT_TZ(j.start, 'UTC', ?) AS start,CONVERT_TZ(j.end, 'UTC', ?) AS end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=?;";
     params = [safeTimezone, safeTimezone, id, id];
   } else {
     // the owner, or an approver of the job's approval while it waits for it (approverCondition)
     const approver = approverCondition(user, "j.");
     query =
-      "SELECT j.id,j.form,j.target,j.status,CONVERT_TZ(j.start, 'UTC', ?) AS start,CONVERT_TZ(j.end, 'UTC', ?) AS end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs WHERE user=? AND user_type=?)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=? AND ((j.user=? AND j.user_type=?) OR " + approver.sql + ");";
+      "SELECT j.id,j.form,j.target,j.status,CONVERT_TZ(j.start, 'UTC', ?) AS start,CONVERT_TZ(j.end, 'UTC', ?) AS end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs WHERE user=? AND user_type=?)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=? AND ((j.user=? AND j.user_type=?) OR " + approver.sql + ");";
     params = [safeTimezone, safeTimezone, user.username, user.type, id, id, user.username, user.type, ...approver.params];
   }
   try {
@@ -1444,9 +1446,10 @@ Job.launch = async function ({
   // by the extravars the server builds under 'enforce'.
   serverExtravars = {},
   // Set ONLY by the launch controller (the form opened with ?storedJob=<id>), the MCP
-  // launch_job (a storedJob) and a planned run as it fires (Schedule.launch, from the stored
-  // job it was planned from ; never a schedule's) : the stored job the values came from,
-  // checked below (lib/storedJobUse.js) before its last use is recorded.
+  // launch_job (a storedJob), a planned run as it fires (Schedule.launch, from the stored
+  // job it was planned from ; never a schedule's) and a relaunch (the stored job of the job
+  // relaunched) : the stored job the values came from, checked below (lib/storedJobUse.js)
+  // before the job keeps it and its last use is recorded.
   storedJobId = null
 }) {
   let creds = credentials; // Alias for backward compatibility internally
@@ -1498,8 +1501,9 @@ Job.launch = async function ({
   // the credentials and the runner this job would use, as the user's roles allow them
   await assertLaunchScope(user, jobTypeOf(formObj.type), extravars, creds, formObj.type);
 
-  // the stored job this launch came from, when the user sees it and it is of this form ; a
-  // step of a multistep never names one, its parent job does
+  // the stored job this launch came from, when the user sees it and it is of this form : the job
+  // keeps it (jobs.stored_job_id) and its last use is written ; a step of a multistep never names
+  // one, its parent job does
   const fromStoredJob = isStep ? null : await storedJobOfLaunch(user, storedJobId, form, formObj);
 
   // we have form and we have access
@@ -1529,6 +1533,8 @@ Job.launch = async function ({
         extravars: JSON.stringify(extravars),
         credentials: JSON.stringify(creds),
         notifications: JSON.stringify(notifications),
+        // the stored job it was launched from, checked above ; none for a launch without one
+        stored_job_id: fromStoredJob,
       })
     );
   } catch (err) {
@@ -1963,6 +1969,11 @@ Job.relaunchWithValues = async function ({ user, id, values = {}, verbose = fals
   logger.notice(`Relaunching job ${id} with form ${job.form}, with ${Object.keys(values || {}).length} changed field(s)`);
   const launched = await Job.launch({
     form: job.form, user, credentials, extravars, rawFormData, fromClient: true, validated: true, serverExtravars,
+    // launched from a stored job : so is its relaunch, with or without changes, as a launch of
+    // the form after Load is with values changed. Checked again as the relauncher (a stored job
+    // deleted since, or not theirs to see, is skipped) before the new job keeps it and its last
+    // use is written (lib/storedJobUse.js)
+    storedJobId: job.stored_job_id ?? null,
   });
   await Job.sendEventNotification(id, 'relaunch', user);
   return { ...launched, payloadHash, warnings: result.warnings, ...(rerun?.answer || {}) };
@@ -2060,6 +2071,10 @@ async function replayJob(user, job, verbose, serverExtravars = {}) {
       rawFormData,
       replay: true,
       serverExtravars,
+      // launched from a stored job : so is its relaunch. Checked again as the relauncher (a
+      // stored job deleted since, or not theirs to see, is skipped) before the new job keeps it
+      // and its last use is written (lib/storedJobUse.js)
+      storedJobId: job.stored_job_id ?? null,
     });
     // Send relaunch notification
     await Job.sendEventNotification(id, 'relaunch', user);

@@ -8,12 +8,19 @@ process.env.DB_USER ||= "test";
 process.env.DB_PASSWORD ||= "test";
 
 let launched;
+// the stored job the job read below was launched from
+let stored_job_id = null;
 vi.mock("../src/models/job.model.js", () => ({
   default: {
     launch: async (args) => { launched = args; return { id: 7 }; },
     relaunchOptions: async () => ({ failedHosts: ["web02"] }),
-    findById: async () => ({ id: 7, status: "failed", extravars: JSON.stringify({ who: "Mirko" }), credentials: "{}", approval: "{}", notifications: "{}", subjobs: "" }),
+    findById: async () => ({ id: 7, status: "failed", extravars: JSON.stringify({ who: "Mirko" }), credentials: "{}", approval: "{}", notifications: "{}", subjobs: "", stored_job_id }),
   },
+}));
+
+// the stored job a job names (#1437) : any id is a stored job this viewer sees, named monthly
+vi.mock("../src/lib/storedJobUse.js", () => ({
+  storedJobOfJob: async (_user, id) => (id ? { id, name: "monthly" } : null),
 }));
 
 const { default: controller } = await import("../src/controllers/v2/job.controller.js");
@@ -23,7 +30,7 @@ function res() {
   return { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
 }
 
-beforeEach(() => { launched = null; });
+beforeEach(() => { launched = null; stored_job_id = null; });
 
 describe("payload and extravars", () => {
   test("POST takes extravars, and payload the same", async () => {
@@ -53,5 +60,18 @@ describe("payload and extravars", () => {
     expect(job.payload).toEqual(job.extravars);
     // an ended job carries what its Relaunch offers, so the page draws it with its other buttons
     expect(job.relaunchOptions).toEqual({ failedHosts: ["web02"] });
+  });
+
+  test("GET names the stored job it was launched from, without its bare id ; none without one (#1437)", async () => {
+    const r = res();
+    await controller.getJob({ params: { id: 7 }, query: {}, user }, r);
+    const job = r.body?.data?.output ?? r.body;
+    expect(job.storedJob).toBeNull();
+    stored_job_id = 5;
+    const r2 = res();
+    await controller.getJob({ params: { id: 7 }, query: {}, user }, r2);
+    const named = r2.body?.data?.output ?? r2.body;
+    expect(named.storedJob).toEqual({ id: 5, name: "monthly" });
+    expect(named.stored_job_id).toBeUndefined();
   });
 });
