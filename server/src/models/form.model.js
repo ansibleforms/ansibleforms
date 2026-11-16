@@ -1805,6 +1805,9 @@ Form.save = async function(data){
     const savedFormNames = new Set(
       Object.values(groups).flatMap(g => (g.forms || []).map(f => f?.name)).filter(Boolean)
     )
+    // the copies the loader skipped (a form name another forms folder defines first) : never in
+    // the payload, so a file holding one with other forms would lose it when written again
+    const skipped = skippedCopies(formsDirs)
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)
@@ -1825,6 +1828,12 @@ Form.save = async function(data){
             // writing over it would lose them all
             throw new Errors.BadRequestError(`The file '${g.source}' cannot be read as forms ; fix it, or save the form to another file`)
           }
+          // the skipped copy of a form name another forms folder defines first : the designer
+          // never had it either, so it stays as it is, in its place, like a form that does not load
+          const skippedHere = skipped.get(path.resolve(target))
+          if (skippedHere?.size) {
+            for (const f of onDisk.forms) if (f.name && skippedHere.has(f.name)) f.notLoaded = true
+          }
           const savedNames = new Set(forms.map(f => f?.name).filter(Boolean))
           // a form the designer never received, sent now : it is that form, edited. It must
           // load once saved, or the save is refused with the reason
@@ -1836,7 +1845,7 @@ Form.save = async function(data){
             }
           }
           kept = formsToKeep(onDisk, savedNames)
-          if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load, so the designer never had it`)
+          if (kept.length) logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${target}' as it was : it does not load or is a skipped duplicate, so the designer never had it`)
         }
         logger.debug(`saving ${forms.length==1 ? `single form '${forms[0].name}'` : `forms ${forms.map(x => x.name)}`} to '${target}'`)
         // ensure parent directory exists for nested paths
@@ -1870,6 +1879,13 @@ Form.save = async function(data){
               logger.warning(`Not removing '${existing}' from '${dirEntry.path}': it could not be parsed, so it was never loaded and cannot have been deleted here`)
               continue
             }
+            // a skipped copy of a form name another forms folder defines first : the designer
+            // never had it either, so it cannot have been deleted in it, like a form that does
+            // not load
+            const skippedThere = skipped.get(path.resolve(fullPath))
+            if (skippedThere?.size) {
+              for (const f of onDisk.forms) if (f.name && skippedThere.has(f.name)) f.notLoaded = true
+            }
             // a form the designer never received cannot have been deleted in it. Such a file
             // stays as it is when nothing else in it was deleted, and is written again without
             // the deleted forms only : the forms that do not load stay, and so does a form
@@ -1880,7 +1896,7 @@ Form.save = async function(data){
                 logger.info(`Keeping ${kept.map(k => k.name ? `'${k.name}'` : '(a form with no name)').join(", ")} in '${existing}' : the designer never had it ; the other forms of the file were deleted`)
                 fs.writeFileSync(fullPath, kept.map(k => k.text).join(""))
               } else {
-                logger.warning(`Not removing '${existing}' from '${dirEntry.path}': its forms do not load, so the designer never had them`)
+                logger.warning(`Not removing '${existing}' from '${dirEntry.path}': its forms do not load or are skipped duplicates, so the designer never had them`)
               }
               continue
             }
@@ -1936,6 +1952,10 @@ Form.save = async function(data){
 // forms the designer sent, so such a form was dropped from its file - and from git at the
 // next push - by a save of ANOTHER form of the same file. These helpers find those forms on
 // disk so the save writes them back exactly as they were.
+//
+// The same goes for the copy of a form name the loader skips because a forms folder read before
+// already defines it (skippedCopies) : the designer never receives it either, so it is kept in
+// its file the same way.
 
 /**
  * Tells whether the loader would leave a form of a file out (Form.load) : not a mapping, no
@@ -2024,6 +2044,36 @@ function readFileForms(fullPath, filename) {
     return { name: value?.name, notLoaded: notLoaded(value, filename), text }
   })
   return { forms, single: !yaml.isSeq(contents) }
+}
+
+/**
+ * The copies of a form the loader skips, by their file : a name a folder read before already
+ * defines (Form.load keeps the first copy, warns of the others). The designer never sees them, so
+ * a save never sends them ; they are kept in their files when the file is written again, as the
+ * forms that do not load are (formsToKeep).
+ *
+ * Args:
+ *   formsDirs (object[]): the forms folders, in the order they are read (getSaveTargets).
+ *
+ * Returns:
+ *   Map<string, Set<string>>: by the file's absolute path, the names of the copies skipped in it.
+ */
+function skippedCopies(formsDirs) {
+  const entries = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+  const first = new Set()
+  const out = new Map()
+  for (const e of entries) {
+    const name = e.form?.name
+    if (!name) continue
+    if (!first.has(name)) {
+      first.add(name)
+      continue
+    }
+    const abs = path.resolve(e.dir.path, e.file)
+    if (!out.has(abs)) out.set(abs, new Set())
+    out.get(abs).add(name)
+  }
+  return out
 }
 
 /**
