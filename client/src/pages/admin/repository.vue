@@ -527,22 +527,6 @@ onMounted(async () => {
                 t('settings.repositories.formDuplicate', { name: d.name, used: d.used.place, skipped: d.skipped.place })
               }}
             </div>
-            <!-- where it stands : its pull, push and head, each a field of the column, read only -->
-            <div v-show="fieldShown('pull')" class="mb-3">
-              <div class="form-label fw-bold">{{ t('settings.fields.pull') }}</div>
-              <!-- the last pull (clone, sync or reset) : running, success or failed -->
-              <span v-html="repositoryPullPill(t, repo)"></span>
-            </div>
-            <div v-show="fieldShown('push')" class="mb-3">
-              <div class="form-label fw-bold">{{ t('settings.fields.push') }}</div>
-              <!-- changes saved here and not pushed yet, or none -->
-              <span v-html="repositoryPushPill(t, repo)"></span>
-            </div>
-            <div v-show="fieldShown('head')" class="mb-3">
-              <div class="form-label fw-bold">{{ t('settings.fields.head') }}</div>
-              <span v-if="repo.head" class="font-monospace af-repo-head">{{ repo.head }}</span>
-              <span v-else>–</span>
-            </div>
             <BsInput
               class="af-repo-field"
               v-model="edit.name"
@@ -555,14 +539,11 @@ onMounted(async () => {
             />
             <BsInput
               class="af-repo-field"
-              v-model="edit.branch"
-              v-show="fieldShown('branch')"
-              icon="code-branch"
-              placeholder="main"
-              :readonly="sourceLocked"
+              v-model="edit.description"
+              v-show="fieldShown('description')"
+              icon="info-circle"
               :isFloating="false"
-              :required="true"
-              :label="t('settings.fields.branch')"
+              :label="t('settings.fields.description')"
             />
             <BsInput
               class="af-repo-field"
@@ -578,13 +559,32 @@ onMounted(async () => {
             />
             <BsInput
               class="af-repo-field"
-              v-model="edit.description"
-              v-show="fieldShown('description')"
-              icon="info-circle"
+              v-model="edit.branch"
+              v-show="fieldShown('branch')"
+              icon="code-branch"
+              placeholder="main"
+              :readonly="sourceLocked"
               :isFloating="false"
               :required="true"
-              :label="t('settings.fields.description')"
+              :label="t('settings.fields.branch')"
             />
+            <!-- where it stands : its pull, push and head, each a field of the column, read only ; after
+                 its name, description, branch and uri, as every record page's Details -->
+            <div v-show="fieldShown('pull')" class="mb-3">
+              <div class="form-label fw-bold">{{ t('settings.fields.pull') }}</div>
+              <!-- the last pull (clone, sync or reset) : running, success or failed -->
+              <span v-html="repositoryPullPill(t, repo)"></span>
+            </div>
+            <div v-show="fieldShown('push')" class="mb-3">
+              <div class="form-label fw-bold">{{ t('settings.fields.push') }}</div>
+              <!-- changes saved here and not pushed yet, or none -->
+              <span v-html="repositoryPushPill(t, repo)"></span>
+            </div>
+            <div v-show="fieldShown('head')" class="mb-3">
+              <div class="form-label fw-bold">{{ t('settings.fields.head') }}</div>
+              <span v-if="repo.head" class="font-monospace af-repo-head">{{ repo.head }}</span>
+              <span v-else>–</span>
+            </div>
           </template>
           <!-- Credentials : the user and password git uses -->
           <template v-if="tabShown('credentials')">

@@ -943,7 +943,6 @@ onMounted(async () => {
                 v-show="fieldShown('description')"
                 icon="info-circle"
                 :isFloating="false"
-                :required="true"
                 :label="t('settings.fields.description')"
               />
             </template>
