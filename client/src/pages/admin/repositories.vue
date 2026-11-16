@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
 import { sortPulls } from '@/lib/pullResults';
 import { useAppStore } from '@/stores/app';
+import { toPush } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
@@ -90,6 +91,31 @@ async function pullAll() {
     adminMulti.value?.loadItems();
   }
 }
+// Push all, on the right of Pull all : every repository with changes not pushed yet pushed, as its
+// own Push does, one after the other, the ones that fail named ; greyed while none has any (read
+// from the list as shown : lib/repositoryUsage.js toPush)
+const pushingAll = ref(false);
+const pushable = computed(() => toPush(adminMulti.value?.itemList));
+async function pushAll() {
+  pushingAll.value = true;
+  try {
+    const repos = pushable.value;
+    for (const repo of repos) adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
+    // one after the other, as the designer's Push all (each a commit and a push of its own)
+    const failed = [];
+    for (const repo of repos) {
+      await axios
+        .post(`/api/v2/repository/${encodeURIComponent(repo.name)}/sync`, {})
+        .catch(() => failed.push(repo.name));
+    }
+    const pushed = repos.length - failed.length;
+    if (failed.length) toast.error(t('settings.repositories.pushAllFailed', { names: failed.join(', ') }));
+    else if (pushed) toast.success(t('settings.repositories.pushAllDone', pushed));
+  } finally {
+    pushingAll.value = false;
+    adminMulti.value?.loadItems();
+  }
+}
 async function triggerSync(repo) {
   await runGit(repo, 'sync', t('settings.repositories.push'));
 }
@@ -117,9 +143,17 @@ onMounted(async () => {
       @sync="triggerSync"
     >
       <template #actionsBefore>
-        <BsButton icon="download" :disabled="pullingAll" @click="pullAll()">{{
+        <BsButton icon="download" :disabled="pullingAll || pushingAll" @click="pullAll()">{{
           t('settings.repositories.pullAll')
         }}</BsButton>
+        <!-- greyed while no repository has anything to push, why in the tooltip -->
+        <BsButton
+          icon="upload"
+          :disabled="pushingAll || pullingAll || !pushable.length"
+          :title="pushable.length ? null : t('settings.repositories.pushAllNone')"
+          @click="pushAll()"
+          >{{ t('settings.repositories.pushAll') }}</BsButton
+        >
       </template>
     </AppAdminMulti>
   </AppSettingsPage>

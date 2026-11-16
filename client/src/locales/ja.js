@@ -1342,6 +1342,10 @@ export default {
       pullAllSkipped:
         'プッシュされていない変更があるためプルしませんでした。先にプッシュするか、リポジトリをリセットしてください: {names}',
       push: 'プッシュ',
+      pushAll: 'すべてプッシュ',
+      pushAllDone: '{n} 件のリポジトリをプッシュしました',
+      pushAllFailed: 'プッシュに失敗: {names}',
+      pushAllNone: 'プッシュする変更のあるリポジトリはありません',
       pushHint: 'デザイナーが書き込むリポジトリ (フォーム、設定、プレイブック、ワークフロー) だけがプッシュされます。',
       reset: 'リセット',
       changeCredentials: '認証情報を変更',

@@ -1351,6 +1351,10 @@ export default {
       pullAllSkipped:
         'Sem pull, há alterações ainda não enviadas: envie-as primeiro (Push) ou reponha o repositório: {names}',
       push: 'Push',
+      pushAll: 'Push de todos',
+      pushAllDone: '{n} repositório enviado | {n} repositórios enviados',
+      pushAllFailed: 'O push falhou para: {names}',
+      pushAllNone: 'Nenhum repositório tem alterações por enviar',
       pushHint:
         'Só um repositório onde o designer escreve (formulários, definições, playbooks, workflows) é enviado de volta.',
       reset: 'Repor',

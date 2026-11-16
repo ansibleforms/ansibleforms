@@ -1355,6 +1355,10 @@ export default {
       pullAllSkipped:
         'Nicht gepullt, Änderungen noch nicht gepusht: zuerst pushen (Push) oder das Repository zurücksetzen: {names}',
       push: 'Push',
+      pushAll: 'Alle pushen',
+      pushAllDone: '{n} Repository gepusht | {n} Repositories gepusht',
+      pushAllFailed: 'Push fehlgeschlagen für: {names}',
+      pushAllNone: 'Kein Repository hat Änderungen zum Pushen',
       pushHint:
         'Nur ein Repository, in das der Designer schreibt (Formulare, Einstellungen, Playbooks, Workflows), wird zurückgepusht.',
       reset: 'Zurücksetzen',

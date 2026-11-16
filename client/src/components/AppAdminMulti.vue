@@ -1587,6 +1587,8 @@ onBeforeUnmount(() => {
 defineExpose({
   loadItems,
   setItemProperty,
+  // the records as listed (the repositories' Push all : greyed when none has anything to push)
+  itemList,
   // another dialog's New button creates a record with this one's dialog (dialogOnly)
   newItem,
 });
