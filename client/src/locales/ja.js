@@ -771,11 +771,6 @@ export default {
     warranty:
       'このプログラムは有用であることを願って頒布されますが、商品性や特定目的への適合性についての暗黙の保証も含め、いかなる保証もありません。詳しくは GNU 一般公衆利用許諾書をご覧ください。',
     findLicense: 'GNU 一般公衆利用許諾書は次の場所で入手できます:',
-    serverBuild: 'サーバービルド',
-    clientBuild: 'クライアントビルド',
-    sha: 'SHA',
-    built: 'ビルド日時',
-    dirty: '未コミットの変更あり',
     newVersionAvailable: 'AnsibleForms の新しいバージョンが利用可能です。',
     newVersionReload: '再読み込み',
     newVersionDismiss: '閉じる',

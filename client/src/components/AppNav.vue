@@ -29,7 +29,6 @@ function setLanguage(code) {
 // ENV-BASED HOME MENU LABEL/ICON
 
 import axios from 'axios';
-import Time from '@/lib/Time';
 import { useLiveEvent } from '@/composables/useLiveEvent';
 import { jobsPath } from '@/lib/jobsPath';
 import { iconOrDefault } from '@/lib/iconName';
@@ -325,6 +324,15 @@ const currentLanguage = computed(() => languages.find((l) => l.code === locale.v
 const helpMenu = computed(() => helpMenuOptions.value);
 
 // Check if client/server builds match (cache detection)
+/**
+ * The About dialog's logo : the product's own for the current theme (as the header's without a
+ * custom logo, BsNavBar), a colour hovered included.
+ */
+const aboutLogo = computed(() => {
+  const theme = store.themePreview || currentTheme.value;
+  return theme === 'dark' ? 'img/logo_dark.svg' : theme === 'light' ? 'img/logo_light.svg' : 'img/logo_color.svg';
+});
+
 const buildMismatch = computed(() => {
   const serverSha = store.serverBuild?.gitSha;
   const clientSha = store.clientBuild?.gitSha;
@@ -336,16 +344,19 @@ const buildMismatch = computed(() => {
 </script>
 
 <template>
-  <!-- About : two build cards and a few lines, in a narrow dialog (af-about-dialog) -->
+  <!-- About : the product's logo and its version, then its license, in a narrow dialog
+       (af-about-dialog) -->
   <BsModal v-if="showVersion" size="md" dialogClass="af-about-dialog" @close="showVersion = false" icon="circle-info">
-    <!-- named as its menu link, About ; the product and its version its first lines -->
+    <!-- named as its menu link, About -->
     <template v-slot:title>{{ t('nav.about') }}</template>
     <template v-slot>
+      <!-- the product : always its own logo for the theme, never an instance's custom one, its
+           version under it -->
       <div class="af-about-product">
-        <span class="af-about-name">{{ t('version.title') }}</span>
+        <img class="af-about-logo" :src="aboutLogo" :alt="t('version.title')" />
         <span class="af-about-version">v{{ store.version }}</span>
       </div>
-      <!-- Cache Mismatch Warning -->
+      <!-- this page runs an older build than the server : reload it -->
       <div v-if="buildMismatch" class="alert alert-warning d-flex align-items-center" role="alert">
         <font-awesome-icon icon="triangle-exclamation" class="me-2" />
         <div>
@@ -354,44 +365,7 @@ const buildMismatch = computed(() => {
           <small>{{ t('version.cacheMismatchMsg') }}</small>
         </div>
       </div>
-
-      <div class="mb-3">
-        <div class="row g-2">
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-body">
-                <h6 class="card-title">{{ t('version.serverBuild') }}</h6>
-                <p class="card-text mb-1">
-                  <small class="text-muted">{{ t('version.sha') }}:</small>
-                  <code class="ms-1 fs-6 fw-bold">{{ store.serverBuild?.gitSha || 'unknown' }}</code>
-                  <span v-if="store.serverBuild?.dirty" class="badge bg-warning ms-2">{{ t('version.dirty') }}</span>
-                </p>
-                <p class="card-text mb-0" v-if="store.serverBuild?.buildTime">
-                  <small class="text-muted">{{ t('version.built') }}:</small>
-                  <small class="ms-1">{{ Time.format(store.serverBuild.buildTime) }}</small>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-body">
-                <h6 class="card-title">{{ t('version.clientBuild') }}</h6>
-                <p class="card-text mb-1">
-                  <small class="text-muted">{{ t('version.sha') }}:</small>
-                  <code class="ms-1 fs-6 fw-bold">{{ store.clientBuild?.gitSha || 'unknown' }}</code>
-                  <span v-if="store.clientBuild?.dirty" class="badge bg-warning ms-2">{{ t('version.dirty') }}</span>
-                </p>
-                <p class="card-text mb-0" v-if="store.clientBuild?.buildTime">
-                  <small class="text-muted">{{ t('version.built') }}:</small>
-                  <small class="ms-1">{{ Time.format(store.clientBuild.buildTime) }}</small>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <p class="mt-3 fs-6 user-select-none">
+      <p class="mb-0 fs-6 user-select-none">
         {{ t('version.license') }}<br />
         <br />
         {{ t('version.warranty') }}<br />
@@ -627,16 +601,17 @@ const buildMismatch = computed(() => {
 </template>
 
 <style lang="scss">
-/* the About dialog's first line : the product, large and bold, its version beside it in grey */
+/* the About dialog's top : the product's logo, centred, its version under it in grey */
 .af-about-product {
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin: 0.5rem 0 1.5rem;
 }
-.af-about-name {
-  font-size: 1.25rem;
-  font-weight: 600;
+.af-about-logo {
+  height: 3rem;
+  max-width: 100%;
 }
 .af-about-version {
   color: var(--bs-secondary-color);
