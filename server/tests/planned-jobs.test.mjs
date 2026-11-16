@@ -187,7 +187,7 @@ describe("Schedule.plan", () => {
     await assert.rejects(Schedule.plan(planner, planBody({ one_time_run: "not a time" })), { name: "BadRequestError" });
   });
 
-  test("the pair before 7.5.0 (one_time_run true with run_at) still plans, at run_at (deprecated)", async () => {
+  test("the pair before 7.8.0 (one_time_run true with run_at) still plans, at run_at (deprecated)", async () => {
     await Schedule.plan(planner, planBody({ one_time_run: true, run_at: "2030-01-01 10:00:00" }));
     assert.equal(created.one_time_run, stored);
     await Schedule.plan(planner, planBody({ one_time_run: undefined, run_at: runAt }));
@@ -282,7 +282,7 @@ describe("Schedule.plan", () => {
       // once, at its moment : the cron and the rrule cleared
       await Schedule.update({ one_time_run: "2030-01-01T00:00:00Z" }, 7);
       assert.deepEqual([updated.rrule, updated.cron, updated.one_time_run], [null, null, "2030-01-01 00:00:00"]);
-      // the pair before 7.5.0 : read as that moment ; the flag off with a cron : the cron
+      // the pair before 7.8.0 : read as that moment ; the flag off with a cron : the cron
       await Schedule.update({ one_time_run: 1, run_at: "2030-01-01T00:00:00.000Z" }, 7);
       assert.deepEqual([updated.one_time_run, "run_at" in updated], ["2030-01-01 00:00:00", false]);
       await Schedule.update({ one_time_run: 0, cron: "0 1 * * *", run_at: "2030-01-01T00:00:00Z" }, 7);
@@ -334,7 +334,7 @@ describe("Schedule.launch", () => {
     assert.equal(launched.extravars.schedule, undefined, "the schedule's record is not form output");
   });
 
-  test("the schedule extra var keeps run_at, a copy of one_time_run's moment as before 7.5.0 (deprecated)", async () => {
+  test("the schedule extra var keeps run_at, a copy of one_time_run's moment as before 7.8.0 (deprecated)", async () => {
     await Schedule.launch(1);
     const { schedule } = launched.serverExtravars;
     // the moment as the table gives it, a Date : sent as before

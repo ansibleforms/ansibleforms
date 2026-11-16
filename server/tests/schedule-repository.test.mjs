@@ -521,7 +521,7 @@ describe("an edit in the app goes to its entry", () => {
     const odd = await ScheduleRepo.create("ops", { name: "Odd", form: "Report", cron: "0 0 1 * 1", one_time_run: null });
     const weekly = await ScheduleRepo.create("ops", { name: "Weekly", form: "Report", rrule: RRULE });
     const once = await ScheduleRepo.create("ops", { name: "Once", form: "Report", one_time_run: "2030-01-02T03:04:00.000Z" });
-    // the pair before 7.5.0 : read as the moment, deprecated
+    // the pair before 7.8.0 : read as the moment, deprecated
     const legacy = await ScheduleRepo.create("ops", { name: "Legacy", form: "Report", one_time_run: 1, run_at: "2030-01-02T05:06:00Z" });
     assert.equal(rows.find((r) => r.id === legacy).one_time_run, "2030-01-02 05:06:00");
     const row = (id) => rows.find((r) => r.id === id);

@@ -412,7 +412,7 @@ describe("an SSO provider's type : entraid in a file, azuread stored", () => {
     assert.equal(summary.created, 2);
     assert.deepEqual(["corp", "emea"].map((n) => fx.rowNamed("oauth2_providers", n).provider), ["azuread", "azuread"]);
     const said = summary.notes.filter((n) => /provider: azuread is deprecated/.test(n));
-    assert.deepEqual(said, ["Deprecated: provider: azuread is deprecated since 7.5.0 and removed in 8: read as provider: entraid, declare that instead"]);
+    assert.deepEqual(said, ["Deprecated: provider: azuread is deprecated since 7.8.0 and removed in 8: read as provider: entraid, declare that instead"]);
     const { summaryText } = await import("../src/lib/repoObjects/engine.js");
     assert.match(summaryText(await desc(), summary), /Deprecated: provider: azuread is deprecated/);
   });

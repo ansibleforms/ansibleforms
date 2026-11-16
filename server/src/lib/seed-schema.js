@@ -180,7 +180,7 @@ export function foldAwxIntoRunners(doc) {
 }
 
 /**
- * A repository's use_for_config (deprecated since 7.5.0, removed in 8) as the three flags it is
+ * A repository's use_for_config (deprecated since 7.8.0, removed in 8) as the three flags it is
  * now : use_for_roles, use_for_categories and use_for_constants, each the item's own when it
  * declares it. The one rule for the config seed's repositories (foldConfigFlag) and a
  * repositories: entries of a repository (lib/repoObjects/repositories.js).
@@ -478,7 +478,7 @@ export const ssoProviderItem = (({ anyOf: _client, ...item }) => item)(oauth2Ite
 
 // an SSO provider's type : Microsoft Entra ID is entraid in a file ; the database, the sign-in and
 // the API keep azuread, its name of before (a role's members say entraid/ the same way)
-export const OAUTH2_VALUES = { provider: { azuread: { file: "entraid", deprecated: "7.5.0" } } };
+export const OAUTH2_VALUES = { provider: { azuread: { file: "entraid", deprecated: "7.8.0" } } };
 
 /**
  * An object's values as a file says them : each stored value of a field the map names given its
@@ -575,7 +575,7 @@ const repositoryItem = {
     credential: str,
     // what the app reads from it : every usage type's flag (lib/repoObjects/types.js)
     ...Object.fromEntries(USAGE_TYPES.map((t) => [t.flag, bool])),
-    // deprecated since 7.5.0, removed in 8 : the roles, the categories and the constants at once
+    // deprecated since 7.8.0, removed in 8 : the roles, the categories and the constants at once
     // (foldConfigFlag)
     use_for_config: bool,
     rebase_on_start: bool,

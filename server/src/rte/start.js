@@ -29,7 +29,7 @@ export async function startRteInMode() {
     );
     return startRte();
   }
-  // the names of before 7.6 still set : CONTROLLER_URL, CONTROLLER_TLS_VERIFY (lib/controllerEnv.js)
+  // the names of before 7.8 still set : CONTROLLER_URL, CONTROLLER_TLS_VERIFY (lib/controllerEnv.js)
   const { controllerEnvWarnings } = await import("../lib/controllerEnv.js");
   const warnings = controllerEnvWarnings();
   if (warnings.length) {

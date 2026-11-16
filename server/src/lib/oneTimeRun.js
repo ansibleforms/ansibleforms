@@ -3,7 +3,7 @@
 // the app takes it : an ISO 8601 time with its offset or Z, so the run never depends on the zone of
 // a server or a browser (#1064), on a day that exists. The MCP tools (plan_job, create_schedule),
 // the schedule model and the schedules repository's entries (lib/scheduleFiles.js) read it with
-// it ; whether it may be in the past is the caller's to say. The pair a request sent before 7.5.0
+// it ; whether it may be in the past is the caller's to say. The pair a request sent before 7.8.0
 // (one_time_run true with run_at) is still read here, deprecated (oneTimeRunOf).
 
 import logger from './logger.js';
@@ -95,8 +95,8 @@ function flagOf(value) {
 }
 
 /**
- * A request's one-time run in the shape 7.5.0 takes it : one_time_run, the moment of the run (or
- * null : not one). The pair before it is still read, deprecated since 7.5.0 and removed in 8, said
+ * A request's one-time run in the shape 7.8.0 takes it : one_time_run, the moment of the run (or
+ * null : not one). The pair before it is still read, deprecated since 7.8.0 and removed in 8, said
  * once in the server log per caller : one_time_run true (or 1) with run_at is a one-time run at
  * run_at, run_at alone too ; one_time_run false (or 0) is none (its run_at ignored : a cron or a
  * rrule times it). The request is changed in place, run_at removed.
@@ -120,7 +120,7 @@ export function oneTimeRunOf(data, caller = "api") {
   if (flag !== null || runAt) {
     if (!warned.has(caller)) {
       warned.add(caller);
-      logger.warning(`A schedule was sent one_time_run as a yes or no${runAt ? " with run_at" : ""} (${caller}), deprecated since 7.5.0 and removed in 8: send one_time_run with the moment of the run instead (an ISO 8601 time with its offset or Z)`);
+      logger.warning(`A schedule was sent one_time_run as a yes or no${runAt ? " with run_at" : ""} (${caller}), deprecated since 7.8.0 and removed in 8: send one_time_run with the moment of the run instead (an ISO 8601 time with its offset or Z)`);
     }
   }
   if (flag === true) {
@@ -135,7 +135,7 @@ export function oneTimeRunOf(data, caller = "api") {
 /**
  * A one-time run's moment as the schedule table keeps it, from what the app is sent : an ISO 8601
  * time with its offset or Z, a Date, or a time without a zone taken as UTC (as the table took one
- * before 7.5.0).
+ * before 7.8.0).
  *
  * Args:
  *   value (any): the moment.

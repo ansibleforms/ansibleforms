@@ -799,7 +799,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       const rruleText = String(rruleGiven ?? '').trim();
       if (!mayManage) throw new ToolError('You do not have permission to create schedules (the allowScheduledJobs role option)', 'access_denied');
       if (!String(name ?? '').trim()) throw new ToolError('A schedule needs a name', 'invalid_request');
-      // its one run's moment : one_time_run, or run_at as before 7.5.0 (deprecated, said once)
+      // its one run's moment : one_time_run, or run_at as before 7.8.0 (deprecated, said once)
       const runAt = runAtGiven !== undefined && !onceGiven
         ? oneTimeRunOf({ run_at: runAtGiven }, 'mcp').one_time_run
         : onceGiven;
@@ -1265,7 +1265,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       cron: z.string().optional().describe('A cron expression, for a recurring schedule'),
       rrule: z.string().optional().describe('An iCal rrule, for a recurring schedule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1'),
       one_time_run: z.string().optional().describe('One run at this moment: ISO 8601 with its offset or Z'),
-      run_at: z.string().optional().describe('Deprecated since 7.5.0, removed in 8: the name one_time_run had before'),
+      run_at: z.string().optional().describe('Deprecated since 7.8.0, removed in 8: the name one_time_run had before'),
       extraVars: z.record(z.string(), z.any()).optional().describe('The extra vars the job gets'),
     },
     annotations: { readOnlyHint: false, destructiveHint: true },

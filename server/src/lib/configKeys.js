@@ -8,7 +8,7 @@
 // read, both named ; its own file at the root (roles.yaml) without the key is read and refused,
 // never the base's served in its place - else from the config.yaml of before at its root, which
 // may leave it out, its keys plain there (roles:, categories:, constants:)
-// (deprecated since 7.5.0, no longer read in 8.0.0 : said in the server log once per load, in the
+// (deprecated since 7.8.0, no longer read in 8.0.0 : said in the server log once per load, in the
 // repository's pull output and on its page), and written back to the file it was read from -
 // config.yaml stays config.yaml until it is moved - or a new one of its own (roles.yaml ...).
 //

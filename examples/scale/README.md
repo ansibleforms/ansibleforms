@@ -5,7 +5,7 @@ One image, started in different roles (`AF_ROLE`):
 | Role | Runs | How many |
 |---|---|---|
 | unset | the controller's web interface and API **and** the worker, in one process: the default | 1 |
-| `controller` | the web interface and the API (`app` before 7.6, still read) | as many as you like, behind a load balancer |
+| `controller` | the web interface and the API (`app` before 7.8, still read) | as many as you like, behind a load balancer |
 | `worker` | the background work: the database bootstrap and the config seed, the schedules, the nightly backup, the repository syncs, the cleanups | 1 at work; more wait and take over |
 | `rte` | the playbooks (the `ansibleforms-rte-full` image) | as many as you like |
 

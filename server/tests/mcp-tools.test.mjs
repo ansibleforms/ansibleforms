@@ -566,7 +566,7 @@ describe("MCP schedules", () => {
     expect(once.data).toMatchObject({ oneTimeRun: later.toISOString() });
     expect(once.data.runAt).toBeUndefined();
     expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "once", form: "Create volume", extra_vars: "{}\n", one_time_run: later.toISOString() });
-    // run_at, its name before 7.5.0 : still read, deprecated
+    // run_at, its name before 7.8.0 : still read, deprecated
     const legacy = await call(client, "create_schedule", { form: "Create volume", name: "legacy", run_at: later.toISOString() });
     expect(legacy.data).toMatchObject({ oneTimeRun: later.toISOString() });
     expect((await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "bad", cron: "99 * * * *" } })).structuredContent.code).toBe("invalid_request");

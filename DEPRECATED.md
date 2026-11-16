@@ -22,13 +22,13 @@ Removed in 8.0.0. Each logs a warning when it is used.
 | the `mail_*` fields in `PUT /api/v2/settings` (ignored, it logs a warning ; a body of only them changes nothing and answers 400 saying where the mail settings went) | a mail channel (Connections > Notifications, `/api/v2/notificationchannel`) | 7.6.0 |
 | `POST /api/v2/settings/mailcheck` (with a masked password or no `mail_server` it tests the active mail channel, and logs a warning) | `POST /api/v2/notificationchannel/{id}/test` (a mail channel's Test button) | 7.6.0 |
 | `forms_yaml` in `GET` and `PUT /api/v2/settings/config` (a `PUT` with it logs a warning) | `config_yaml` | 7.6.0 |
-| a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.5.0 |
-| `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.5.0 |
-| `provider: azuread` on an SSO provider of the config seed's `oauth2:` items or of a repository's `controller_sso:` entries (still read as Microsoft Entra ID, with a warning in the server log and the repository's pull output) | `provider: entraid` | 7.5.0 |
-| a schedule's `one_time_run: true` with `run_at` (or `run_at` alone) through the API, and `run_at` in the MCP tool `create_schedule` (still read as a one-time run at that moment, with a warning in the server log once per caller ; `one_time_run: false` is no one-time run) ; `run_at` in the `schedule` extra var a scheduled job gets (still sent, a copy of `one_time_run`) | `one_time_run` holding the moment of the run (an ISO 8601 time with its offset or Z), in the API and in the `schedule` extra var | 7.5.0 |
-| `APP_URL` on an RTE (still read when `CONTROLLER_URL` is not set, with a warning at the RTE's start ; `CONTROLLER_URL` wins when both are set) | `CONTROLLER_URL` | 7.6.0 |
-| `APP_TLS_VERIFY` on an RTE (still read the same way) | `CONTROLLER_TLS_VERIFY` | 7.6.0 |
-| `AF_ROLE=app` (still read as `controller`, with a warning at start ; a node started with it keeps its `app-` name, so it finds its jobs again) | `AF_ROLE=controller` | 7.6.0 |
+| a repository's `config.yaml` holding the `roles:`, `categories:` or `constants:` of a Roles, Categories or Constants repository (still read when the key's own file is missing, with a warning in the server log, the repository's pull output and its page) | the key in its own file at the repository's root : `roles.yaml`, `categories.yaml`, `constants.yaml` | 7.8.0 |
+| `use_for_config` on a repository of the config seed (it logs a warning and sets the three flags) | `use_for_roles`, `use_for_categories` and `use_for_constants` | 7.8.0 |
+| `provider: azuread` on an SSO provider of the config seed's `oauth2:` items or of a repository's `controller_sso:` entries (still read as Microsoft Entra ID, with a warning in the server log and the repository's pull output) | `provider: entraid` | 7.8.0 |
+| a schedule's `one_time_run: true` with `run_at` (or `run_at` alone) through the API, and `run_at` in the MCP tool `create_schedule` (still read as a one-time run at that moment, with a warning in the server log once per caller ; `one_time_run: false` is no one-time run) ; `run_at` in the `schedule` extra var a scheduled job gets (still sent, a copy of `one_time_run`) | `one_time_run` holding the moment of the run (an ISO 8601 time with its offset or Z), in the API and in the `schedule` extra var | 7.8.0 |
+| `APP_URL` on an RTE (still read when `CONTROLLER_URL` is not set, with a warning at the RTE's start ; `CONTROLLER_URL` wins when both are set) | `CONTROLLER_URL` | 7.8.0 |
+| `APP_TLS_VERIFY` on an RTE (still read the same way) | `CONTROLLER_TLS_VERIFY` | 7.8.0 |
+| `AF_ROLE=app` (still read as `controller`, with a warning at start ; a node started with it keeps its `app-` name, so it finds its jobs again) | `AF_ROLE=controller` | 7.8.0 |
 
 ## Upgrading from 6.5 to 7.0.0 - read first
 
@@ -56,7 +56,7 @@ the removals below, this is what a 6.5 install changes when it moves to 7.
 | a local password set through the application needs `PASSWORD_MIN_LENGTH` (8) characters, and cannot be the username or the default | choose longer passwords ; `PASSWORD_MIN_LENGTH=0` checks no length. Existing passwords keep working |
 | `PROCESS_MAX_BUFFER` (now 50 MB) no longer stops a playbook : past it, the output is no longer stored (the job says so) and the playbook goes on | nothing ; a value set to stop runaway playbooks no longer does |
 | an uncaught exception now ends the process (logged as `crit`) instead of leaving it running in an unknown state | run the containers with a restart policy (the compose example's `unless-stopped`, Kubernetes restarts by itself) |
-| optional : several controller nodes | `AF_ROLE=controller` nodes (`AF_ROLE=app` before 7.6) plus one `AF_ROLE=worker`, sharing the database and the persistent volume - see `examples/scale` |
+| optional : several controller nodes | `AF_ROLE=controller` nodes (`AF_ROLE=app` before 7.8) plus one `AF_ROLE=worker`, sharing the database and the persistent volume - see `examples/scale` |
 
 ## Removed in 7.0.0
 

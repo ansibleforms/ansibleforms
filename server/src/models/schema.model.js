@@ -644,7 +644,7 @@ const SCHEMA_MANIFEST = {
                               'audit', 'chat_settings'],
                      columns: ['oauth2_providers.tenant_id', 'jobs.raw_form_data', 'repositories.use_for_config',
                                'jobs.pid', 'jobs.host', 'schedule.one_time_run',
-                               // not schedule.run_at : 7.5.0 drops it, one_time_run holds the moment
+                               // not schedule.run_at : 7.8.0 drops it, one_time_run holds the moment
                                'credentials.vault_path', 'jobs.awx_workflow', 'settings.logo',
                                'settings.config_source', 'settings.default_language',
                                'settings.default_theme', 'settings.default_theme_color',
@@ -874,7 +874,7 @@ async function patchVersion6(messages, success, failed) {
   // This allows schedules to be either recurring (false) or one-time (true)
   // Add run_at column to schedule table (6.2.0)
   // This stores the datetime for one-time scheduled jobs
-  // 7.5.0 turns them into one column, one_time_run holding the moment (oneTimeRunMoment, patch 7) :
+  // 7.8.0 turns them into one column, one_time_run holding the moment (oneTimeRunMoment, patch 7) :
   // added as 6.2.0 had them only on a database that has neither yet, never again after that
   if (!(await oneTimeRunIsMoment())) {
     await checkPromise(addColumn("schedule", "one_time_run", "tinyint(4)", true, "0"), messages, success, failed);
@@ -1368,7 +1368,7 @@ export async function addDatabasesForCredentials() {
 }
 
 /**
- * Whether a schedule's one_time_run already holds the moment of its run (7.5.0 : a datetime column,
+ * Whether a schedule's one_time_run already holds the moment of its run (7.8.0 : a datetime column,
  * no run_at beside it) rather than the flag 6.2.0 added.
  *
  * Args:
@@ -1384,7 +1384,7 @@ export async function oneTimeRunIsMoment(query = (sql, params) => mysql.do(sql, 
 }
 
 /**
- * Turns a schedule's one-time run into one column holding its moment (7.5.0) : a schedule is
+ * Turns a schedule's one-time run into one column holding its moment (7.8.0) : a schedule is
  * timed by exactly one of cron, rrule and one_time_run. Each step checks what is there first, so a
  * start that stopped halfway finishes it, and a second run does nothing :
  *   1. a column one_time_moment (datetime) is added ;

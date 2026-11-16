@@ -1,5 +1,5 @@
 // The controller's names in the environment (lib/controllerEnv.js, lib/role.js) : CONTROLLER_URL and
-// CONTROLLER_TLS_VERIFY on an RTE, AF_ROLE=controller for the web process ; the names of before 7.6
+// CONTROLLER_TLS_VERIFY on an RTE, AF_ROLE=controller for the web process ; the names of before 7.8
 // (APP_URL, APP_TLS_VERIFY, AF_ROLE=app) still read, the new one winning, each old one said.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";

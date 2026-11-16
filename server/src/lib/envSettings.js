@@ -67,7 +67,7 @@ export const REFUSED = {
 // the environment of the container, not edited from inside the app - but RTE_QUEUE_MINUTES, how
 // long the controller's job waits for a busy RTE, and RTE_FILES_MAX_MB, the largest folder it sends
 // an RTE, which the controller reads (Jobs). ANSIBLE_PATH, PROCESS_MAX_BUFFER, CONTROLLER_URL,
-// CONTROLLER_TLS_VERIFY (APP_URL, APP_TLS_VERIFY before 7.6) and LISTEN_HOST are read by an RTE
+// CONTROLLER_TLS_VERIFY (APP_URL, APP_TLS_VERIFY before 7.8) and LISTEN_HOST are read by an RTE
 // only : since 7 the controller runs no playbook itself.
 // the MCP server's switch and options (Settings > Connections > MCP) and the chat assistant's
 // switch (Settings > Connections > Chat assistant) ; the default language (Settings > Appearance >

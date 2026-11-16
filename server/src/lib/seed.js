@@ -566,7 +566,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     throw new Error("Seed file must contain a yaml mapping at the top level");
   }
   doc = interpolateEnv(doc);
-  // a repository's use_for_config : deprecated since 7.5.0, removed in 8 - the roles, the categories
+  // a repository's use_for_config : deprecated since 7.8.0, removed in 8 - the roles, the categories
   // and the constants, each a flag of its own now
   // the repository holding them already (the one the schema patch gave them to) keeps them ; the
   // configuration kept in the database : 7.3 read none of them, none gets the flags. Read before the
@@ -586,15 +586,15 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   doc = configFlag.doc;
   if (inDatabase) {
     for (const name of configFlag.dropped) {
-      logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.5.0 and removed in 8: the configuration is kept in the database, which was served instead of it, so it is not applied (declare use_for_roles, use_for_categories or use_for_constants to read them from it)`);
+      logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.8.0 and removed in 8: the configuration is kept in the database, which was served instead of it, so it is not applied (declare use_for_roles, use_for_categories or use_for_constants to read them from it)`);
     }
     configFlag.dropped = [];
   }
   for (const name of configFlag.folded) {
-    logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.5.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
+    logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.8.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
   }
   for (const name of configFlag.dropped) {
-    logger.warning(`The config seed's repository '${name}' uses use_for_config too, deprecated since 7.5.0 and removed in 8: only one repository holds the roles, the categories and the constants, '${configFlag.holder}' has them ; its use_for_config is not applied`);
+    logger.warning(`The config seed's repository '${name}' uses use_for_config too, deprecated since 7.8.0 and removed in 8: only one repository holds the roles, the categories and the constants, '${configFlag.holder}' has them ; its use_for_config is not applied`);
   }
   // a runner's own token, or user and password : deprecated since 7.3 in favour of a credential
   // of its kind (credential:), removed in 8. Applied as such a credential, named after the runner
@@ -614,7 +614,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     logger.warning(`The config seed's runner '${name}' carries its own token or user and password, deprecated since 7.3 and removed in 8: declare a credential of its kind with its url and name it with credential: (applied now as the credential '${credential}')`);
   }
   // an oauth2 provider's type as a file says it (provider: entraid) : applied as it is stored
-  // (azuread) ; provider: azuread still read, deprecated since 7.5.0 (lib/seed-schema.js OAUTH2_VALUES)
+  // (azuread) ; provider: azuread still read, deprecated since 7.8.0 (lib/seed-schema.js OAUTH2_VALUES)
   const oauth2Values = foldOauth2Values(doc);
   doc = oauth2Values.doc;
   for (const d of oauth2Values.deprecated) logger.warning(`The config seed's oauth2 provider '${d.name}' says ${d.notice}`);

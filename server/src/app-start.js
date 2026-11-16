@@ -1,7 +1,7 @@
 // The app : the web interface, the API and everything around it. Started by index.js with
 // AF_ROLE unset (the controller and the worker in one process, as AnsibleForms always ran) or
 // AF_ROLE=controller (the web interface and the API only, next to a worker - several may run
-// behind a load balancer ; AF_ROLE=app, its name before 7.6, is read the same).
+// behind a load balancer ; AF_ROLE=app, its name before 7.8, is read the same).
 // A worker or an RTE never loads this module.
 import express from 'express';
 import ansibleforms from './app.js';
@@ -151,7 +151,7 @@ export async function startApp(){
 
   // the Entra ID variables of before 7.3 (AZURE_*) : still read, said once
   for (const warning of entraEnvWarnings()) logger.warning(warning);
-  // the names of before 7.6 still set : AF_ROLE=app (lib/controllerEnv.js)
+  // the names of before 7.8 still set : AF_ROLE=app (lib/controllerEnv.js)
   for (const warning of controllerEnvWarnings()) logger.warning(warning);
 
   if (authConfig.secretIsGenerated) {

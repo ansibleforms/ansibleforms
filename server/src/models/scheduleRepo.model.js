@@ -131,7 +131,7 @@ async function checkValues(values, id) {
 /**
  * The timing a request gives a schedule of a repository, as the app takes it for its own
  * (models/schedule.model.js checkAppTiming) : a one time run by its moment (one_time_run ; the pair
- * before 7.5.0 read already, lib/oneTimeRun.js), else a rrule, which wins over a cron sent with
+ * before 7.8.0 read already, lib/oneTimeRun.js), else a rrule, which wins over a cron sent with
  * it, else a cron ; a rrule sent with a one time run is refused. Nothing given (an edit of its
  * other fields) : undefined, its timing stays.
  *
@@ -192,7 +192,7 @@ ScheduleRepo.create = async function (repository, data) {
     description: String(data.description ?? ""),
     form: data.form || "",
     // its timing, written as it is given : a rrule, a cron, or one run at its moment (the pair
-    // before 7.5.0, one_time_run true with run_at, read as that moment)
+    // before 7.8.0, one_time_run true with run_at, read as that moment)
     ...timingOfRequest(oneTimeRunOf(data, "api")),
     enabled: data.enabled === undefined || data.enabled === null ? true : data.enabled === true || Number(data.enabled) === 1,
     extra_vars: data.extra_vars ?? "",

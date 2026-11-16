@@ -113,7 +113,7 @@ async function withNextRunAsync(row) {
  * (one_time_run, its moment), a rrule (checked) or a cron. A rrule sent with a one time run is
  * refused ; a rrule wins over a cron sent with it ; the timing given replaces the one it had (the
  * other two cleared). None of them given, nothing changes ; a one time run taken off without a
- * cron or a rrule in its place is refused. The pair before 7.5.0 (one_time_run true with run_at)
+ * cron or a rrule in its place is refused. The pair before 7.8.0 (one_time_run true with run_at)
  * is read as a one time run at run_at (lib/oneTimeRun.js, deprecated).
  *
  * Args:
@@ -205,7 +205,7 @@ class Schedule extends CrudModel {
     logger.info(`Creating schedule ${data.name}`);
     // where it comes from is never a request body's
     for (const key of REPOSITORY_FIELDS) delete data[key];
-    // the pair before 7.5.0 (one_time_run true with run_at) read as a one time run at run_at
+    // the pair before 7.8.0 (one_time_run true with run_at) read as a one time run at run_at
     oneTimeRunOf(data, 'api');
     // a schedule while a schedules repository is used : saved, and written there as a new entry
     // waiting for its Push, with its own timing (a cron, a rrule or a one time run). A job a user
@@ -270,7 +270,7 @@ class Schedule extends CrudModel {
     if (notOnce || data.cron || data.rrule) {
       throw new Errors.AccessDeniedError("You can only plan a one-time run. Recurring schedules need the 'allowScheduledJobs' role option.");
     }
-    // its moment : one_time_run, or the pair before 7.5.0 (one_time_run true with run_at)
+    // its moment : one_time_run, or the pair before 7.8.0 (one_time_run true with run_at)
     if ([true, 1, '1', 'true'].includes(data.one_time_run) && !data.run_at) throw new Errors.BadRequestError("A planned job needs the moment of its run (one_time_run).");
     oneTimeRunOf(data, 'api');
     if (!data.one_time_run) throw new Errors.BadRequestError("A planned job needs the moment of its run (one_time_run).");
@@ -362,7 +362,7 @@ class Schedule extends CrudModel {
     logger.info(`Updating schedule ${(data.name) ? data.name : id}`);
     // where it comes from is never changed by an edit
     for (const key of REPOSITORY_FIELDS) delete data[key];
-    // the pair before 7.5.0 (one_time_run true with run_at) read as a one time run at run_at
+    // the pair before 7.8.0 (one_time_run true with run_at) read as a one time run at run_at
     oneTimeRunOf(data, 'api');
     // (an id that is not there is answered by the update below)
     const current = await super.findById(this.modelName, id).catch(() => null);
@@ -517,7 +517,7 @@ class Schedule extends CrudModel {
       delete scheduleInfo.launch_options;
       delete scheduleInfo.extra_vars;
       delete scheduleInfo.raw_form_data;
-      // run_at : the moment of its one run as a playbook read it before 7.5.0 (one_time_run holds
+      // run_at : the moment of its one run as a playbook read it before 7.8.0 (one_time_run holds
       // it now) - a copy kept for those playbooks, deprecated, removed in 8
       scheduleInfo.run_at = schedule.one_time_run ?? null;
       delete scheduleInfo.stored_job_id;

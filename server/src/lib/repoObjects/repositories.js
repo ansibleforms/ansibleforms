@@ -62,12 +62,12 @@ export default seedType({
   keptReason: (row, holder) => (Number(row.use_for_repositories) || (holder && row.name === holder) ? "holder" : uriCarriesSecret(row.uri) ? "uriSecret" : null),
   // no chains, and no usage another repository holds
   adjust: async (o) => {
-    // use_for_config (deprecated since 7.5.0, removed in 8) : the three flags it is now, as the
+    // use_for_config (deprecated since 7.8.0, removed in 8) : the three flags it is now, as the
     // config seed folds it - the one-repository rule below applies to them
     const out = { ...foldConfigItem(o) };
     const notes = [];
     if (o.use_for_config !== undefined) {
-      notes.push("use_for_config is deprecated since 7.5.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, declare those instead");
+      notes.push("use_for_config is deprecated since 7.8.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, declare those instead");
     }
     if (flagOn(out.use_for_repositories)) {
       delete out.use_for_repositories;

@@ -239,7 +239,7 @@ describe("the seed schema refuses anything it does not understand", () => {
     assert.equal(validateSeed(seed), true);
     const { doc, deprecated } = foldOauth2Values(seed);
     assert.deepEqual(doc.oauth2.items.map((i) => i.provider), ["azuread", "azuread", "oidc"]);
-    assert.deepEqual(deprecated, [{ name: "b", notice: "provider: azuread is deprecated since 7.5.0 and removed in 8: read as provider: entraid, declare that instead" }]);
+    assert.deepEqual(deprecated, [{ name: "b", notice: "provider: azuread is deprecated since 7.8.0 and removed in 8: read as provider: entraid, declare that instead" }]);
     assert.deepEqual(foldOauth2Values({}).doc, {}, "a seed without oauth2 as it is");
   });
 

@@ -4,7 +4,7 @@
 //   all (unset) : the controller's web interface, its API and the worker in one process, the way
 //                 AnsibleForms always ran
 //   controller  : the web interface and the API only - run as many as you like behind a load
-//                 balancer ; app, its name before 7.6, still works (deprecated, removed in 8.0.0)
+//                 balancer ; app, its name before 7.8, still works (deprecated, removed in 8.0.0)
 //   worker      : the background work only - schema, seed, schedules, backups, repository
 //                 syncs, cleanups. One holds the worker lock (lib/workerLock.js), others wait.
 //   rte         : a runtime environment that runs playbooks (src/rte/server.js)

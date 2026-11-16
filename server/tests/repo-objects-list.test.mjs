@@ -158,7 +158,7 @@ describe("a pull of repositories.yaml", () => {
     assert.equal(Number(row.use_for_roles), 1);
     assert.equal(Number(row.use_for_categories), 1);
     assert.equal(Number(row.use_for_constants), 1);
-    assert.match(RepoObjects.summaryText(await desc(), summary), /repositories.yaml#cfg: use_for_config is deprecated since 7.5.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants/);
+    assert.match(RepoObjects.summaryText(await desc(), summary), /repositories.yaml#cfg: use_for_config is deprecated since 7.8.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants/);
     CrudModel.flushAllLocal();
     const again = await RepoObjects.syncRepository(await desc(), "hub");
     assert.equal(again.updated, 0, JSON.stringify(again));

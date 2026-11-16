@@ -815,7 +815,7 @@
                   "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
                   "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
                   "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
-                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.5.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
+                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.8.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
                   "use_for_forms": { "type": "boolean" },
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
@@ -1019,7 +1019,7 @@
                   "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
                   "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
                   "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
-                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.5.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
+                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.8.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
                   "use_for_forms": { "type": "boolean" },
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
@@ -6875,7 +6875,7 @@
           "schedule"
         ],
         "summary": "Create a schedule, or plan a one-time run",
-        "description": "With allowScheduledJobs and no planned flag an admin-level schedule is created. While a schedules repository is used, it is saved and written to it as a new entry (waiting for the repository's Push), with its own timing: a cron, a rrule or a one-time run (one_time_run, the moment: an ISO 8601 time with its offset or Z); otherwise it is kept in the app, timed the same ways. Exactly one timing is kept. Otherwise (allowPlannedJobs, or planned: true) it plans a one-time run of a form the caller may run, as the caller, and needs name, form and one_time_run, with no cron nor rrule. Deprecated since 7.5.0 (removed in 8, a warning in the server log): one_time_run true with run_at, or run_at alone, is read as one_time_run at run_at; one_time_run false is no one-time run.",
+        "description": "With allowScheduledJobs and no planned flag an admin-level schedule is created. While a schedules repository is used, it is saved and written to it as a new entry (waiting for the repository's Push), with its own timing: a cron, a rrule or a one-time run (one_time_run, the moment: an ISO 8601 time with its offset or Z); otherwise it is kept in the app, timed the same ways. Exactly one timing is kept. Otherwise (allowPlannedJobs, or planned: true) it plans a one-time run of a form the caller may run, as the caller, and needs name, form and one_time_run, with no cron nor rrule. Deprecated since 7.8.0 (removed in 8, a warning in the server log): one_time_run true with run_at, or run_at alone, is read as one_time_run at run_at; one_time_run false is no one-time run.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11207,7 +11207,7 @@
             "type": "string",
             "format": "date-time",
             "deprecated": true,
-            "description": "Deprecated since 7.5.0, removed in 8: the moment before one_time_run held it (with one_time_run true, or alone). Read as one_time_run"
+            "description": "Deprecated since 7.8.0, removed in 8: the moment before one_time_run held it (with one_time_run true, or alone). Read as one_time_run"
           },
           "extra_vars": {
             "type": "string",

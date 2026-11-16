@@ -1,7 +1,7 @@
 'use strict';
 // The controller's names in the environment : the AnsibleForms server that serves the web
 // interface and the API and hands jobs to its runners, as the installer and the definitions call
-// it. Before 7.6 its variables were named after "the app" : APP_URL and APP_TLS_VERIFY on an RTE,
+// it. Before 7.8 its variables were named after "the app" : APP_URL and APP_TLS_VERIFY on an RTE,
 // AF_ROLE=app for the web process. The old names still work, deprecated, removed in 8.0.0 : the new
 // one wins when both are set, and each old one still set is said once at start.
 //
@@ -33,7 +33,7 @@ export function controllerEnv(name, env = process.env) {
 }
 
 /**
- * The controller's address an RTE dials (CONTROLLER_URL, APP_URL before 7.6).
+ * The controller's address an RTE dials (CONTROLLER_URL, APP_URL before 7.8).
  *
  * Args:
  *   env (object): the environment, process.env by default.
@@ -45,7 +45,7 @@ export const controllerUrl = (env = process.env) => controllerEnv("CONTROLLER_UR
 
 /**
  * Whether an RTE checks the controller's certificate (CONTROLLER_TLS_VERIFY, APP_TLS_VERIFY before
- * 7.6) : yes unless it is 0.
+ * 7.8) : yes unless it is 0.
  *
  * Args:
  *   env (object): the environment, process.env by default.

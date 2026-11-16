@@ -1,4 +1,4 @@
-// 7.5.0 : a schedule's one-time run is one column holding its moment (one_time_run), instead of
+// 7.8.0 : a schedule's one-time run is one column holding its moment (one_time_run), instead of
 // the 6.2.0 flag with run_at beside it (models/schema.model.js oneTimeRunMoment). Each row keeps
 // exactly one timing : a one-time row its moment (its stale cron and rrule cleared), a recurring
 // one its cron or rrule (its stale run_at dropped), a job a user planned its moment and owner ; a
