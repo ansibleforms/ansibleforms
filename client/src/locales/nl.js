@@ -776,11 +776,6 @@ export default {
     warranty:
       'Dit programma wordt gedistribueerd in de hoop dat het nuttig zal zijn, maar ZONDER ENIGE GARANTIE; zonder zelfs de impliciete garantie van VERKOOPBAARHEID of GESCHIKTHEID VOOR EEN BEPAALD DOEL. Zie de GNU General Public License voor meer details.',
     findLicense: 'U vindt de GNU General Public License op',
-    serverBuild: 'Server build',
-    clientBuild: 'Client build',
-    sha: 'SHA',
-    built: 'Gebouwd',
-    dirty: 'onopgeslagen',
     newVersionAvailable: 'Er is een nieuwere versie van AnsibleForms beschikbaar.',
     newVersionReload: 'Herladen',
     newVersionDismiss: 'Sluiten',

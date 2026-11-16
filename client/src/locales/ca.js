@@ -776,11 +776,6 @@ export default {
     warranty:
       "Aquest programa es distribueix amb l'esperança que sigui útil, però SENSE CAP GARANTIA; fins i tot sense la garantia implícita de COMERCIABILITAT o IDONEÏTAT PER A UN PROPÒSIT DETERMINAT. Consulta la Llicència Pública General de GNU per a més detalls.",
     findLicense: 'Pots trobar la Llicència Pública General de GNU a',
-    serverBuild: 'Compilació del servidor',
-    clientBuild: 'Compilació del client',
-    sha: 'SHA',
-    built: 'Compilat',
-    dirty: 'amb canvis',
     newVersionAvailable: "Hi ha disponible una versió més nova d'AnsibleForms.",
     newVersionReload: 'Torna a carregar',
     newVersionDismiss: 'Descarta',

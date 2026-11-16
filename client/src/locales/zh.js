@@ -758,11 +758,6 @@ export default {
     warranty:
       '分发本程序是希望它能有用，但不提供任何担保；甚至不提供适销性或特定用途适用性的默示担保。详情请参阅 GNU 通用公共许可证。',
     findLicense: 'GNU 通用公共许可证可在此处找到：',
-    serverBuild: '服务器构建',
-    clientBuild: '客户端构建',
-    sha: 'SHA',
-    built: '构建时间',
-    dirty: '有未提交的更改',
     newVersionAvailable: 'AnsibleForms 有新版本可用。',
     newVersionReload: '重新加载',
     newVersionDismiss: '忽略',
