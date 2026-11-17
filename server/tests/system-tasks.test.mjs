@@ -6,8 +6,7 @@
 // What has to hold :
 //   - every run writes one row, with its outcome, a short result and the node that ran it ; a
 //     task that throws is a failed run, and the scheduler never sees the error ;
-//   - a task of every minute adds no row for a run that changed nothing : it rewrites its one
-//     quiet row, so its last run stays known without 1440 rows a day ;
+//   - every run is a row, a task of every minute's too, also one that changed nothing ;
 //   - the table keeps itself small : a month, and 1000 rows a task at most ;
 //   - the scheduler registers each task on the cron the API reports ;
 //   - the API is the admin settings' (checkSettingsMiddleware) and documented.
@@ -130,33 +129,17 @@ describe("a run is recorded", () => {
   });
 });
 
-describe("a task of every minute writes no row a minute", () => {
-  test("a run that changed nothing rewrites the task's one quiet row", async () => {
-    await recorded("deadNodes", async () => ({ changed: 0, result: "Nothing to free" }))();
+describe("every run is a row of its own", () => {
+  test.each([
+    ["deadNodes", { changed: 0, result: "Nothing to free" }],
+    ["deadNodes", { changed: 2, result: "Abandoned 2 jobs" }],
+    ["scheduleEnds", { failed: true, result: "Failed" }],
+    ["tokenCleanup", { changed: 0, result: "No expired token" }],
+  ])("%s : %o", async (key, out) => {
+    await recorded(key, async () => out)();
     const [row] = inserts();
-    assert.match(row.sql, /quiet_of\) VALUES \(\?, \?, \?, \?, \?, \?, \?\) ON DUPLICATE KEY UPDATE started_at = VALUES\(started_at\)/);
-    assert.equal(row.params[6], "deadNodes");
-  });
-
-  test("a run that changed something is a row of its own", async () => {
-    await recorded("deadNodes", async () => ({ changed: 2, result: "Abandoned 2 jobs" }))();
-    assert.doesNotMatch(inserts()[0].sql, /ON DUPLICATE KEY/);
-  });
-
-  test("a failed run is a row of its own, even when it changed nothing", async () => {
-    await recorded("scheduleEnds", async () => ({ failed: true, result: "Failed" }))();
-    assert.doesNotMatch(inserts()[0].sql, /ON DUPLICATE KEY/);
-  });
-
-  test("a daily task keeps every run, also one that changed nothing", async () => {
-    await recorded("tokenCleanup", async () => ({ changed: 0, result: "No expired token" }))();
-    assert.doesNotMatch(inserts()[0].sql, /ON DUPLICATE KEY/);
-  });
-
-  test("the tasks of every minute and the seed reload are the quiet ones", () => {
-    const quiet = SYSTEM_TASKS.filter((t) => t.quiet).map((t) => t.key).sort();
-    assert.deepEqual(quiet, ["configSeedReload", "deadNodes", "scheduleEnds"]);
-    for (const task of SYSTEM_TASKS.filter((t) => t.cron === "* * * * *")) assert.ok(task.quiet, task.key);
+    assert.match(row.sql, /\(task_key, started_at, ended_at, outcome, result, node\) VALUES \(\?, \?, \?, \?, \?, \?\)$/);
+    assert.equal(row.params[0], key);
   });
 });
 
@@ -236,13 +219,13 @@ describe("the scheduler records every task", () => {
     assert.match(inserts()[0].params[4], /Retention is off \(AUDIT_RETENTION_DAYS=0\)/);
   });
 
-  test("the stopped-node sweep that found nothing writes its quiet row", async () => {
+  test("the stopped-node sweep that found nothing writes its row", async () => {
     answer = (sql) => (/^\s*SELECT/i.test(sql) ? [] : { affectedRows: 0, changedRows: 0 });
     await run("* * * * *", 0);
     const [row] = inserts();
     assert.equal(row.params[0], "deadNodes");
     assert.equal(row.params[4], "Nothing to free");
-    assert.match(row.sql, /ON DUPLICATE KEY UPDATE/);
+    assert.doesNotMatch(row.sql, /ON DUPLICATE KEY/);
   });
 
   test("the token cleanup counts what it removed", async () => {
@@ -390,6 +373,6 @@ describe("the table", () => {
     assert.match(model, /addTable\("system_task_runs", taskRuns\.toString\(\)\)/);
     assert.equal((model.match(/'system_task_runs'/g) || []).length, 2, "the base tables and patchVersion7's");
     const own = read("src/db/create_system_task_runs_table.sql");
-    assert.match(own, /UNIQUE KEY `uk_system_task_runs_quiet` \(`quiet_of`\)/);
+    assert.doesNotMatch(own, /quiet_of/);
   });
 });

@@ -11,11 +11,10 @@
 // The tasks of every minute and the seed reload keep theirs : the app needs them that often.
 //
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
-// result (removed 120 jobs, or the error) and the node that ran it. A task that runs every minute
-// (or more often) does not add a row for a run that changed nothing : it rewrites one row of its
-// own instead (quiet_of), so its latest run stays known without a row a minute. The table keeps
-// itself small : its rows older than RUNS_KEEP_DAYS go, and a task keeps RUNS_KEEP_PER_TASK rows
-// at most.
+// result (removed 120 jobs, or the error) and the node that ran it ; every run, the ones of every
+// minute that changed nothing too, so the Runs tab shows each of them. The table keeps itself
+// small : its rows older than RUNS_KEEP_DAYS go, and a task keeps RUNS_KEEP_PER_TASK rows at most
+// (a task of every minute : its last 16 hours or so).
 import logger from './logger.js';
 import mysql from '../models/db.model.js';
 import { nodeId } from './role.js';
@@ -46,7 +45,6 @@ const scheduleSetting = (env, config) => ({ env, config });
  *   key: the task's name in the scheduler and in the table
  *   cron: when it runs (the app's timezone, LOG_TZ) ; null for a task timed by an interval
  *   intervalSetting: the appConfig key of the seconds between its runs (the config seed reload)
- *   quiet: a frequent task : a run that changed nothing rewrites its quiet row instead of adding one
  *   name, description: what it is, in English, as the API answers it (the GUI says it in the user's
  *     language : client/src/locales, jobs.system.tasks)
  *   setting: the setting it applies - its environment variable (env), its appConfig key (config)
@@ -59,7 +57,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'abandonedJobs',
     cron: '0 * * * *',
-    quiet: false,
     name: 'Abandoned jobs',
     description: 'Ends the jobs that ran a day without output and no runner took.',
     setting: null,
@@ -68,7 +65,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'deadNodes',
     cron: '* * * * *',
-    quiet: true,
     name: 'Stopped nodes',
     description: 'Frees what nodes and runners that stopped answering held.',
     setting: null,
@@ -77,7 +73,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'scheduleEnds',
     cron: '* * * * *',
-    quiet: true,
     name: 'Schedule ends',
     description: 'Turns off or removes the schedules that reached their end.',
     setting: null,
@@ -86,7 +81,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'tokenCleanup',
     cron: '0 3 * * *',
-    quiet: false,
     name: 'Expired tokens',
     description: 'Removes expired sign-in tokens, revocations and API tokens.',
     setting: null,
@@ -95,7 +89,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'auditCleanup',
     cron: '30 3 * * *',
-    quiet: false,
     name: 'Audit log cleanup',
     description: 'Removes audit log entries older than the audit retention.',
     setting: { env: 'AUDIT_RETENTION_DAYS', config: 'auditRetentionDays', tab: RETENTION_TAB },
@@ -104,7 +97,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'jobCleanup',
     cron: '30 2 * * *',
-    quiet: false,
     name: 'Job cleanup',
     description: 'Removes finished jobs older than the job retention.',
     setting: { env: 'JOB_RETENTION_DAYS', config: 'jobRetentionDays', tab: RETENTION_TAB },
@@ -113,7 +105,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'nightlyBackup',
     cron: '0 0 * * *',
-    quiet: false,
     name: 'Nightly backup',
     description: 'Backs up the database and removes the oldest nightly backups.',
     setting: { env: 'NIGHTLY_BACKUP_RETENTION', config: 'nightlyBackupRetention', tab: RETENTION_TAB },
@@ -122,7 +113,6 @@ export const SYSTEM_TASKS = [
   {
     key: 'storedJobsCleanup',
     cron: '0 4 * * *',
-    quiet: false,
     name: 'Stored jobs cleanup',
     description: 'Removes expired or unused stored jobs, and forgets old nodes.',
     setting: { env: 'STORED_JOB_UNUSED_DAYS', config: 'storedJobUnusedDays', tab: RETENTION_TAB },
@@ -132,7 +122,6 @@ export const SYSTEM_TASKS = [
     key: 'configSeedReload',
     cron: null,
     intervalSetting: 'configSeedReloadSeconds',
-    quiet: true,
     name: 'Config seed reload',
     description: 'Applies the config seed again when its file changes.',
     setting: { env: 'CONFIG_SEED_RELOAD_SECONDS', config: 'configSeedReloadSeconds', tab: 'configuration' },
@@ -301,9 +290,8 @@ export async function pruneRuns() {
 }
 
 /**
- * Writes one run of a task. A quiet task's run that succeeded and changed nothing rewrites the
- * task's quiet row (quiet_of, unique) ; every other run is a row of its own. Never throws : a
- * run that cannot be written is logged, the task itself has run.
+ * Writes one run of a task, a row of its own. Never throws : a run that cannot be written is
+ * logged, the task itself has run.
  *
  * Args:
  *   task (object): the task's entry of SYSTEM_TASKS.
@@ -314,28 +302,15 @@ export async function pruneRuns() {
  *   Promise<boolean>: whether the run was written.
  */
 export async function recordRun(task, run) {
-  const quiet = !!task.quiet && run.outcome === 'success' && !run.changed;
   const result = String(run.result ?? '').slice(0, RESULT_MAX);
-  const params = [task.key, run.startedAt, run.endedAt, run.outcome, result, nodeId];
   try {
-    if (quiet) {
-      // step 1a : the task's one quiet row, written over
-      await mysql.do(
-        'INSERT INTO AnsibleForms.`system_task_runs` (task_key, started_at, ended_at, outcome, result, node, quiet_of) ' +
-          'VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE started_at = VALUES(started_at), ' +
-          'ended_at = VALUES(ended_at), outcome = VALUES(outcome), result = VALUES(result), node = VALUES(node)',
-        [...params, task.key],
-        true,
-      );
-    } else {
-      // step 1b : a row of its own
-      await mysql.do(
-        'INSERT INTO AnsibleForms.`system_task_runs` (task_key, started_at, ended_at, outcome, result, node) ' +
-          'VALUES (?, ?, ?, ?, ?, ?)',
-        params,
-        true,
-      );
-    }
+    // step 1 : its row
+    await mysql.do(
+      'INSERT INTO AnsibleForms.`system_task_runs` (task_key, started_at, ended_at, outcome, result, node) ' +
+        'VALUES (?, ?, ?, ?, ?, ?)',
+      [task.key, run.startedAt, run.endedAt, run.outcome, result, nodeId],
+      true,
+    );
   } catch (err) {
     logger.warning(`Could not record the run of the system task ${task.key}: ${err.message || err}`);
     return false;
@@ -352,7 +327,7 @@ export async function recordRun(task, run) {
  * A task's run, recorded : the run's own work, then one row (recordRun) with its outcome and
  * result. The work returns { result, changed, failed } :
  *   result: what it did, in a few words (Removed 120 jobs) ;
- *   changed: how much it changed (0 : nothing, a quiet task then rewrites its quiet row) ;
+ *   changed: how much it changed (0 : nothing) ;
  *   failed: true when a part of it failed (its result then says what).
  * A work that throws is a failed run, with the error as its result ; the error is logged and
  * goes no further, as the tasks never threw into the scheduler.
