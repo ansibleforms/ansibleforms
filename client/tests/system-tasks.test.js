@@ -1,8 +1,9 @@
 // Jobs > System : the app's own maintenance tasks (the job retention, the nightly backup, the
 // expired tokens ...), under Future after Scheduled and Stored, for an admin only (the route's
 // showSettings, the api's guard). The list is the scheduled jobs' table, a row opening the task's
-// page : Details, Schedule then Runs, a nightly task's cron changed on its Schedule tab as a
-// schedule's (its editor, Save and Revert). Read from the sources and the config, as the other page
+// page : Details, Schedule then Runs, every task's cron changed on its Schedule tab as a
+// schedule's (its editor, Save and Revert), the config seed reload's too, whose cron may still come
+// from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). Read from the sources and the config, as the other page
 // tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -89,13 +90,12 @@ describe('a task in words', () => {
     expect(taskName(tr, { key: 'notATask', name: 'Server name' })).toBe('Server name');
   });
 
-  it('when it runs : its cron in words, every so many seconds, or off', () => {
+  it('when it runs : its cron in words, or off', () => {
     expect(taskTiming(t, { cron: '0 * * * *', enabled: true }, 'en')).toBe('Every hour');
-    expect(taskTiming(t, { cron: null, interval_seconds: 60, enabled: true })).toBe(
-      'jobs.system.everySeconds {"n":60}',
-    );
-    expect(taskTiming(t, { cron: null, interval_seconds: 60, enabled: false })).toBe('jobs.system.off');
-    expect(taskTimingCell(t, { cron: null, interval_seconds: 60, enabled: false })).not.toMatch(/popover/);
+    expect(taskTiming(t, { cron: '* * * * *', enabled: false })).toBe('jobs.system.off');
+    expect(taskTimingCell(t, { cron: '* * * * *', enabled: false })).not.toMatch(/popover/);
+    // no task is timed by seconds any more : the words of it are gone
+    expect(read('src/lib/systemTasks.js')).not.toMatch(/interval_seconds|everySeconds/);
   });
 
   it('how long a run took : milliseconds under a second, else as a job', () => {
@@ -131,11 +131,10 @@ describe("a task's page", () => {
     expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(5);
   });
 
-  it('shows on its Schedule tab, for the tasks the app times, when it runs and its next three runs, read only', () => {
+  it('shows on its Schedule tab the editor only : no task has a timing of its own, read only', () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
-    const fixed = tab.slice(tab.indexOf('<template v-else>'));
-    expect([...fixed.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'nextRuns']);
-    expect(fixed).not.toMatch(/<input|<select|v-model|BsCron/);
+    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['cron']);
+    expect(page).not.toMatch(/scheduleOwned|nextRunsLabel/);
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
@@ -156,7 +155,7 @@ describe("a task's page", () => {
     expect(page).toMatch(/t\('jobs\.system\.settingEnv'\)/);
   });
 
-  it("has no Delete, and edits nothing but a nightly task's cron", () => {
+  it("has no Delete, and edits nothing but the task's cron", () => {
     expect(page).not.toMatch(/icon="trash"/);
     expect(page).not.toMatch(/axios\.(post|delete)/);
     expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(['cronEdit', 'search']);
@@ -170,38 +169,27 @@ describe("a task's page", () => {
   });
 });
 
-describe("a nightly task's Schedule tab", () => {
+describe("a task's Schedule tab", () => {
   const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
-  // each task's declaration on the server, by its key ; the nightly ones have a schedule setting
+  // each task's declaration on the server, by its key ; each has a schedule setting
   const declared = serverTasks
     .split(/^ {4}key: '/m)
     .slice(1)
     .map((chunk) => ({ key: chunk.slice(0, chunk.indexOf("'")), schedule: /schedule: scheduleSetting\(/.test(chunk) }));
-  const NIGHTLY = declared.filter((d) => d.schedule).map((d) => d.key);
 
-  it('the five nightly tasks have a cron setting, the tasks the app needs often none', () => {
-    expect(NIGHTLY.sort()).toEqual([
-      'auditCleanup',
-      'jobCleanup',
-      'nightlyBackup',
-      'storedJobsCleanup',
-      'tokenCleanup',
-    ]);
-    const fixed = declared
-      .filter((d) => !d.schedule)
-      .map((d) => d.key)
-      .sort();
-    expect(fixed).toEqual(['abandonedJobs', 'configSeedReload', 'deadNodes', 'scheduleEnds']);
+  it('every task has a cron setting, none keeps a timing of its own', () => {
+    expect(declared.filter((d) => d.schedule).map((d) => d.key)).toEqual(TASK_KEYS);
+    expect(declared.filter((d) => !d.schedule)).toEqual([]);
   });
 
-  it("shows a nightly task's cron in a schedule's editor, no line under it while it may be changed", () => {
-    expect(page).toMatch(/const scheduleOwned = computed\(\(\) => !!task\.value\?\.schedule_env\);/);
-    expect(tab).toMatch(/<div v-if="scheduleOwned" v-show="fieldShown\('cron'\)" class="af-system-cron mb-0">/);
+  it("shows the task's cron in a schedule's editor, no line under it while it may be changed", () => {
+    expect(tab).toMatch(/<div v-show="fieldShown\('cron'\)" class="af-system-cron mb-0">/);
     expect(tab).toMatch(
       /<BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" \/>/,
     );
     // a line only for its error, or when the environment sets it
     expect(tab).toMatch(/<div v-if="cronError" class="invalid-feedback d-block">/);
+    expect(tab).toMatch(/<div v-else-if="deprecated" class="form-text af-schedule-deprecated">/);
     expect(tab).toMatch(/<div v-else-if="!scheduleEditable" class="form-text">/);
     // a schedule's own editor, the same width
     const schedule = withoutComments(read('src/pages/schedule.vue'));
@@ -211,7 +199,7 @@ describe("a nightly task's Schedule tab", () => {
 
   it('pinned by the environment : the editor read only, one line naming the variable', () => {
     expect(page).toMatch(
-      /const scheduleEditable = computed\(\(\) => scheduleOwned\.value && !!task\.value\?\.editable_schedule\);/,
+      /const scheduleEditable = computed\(\(\) => !!task\.value\?\.schedule_env && !!task\.value\?\.editable_schedule\);/,
     );
     expect(tab).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.schedule_env \}\)/);
     // no Save, no Revert then
@@ -228,7 +216,7 @@ describe("a nightly task's Schedule tab", () => {
     const actions = page.slice(page.indexOf('#actions>'), page.indexOf('</AppSettings>'));
     expect(actions).toMatch(/<BsButton icon="clock-rotate-left" :disabled="!dirty" @click="revert\(\)">/);
     // the save icon : orange while enabled (BsButton), grey while nothing changed
-    expect(actions).toMatch(/<BsButton icon="save" :disabled="!dirty" @click="save\(\)">/);
+    expect(actions).toMatch(/<BsButton icon="save" :disabled="!canSave" @click="save\(\)">/);
     expect(actions.indexOf('revert()')).toBeLessThan(actions.indexOf('save()'));
     expect(page).toMatch(/useUnsavedGuard\(\s*dirty,/);
     expect(page).toMatch(
@@ -244,6 +232,32 @@ describe("a nightly task's Schedule tab", () => {
 
   it('refuses a cron of other than 5 fields before sending it, as the server does', () => {
     expect(page).toMatch(/\.length !== 5\) return t\('jobs\.system\.cronFiveFields'\)/);
+    const save = page.slice(page.indexOf('async function save()'), page.indexOf('function revert()'));
+    expect(save).toMatch(/if \(cronProblem\.value\) \{\s*toast\.warning\(cronProblem\.value\);\s*return false;/);
+  });
+});
+
+describe("the config seed reload's Schedule tab, its cron from the deprecated seconds", () => {
+  const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
+
+  it('is editable as the others : its cron setting is CONFIG_SEED_RELOAD_CRON, every minute by default', () => {
+    const seed = serverTasks.slice(serverTasks.indexOf("key: 'configSeedReload'"));
+    expect(seed).toMatch(/cron: '\* \* \* \* \*',/);
+    expect(seed).toMatch(/schedule: scheduleSetting\('CONFIG_SEED_RELOAD_CRON', 'configSeedReloadCron', \{/);
+    expect(seed).toMatch(/env: 'CONFIG_SEED_RELOAD_SECONDS',/);
+  });
+
+  it('shows the cron the deprecated variable reads as, one line naming it', () => {
+    expect(page).toMatch(/const deprecated = computed\(\(\) => task\.value\?\.schedule_deprecated \|\| null\);/);
+    expect(tab).toMatch(/t\('jobs\.system\.scheduleDeprecated', \{ env: deprecated\.env \}\)/);
+    // the editor holds the cron in force (6 fields for seconds) : no error until it is changed
+    expect(page).toMatch(/const cronError = computed\(\(\) => \(dirty\.value \? cronProblem\.value : ''\)\);/);
+  });
+
+  it('Save writes it as the new variable : enabled for its cron unchanged when it has 5 fields', () => {
+    expect(page).toMatch(
+      /const canSave = computed\(\(\) => dirty\.value \|\| \(scheduleEditable\.value && !!deprecated\.value && !cronProblem\.value\)\);/,
+    );
   });
 });
 
@@ -280,6 +294,14 @@ describe('the texts', () => {
       const pinned = texts.jobs.system.scheduleEnv.replace('{env}', 'STORED_JOB_CLEANUP_CRON');
       expect(texts.jobs.system.scheduleEnv, lang).toMatch(/\{env\}/);
       expect(pinned.length * wide, lang).toBeLessThanOrEqual(90);
+      // the line of a cron read from a deprecated variable, its name in it, on one line : the CJK
+      // characters twice as wide as the variable's
+      const old = texts.jobs.system.scheduleDeprecated;
+      expect(old, lang).toMatch(/\{env\}/);
+      const shown = old.replace('{env}', 'CONFIG_SEED_RELOAD_SECONDS');
+      const width = [...shown].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
+      expect(width, lang).toBeLessThanOrEqual(90);
+      expect(texts.jobs.system.everySeconds, lang).toBeUndefined();
       // a toolbar button : a word or two
       expect(texts.jobs.system.revert.length * wide, lang).toBeLessThanOrEqual(14);
     }

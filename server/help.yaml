@@ -258,21 +258,36 @@
       be late). Leaving it empty turns the seed off: the next start releases every object an
       earlier seed made read-only, keeping its values, so it can be changed in the interface
       again. See the Config seed page in the documentation.
+  - name: CONFIG_SEED_RELOAD_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Config seed reload schedule (cron)
+    default: "* * * * *"
+    description: |
+      When the Config seed reload system task runs: it checks the config seed file (CONFIG_SEED_PATH) and applies it again when its content has changed.
+      This is what lets a seed edited in git take effect without restarting: on kubernetes a ConfigMap
+      is remounted under the running pod within about a minute and the change is picked up from there.
+      A reload that fails is never fatal, unlike the one at startup: the configuration already in
+      force is kept and the Status page reports it. Without CONFIG_SEED_PATH the task is off.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every minute.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+      Replaces `CONFIG_SEED_RELOAD_SECONDS`, still read when this one is not set.
   - name: CONFIG_SEED_RELOAD_SECONDS
     version: 6.3.0
     type: integer
     allowed: 0 or a number of seconds
-    short: Config seed reload interval (seconds)
-    hint: How often the seed file is read again, so a change in git reaches a running instance.
-    default: 60
+    short: Config seed reload interval (seconds) (deprecated)
     description: |
-      How often the config seed file is checked and re-applied when its content has changed,
-      in seconds. This is what lets a seed edited in git take effect without restarting: on
-      kubernetes a ConfigMap is remounted under the running pod within about a minute and the
-      change is picked up from there. A reload that fails is never fatal, unlike the one at
-      startup: the configuration already in force is kept and the Status page reports it.
-      Set it to 0 to check only at startup, leaving POST /api/v2/config-seed/apply and SIGHUP.
-      Takes effect at once, without a restart.
+      **Deprecated: use `CONFIG_SEED_RELOAD_CRON` ; removed in 8.0.** Still read when
+      `CONFIG_SEED_RELOAD_CRON` is not set, as a cron, with a warning in the log at start ; when
+      both are set, `CONFIG_SEED_RELOAD_CRON` wins. 60 reads as `* * * * *`, a multiple of 60 up to
+      3600 as `*/N * * * *` in minutes (3600 as `0 * * * *`), a number under 60 that divides 60 as
+      `*/N * * * * *` in seconds, and 0 still turns the reload off. Any other number reads as the
+      nearest of these, which the log says. The task's page shows the cron it reads as, read only
+      until a cron is saved there, which writes `CONFIG_SEED_RELOAD_CRON`.
       Ignored when CONFIG_SEED_PATH is empty.
   - name: ALLOW_ENV_EDIT
     version: 6.3.0
@@ -753,6 +768,43 @@
     description: |
       When the Nightly backup system task runs: it backs up the database and removes the oldest nightly backups beyond NIGHTLY_BACKUP_RETENTION.
       A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at midnight.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: ABANDONED_JOBS_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Abandoned jobs schedule (cron)
+    default: "0 * * * *"
+    description: |
+      When the Abandoned jobs system task runs: it ends the jobs that ran a day without output and that no runner took.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every hour.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: DEAD_NODES_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Stopped nodes schedule (cron)
+    default: "* * * * *"
+    description: |
+      When the Stopped nodes system task runs: it frees the jobs, claims and runners held by nodes and RTEs that stopped answering.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every minute.
+      Running it less often leaves the work of a stopped node waiting longer before another takes it.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: SCHEDULE_ENDS_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Schedule ends schedule (cron)
+    default: "* * * * *"
+    description: |
+      When the Schedule ends system task runs: it turns off or removes the schedules that reached their end.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every minute.
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.

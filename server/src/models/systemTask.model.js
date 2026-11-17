@@ -12,7 +12,7 @@ import { Cron } from 'croner';
 import mysql from './db.model.js';
 import appConfig from '../../config/app.config.js';
 import logConfig from '../../config/log.config.js';
-import { SYSTEM_TASKS, systemTask, taskCron } from '../lib/systemTasks.js';
+import { SYSTEM_TASKS, systemTask, taskCron, taskEnabled, deprecatedSchedule } from '../lib/systemTasks.js';
 import { readManaged, isOverridden } from '../lib/envSettings.js';
 
 // the runs one task's page lists, its latest first
@@ -45,22 +45,22 @@ function runOf(row) {
 }
 
 /**
- * The cron a task runs on now : its schedule setting's, or its default ; null for a task timed by
- * an interval.
+ * The cron a task runs on now : its schedule setting's, the deprecated variable's it replaces
+ * (lib/systemTasks.js deprecatedSchedule), or its default.
  *
  * Args:
  *   task (object): the task's entry of SYSTEM_TASKS.
  *
  * Returns:
- *   string|null: its cron.
+ *   string: its cron.
  */
 export function cronOf(task) {
-  return task.cron ? taskCron(task.key) : null;
+  return taskCron(task.key);
 }
 
 /**
  * Whether an admin may change when a task runs (PUT /api/v2/system/tasks/:key/schedule) : a task
- * with a schedule setting (the nightly ones), the settings file writable (ALLOW_ENV_EDIT), and its
+ * with a schedule setting (every one), the settings file writable (ALLOW_ENV_EDIT), and its
  * variable not set in the process's own environment, which the file cannot override.
  *
  * Args:
@@ -76,78 +76,55 @@ export function scheduleEditable(task, managed) {
 }
 
 /**
- * Whether a task runs here and now : the config seed reload only with a seed and seconds above 0,
- * every other task always.
+ * When a task runs next : its cron's next occurrence ; null when it is off.
  *
  * Args:
  *   task (object): the task's entry of SYSTEM_TASKS.
- *
- * Returns:
- *   boolean: true when it runs.
- */
-function isEnabled(task) {
-  if (task.key === 'configSeedReload') return !!appConfig.configSeedPath && Number(appConfig.configSeedReloadSeconds) > 0;
-  return true;
-}
-
-/**
- * When a task runs next : its cron's next occurrence, or for a task timed by seconds its last
- * run and the seconds after it ; null when it is off, or not known (never ran).
- *
- * Args:
- *   task (object): the task's entry of SYSTEM_TASKS.
- *   lastRun (object|null): its last run, as runOf gives it.
  *
  * Returns:
  *   string|null: an ISO date, or null.
  */
-export function nextRunOf(task, lastRun) {
-  if (!isEnabled(task)) return null;
-  try {
-    if (task.cron) {
-      const cron = new Cron(cronOf(task), { paused: true, timezone: logConfig.tz });
-      const next = cron.nextRun();
-      cron.stop();
-      return next ? next.toISOString() : null;
-    }
-    const seconds = Number(appConfig[task.intervalSetting]) || 0;
-    if (!lastRun?.started_at || seconds <= 0) return null;
-    // the next tick after the interval : at least a second from now (a missed one runs then)
-    const next = Math.max(new Date(lastRun.started_at).getTime() + seconds * 1000, Date.now() + 1000);
-    return new Date(next).toISOString();
-  } catch {
-    return null;
-  }
+export function nextRunOf(task) {
+  return nextRunsOf(task, 1)[0] || null;
 }
 
 /**
- * Its next runs, as a schedule's preview shows them (three) : its cron's next occurrences, or for a
- * task timed by seconds the next one and the intervals after it ; none when it is off or not known.
+ * Its next runs, as a schedule's preview shows them (three) : its cron's next occurrences ; none
+ * when it is off.
  *
  * Args:
  *   task (object): the task's entry of SYSTEM_TASKS.
- *   lastRun (object|null): its last run, as runOf gives it.
  *   count (number): how many.
  *
  * Returns:
  *   string[]: ISO dates.
  */
-export function nextRunsOf(task, lastRun, count = 3) {
-  if (!isEnabled(task)) return [];
+export function nextRunsOf(task, count = 3) {
+  if (!taskEnabled(task.key)) return [];
   try {
-    if (task.cron) {
-      const cron = new Cron(cronOf(task), { paused: true, timezone: logConfig.tz });
-      const runs = cron.nextRuns(count);
-      cron.stop();
-      return runs.map((d) => d.toISOString());
-    }
-    const first = nextRunOf(task, lastRun);
-    const seconds = Number(appConfig[task.intervalSetting]) || 0;
-    if (!first || seconds <= 0) return [];
-    return Array.from({ length: count }, (_, i) => new Date(new Date(first).getTime() + i * seconds * 1000).toISOString());
+    const cron = new Cron(cronOf(task), { paused: true, timezone: logConfig.tz });
+    const runs = cron.nextRuns(count);
+    cron.stop();
+    return runs.map((d) => d.toISOString());
   } catch {
     return [];
   }
+}
+
+/**
+ * The deprecated variable a task's cron still comes from, as the API answers it : its name, its
+ * value, and the cron it is read as (lib/systemTasks.js deprecatedSchedule).
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *
+ * Returns:
+ *   object|null: { env, value, cron, off, exact }, or null when none is in force.
+ */
+export function scheduleDeprecatedOf(task) {
+  const deprecated = deprecatedSchedule(task);
+  if (!deprecated) return null;
+  return { env: deprecated.env, value: deprecated.value, cron: deprecated.cron, off: deprecated.off, exact: deprecated.exact };
 }
 
 /**
@@ -186,7 +163,7 @@ export function settingOf(task, managed) {
  *
  * Returns:
  *   object: { key, name, description, cron, default_cron, schedule_env, editable_schedule,
- *     interval_seconds, enabled, last_run, next_run, next_runs, timezone, setting }.
+ *     schedule_deprecated, enabled, last_run, next_run, next_runs, timezone, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -198,17 +175,19 @@ function describe(task, lastRow, managed) {
     cron: cronOf(task),
     // its own cron, the one in force while its setting is not set
     default_cron: task.cron,
-    // the variable of its cron, for a task whose schedule an admin changes (null : the app's own)
+    // the variable of its cron
     schedule_env: task.schedule?.env || null,
     // whether it may be changed here : not when the environment sets it (ALLOW_ENV_EDIT=0, or the
     // variable set in the process's own environment)
     editable_schedule: scheduleEditable(task, managed),
-    interval_seconds: task.intervalSetting ? Number(appConfig[task.intervalSetting]) || 0 : null,
-    enabled: isEnabled(task),
+    // the deprecated variable its cron still comes from, while its own is not set (the config seed
+    // reload's CONFIG_SEED_RELOAD_SECONDS) ; null for none
+    schedule_deprecated: scheduleDeprecatedOf(task),
+    enabled: taskEnabled(task.key),
     last_run: lastRun,
-    next_run: nextRunOf(task, lastRun),
+    next_run: nextRunOf(task),
     // its next runs, the Schedule tab's preview
-    next_runs: nextRunsOf(task, lastRun),
+    next_runs: nextRunsOf(task),
     // the zone its cron runs in (the scheduler's), the preview's
     timezone: logConfig.tz || null,
     setting: settingOf(task, managed),

@@ -1,16 +1,19 @@
-// Jobs > System : when the nightly system tasks run is an admin's to change. Each of the five
-// (jobCleanup, auditCleanup, tokenCleanup, storedJobsCleanup, nightlyBackup) takes its cron from a
-// setting (JOB_CLEANUP_CRON and the like, lib/systemTasks.js), saved as Settings > System >
-// General saves its variables (lib/envSave.js) through PUT /api/v2/system/tasks/:key/schedule.
+// Jobs > System : when every system task runs is an admin's to change. Each one takes its cron
+// from a setting (JOB_CLEANUP_CRON and the like, lib/systemTasks.js), saved as Settings > System >
+// General saves its variables (lib/envSave.js) through PUT /api/v2/system/tasks/:key/schedule. The
+// config seed reload's (CONFIG_SEED_RELOAD_CRON) replaces its seconds of before 7.8
+// (CONFIG_SEED_RELOAD_SECONDS), deprecated, still read as a cron while the new one is not set.
 //
 // What has to hold :
 //   - a cron setting is 5 fields croner accepts and that runs again, refused otherwise ;
 //   - saved, it applies at once : the scheduler registers the task again on its new cron, here
 //     and on every other node (the 'env' epoch, init/cluster.js applyChangedEnv), without a
 //     restart, and cleared it goes back to the task's default ;
-//   - the tasks the app needs often (every minute, every hour, the seed reload) keep theirs ;
-//   - the endpoint is the settings', refuses a bad cron (400), a task that is not editable or
-//     whose variable the environment sets (403) and an unknown key (404), and is audited ;
+//   - no task keeps a timing of its own ;
+//   - the endpoint is the settings', refuses a bad cron (400), a task whose variable the
+//     environment sets (403) and an unknown key (404), and is audited ;
+//   - the seed reload runs on its croner job only with a seed, its deprecated seconds read as a
+//     cron while CONFIG_SEED_RELOAD_CRON is not set, which a save on its page writes and wins ;
 //   - the API says which task may be changed (editable_schedule) and its variable ;
 //   - it is documented.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
@@ -92,15 +95,18 @@ const Middleware = (await import("../src/lib/middleware.js")).default;
 const systemRoutes = (await import("../src/routes/v2/system.routes.js")).default;
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 
-// the five nightly tasks and their variables
-const NIGHTLY = {
+// every task and its variable, with its default
+const TASKS = {
+  abandonedJobs: ["ABANDONED_JOBS_CRON", "0 * * * *"],
+  deadNodes: ["DEAD_NODES_CRON", "* * * * *"],
+  scheduleEnds: ["SCHEDULE_ENDS_CRON", "* * * * *"],
   tokenCleanup: ["TOKEN_CLEANUP_CRON", "0 3 * * *"],
   auditCleanup: ["AUDIT_CLEANUP_CRON", "30 3 * * *"],
   jobCleanup: ["JOB_CLEANUP_CRON", "30 2 * * *"],
   nightlyBackup: ["NIGHTLY_BACKUP_CRON", "0 0 * * *"],
   storedJobsCleanup: ["STORED_JOB_CLEANUP_CRON", "0 4 * * *"],
+  configSeedReload: ["CONFIG_SEED_RELOAD_CRON", "* * * * *"],
 };
-const FIXED = ["abandonedJobs", "deadNodes", "scheduleEnds", "configSeedReload"];
 
 /** Starts the scheduler's system tasks, as the worker does. */
 async function startTasks() {
@@ -122,6 +128,10 @@ beforeEach(async () => {
     appConfig[s.config] = "";
     delete process.env[s.env];
   }
+  // no seed, no deprecated seconds
+  appConfig.configSeedPath = "";
+  appConfig.configSeedReloadSeconds = "";
+  delete process.env.CONFIG_SEED_RELOAD_SECONDS;
   await fs.rm(process.env.MANAGED_ENV_PATH, { force: true });
 });
 
@@ -132,16 +142,16 @@ afterEach(async () => {
 // ------------------------------------------------------------------
 // the settings
 // ------------------------------------------------------------------
-describe("the five cron settings", () => {
-  test("each nightly task has one, its default the cron it always had ; the others none", () => {
+describe("the cron settings", () => {
+  test("every task has one, its default the cron it always had (the seed reload : every minute)", () => {
     const declared = Object.fromEntries(SCHEDULE_SETTINGS.map((s) => [s.key, [s.env, s.default]]));
-    assert.deepEqual(declared, NIGHTLY);
-    for (const key of FIXED) assert.equal(SYSTEM_TASKS.find((t) => t.key === key).schedule, null, key);
+    assert.deepEqual(declared, TASKS);
+    assert.ok(SYSTEM_TASKS.every((t) => t.schedule), "no task keeps a timing of its own");
   });
 
   test("documented in help.yaml with their default, applied live, shown on the task's page only", () => {
     const help = read("help.yaml");
-    for (const [env, cron] of Object.values(NIGHTLY)) {
+    for (const [env, cron] of Object.values(TASKS)) {
       assert.match(help, new RegExp(`- name: ${env}\\n    version: 7\\.8\\.0\\n    type: string\\n[\\s\\S]*?default: "${cron.replace(/\*/g, "\\*")}"`), env);
       assert.equal(EnvSettings.classify(env), "live", env);
       // not on Settings > System > General, nor in a General repository's file
@@ -259,17 +269,14 @@ const ADMIN = { showSettings: true };
 const put = (key, cron, options = ADMIN) => call("PUT", `/api/v2/system/tasks/${key}/schedule`, options, { cron });
 
 describe("which task may be changed, as the API says it", () => {
-  test("the five nightly tasks, with their variable ; the others are the app's own", async () => {
+  test("every task, with its variable", async () => {
     const list = await SystemTask.list();
+    assert.deepEqual(list.map((t) => t.key).sort(), Object.keys(TASKS).sort());
     for (const task of list) {
-      if (NIGHTLY[task.key]) {
-        assert.equal(task.editable_schedule, true, task.key);
-        assert.equal(task.schedule_env, NIGHTLY[task.key][0]);
-        assert.equal(task.default_cron, NIGHTLY[task.key][1]);
-      } else {
-        assert.equal(task.editable_schedule, false, task.key);
-        assert.equal(task.schedule_env, null, task.key);
-      }
+      assert.equal(task.editable_schedule, true, task.key);
+      assert.equal(task.schedule_env, TASKS[task.key][0]);
+      assert.equal(task.default_cron, TASKS[task.key][1]);
+      assert.equal(task.schedule_deprecated, null, task.key);
     }
   });
 
@@ -327,12 +334,17 @@ describe("PUT /api/v2/system/tasks/:key/schedule", () => {
     assert.equal(saved.length, 0);
   });
 
-  test("a task whose timing is the app's own is 403", async () => {
-    for (const key of FIXED) {
-      const res = await put(key, "0 1 * * *");
-      assert.equal(res.status, 403, key);
+  test("every task may be changed : the tasks of every minute and every hour too", async () => {
+    await startTasks();
+    for (const key of ["abandonedJobs", "deadNodes", "scheduleEnds"]) {
+      const res = await put(key, "*/5 * * * *");
+      assert.equal(res.status, 200, key);
+      await vi.waitFor(() => assert.equal(registered(key), "*/5 * * * *"));
     }
-    assert.equal(saved.length, 0);
+    assert.doesNotMatch(read("src/controllers/v2/systemTask.controller.js"), /systemTaskScheduleFixed/);
+    for (const lang of ["en", "de", "fr", "it", "es", "nl", "ca", "pt", "ja", "zh", "pl"]) {
+      assert.doesNotMatch(read(`src/locales/${lang}.js`), /systemTaskScheduleFixed/, lang);
+    }
   });
 
   test("a variable set in the environment is 403, and so is ALLOW_ENV_EDIT=0", async () => {
@@ -371,5 +383,119 @@ describe("PUT /api/v2/system/tasks/:key/schedule", () => {
       const props = schema.properties.records?.items?.properties || schema.properties;
       for (const field of ["cron", "default_cron", "schedule_env", "editable_schedule"]) assert.ok(props[field], `${p} ${field}`);
     }
+  });
+});
+
+// ------------------------------------------------------------------
+// the config seed reload : a cron, its deprecated seconds still read
+// ------------------------------------------------------------------
+describe("the config seed reload", () => {
+  // a seed set : the task runs
+  beforeEach(() => {
+    appConfig.configSeedPath = "/tmp/seed.yaml";
+  });
+
+  test("runs on its croner job, every minute by default, as the other tasks", async () => {
+    await startTasks();
+    assert.equal(registered("configSeedReload"), "* * * * *");
+    assert.equal(taskCron("configSeedReload"), "* * * * *");
+    // its own seconds timer is gone
+    assert.equal(typeof cronService.scheduleConfigSeedReload, "undefined");
+    assert.doesNotMatch(read("src/services/cron.service.js"), /interval: |'\* \* \* \* \* \*'/);
+  });
+
+  test("without CONFIG_SEED_PATH it is off : not registered, Off on its page", async () => {
+    appConfig.configSeedPath = "";
+    await startTasks();
+    assert.equal(cronService.jobs.system.has("configSeedReload"), false);
+    const seed = await SystemTask.get("configSeedReload");
+    assert.equal(seed.enabled, false);
+    assert.equal(seed.next_run, null);
+    assert.deepEqual(seed.next_runs, []);
+  });
+
+  test("its deprecated seconds are read as a cron while CONFIG_SEED_RELOAD_CRON is not set", async () => {
+    appConfig.configSeedReloadSeconds = "300";
+    await startTasks();
+    assert.equal(registered("configSeedReload"), "*/5 * * * *");
+    const seed = await SystemTask.get("configSeedReload");
+    assert.equal(seed.cron, "*/5 * * * *");
+    assert.deepEqual(seed.schedule_deprecated, { env: "CONFIG_SEED_RELOAD_SECONDS", value: "300", cron: "*/5 * * * *", off: false, exact: true });
+    // still editable : a cron saved there replaces it
+    assert.equal(seed.editable_schedule, true);
+  });
+
+  test("seconds under a minute run on a seconds cron, 0 still turns it off", async () => {
+    appConfig.configSeedReloadSeconds = "30";
+    await startTasks();
+    assert.equal(registered("configSeedReload"), "*/30 * * * * *");
+    assert.equal((await SystemTask.get("configSeedReload")).next_runs.length, 3);
+    appConfig.configSeedReloadSeconds = "0";
+    await startTasks();
+    assert.equal(cronService.jobs.system.has("configSeedReload"), false);
+    const seed = await SystemTask.get("configSeedReload");
+    assert.equal(seed.enabled, false);
+    assert.equal(seed.schedule_deprecated.off, true);
+  });
+
+  test("CONFIG_SEED_RELOAD_CRON set wins : the deprecated seconds are ignored", async () => {
+    appConfig.configSeedReloadSeconds = "300";
+    appConfig.configSeedReloadCron = "*/10 * * * *";
+    await startTasks();
+    assert.equal(registered("configSeedReload"), "*/10 * * * *");
+    assert.equal((await SystemTask.get("configSeedReload")).schedule_deprecated, null);
+    // turned off by the seconds no more either
+    appConfig.configSeedReloadSeconds = "0";
+    assert.equal((await SystemTask.get("configSeedReload")).enabled, true);
+  });
+
+  test("a cron saved on its page writes CONFIG_SEED_RELOAD_CRON, which wins at once", async () => {
+    appConfig.configSeedReloadSeconds = "30";
+    await startTasks();
+    const res = await put("configSeedReload", "*/2 * * * *");
+    assert.equal(res.status, 200);
+    assert.deepEqual(saved, [{ CONFIG_SEED_RELOAD_CRON: "*/2 * * * *" }]);
+    assert.equal(res.body.cron, "*/2 * * * *");
+    assert.equal(res.body.schedule_deprecated, null);
+    await vi.waitFor(() => assert.equal(registered("configSeedReload"), "*/2 * * * *"));
+    // the editor takes 5 fields only : the seconds cron the old variable read as is refused
+    assert.equal((await put("configSeedReload", "*/30 * * * * *")).status, 400);
+  });
+
+  test("applied live, here and on every node, as the other crons : re-registered, the old job stopped", async () => {
+    await startTasks();
+    const before = cronService.jobs.system.get("configSeedReload");
+    assert.equal(EnvSettings.applyLive("CONFIG_SEED_RELOAD_CRON", "*/15 * * * *", "* * * * *"), true);
+    await vi.waitFor(() => assert.equal(registered("configSeedReload"), "*/15 * * * *"));
+    assert.equal(before.isStopped(), true);
+    // cleared : the default again, or the deprecated seconds while they are set
+    process.env.CONFIG_SEED_RELOAD_SECONDS = "120";
+    appConfig.configSeedReloadSeconds = "120";
+    EnvSettings.applyLive("CONFIG_SEED_RELOAD_CRON", "", "* * * * *");
+    await vi.waitFor(() => assert.equal(registered("configSeedReload"), "*/2 * * * *"));
+    assert.equal(appConfig.configSeedReloadCron, "");
+    // the deprecated variable changed in the settings file by hand : registered again on it
+    EnvSettings.applyLive("CONFIG_SEED_RELOAD_SECONDS", "3600");
+    await vi.waitFor(() => assert.equal(registered("configSeedReload"), "0 * * * *"));
+    // another node's save reaches this one through the 'env' epoch
+    const { applyChangedEnv } = await import("../src/init/cluster.js");
+    await applyChangedEnv();
+    await EnvSettings.writeManaged(new Map([["CONFIG_SEED_RELOAD_CRON", "*/3 * * * *"]]));
+    await applyChangedEnv();
+    await vi.waitFor(() => assert.equal(registered("configSeedReload"), "*/3 * * * *"));
+  });
+
+  test("its variables are not on Settings > System > General : the task's page is the place", () => {
+    assert.ok(EnvSettings.OWNED_ELSEWHERE.test("CONFIG_SEED_RELOAD_CRON"));
+    assert.ok(EnvSettings.OWNED_ELSEWHERE.test("CONFIG_SEED_RELOAD_SECONDS"));
+    assert.doesNotMatch(read("../client/src/pages/admin/settings.vue"), /'CONFIG_SEED_RELOAD_SECONDS'/);
+    assert.equal(EnvSettings.validate("CONFIG_SEED_RELOAD_CRON", "*/30 * * * * *").includes("5 fields"), true);
+  });
+
+  test("the deprecated variable is documented as such", () => {
+    const help = read("help.yaml");
+    assert.match(help, /- name: CONFIG_SEED_RELOAD_SECONDS[\s\S]*?short: Config seed reload interval \(seconds\) \(deprecated\)[\s\S]*?\*\*Deprecated: use `CONFIG_SEED_RELOAD_CRON` ; removed in 8\.0\.\*\*/);
+    assert.match(read("../DEPRECATED.md"), /^\| `CONFIG_SEED_RELOAD_SECONDS` .*\| `CONFIG_SEED_RELOAD_CRON`.*\| 7\.8\.0 \|$/m);
+    assert.match(read("src/app-start.js"), /for \(const warning of seedReloadWarnings\(\)\) logger\.warning\(warning\);/);
   });
 });

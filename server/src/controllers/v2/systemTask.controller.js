@@ -10,7 +10,7 @@ import { saveEnvValues, EnvSaveError } from '../../lib/envSave.js';
 
 // GET /api/v2/system/tasks : the app's own maintenance tasks (Jobs > System), each with when it
 // runs, its last run and its next one, and the setting it applies. A task is the app's own : only
-// when the nightly ones run is changed here (PUT /tasks/:key/schedule).
+// when it runs is changed here (PUT /tasks/:key/schedule).
 const list = async function (req, res) {
   try {
     const tasks = await SystemTask.list();
@@ -48,22 +48,19 @@ function refuse(req, res, status, detail) {
   res.status(status).json(RestResult.error(i18n.t(req, 'resources.systemTaskScheduleFailed'), detail));
 }
 
-// PUT /api/v2/system/tasks/:key/schedule { cron } : when a nightly task runs. Saved as the
+// PUT /api/v2/system/tasks/:key/schedule { cron } : when a task runs. Saved as the
 // settings page saves its variables (lib/envSave.js : the settings file, the other nodes told,
 // applied at once), its setting re-registering the task on its new cron on the node that runs the
-// tasks. 404 for a key no task has, 403 for a task whose timing is the app's own or whose variable
-// the environment sets (ALLOW_ENV_EDIT=0, or set in the process's own environment), 400 for a
-// cron that is not 5 fields croner runs. Answers the task as GET does.
+// tasks. 404 for a key no task has, 403 for a task whose variable the environment sets
+// (ALLOW_ENV_EDIT=0, or set in the process's own environment), 400 for a cron that is not 5
+// fields croner runs. Saved, it wins over a deprecated variable its cron came from (the config
+// seed reload's CONFIG_SEED_RELOAD_SECONDS). Answers the task as GET does.
 const saveSchedule = async function (req, res) {
   try {
-    // step 1 : the task, one an admin may time
+    // step 1 : the task
     const task = systemTask(req.params.key);
     if (!task) {
       res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
-      return;
-    }
-    if (!task.schedule) {
-      refuse(req, res, 403, i18n.t(req, 'resources.systemTaskScheduleFixed'));
       return;
     }
     // step 2 : the cron, 5 fields croner runs

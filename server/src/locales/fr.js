@@ -149,7 +149,6 @@ export default {
     databaseNotFound: "Base de données introuvable",
     systemTaskNotFound: "Tâche système introuvable",
     systemTaskScheduleFailed: "Le planning de la tâche n'a pas pu être enregistré",
-    systemTaskScheduleFixed: "Cette tâche suit le rythme propre de l'application et ne peut pas être modifiée",
     runnerAdminOnly:
       "Seul un admin peut ajouter, modifier ou supprimer un runner : un runner recoit les identifiants des jobs qu'il execute",
     repositoryAdminOnly:

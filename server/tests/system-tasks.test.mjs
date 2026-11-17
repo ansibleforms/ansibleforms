@@ -125,7 +125,7 @@ describe("a run is recorded", () => {
 
   test("a key no task has is refused when the scheduler starts", () => {
     assert.throws(() => recorded("notATask", async () => ({})));
-    assert.throws(() => systemTasks.taskCron("configSeedReload"), /cron/);
+    assert.throws(() => systemTasks.taskCron("notATask"), /No system task/);
   });
 });
 
@@ -200,11 +200,12 @@ describe("the scheduler records every task", () => {
     await found.fn();
   };
 
-  test("each task on the cron the API reports", () => {
+  test("each task on the cron the API reports, the seed reload only with a seed", () => {
+    // no CONFIG_SEED_PATH here : the config seed reload is off, not registered
+    const running = SYSTEM_TASKS.filter((t) => t.key !== "configSeedReload");
     const patterns = [...tasks.values()].map((t) => t.pattern).sort();
-    const declared = SYSTEM_TASKS.filter((t) => t.cron).map((t) => t.cron).sort();
-    assert.deepEqual(patterns, declared);
-    assert.deepEqual([...cronService.jobs.system.keys()].sort(), SYSTEM_TASKS.filter((t) => t.cron).map((t) => t.key).sort());
+    assert.deepEqual(patterns, running.map((t) => t.cron).sort());
+    assert.deepEqual([...cronService.jobs.system.keys()].sort(), running.map((t) => t.key).sort());
   });
 
   test("the job cleanup says how many jobs it removed", async () => {
@@ -255,7 +256,7 @@ describe("the tasks as the API answers them", () => {
   });
 
   test("every task, in the scheduler's order, with its last run, next run and setting", async () => {
-    Object.assign(appConfig, { jobRetentionDays: 90, auditRetentionDays: 365, configSeedPath: "", configSeedReloadSeconds: 60 });
+    Object.assign(appConfig, { jobRetentionDays: 90, auditRetentionDays: 365, configSeedPath: "", configSeedReloadSeconds: "" });
     answer = (sql) => (/^SELECT/.test(sql) ? [last("jobCleanup")] : []);
     const list = await SystemTask.list();
     assert.deepEqual(list.map((t) => t.key), SYSTEM_TASKS.map((t) => t.key));
@@ -279,7 +280,9 @@ describe("the tasks as the API answers them", () => {
     const seed = list.find((t) => t.key === "configSeedReload");
     assert.equal(seed.enabled, false);
     assert.equal(seed.next_run, null);
-    assert.equal(seed.interval_seconds, 60);
+    assert.equal(seed.cron, "* * * * *");
+    assert.equal(seed.schedule_deprecated, null);
+    assert.equal("interval_seconds" in seed, false);
   });
 
   test("ALLOW_ENV_EDIT=0 : every setting is the environment's", async () => {

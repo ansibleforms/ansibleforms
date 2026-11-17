@@ -141,7 +141,6 @@ export default {
     databaseNotFound: "No s'ha trobat la base de dades",
     systemTaskNotFound: "No s'ha trobat la tasca del sistema",
     systemTaskScheduleFailed: "No s'ha pogut desar la programació de la tasca",
-    systemTaskScheduleFixed: "Aquesta tasca segueix el ritme propi de l'aplicació i no es pot canviar",
     runnerAdminOnly:
       "Només un admin pot afegir, canviar o eliminar un runner: un runner rep les credencials dels treballs que executa",
     repositoryAdminOnly:

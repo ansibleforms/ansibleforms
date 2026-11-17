@@ -3393,7 +3393,7 @@
           "system"
         ],
         "summary": "The app's maintenance tasks (Jobs > System)",
-        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. The nightly tasks' schedule is changed with PUT /system/tasks/{key}/schedule. Requires settings access.",
+        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Each task's schedule is changed with PUT /system/tasks/{key}/schedule. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3428,27 +3428,47 @@
                           },
                           "cron": {
                             "type": "string",
-                            "nullable": true,
-                            "description": "When it runs now, in the app's timezone: its schedule setting's when set, else its default; null for a task timed by seconds (configSeedReload)"
+                            "description": "When it runs now, in the app's timezone: its schedule setting's when set, else the deprecated variable's it replaces when that one is set (configSeedReload: CONFIG_SEED_RELOAD_SECONDS, a cron of 6 fields for seconds), else its default"
                           },
                           "default_cron": {
                             "type": "string",
-                            "nullable": true,
                             "description": "Its own cron, in force while its schedule setting is not set"
                           },
                           "schedule_env": {
                             "type": "string",
-                            "nullable": true,
-                            "description": "The environment variable of its cron (JOB_CLEANUP_CRON) for a nightly task; null for a task whose timing is the app's own"
+                            "description": "The environment variable of its cron (JOB_CLEANUP_CRON)"
                           },
                           "editable_schedule": {
                             "type": "boolean",
-                            "description": "Whether PUT /system/tasks/{key}/schedule may change it: a nightly task whose variable the environment does not set (nor ALLOW_ENV_EDIT=0)"
+                            "description": "Whether PUT /system/tasks/{key}/schedule may change it: its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                           },
-                          "interval_seconds": {
-                            "type": "integer",
+                          "schedule_deprecated": {
+                            "type": "object",
                             "nullable": true,
-                            "description": "The seconds between its runs, for a task timed by seconds"
+                            "description": "The deprecated variable its cron still comes from while schedule_env is not set (configSeedReload: CONFIG_SEED_RELOAD_SECONDS, removed in 8.0.0); null for none. Saving a cron replaces it",
+                            "properties": {
+                              "env": {
+                                "type": "string",
+                                "description": "The deprecated variable, e.g. CONFIG_SEED_RELOAD_SECONDS"
+                              },
+                              "value": {
+                                "type": "string",
+                                "description": "Its value, as set"
+                              },
+                              "cron": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "The cron it is read as (6 fields for seconds); null when it turns the task off"
+                              },
+                              "off": {
+                                "type": "boolean",
+                                "description": "Whether it turns the task off (0)"
+                              },
+                              "exact": {
+                                "type": "boolean",
+                                "description": "Whether the cron runs at the same moments; false: the nearest one"
+                              }
+                            }
                           },
                           "enabled": {
                             "type": "boolean",
@@ -3593,27 +3613,47 @@
                     },
                     "cron": {
                       "type": "string",
-                      "nullable": true,
-                      "description": "When it runs now, in the app's timezone: its schedule setting's when set, else its default; null for a task timed by seconds (configSeedReload)"
+                      "description": "When it runs now, in the app's timezone: its schedule setting's when set, else the deprecated variable's it replaces when that one is set (configSeedReload: CONFIG_SEED_RELOAD_SECONDS, a cron of 6 fields for seconds), else its default"
                     },
                     "default_cron": {
                       "type": "string",
-                      "nullable": true,
                       "description": "Its own cron, in force while its schedule setting is not set"
                     },
                     "schedule_env": {
                       "type": "string",
-                      "nullable": true,
-                      "description": "The environment variable of its cron (JOB_CLEANUP_CRON) for a nightly task; null for a task whose timing is the app's own"
+                      "description": "The environment variable of its cron (JOB_CLEANUP_CRON)"
                     },
                     "editable_schedule": {
                       "type": "boolean",
-                      "description": "Whether PUT /system/tasks/{key}/schedule may change it: a nightly task whose variable the environment does not set (nor ALLOW_ENV_EDIT=0)"
+                      "description": "Whether PUT /system/tasks/{key}/schedule may change it: its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                     },
-                    "interval_seconds": {
-                      "type": "integer",
+                    "schedule_deprecated": {
+                      "type": "object",
                       "nullable": true,
-                      "description": "The seconds between its runs, for a task timed by seconds"
+                      "description": "The deprecated variable its cron still comes from while schedule_env is not set (configSeedReload: CONFIG_SEED_RELOAD_SECONDS, removed in 8.0.0); null for none. Saving a cron replaces it",
+                      "properties": {
+                        "env": {
+                          "type": "string",
+                          "description": "The deprecated variable, e.g. CONFIG_SEED_RELOAD_SECONDS"
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "Its value, as set"
+                        },
+                        "cron": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "The cron it is read as (6 fields for seconds); null when it turns the task off"
+                        },
+                        "off": {
+                          "type": "boolean",
+                          "description": "Whether it turns the task off (0)"
+                        },
+                        "exact": {
+                          "type": "boolean",
+                          "description": "Whether the cron runs at the same moments; false: the nearest one"
+                        }
+                      }
                     },
                     "enabled": {
                       "type": "boolean",
@@ -3759,8 +3799,8 @@
         "tags": [
           "system"
         ],
-        "summary": "Change when a nightly maintenance task runs",
-        "description": "Saves the cron of a nightly task (jobCleanup, auditCleanup, tokenCleanup, storedJobsCleanup, nightlyBackup) as its environment variable (JOB_CLEANUP_CRON, AUDIT_CLEANUP_CRON, TOKEN_CLEANUP_CRON, STORED_JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. The tasks of every minute, the hourly abandoned jobs and the config seed reload keep the app's own timing. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
+        "summary": "Change when a maintenance task runs",
+        "description": "Saves the cron of a task as its environment variable (ABANDONED_JOBS_CRON, DEAD_NODES_CRON, SCHEDULE_ENDS_CRON, TOKEN_CLEANUP_CRON, AUDIT_CLEANUP_CRON, JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON, STORED_JOB_CLEANUP_CRON, CONFIG_SEED_RELOAD_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. Saved, CONFIG_SEED_RELOAD_CRON wins over the deprecated CONFIG_SEED_RELOAD_SECONDS. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
         "security": [
           {
             "bearerAuth": []
@@ -3812,7 +3852,7 @@
             "description": "Not a cron of 5 fields that croner runs"
           },
           "403": {
-            "description": "No settings access, a task whose timing is the app's own, or its variable set by the environment (or ALLOW_ENV_EDIT=0)"
+            "description": "No settings access, or its variable set by the environment (or ALLOW_ENV_EDIT=0)"
           },
           "404": {
             "description": "No task has that key"

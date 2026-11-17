@@ -71,12 +71,17 @@ var app_config = {
   // repositories, ldap, mail/url). Empty = feature off. NOT the same thing as configPath,
   // which holds the forms configuration - see https://ansibleforms.com/seed.
   configSeedPath: process.env.CONFIG_SEED_PATH || "",
-  // How often the seed file is re-read and re-applied when its content changed, in
-  // seconds. 0 turns the poll off, leaving the boot apply, POST /api/v2/config-seed/apply
-  // and SIGHUP. A poll rather than a watcher on purpose : a mounted ConfigMap is updated
-  // by swapping the ..data symlink, which fs.watch on the file never sees, and kubelet
-  // takes up to a minute to do it anyway - so a watcher would buy no time it could use.
-  configSeedReloadSeconds: parseInt(process.env.CONFIG_SEED_RELOAD_SECONDS || "60", 10),
+  // When the seed file is re-read and re-applied when its content changed : a 5-field cron in
+  // LOG_TZ (the system task configSeedReload, changed on its page, Jobs > System). Empty : its
+  // default, every minute (server/src/lib/systemTasks.js SYSTEM_TASKS). A poll rather than a
+  // watcher on purpose : a mounted ConfigMap is updated by swapping the ..data symlink, which
+  // fs.watch on the file never sees, and kubelet takes up to a minute to do it anyway - so a
+  // watcher would buy no time it could use.
+  configSeedReloadCron: (process.env.CONFIG_SEED_RELOAD_CRON || "").trim(),
+  // DEPRECATED since 7.8.0, removed in 8.0.0 : the same in seconds, as it was set before (0 :
+  // off). Kept as set ("" : not set), read only while CONFIG_SEED_RELOAD_CRON is not set, as a
+  // cron (server/src/lib/seedReloadCron.js).
+  configSeedReloadSeconds: (process.env.CONFIG_SEED_RELOAD_SECONDS || "").trim(),
   // Whether the settings pages may write persistent/.env. Turn this off where the
   // environment is declared elsewhere (kubernetes ConfigMap, docker-compose, ArgoCD) :
   // there the file is either ephemeral, so a save is silently lost at the next restart,
@@ -100,9 +105,12 @@ var app_config = {
   // removes it. DEFAULT 0 : never, so nothing changes on an upgrade. A stored job may ask for
   // fewer days of its own, never more (lib/storedJobExpiry.js).
   storedJobUnusedDays: parseInt(process.env.STORED_JOB_UNUSED_DAYS || "0", 10),
-  // When the nightly system tasks run, each a 5-field cron in LOG_TZ (changed on the task's page,
+  // When the system tasks run, each a 5-field cron in LOG_TZ (changed on the task's page,
   // Jobs > System). Empty : the task's own default (server/src/lib/systemTasks.js SYSTEM_TASKS),
   // so the defaults are declared in one place only.
+  abandonedJobsCron: (process.env.ABANDONED_JOBS_CRON || "").trim(),
+  deadNodesCron: (process.env.DEAD_NODES_CRON || "").trim(),
+  scheduleEndsCron: (process.env.SCHEDULE_ENDS_CRON || "").trim(),
   tokenCleanupCron: (process.env.TOKEN_CLEANUP_CRON || "").trim(),
   auditCleanupCron: (process.env.AUDIT_CLEANUP_CRON || "").trim(),
   jobCleanupCron: (process.env.JOB_CLEANUP_CRON || "").trim(),

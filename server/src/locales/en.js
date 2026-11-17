@@ -139,7 +139,6 @@ export default {
     databaseNotFound: "Database not found",
     systemTaskNotFound: "System task not found",
     systemTaskScheduleFailed: "The task's schedule could not be saved",
-    systemTaskScheduleFixed: "This task runs on the app's own timing and cannot be changed",
     runnerAdminOnly:
       "Only an admin can add, change or delete a runner: a runner receives the credentials of the jobs it runs",
     repositoryAdminOnly:

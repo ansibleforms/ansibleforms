@@ -27,7 +27,7 @@ import { cleanupQuery } from '../lib/storedJobExpiry.js';
 // whether a schedule reached its end (its end date passed, or its runs done)
 import { endReached } from '../lib/scheduleEnd.js';
 // the maintenance tasks' crons, and the record of their runs (Jobs > System)
-import { taskCron, recorded, counted, sentence, systemTask, scheduleValue } from '../lib/systemTasks.js';
+import { taskCron, taskEnabled, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue } from '../lib/systemTasks.js';
 
 // the cron registry is re-read from the database this often even without a change notice
 // (lib/epochs.js), in case one was missed
@@ -94,8 +94,8 @@ class CronService {
     // the registration of each rrule schedule under way : one made or removed meanwhile ends it
     this.rruleTurns = new Map();
     this.active = false;
-    // the system tasks (initializeSystemTasks) run on this node : what scheduleConfigSeedReload
-    // and rescheduleSystemTask check before rescheduling
+    // the system tasks (initializeSystemTasks) run on this node : what rescheduleSystemTask
+    // checks before rescheduling
     this.systemTasksStarted = false;
     // each system task's work by its key, so a task is registered again on a new cron
     // (rescheduleSystemTask) with the work it was started with
@@ -551,7 +551,7 @@ class CronService {
       this.registerSystemTask(key);
     };
 
-    // 1. Abandoned jobs cleanup - runs every hour
+    // 1. Abandoned jobs cleanup - runs every hour by default (ABANDONED_JOBS_CRON)
     register('abandonedJobs', async () => {
       logger.info('Running abandoned jobs cleanup');
       try {
@@ -565,9 +565,9 @@ class CronService {
         return { failed: true, result: `Failed to abandon jobs: ${err.message || err}` };
       }
     });
-    logger.info('Initialized abandoned jobs cleanup (hourly)');
+    logger.info(`Initialized abandoned jobs cleanup (${taskCron('abandonedJobs')})`);
 
-    // 1b. The jobs of an app node that stopped answering - every minute. The node that follows
+    // 1b. The jobs of an app node that stopped answering - every minute by default (DEAD_NODES_CRON). The node that follows
     // a job (jobs.tracker) ends it itself when it restarts, but a replaced container comes back
     // under another name, or not at all.
     register('deadNodes', async () => {
@@ -635,9 +635,9 @@ class CronService {
       }
       return { changed, failed: errors.length > 0, result: sentence(errors.length ? [...errors.map((e) => `failed on ${e}`), ...done] : done, 'Nothing to free') };
     });
-    logger.info('Initialized the stopped-node sweep (every minute)');
+    logger.info(`Initialized the stopped-node sweep (${taskCron('deadNodes')})`);
 
-    // 1c. The schedules at their end - every minute. A schedule whose end date passed between two
+    // 1c. The schedules at their end - every minute by default (SCHEDULE_ENDS_CRON). A schedule whose end date passed between two
     // of its runs is turned off or removed (its end_action) at that minute rather than at its next
     // run, and so is one whose runs are done that a pull put back on (lib/scheduleEnd.js).
     register('scheduleEnds', async () => {
@@ -650,7 +650,7 @@ class CronService {
         return { failed: true, result: `Failed to end the schedules: ${err.message || err}` };
       }
     });
-    logger.info('Initialized the schedule end sweep (every minute)');
+    logger.info(`Initialized the schedule end sweep (${taskCron('scheduleEnds')})`);
 
     // 2. Token cleanup - runs daily at 3:00 AM by default (TOKEN_CLEANUP_CRON)
     register('tokenCleanup', async () => {
@@ -841,9 +841,23 @@ class CronService {
     });
     logger.info(`Initialized stored jobs cleanup (${taskCron('storedJobsCleanup')})`);
 
-    // 5. Config seed reload - re-applies CONFIG_SEED_PATH when its content changes
+    // 5. Config seed reload - re-applies CONFIG_SEED_PATH when its content changes, every minute
+    // by default (CONFIG_SEED_RELOAD_CRON, or the deprecated CONFIG_SEED_RELOAD_SECONDS while it
+    // is not set). Registered only with a seed (registerSystemTask, taskEnabled), and here rather
+    // than as a watcher of its own so it stops with everything else.
+    register('configSeedReload', async () => {
+      // reloadConfigSeed handles its own failures - it must never throw into the scheduler,
+      // because a rejection here would leave the tick counted and the reason logged by croner
+      // rather than by the seed. What it answers is the run's result : applied is a change, a
+      // failure a failed run, the rest (unchanged, skipped, off) a run that changed nothing
+      const answer = (await reloadConfigSeed({ trigger: 'poll' })) || {};
+      if (answer.status === 'applied') return { changed: 1, result: 'Applied the config seed again, its file changed' };
+      if (answer.status === 'failed') return { failed: true, result: `The config seed could not be applied: ${answer.error}` };
+      if (answer.status === 'skipped') return { result: 'The config seed is unchanged since it failed' };
+      return { result: 'The config seed is unchanged' };
+    });
+    if (taskEnabled('configSeedReload')) logger.info(`Initialized config seed reload (${taskCron('configSeedReload')})`);
     this.systemTasksStarted = true;
-    this.scheduleConfigSeedReload(appConfig);
 
     logger.info('System maintenance tasks initialization complete');
   }
@@ -852,7 +866,9 @@ class CronService {
    * Registers one system task on the cron it runs on now (lib/systemTasks.js taskCron), the one
    * in place stopped first : one left running keeps firing next to its successor. A schedule
    * setting that is not a valid cron (set by hand in the environment, the app refuses it) is
-   * logged, and the task runs on its default.
+   * logged, and the task runs on its default. A task that does not run (the config seed reload
+   * without CONFIG_SEED_PATH, or turned off by its deprecated seconds, taskEnabled) is not
+   * registered ; turned off by its seconds, the log says so.
    *
    * Args:
    *   key (string): the task's key.
@@ -869,14 +885,23 @@ class CronService {
       previous.stop();
       this.jobs.system.delete(key);
     }
-    // step 2 : its cron, said when its setting's was passed over
-    const cron = taskCron(key);
+    // step 2 : not registered when it does not run
     const task = systemTask(key);
+    if (!taskEnabled(key)) {
+      const deprecated = deprecatedSchedule(task);
+      if (deprecated?.off) {
+        logger.info(`Config seed reload is off (${deprecated.env}=${deprecated.value}), the seed applies at startup only`);
+      }
+      return true;
+    }
+    // step 3 : its cron, said when its setting's was passed over
+    const cron = taskCron(key);
     const set = scheduleValue(task);
     if (set && set !== cron) {
       logger.warning(`${task.schedule.env}=${set} is not a valid cron, the system task ${key} runs on its default ${cron}`);
     }
-    // step 3 : registered, its run recorded
+    // step 4 : registered, its run recorded ; protect : a run that lasts (a seeded repository
+    // being cloned) never has a second one started on top of it
     this.jobs.system.set(key, new Cron(cron, {
       timezone: this.timezone,
       protect: true
@@ -899,61 +924,7 @@ class CronService {
   rescheduleSystemTask(key) {
     if (!this.systemTasksStarted || !this.systemWork.has(key)) return false;
     this.registerSystemTask(key);
-    logger.info(`Rescheduled the system task ${key} (${taskCron(key)})`);
-    return true;
-  }
-
-  /**
-   * (Re)registers the config seed reload : re-applies CONFIG_SEED_PATH when its content changes,
-   * every CONFIG_SEED_RELOAD_SECONDS. Called at startup with the other system tasks, and again
-   * when the interval is changed in the settings, so a new interval needs no restart. A node
-   * that runs no scheduler (its system tasks never started) has nothing to reschedule.
-   *
-   * Registered here rather than as a watcher of its own so it stops with everything else, and
-   * so the seed is refreshed by the same machinery that already refreshes the repositories.
-   * `interval` is croner's own throttle : the pattern fires every second and the option holds
-   * each run back until the interval has passed, which is how an arbitrary number of seconds
-   * is expressed - a step pattern (every n seconds) silently breaks for anything above 59.
-   *
-   * Args:
-   *   appConfig (object): the app config (configSeedPath, configSeedReloadSeconds).
-   *
-   * Returns:
-   *   boolean: whether the scheduler runs here (the task is then as configured).
-   */
-  scheduleConfigSeedReload(appConfig) {
-    if (!this.systemTasksStarted) return false;
-    // the task in place goes first : one left running keeps firing next to its successor
-    const previous = this.jobs.system.get('configSeedReload');
-    if (previous) {
-      previous.stop();
-      this.jobs.system.delete('configSeedReload');
-    }
-    const seedReloadSeconds = appConfig.configSeedReloadSeconds;
-    if (appConfig.configSeedPath && seedReloadSeconds > 0) {
-      const configSeedTask = new Cron('* * * * * *', {
-        timezone: this.timezone,
-        interval: seedReloadSeconds,
-        // an apply that runs long (a seeded repository being cloned) must not have a
-        // second one started on top of it
-        protect: true
-      }, recorded('configSeedReload', async () => {
-        // reloadConfigSeed handles its own failures - it must never throw into the
-        // scheduler, because a rejection here would leave the tick counted and the
-        // reason logged by croner rather than by the seed. What it answers is the run's
-        // result : applied is a change, a failure a failed run, the rest (unchanged,
-        // skipped, off) a run that changed nothing, rewritten in place (a quiet task)
-        const answer = (await reloadConfigSeed({ trigger: 'poll' })) || {};
-        if (answer.status === 'applied') return { changed: 1, result: 'Applied the config seed again, its file changed' };
-        if (answer.status === 'failed') return { failed: true, result: `The config seed could not be applied: ${answer.error}` };
-        if (answer.status === 'skipped') return { result: 'The config seed is unchanged since it failed' };
-        return { result: 'The config seed is unchanged' };
-      }));
-      this.jobs.system.set('configSeedReload', configSeedTask);
-      logger.info(`Initialized config seed reload (every ${seedReloadSeconds}s)`);
-    } else if (appConfig.configSeedPath) {
-      logger.info('Config seed reload is off (CONFIG_SEED_RELOAD_SECONDS=0), the seed applies at startup only');
-    }
+    logger.info(`Rescheduled the system task ${key} (${taskEnabled(key) ? taskCron(key) : 'off'})`);
     return true;
   }
 

@@ -38,8 +38,9 @@ const envGroupOrder = [
     key: 'configuration',
     label: () => t('settings.settingsPage.tabConfiguration'),
     icon: 'right-left',
-    // config.yaml's path with the rest of where the configuration comes from
-    exact: ['CONFIG_PATH', 'ENABLE_CONFIG_IN_DATABASE', 'CONFIG_SEED_PATH', 'CONFIG_SEED_RELOAD_SECONDS'],
+    // config.yaml's path with the rest of where the configuration comes from ; when the seed is
+    // read again is the Config seed reload task's (Jobs > System > the task > Schedule)
+    exact: ['CONFIG_PATH', 'ENABLE_CONFIG_IN_DATABASE', 'CONFIG_SEED_PATH'],
   },
   {
     key: 'server',

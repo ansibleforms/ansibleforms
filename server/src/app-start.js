@@ -21,6 +21,7 @@ import { registerHttpsServer } from './lib/httpsContext.js';
 import { httpServerOptions } from './lib/httpServerOptions.js';
 import authConfig, { entraEnvWarnings } from '../config/auth.config.js';
 import { controllerEnvWarnings } from './lib/controllerEnv.js';
+import { seedReloadWarnings } from './lib/seedReloadCron.js';
 import logger from './lib/logger.js';
 import { reloadConfigSeed } from './lib/seed.js';
 import { getExpressionMode } from './lib/expressionMode.js';
@@ -153,6 +154,9 @@ export async function startApp(){
   for (const warning of entraEnvWarnings()) logger.warning(warning);
   // the names of before 7.8 still set : AF_ROLE=app (lib/controllerEnv.js)
   for (const warning of controllerEnvWarnings()) logger.warning(warning);
+  // the config seed reload's seconds of before 7.8 (CONFIG_SEED_RELOAD_SECONDS) : still read as a
+  // cron while CONFIG_SEED_RELOAD_CRON is not set, said once with the cron it reads as
+  for (const warning of seedReloadWarnings()) logger.warning(warning);
 
   if (authConfig.secretIsGenerated) {
     logger.warning('[SECURITY] JWT signing secret was auto-generated. All tokens will be invalidated on restart. Set the ACCESS_TOKEN_SECRET environment variable for persistent token signing.');

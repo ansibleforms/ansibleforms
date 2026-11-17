@@ -2,13 +2,14 @@
 // The app's own maintenance tasks (services/cron.service.js initializeSystemTasks), and the record
 // of their runs (the system_task_runs table), as Jobs > System shows them.
 //
-// Each task is declared once here : its key, when it runs (its cron, or every so many seconds),
-// what it does, and the setting it applies. The scheduler registers it with that cron, and the
+// Each task is declared once here : its key, when it runs by default (its cron), what it does,
+// the setting it applies and the setting of its cron. The scheduler registers it with that cron, and the
 // API (models/systemTask.model.js) describes it from the same entry, so the two cannot disagree.
 //
-// The nightly tasks' cron is an admin's to change (their schedule setting, JOB_CLEANUP_CRON and
-// the like) : the declared cron is then only the default, and taskCron answers the one in force.
-// The tasks of every minute and the seed reload keep theirs : the app needs them that often.
+// Every task's cron is an admin's to change (its schedule setting, JOB_CLEANUP_CRON and the like,
+// on the task's Schedule tab) : the declared cron is then only the default, and taskCron answers
+// the one in force. The config seed reload's was a number of seconds before 7.8.0
+// (CONFIG_SEED_RELOAD_SECONDS) : still read, deprecated, as a cron (lib/seedReloadCron.js).
 //
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
 // result (removed 120 jobs, or the error) and the node that ran it ; every run, the ones of every
@@ -20,6 +21,7 @@ import mysql from '../models/db.model.js';
 import { nodeId } from './role.js';
 import { cronError } from './cronValidate.js';
 import appConfig from '../../config/app.config.js';
+import { secondsToCron } from './seedReloadCron.js';
 
 // ─── the tasks ───────────────────────────────────────────────────────────────
 
@@ -27,31 +29,32 @@ import appConfig from '../../config/app.config.js';
 const RETENTION_TAB = 'retention';
 
 /**
- * A nightly task's schedule setting : the environment variable of its cron (changed on the task's
- * own page, Jobs > System > the task > Schedule) and its appConfig key.
+ * A task's schedule setting : the environment variable of its cron (changed on the task's own
+ * page, Jobs > System > the task > Schedule) and its appConfig key ; for the config seed reload,
+ * the deprecated variable of before it too.
  *
  * Args:
  *   env (string): the variable (JOB_CLEANUP_CRON).
  *   config (string): its appConfig key (jobCleanupCron).
+ *   deprecated (object|null): the variable it replaces, still read while it is not set :
+ *     { env, config, toCron } (toCron : the old value as { cron, off, exact }) ; null for none.
  *
  * Returns:
- *   object: { env, config }.
+ *   object: { env, config, deprecated }.
  */
-const scheduleSetting = (env, config) => ({ env, config });
+const scheduleSetting = (env, config, deprecated = null) => ({ env, config, deprecated });
 
 /**
  * The maintenance tasks, in the order the scheduler registers them.
  *
  *   key: the task's name in the scheduler and in the table
- *   cron: when it runs (the app's timezone, LOG_TZ) ; null for a task timed by an interval
- *   intervalSetting: the appConfig key of the seconds between its runs (the config seed reload)
+ *   cron: when it runs by default (the app's timezone, LOG_TZ)
  *   name, description: what it is, in English, as the API answers it (the GUI says it in the user's
  *     language : client/src/locales, jobs.system.tasks)
  *   setting: the setting it applies - its environment variable (env), its appConfig key (config)
  *     and the tab of Settings > System > General it is changed on (tab) ; null for none
  *   schedule: the setting that changes its cron (scheduleSetting), the cron above then only its
- *     default ; null for a task whose timing is the app's own (every minute, every hour, the seed
- *     reload's seconds)
+ *     default
  */
 export const SYSTEM_TASKS = [
   {
@@ -60,7 +63,7 @@ export const SYSTEM_TASKS = [
     name: 'Abandoned jobs',
     description: 'Ends the jobs that ran a day without output and no runner took.',
     setting: null,
-    schedule: null,
+    schedule: scheduleSetting('ABANDONED_JOBS_CRON', 'abandonedJobsCron'),
   },
   {
     key: 'deadNodes',
@@ -68,7 +71,7 @@ export const SYSTEM_TASKS = [
     name: 'Stopped nodes',
     description: 'Frees what nodes and runners that stopped answering held.',
     setting: null,
-    schedule: null,
+    schedule: scheduleSetting('DEAD_NODES_CRON', 'deadNodesCron'),
   },
   {
     key: 'scheduleEnds',
@@ -76,7 +79,7 @@ export const SYSTEM_TASKS = [
     name: 'Schedule ends',
     description: 'Turns off or removes the schedules that reached their end.',
     setting: null,
-    schedule: null,
+    schedule: scheduleSetting('SCHEDULE_ENDS_CRON', 'scheduleEndsCron'),
   },
   {
     key: 'tokenCleanup',
@@ -120,12 +123,17 @@ export const SYSTEM_TASKS = [
   },
   {
     key: 'configSeedReload',
-    cron: null,
-    intervalSetting: 'configSeedReloadSeconds',
+    cron: '* * * * *',
     name: 'Config seed reload',
     description: 'Applies the config seed again when its file changes.',
-    setting: { env: 'CONFIG_SEED_RELOAD_SECONDS', config: 'configSeedReloadSeconds', tab: 'configuration' },
-    schedule: null,
+    setting: null,
+    // before 7.8.0 a number of seconds (CONFIG_SEED_RELOAD_SECONDS) : deprecated, removed in 8.0.0,
+    // still read as a cron while CONFIG_SEED_RELOAD_CRON is not set
+    schedule: scheduleSetting('CONFIG_SEED_RELOAD_CRON', 'configSeedReloadCron', {
+      env: 'CONFIG_SEED_RELOAD_SECONDS',
+      config: 'configSeedReloadSeconds',
+      toCron: secondsToCron,
+    }),
   },
 ];
 
@@ -145,7 +153,7 @@ export function systemTask(key) {
   return TASKS.get(String(key)) || null;
 }
 
-// the tasks whose cron an admin changes, by their setting's variable
+// every task's cron setting, by its variable
 export const SCHEDULE_SETTINGS = SYSTEM_TASKS.filter((task) => task.schedule).map((task) => ({
   key: task.key,
   env: task.schedule.env,
@@ -154,7 +162,7 @@ export const SCHEDULE_SETTINGS = SYSTEM_TASKS.filter((task) => task.schedule).ma
 }));
 
 /**
- * Why a cron cannot be a nightly task's schedule, or null when it can : five fields (minute, hour,
+ * Why a cron cannot be a task's schedule, or null when it can : five fields (minute, hour,
  * day of the month, month, day of the week ; croner's sixth, the seconds, is not offered), that
  * croner accepts and that occurs again (lib/cronValidate.js, the schedules' own check).
  *
@@ -173,25 +181,66 @@ export function scheduleCronProblem(cron) {
 }
 
 /**
- * The cron a task runs on : its schedule setting's when one is set and valid, else the declared
- * one. A value that is not a valid cron (written by hand in the environment, never through the
- * app, which checks it) is passed over for the declared one, and the scheduler logs it.
+ * The cron a task runs on : its schedule setting's when one is set and valid, else the deprecated
+ * variable's it replaces when that one is set (the config seed reload's seconds, as a cron that
+ * may have 6 fields), else the declared one. A value that is not a valid cron (written by hand in
+ * the environment, never through the app, which checks it) is passed over for the declared one,
+ * and the scheduler logs it.
  *
  * Args:
  *   key (string): the task's key.
  *
  * Returns:
- *   string: its cron.
+ *   string: its cron (the declared one for a deprecated value that turns the task off : it does
+ *     not run, taskEnabled says so).
  *
  * Raises:
- *   Error: when no task has that key, or it is timed by an interval : a typo in the scheduler
- *     fails at its start rather than registering nothing.
+ *   Error: when no task has that key : a typo in the scheduler fails at its start rather than
+ *     registering nothing.
  */
 export function taskCron(key) {
   const task = systemTask(key);
-  if (!task?.cron) throw new Error(`No system task with a cron is named ${key}`);
+  if (!task) throw new Error(`No system task is named ${key}`);
   const set = scheduleValue(task);
-  return set && !scheduleCronProblem(set) ? set : task.cron;
+  if (set) return scheduleCronProblem(set) ? task.cron : set;
+  const deprecated = deprecatedSchedule(task);
+  return deprecated?.cron || task.cron;
+}
+
+/**
+ * The deprecated variable a task's cron still comes from : set, and the schedule setting that
+ * replaces it not set (which always wins). Only the config seed reload has one
+ * (CONFIG_SEED_RELOAD_SECONDS, lib/seedReloadCron.js).
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *
+ * Returns:
+ *   object|null: { env, value, cron, off, exact }, or null when none is in force.
+ */
+export function deprecatedSchedule(task) {
+  const deprecated = task?.schedule?.deprecated;
+  if (!deprecated || scheduleValue(task)) return null;
+  const value = String(appConfig[deprecated.config] ?? '').trim();
+  if (!value) return null;
+  return { env: deprecated.env, value, ...deprecated.toCron(value) };
+}
+
+/**
+ * Whether a task runs here and now : the config seed reload only with a seed (CONFIG_SEED_PATH)
+ * and not turned off by its deprecated seconds (0), every other task always.
+ *
+ * Args:
+ *   key (string): the task's key.
+ *
+ * Returns:
+ *   boolean: true when it runs.
+ */
+export function taskEnabled(key) {
+  const task = systemTask(key);
+  if (!task) return false;
+  if (task.key === 'configSeedReload') return !!appConfig.configSeedPath && !deprecatedSchedule(task)?.off;
+  return true;
 }
 
 /**
@@ -371,4 +420,4 @@ export function resetPruneForTests() {
   lastPrune = 0;
 }
 
-export default { SYSTEM_TASKS, SCHEDULE_SETTINGS, systemTask, taskCron, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };
+export default { SYSTEM_TASKS, SCHEDULE_SETTINGS, systemTask, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };
