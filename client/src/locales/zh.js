@@ -48,6 +48,7 @@ export default {
     play: 'Play {n}',
     other: '不是 play：请在 YAML 中编辑',
     name: '名称',
+    noRoles: '尚未配置任何角色。',
     hostsHelp: '主机、组或模式；多个按 web,db 或 all:!backup 这样分隔。',
     hosts: '主机',
     become: 'Become',

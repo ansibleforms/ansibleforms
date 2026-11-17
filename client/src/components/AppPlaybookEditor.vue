@@ -218,8 +218,12 @@ function pickSection(pi) {
           <!-- its roles : pills to remove, one more typed -->
           <label class="form-label fw-bold">{{ t('playbookOutline.sections.roles') }}</label>
           <div v-if="play.rolesEditable" class="mb-3">
+            <!-- none yet : said, as the other empty lists -->
+            <div v-if="!play.roles.length" class="text-body-secondary fst-italic mb-2">
+              {{ t('playbookEditor.noRoles') }}
+            </div>
             <!-- the roles it has, as pills to remove -->
-            <div v-if="play.roles.length" class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <div v-else class="d-flex flex-wrap align-items-center gap-2 mb-2">
               <span v-for="r in play.roles" :key="r" class="badge rounded-pill af-pbe-role">
                 <FaIcon icon="cubes" class="me-1" />{{ r }}
                 <button
