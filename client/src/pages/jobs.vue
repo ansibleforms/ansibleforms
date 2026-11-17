@@ -1210,8 +1210,7 @@ onMounted(async () => {
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.deleteConfirm') }} <strong>{{ tempJobId }}</strong
-          >?
+          {{ t('jobs.deleteConfirm') }} <strong>{{ tempJobId }}</strong>?
         </p></template
       >
       <template #footer
@@ -1242,8 +1241,7 @@ onMounted(async () => {
       <template #title> {{ t('jobs.abortJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.abortConfirm') }} <strong>{{ tempJobId }}</strong
-          >?
+          {{ t('jobs.abortConfirm') }} <strong>{{ tempJobId }}</strong>?
         </p></template
       >
       <template #footer
@@ -1273,8 +1271,7 @@ onMounted(async () => {
           {{ t('jobs.relaunchFailedNodeLead', { id: tempJobId }) }}
         </p>
         <p v-else class="mt-3 fs-6 user-select-none">
-          {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong
-          >:
+          {{ t('jobs.relaunchChoose') }} <strong>{{ tempJobId }}</strong>:
         </p>
         <BsCheckbox
           v-if="store.profile.options?.allowVerboseMode"
@@ -1779,8 +1776,11 @@ onMounted(async () => {
                   <dt><FaIcon icon="server" />{{ t('jobs.hosts') }}</dt>
                   <!-- one line : the hosts cut short when long, their note always seen -->
                   <dd :title="jobHosts.value" class="af-job-fact-split">
-                    <span class="af-job-fact-text">{{ jobHosts.value }}</span
-                    ><span v-if="jobHosts.note" class="af-job-fact-note">{{ jobHosts.note }}</span>
+                    <span class="af-job-fact-text">{{ jobHosts.value }}</span><span
+                      v-if="jobHosts.note"
+                      class="af-job-fact-note"
+                      >{{ jobHosts.note }}</span
+                    >
                   </dd>
                 </div>
                 <div v-else class="af-job-fact">
@@ -1811,8 +1811,7 @@ onMounted(async () => {
                   <dt><FaIcon icon="diagram-project" />{{ t('workflow.title') }}</dt>
                   <!-- one line : the workflow cut short when long, its node count always seen -->
                   <dd :title="job.awx_workflow.name" class="af-job-fact-split">
-                    <span class="af-job-fact-text">{{ job.awx_workflow.name }}</span
-                    ><span class="af-job-fact-note">{{
+                    <span class="af-job-fact-text">{{ job.awx_workflow.name }}</span><span class="af-job-fact-note">{{
                       t('workflow.nodes', { count: job.awx_workflow.nodes?.length || 0 })
                     }}</span>
                   </dd>
@@ -1825,8 +1824,11 @@ onMounted(async () => {
                   <dt><FaIcon icon="user" />{{ t('jobs.launchedBy') }}</dt>
                   <!-- one line : the user cut short when long, how it signs in always seen -->
                   <dd :title="job.user" class="af-job-fact-split">
-                    <span class="af-job-fact-text">{{ job.user || '–' }}</span
-                    ><span v-if="job.user_type" class="af-job-fact-note">{{ job.user_type }}</span>
+                    <span class="af-job-fact-text">{{ job.user || '–' }}</span><span
+                      v-if="job.user_type"
+                      class="af-job-fact-note"
+                      >{{ job.user_type }}</span
+                    >
                   </dd>
                 </div>
                 <div class="af-job-fact">

@@ -19,8 +19,9 @@ const errorMessageText = computed(() => String(store.errorMessage || '').replace
       <div class="row justify-content-center">
         <div class="col-md-6 col-lg-5">
           <div class="alert alert-warning shadow-sm p-4">
-            <strong v-if="store.errorMessage !== ''" class="af-error-message">{{ errorMessageText }}</strong
-            ><br /><br />
+            <strong v-if="store.errorMessage !== ''" class="af-error-message">{{
+              errorMessageText
+            }}</strong><br /><br />
             {{ t('errors.endOfLine') }}<br />
             {{ t('errors.fixSteps') }}<br />
             <ol class="mt-2">

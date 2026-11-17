@@ -1598,8 +1598,7 @@ defineExpose({
     <template #title> {{ t('common.delete') }} {{ objectLabelInSentence }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ deleteLabel }}</strong
-        >?
+        {{ t('settings.common.deleteConfirm') }} <strong>{{ deleteLabel }}</strong>?
       </p>
     </template>
     <template #footer>

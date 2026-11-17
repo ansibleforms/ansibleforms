@@ -233,14 +233,12 @@ onBeforeUnmount(() => {
             <div class="af-search-section">
               <FaIcon :icon="r.icon" :fixedwidth="true" class="me-1" />
               <template v-for="(p, j) in Search.highlight(r.section || t(`search.kind.${r.kind}`), query)" :key="j">
-                <mark v-if="p.match">{{ p.text }}</mark
-                ><template v-else>{{ p.text }}</template>
+                <mark v-if="p.match">{{ p.text }}</mark><template v-else>{{ p.text }}</template>
               </template>
             </div>
             <div class="af-search-title">
               <template v-for="(p, j) in Search.highlight(r.title, query)" :key="j">
-                <mark v-if="p.match">{{ p.text }}</mark
-                ><template v-else>{{ p.text }}</template>
+                <mark v-if="p.match">{{ p.text }}</mark><template v-else>{{ p.text }}</template>
               </template>
             </div>
             <div class="af-search-path">{{ r.path }}</div>
@@ -248,8 +246,7 @@ onBeforeUnmount(() => {
           <div v-if="r.snippets.length" class="af-search-snippets">
             <div v-for="(s, k) in r.snippets" :key="k" class="af-search-snippet">
               <template v-for="(p, j) in Search.highlight(s, query)" :key="j">
-                <mark v-if="p.match">{{ p.text }}</mark
-                ><template v-else>{{ p.text }}</template>
+                <mark v-if="p.match">{{ p.text }}</mark><template v-else>{{ p.text }}</template>
               </template>
             </div>
           </div>

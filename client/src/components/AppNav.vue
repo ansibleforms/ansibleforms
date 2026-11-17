@@ -360,8 +360,7 @@ const buildMismatch = computed(() => {
       <div v-if="buildMismatch" class="alert alert-warning d-flex align-items-center" role="alert">
         <font-awesome-icon icon="triangle-exclamation" class="me-2" />
         <div>
-          <strong>{{ t('version.cacheMismatchTitle') }}</strong
-          ><br />
+          <strong>{{ t('version.cacheMismatchTitle') }}</strong><br />
           <small>{{ t('version.cacheMismatchMsg') }}</small>
         </div>
       </div>
