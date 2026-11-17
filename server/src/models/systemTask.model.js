@@ -234,6 +234,13 @@ function describeLoop(loop, lastRow) {
       node: state.node,
     };
   }
+  // its next runs : the seconds after its last run on this node, while the hub runs here (at
+  // least a second from now, a missed tick runs then) ; none where no hub runs
+  const next = [];
+  if (state?.running && state.last_run_at) {
+    const first = Math.max(new Date(state.last_run_at).getTime() + loop.seconds * 1000, Date.now() + 1000);
+    for (let i = 0; i < 3; i++) next.push(new Date(first + i * loop.seconds * 1000).toISOString());
+  }
   return {
     key: loop.key,
     name: loop.name,
@@ -247,8 +254,8 @@ function describeLoop(loop, lastRow) {
     loop: state,
     enabled: !!state?.running,
     last_run: lastRun,
-    next_run: null,
-    next_runs: [],
+    next_run: next[0] || null,
+    next_runs: next,
     timezone: logConfig.tz || null,
     setting: null,
   };

@@ -311,6 +311,24 @@ describe("the loops as the API answers them", () => {
     assert.ok(Array.isArray(res.body.runs));
   });
 
+  test("its next runs : its seconds after its last run, three of them", async () => {
+    await loopRun("runnerDial", async () => {});
+    const res = await call("GET", "/api/v2/system/tasks/runnerDial");
+    const last = new Date(res.body.last_run.started_at).getTime();
+    const next = res.body.next_runs.map((d) => new Date(d).getTime());
+    assert.equal(next.length, 3);
+    assert.equal(res.body.next_run, res.body.next_runs[0]);
+    assert.ok(next[0] >= last + 10000 - 5 && next[0] <= Date.now() + 11000);
+    assert.deepEqual([next[1] - next[0], next[2] - next[1]], [10000, 10000]);
+  });
+
+  test("no next run where no hub runs", async () => {
+    resetLoopsForTests(false);
+    const res = await call("GET", "/api/v2/system/tasks/runnerDial");
+    assert.equal(res.body.next_run, null);
+    assert.deepEqual(res.body.next_runs, []);
+  });
+
   test("its Runs are its failures, the rows of its key", async () => {
     answer = (sql, params) =>
       /^SELECT \* FROM AnsibleForms\.`system_task_runs` WHERE task_key = \?/.test(sql) && params[0] === "runnerDial"
