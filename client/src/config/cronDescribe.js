@@ -74,7 +74,7 @@ function englishList(items) {
 /**
  * cronstrue's English, as a repeating schedule reads : weekdays in the plural and the week's
  * order ('only on Monday' read as a single Monday), months without 'only', a whole hour's
- * interval without 'At 0 minutes past the hour', and days of the month in the plural.
+ * interval without 'At 0 minutes past the hour' or 'On the hour', and days of the month in the plural.
  *
  * Args:
  *   words (string): cronstrue's description.
@@ -98,8 +98,9 @@ function polishEnglish(words) {
       })
       // ', only in January' -> ', in January'
       .replace(/, only in /, ', in ')
-      // 'At 0 minutes past the hour, every 2 hours' -> 'Every 2 hours'
-      .replace(/^At 0 minutes past the hour, every /, 'Every ')
+      // 'At 0 minutes past the hour, every 2 hours' (cronstrue 2) or 'On the hour, every 2 hours'
+      // (cronstrue 3) -> 'Every 2 hours'
+      .replace(/^(?:At 0 minutes past the hour|On the hour), every /, 'Every ')
       // 'on day 1 and 15 of the month' -> 'on days 1 and 15 of the month'
       .replace(/\bon day (\d+(?:, \d+)*,? and \d+) of the month/, 'on days $1 of the month')
   );

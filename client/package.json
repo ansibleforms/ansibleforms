@@ -29,7 +29,7 @@
     "ace-builds": "^1.45.2",
     "axios": "^1.21.1",
     "bootstrap": "^5.3.9",
-    "cronstrue": "^2.59.0",
+    "cronstrue": "^3.39.0",
     "dayjs": "^1.11.23",
     "dompurify": "^3.4.17",
     "highlight.js": "^11.12.0",
