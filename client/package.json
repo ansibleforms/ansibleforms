@@ -28,7 +28,7 @@
     "@vuepic/vue-datepicker": "^12.1.0",
     "ace-builds": "^1.45.2",
     "axios": "^1.21.1",
-    "bootstrap": "^5.3.8",
+    "bootstrap": "^5.3.9",
     "cronstrue": "^2.59.0",
     "dayjs": "^1.11.23",
     "dompurify": "^3.4.17",
