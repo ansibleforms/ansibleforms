@@ -48,6 +48,7 @@ export default {
     play: 'Play {n}',
     other: 'Non è un play: modificalo nello YAML',
     name: 'Nome',
+    hostsHelp: 'Un host, un gruppo o un pattern; più valori con virgole, es. web,db o all:!backup.',
     hosts: 'Host',
     become: 'Become',
     gatherFacts: 'Raccogli facts',

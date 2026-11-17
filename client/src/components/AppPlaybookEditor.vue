@@ -195,6 +195,7 @@ function pickSection(pi) {
                   @change="apply((text) => editPlay(text, pi, 'hosts', $event.target.value.trim()))"
                 />
               </div>
+              <div class="form-text">{{ t('playbookEditor.hostsHelp') }}</div>
             </div>
           </div>
           <!-- become, gather facts : a line each, titled as a field is -->

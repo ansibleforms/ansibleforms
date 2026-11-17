@@ -48,6 +48,7 @@ export default {
     play: 'プレイ {n}',
     other: 'プレイではありません: YAML で編集してください',
     name: '名前',
+    hostsHelp: 'ホスト、グループ、パターンを指定。複数はカンマ区切り (例: web,db、all:!backup)。',
     hosts: 'ホスト',
     become: 'Become',
     gatherFacts: 'facts を収集',

@@ -48,6 +48,7 @@ export default {
     play: 'Play {n}',
     other: '不是 play：请在 YAML 中编辑',
     name: '名称',
+    hostsHelp: '主机、组或模式；多个用逗号分隔，例如 web,db 或 all:!backup。',
     hosts: '主机',
     become: 'Become',
     gatherFacts: '收集 facts',
