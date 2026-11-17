@@ -90,6 +90,23 @@ function addRole(pi) {
   roleToAdd.value = { ...roleToAdd.value, [pi]: '' };
 }
 
+// the plays whose role field was opened with Add role while they had no role
+const addingRole = ref({});
+/**
+ * Add role : opens the field when it is hidden (a play without roles), else adds the role typed.
+ *
+ * Args:
+ *   pi (number): the play's place.
+ *   play (object): the play.
+ */
+function onAddRole(pi, play) {
+  if (!play.roles.length && !addingRole.value[pi]) {
+    addingRole.value = { ...addingRole.value, [pi]: true };
+    return;
+  }
+  addRole(pi);
+}
+
 // ─── a task : its dialog ───
 const open = ref(null); // { pi, section, ti }
 const task = computed(() =>
@@ -245,18 +262,20 @@ function pickSection(pi) {
             </div>
             <!-- one more : typed with its icon in front, as every field, Add role on a line of its own under it -->
             <template v-if="!readOnly">
-              <div class="input-group af-pbe-role-input">
+              <!-- the field : shown once the play has a role, or Add role was clicked -->
+              <div v-if="play.roles.length || addingRole[pi]" class="input-group af-pbe-role-input">
                 <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="cubes" /></span>
                 <input
                   v-model="roleToAdd[pi]"
+                  autofocus
                   class="form-control"
                   :placeholder="t('playbookEditor.role')"
                   spellcheck="false"
                   @keyup.enter="addRole(pi)"
                 />
               </div>
-              <div class="mt-2">
-                <BsButton icon="plus" @click="addRole(pi)">{{ t('playbookEditor.addRole') }}</BsButton>
+              <div :class="{ 'mt-2': play.roles.length || addingRole[pi] }">
+                <BsButton icon="plus" @click="onAddRole(pi, play)">{{ t('playbookEditor.addRole') }}</BsButton>
               </div>
             </template>
           </div>
