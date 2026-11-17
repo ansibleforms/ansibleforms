@@ -48,7 +48,7 @@ export default {
     play: 'Play {n}',
     other: 'To nie play: edytuj go w YAML',
     name: 'Nazwa',
-    hostsHelp: 'Host, grupa lub wzorzec; kilka po przecinku, np. web,db lub all:!backup.',
+    hostsHelp: 'Host, grupa lub wzorzec; kilka oddzielonych jak web,db lub all:!backup.',
     hosts: 'Hosty',
     become: 'Become',
     gatherFacts: 'Zbieraj fakty',
