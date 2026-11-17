@@ -1,10 +1,10 @@
 /******************************************************************/
 /*                                                                */
 /*  keepEdits : a record read again after something saved at     */
-/*  once (its Enabled switch, Approve), without throwing away     */
-/*  what is being edited on its page. The page's form holds its   */
-/*  own copy (edit) : read again, the record is the saved one and */
-/*  the form keeps the words typed and not saved yet.             */
+/*  once (Approve, Ask again), without throwing away what is      */
+/*  being edited on its page. The page's form holds its own copy  */
+/*  (edit) : read again, the record is the saved one and the form */
+/*  keeps the words typed and not saved yet.                      */
 /*                                                                */
 /******************************************************************/
 

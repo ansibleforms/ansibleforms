@@ -5,7 +5,8 @@
 /*  users list, in tabs, the tab kept in the address              */
 /*  (/groups, /roles...) ; a row of a tab opens its item :        */
 /*  Details - its Allow sign-in switch (off : blocked, asked      */
-/*            first), username, description, email               */
+/*            first ; saved with Save), username, description,    */
+/*            email                                               */
 /*  Groups - the groups it belongs to : Add group, and a row's    */
 /*           menu or the checkboxes remove one, never the last    */
 /*  Roles - the roles it has, and how (by name, through a group,  */
@@ -15,9 +16,9 @@
 /*  Stored jobs - the form values it stored to run again          */
 /*  Schedules - the jobs it planned with Run later                */
 /*  Activity - what the audit log recorded it doing               */
-/*  Change password and Delete top right, as the list's row menu  */
-/*  has them ; the search on the title line narrows every tab at  */
-/*  once (API tokens aside : its table keeps its own search).     */
+/*  Change password, Delete and Save top right ; the search on    */
+/*  the title line narrows every tab at once (API tokens aside :  */
+/*  its table keeps its own search).                              */
 /*                                                                */
 /******************************************************************/
 import { ref, computed, onMounted, watch, useId } from 'vue';
@@ -38,6 +39,7 @@ import { useRoleAssignments } from '@/composables/useRoleAssignments';
 import { useRoleMembership } from '@/composables/useRoleMembership';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { reloadKeepingEdits } from '@/lib/keepEdits';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -51,18 +53,21 @@ const tokenCount = ref(null);
 // ─── the user and the groups ──────────────────────────────────────────────────
 const userId = computed(() => String(route.params.id || ''));
 const user = ref(null); // as saved
-const edit = ref(null); // as edited : username, description, email
+const edit = ref(null); // as edited : username, description, email, signIn (Allow sign-in)
 const groups = ref([]); // every local group : { id, name, description }
 
 // the admin user : the way back in, never deleted or renamed (the server refuses both)
 const isAdminUser = computed(() => user.value?.username === 'admin');
 
-const dirty = computed(
+const detailsDirty = computed(
   () =>
     !!user.value &&
     !!edit.value &&
     ['username', 'description', 'email'].some((k) => (edit.value[k] || '') !== (user.value[k] || '')),
 );
+// its Allow sign-in switch turned : saved with Save, as every record page's switches
+const signInDirty = computed(() => !!user.value && !!edit.value && edit.value.signIn === !!user.value.blocked);
+const dirty = computed(() => detailsDirty.value || signInDirty.value);
 // leaving with the details changed and unsaved asks first
 useUnsavedGuard(
   dirty,
@@ -88,7 +93,12 @@ async function load() {
     const record = u.data.records ? u.data.records[0] : u.data;
     user.value = record || null;
     edit.value = record
-      ? { username: record.username || '', description: record.description || '', email: record.email || '' }
+      ? {
+          username: record.username || '',
+          description: record.description || '',
+          email: record.email || '',
+          signIn: !record.blocked,
+        }
       : null;
     groups.value = (g.data.records || g.data).map((x) => ({ id: x.id, name: x.name, description: x.description }));
   } catch {
@@ -270,7 +280,7 @@ const shownFields = computed(() =>
     [
       'signIn',
       t('settings.directory.allowSignIn'),
-      user.value?.blocked ? t('settings.directory.blockedNote') : t('settings.users.signInHelp'),
+      edit.value && !edit.value.signIn ? t('settings.directory.blockedNote') : t('settings.users.signInHelp'),
     ],
   ]),
 );
@@ -306,26 +316,51 @@ const lastSignIn = computed(() => (user.value?.last_login ? Helpers.formatServer
 const emailValid = computed(() => !edit.value?.email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(edit.value.email));
 
 /**
- * Saves the details : username, description and email.
+ * Saves the details : username, description and email (PUT user/<id>), then the Allow sign-in
+ * switch when turned (POST user/<id>/block) ; turned off, asks first.
+ *
+ * Args:
+ *   confirmed (boolean): true once blocking was confirmed in its dialog.
+ *
+ * Returns:
+ *   Promise<boolean>: whether everything was saved (false while the dialog asks).
  */
-async function saveDetails() {
+async function saveDetails(confirmed = false) {
   if (!edit.value.username.trim()) {
     toast.warning(t('settings.users.usernameRequired'));
-    return;
+    return false;
   }
   if (!emailValid.value) {
     toast.warning(t('settings.users.emailInvalid'));
-    return;
+    return false;
   }
+  // step 1 : blocking asks first, before anything is saved
+  const blocked = !edit.value.signIn;
+  if (signInDirty.value && blocked && !confirmed) {
+    confirmBlock.value = true;
+    return false;
+  }
+  confirmBlock.value = false;
+  // step 2 : the details, when changed
   const data = {
     username: edit.value.username.trim(),
     description: edit.value.description.trim(),
     email: edit.value.email.trim(),
   };
-  if (await update(data)) {
-    toast.success(t('settings.common.nameUpdated', { name: data.username }));
-    await load();
+  if (detailsDirty.value && !(await update(data))) return false;
+  // step 3 : the switch, when turned (its own api : blocked, its sessions end)
+  if (signInDirty.value) {
+    try {
+      await setSignInBlocked({ id: userId.value, username: data.username, source: 'local' }, blocked);
+    } catch (err) {
+      toast.error(Helpers.parseAxiosResponseError(err));
+      await reloadKeepingEdits(edit, load, ['username', 'description', 'email']);
+      return false;
+    }
   }
+  toast.success(t('settings.common.nameUpdated', { name: data.username }));
+  await load();
+  return true;
 }
 
 // ─── Add group / remove groups ────────────────────────────────────────────────
@@ -391,44 +426,9 @@ async function savePassword(password) {
 }
 
 // ─── Allow sign-in ────────────────────────────────────────────────────────────
-// on : it signs in ; off : blocked, its sessions end and every sign-in is refused (asked first,
-// the switch staying on until confirmed). Never the admin user, the way back in.
+// on : it signs in ; off : blocked, its sessions end and every sign-in is refused (Save asks
+// first). Never the admin user, the way back in.
 const confirmBlock = ref(false);
-
-/**
- * The Allow sign-in switch turned : on allows at once ; off asks first.
- *
- * Args:
- *   event (Event): the switch's change.
- */
-function onSignInSwitch(event) {
-  if (event.target.checked) {
-    setBlocked(false);
-    return;
-  }
-  event.target.checked = true;
-  confirmBlock.value = true;
-}
-
-/**
- * Blocks or allows the user's sign-in, then reloads it ; a refusal (its own sign-in) in a toast.
- *
- * Args:
- *   blocked (boolean): true to block.
- */
-async function setBlocked(blocked) {
-  confirmBlock.value = false;
-  const name = user.value.username;
-  try {
-    await setSignInBlocked({ id: userId.value, username: name, source: 'local' }, blocked);
-    toast.success(
-      blocked ? t('settings.directory.nowBlocked', { name }) : t('settings.directory.nowAllowed', { name }),
-    );
-    await load();
-  } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err));
-  }
-}
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 const confirmDelete = ref(false);
@@ -498,7 +498,7 @@ onMounted(async () => {
   <AppBlockSignInDialog
     v-if="confirmBlock"
     :name="user?.username || ''"
-    @confirm="setBlocked(true)"
+    @confirm="saveDetails(true)"
     @close="confirmBlock = false"
   />
   <BsModal v-if="confirmDelete" size="md" @close="confirmDelete = false" icon="trash">
@@ -620,7 +620,7 @@ onMounted(async () => {
               :disabled="true"
               :label="t('settings.directory.lastLogin')"
             />
-            <!-- Allow sign-in : saved at once, as a runner's Default ; never off for the admin user -->
+            <!-- Allow sign-in : saved with Save, as a runner's Default ; never off for the admin user -->
             <div v-show="fieldShown('signIn')" class="mb-0">
               <label class="form-label fw-bold d-block" for="af-sign-in">{{
                 t('settings.directory.allowSignIn')
@@ -631,14 +631,13 @@ onMounted(async () => {
                   class="form-check-input"
                   type="checkbox"
                   role="switch"
-                  :checked="!user.blocked"
+                  v-model="edit.signIn"
                   :disabled="isAdminUser && !user.blocked"
-                  @change="onSignInSwitch"
                 />
               </div>
               <!-- On, then Off on its own line -->
               <div class="form-text af-help-lines">
-                {{ user.blocked ? t('settings.directory.blockedNote') : t('settings.users.signInHelp') }}
+                {{ !edit.signIn ? t('settings.directory.blockedNote') : t('settings.users.signInHelp') }}
               </div>
             </div>
           </div>

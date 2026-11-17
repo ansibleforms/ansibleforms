@@ -4,7 +4,7 @@
 /*  An announcement's page (/settings/announcements/<id>), opened */
 /*  from the announcements' list : its message, its type, its     */
 /*  start and its end, and whether it is enabled (shown under the */
-/*  header from its start until its end ; saved at once).         */
+/*  header from its start until its end).                         */
 /*  Delete and Save top right.                                    */
 /*                                                                */
 /******************************************************************/
@@ -18,7 +18,6 @@ import Helpers from '@/lib/Helpers';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { reloadKeepingEdits } from '@/lib/keepEdits';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -30,7 +29,8 @@ const loaded = ref(false);
 const announcementId = computed(() => String(route.params.id || ''));
 const record = ref(null); // as saved
 const edit = ref(null); // as edited
-const FIELDS = ['message', 'level', 'start_at', 'end_at'];
+// its switch among them : shown or not, saved with Save as the rest
+const FIELDS = ['message', 'level', 'start_at', 'end_at', 'enabled'];
 // its types, as the list's wizard offers them
 const LEVELS = computed(() =>
   ['info', 'warning', 'danger'].map((value) => ({ value, label: t(`settings.interface.banner_${value}`) })),
@@ -49,6 +49,7 @@ const LEVELS = computed(() =>
  */
 function comparable(key, value) {
   if (key === 'start_at' || key === 'end_at') return value ? new Date(value).getTime() : '';
+  if (key === 'enabled') return !!Number(value);
   return value ?? '';
 }
 const dirty = computed(
@@ -67,34 +68,21 @@ async function load() {
   try {
     const res = await axios.get(`/api/v2/announcement/${encodeURIComponent(announcementId.value)}`);
     record.value = res.data?.id ? res.data : null;
-    edit.value = record.value ? Object.fromEntries(FIELDS.map((k) => [k, record.value[k] ?? null])) : null;
+    edit.value = record.value
+      ? {
+          ...Object.fromEntries(FIELDS.map((k) => [k, record.value[k] ?? null])),
+          enabled: !!Number(record.value.enabled),
+        }
+      : null;
   } catch {
     record.value = null;
   }
   loaded.value = true;
 }
 
-// ─── its switch : shown under the header or not ───────────────────────────────
-/**
- * Enables or disables it, saved at once.
- *
- * Args:
- *   on (boolean): the switch's new state.
- */
-async function setEnabled(on) {
-  try {
-    await axios.put(`/api/v2/announcement/${encodeURIComponent(announcementId.value)}`, { enabled: on });
-    toast.success(t(on ? 'settings.interface.announcementEnabledDone' : 'settings.interface.announcementDisabledDone'));
-  } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
-}
-
 // ─── Save ─────────────────────────────────────────────────────────────────────
 /**
- * Saves its message, its type and its moments.
+ * Saves its message, its type, its moments and whether it is enabled.
  *
  * Returns:
  *   Promise<boolean>: whether it was saved.
@@ -111,6 +99,7 @@ async function save() {
       level: edit.value.level,
       start_at: edit.value.start_at || null,
       end_at: edit.value.end_at || null,
+      enabled: !!edit.value.enabled,
     });
     // read again first : the toast names it by its message as saved
     await load();
@@ -281,7 +270,7 @@ onMounted(async () => {
             <BsDateTime v-model="edit.end_at" icon="calendar" dateType="datetime" convertToUtc />
             <div class="form-text">{{ t('settings.interface.bannerEndHelp') }}</div>
           </div>
-          <!-- whether it shows : a switch, as a disclaimer's, saved at once -->
+          <!-- whether it shows : a switch, as a disclaimer's, saved with Save -->
           <div v-show="fieldShown('enabled')" class="mb-0">
             <label class="form-label fw-bold d-block" for="af-announcement-enabled">{{
               t('settings.interface.announcementEnabled')
@@ -292,8 +281,7 @@ onMounted(async () => {
                 class="form-check-input"
                 type="checkbox"
                 role="switch"
-                :checked="!!record.enabled"
-                @change="setEnabled($event.target.checked)"
+                v-model="edit.enabled"
               />
             </div>
             <div class="form-text">{{ t('settings.interface.announcementEnabledHelp') }}</div>

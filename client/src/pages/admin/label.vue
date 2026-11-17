@@ -3,7 +3,7 @@
 /*                                                                */
 /*  A label's page (/settings/labels/<id>), opened from the       */
 /*  labels' list : its text, its colour, its place among the      */
-/*  others, whether it is shown (saved at once), and a preview of */
+/*  others, whether it is shown (its switch), and a preview of    */
 /*  the header with every label shown. Delete and Save top right. */
 /*                                                                */
 /******************************************************************/
@@ -19,7 +19,6 @@ import { LABEL_COLORS } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { reloadKeepingEdits } from '@/lib/keepEdits';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -32,9 +31,26 @@ const labelId = computed(() => String(route.params.id || ''));
 const record = ref(null); // as saved
 const edit = ref(null); // as edited
 const others = ref([]); // every label, for the preview
-const FIELDS = ['name', 'color', 'position'];
+// its switch among them : shown or not, saved with Save as the rest
+const FIELDS = ['name', 'color', 'position', 'enabled'];
+
+/**
+ * The fields of a label as this page edits them.
+ *
+ * Args:
+ *   rec (object): the label.
+ *
+ * Returns:
+ *   object: the edited fields.
+ */
+const editable = (rec) => ({
+  name: rec.name ?? null,
+  color: rec.color ?? null,
+  position: rec.position ?? null,
+  enabled: !!Number(rec.enabled),
+});
 const dirty = computed(
-  () => !!record.value && FIELDS.some((k) => String(edit.value[k] ?? '') !== String(record.value[k] ?? '')),
+  () => !!record.value && FIELDS.some((k) => String(edit.value[k] ?? '') !== String(editable(record.value)[k] ?? '')),
 );
 useUnsavedGuard(
   dirty,
@@ -52,7 +68,7 @@ async function load() {
       axios.get('/api/v2/label/').catch(() => ({ data: { records: [] } })),
     ]);
     record.value = one.data?.id ? one.data : null;
-    edit.value = record.value ? Object.fromEntries(FIELDS.map((k) => [k, record.value[k] ?? null])) : null;
+    edit.value = record.value ? editable(record.value) : null;
     others.value = all.data?.records || [];
   } catch {
     record.value = null;
@@ -60,27 +76,9 @@ async function load() {
   loaded.value = true;
 }
 
-// ─── its switch : shown beside the logo or not ────────────────────────────────
-/**
- * Shows or hides it, saved at once.
- *
- * Args:
- *   on (boolean): the switch's new state.
- */
-async function setEnabled(on) {
-  try {
-    await axios.put(`/api/v2/label/${encodeURIComponent(labelId.value)}`, { enabled: on });
-    toast.success(t(on ? 'settings.labels.enabledDone' : 'settings.labels.disabledDone'));
-  } catch (err) {
-    toast.error(Helpers.parseAxiosResponseError(err));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
-}
-
 // ─── Save ─────────────────────────────────────────────────────────────────────
 /**
- * Saves its text, its colour and its place.
+ * Saves its text, its colour, its place and whether it is shown.
  *
  * Returns:
  *   Promise<boolean>: whether it was saved.
@@ -96,6 +94,7 @@ async function save() {
       name: edit.value.name,
       color: edit.value.color,
       position: edit.value.position === '' ? null : edit.value.position,
+      enabled: !!edit.value.enabled,
     });
     toast.success(t('settings.common.nameUpdated', { name: edit.value.name }));
     await load();
@@ -272,7 +271,7 @@ onMounted(async () => {
             :help="t('settings.labels.positionHelp')"
             :label="t('settings.labels.position')"
           />
-          <!-- enabled or not : a switch, after the fields as on the other records' pages, saved at once -->
+          <!-- enabled or not : a switch, after the fields as on the other records' pages, saved with Save -->
           <div v-show="fieldShown('enabled')" class="mb-3">
             <label class="form-label fw-bold d-block" for="af-label-enabled">{{ t('settings.labels.enabled') }}</label>
             <div class="form-check form-switch mb-0">
@@ -281,8 +280,7 @@ onMounted(async () => {
                 class="form-check-input"
                 type="checkbox"
                 role="switch"
-                :checked="!!record.enabled"
-                @change="setEnabled($event.target.checked)"
+                v-model="edit.enabled"
               />
             </div>
             <div class="form-text">{{ t('settings.labels.enabledHelp') }}</div>
@@ -291,7 +289,7 @@ onMounted(async () => {
           <div v-show="fieldShown('preview')">
             <label class="form-label fw-bold d-block">{{ t('settings.labels.preview') }}</label>
             <AppLabelsPreview :labels="previewLabels" />
-            <div v-if="!record.enabled" class="form-text">{{ t('settings.labels.previewHidden') }}</div>
+            <div v-if="!edit.enabled" class="form-text">{{ t('settings.labels.previewHidden') }}</div>
           </div>
         </div>
       </template>

@@ -51,7 +51,6 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
-import { reloadKeepingEdits } from '@/lib/keepEdits';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -73,11 +72,11 @@ const EDITED_BY_TYPE = {
   telegram: ['token_credential', 'chat_id', 'api_url'],
   webhook: ['url', 'method', 'token_credential', 'verify_tls', 'headers', 'payload'],
 };
-// Default for mail saved with Save as the rest ; Enabled is not one : its switch saves at once
-// (setEnabled), as every record page's
+// Enabled, and Default for mail, saved with Save as the rest, as every record page's switches
 const edited = computed(() => [
   'name',
   'description',
+  'enabled',
   ...(type.value === 'mail' ? ['is_active'] : []),
   ...EDITED_BY_TYPE[type.value],
 ]);
@@ -95,6 +94,7 @@ function editable(record) {
   return {
     name: record.name ?? '',
     description: record.description ?? '',
+    enabled: !!Number(record.enabled),
     is_active: !!record.is_active,
     from_address: record.from_address ?? '',
     credential: record.credential ?? '',
@@ -336,7 +336,7 @@ const fieldShown = (key) => Object.values(shownFields.value).some((keys) => keys
 
 // ─── actions ──────────────────────────────────────────────────────────────────
 /**
- * Saves the fields of every tab : its name and description, and its type's.
+ * Saves the fields of every tab : its name, description and Enabled switch, and its type's.
  */
 async function save() {
   const e = edit.value;
@@ -344,7 +344,7 @@ async function save() {
     toast.warning(t('settings.notificationChannels.fieldsRequired'));
     return;
   }
-  const data = { name: e.name.trim(), description: e.description.trim() };
+  const data = { name: e.name.trim(), description: e.description.trim(), enabled: e.enabled ? 1 : 0 };
   // the default mail channel : made it here, the one before stops being it (never unmade here)
   if (type.value === 'mail' && e.is_active && !channel.value.is_active) data.is_active = 1;
   for (const key of EDITED_BY_TYPE[type.value]) {
@@ -372,22 +372,6 @@ async function save() {
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
     await load();
   }
-}
-
-// ─── its switch : notifications sent to it or not ────────────────────────────────
-/**
- * Turns it on or off, saved at once as every record's Enabled switch ; what is being edited and
- * not saved yet stays as it is.
- *
- * Args:
- *   on (boolean): the switch's new state.
- */
-async function setEnabled(on) {
-  if (await update({ enabled: on ? 1 : 0 })) {
-    toast.success(t('settings.common.nameUpdated', { name: channel.value.name }));
-  }
-  // read again, what is being edited and not saved yet kept as it is (lib/keepEdits.js)
-  await reloadKeepingEdits(edit, load);
 }
 
 // Send test : a dialog - for mail the address (the one typed last offered again, this browser
@@ -607,15 +591,14 @@ onMounted(async () => {
                 <label class="form-label fw-bold d-block" for="af-channel-enabled">{{
                   t('settings.notificationChannels.enabled')
                 }}</label>
-                <!-- saved at once, as every record's Enabled -->
+                <!-- saved with Save, as every record's Enabled -->
                 <div class="form-check form-switch mb-0">
                   <input
                     id="af-channel-enabled"
                     class="form-check-input"
                     type="checkbox"
                     role="switch"
-                    :checked="!!Number(channel.enabled)"
-                    @change="setEnabled($event.target.checked)"
+                    v-model="edit.enabled"
                   />
                 </div>
                 <div class="form-text">{{ t('settings.notificationChannels.enabledHelp') }}</div>
