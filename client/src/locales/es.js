@@ -3012,6 +3012,7 @@ export default {
       future: 'Futuro',
       scheduled: 'Programados',
       stored: 'Guardados',
+      system: 'Sistema',
       all: 'Todos los jobs',
       running: 'En ejecución',
       approve: 'Esperando aprobación',
@@ -3179,6 +3180,59 @@ export default {
     failedToLoad: 'Error al cargar los trabajos',
     failedToLoadOutput: 'Error al cargar la salida del trabajo',
     failedToRead: 'Error al leer el trabajo {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'Las tareas de mantenimiento que la app ejecuta por sí sola, y su último resultado.',
+      timing: 'Cuándo se ejecuta',
+      everySeconds: 'Cada {n} segundos',
+      off: 'Desactivada',
+      result: 'Resultado',
+      setting: 'Ajuste aplicado',
+      settingChange: 'Cámbialo en Configuración',
+      settingEnv: 'Definido por una variable de entorno',
+      tabRuns: 'Ejecuciones',
+      node: 'Nodo',
+      noRuns: 'Ninguna ejecución registrada',
+      notFound: 'Ninguna tarea del sistema se llama {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Jobs abandonados',
+          description: 'Termina los jobs que pasaron un día sin salida y que ningún runner tomó.',
+        },
+        deadNodes: {
+          name: 'Nodos detenidos',
+          description: 'Libera lo que retenían los nodos y runners que dejaron de responder.',
+        },
+        scheduleEnds: {
+          name: 'Fin de programaciones',
+          description: 'Desactiva o elimina las programaciones que llegaron a su fin.',
+        },
+        tokenCleanup: {
+          name: 'Tokens caducados',
+          description: 'Elimina los tokens de sesión, revocaciones y tokens de API caducados.',
+        },
+        auditCleanup: {
+          name: 'Limpieza de auditoría',
+          description: 'Elimina las entradas de auditoría más antiguas que la retención.',
+        },
+        jobCleanup: {
+          name: 'Limpieza de jobs',
+          description: 'Elimina los jobs terminados más antiguos que la retención de jobs.',
+        },
+        nightlyBackup: {
+          name: 'Copia nocturna',
+          description: 'Copia la base de datos y elimina las copias nocturnas más antiguas.',
+        },
+        storedJobsCleanup: {
+          name: 'Limpieza de jobs guardados',
+          description: 'Elimina los jobs guardados caducados o sin uso, y los nodos viejos.',
+        },
+        configSeedReload: {
+          name: 'Recarga del config seed',
+          description: 'Vuelve a aplicar el config seed cuando cambia su archivo.',
+        },
+      },
+    },
     jobIdNote: '(id de trabajo {id})',
   },
   form: {

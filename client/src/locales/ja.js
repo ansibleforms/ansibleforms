@@ -2970,6 +2970,7 @@ export default {
       future: '未来',
       scheduled: 'スケジュール済み',
       stored: '保存済み',
+      system: 'システム',
       all: 'すべてのジョブ',
       running: '実行中',
       approve: '承認待ち',
@@ -3136,6 +3137,50 @@ export default {
     failedToLoad: 'ジョブの読み込みに失敗しました',
     failedToLoadOutput: 'ジョブの出力の読み込みに失敗しました',
     failedToRead: 'ジョブ {id} の読み込みに失敗しました',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'アプリが自動で実行するメンテナンス処理と、その直近の結果です。',
+      timing: '実行タイミング',
+      everySeconds: '{n} 秒ごと',
+      off: 'オフ',
+      result: '結果',
+      setting: '適用される設定',
+      settingChange: '設定で変更',
+      settingEnv: '環境変数で設定',
+      tabRuns: '実行履歴',
+      node: 'ノード',
+      noRuns: 'まだ実行の記録はありません',
+      notFound: '{key} という名前のシステム処理はありません。',
+      tasks: {
+        abandonedJobs: {
+          name: '放棄されたジョブ',
+          description: '出力がないまま1日経ち、どのランナーも受け取らなかったジョブを終了します。',
+        },
+        deadNodes: {
+          name: '停止したノード',
+          description: '応答しなくなったノードとランナーが保持していたものを解放します。',
+        },
+        scheduleEnds: { name: 'スケジュールの終了', description: '終了に達したスケジュールを無効化または削除します。' },
+        tokenCleanup: {
+          name: '期限切れトークン',
+          description: '期限切れのサインイントークン、失効情報、API トークンを削除します。',
+        },
+        auditCleanup: { name: '監査ログの整理', description: '保持期間より古い監査ログのエントリを削除します。' },
+        jobCleanup: { name: 'ジョブの整理', description: 'ジョブの保持期間より古い完了済みジョブを削除します。' },
+        nightlyBackup: {
+          name: '夜間バックアップ',
+          description: 'データベースをバックアップし、古い夜間バックアップを削除します。',
+        },
+        storedJobsCleanup: {
+          name: '保存済みジョブの整理',
+          description: '期限切れまたは未使用の保存済みジョブと古いノードを削除します。',
+        },
+        configSeedReload: {
+          name: '構成シードの再読み込み',
+          description: 'ファイルが変わったときに構成シードを再適用します。',
+        },
+      },
+    },
     jobIdNote: '(ジョブ ID {id})',
   },
   form: {

@@ -3024,6 +3024,7 @@ export default {
       future: 'Zukunft',
       scheduled: 'Geplant',
       stored: 'Gespeichert',
+      system: 'System',
       all: 'Alle Jobs',
       running: 'Läuft',
       approve: 'Wartet auf Genehmigung',
@@ -3193,6 +3194,56 @@ export default {
     failedToLoad: 'Jobs konnten nicht geladen werden',
     failedToLoadOutput: 'Jobausgabe konnte nicht geladen werden',
     failedToRead: 'Job {id} konnte nicht gelesen werden',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'Die Wartungsaufgaben, die die App selbst ausführt, und ihr letztes Ergebnis.',
+      timing: 'Wann sie läuft',
+      everySeconds: 'Alle {n} Sekunden',
+      off: 'Aus',
+      result: 'Ergebnis',
+      setting: 'Angewandte Einstellung',
+      settingChange: 'In den Einstellungen ändern',
+      settingEnv: 'Durch eine Umgebungsvariable gesetzt',
+      tabRuns: 'Läufe',
+      node: 'Knoten',
+      noRuns: 'Noch kein Lauf erfasst',
+      notFound: 'Keine Systemaufgabe heißt {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Verwaiste Jobs',
+          description: 'Beendet Jobs, die einen Tag ohne Ausgabe liefen und kein Runner nahm.',
+        },
+        deadNodes: {
+          name: 'Gestoppte Knoten',
+          description: 'Gibt frei, was nicht mehr antwortende Knoten und Runner hielten.',
+        },
+        scheduleEnds: { name: 'Zeitplanenden', description: 'Schaltet Zeitpläne an ihrem Ende aus oder entfernt sie.' },
+        tokenCleanup: {
+          name: 'Abgelaufene Tokens',
+          description: 'Entfernt abgelaufene Anmeldetokens, Widerrufe und API-Tokens.',
+        },
+        auditCleanup: {
+          name: 'Audit-Log-Bereinigung',
+          description: 'Entfernt Audit-Log-Einträge, die älter als die Aufbewahrung sind.',
+        },
+        jobCleanup: {
+          name: 'Job-Bereinigung',
+          description: 'Entfernt beendete Jobs, die älter als die Job-Aufbewahrung sind.',
+        },
+        nightlyBackup: {
+          name: 'Nächtliche Sicherung',
+          description: 'Sichert die Datenbank und entfernt die ältesten nächtlichen Sicherungen.',
+        },
+        storedJobsCleanup: {
+          name: 'Bereinigung gespeicherter Jobs',
+          description: 'Entfernt abgelaufene oder ungenutzte gespeicherte Jobs und alte Knoten.',
+        },
+        configSeedReload: {
+          name: 'Config-Seed neu laden',
+          description: 'Wendet den Config-Seed erneut an, wenn sich seine Datei ändert.',
+        },
+      },
+    },
     jobIdNote: '(Job-ID {id})',
   },
   form: {

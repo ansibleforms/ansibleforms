@@ -147,6 +147,7 @@ export default {
     runnerNotFound: "Runner introuvable",
     databaseAdded: "Base de données ajoutée",
     databaseNotFound: "Base de données introuvable",
+    systemTaskNotFound: "Tâche système introuvable",
     runnerAdminOnly:
       "Seul un admin peut ajouter, modifier ou supprimer un runner : un runner recoit les identifiants des jobs qu'il execute",
     repositoryAdminOnly:

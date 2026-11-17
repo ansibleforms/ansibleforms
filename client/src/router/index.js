@@ -55,6 +55,8 @@ const schedules = () => import('@/pages/admin/schedules.vue');
 const schedule = () => import('@/pages/schedule.vue');
 const storedJobs = () => import('@/pages/admin/stored-jobs.vue');
 const storedJob = () => import('@/pages/stored-job.vue');
+const systemTasks = () => import('@/pages/admin/system-tasks.vue');
+const systemTask = () => import('@/pages/system-task.vue');
 const settings = () => import('@/pages/admin/settings.vue');
 const status = () => import('@/pages/admin/status.vue');
 const secretStores = () => import('@/pages/admin/secretStores.vue');
@@ -136,6 +138,15 @@ const routes = [
     name: '/jobs/stored/:id',
     component: storedJob,
     meta: { permission: 'allowStoredJobs' },
+  },
+  // the app's own maintenance tasks and their runs : the admin settings' (the api's guard,
+  // showSettings), read only ; a task by its key (jobCleanup)
+  { path: '/jobs/system', name: '/jobs/system', component: systemTasks, meta: { permission: 'showSettings' } },
+  {
+    path: '/jobs/system/:key([A-Za-z]\\w*)/:tab?',
+    name: '/jobs/system/:key',
+    component: systemTask,
+    meta: { permission: 'showSettings' },
   },
   // the jobs of a status (/jobs/running, /jobs/approval ...) ; a job's page by its number only,
   // so a status's name is never read as a job

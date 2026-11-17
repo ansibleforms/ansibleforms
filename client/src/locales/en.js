@@ -2973,6 +2973,7 @@ export default {
       future: 'Future',
       scheduled: 'Scheduled',
       stored: 'Stored',
+      system: 'System',
       all: 'All jobs',
       running: 'Running',
       approve: 'Waiting for approval',
@@ -3140,6 +3141,53 @@ export default {
     failedToLoad: 'Failed to load jobs',
     failedToLoadOutput: 'Failed to load the job output',
     failedToRead: 'Failed to read job {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'The maintenance tasks the app runs on its own, and how they last went.',
+      timing: 'When it runs',
+      everySeconds: 'Every {n} seconds',
+      off: 'Off',
+      result: 'Result',
+      setting: 'Setting it applies',
+      settingChange: 'Change it in Settings',
+      settingEnv: 'Set by an environment variable',
+      tabRuns: 'Runs',
+      node: 'Node',
+      noRuns: 'No run recorded yet',
+      notFound: 'No system task is named {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Abandoned jobs',
+          description: 'Ends the jobs that ran a day without output and no runner took.',
+        },
+        deadNodes: { name: 'Stopped nodes', description: 'Frees what nodes and runners that stopped answering held.' },
+        scheduleEnds: {
+          name: 'Schedule ends',
+          description: 'Turns off or removes the schedules that reached their end.',
+        },
+        tokenCleanup: {
+          name: 'Expired tokens',
+          description: 'Removes expired sign-in tokens, revocations and API tokens.',
+        },
+        auditCleanup: {
+          name: 'Audit log cleanup',
+          description: 'Removes audit log entries older than the audit retention.',
+        },
+        jobCleanup: { name: 'Job cleanup', description: 'Removes finished jobs older than the job retention.' },
+        nightlyBackup: {
+          name: 'Nightly backup',
+          description: 'Backs up the database and removes the oldest nightly backups.',
+        },
+        storedJobsCleanup: {
+          name: 'Stored jobs cleanup',
+          description: 'Removes expired or unused stored jobs, and forgets old nodes.',
+        },
+        configSeedReload: {
+          name: 'Config seed reload',
+          description: 'Applies the config seed again when its file changes.',
+        },
+      },
+    },
     jobIdNote: '(job id {id})',
   },
   form: {

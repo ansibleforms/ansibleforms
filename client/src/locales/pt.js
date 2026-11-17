@@ -3009,6 +3009,7 @@ export default {
       future: 'Futuro',
       scheduled: 'Agendados',
       stored: 'Guardados',
+      system: 'Sistema',
       all: 'Todas as tarefas',
       running: 'Em execução',
       approve: 'À espera de aprovação',
@@ -3177,6 +3178,59 @@ export default {
     failedToLoad: 'Falha ao carregar as tarefas',
     failedToLoadOutput: 'Falha ao carregar a saída da tarefa',
     failedToRead: 'Falha ao ler a tarefa {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'Os processos de manutenção que a app executa sozinha, e o seu último resultado.',
+      timing: 'Quando é executado',
+      everySeconds: 'A cada {n} segundos',
+      off: 'Desativado',
+      result: 'Resultado',
+      setting: 'Definição aplicada',
+      settingChange: 'Alterar nas Definições',
+      settingEnv: 'Definido por uma variável de ambiente',
+      tabRuns: 'Execuções',
+      node: 'Nó',
+      noRuns: 'Nenhuma execução registada',
+      notFound: 'Nenhum processo do sistema se chama {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Tarefas abandonadas',
+          description: 'Termina as tarefas que estiveram um dia sem saída e nenhum runner assumiu.',
+        },
+        deadNodes: {
+          name: 'Nós parados',
+          description: 'Liberta o que retinham os nós e runners que deixaram de responder.',
+        },
+        scheduleEnds: {
+          name: 'Fim dos agendamentos',
+          description: 'Desativa ou remove os agendamentos que chegaram ao fim.',
+        },
+        tokenCleanup: {
+          name: 'Tokens expirados',
+          description: 'Remove os tokens de sessão, revogações e tokens de API expirados.',
+        },
+        auditCleanup: {
+          name: 'Limpeza da auditoria',
+          description: 'Remove as entradas de auditoria mais antigas do que a retenção.',
+        },
+        jobCleanup: {
+          name: 'Limpeza de tarefas',
+          description: 'Remove as tarefas terminadas mais antigas do que a sua retenção.',
+        },
+        nightlyBackup: {
+          name: 'Cópia noturna',
+          description: 'Copia a base de dados e remove as cópias noturnas mais antigas.',
+        },
+        storedJobsCleanup: {
+          name: 'Limpeza de tarefas guardadas',
+          description: 'Remove as tarefas guardadas expiradas ou sem uso, e nós antigos.',
+        },
+        configSeedReload: {
+          name: 'Recarga do config seed',
+          description: 'Volta a aplicar o config seed quando o seu ficheiro muda.',
+        },
+      },
+    },
     jobIdNote: '(id da tarefa {id})',
   },
   form: {

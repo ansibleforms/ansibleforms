@@ -3387,6 +3387,325 @@
         }
       }
     },
+    "/system/tasks": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "The app's maintenance tasks (Jobs > System)",
+        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Read only. Requires settings access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "description": "The task's key, e.g. jobCleanup"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "What the task does"
+                          },
+                          "cron": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "When it runs, in the app's timezone; null for a task timed by seconds (configSeedReload)"
+                          },
+                          "interval_seconds": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "The seconds between its runs, for a task timed by seconds"
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "description": "Whether it runs (configSeedReload only with CONFIG_SEED_PATH set)"
+                          },
+                          "last_run": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "started_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "ended_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "duration_ms": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "success",
+                                  "failed"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "description": "What the run did, in a few words (Removed 120 finished jobs older than 90 days), or the error"
+                              },
+                              "node": {
+                                "type": "string",
+                                "description": "The node that ran it (the worker)"
+                              }
+                            },
+                            "nullable": true,
+                            "description": "Its latest run; null when none is recorded"
+                          },
+                          "next_run": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "setting": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "The setting it applies; null for none",
+                            "properties": {
+                              "env": {
+                                "type": "string",
+                                "description": "Its environment variable, e.g. JOB_RETENTION_DAYS"
+                              },
+                              "value": {
+                                "description": "Its value now"
+                              },
+                              "editable": {
+                                "type": "boolean",
+                                "description": "Changed in Settings; false when set by the environment only"
+                              },
+                              "link": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "The app page it is changed on"
+                              },
+                              "where": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "That page, in words"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No settings access"
+          }
+        }
+      }
+    },
+    "/system/tasks/{key}": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "One maintenance task, with its recent runs",
+        "description": "The same as the list for one task, with its recent runs, the latest first. Runs are kept 30 days, 1000 per task at most. Requires settings access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The task's key, e.g. jobCleanup"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "The task's key, e.g. jobCleanup"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "What the task does"
+                    },
+                    "cron": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "When it runs, in the app's timezone; null for a task timed by seconds (configSeedReload)"
+                    },
+                    "interval_seconds": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "The seconds between its runs, for a task timed by seconds"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Whether it runs (configSeedReload only with CONFIG_SEED_PATH set)"
+                    },
+                    "last_run": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "ended_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "duration_ms": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "success",
+                            "failed"
+                          ]
+                        },
+                        "result": {
+                          "type": "string",
+                          "description": "What the run did, in a few words (Removed 120 finished jobs older than 90 days), or the error"
+                        },
+                        "node": {
+                          "type": "string",
+                          "description": "The node that ran it (the worker)"
+                        }
+                      },
+                      "nullable": true,
+                      "description": "Its latest run; null when none is recorded"
+                    },
+                    "next_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "setting": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "The setting it applies; null for none",
+                      "properties": {
+                        "env": {
+                          "type": "string",
+                          "description": "Its environment variable, e.g. JOB_RETENTION_DAYS"
+                        },
+                        "value": {
+                          "description": "Its value now"
+                        },
+                        "editable": {
+                          "type": "boolean",
+                          "description": "Changed in Settings; false when set by the environment only"
+                        },
+                        "link": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "The app page it is changed on"
+                        },
+                        "where": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "That page, in words"
+                        }
+                      }
+                    },
+                    "runs": {
+                      "type": "array",
+                      "description": "Its recent runs, the latest first (100 at most)",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "started_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "ended_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "duration_ms": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "enum": [
+                              "success",
+                              "failed"
+                            ]
+                          },
+                          "result": {
+                            "type": "string",
+                            "description": "What the run did, in a few words (Removed 120 finished jobs older than 90 days), or the error"
+                          },
+                          "node": {
+                            "type": "string",
+                            "description": "The node that ran it (the worker)"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No settings access"
+          },
+          "404": {
+            "description": "No task has that key"
+          }
+        }
+      }
+    },
     "/audit": {
       "get": {
         "tags": [

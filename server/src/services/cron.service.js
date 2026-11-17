@@ -26,6 +26,8 @@ import { nextRunsAsync, limits as rruleLimits, TIMEOUT as RRULE_TIMEOUT } from '
 import { cleanupQuery } from '../lib/storedJobExpiry.js';
 // whether a schedule reached its end (its end date passed, or its runs done)
 import { endReached } from '../lib/scheduleEnd.js';
+// the maintenance tasks' crons, and the record of their runs (Jobs > System)
+import { taskCron, recorded, counted, sentence } from '../lib/systemTasks.js';
 
 // the cron registry is re-read from the database this often even without a change notice
 // (lib/epochs.js), in case one was missed
@@ -509,6 +511,22 @@ class CronService {
   /**
    * Initialize system maintenance tasks
    * These are internal maintenance jobs (not from database)
+   *
+   * Each one is declared in lib/systemTasks.js (its key, its cron, the setting it applies), and
+   * each run is recorded there (recorded) : one row of system_task_runs with its outcome and
+   * what it did, for Jobs > System. A task's work returns { result, changed, failed } rather
+   * than only logging : the result is what the row says, changed decides whether a task of
+   * every minute adds a row (it does not when it changed nothing), failed marks a run that
+   * failed in part.
+   *
+   * Args:
+   *   Job (object): the job model (abandon, abandonDeadNodes, removeOlderThan).
+   *   Token (object): the token model (cleanup).
+   *   BackupModel (object): the backup model (doBackup, listBackups, deleteBackup).
+   *   appConfig (object): the app config, read at each run (the retention settings).
+   *
+   * Returns:
+   *   Promise<void>: once every task is registered.
    */
   async initializeSystemTasks(Job, Token, BackupModel, appConfig) {
     logger.info('Initializing system maintenance tasks...');
@@ -516,146 +534,179 @@ class CronService {
     this.jobs.system.forEach((task) => task.stop());
     this.jobs.system.clear();
 
+    /**
+     * Registers one task : its cron from lib/systemTasks.js, its run recorded.
+     *
+     * Args:
+     *   key (string): the task's key.
+     *   work (function): the run's work, returning { result, changed, failed }.
+     */
+    const register = (key, work) => {
+      const task = new Cron(taskCron(key), {
+        timezone: this.timezone,
+        protect: true
+      }, recorded(key, work));
+      this.jobs.system.set(key, task);
+    };
+
     // 1. Abandoned jobs cleanup - runs every hour
-    const abandonedJobsTask = new Cron('0 * * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('abandonedJobs', async () => {
       logger.info('Running abandoned jobs cleanup');
       try {
-        const changed = await Job.abandon();
+        const changed = (await Job.abandon()) || 0;
         if (changed > 0) {
           logger.warning(`Abandoned ${changed} jobs`);
         }
+        return { result: changed > 0 ? `Abandoned ${counted(changed, 'job')}` : 'No job to abandon', changed };
       } catch (err) {
         logger.error('Failed to abandon jobs:', err);
+        return { failed: true, result: `Failed to abandon jobs: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('abandonedJobs', abandonedJobsTask);
     logger.info('Initialized abandoned jobs cleanup (hourly)');
 
     // 1b. The jobs of an app node that stopped answering - every minute. The node that follows
     // a job (jobs.tracker) ends it itself when it restarts, but a replaced container comes back
     // under another name, or not at all.
-    const deadNodesTask = new Cron('* * * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('deadNodes', async () => {
+      // what it did, and what failed, each a few words of the result
+      const done = [];
+      const errors = [];
+      let changed = 0;
       try {
-        const changed = await Job.abandonDeadNodes(nodeId);
-        if (changed > 0) {
-          logger.warning(`Abandoned ${changed} jobs followed by a node that stopped answering`);
+        const jobs = (await Job.abandonDeadNodes(nodeId)) || 0;
+        if (jobs > 0) {
+          logger.warning(`Abandoned ${jobs} jobs followed by a node that stopped answering`);
+          done.push(`abandoned ${counted(jobs, 'job')}`);
+          changed += jobs;
           // the ones still running on their runner (an AWX template) are followed again here
           // (#1084)
           await resumeAbandoned(nodeId);
         }
       } catch (err) {
         logger.error('Failed to abandon the jobs of stopped nodes:', err);
+        errors.push(`jobs: ${err.message || err}`);
       }
       // and the claims they held : a repository left 'running' refuses every pull and save, a
       // schedule left 'running' stops the whole queue
       try {
-        const repos = await Repository.releaseStaleClaims();
-        if (repos > 0) logger.warning(`Released ${repos} repository claim(s) held by a node that stopped answering`);
-        const schedules = await Schedule.releaseStale();
-        if (schedules > 0) logger.warning(`Released ${schedules} schedule launch(es) held by a node that stopped answering`);
+        const repos = (await Repository.releaseStaleClaims()) || 0;
+        if (repos > 0) {
+          logger.warning(`Released ${repos} repository claim(s) held by a node that stopped answering`);
+          done.push(`released ${counted(repos, 'repository claim')}`);
+          changed += repos;
+        }
+        const schedules = (await Schedule.releaseStale()) || 0;
+        if (schedules > 0) {
+          logger.warning(`Released ${schedules} schedule launch(es) held by a node that stopped answering`);
+          done.push(`released ${counted(schedules, 'schedule launch', 'schedule launches')}`);
+          changed += schedules;
+        }
       } catch (err) {
         logger.error('Failed to release the claims of stopped nodes:', err);
+        errors.push(`claims: ${err.message || err}`);
       }
       // and the runners an RTE registered itself (rte/register.js) whose RTE is gone : a
       // recreated container registered again under its new address
       try {
-        const runners = await Runner.removeUnresponsive();
-        if (runners > 0) logger.warning(`Removed ${runners} runner(s) registered by an RTE that stopped answering`);
+        const runners = (await Runner.removeUnresponsive()) || 0;
+        if (runners > 0) {
+          logger.warning(`Removed ${runners} runner(s) registered by an RTE that stopped answering`);
+          done.push(`removed ${counted(runners, 'runner')} that stopped answering`);
+          changed += runners;
+        }
       } catch (err) {
         logger.error('Failed to remove the runners of stopped RTEs:', err);
+        errors.push(`runners: ${err.message || err}`);
       }
       // and the RTEs that asked to join and nobody approved within a day
       try {
-        const pending = await Runner.removeStalePending();
-        if (pending > 0) logger.warning(`Removed ${pending} runner(s) that asked to join and were not approved within a day`);
+        const pending = (await Runner.removeStalePending()) || 0;
+        if (pending > 0) {
+          logger.warning(`Removed ${pending} runner(s) that asked to join and were not approved within a day`);
+          done.push(`removed ${counted(pending, 'runner')} not approved within a day`);
+          changed += pending;
+        }
       } catch (err) {
         logger.error('Failed to remove the runners waiting for approval too long:', err);
+        errors.push(`pending runners: ${err.message || err}`);
       }
+      return { changed, failed: errors.length > 0, result: sentence(errors.length ? [...errors.map((e) => `failed on ${e}`), ...done] : done, 'Nothing to free') };
     });
-    this.jobs.system.set('deadNodes', deadNodesTask);
     logger.info('Initialized the stopped-node sweep (every minute)');
 
     // 1c. The schedules at their end - every minute. A schedule whose end date passed between two
     // of its runs is turned off or removed (its end_action) at that minute rather than at its next
     // run, and so is one whose runs are done that a pull put back on (lib/scheduleEnd.js).
-    const scheduleEndsTask = new Cron('* * * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('scheduleEnds', async () => {
       try {
-        const ended = await Schedule.endReachedSchedules();
+        const ended = (await Schedule.endReachedSchedules()) || 0;
         if (ended > 0) logger.info(`Ended ${ended} schedule(s) that reached their end`);
+        return { result: ended > 0 ? `Ended ${counted(ended, 'schedule')}` : 'No schedule at its end', changed: ended };
       } catch (err) {
         logger.error('Failed to end the schedules that reached their end:', err);
+        return { failed: true, result: `Failed to end the schedules: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('scheduleEnds', scheduleEndsTask);
     logger.info('Initialized the schedule end sweep (every minute)');
 
     // 2. Token cleanup - runs daily at 3:00 AM
-    const tokenCleanupTask = new Cron('0 3 * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('tokenCleanup', async () => {
       logger.info('Running token cleanup');
       try {
-        await Token.cleanup();
+        const tokens = (await Token.cleanup()) || 0;
         // the revocations no token can need any more
-        await purgeRevocations();
+        const revocations = (await purgeRevocations()) || 0;
         // the api tokens that expired : off their users' lists
-        await ApiToken.purge();
+        const apiTokens = (await ApiToken.purge()) || 0;
+        const changed = tokens + revocations + apiTokens;
+        return {
+          changed,
+          result: changed > 0
+            ? `Removed ${counted(tokens, 'token')}, ${counted(revocations, 'revocation')} and ${counted(apiTokens, 'API token')}`
+            : 'No expired token'
+        };
       } catch (err) {
         logger.error('Failed to cleanup tokens:', err);
+        return { failed: true, result: `Failed to remove the expired tokens: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('tokenCleanup', tokenCleanupTask);
     logger.info('Initialized token cleanup (daily at 3:00 AM)');
 
     // 2b. Audit retention - runs at 3:30 AM. Shipped with the audit trail rather
     // than after it : an append-only table with no sweep is the same unbounded
     // growth problem job_output already has.
-    const auditCleanupTask = new Cron('30 3 * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('auditCleanup', async () => {
       const keep = appConfig.auditRetentionDays;
       if (!keep || keep < 1) {
         logger.info('Audit retention is disabled, keeping all entries');
-        return;
+        return { result: 'Retention is off (AUDIT_RETENTION_DAYS=0), every entry kept' };
       }
       logger.info(`Running audit cleanup, keeping the last ${keep} days`);
       try {
-        const removed = await Audit.removeOlderThan(keep);
+        const removed = (await Audit.removeOlderThan(keep)) || 0;
         logger.info(`Removed ${removed} audit entries older than ${keep} days`);
+        return { changed: removed, result: `Removed ${counted(removed, 'entry', 'entries')} older than ${counted(keep, 'day')}` };
       } catch (err) {
         logger.error('Failed to cleanup audit entries:', err);
+        return { failed: true, result: `Failed to remove the old audit entries: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('auditCleanup', auditCleanupTask);
     logger.info('Initialized audit cleanup (daily at 3:30 AM)');
 
     // 2c. Job retention - runs at 2:30 AM. Job output is longtext and nothing pruned
     // it before, so this is the table that grows without limit on a busy instance.
     // 90 days by default since 7.6.0 (JOB_RETENTION_DAYS) ; 0 keeps every job. The health
     // page reports the size, and says so when pruning is switched off.
-    const jobCleanupTask = new Cron('30 2 * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('jobCleanup', async () => {
       const keep = appConfig.jobRetentionDays;
       if (!keep || keep < 1) {
         logger.info('Job retention is disabled (JOB_RETENTION_DAYS), keeping all jobs');
-        return;
+        return { result: 'Retention is off (JOB_RETENTION_DAYS=0), every job kept' };
       }
       logger.info(`Running job cleanup, keeping the last ${keep} days`);
       try {
-        const removed = await Job.removeOlderThan(keep);
+        const removed = (await Job.removeOlderThan(keep)) || 0;
         // only audited when it actually removed something : a nightly 'removed 0 rows'
         // entry for every task would bury the events worth reading
         if (removed > 0) {
@@ -665,19 +716,17 @@ class CronService {
             detail: { removed, retentionDays: keep }
           });
         }
+        return { changed: removed, result: `Removed ${counted(removed, 'finished job')} older than ${counted(keep, 'day')}` };
       } catch (err) {
         logger.error('Failed to cleanup jobs:', err);
         Audit.log({ action: 'job.prune', outcome: 'failure', targetType: 'job', detail: { error: err.message || String(err) } });
+        return { failed: true, result: `Failed to remove the old jobs: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('jobCleanup', jobCleanupTask);
     logger.info('Initialized job cleanup (daily at 2:30 AM)');
 
     // 3. Nightly backup - runs at midnight
-    const nightlyBackupTask = new Cron('0 0 * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('nightlyBackup', async () => {
       logger.info('Running automated nightly backup');
       try {
         const result = await BackupModel.doBackup('Automated nightly backup');
@@ -690,6 +739,7 @@ class CronService {
           target: result.timestamp || null,
           detail: { folder: result.backupFolder, description: result.description }
         });
+        const backedUp = `Backed up the database${result.timestamp ? ` (${result.timestamp})` : ''}`;
 
         // Cleanup old nightly backups.
         // A retention of 0 (or a negative / non-numeric value) means DO NOT CLEAN UP :
@@ -700,7 +750,7 @@ class CronService {
         const keepBackups = appConfig.nightlyBackupRetention;
         if (!(keepBackups >= 1)) {
           logger.info('Nightly backup cleanup is disabled (NIGHTLY_BACKUP_RETENTION), keeping all backups');
-          return;
+          return { changed: 1, result: `${backedUp}, every backup kept` };
         }
         logger.info(`Cleaning up nightly backups, keeping last ${keepBackups} backups`);
         const backups = await BackupModel.listBackups();   // newest first
@@ -717,26 +767,27 @@ class CronService {
         const newestKept = validNightly[0]?.folder || null;
         if (!newestKept) {
           logger.warning('No valid nightly backup exists, skipping the retention sweep entirely');
-        } else {
-          // INVALID folders are swept too. Excluding them from the quota (above) is right,
-          // but they were then also excluded from the deletion list, so a 0-byte folder was
-          // kept for ever - the retention setting silently did not apply to exactly the
-          // folders nobody wants. Nothing NEWER than the newest kept backup is ever a
-          // candidate, so a backup still being written cannot be deleted underneath itself.
-          const toDelete = nightlyBackups.filter(b => !kept.has(b.folder) && b.folder < newestKept);
-          for (const backup of toDelete) {
-            logger.info(`Deleting old nightly backup: ${backup.folder}${backup.valid ? '' : ' (no usable dump)'}`);
-            await BackupModel.deleteBackup(backup.folder);
-            Audit.log({
-              action: 'backup.delete', outcome: 'success', targetType: 'backup',
-              target: backup.folder, detail: { reason: 'retention', keep: keepBackups, valid: !!backup.valid }
-            });
-          }
-          if (toDelete.length > 0) {
-            const junk = toDelete.filter(b => !b.valid).length;
-            logger.info(`Cleaned up ${toDelete.length} old nightly backups${junk ? ` (${junk} with no usable dump)` : ''}`);
-          }
+          return { changed: 1, result: `${backedUp}, no valid backup to keep so none removed` };
         }
+        // INVALID folders are swept too. Excluding them from the quota (above) is right,
+        // but they were then also excluded from the deletion list, so a 0-byte folder was
+        // kept for ever - the retention setting silently did not apply to exactly the
+        // folders nobody wants. Nothing NEWER than the newest kept backup is ever a
+        // candidate, so a backup still being written cannot be deleted underneath itself.
+        const toDelete = nightlyBackups.filter(b => !kept.has(b.folder) && b.folder < newestKept);
+        for (const backup of toDelete) {
+          logger.info(`Deleting old nightly backup: ${backup.folder}${backup.valid ? '' : ' (no usable dump)'}`);
+          await BackupModel.deleteBackup(backup.folder);
+          Audit.log({
+            action: 'backup.delete', outcome: 'success', targetType: 'backup',
+            target: backup.folder, detail: { reason: 'retention', keep: keepBackups, valid: !!backup.valid }
+          });
+        }
+        if (toDelete.length > 0) {
+          const junk = toDelete.filter(b => !b.valid).length;
+          logger.info(`Cleaned up ${toDelete.length} old nightly backups${junk ? ` (${junk} with no usable dump)` : ''}`);
+        }
+        return { changed: 1 + toDelete.length, result: `${backedUp}, removed ${counted(toDelete.length, 'old backup')}` };
       } catch (err) {
         logger.error('Failed to create nightly backup:', err);
         // the whole point : a failed backup is now queryable in the audit trail and
@@ -745,38 +796,47 @@ class CronService {
           action: 'backup.create', outcome: 'failure', targetType: 'backup',
           detail: { error: err.message || String(err) }
         });
+        return { failed: true, result: `The nightly backup failed: ${err.message || err}` };
       }
     });
-    this.jobs.system.set('nightlyBackup', nightlyBackupTask);
     logger.info('Initialized nightly backup (daily at midnight)');
 
     // 4. Stored jobs cleanup - runs daily at 4:00 AM
-    const storedJobsCleanupTask = new Cron('0 4 * * *', {
-      timezone: this.timezone,
-      protect: true
-    }, async () => {
+    register('storedJobsCleanup', async () => {
       logger.info('Running stored jobs cleanup');
+      const done = [];
+      const errors = [];
+      let changed = 0;
       try {
         // past their expiry date, or unused for longer than their days : the shorter of
         // STORED_JOB_UNUSED_DAYS (read now, it applies without a restart) and their own
         // (lib/storedJobExpiry.js) ; whichever comes first
         const { sql, params } = cleanupQuery(appConfig.storedJobUnusedDays);
         const result = await mysql.do(sql, params, true);
-        if (result.affectedRows > 0) {
-          logger.info(`Cleaned up ${result.affectedRows} expired or unused stored job(s)`);
+        const removed = result?.affectedRows || 0;
+        if (removed > 0) {
+          logger.info(`Cleaned up ${removed} expired or unused stored job(s)`);
         }
+        done.push(`removed ${counted(removed, 'stored job')}`);
+        changed += removed;
       } catch (err) {
         logger.error('Failed to cleanup expired stored jobs:', err);
+        errors.push(`failed on stored jobs: ${err.message || err}`);
       }
       // and the rows of nodes gone for a day
       try {
-        const forgotten = await forgetOldNodes();
-        if (forgotten > 0) logger.info(`Forgot ${forgotten} node(s) not seen for a day`);
+        const forgotten = (await forgetOldNodes()) || 0;
+        if (forgotten > 0) {
+          logger.info(`Forgot ${forgotten} node(s) not seen for a day`);
+          done.push(`forgot ${counted(forgotten, 'node')}`);
+          changed += forgotten;
+        }
       } catch (err) {
         logger.error('Failed to forget old nodes:', err);
+        errors.push(`failed on nodes: ${err.message || err}`);
       }
+      return { changed, failed: errors.length > 0, result: sentence([...errors, ...done], 'Nothing to remove') };
     });
-    this.jobs.system.set('storedJobsCleanup', storedJobsCleanupTask);
     logger.info('Initialized stored jobs cleanup (daily at 4:00 AM)');
 
     // 5. Config seed reload - re-applies CONFIG_SEED_PATH when its content changes
@@ -820,12 +880,18 @@ class CronService {
         // an apply that runs long (a seeded repository being cloned) must not have a
         // second one started on top of it
         protect: true
-      }, async () => {
+      }, recorded('configSeedReload', async () => {
         // reloadConfigSeed handles its own failures - it must never throw into the
         // scheduler, because a rejection here would leave the tick counted and the
-        // reason logged by croner rather than by the seed
-        await reloadConfigSeed({ trigger: 'poll' });
-      });
+        // reason logged by croner rather than by the seed. What it answers is the run's
+        // result : applied is a change, a failure a failed run, the rest (unchanged,
+        // skipped, off) a run that changed nothing, rewritten in place (a quiet task)
+        const answer = (await reloadConfigSeed({ trigger: 'poll' })) || {};
+        if (answer.status === 'applied') return { changed: 1, result: 'Applied the config seed again, its file changed' };
+        if (answer.status === 'failed') return { failed: true, result: `The config seed could not be applied: ${answer.error}` };
+        if (answer.status === 'skipped') return { result: 'The config seed is unchanged since it failed' };
+        return { result: 'The config seed is unchanged' };
+      }));
       this.jobs.system.set('configSeedReload', configSeedTask);
       logger.info(`Initialized config seed reload (every ${seedReloadSeconds}s)`);
     } else if (appConfig.configSeedPath) {

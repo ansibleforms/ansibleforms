@@ -3006,6 +3006,7 @@ export default {
       future: 'Futuro',
       scheduled: 'Pianificati',
       stored: 'Salvati',
+      system: 'Sistema',
       all: 'Tutti i job',
       running: 'In esecuzione',
       approve: 'In attesa di approvazione',
@@ -3174,6 +3175,59 @@ export default {
     failedToLoad: 'Impossibile caricare i job',
     failedToLoadOutput: "Impossibile caricare l'output del job",
     failedToRead: 'Impossibile leggere il job {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: "Le attività di manutenzione che l'app esegue da sola, e il loro ultimo esito.",
+      timing: 'Quando viene eseguita',
+      everySeconds: 'Ogni {n} secondi',
+      off: 'Disattivata',
+      result: 'Risultato',
+      setting: 'Impostazione applicata',
+      settingChange: 'Modificala nelle Impostazioni',
+      settingEnv: "Impostata da una variabile d'ambiente",
+      tabRuns: 'Esecuzioni',
+      node: 'Nodo',
+      noRuns: 'Nessuna esecuzione registrata',
+      notFound: 'Nessuna attività di sistema si chiama {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Job abbandonati',
+          description: 'Chiude i job rimasti un giorno senza output e non presi da alcun runner.',
+        },
+        deadNodes: {
+          name: 'Nodi fermati',
+          description: 'Libera ciò che tenevano i nodi e i runner che non rispondono più.',
+        },
+        scheduleEnds: {
+          name: 'Fine delle pianificazioni',
+          description: 'Disattiva o rimuove le pianificazioni giunte alla fine.',
+        },
+        tokenCleanup: {
+          name: 'Token scaduti',
+          description: 'Rimuove i token di accesso, le revoche e i token API scaduti.',
+        },
+        auditCleanup: {
+          name: 'Pulizia del log di audit',
+          description: 'Rimuove le voci di audit più vecchie della loro conservazione.',
+        },
+        jobCleanup: {
+          name: 'Pulizia dei job',
+          description: 'Rimuove i job terminati più vecchi della conservazione dei job.',
+        },
+        nightlyBackup: {
+          name: 'Backup notturno',
+          description: 'Esegue il backup del database e rimuove i backup notturni più vecchi.',
+        },
+        storedJobsCleanup: {
+          name: 'Pulizia dei job salvati',
+          description: 'Rimuove i job salvati scaduti o inutilizzati, e i nodi vecchi.',
+        },
+        configSeedReload: {
+          name: 'Ricarica del config seed',
+          description: 'Riapplica il config seed quando il suo file cambia.',
+        },
+      },
+    },
     jobIdNote: '(id job {id})',
   },
   form: {

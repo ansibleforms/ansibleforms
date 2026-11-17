@@ -3012,6 +3012,7 @@ export default {
       future: 'Futur',
       scheduled: 'Programats',
       stored: 'Desats',
+      system: 'Sistema',
       all: 'Totes les tasques',
       running: 'En execució',
       approve: 'Esperant aprovació',
@@ -3179,6 +3180,59 @@ export default {
     failedToLoad: "No s'han pogut carregar les tasques",
     failedToLoadOutput: "No s'ha pogut carregar la sortida de la tasca",
     failedToRead: "No s'ha pogut llegir la tasca {id}",
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: "Els processos de manteniment que l'app executa sola, i el seu darrer resultat.",
+      timing: "Quan s'executa",
+      everySeconds: 'Cada {n} segons',
+      off: 'Desactivat',
+      result: 'Resultat',
+      setting: 'Paràmetre aplicat',
+      settingChange: 'Canvia-ho a Configuració',
+      settingEnv: "Definit per una variable d'entorn",
+      tabRuns: 'Execucions',
+      node: 'Node',
+      noRuns: 'Cap execució registrada',
+      notFound: 'Cap procés del sistema no es diu {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Tasques abandonades',
+          description: 'Acaba les tasques que van estar un dia sense sortida i cap runner va agafar.',
+        },
+        deadNodes: {
+          name: 'Nodes aturats',
+          description: 'Allibera el que retenien els nodes i runners que ja no responen.',
+        },
+        scheduleEnds: {
+          name: 'Fi de les programacions',
+          description: 'Desactiva o elimina les programacions que han arribat al final.',
+        },
+        tokenCleanup: {
+          name: 'Tokens caducats',
+          description: "Elimina els tokens de sessió, les revocacions i els tokens d'API caducats.",
+        },
+        auditCleanup: {
+          name: "Neteja de l'auditoria",
+          description: "Elimina les entrades d'auditoria més antigues que la retenció.",
+        },
+        jobCleanup: {
+          name: 'Neteja de tasques',
+          description: 'Elimina les tasques acabades més antigues que la retenció de tasques.',
+        },
+        nightlyBackup: {
+          name: 'Còpia nocturna',
+          description: 'Copia la base de dades i elimina les còpies nocturnes més antigues.',
+        },
+        storedJobsCleanup: {
+          name: 'Neteja de tasques desades',
+          description: 'Elimina les tasques desades caducades o sense ús, i els nodes vells.',
+        },
+        configSeedReload: {
+          name: 'Recàrrega del config seed',
+          description: 'Torna a aplicar el config seed quan canvia el seu fitxer.',
+        },
+      },
+    },
     jobIdNote: '(id de tasca {id})',
   },
   form: {

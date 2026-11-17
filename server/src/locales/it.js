@@ -138,6 +138,7 @@ export default {
     runnerNotFound: "Runner non trovato",
     databaseAdded: "Database aggiunto",
     databaseNotFound: "Database non trovato",
+    systemTaskNotFound: "Attività di sistema non trovata",
     runnerAdminOnly:
       "Solo un admin può aggiungere, modificare o eliminare un runner: un runner riceve le credenziali dei job che esegue",
     repositoryAdminOnly:

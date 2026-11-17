@@ -3005,6 +3005,7 @@ export default {
       future: 'Toekomst',
       scheduled: 'Gepland',
       stored: 'Opgeslagen',
+      system: 'Systeem',
       all: 'Alle jobs',
       running: 'Bezig',
       approve: 'Wacht op goedkeuring',
@@ -3172,6 +3173,59 @@ export default {
     failedToLoad: 'Jobs laden mislukt',
     failedToLoadOutput: 'Uitvoer van de job laden mislukt',
     failedToRead: 'Job {id} lezen mislukt',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'De onderhoudstaken die de app zelf uitvoert, en hun laatste resultaat.',
+      timing: 'Wanneer hij draait',
+      everySeconds: 'Elke {n} seconden',
+      off: 'Uit',
+      result: 'Resultaat',
+      setting: 'Toegepaste instelling',
+      settingChange: 'Wijzig hem in Instellingen',
+      settingEnv: 'Ingesteld door een omgevingsvariabele',
+      tabRuns: 'Runs',
+      node: 'Node',
+      noRuns: 'Nog geen run vastgelegd',
+      notFound: 'Geen systeemtaak heet {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Verlaten jobs',
+          description: 'Beëindigt jobs die een dag zonder uitvoer liepen en die geen runner nam.',
+        },
+        deadNodes: {
+          name: 'Gestopte nodes',
+          description: 'Geeft vrij wat nodes en runners hielden die niet meer antwoorden.',
+        },
+        scheduleEnds: {
+          name: 'Einde van planningen',
+          description: 'Zet planningen die hun einde bereikten uit of verwijdert ze.',
+        },
+        tokenCleanup: {
+          name: 'Verlopen tokens',
+          description: 'Verwijdert verlopen aanmeldtokens, intrekkingen en API-tokens.',
+        },
+        auditCleanup: {
+          name: 'Auditlog opschonen',
+          description: 'Verwijdert auditregels die ouder zijn dan de bewaartermijn.',
+        },
+        jobCleanup: {
+          name: 'Jobs opschonen',
+          description: 'Verwijdert afgeronde jobs ouder dan de bewaartermijn van jobs.',
+        },
+        nightlyBackup: {
+          name: 'Nachtelijke back-up',
+          description: 'Maakt een back-up van de database en verwijdert de oudste nachtelijke.',
+        },
+        storedJobsCleanup: {
+          name: 'Opgeslagen jobs opschonen',
+          description: 'Verwijdert verlopen of ongebruikte opgeslagen jobs, en oude nodes.',
+        },
+        configSeedReload: {
+          name: 'Config seed herladen',
+          description: 'Past de config seed opnieuw toe als zijn bestand verandert.',
+        },
+      },
+    },
     jobIdNote: '(job-id {id})',
   },
   form: {

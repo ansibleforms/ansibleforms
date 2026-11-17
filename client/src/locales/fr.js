@@ -3019,6 +3019,7 @@ export default {
       future: 'Futur',
       scheduled: 'Planifiés',
       stored: 'Enregistrés',
+      system: 'Système',
       all: 'Tous les jobs',
       running: 'En cours',
       approve: "En attente d'approbation",
@@ -3186,6 +3187,59 @@ export default {
     failedToLoad: 'Echec du chargement des jobs',
     failedToLoadOutput: 'Échec du chargement de la sortie du job',
     failedToRead: 'Échec de la lecture du job {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: "Les tâches de maintenance que l'app exécute d'elle-même, et leur dernier résultat.",
+      timing: "Quand elle s'exécute",
+      everySeconds: 'Toutes les {n} secondes',
+      off: 'Désactivée',
+      result: 'Résultat',
+      setting: 'Paramètre appliqué',
+      settingChange: 'À modifier dans les Paramètres',
+      settingEnv: "Défini par une variable d'environnement",
+      tabRuns: 'Exécutions',
+      node: 'Nœud',
+      noRuns: 'Aucune exécution enregistrée',
+      notFound: 'Aucune tâche système ne se nomme {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Jobs abandonnés',
+          description: "Termine les jobs restés un jour sans sortie qu'aucun runner n'a pris.",
+        },
+        deadNodes: {
+          name: 'Nœuds arrêtés',
+          description: 'Libère ce que tenaient les nœuds et runners qui ne répondent plus.',
+        },
+        scheduleEnds: {
+          name: 'Fins de planification',
+          description: 'Désactive ou supprime les planifications arrivées à leur fin.',
+        },
+        tokenCleanup: {
+          name: 'Jetons expirés',
+          description: 'Supprime les jetons de connexion, révocations et jetons API expirés.',
+        },
+        auditCleanup: {
+          name: "Nettoyage du journal d'audit",
+          description: "Supprime les entrées d'audit plus anciennes que leur rétention.",
+        },
+        jobCleanup: {
+          name: 'Nettoyage des jobs',
+          description: 'Supprime les jobs terminés plus anciens que la rétention des jobs.',
+        },
+        nightlyBackup: {
+          name: 'Sauvegarde nocturne',
+          description: 'Sauvegarde la base de données et supprime les plus anciennes sauvegardes.',
+        },
+        storedJobsCleanup: {
+          name: 'Nettoyage des jobs enregistrés',
+          description: 'Supprime les jobs enregistrés expirés ou inutilisés, et les vieux nœuds.',
+        },
+        configSeedReload: {
+          name: 'Rechargement du config seed',
+          description: 'Réapplique le config seed quand son fichier change.',
+        },
+      },
+    },
     jobIdNote: '(id du job {id})',
   },
   form: {

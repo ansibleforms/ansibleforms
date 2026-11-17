@@ -202,11 +202,15 @@ export async function consumeOnce(key, expiresAtMs) {
  * Removes the revocations that no token can need any more.
  *
  * Returns:
- *   Promise<void>: settles once removed.
+ *   Promise<number>: the revocations removed.
+ *
+ * Raises:
+ *   Error: when the database refuses the delete (the daily token cleanup records it).
  */
 export async function purgeRevocations() {
   const mysql = await db();
-  await mysql.do("DELETE FROM AnsibleForms.`token_revocations` WHERE expires_at < NOW()").catch(() => {});
+  const res = await mysql.do("DELETE FROM AnsibleForms.`token_revocations` WHERE expires_at < NOW()");
+  return res?.affectedRows || 0;
 }
 
 // tests only

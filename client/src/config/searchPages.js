@@ -43,6 +43,13 @@ export function searchPages(t, options) {
       icon: 'floppy-disk',
       link: '/jobs/stored',
     },
+    // the app's own maintenance tasks (an admin's)
+    {
+      title: t('jobs.menu.system'),
+      section: t('nav.jobs'),
+      icon: 'gears',
+      link: '/jobs/system',
+    },
 
     // ---------------------------------------------------------------
     // the settings menu

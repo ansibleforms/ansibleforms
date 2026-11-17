@@ -2993,6 +2993,7 @@ export default {
       future: 'Przyszłe',
       scheduled: 'Zaplanowane',
       stored: 'Zapisane',
+      system: 'System',
       all: 'Wszystkie zadania',
       running: 'Uruchomione',
       approve: 'Oczekuje na zatwierdzenie',
@@ -3161,6 +3162,59 @@ export default {
     failedToLoad: 'Nie udało się wczytać zadań',
     failedToLoadOutput: 'Nie udało się wczytać wyniku zadania',
     failedToRead: 'Nie udało się odczytać zadania {id}',
+    // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
+    system: {
+      description: 'Procesy konserwacji uruchamiane przez aplikację i ich ostatni wynik.',
+      timing: 'Kiedy działa',
+      everySeconds: 'Co {n} s',
+      off: 'Wyłączony',
+      result: 'Wynik',
+      setting: 'Stosowane ustawienie',
+      settingChange: 'Zmień w Ustawieniach',
+      settingEnv: 'Ustawione przez zmienną środowiskową',
+      tabRuns: 'Uruchomienia',
+      node: 'Węzeł',
+      noRuns: 'Brak zapisanych uruchomień',
+      notFound: 'Żaden proces systemowy nie nazywa się {key}.',
+      tasks: {
+        abandonedJobs: {
+          name: 'Porzucone zadania',
+          description: 'Kończy zadania bez wyjścia od doby, których nie przejął żaden runner.',
+        },
+        deadNodes: {
+          name: 'Zatrzymane węzły',
+          description: 'Zwalnia to, co trzymały węzły i runnery, które przestały odpowiadać.',
+        },
+        scheduleEnds: {
+          name: 'Koniec harmonogramów',
+          description: 'Wyłącza lub usuwa harmonogramy, które dotarły do końca.',
+        },
+        tokenCleanup: {
+          name: 'Wygasłe tokeny',
+          description: 'Usuwa wygasłe tokeny logowania, unieważnienia i tokeny API.',
+        },
+        auditCleanup: {
+          name: 'Czyszczenie audytu',
+          description: 'Usuwa wpisy audytu starsze niż okres ich przechowywania.',
+        },
+        jobCleanup: {
+          name: 'Czyszczenie zadań',
+          description: 'Usuwa zakończone zadania starsze niż okres przechowywania zadań.',
+        },
+        nightlyBackup: {
+          name: 'Nocna kopia zapasowa',
+          description: 'Tworzy kopię bazy danych i usuwa najstarsze nocne kopie.',
+        },
+        storedJobsCleanup: {
+          name: 'Czyszczenie zapisanych zadań',
+          description: 'Usuwa wygasłe lub nieużywane zapisane zadania oraz stare węzły.',
+        },
+        configSeedReload: {
+          name: 'Ponowne wczytanie config seed',
+          description: 'Ponownie stosuje config seed, gdy zmieni się jego plik.',
+        },
+      },
+    },
     jobIdNote: '(id zadania {id})',
   },
   form: {

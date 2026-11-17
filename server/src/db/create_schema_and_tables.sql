@@ -925,5 +925,30 @@ CREATE TABLE `workflow_node_runs` (
   CONSTRAINT `FK_workflow_node_runs_jobs` FOREIGN KEY (`job_id`) REFERENCES `jobs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- the runs of the app's own maintenance tasks (Jobs > System) : one row per run that did
+-- something, and each task's latest run (lib/systemTasks.js)
+-- (keep in sync with src/db/create_system_task_runs_table.sql)
+DROP TABLE IF EXISTS `system_task_runs`;
+CREATE TABLE `system_task_runs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  -- the task that ran (lib/systemTasks.js SYSTEM_TASKS : jobCleanup, nightlyBackup ...)
+  `task_key` varchar(50) NOT NULL,
+  -- when the run started and ended, in UTC, to the millisecond (its duration)
+  `started_at` datetime(3) NOT NULL,
+  `ended_at` datetime(3) DEFAULT NULL,
+  -- success or failed
+  `outcome` varchar(10) NOT NULL,
+  -- what it did, in a few words (removed 120 jobs), or the error
+  `result` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- the node that ran it (the worker's name, lib/role.js nodeId)
+  `node` varchar(250) DEFAULT NULL,
+  -- the task's key on the one row holding its latest run that changed nothing (a task of every
+  -- minute rewrites that row rather than adding one) ; NULL on every other row
+  `quiet_of` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_system_task_runs_quiet` (`quiet_of`),
+  KEY `idx_system_task_runs_task` (`task_key`, `started_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- enable foreign key checks
 SET FOREIGN_KEY_CHECKS=1;

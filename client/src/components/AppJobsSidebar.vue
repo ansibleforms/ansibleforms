@@ -3,9 +3,9 @@
 /*                                                                */
 /*  The jobs left menu                                            */
 /*                                                                */
-/*  Shown on the jobs list, the scheduled jobs and the stored     */
-/*  jobs pages, so all three keep the same menu (the header's     */
-/*  Jobs link covers them all).                                   */
+/*  Shown on the jobs list, the scheduled jobs, the stored jobs   */
+/*  and the system tasks pages, so all of them keep the same menu */
+/*  (the header's Jobs link covers them all).                     */
 /*                                                                */
 /*  @props:                                                       */
 /*      jobs: Array - the jobs list's own jobs, for the counts.   */
@@ -77,10 +77,10 @@ watch(
   { immediate: true },
 );
 
-// the future jobs' counts : the schedules and the stored jobs the user may see (undefined until
-// read : a grey pill ; null when they could not be read : none ; then the count of last time while
-// they are read again)
-const futureCounts = remembered('jobsFuture', { schedules: undefined, stored: undefined });
+// the future jobs' counts : the schedules and the stored jobs the user may see, and the app's own
+// maintenance tasks for an admin (undefined until read : a grey pill ; null when they could not be
+// read : none ; then the count of last time while they are read again)
+const futureCounts = remembered('jobsFuture', { schedules: undefined, stored: undefined, system: undefined });
 
 // the statuses of the menu, with their names and icons, in the same order and with the
 // same icons as the jobs list's page titles (pages/jobs.vue). The labels are spelled out,
@@ -150,6 +150,15 @@ const sections = computed(() => {
       badge: futureCounts.value.stored,
       badgeLoading: futureCounts.value.stored === undefined,
     },
+    // the app's own maintenance tasks (the job retention, the nightly backup ...) : an admin's,
+    // as their route says (showSettings)
+    {
+      title: t('jobs.menu.system'),
+      icon: 'gears',
+      link: '/jobs/system',
+      badge: futureCounts.value.system,
+      badgeLoading: futureCounts.value.system === undefined,
+    },
   ].filter((i) => mayOpen(i.link, store.profile?.options));
   if (future.length) sections.push({ title: t('jobs.menu.future'), items: future });
   return sections;
@@ -171,8 +180,9 @@ async function loadCounts() {
 }
 
 /**
- * Reads how many schedules and stored jobs the user has, for the Upcoming badges : only those
- * the user may open (the same role options as their pages).
+ * Reads how many schedules and stored jobs the user has, and how many maintenance tasks the app
+ * runs, for the Future badges : only those the user may open (the same role options as their
+ * pages).
  */
 async function loadFutureCounts() {
   const options = store.profile?.options;
@@ -186,11 +196,12 @@ async function loadFutureCounts() {
       return null;
     }
   };
-  const [schedules, stored] = await Promise.all([
+  const [schedules, stored, system] = await Promise.all([
     read('/jobs/scheduled', '/api/v2/schedule/'),
     read('/jobs/stored', '/api/v2/stored-jobs/'),
+    read('/jobs/system', '/api/v2/system/tasks'),
   ]);
-  futureCounts.value = { schedules, stored };
+  futureCounts.value = { schedules, stored, system };
 }
 
 // MOUNT

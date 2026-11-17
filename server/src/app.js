@@ -73,6 +73,7 @@ import backupRoutes from "./routes/v2/backup.routes.js";
 import groupRoutesv2 from "./routes/v2/group.routes.js";
 import settingsRoutesv2 from "./routes/v2/settings.routes.js";
 import healthRoutesv2 from "./routes/v2/health.routes.js";
+import systemRoutesv2 from "./routes/v2/system.routes.js";
 import auditRoutesv2 from "./routes/v2/audit.routes.js";
 import directoryRoutesv2 from "./routes/v2/directory.routes.js";
 import auditMiddleware from "./lib/auditMiddleware.js";
@@ -256,6 +257,8 @@ const load = async (app) => {
   app.use(`/api/v2/group`, cors(), authobj, Middleware.checkSettingsMiddleware, groupRoutesv2);
   app.use(`/api/v2/settings`, cors(), authobj, Middleware.checkAnySettingsMiddleware, settingsRoutesv2);
   app.use(`/api/v2/health`, cors(), authobj, Middleware.checkSettingsMiddleware, healthRoutesv2);
+  // the app's own maintenance tasks and their runs (Jobs > System) : the admin settings, read only
+  app.use(`/api/v2/system`, cors(), authobj, Middleware.checkSettingsMiddleware, systemRoutesv2);
   app.use(`/api/v2/audit`, cors(), authobj, Middleware.checkAuditMiddleware, auditRoutesv2);
   // the LDAP and SSO users and groups of Settings > Users and Groups (models/directoryUser.model.js)
   app.use(`/api/v2/directory`, cors(), authobj, Middleware.checkSettingsMiddleware, directoryRoutesv2);

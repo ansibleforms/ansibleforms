@@ -185,10 +185,12 @@ function jobsPage(words, section, t) {
       ],
     };
   }
-  // the scheduled and the stored jobs : their list, or one of them in tabs
+  // the scheduled and the stored jobs, and the system tasks : their list, or one of them in tabs
   const future = {
     scheduled: { title: t('jobs.menu.scheduled'), icon: 'clock', to: '/jobs/scheduled', tabs: 3 },
     stored: { title: t('jobs.menu.stored'), icon: 'floppy-disk', to: '/jobs/stored', tabs: 2 },
+    // the app's own maintenance tasks : Details and Runs, no buttons
+    system: { title: t('jobs.menu.system'), icon: 'gears', to: '/jobs/system', tabs: 2 },
   }[first];
   if (future) {
     const own = { title: future.title, icon: future.icon, to: future.to };
