@@ -280,6 +280,11 @@ class CrudModel {
     await this.checkExist(modelName, id);
     if (!opts.fromSeed) await this.assertNotManaged(modelName, id);
     const fieldValues = this.getFieldValues(modelName, data, true);
+    // nothing it knows to change (unknown keys only, or an empty body) : said, rather than an
+    // UPDATE with an empty SET, whose SQL syntax error MySQL would have answered with
+    if (!Object.keys(fieldValues).length) {
+      throw new Errors.BadRequestError(`Nothing to change: none of the fields given is a field of ${modelName}`);
+    }
     const sql = `UPDATE ${config.table} SET ? WHERE ${key} = ?`;
     const res = await mysql.do(sql, [fieldValues, id]);
     if (config.allowCache && cache) {
