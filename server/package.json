@@ -64,7 +64,7 @@
     "read-last-lines": "~1.10.0",
     "shell-quote": "1.12.0",
     "swagger-ui-express": "~5.0.1",
-    "tar": "~7.5.22",
+    "tar": "~7.5.23",
     "thenby": "~1.4.1",
     "undici": "~7.30.2",
     "winston": "~3.19.0",
