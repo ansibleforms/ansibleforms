@@ -137,9 +137,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # MySQL 9.7, the current LTS (the docker setup's), 8.4 the one before it (v6, the Helm
-        # chart), and MariaDB
-        db: ["mysql:9.7", "mysql:8.4", "mariadb:12.3"]
+        # the current LTS of each : MySQL 9.7 (the docker setup's and the Helm chart's) and
+        # MariaDB 12.3
+        db: ["mysql:9.7", "mariadb:12.3"]
     services:
       db:
         image: ${{ matrix.db }}
