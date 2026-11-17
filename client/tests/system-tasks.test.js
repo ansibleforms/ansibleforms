@@ -1,8 +1,9 @@
 // Jobs > System : the app's own maintenance tasks (the job retention, the nightly backup, the
 // expired tokens ...), under Future after Scheduled and Stored, for an admin only (the route's
 // showSettings, the api's guard). The list is the scheduled jobs' table, a row opening the task's
-// page ; the page is read only, Details then Runs. Read from the sources and the config, as the
-// other page tests do.
+// page : Details, Schedule then Runs, a nightly task's cron changed on its Schedule tab as a
+// schedule's (its editor, Save and Revert). Read from the sources and the config, as the other page
+// tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -130,10 +131,11 @@ describe("a task's page", () => {
     expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(5);
   });
 
-  it('shows on its Schedule tab when it runs and its next three runs, read only', () => {
+  it('shows on its Schedule tab, for the tasks the app times, when it runs and its next three runs, read only', () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
-    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'nextRuns']);
-    expect(tab).not.toMatch(/<input|<select|v-model/);
+    const fixed = tab.slice(tab.indexOf('<template v-else>'));
+    expect([...fixed.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'nextRuns']);
+    expect(fixed).not.toMatch(/<input|<select|v-model|BsCron/);
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
@@ -154,10 +156,10 @@ describe("a task's page", () => {
     expect(page).toMatch(/t\('jobs\.system\.settingEnv'\)/);
   });
 
-  it('is read only : no Save, no Delete, no field to edit', () => {
-    expect(page).not.toMatch(/#actions/);
-    expect(page).not.toMatch(/axios\.(put|post|delete)/);
-    expect(page).not.toMatch(/v-model="(?!search)/);
+  it("has no Delete, and edits nothing but a nightly task's cron", () => {
+    expect(page).not.toMatch(/icon="trash"/);
+    expect(page).not.toMatch(/axios\.(post|delete)/);
+    expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(['cronEdit', 'search']);
   });
 
   it('lists the runs in the linked table of the other Runs tabs, a row opening nothing', () => {
@@ -165,6 +167,83 @@ describe("a task's page", () => {
     expect(tab).toMatch(/<AppLinkedTable/);
     expect(tab).not.toMatch(/:to=/);
     expect(tab).toMatch(/<template #cell-outcome="\{ row \}"><AppStatusPill :status="row\.outcome" \/><\/template>/);
+  });
+});
+
+describe("a nightly task's Schedule tab", () => {
+  const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
+  // each task's declaration on the server, by its key ; the nightly ones have a schedule setting
+  const declared = serverTasks
+    .split(/^ {4}key: '/m)
+    .slice(1)
+    .map((chunk) => ({ key: chunk.slice(0, chunk.indexOf("'")), schedule: /schedule: scheduleSetting\(/.test(chunk) }));
+  const NIGHTLY = declared.filter((d) => d.schedule).map((d) => d.key);
+
+  it('the five nightly tasks have a cron setting, the tasks the app needs often none', () => {
+    expect(NIGHTLY.sort()).toEqual([
+      'auditCleanup',
+      'jobCleanup',
+      'nightlyBackup',
+      'storedJobsCleanup',
+      'tokenCleanup',
+    ]);
+    const fixed = declared
+      .filter((d) => !d.schedule)
+      .map((d) => d.key)
+      .sort();
+    expect(fixed).toEqual(['abandonedJobs', 'configSeedReload', 'deadNodes', 'scheduleEnds']);
+  });
+
+  it("shows a nightly task's cron in a schedule's editor, no line under it while it may be changed", () => {
+    expect(page).toMatch(/const scheduleOwned = computed\(\(\) => !!task\.value\?\.schedule_env\);/);
+    expect(tab).toMatch(/<div v-if="scheduleOwned" v-show="fieldShown\('cron'\)" class="af-system-cron mb-0">/);
+    expect(tab).toMatch(
+      /<BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" \/>/,
+    );
+    // a line only for its error, or when the environment sets it
+    expect(tab).toMatch(/<div v-if="cronError" class="invalid-feedback d-block">/);
+    expect(tab).toMatch(/<div v-else-if="!scheduleEditable" class="form-text">/);
+    // a schedule's own editor, the same width
+    const schedule = withoutComments(read('src/pages/schedule.vue'));
+    expect(schedule).toMatch(/<BsCron\s+v-model="edit\.cron"\s+icon="stopwatch"/);
+    expect(page).toMatch(/\.af-system-cron \{\s*max-width: 40rem;/);
+  });
+
+  it('pinned by the environment : the editor read only, one line naming the variable', () => {
+    expect(page).toMatch(
+      /const scheduleEditable = computed\(\(\) => scheduleOwned\.value && !!task\.value\?\.editable_schedule\);/,
+    );
+    expect(tab).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.schedule_env \}\)/);
+    // no Save, no Revert then
+    expect(page).toMatch(/<template v-if="task && scheduleEditable" #actions>/);
+  });
+
+  it('BsCron greys out every preset, field and the expression when disabled', () => {
+    const cron = read('src/components/BsCron.vue');
+    expect(cron).toMatch(/disabled: \{ type: Boolean, default: false \}/);
+    expect(cron).toMatch(/<fieldset :disabled="disabled">/);
+  });
+
+  it('saves with Save, orange while changed, undoes with Revert, and asks before leaving', () => {
+    const actions = page.slice(page.indexOf('#actions>'), page.indexOf('</AppSettings>'));
+    expect(actions).toMatch(/<BsButton icon="clock-rotate-left" :disabled="!dirty" @click="revert\(\)">/);
+    // the save icon : orange while enabled (BsButton), grey while nothing changed
+    expect(actions).toMatch(/<BsButton icon="save" :disabled="!dirty" @click="save\(\)">/);
+    expect(actions.indexOf('revert()')).toBeLessThan(actions.indexOf('save()'));
+    expect(page).toMatch(/useUnsavedGuard\(\s*dirty,/);
+    expect(page).toMatch(
+      /axios\.put\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/schedule`, \{\s*cron: cronEdit\.value\.trim\(\),/,
+    );
+  });
+
+  it('reads the task again after a save : its last run, next run and next runs follow', () => {
+    const save = page.slice(page.indexOf('async function save()'), page.indexOf('function revert()'));
+    expect(save).toMatch(/await axios\.put[\s\S]*await load\(\);/);
+    expect(page).toMatch(/cronEdit\.value = task\.value\?\.cron \|\| '';\s*loaded\.value = true;/);
+  });
+
+  it('refuses a cron of other than 5 fields before sending it, as the server does', () => {
+    expect(page).toMatch(/\.length !== 5\) return t\('jobs\.system\.cronFiveFields'\)/);
   });
 });
 
@@ -184,10 +263,25 @@ describe('the texts', () => {
         expect(task.name.length * wide, `${lang} ${key}`).toBeLessThanOrEqual(34);
         expect(task.description.length * wide, `${lang} ${key}`).toBeLessThanOrEqual(90);
       }
-      for (const key of ['description', 'timing', 'result', 'setting', 'settingChange', 'settingEnv', 'noRuns']) {
+      for (const key of [
+        'description',
+        'timing',
+        'result',
+        'setting',
+        'settingChange',
+        'settingEnv',
+        'noRuns',
+        'cronFiveFields',
+      ]) {
         expect(texts.jobs.system[key], `${lang} ${key}`).toBeTruthy();
         expect(texts.jobs.system[key].length * wide, `${lang} ${key}`).toBeLessThanOrEqual(90);
       }
+      // the line under the editor, its variable's name in it (the longest : STORED_JOB_CLEANUP_CRON)
+      const pinned = texts.jobs.system.scheduleEnv.replace('{env}', 'STORED_JOB_CLEANUP_CRON');
+      expect(texts.jobs.system.scheduleEnv, lang).toMatch(/\{env\}/);
+      expect(pinned.length * wide, lang).toBeLessThanOrEqual(90);
+      // a toolbar button : a word or two
+      expect(texts.jobs.system.revert.length * wide, lang).toBeLessThanOrEqual(14);
     }
   });
 });

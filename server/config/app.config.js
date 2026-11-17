@@ -100,6 +100,14 @@ var app_config = {
   // removes it. DEFAULT 0 : never, so nothing changes on an upgrade. A stored job may ask for
   // fewer days of its own, never more (lib/storedJobExpiry.js).
   storedJobUnusedDays: parseInt(process.env.STORED_JOB_UNUSED_DAYS || "0", 10),
+  // When the nightly system tasks run, each a 5-field cron in LOG_TZ (changed on the task's page,
+  // Jobs > System). Empty : the task's own default (server/src/lib/systemTasks.js SYSTEM_TASKS),
+  // so the defaults are declared in one place only.
+  tokenCleanupCron: (process.env.TOKEN_CLEANUP_CRON || "").trim(),
+  auditCleanupCron: (process.env.AUDIT_CLEANUP_CRON || "").trim(),
+  jobCleanupCron: (process.env.JOB_CLEANUP_CRON || "").trim(),
+  nightlyBackupCron: (process.env.NIGHTLY_BACKUP_CRON || "").trim(),
+  storedJobCleanupCron: (process.env.STORED_JOB_CLEANUP_CRON || "").trim(),
   // Serve the MCP server for AI agents on /api/v2/mcp. Off by default : it is a new way
   // in, and an operator should opt in to it.
   enableMcp: (process.env.ENABLE_MCP ?? 0) == 1,

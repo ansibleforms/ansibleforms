@@ -27,7 +27,7 @@ import { cleanupQuery } from '../lib/storedJobExpiry.js';
 // whether a schedule reached its end (its end date passed, or its runs done)
 import { endReached } from '../lib/scheduleEnd.js';
 // the maintenance tasks' crons, and the record of their runs (Jobs > System)
-import { taskCron, recorded, counted, sentence } from '../lib/systemTasks.js';
+import { taskCron, recorded, counted, sentence, systemTask, scheduleValue } from '../lib/systemTasks.js';
 
 // the cron registry is re-read from the database this often even without a change notice
 // (lib/epochs.js), in case one was missed
@@ -95,8 +95,11 @@ class CronService {
     this.rruleTurns = new Map();
     this.active = false;
     // the system tasks (initializeSystemTasks) run on this node : what scheduleConfigSeedReload
-    // checks before rescheduling
+    // and rescheduleSystemTask check before rescheduling
     this.systemTasksStarted = false;
+    // each system task's work by its key, so a task is registered again on a new cron
+    // (rescheduleSystemTask) with the work it was started with
+    this.systemWork = new Map();
     this.lastResync = null;
     this.safetyTimer = null;
     this.timezone = logConfig.tz;
@@ -533,20 +536,19 @@ class CronService {
     // never twice : a replaced task that is not stopped keeps firing next to its successor
     this.jobs.system.forEach((task) => task.stop());
     this.jobs.system.clear();
+    this.systemWork.clear();
 
     /**
-     * Registers one task : its cron from lib/systemTasks.js, its run recorded.
+     * Registers one task : its cron from lib/systemTasks.js (its schedule setting's, or its
+     * default), its run recorded. Its work is kept, so a new cron registers it again.
      *
      * Args:
      *   key (string): the task's key.
      *   work (function): the run's work, returning { result, changed, failed }.
      */
     const register = (key, work) => {
-      const task = new Cron(taskCron(key), {
-        timezone: this.timezone,
-        protect: true
-      }, recorded(key, work));
-      this.jobs.system.set(key, task);
+      this.systemWork.set(key, work);
+      this.registerSystemTask(key);
     };
 
     // 1. Abandoned jobs cleanup - runs every hour
@@ -650,7 +652,7 @@ class CronService {
     });
     logger.info('Initialized the schedule end sweep (every minute)');
 
-    // 2. Token cleanup - runs daily at 3:00 AM
+    // 2. Token cleanup - runs daily at 3:00 AM by default (TOKEN_CLEANUP_CRON)
     register('tokenCleanup', async () => {
       logger.info('Running token cleanup');
       try {
@@ -671,9 +673,9 @@ class CronService {
         return { failed: true, result: `Failed to remove the expired tokens: ${err.message || err}` };
       }
     });
-    logger.info('Initialized token cleanup (daily at 3:00 AM)');
+    logger.info(`Initialized token cleanup (${taskCron('tokenCleanup')})`);
 
-    // 2b. Audit retention - runs at 3:30 AM. Shipped with the audit trail rather
+    // 2b. Audit retention - runs at 3:30 AM by default (AUDIT_CLEANUP_CRON). Shipped with the audit trail rather
     // than after it : an append-only table with no sweep is the same unbounded
     // growth problem job_output already has.
     register('auditCleanup', async () => {
@@ -692,9 +694,9 @@ class CronService {
         return { failed: true, result: `Failed to remove the old audit entries: ${err.message || err}` };
       }
     });
-    logger.info('Initialized audit cleanup (daily at 3:30 AM)');
+    logger.info(`Initialized audit cleanup (${taskCron('auditCleanup')})`);
 
-    // 2c. Job retention - runs at 2:30 AM. Job output is longtext and nothing pruned
+    // 2c. Job retention - runs at 2:30 AM by default (JOB_CLEANUP_CRON). Job output is longtext and nothing pruned
     // it before, so this is the table that grows without limit on a busy instance.
     // 90 days by default since 7.6.0 (JOB_RETENTION_DAYS) ; 0 keeps every job. The health
     // page reports the size, and says so when pruning is switched off.
@@ -723,9 +725,9 @@ class CronService {
         return { failed: true, result: `Failed to remove the old jobs: ${err.message || err}` };
       }
     });
-    logger.info('Initialized job cleanup (daily at 2:30 AM)');
+    logger.info(`Initialized job cleanup (${taskCron('jobCleanup')})`);
 
-    // 3. Nightly backup - runs at midnight
+    // 3. Nightly backup - runs at midnight by default (NIGHTLY_BACKUP_CRON)
     register('nightlyBackup', async () => {
       logger.info('Running automated nightly backup');
       try {
@@ -799,9 +801,9 @@ class CronService {
         return { failed: true, result: `The nightly backup failed: ${err.message || err}` };
       }
     });
-    logger.info('Initialized nightly backup (daily at midnight)');
+    logger.info(`Initialized nightly backup (${taskCron('nightlyBackup')})`);
 
-    // 4. Stored jobs cleanup - runs daily at 4:00 AM
+    // 4. Stored jobs cleanup - runs daily at 4:00 AM by default (STORED_JOB_CLEANUP_CRON)
     register('storedJobsCleanup', async () => {
       logger.info('Running stored jobs cleanup');
       const done = [];
@@ -837,13 +839,68 @@ class CronService {
       }
       return { changed, failed: errors.length > 0, result: sentence([...errors, ...done], 'Nothing to remove') };
     });
-    logger.info('Initialized stored jobs cleanup (daily at 4:00 AM)');
+    logger.info(`Initialized stored jobs cleanup (${taskCron('storedJobsCleanup')})`);
 
     // 5. Config seed reload - re-applies CONFIG_SEED_PATH when its content changes
     this.systemTasksStarted = true;
     this.scheduleConfigSeedReload(appConfig);
 
     logger.info('System maintenance tasks initialization complete');
+  }
+
+  /**
+   * Registers one system task on the cron it runs on now (lib/systemTasks.js taskCron), the one
+   * in place stopped first : one left running keeps firing next to its successor. A schedule
+   * setting that is not a valid cron (set by hand in the environment, the app refuses it) is
+   * logged, and the task runs on its default.
+   *
+   * Args:
+   *   key (string): the task's key.
+   *
+   * Returns:
+   *   boolean: whether it was registered (false : no work kept for it, its tasks never started).
+   */
+  registerSystemTask(key) {
+    const work = this.systemWork.get(key);
+    if (!work) return false;
+    // step 1 : the task in place goes
+    const previous = this.jobs.system.get(key);
+    if (previous) {
+      previous.stop();
+      this.jobs.system.delete(key);
+    }
+    // step 2 : its cron, said when its setting's was passed over
+    const cron = taskCron(key);
+    const task = systemTask(key);
+    const set = scheduleValue(task);
+    if (set && set !== cron) {
+      logger.warning(`${task.schedule.env}=${set} is not a valid cron, the system task ${key} runs on its default ${cron}`);
+    }
+    // step 3 : registered, its run recorded
+    this.jobs.system.set(key, new Cron(cron, {
+      timezone: this.timezone,
+      protect: true
+    }, recorded(key, work)));
+    return true;
+  }
+
+  /**
+   * Registers a system task again on its new cron, when its schedule setting was saved (here, or
+   * on another node : lib/envSettings.js applies the setting on every node, init/cluster.js
+   * applyChangedEnv). A node whose scheduler does not run the tasks has nothing to reschedule :
+   * the one holding the worker lock does.
+   *
+   * Args:
+   *   key (string): the task's key.
+   *
+   * Returns:
+   *   boolean: whether the scheduler runs here (the task is then on its new cron).
+   */
+  rescheduleSystemTask(key) {
+    if (!this.systemTasksStarted || !this.systemWork.has(key)) return false;
+    this.registerSystemTask(key);
+    logger.info(`Rescheduled the system task ${key} (${taskCron(key)})`);
+    return true;
   }
 
   /**
@@ -937,6 +994,8 @@ class CronService {
       logger.debug(`Stopped system task: ${name}`);
     });
     this.jobs.system.clear();
+    // and their work : a schedule saved after the stop registers nothing again
+    this.systemWork.clear();
 
     // the runs already going : polled, as croner tells only whether a job is busy
     const until = Date.now() + waitMs;

@@ -8,19 +8,26 @@
 /*             it runs, its last run and its result, its next     */
 /*             run, and the setting it applies (where it is       */
 /*             changed, or the environment variable that sets it) */
+/*    Schedule when it runs : a nightly task's cron in the editor */
+/*             of a schedule's Schedule tab, saved with Save and  */
+/*             undone with Revert (read only when the environment */
+/*             sets it) ; the others, read only, in words with    */
+/*             their next runs                                    */
 /*    Runs     its recent runs, the latest first                  */
-/*  Read only : no Save, no Delete, nothing to edit - the task is */
-/*  the app's own. The search of the title line narrows both tabs */
-/*  at once.                                                      */
+/*  No Delete, nothing else to edit - the task is the app's own.  */
+/*  The search of the title line narrows every tab at once.       */
 /*                                                                */
 /******************************************************************/
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
 import { useRouteTab } from '@/composables/useRouteTab';
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
+import { cronValidationMessage } from '@/config/cron';
 import { tableMatches } from '@/lib/recordSearch';
 import { statusPill } from '@/config/settings';
 import { taskName, taskDescription, taskTiming, runDuration } from '@/lib/systemTasks';
@@ -34,9 +41,12 @@ const loaded = ref(false);
 const taskKey = computed(() => String(route.params.key || ''));
 // as the server answers it, with its recent runs (null : not found)
 const task = ref(null);
+// its cron as edited on the Schedule tab (a nightly task's), the saved one until changed
+const cronEdit = ref('');
 
 /**
- * Loads the task and its recent runs ; refused or failing, the page says it is not found.
+ * Loads the task and its recent runs ; refused or failing, the page says it is not found. Its
+ * cron in the editor is the saved one again.
  */
 async function load() {
   try {
@@ -45,7 +55,62 @@ async function load() {
   } catch {
     task.value = null;
   }
+  cronEdit.value = task.value?.cron || '';
   loaded.value = true;
+}
+
+// ─── its schedule ─────────────────────────────────────────────────────────────
+// a nightly task : its cron is a setting (schedule_env), in the editor ; the others keep the app's
+// own timing, said in words
+const scheduleOwned = computed(() => !!task.value?.schedule_env);
+// changed here : not when the environment sets its variable (or ALLOW_ENV_EDIT=0), the editor
+// then read only, saying so
+const scheduleEditable = computed(() => scheduleOwned.value && !!task.value?.editable_schedule);
+// why the cron cannot be saved : 5 fields (the server takes no seconds), then croner's own rules
+const cronError = computed(() => {
+  if (!scheduleEditable.value) return '';
+  const cron = cronEdit.value.trim();
+  if (cron.split(/\s+/).filter(Boolean).length !== 5) return t('jobs.system.cronFiveFields');
+  return cronValidationMessage(t, cron);
+});
+// the cron changed and not saved : Save turns orange, leaving asks first
+const dirty = computed(() => scheduleEditable.value && cronEdit.value.trim() !== (task.value?.cron || ''));
+useUnsavedGuard(
+  dirty,
+  () => t('settings.common.unsavedChanges'),
+  () => save(),
+);
+
+/**
+ * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), then reads the task again : its
+ * next run and next runs follow the new cron.
+ *
+ * Returns:
+ *   Promise<boolean>: false when the cron was refused (the leave dialog then stays).
+ */
+async function save() {
+  if (cronError.value) {
+    toast.warning(cronError.value);
+    return false;
+  }
+  try {
+    await axios.put(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/schedule`, {
+      cron: cronEdit.value.trim(),
+    });
+    toast.success(t('settings.common.nameUpdated', { name: name.value }));
+    await load();
+    return true;
+  } catch (err) {
+    toast.error(Helpers.parseAxiosResponseError(err));
+    return false;
+  }
+}
+
+/**
+ * Puts the saved cron back in the editor.
+ */
+function revert() {
+  cronEdit.value = task.value?.cron || '';
 }
 
 // its name and what it does, in the user's language
@@ -173,10 +238,13 @@ const tabFields = computed(() => ({
     ],
     ['setting', t('jobs.system.setting'), setting.value?.env, setting.value?.value],
   ],
-  schedule: [
-    ['timing', t('jobs.system.timing'), timing.value],
-    ['nextRuns', nextRunsLabel.value, ...nextRuns.value],
-  ],
+  // a nightly task's editor, or the others' timing in words and next runs
+  schedule: scheduleOwned.value
+    ? [['cron', t('jobs.system.timing'), cronEdit.value, timing.value]]
+    : [
+        ['timing', t('jobs.system.timing'), timing.value],
+        ['nextRuns', nextRunsLabel.value, ...nextRuns.value],
+      ],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('jobs.system.tabRuns')]],
 }));
@@ -321,7 +389,8 @@ onMounted(async () => {
                 <span v-else>–</span>
               </div>
             </template>
-            <!-- Schedule : when it runs, in words with its cron, and its next runs ; read only -->
+            <!-- Schedule : a nightly task's cron in a schedule's editor ; the others when they run, in
+                 words with their cron, and their next runs, read only -->
             <template v-if="tabShown('schedule')">
               <template v-if="searching && searchHead('schedule')">
                 <hr v-if="!searchHead('schedule').first" class="mt-4 mb-0 af-search-line" />
@@ -332,24 +401,36 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
                 </h6>
               </template>
-              <div v-show="fieldShown('timing')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
-                <span>{{ timing || '–' }}</span>
-              </div>
-              <!-- the tab's last field, no margin under it -->
-              <div v-show="fieldShown('nextRuns')" class="mb-0">
-                <div class="form-label fw-bold">{{ nextRunsLabel }}</div>
-                <div v-if="nextRuns.length" class="d-flex flex-wrap gap-2">
-                  <span
-                    v-for="(run, i) in nextRuns"
-                    :key="i"
-                    class="badge bg-body-secondary text-body-secondary border"
-                  >
-                    {{ run }}
-                  </span>
+              <!-- a nightly task : the editor of a schedule's Schedule tab (presets, fields, words, next
+                   runs), saved with Save ; read only when the environment sets it, which one line says.
+                   The tab's last field, no margin under it -->
+              <div v-if="scheduleOwned" v-show="fieldShown('cron')" class="af-system-cron mb-0">
+                <BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" />
+                <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
+                <div v-else-if="!scheduleEditable" class="form-text">
+                  {{ t('jobs.system.scheduleEnv', { env: task.schedule_env }) }}
                 </div>
-                <span v-else>–</span>
               </div>
+              <template v-else>
+                <div v-show="fieldShown('timing')" class="mb-3">
+                  <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
+                  <span>{{ timing || '–' }}</span>
+                </div>
+                <!-- the tab's last field, no margin under it -->
+                <div v-show="fieldShown('nextRuns')" class="mb-0">
+                  <div class="form-label fw-bold">{{ nextRunsLabel }}</div>
+                  <div v-if="nextRuns.length" class="d-flex flex-wrap gap-2">
+                    <span
+                      v-for="(run, i) in nextRuns"
+                      :key="i"
+                      class="badge bg-body-secondary text-body-secondary border"
+                    >
+                      {{ run }}
+                    </span>
+                  </div>
+                  <span v-else>–</span>
+                </div>
+              </template>
             </template>
             <!-- Runs : its recent runs, the latest first -->
             <template v-if="tabShown('runs')">
@@ -377,6 +458,14 @@ onMounted(async () => {
             </div>
           </div>
         </template>
+        <!-- a nightly task whose cron may be changed : Revert and Save, as a record page's (Save orange
+             while the cron is changed) -->
+        <template v-if="task && scheduleEditable" #actions>
+          <BsButton icon="clock-rotate-left" :disabled="!dirty" @click="revert()">{{
+            t('jobs.system.revert')
+          }}</BsButton>
+          <BsButton icon="save" :disabled="!dirty" @click="save()">{{ t('settings.common.save') }}</BsButton>
+        </template>
       </AppSettings>
       <!-- the user being checked : the title and placeholders where the page comes -->
       <AppPageSkeleton v-else />
@@ -384,9 +473,10 @@ onMounted(async () => {
   </div>
 </template>
 <style scoped>
-/* the wide fields' width of the record pages */
+/* the wide fields' width of the record pages, the cron editor's as a schedule's */
 .af-system-field :deep(.input-group),
-.af-system-field {
+.af-system-field,
+.af-system-cron {
   max-width: 40rem;
 }
 /* the count of a tab : small and grey, as the menus' badges */

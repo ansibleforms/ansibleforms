@@ -137,6 +137,8 @@ export default {
     databaseAdded: "データベースを追加しました",
     databaseNotFound: "データベースが見つかりません",
     systemTaskNotFound: "システムタスクが見つかりません",
+    systemTaskScheduleFailed: "タスクのスケジュールを保存できませんでした",
+    systemTaskScheduleFixed: "このタスクはアプリ独自のタイミングで実行され、変更できません",
     runnerAdminOnly:
       "ランナーを追加、変更、削除できるのは admin だけです：ランナーは実行するジョブの認証情報を受け取ります",
     repositoryAdminOnly:

@@ -5,12 +5,14 @@
 //
 // Read from the declarations and the database only, never from the scheduler : the tasks run on
 // the worker, and the page may be served by any app node. The next run is worked out from the
-// task's cron in the scheduler's timezone, as the schedules' (models/schedule.model.js).
+// task's cron in the scheduler's timezone, as the schedules' (models/schedule.model.js) : the cron
+// in force, its schedule setting's when an admin changed it (lib/systemTasks.js taskCron), which
+// every node applies when it is saved.
 import { Cron } from 'croner';
 import mysql from './db.model.js';
 import appConfig from '../../config/app.config.js';
 import logConfig from '../../config/log.config.js';
-import { SYSTEM_TASKS, systemTask } from '../lib/systemTasks.js';
+import { SYSTEM_TASKS, systemTask, taskCron } from '../lib/systemTasks.js';
 import { readManaged, isOverridden } from '../lib/envSettings.js';
 
 // the runs one task's page lists, its latest first
@@ -43,6 +45,37 @@ function runOf(row) {
 }
 
 /**
+ * The cron a task runs on now : its schedule setting's, or its default ; null for a task timed by
+ * an interval.
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *
+ * Returns:
+ *   string|null: its cron.
+ */
+export function cronOf(task) {
+  return task.cron ? taskCron(task.key) : null;
+}
+
+/**
+ * Whether an admin may change when a task runs (PUT /api/v2/system/tasks/:key/schedule) : a task
+ * with a schedule setting (the nightly ones), the settings file writable (ALLOW_ENV_EDIT), and its
+ * variable not set in the process's own environment, which the file cannot override.
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *   managed (Map): the variables of the settings file (envSettings readManaged).
+ *
+ * Returns:
+ *   boolean: true when its schedule may be changed.
+ */
+export function scheduleEditable(task, managed) {
+  if (!task.schedule) return false;
+  return !!appConfig.allowEnvEdit && !isOverridden(task.schedule.env, managed);
+}
+
+/**
  * Whether a task runs here and now : the config seed reload only with a seed and seconds above 0,
  * every other task always.
  *
@@ -72,7 +105,7 @@ export function nextRunOf(task, lastRun) {
   if (!isEnabled(task)) return null;
   try {
     if (task.cron) {
-      const cron = new Cron(task.cron, { paused: true, timezone: logConfig.tz });
+      const cron = new Cron(cronOf(task), { paused: true, timezone: logConfig.tz });
       const next = cron.nextRun();
       cron.stop();
       return next ? next.toISOString() : null;
@@ -103,7 +136,7 @@ export function nextRunsOf(task, lastRun, count = 3) {
   if (!isEnabled(task)) return [];
   try {
     if (task.cron) {
-      const cron = new Cron(task.cron, { paused: true, timezone: logConfig.tz });
+      const cron = new Cron(cronOf(task), { paused: true, timezone: logConfig.tz });
       const runs = cron.nextRuns(count);
       cron.stop();
       return runs.map((d) => d.toISOString());
@@ -152,8 +185,8 @@ export function settingOf(task, managed) {
  *   managed (Map): the variables of the settings file.
  *
  * Returns:
- *   object: { key, name, description, cron, interval_seconds, enabled, last_run, next_run,
- *     next_runs, setting }.
+ *   object: { key, name, description, cron, default_cron, schedule_env, editable_schedule,
+ *     interval_seconds, enabled, last_run, next_run, next_runs, timezone, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -161,7 +194,15 @@ function describe(task, lastRow, managed) {
     key: task.key,
     name: task.name,
     description: task.description,
-    cron: task.cron,
+    // the cron in force : its schedule setting's, or its default
+    cron: cronOf(task),
+    // its own cron, the one in force while its setting is not set
+    default_cron: task.cron,
+    // the variable of its cron, for a task whose schedule an admin changes (null : the app's own)
+    schedule_env: task.schedule?.env || null,
+    // whether it may be changed here : not when the environment sets it (ALLOW_ENV_EDIT=0, or the
+    // variable set in the process's own environment)
+    editable_schedule: scheduleEditable(task, managed),
     interval_seconds: task.intervalSetting ? Number(appConfig[task.intervalSetting]) || 0 : null,
     enabled: isEnabled(task),
     last_run: lastRun,
@@ -189,6 +230,24 @@ async function managedVariables() {
 }
 
 const SystemTask = {};
+
+/**
+ * The variables of the settings file, for a caller that checks a task's schedule
+ * (scheduleEditable) ; none when it cannot be read.
+ *
+ * Returns:
+ *   Promise<Map>: the variables.
+ */
+SystemTask.managed = managedVariables;
+
+/**
+ * Whether the settings file may be written from the app (ALLOW_ENV_EDIT) : a task's schedule is
+ * saved there.
+ *
+ * Returns:
+ *   boolean: true when it may.
+ */
+SystemTask.envEditAllowed = () => !!appConfig.allowEnvEdit;
 
 /**
  * Every maintenance task, in the scheduler's order, with its last run.

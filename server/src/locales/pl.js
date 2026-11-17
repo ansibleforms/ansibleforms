@@ -143,6 +143,8 @@ export default {
     databaseAdded: "Dodano bazę danych",
     databaseNotFound: "Nie znaleziono bazy danych",
     systemTaskNotFound: "Nie znaleziono zadania systemowego",
+    systemTaskScheduleFailed: "Nie udało się zapisać harmonogramu zadania",
+    systemTaskScheduleFixed: "To zadanie działa według własnego harmonogramu aplikacji i nie można go zmienić",
     runnerAdminOnly:
       "Tylko admin może dodać, zmienić lub usunąć runner: runner otrzymuje poświadczenia zadań, które uruchamia",
     repositoryAdminOnly:

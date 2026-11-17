@@ -144,6 +144,8 @@ export default {
     databaseAdded: "Base de datos añadida",
     databaseNotFound: "Base de datos no encontrada",
     systemTaskNotFound: "Tarea del sistema no encontrada",
+    systemTaskScheduleFailed: "No se pudo guardar la programación de la tarea",
+    systemTaskScheduleFixed: "Esta tarea sigue el ritmo propio de la aplicación y no se puede cambiar",
     runnerAdminOnly:
       "Solo un admin puede añadir, cambiar o eliminar un runner: un runner recibe las credenciales de los trabajos que ejecuta",
     repositoryAdminOnly:

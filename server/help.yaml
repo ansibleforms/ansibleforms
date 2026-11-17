@@ -340,7 +340,7 @@
     default: "30"
     description: | 
       Number of automated nightly backups to retain.
-      AnsibleForms automatically creates a full backup (database + config + forms) every night at midnight.
+      AnsibleForms automatically creates a full backup (database + config + forms) every night at midnight (NIGHTLY_BACKUP_CRON).
       Older nightly backups beyond this count are automatically deleted.
       Set to 0 to disable automatic cleanup (not recommended).
       Only backups that actually contain a usable database dump count towards this number,
@@ -354,7 +354,7 @@
     description: |
       How long entries in the audit trail are kept.
       The trail is append-only, so without a sweep it grows for ever; a daily task at 3:30 AM
-      removes entries older than this.
+      (AUDIT_CLEANUP_CRON) removes entries older than this.
       Set to 0 to keep everything.
   - name: AF_ROLE
     version: 7.0.0
@@ -666,7 +666,7 @@
     description: |
       How long finished jobs and their output are kept. Job output can be large, so this is
       usually the fastest growing table in the database; the Status page reports its size.
-      A daily task at 2:30 AM removes finished jobs older than this, together with their output.
+      A daily task at 2:30 AM (JOB_CLEANUP_CRON) removes finished jobs older than this, together with their output.
       Only finished jobs are ever removed - a running job, or one awaiting approval, is kept
       however old it is.
       Defaults to 90 days since 7.6.0; before, the default 0 kept everything. Set 0 to keep
@@ -681,7 +681,7 @@
     description: |
       Removes the stored jobs no job was launched from for this many days, counted from their
       last use (Last used on the stored jobs page) or, for one never used, from when it was
-      stored. The daily cleanup at 4:00 AM that removes the stored jobs past their expiry date
+      stored. The daily cleanup at 4:00 AM (STORED_JOB_CLEANUP_CRON) that removes the stored jobs past their expiry date
       removes these too, whichever comes first. 0, the default, never removes a stored job for
       being unused.
 
@@ -696,6 +696,66 @@
       this many and the Store dialog starts at them, and one removed on a date is still removed
       once unused for this many days. With 0 any number of days is allowed. Lowering it later
       shortens the stored jobs that asked for more. Takes effect at once, without a restart.
+  - name: JOB_CLEANUP_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Job cleanup schedule (cron)
+    default: "30 2 * * *"
+    description: |
+      When the Job cleanup system task runs: it removes the finished jobs older than JOB_RETENTION_DAYS.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at 2:30 AM.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: AUDIT_CLEANUP_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Audit log cleanup schedule (cron)
+    default: "30 3 * * *"
+    description: |
+      When the Audit log cleanup system task runs: it removes the audit entries older than AUDIT_RETENTION_DAYS.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at 3:30 AM.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: TOKEN_CLEANUP_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Expired tokens cleanup schedule (cron)
+    default: "0 3 * * *"
+    description: |
+      When the Expired tokens system task runs: it removes the expired sign-in tokens, revocations and API tokens.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at 3:00 AM.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: STORED_JOB_CLEANUP_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Stored jobs cleanup schedule (cron)
+    default: "0 4 * * *"
+    description: |
+      When the Stored jobs cleanup system task runs: it removes the stored jobs past their expiry date or unused for STORED_JOB_UNUSED_DAYS, and forgets the nodes gone for a day.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at 4:00 AM.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: NIGHTLY_BACKUP_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Nightly backup schedule (cron)
+    default: "0 0 * * *"
+    description: |
+      When the Nightly backup system task runs: it backs up the database and removes the oldest nightly backups beyond NIGHTLY_BACKUP_RETENTION.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at midnight.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: ENTRA_AUTHORITY_URI
     version: 7.3.0
     type: string

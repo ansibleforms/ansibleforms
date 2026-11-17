@@ -6,6 +6,10 @@
 // what it does, and the setting it applies. The scheduler registers it with that cron, and the
 // API (models/systemTask.model.js) describes it from the same entry, so the two cannot disagree.
 //
+// The nightly tasks' cron is an admin's to change (their schedule setting, JOB_CLEANUP_CRON and
+// the like) : the declared cron is then only the default, and taskCron answers the one in force.
+// The tasks of every minute and the seed reload keep theirs : the app needs them that often.
+//
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
 // result (removed 120 jobs, or the error) and the node that ran it. A task that runs every minute
 // (or more often) does not add a row for a run that changed nothing : it rewrites one row of its
@@ -15,11 +19,26 @@
 import logger from './logger.js';
 import mysql from '../models/db.model.js';
 import { nodeId } from './role.js';
+import { cronError } from './cronValidate.js';
+import appConfig from '../../config/app.config.js';
 
 // ─── the tasks ───────────────────────────────────────────────────────────────
 
 // the retention settings' tab of Settings > System > General (pages/admin/settings.vue)
 const RETENTION_TAB = 'retention';
+
+/**
+ * A nightly task's schedule setting : the environment variable of its cron (changed on the task's
+ * own page, Jobs > System > the task > Schedule) and its appConfig key.
+ *
+ * Args:
+ *   env (string): the variable (JOB_CLEANUP_CRON).
+ *   config (string): its appConfig key (jobCleanupCron).
+ *
+ * Returns:
+ *   object: { env, config }.
+ */
+const scheduleSetting = (env, config) => ({ env, config });
 
 /**
  * The maintenance tasks, in the order the scheduler registers them.
@@ -32,6 +51,9 @@ const RETENTION_TAB = 'retention';
  *     language : client/src/locales, jobs.system.tasks)
  *   setting: the setting it applies - its environment variable (env), its appConfig key (config)
  *     and the tab of Settings > System > General it is changed on (tab) ; null for none
+ *   schedule: the setting that changes its cron (scheduleSetting), the cron above then only its
+ *     default ; null for a task whose timing is the app's own (every minute, every hour, the seed
+ *     reload's seconds)
  */
 export const SYSTEM_TASKS = [
   {
@@ -41,6 +63,7 @@ export const SYSTEM_TASKS = [
     name: 'Abandoned jobs',
     description: 'Ends the jobs that ran a day without output and no runner took.',
     setting: null,
+    schedule: null,
   },
   {
     key: 'deadNodes',
@@ -49,6 +72,7 @@ export const SYSTEM_TASKS = [
     name: 'Stopped nodes',
     description: 'Frees what nodes and runners that stopped answering held.',
     setting: null,
+    schedule: null,
   },
   {
     key: 'scheduleEnds',
@@ -57,6 +81,7 @@ export const SYSTEM_TASKS = [
     name: 'Schedule ends',
     description: 'Turns off or removes the schedules that reached their end.',
     setting: null,
+    schedule: null,
   },
   {
     key: 'tokenCleanup',
@@ -65,6 +90,7 @@ export const SYSTEM_TASKS = [
     name: 'Expired tokens',
     description: 'Removes expired sign-in tokens, revocations and API tokens.',
     setting: null,
+    schedule: scheduleSetting('TOKEN_CLEANUP_CRON', 'tokenCleanupCron'),
   },
   {
     key: 'auditCleanup',
@@ -73,6 +99,7 @@ export const SYSTEM_TASKS = [
     name: 'Audit log cleanup',
     description: 'Removes audit log entries older than the audit retention.',
     setting: { env: 'AUDIT_RETENTION_DAYS', config: 'auditRetentionDays', tab: RETENTION_TAB },
+    schedule: scheduleSetting('AUDIT_CLEANUP_CRON', 'auditCleanupCron'),
   },
   {
     key: 'jobCleanup',
@@ -81,6 +108,7 @@ export const SYSTEM_TASKS = [
     name: 'Job cleanup',
     description: 'Removes finished jobs older than the job retention.',
     setting: { env: 'JOB_RETENTION_DAYS', config: 'jobRetentionDays', tab: RETENTION_TAB },
+    schedule: scheduleSetting('JOB_CLEANUP_CRON', 'jobCleanupCron'),
   },
   {
     key: 'nightlyBackup',
@@ -89,6 +117,7 @@ export const SYSTEM_TASKS = [
     name: 'Nightly backup',
     description: 'Backs up the database and removes the oldest nightly backups.',
     setting: { env: 'NIGHTLY_BACKUP_RETENTION', config: 'nightlyBackupRetention', tab: RETENTION_TAB },
+    schedule: scheduleSetting('NIGHTLY_BACKUP_CRON', 'nightlyBackupCron'),
   },
   {
     key: 'storedJobsCleanup',
@@ -97,6 +126,7 @@ export const SYSTEM_TASKS = [
     name: 'Stored jobs cleanup',
     description: 'Removes expired or unused stored jobs, and forgets old nodes.',
     setting: { env: 'STORED_JOB_UNUSED_DAYS', config: 'storedJobUnusedDays', tab: RETENTION_TAB },
+    schedule: scheduleSetting('STORED_JOB_CLEANUP_CRON', 'storedJobCleanupCron'),
   },
   {
     key: 'configSeedReload',
@@ -106,6 +136,7 @@ export const SYSTEM_TASKS = [
     name: 'Config seed reload',
     description: 'Applies the config seed again when its file changes.',
     setting: { env: 'CONFIG_SEED_RELOAD_SECONDS', config: 'configSeedReloadSeconds', tab: 'configuration' },
+    schedule: null,
   },
 ];
 
@@ -125,8 +156,37 @@ export function systemTask(key) {
   return TASKS.get(String(key)) || null;
 }
 
+// the tasks whose cron an admin changes, by their setting's variable
+export const SCHEDULE_SETTINGS = SYSTEM_TASKS.filter((task) => task.schedule).map((task) => ({
+  key: task.key,
+  env: task.schedule.env,
+  config: task.schedule.config,
+  default: task.cron,
+}));
+
 /**
- * The cron a task runs on.
+ * Why a cron cannot be a nightly task's schedule, or null when it can : five fields (minute, hour,
+ * day of the month, month, day of the week ; croner's sixth, the seconds, is not offered), that
+ * croner accepts and that occurs again (lib/cronValidate.js, the schedules' own check).
+ *
+ * Args:
+ *   cron (string): the cron.
+ *
+ * Returns:
+ *   string|null: the problem, in English, or null.
+ */
+export function scheduleCronProblem(cron) {
+  const value = String(cron ?? '').trim();
+  if (!value) return 'must be a cron expression';
+  if (value.split(/\s+/).length !== 5) return 'must be a cron of 5 fields (minute hour day month weekday)';
+  const problem = cronError(value);
+  return problem ? `is not a cron that runs: ${problem}` : null;
+}
+
+/**
+ * The cron a task runs on : its schedule setting's when one is set and valid, else the declared
+ * one. A value that is not a valid cron (written by hand in the environment, never through the
+ * app, which checks it) is passed over for the declared one, and the scheduler logs it.
  *
  * Args:
  *   key (string): the task's key.
@@ -139,9 +199,24 @@ export function systemTask(key) {
  *     fails at its start rather than registering nothing.
  */
 export function taskCron(key) {
-  const cron = systemTask(key)?.cron;
-  if (!cron) throw new Error(`No system task with a cron is named ${key}`);
-  return cron;
+  const task = systemTask(key);
+  if (!task?.cron) throw new Error(`No system task with a cron is named ${key}`);
+  const set = scheduleValue(task);
+  return set && !scheduleCronProblem(set) ? set : task.cron;
+}
+
+/**
+ * The cron a task's schedule setting holds, as it is set ('' : not set, the default applies).
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *
+ * Returns:
+ *   string: the setting's value, trimmed ; '' for a task without one.
+ */
+export function scheduleValue(task) {
+  if (!task?.schedule) return '';
+  return String(appConfig[task.schedule.config] ?? '').trim();
 }
 
 // ─── the record of their runs ────────────────────────────────────────────────
@@ -321,4 +396,4 @@ export function resetPruneForTests() {
   lastPrune = 0;
 }
 
-export default { SYSTEM_TASKS, systemTask, taskCron, counted, sentence, pruneRuns, recordRun, recorded };
+export default { SYSTEM_TASKS, SCHEDULE_SETTINGS, systemTask, taskCron, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };

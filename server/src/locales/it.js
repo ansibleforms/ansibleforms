@@ -139,6 +139,8 @@ export default {
     databaseAdded: "Database aggiunto",
     databaseNotFound: "Database non trovato",
     systemTaskNotFound: "Attività di sistema non trovata",
+    systemTaskScheduleFailed: "Non è stato possibile salvare la pianificazione dell'attività",
+    systemTaskScheduleFixed: "Questa attività segue i tempi dell'app e non può essere modificata",
     runnerAdminOnly:
       "Solo un admin può aggiungere, modificare o eliminare un runner: un runner riceve le credenziali dei job che esegue",
     repositoryAdminOnly:

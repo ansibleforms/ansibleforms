@@ -3393,7 +3393,7 @@
           "system"
         ],
         "summary": "The app's maintenance tasks (Jobs > System)",
-        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Read only. Requires settings access.",
+        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. The nightly tasks' schedule is changed with PUT /system/tasks/{key}/schedule. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3429,7 +3429,21 @@
                           "cron": {
                             "type": "string",
                             "nullable": true,
-                            "description": "When it runs, in the app's timezone; null for a task timed by seconds (configSeedReload)"
+                            "description": "When it runs now, in the app's timezone: its schedule setting's when set, else its default; null for a task timed by seconds (configSeedReload)"
+                          },
+                          "default_cron": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Its own cron, in force while its schedule setting is not set"
+                          },
+                          "schedule_env": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The environment variable of its cron (JOB_CLEANUP_CRON) for a nightly task; null for a task whose timing is the app's own"
+                          },
+                          "editable_schedule": {
+                            "type": "boolean",
+                            "description": "Whether PUT /system/tasks/{key}/schedule may change it: a nightly task whose variable the environment does not set (nor ALLOW_ENV_EDIT=0)"
                           },
                           "interval_seconds": {
                             "type": "integer",
@@ -3580,7 +3594,21 @@
                     "cron": {
                       "type": "string",
                       "nullable": true,
-                      "description": "When it runs, in the app's timezone; null for a task timed by seconds (configSeedReload)"
+                      "description": "When it runs now, in the app's timezone: its schedule setting's when set, else its default; null for a task timed by seconds (configSeedReload)"
+                    },
+                    "default_cron": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Its own cron, in force while its schedule setting is not set"
+                    },
+                    "schedule_env": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The environment variable of its cron (JOB_CLEANUP_CRON) for a nightly task; null for a task whose timing is the app's own"
+                    },
+                    "editable_schedule": {
+                      "type": "boolean",
+                      "description": "Whether PUT /system/tasks/{key}/schedule may change it: a nightly task whose variable the environment does not set (nor ALLOW_ENV_EDIT=0)"
                     },
                     "interval_seconds": {
                       "type": "integer",
@@ -3719,6 +3747,72 @@
           },
           "403": {
             "description": "No settings access"
+          },
+          "404": {
+            "description": "No task has that key"
+          }
+        }
+      }
+    },
+    "/system/tasks/{key}/schedule": {
+      "put": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Change when a nightly maintenance task runs",
+        "description": "Saves the cron of a nightly task (jobCleanup, auditCleanup, tokenCleanup, storedJobsCleanup, nightlyBackup) as its environment variable (JOB_CLEANUP_CRON, AUDIT_CLEANUP_CRON, TOKEN_CLEANUP_CRON, STORED_JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. The tasks of every minute, the hourly abandoned jobs and the config seed reload keep the app's own timing. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The task's key, e.g. jobCleanup"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cron"
+                ],
+                "properties": {
+                  "cron": {
+                    "type": "string",
+                    "description": "A cron of 5 fields (minute hour day month weekday) in the app's timezone (LOG_TZ) that runs again, e.g. 30 2 * * *",
+                    "example": "30 2 * * *"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved: the task, as GET /system/tasks/{key} answers it, with its new cron and next runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a cron of 5 fields that croner runs"
+          },
+          "403": {
+            "description": "No settings access, a task whose timing is the app's own, or its variable set by the environment (or ALLOW_ENV_EDIT=0)"
           },
           "404": {
             "description": "No task has that key"
