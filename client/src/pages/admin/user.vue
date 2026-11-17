@@ -505,8 +505,7 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ user?.username }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ user?.username }}</strong
-        >?
+        {{ t('settings.common.deleteConfirm') }} <strong>{{ user?.username }}</strong>?
       </p>
     </template>
     <template #footer>

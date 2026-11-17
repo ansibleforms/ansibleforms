@@ -407,8 +407,7 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ store?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ store?.name }}</strong
-        >?
+        {{ t('settings.common.deleteConfirm') }} <strong>{{ store?.name }}</strong>?
       </p>
     </template>
     <template #footer>

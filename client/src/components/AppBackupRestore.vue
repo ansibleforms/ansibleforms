@@ -122,8 +122,7 @@ async function triggerRestore(item) {
     <template #title> {{ t('admin.backups.restoreTitle') }} {{ backup.folder }} </template>
     <template #default>
       <div v-if="!backup.valid" class="alert alert-warning mt-3 mb-0" role="alert">
-        <strong>{{ t('admin.backups.incomplete') }}</strong
-        ><br />
+        <strong>{{ t('admin.backups.incomplete') }}</strong><br />
         {{ t('admin.backups.incompleteDetail') }}
       </div>
       <ul class="list-group list-group-flush mt-3">

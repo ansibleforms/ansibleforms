@@ -461,8 +461,7 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ repo?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ repo?.name }}</strong
-        >?
+        {{ t('settings.common.deleteConfirm') }} <strong>{{ repo?.name }}</strong>?
       </p>
     </template>
     <template #footer>
@@ -708,8 +707,11 @@ onMounted(async () => {
               <!-- as the server log shows its lines : each with its number in a grey column -->
               <div class="af-repo-output font-monospace" tabindex="0" role="region">
                 <div v-for="line in outputLines(key)" :key="line.no" class="af-repo-output-line">
-                  <span class="af-line-no af-repo-line-no">{{ line.no }}</span
-                  ><span class="af-repo-line" :class="{ 'af-repo-output-empty': line.empty }">{{ line.text }}</span>
+                  <span class="af-line-no af-repo-line-no">{{ line.no }}</span><span
+                    class="af-repo-line"
+                    :class="{ 'af-repo-output-empty': line.empty }"
+                    >{{ line.text }}</span
+                  >
                 </div>
               </div>
             </template>
