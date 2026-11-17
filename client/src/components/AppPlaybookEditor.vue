@@ -205,35 +205,44 @@ function pickSection(pi) {
           </div>
           <!-- its roles : pills to remove, one more typed -->
           <label class="form-label fw-bold">{{ t('playbookOutline.sections.roles') }}</label>
-          <div v-if="play.rolesEditable" class="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <span v-for="r in play.roles" :key="r" class="badge rounded-pill af-pbe-role">
-              <FaIcon icon="cubes" class="me-1" />{{ r }}
-              <button
-                v-if="!readOnly"
-                type="button"
-                class="btn-close btn-close-sm ms-1"
-                :aria-label="t('playbookEditor.removeRole')"
-                @click="
-                  apply((text) =>
-                    editRoles(
-                      text,
-                      pi,
-                      play.roles.filter((x) => x !== r),
-                    ),
-                  )
-                "
-              ></button>
-            </span>
-            <div v-if="!readOnly" class="d-flex gap-2">
-              <input
-                v-model="roleToAdd[pi]"
-                class="form-control af-pbe-role-input"
-                :placeholder="t('playbookEditor.role')"
-                spellcheck="false"
-                @keyup.enter="addRole(pi)"
-              />
-              <BsButton icon="plus" :title="t('playbookEditor.addRole')" @click="addRole(pi)" />
+          <div v-if="play.rolesEditable" class="mb-3">
+            <!-- the roles it has, as pills to remove -->
+            <div v-if="play.roles.length" class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span v-for="r in play.roles" :key="r" class="badge rounded-pill af-pbe-role">
+                <FaIcon icon="cubes" class="me-1" />{{ r }}
+                <button
+                  v-if="!readOnly"
+                  type="button"
+                  class="btn-close btn-close-sm ms-1"
+                  :aria-label="t('playbookEditor.removeRole')"
+                  @click="
+                    apply((text) =>
+                      editRoles(
+                        text,
+                        pi,
+                        play.roles.filter((x) => x !== r),
+                      ),
+                    )
+                  "
+                ></button>
+              </span>
             </div>
+            <!-- one more : typed with its icon in front, as every field, Add role on a line of its own under it -->
+            <template v-if="!readOnly">
+              <div class="input-group af-pbe-role-input">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="cubes" /></span>
+                <input
+                  v-model="roleToAdd[pi]"
+                  class="form-control"
+                  :placeholder="t('playbookEditor.role')"
+                  spellcheck="false"
+                  @keyup.enter="addRole(pi)"
+                />
+              </div>
+              <div class="mt-2">
+                <BsButton icon="plus" @click="addRole(pi)">{{ t('playbookEditor.addRole') }}</BsButton>
+              </div>
+            </template>
           </div>
           <div v-else class="d-flex align-items-center gap-2 mb-3">
             <span class="text-body-secondary">{{ play.roles.join(', ') }}</span>
@@ -481,7 +490,7 @@ function pickSection(pi) {
   font-size: 0.55rem;
 }
 .af-pbe-role-input {
-  width: 12rem;
+  max-width: 20rem;
 }
 .af-pbe-section-select {
   max-width: 14rem;
