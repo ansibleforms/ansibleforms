@@ -729,7 +729,7 @@ onMounted(async () => {
     <BsModal v-if="showImportConfirm" @close="showImportConfirm = false" icon="file-import">
       <template #title> {{ t('settings.settingsPage.importConfirmTitle') }} </template>
       <template #default>
-        <p class="mt-3 fs-6 user-select-none">
+        <p class="py-3 fs-6 user-select-none">
           {{ t('settings.settingsPage.importConfirmText') }}
         </p>
       </template>
@@ -742,7 +742,7 @@ onMounted(async () => {
     <BsModal v-if="showExportConfirm" @close="showExportConfirm = false" icon="file-export">
       <template #title> {{ t('settings.settingsPage.exportConfirmTitle') }} </template>
       <template #default>
-        <p class="mt-3 fs-6 user-select-none">
+        <p class="py-3 fs-6 user-select-none">
           {{ t('settings.settingsPage.exportConfirmText') }}
         </p>
       </template>

@@ -2938,7 +2938,7 @@ export default {
     failedHostsNote: 'fehlgeschlagene Hosts',
     relaunchFromFirstNode: 'Ab dem ersten Knoten',
     relaunchFromFailedNode: 'Ab dem fehlgeschlagenen Knoten',
-    relaunchFailedNodeLead: 'Job {id} ab seinem fehlgeschlagenen Knoten neu starten, die Knoten davor bleiben:',
+    relaunchFailedNodeLead: 'Job {id} nur ab seinem fehlgeschlagenen Knoten neu starten:',
     failedNodeNote: 'fehlgeschlagener Knoten',
     reviewApproval: 'Genehmigung prüfen',
     reviewLead: 'Dieser Job wartet auf Ihre Genehmigung, bevor er ausgeführt wird:',

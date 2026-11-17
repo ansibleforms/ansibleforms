@@ -2926,7 +2926,7 @@ export default {
     failedHostsNote: 'hosts fallits',
     relaunchFromFirstNode: 'Des del primer node',
     relaunchFromFailedNode: 'Des del node fallit',
-    relaunchFailedNodeLead: 'Rellança la tasca {id} des del node fallit, conservant els nodes anteriors:',
+    relaunchFailedNodeLead: 'Rellança la tasca {id} només des del node fallit:',
     failedNodeNote: 'node fallit',
     reviewApproval: "Revisar l'aprovació",
     reviewLead: "Aquesta feina espera la teva aprovació abans d'executar-se:",

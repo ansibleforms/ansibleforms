@@ -2890,7 +2890,7 @@ export default {
     failedHostsNote: '失敗したホスト',
     relaunchFromFirstNode: '最初のノードから',
     relaunchFromFailedNode: '失敗したノードから',
-    relaunchFailedNodeLead: 'ジョブ {id} を失敗したノードから再起動し、前のノードの結果を保持します:',
+    relaunchFailedNodeLead: 'ジョブ {id} を失敗したノードからのみ再起動:',
     failedNodeNote: '失敗したノード',
     reviewApproval: '承認を確認',
     reviewLead: 'このジョブは実行前にあなたの承認を待っています：',

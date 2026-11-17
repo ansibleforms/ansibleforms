@@ -2828,7 +2828,7 @@ export default {
     failedHostsNote: '失败的主机',
     relaunchFromFirstNode: '从第一个节点',
     relaunchFromFailedNode: '从失败的节点',
-    relaunchFailedNodeLead: '从失败的节点重新运行作业 {id}，保留之前节点的结果：',
+    relaunchFailedNodeLead: '仅从失败的节点重新运行作业 {id}：',
     failedNodeNote: '失败的节点',
     reviewApproval: '审核审批',
     reviewLead: '此作业在运行前等待您的审批：',

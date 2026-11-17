@@ -2892,7 +2892,7 @@ export default {
     failedHostsNote: 'failed hosts',
     relaunchFromFirstNode: 'From the first node',
     relaunchFromFailedNode: 'From the failed node',
-    relaunchFailedNodeLead: 'Relaunch job {id} from its failed node, keeping what the nodes before it did:',
+    relaunchFailedNodeLead: 'Relaunch job {id} from its failed node only:',
     failedNodeNote: 'failed node',
     reviewApproval: 'Review approval',
     reviewLead: 'This job is waiting for your approval before it runs:',

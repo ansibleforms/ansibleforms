@@ -2912,7 +2912,7 @@ export default {
     failedHostsNote: 'nieudane hosty',
     relaunchFromFirstNode: 'Od pierwszego węzła',
     relaunchFromFailedNode: 'Od nieudanego węzła',
-    relaunchFailedNodeLead: 'Uruchom ponownie zadanie {id} od nieudanego węzła, zachowując wcześniejsze węzły:',
+    relaunchFailedNodeLead: 'Uruchom ponownie zadanie {id} tylko od nieudanego węzła:',
     failedNodeNote: 'nieudany węzeł',
     reviewApproval: 'Rozpatrz zatwierdzenie',
     reviewLead: 'To zadanie czeka na Twoje zatwierdzenie przed uruchomieniem:',
