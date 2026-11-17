@@ -137,7 +137,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        db: ["mysql:8.4", "mariadb:11"]
+        # MySQL 9.7, the current LTS (the docker setup's), 8.4 the one before it (v6, the Helm
+        # chart), and MariaDB
+        db: ["mysql:9.7", "mysql:8.4", "mariadb:11"]
     services:
       db:
         image: ${{ matrix.db }}
@@ -290,7 +292,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       db:
-        image: mysql:8.4
+        image: mysql:9.7
         env:
           MYSQL_ROOT_PASSWORD: ci-not-a-real-password
         ports: ["3306:3306"]
