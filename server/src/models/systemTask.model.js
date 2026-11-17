@@ -88,6 +88,36 @@ export function nextRunOf(task, lastRun) {
 }
 
 /**
+ * Its next runs, as a schedule's preview shows them (three) : its cron's next occurrences, or for a
+ * task timed by seconds the next one and the intervals after it ; none when it is off or not known.
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *   lastRun (object|null): its last run, as runOf gives it.
+ *   count (number): how many.
+ *
+ * Returns:
+ *   string[]: ISO dates.
+ */
+export function nextRunsOf(task, lastRun, count = 3) {
+  if (!isEnabled(task)) return [];
+  try {
+    if (task.cron) {
+      const cron = new Cron(task.cron, { paused: true, timezone: logConfig.tz });
+      const runs = cron.nextRuns(count);
+      cron.stop();
+      return runs.map((d) => d.toISOString());
+    }
+    const first = nextRunOf(task, lastRun);
+    const seconds = Number(appConfig[task.intervalSetting]) || 0;
+    if (!first || seconds <= 0) return [];
+    return Array.from({ length: count }, (_, i) => new Date(new Date(first).getTime() + i * seconds * 1000).toISOString());
+  } catch {
+    return [];
+  }
+}
+
+/**
  * The setting a task applies : its variable, its value now, and whether it is changed in the app
  * (Settings > System > General, at its tab) or only in the environment (ALLOW_ENV_EDIT=0, or the
  * variable set in the process's own environment, which the settings file cannot override).
@@ -123,7 +153,7 @@ export function settingOf(task, managed) {
  *
  * Returns:
  *   object: { key, name, description, cron, interval_seconds, enabled, last_run, next_run,
- *     setting }.
+ *     next_runs, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -136,6 +166,10 @@ function describe(task, lastRow, managed) {
     enabled: isEnabled(task),
     last_run: lastRun,
     next_run: nextRunOf(task, lastRun),
+    // its next runs, the Schedule tab's preview
+    next_runs: nextRunsOf(task, lastRun),
+    // the zone its cron runs in (the scheduler's), the preview's
+    timezone: logConfig.tz || null,
     setting: settingOf(task, managed),
   };
 }

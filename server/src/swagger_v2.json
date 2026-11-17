@@ -3483,6 +3483,16 @@
                             "format": "date-time",
                             "nullable": true
                           },
+                          "next_runs": {
+                            "type": "array",
+                            "description": "Its next three runs; none when it is off or not known",
+                            "items": { "type": "string", "format": "date-time" }
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The zone its cron runs in"
+                          },
                           "setting": {
                             "type": "object",
                             "nullable": true,
@@ -3623,6 +3633,16 @@
                       "type": "string",
                       "format": "date-time",
                       "nullable": true
+                    },
+                    "next_runs": {
+                      "type": "array",
+                      "description": "Its next three runs; none when it is off or not known",
+                      "items": { "type": "string", "format": "date-time" }
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The zone its cron runs in"
                     },
                     "setting": {
                       "type": "object",

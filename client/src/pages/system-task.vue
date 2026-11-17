@@ -57,6 +57,32 @@ const timing = computed(() => {
   const words = taskTiming(t, task.value, locale.value);
   return task.value.cron && task.value.enabled !== false ? `${words} (${task.value.cron})` : words;
 });
+// its next three runs, in the zone its cron runs in, as a schedule's preview shows them
+// a field's label : the preview's words without their colon
+const nextRunsLabel = computed(() =>
+  t('settings.cron.nextRunsIn', {
+    tz: task.value?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).replace(/\s*[:：]\s*$/, ''),
+);
+const nextRuns = computed(() =>
+  (task.value?.next_runs || []).map((iso) => {
+    const options = {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    };
+    try {
+      return new Intl.DateTimeFormat(locale.value, { ...options, timeZone: task.value?.timezone || undefined }).format(
+        new Date(iso),
+      );
+    } catch {
+      return new Intl.DateTimeFormat(locale.value, options).format(new Date(iso));
+    }
+  }),
+);
 const lastRun = computed(() => task.value?.last_run || null);
 // why the last run failed, on the Last launch badge's hover (as a schedule's launchError)
 const launchError = computed(() => (lastRun.value?.outcome === 'failed' ? lastRun.value.result || '' : ''));
@@ -90,6 +116,8 @@ const runColumns = computed(() => [
 // ─── tabs ─────────────────────────────────────────────────────────────────────
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
+  // when it runs, as a schedule's Schedule tab : read only
+  { key: 'schedule', label: t('settings.schedules.stepSchedule'), icon: 'stopwatch' },
   { key: 'runs', label: t('jobs.system.tabRuns'), icon: 'history', count: runs.value.length },
 ]);
 const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
@@ -131,7 +159,6 @@ const tabFields = computed(() => ({
   details: [
     ['name', t('settings.fields.name'), name.value],
     ['description', t('settings.fields.description'), description.value],
-    ['timing', t('jobs.system.timing'), timing.value],
     ['lastLaunch', t('settings.schedules.lastLaunch'), lastRun.value?.outcome],
     ['result', t('jobs.system.result'), lastRun.value?.result],
     [
@@ -145,6 +172,10 @@ const tabFields = computed(() => ({
       task.value?.next_run ? Helpers.formatServerDate(task.value.next_run) : '',
     ],
     ['setting', t('jobs.system.setting'), setting.value?.env, setting.value?.value],
+  ],
+  schedule: [
+    ['timing', t('jobs.system.timing'), timing.value],
+    ['nextRuns', nextRunsLabel.value, ...nextRuns.value],
   ],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('jobs.system.tabRuns')]],
@@ -255,10 +286,6 @@ onMounted(async () => {
                 :label="t('settings.fields.description')"
               />
               <!-- the facts the server reports : read only, a dash while unknown, no help line -->
-              <div v-show="fieldShown('timing')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
-                <span>{{ timing || '–' }}</span>
-              </div>
               <!-- its last launch, as a schedule's page has it : the badge only, its error when hovered
                    (a failed run's result) -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
@@ -291,6 +318,36 @@ onMounted(async () => {
                   }}</router-link>
                   <span v-else class="text-body-secondary">{{ t('jobs.system.settingEnv') }}</span></span
                 >
+                <span v-else>–</span>
+              </div>
+            </template>
+            <!-- Schedule : when it runs, in words with its cron, and its next runs ; read only -->
+            <template v-if="tabShown('schedule')">
+              <template v-if="searching && searchHead('schedule')">
+                <hr v-if="!searchHead('schedule').first" class="mt-4 mb-0 af-search-line" />
+                <h6
+                  class="fw-bold text-body-secondary af-search-tab"
+                  :class="{ 'af-search-first': searchHead('schedule').first }"
+                >
+                  <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
+                </h6>
+              </template>
+              <div v-show="fieldShown('timing')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
+                <span>{{ timing || '–' }}</span>
+              </div>
+              <!-- the tab's last field, no margin under it -->
+              <div v-show="fieldShown('nextRuns')" class="mb-0">
+                <div class="form-label fw-bold">{{ nextRunsLabel }}</div>
+                <div v-if="nextRuns.length" class="d-flex flex-wrap gap-2">
+                  <span
+                    v-for="(run, i) in nextRuns"
+                    :key="i"
+                    class="badge bg-body-secondary text-body-secondary border"
+                  >
+                    {{ run }}
+                  </span>
+                </div>
                 <span v-else>–</span>
               </div>
             </template>

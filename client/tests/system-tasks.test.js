@@ -110,21 +110,30 @@ describe("a task's page", () => {
     expect(page).toMatch(/axios\.get\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}`\)/);
   });
 
-  it('has Details then Runs, the runs counted on their tab', () => {
+  it('has Details, Schedule then Runs, the runs counted on their tab', () => {
     const keys = [...page.slice(page.indexOf('const tabs = computed')).matchAll(/\{ key: '(\w+)', label:/g)]
-      .slice(0, 2)
+      .slice(0, 3)
       .map((m) => m[1]);
-    expect(keys).toEqual(['details', 'runs']);
+    expect(keys).toEqual(['details', 'schedule', 'runs']);
     expect(page).toMatch(
       /key: 'runs', label: t\('jobs\.system\.tabRuns'\), icon: 'history', count: runs\.value\.length/,
     );
   });
 
   it('starts its Details with the name, then the description, then the facts, each label bold', () => {
-    const details = page.slice(page.indexOf('v-if="tabShown(\'details\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
+    const details = page.slice(
+      page.indexOf('v-if="tabShown(\'details\')"'),
+      page.indexOf('v-if="tabShown(\'schedule\')"'),
+    );
     const order = [...details.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1]);
-    expect(order).toEqual(['name', 'description', 'timing', 'lastLaunch', 'result', 'lastRun', 'nextRun', 'setting']);
-    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(6);
+    expect(order).toEqual(['name', 'description', 'lastLaunch', 'result', 'lastRun', 'nextRun', 'setting']);
+    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(5);
+  });
+
+  it('shows on its Schedule tab when it runs and its next three runs, read only', () => {
+    const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
+    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'nextRuns']);
+    expect(tab).not.toMatch(/<input|<select|v-model/);
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
