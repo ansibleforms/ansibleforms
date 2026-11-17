@@ -153,13 +153,15 @@ describe('the pages and components carry no hard-coded English', () => {
 // The language before anyone signs in
 // ------------------------------------------------------------------
 
-describe('the language of the pages shown before sign-in', () => {
-  const cookie = vi.hoisted(() => ({ language: null }));
-  vi.mock('@/lib/Helpers', async (importOriginal) => {
-    const real = (await importOriginal()).default;
-    return { default: { ...real, getCookie: (name) => (name === 'af_language' ? cookie.language : null) } };
-  });
+// the language cookie the pages before sign-in read : set by each test (vitest hoists a mock to
+// the top of the file, so it is written there, beside the value it reads)
+const cookie = vi.hoisted(() => ({ language: null }));
+vi.mock('@/lib/Helpers', async (importOriginal) => {
+  const real = (await importOriginal()).default;
+  return { default: { ...real, getCookie: (name) => (name === 'af_language' ? cookie.language : null) } };
+});
 
+describe('the language of the pages shown before sign-in', () => {
   let i18n;
   let State;
   beforeEach(async () => {
