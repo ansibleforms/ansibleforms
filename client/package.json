@@ -55,7 +55,7 @@
     "eslint": "^10.14.0",
     "eslint-plugin-vue": "^10.12.1",
     "globals": "^17.14.0",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "nodemon": "^3.1.14",
     "pinia": "^3.0.4",
     "prettier": "^3.9.10",
