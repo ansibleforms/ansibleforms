@@ -18,6 +18,11 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    # vitest and its coverage plugin need each other's major : bumped apart, each pull request
+    # fails to install
+    groups:
+      vitest:
+        patterns: ['vitest', '@vitest/*']
 
   - package-ecosystem: npm
     directory: /server
