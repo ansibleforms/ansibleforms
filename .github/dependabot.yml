@@ -1,8 +1,8 @@
 version: 2
 
-# Dependabot NEVER proposes a major version : every entry ignores semver-major updates.
-# Majors carry breaking changes by definition, so they are done by hand (npm outdated,
-# read the changelog, decide) and never arrive through a routine-looking pull request.
+# Dependabot proposes every version, majors included, on main : a major carries breaking
+# changes, so its pull request is read against the dependency's changelog before it is merged.
+# The maintenance line (release/6.x, below) takes patch updates only.
 # Updates are never grouped : every dependency gets its own pull request, so each one can be
 # reviewed, tested and reverted on its own.
 #
@@ -18,9 +18,6 @@ updates:
     commit-message:
       prefix: build
       include: scope
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /server
@@ -29,9 +26,6 @@ updates:
     commit-message:
       prefix: build
       include: scope
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
@@ -39,9 +33,6 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
 
   # Moves the digest pins (one Dockerfile per image folder) : node:26-trixie(-slim) in
   # docker/controller, node:26-trixie-slim in docker/runner/rte-base, and the uv image
@@ -56,9 +47,6 @@ updates:
     commit-message:
       prefix: build
       include: scope
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
 
   # The python packages of the RTE images (docker/runner/rte-core for ansibleforms-rte-core,
   # docker/runner/rte-full for ansibleforms-rte-full) : pinned, so an image changes only with a commit here
@@ -75,9 +63,6 @@ updates:
     groups:
       boto:
         patterns: ['boto3', 'botocore']
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
 
   # The maintenance line (release/6.x) : patch updates only - a minor of a dependency is
   # no business of a patch release. Dependabot reads this file from main only, so the
