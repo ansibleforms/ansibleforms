@@ -100,6 +100,7 @@ const TASKS = {
   abandonedJobs: ["ABANDONED_JOBS_CRON", "0 * * * *"],
   deadNodes: ["DEAD_NODES_CRON", "* * * * *"],
   scheduleEnds: ["SCHEDULE_ENDS_CRON", "* * * * *"],
+  scheduleResync: ["SCHEDULE_RESYNC_CRON", "*/5 * * * *"],
   tokenCleanup: ["TOKEN_CLEANUP_CRON", "0 3 * * *"],
   auditCleanup: ["AUDIT_CLEANUP_CRON", "30 3 * * *"],
   jobCleanup: ["JOB_CLEANUP_CRON", "30 2 * * *"],
@@ -147,6 +148,7 @@ describe("the cron settings", () => {
     const declared = Object.fromEntries(SCHEDULE_SETTINGS.map((s) => [s.key, [s.env, s.default]]));
     assert.deepEqual(declared, TASKS);
     assert.ok(SYSTEM_TASKS.every((t) => t.schedule), "no task keeps a timing of its own");
+    // the runner hub's loops are no task : read only, on their own timers (HUB_LOOPS)
   });
 
   test("documented in help.yaml with their default, applied live, shown on the task's page only", () => {
@@ -269,8 +271,15 @@ const ADMIN = { showSettings: true };
 const put = (key, cron, options = ADMIN) => call("PUT", `/api/v2/system/tasks/${key}/schedule`, options, { cron });
 
 describe("which task may be changed, as the API says it", () => {
-  test("every task, with its variable", async () => {
-    const list = await SystemTask.list();
+  test("every task, with its variable ; the runner hub's loops read only", async () => {
+    const all = await SystemTask.list();
+    const loops = all.filter((t) => t.interval_seconds);
+    assert.deepEqual(loops.map((t) => [t.key, t.interval_seconds, t.editable_schedule, t.schedule_env]), [
+      ["runnerDispatch", 2, false, null],
+      ["runnerDial", 10, false, null],
+      ["runnerPrune", 60, false, null],
+    ]);
+    const list = all.filter((t) => !t.interval_seconds);
     assert.deepEqual(list.map((t) => t.key).sort(), Object.keys(TASKS).sort());
     for (const task of list) {
       assert.equal(task.editable_schedule, true, task.key);

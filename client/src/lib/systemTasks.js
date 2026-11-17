@@ -62,12 +62,12 @@ export function taskDescription(t, task) {
 }
 
 /**
- * When a task runs, in words : its cron described (Every hour, At 02:30 AM, every day), or Off for
- * one that does not run.
+ * When a task runs, in words : its cron described (Every hour, At 02:30 AM, every day), every so
+ * many seconds for a runner hub loop, or Off for one that does not run.
  *
  * Args:
  *   t (function): the vue-i18n translate function.
- *   task (object): the task ({ cron, enabled }).
+ *   task (object): the task ({ cron, interval_seconds, enabled }).
  *   locale (string): the user's language (the cron's words).
  *
  * Returns:
@@ -76,6 +76,7 @@ export function taskDescription(t, task) {
 export function taskTiming(t, task, locale = i18n.global.locale.value) {
   if (task?.enabled === false) return t('jobs.system.off');
   if (task?.cron) return describeCron(task.cron, locale) || task.cron;
+  if (task?.interval_seconds) return t('jobs.system.everySeconds', { n: task.interval_seconds });
   return '';
 }
 

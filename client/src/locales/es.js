@@ -3186,6 +3186,7 @@ export default {
     system: {
       description: 'Las tareas de mantenimiento que la app ejecuta por sí sola, y su último resultado.',
       timing: 'Cuándo se ejecuta',
+      everySeconds: 'Cada {n} segundos',
       off: 'Desactivada',
       result: 'Resultado',
       setting: 'Ajuste aplicado',
@@ -3193,6 +3194,7 @@ export default {
       settingEnv: 'Definido por una variable de entorno',
       scheduleEnv: 'Definido por la variable de entorno {env}.',
       scheduleDeprecated: 'De {env}, obsoleta; un cron guardado aquí la sustituye.',
+      hubLoopHint: 'Bucle propio del hub de runners: se ejecuta tan a menudo como lo necesitan.',
       cronFiveFields: 'Usa 5 campos: minuto, hora, día, mes y día de la semana.',
       revert: 'Revertir',
       tabRuns: 'Ejecuciones',
@@ -3231,6 +3233,22 @@ export default {
         storedJobsCleanup: {
           name: 'Limpieza de jobs guardados',
           description: 'Elimina los jobs guardados caducados o sin uso, y los nodos viejos.',
+        },
+        scheduleResync: {
+          name: 'Resincronizar programaciones',
+          description: 'Registra las programaciones y pulls de repositorio cambiados en un nodo.',
+        },
+        runnerDispatch: {
+          name: 'Envío a runners',
+          description: 'Entrega a sus runners los jobs en espera y las cancelaciones.',
+        },
+        runnerDial: {
+          name: 'Llamada a runners entrantes',
+          description: 'Llama a los runners entrantes que este nodo puede retener.',
+        },
+        runnerPrune: {
+          name: 'Limpieza de jobs terminados',
+          description: 'Libera lo que este nodo guardaba de jobs terminados en otro lugar.',
         },
         configSeedReload: {
           name: 'Recarga del config seed',

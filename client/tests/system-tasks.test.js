@@ -3,7 +3,8 @@
 // showSettings, the api's guard). The list is the scheduled jobs' table, a row opening the task's
 // page : Details, Schedule then Runs, every task's cron changed on its Schedule tab as a
 // schedule's (its editor, Save and Revert), the config seed reload's too, whose cron may still come
-// from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). Read from the sources and the config, as the other page
+// from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). The runner hub's own loops are listed
+// too, read only : every so many seconds, one line saying why. Read from the sources and the config, as the other page
 // tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -23,6 +24,8 @@ const LANGUAGES = ['en', 'de', 'fr', 'it', 'es', 'nl', 'ca', 'pt', 'ja', 'zh', '
 // the tasks the server declares (server/src/lib/systemTasks.js SYSTEM_TASKS)
 const serverTasks = read('../server/src/lib/systemTasks.js');
 const TASK_KEYS = [...serverTasks.matchAll(/^ {4}key: '(\w+)',$/gm)].map((m) => m[1]);
+// the runner hub's loops among them (HUB_LOOPS), declared after the tasks
+const LOOP_KEYS = ['runnerDispatch', 'runnerDial', 'runnerPrune'];
 // a translate function that answers the key, so a test sees which text was asked for
 const t = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key);
 
@@ -90,12 +93,12 @@ describe('a task in words', () => {
     expect(taskName(tr, { key: 'notATask', name: 'Server name' })).toBe('Server name');
   });
 
-  it('when it runs : its cron in words, or off', () => {
+  it('when it runs : its cron in words, a runner hub loop every so many seconds, or off', () => {
     expect(taskTiming(t, { cron: '0 * * * *', enabled: true }, 'en')).toBe('Every hour');
+    expect(taskTiming(t, { cron: null, interval_seconds: 2, enabled: true })).toBe('jobs.system.everySeconds {"n":2}');
+    expect(taskTiming(i18n.global.t, { cron: null, interval_seconds: 10, enabled: true })).toBe('Every 10 seconds');
     expect(taskTiming(t, { cron: '* * * * *', enabled: false })).toBe('jobs.system.off');
-    expect(taskTimingCell(t, { cron: '* * * * *', enabled: false })).not.toMatch(/popover/);
-    // no task is timed by seconds any more : the words of it are gone
-    expect(read('src/lib/systemTasks.js')).not.toMatch(/interval_seconds|everySeconds/);
+    expect(taskTimingCell(t, { cron: null, interval_seconds: 2, enabled: true })).not.toMatch(/popover/);
   });
 
   it('how long a run took : milliseconds under a second, else as a job', () => {
@@ -127,14 +130,23 @@ describe("a task's page", () => {
       page.indexOf('v-if="tabShown(\'schedule\')"'),
     );
     const order = [...details.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1]);
-    expect(order).toEqual(['name', 'description', 'lastLaunch', 'result', 'lastRun', 'nextRun', 'setting']);
-    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(5);
+    expect(order).toEqual(['name', 'description', 'lastLaunch', 'result', 'lastRun', 'nextRun', 'node', 'setting']);
+    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(6);
   });
 
-  it('shows on its Schedule tab the editor only : no task has a timing of its own, read only', () => {
+  it("shows on its Schedule tab the editor, or a runner hub loop's seconds read only with one line", () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
-    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['cron']);
+    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'cron']);
+    expect(page).toMatch(/const isLoop = computed\(\(\) => !!task\.value && !task\.value\.schedule_env\);/);
+    const loop = tab.slice(tab.indexOf('<div v-if="isLoop"'), tab.indexOf('<div v-else'));
+    expect(loop).toMatch(/<div class="form-text">\{\{ t\('jobs\.system\.hubLoopHint'\) \}\}<\/div>/);
+    expect(loop).not.toMatch(/<input|<select|v-model|BsCron/);
     expect(page).not.toMatch(/scheduleOwned|nextRunsLabel/);
+  });
+
+  it("names the node whose memory a runner hub loop's last run comes from", () => {
+    expect(page).toMatch(/<div v-if="isLoop" v-show="fieldShown\('node'\)" class="mb-3">/);
+    expect(page).toMatch(/\{\{ task\.loop\?\.node \|\| '–' \}\}/);
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
@@ -177,13 +189,15 @@ describe("a task's Schedule tab", () => {
     .slice(1)
     .map((chunk) => ({ key: chunk.slice(0, chunk.indexOf("'")), schedule: /schedule: scheduleSetting\(/.test(chunk) }));
 
-  it('every task has a cron setting, none keeps a timing of its own', () => {
-    expect(declared.filter((d) => d.schedule).map((d) => d.key)).toEqual(TASK_KEYS);
-    expect(declared.filter((d) => !d.schedule)).toEqual([]);
+  it("every task has a cron setting ; the runner hub's loops none, the one exception", () => {
+    expect(declared.filter((d) => d.schedule).map((d) => d.key)).toEqual(
+      TASK_KEYS.filter((k) => !LOOP_KEYS.includes(k)),
+    );
+    expect(declared.filter((d) => !d.schedule).map((d) => d.key)).toEqual(LOOP_KEYS);
   });
 
   it("shows the task's cron in a schedule's editor, no line under it while it may be changed", () => {
-    expect(tab).toMatch(/<div v-show="fieldShown\('cron'\)" class="af-system-cron mb-0">/);
+    expect(tab).toMatch(/<div v-else v-show="fieldShown\('cron'\)" class="af-system-cron mb-0">/);
     expect(tab).toMatch(
       /<BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" \/>/,
     );
@@ -301,7 +315,11 @@ describe('the texts', () => {
       const shown = old.replace('{env}', 'CONFIG_SEED_RELOAD_SECONDS');
       const width = [...shown].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
       expect(width, lang).toBeLessThanOrEqual(90);
-      expect(texts.jobs.system.everySeconds, lang).toBeUndefined();
+      // a runner hub loop's timing, and the line of its Schedule tab, on one line
+      expect(texts.jobs.system.everySeconds, lang).toMatch(/\{n\}/);
+      const hint = texts.jobs.system.hubLoopHint;
+      const hintWidth = [...hint].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
+      expect(hintWidth, lang).toBeLessThanOrEqual(90);
       // a toolbar button : a word or two
       expect(texts.jobs.system.revert.length * wide, lang).toBeLessThanOrEqual(14);
     }

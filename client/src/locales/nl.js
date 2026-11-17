@@ -3179,6 +3179,7 @@ export default {
     system: {
       description: 'De onderhoudstaken die de app zelf uitvoert, en hun laatste resultaat.',
       timing: 'Wanneer hij draait',
+      everySeconds: 'Elke {n} seconden',
       off: 'Uit',
       result: 'Resultaat',
       setting: 'Toegepaste instelling',
@@ -3186,6 +3187,7 @@ export default {
       settingEnv: 'Ingesteld door een omgevingsvariabele',
       scheduleEnv: 'Ingesteld door de omgevingsvariabele {env}.',
       scheduleDeprecated: 'Uit de verouderde {env}; een hier opgeslagen cron vervangt die.',
+      hubLoopHint: 'De eigen lus van de runner-hub: hij draait zo vaak als de runners nodig hebben.',
       cronFiveFields: 'Gebruik 5 velden: minuut, uur, dag, maand en weekdag.',
       revert: 'Terugzetten',
       tabRuns: 'Runs',
@@ -3224,6 +3226,22 @@ export default {
         storedJobsCleanup: {
           name: 'Opgeslagen jobs opschonen',
           description: 'Verwijdert verlopen of ongebruikte opgeslagen jobs, en oude nodes.',
+        },
+        scheduleResync: {
+          name: 'Planningen hersynchroniseren',
+          description: 'Registreert de planningen en repository-pulls die op een node zijn gewijzigd.',
+        },
+        runnerDispatch: {
+          name: 'Runner-toewijzing',
+          description: 'Geeft wachtende jobs en annuleringen aan hun runners.',
+        },
+        runnerDial: {
+          name: 'Inbound runners verbinden',
+          description: 'Verbindt met de inbound runners die deze node mag houden.',
+        },
+        runnerPrune: {
+          name: 'Beëindigde jobs opruimen',
+          description: 'Laat los wat deze node bewaarde van jobs die elders eindigden.',
         },
         configSeedReload: {
           name: 'Config seed herladen',

@@ -11,6 +11,12 @@
 // the one in force. The config seed reload's was a number of seconds before 7.8.0
 // (CONFIG_SEED_RELOAD_SECONDS) : still read, deprecated, as a cron (lib/seedReloadCron.js).
 //
+// The runner hub's own loops (runners/rteHub.js : dispatch, inbound dial, ended jobs prune) are
+// listed beside them, read only (HUB_LOOPS) : they run every few seconds on their own timers, as
+// often as the runners need them, with no cron to change. What they did is kept in memory on each
+// node (lib/hubLoops.js) ; only their failures are written as rows, one per distinct error a
+// minute at most.
+//
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
 // result (removed 120 jobs, or the error) and the node that ran it ; every run, the ones of every
 // minute that changed nothing too, so the Runs tab shows each of them. The table keeps itself
@@ -82,6 +88,14 @@ export const SYSTEM_TASKS = [
     schedule: scheduleSetting('SCHEDULE_ENDS_CRON', 'scheduleEndsCron'),
   },
   {
+    key: 'scheduleResync',
+    cron: '*/5 * * * *',
+    name: 'Schedule resync',
+    description: 'Registers the schedules and repository pulls changed on any node.',
+    setting: null,
+    schedule: scheduleSetting('SCHEDULE_RESYNC_CRON', 'scheduleResyncCron'),
+  },
+  {
     key: 'tokenCleanup',
     cron: '0 3 * * *',
     name: 'Expired tokens',
@@ -139,6 +153,52 @@ export const SYSTEM_TASKS = [
 
 // the tasks by their key
 const TASKS = new Map(SYSTEM_TASKS.map((task) => [task.key, task]));
+
+/**
+ * The runner hub's own loops (runners/rteHub.js), listed read only after the tasks : each runs
+ * every so many seconds on its own timer, on every controller node, with no setting.
+ *
+ *   key: the loop's name in the table of runs (its failures) and in the API
+ *   seconds: how often it runs
+ *   name, description: what it is, in English, as the API answers it (the GUI says it in the
+ *     user's language : client/src/locales, jobs.system.tasks)
+ */
+export const HUB_LOOPS = [
+  {
+    key: 'runnerDispatch',
+    seconds: 2,
+    name: 'Runner dispatch',
+    description: 'Hands the waiting jobs and the cancels to their runners.',
+  },
+  {
+    key: 'runnerDial',
+    seconds: 10,
+    name: 'Runner inbound dial',
+    description: 'Dials the inbound runners this node may hold.',
+  },
+  {
+    key: 'runnerPrune',
+    seconds: 60,
+    name: 'Runner ended jobs prune',
+    description: 'Lets go what this node kept of jobs that ended elsewhere.',
+  },
+];
+
+// the loops by their key
+const LOOPS = new Map(HUB_LOOPS.map((loop) => [loop.key, loop]));
+
+/**
+ * One of the runner hub's loops by its key.
+ *
+ * Args:
+ *   key (string): the loop's key (runnerDispatch).
+ *
+ * Returns:
+ *   object|null: its entry of HUB_LOOPS, or null for a key no loop has.
+ */
+export function hubLoop(key) {
+  return LOOPS.get(String(key)) || null;
+}
 
 /**
  * A maintenance task by its key.
@@ -321,7 +381,7 @@ export async function pruneRuns() {
     removed += old?.affectedRows || 0;
     // step 2 : each task's rows beyond the ones kept, its latest first (a derived table : MySQL
     // takes no LIMIT in an IN subquery)
-    for (const task of SYSTEM_TASKS) {
+    for (const task of [...SYSTEM_TASKS, ...HUB_LOOPS]) {
       const extra = await mysql.do(
         'DELETE FROM AnsibleForms.`system_task_runs` WHERE task_key = ? AND id NOT IN (' +
           'SELECT id FROM (SELECT id FROM AnsibleForms.`system_task_runs` WHERE task_key = ? ' +
@@ -343,7 +403,7 @@ export async function pruneRuns() {
  * logged, the task itself has run.
  *
  * Args:
- *   task (object): the task's entry of SYSTEM_TASKS.
+ *   task (object): the task's entry of SYSTEM_TASKS (or a loop's of HUB_LOOPS : its failures).
  *   run (object): { startedAt (Date), endedAt (Date), outcome (success, failed), result (string),
  *     changed (number : what the run changed, 0 for nothing) }.
  *
@@ -420,4 +480,4 @@ export function resetPruneForTests() {
   lastPrune = 0;
 }
 
-export default { SYSTEM_TASKS, SCHEDULE_SETTINGS, systemTask, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };
+export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, systemTask, hubLoop, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };

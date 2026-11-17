@@ -3186,6 +3186,7 @@ export default {
     system: {
       description: "Els processos de manteniment que l'app executa sola, i el seu darrer resultat.",
       timing: "Quan s'executa",
+      everySeconds: 'Cada {n} segons',
       off: 'Desactivat',
       result: 'Resultat',
       setting: 'Paràmetre aplicat',
@@ -3193,6 +3194,7 @@ export default {
       settingEnv: "Definit per una variable d'entorn",
       scheduleEnv: "Definit per la variable d'entorn {env}.",
       scheduleDeprecated: 'De {env}, obsoleta; un cron desat aquí la substitueix.',
+      hubLoopHint: "Bucle propi del hub de runners: s'executa tan sovint com els runners ho necessiten.",
       cronFiveFields: 'Fes servir 5 camps: minut, hora, dia, mes i dia de la setmana.',
       revert: 'Reverteix',
       tabRuns: 'Execucions',
@@ -3231,6 +3233,22 @@ export default {
         storedJobsCleanup: {
           name: 'Neteja de tasques desades',
           description: 'Elimina les tasques desades caducades o sense ús, i els nodes vells.',
+        },
+        scheduleResync: {
+          name: 'Resincronitzar programacions',
+          description: 'Registra les programacions i pulls de repositori canviats en un node.',
+        },
+        runnerDispatch: {
+          name: 'Enviament als runners',
+          description: 'Lliura als seus runners els jobs en espera i les cancel·lacions.',
+        },
+        runnerDial: {
+          name: 'Trucada a runners entrants',
+          description: 'Truca els runners entrants que aquest node pot retenir.',
+        },
+        runnerPrune: {
+          name: 'Neteja de jobs acabats',
+          description: 'Allibera el que aquest node guardava de jobs acabats en altres llocs.',
         },
         configSeedReload: {
           name: 'Recàrrega del config seed',

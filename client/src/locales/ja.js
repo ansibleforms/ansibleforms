@@ -3143,6 +3143,7 @@ export default {
     system: {
       description: 'アプリが自動で実行するメンテナンス処理と、その直近の結果です。',
       timing: '実行タイミング',
+      everySeconds: '{n} 秒ごと',
       off: 'オフ',
       result: '結果',
       setting: '適用される設定',
@@ -3150,6 +3151,7 @@ export default {
       settingEnv: '環境変数で設定',
       scheduleEnv: '環境変数 {env} で設定されています。',
       scheduleDeprecated: '非推奨の {env} によるもの。保存した cron で置き換わります。',
+      hubLoopHint: 'ランナーハブ自身のループです。ランナーが必要とする頻度で実行されます。',
       cronFiveFields: '分、時、日、月、曜日の 5 つのフィールドを使用します。',
       revert: '元に戻す',
       tabRuns: '実行履歴',
@@ -3179,6 +3181,19 @@ export default {
         storedJobsCleanup: {
           name: '保存済みジョブの整理',
           description: '期限切れまたは未使用の保存済みジョブと古いノードを削除します。',
+        },
+        scheduleResync: {
+          name: 'スケジュール再同期',
+          description: 'いずれかのノードで変更されたスケジュールとリポジトリのプルを登録します。',
+        },
+        runnerDispatch: { name: 'ランナーへの配布', description: '待機中のジョブとキャンセルをランナーに渡します。' },
+        runnerDial: {
+          name: 'インバウンド接続',
+          description: 'このノードが保持できるインバウンドランナーに接続します。',
+        },
+        runnerPrune: {
+          name: '終了ジョブの整理',
+          description: '他所で終了したジョブについて保持していたものを解放します。',
         },
         configSeedReload: {
           name: '構成シードの再読み込み',

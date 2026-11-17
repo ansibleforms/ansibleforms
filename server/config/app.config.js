@@ -111,6 +111,7 @@ var app_config = {
   abandonedJobsCron: (process.env.ABANDONED_JOBS_CRON || "").trim(),
   deadNodesCron: (process.env.DEAD_NODES_CRON || "").trim(),
   scheduleEndsCron: (process.env.SCHEDULE_ENDS_CRON || "").trim(),
+  scheduleResyncCron: (process.env.SCHEDULE_RESYNC_CRON || "").trim(),
   tokenCleanupCron: (process.env.TOKEN_CLEANUP_CRON || "").trim(),
   auditCleanupCron: (process.env.AUDIT_CLEANUP_CRON || "").trim(),
   jobCleanupCron: (process.env.JOB_CLEANUP_CRON || "").trim(),

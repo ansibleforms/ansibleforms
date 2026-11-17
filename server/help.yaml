@@ -796,6 +796,19 @@
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: SCHEDULE_RESYNC_CRON
+    version: 7.8.0
+    type: string
+    allowed: a cron of 5 fields (minute hour day month weekday) that runs again
+    short: Schedule resync schedule (cron)
+    default: "*/5 * * * *"
+    description: |
+      When the Schedule resync system task runs: the worker reads the schedules and the repository pulls from the database again.
+      Each change already reaches it at once; this is the safety net for a change notice it missed.
+      A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every 5 minutes.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: SCHEDULE_ENDS_CRON
     version: 7.8.0
     type: string

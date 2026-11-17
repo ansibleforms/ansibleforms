@@ -61,7 +61,7 @@ vi.mock("croner", async (importOriginal) => {
 });
 
 const systemTasks = await import("../src/lib/systemTasks.js");
-const { SYSTEM_TASKS, recorded, recordRun, pruneRuns, resetPruneForTests, RUNS_KEEP_DAYS, RUNS_KEEP_PER_TASK } = systemTasks;
+const { SYSTEM_TASKS, HUB_LOOPS, recorded, recordRun, pruneRuns, resetPruneForTests, RUNS_KEEP_DAYS, RUNS_KEEP_PER_TASK } = systemTasks;
 const cronService = (await import("../src/services/cron.service.js")).default;
 const SystemTask = (await import("../src/models/systemTask.model.js")).default;
 const Middleware = (await import("../src/lib/middleware.js")).default;
@@ -151,12 +151,13 @@ describe("the table keeps itself small", () => {
     assert.match(old.sql, /WHERE started_at < UTC_TIMESTAMP\(\) - INTERVAL \? DAY/);
     assert.deepEqual(old.params, [RUNS_KEEP_DAYS]);
     assert.equal(RUNS_KEEP_DAYS, 30);
-    assert.equal(perTask.length, SYSTEM_TASKS.length);
+    // the runner hub's loops' rows (their failures) too
+    assert.equal(perTask.length, SYSTEM_TASKS.length + HUB_LOOPS.length);
     for (const q of perTask) {
       assert.match(q.sql, /id NOT IN \(SELECT id FROM \(SELECT id FROM AnsibleForms\.`system_task_runs` WHERE task_key = \? ORDER BY started_at DESC, id DESC LIMIT \?\) kept\)/);
       assert.equal(q.params[2], RUNS_KEEP_PER_TASK);
     }
-    assert.equal(removed, 2 * (1 + SYSTEM_TASKS.length));
+    assert.equal(removed, 2 * (1 + SYSTEM_TASKS.length + HUB_LOOPS.length));
   });
 
   test("pruned after a recorded run, once an hour at most", async () => {
@@ -201,8 +202,9 @@ describe("the scheduler records every task", () => {
   };
 
   test("each task on the cron the API reports, the seed reload only with a seed", () => {
-    // no CONFIG_SEED_PATH here : the config seed reload is off, not registered
-    const running = SYSTEM_TASKS.filter((t) => t.key !== "configSeedReload");
+    // no CONFIG_SEED_PATH here : the config seed reload is off, not registered ; the cron
+    // service not active (initializeAll) : no registry, no schedule resync
+    const running = SYSTEM_TASKS.filter((t) => !["configSeedReload", "scheduleResync"].includes(t.key));
     const patterns = [...tasks.values()].map((t) => t.pattern).sort();
     assert.deepEqual(patterns, running.map((t) => t.cron).sort());
     assert.deepEqual([...cronService.jobs.system.keys()].sort(), running.map((t) => t.key).sort());
@@ -259,7 +261,8 @@ describe("the tasks as the API answers them", () => {
     Object.assign(appConfig, { jobRetentionDays: 90, auditRetentionDays: 365, configSeedPath: "", configSeedReloadSeconds: "" });
     answer = (sql) => (/^SELECT/.test(sql) ? [last("jobCleanup")] : []);
     const list = await SystemTask.list();
-    assert.deepEqual(list.map((t) => t.key), SYSTEM_TASKS.map((t) => t.key));
+    // the tasks, then the runner hub's loops
+    assert.deepEqual(list.map((t) => t.key), [...SYSTEM_TASKS, ...HUB_LOOPS].map((t) => t.key));
     const job = list.find((t) => t.key === "jobCleanup");
     assert.equal(job.cron, "30 2 * * *");
     assert.deepEqual(job.last_run, {
@@ -282,7 +285,7 @@ describe("the tasks as the API answers them", () => {
     assert.equal(seed.next_run, null);
     assert.equal(seed.cron, "* * * * *");
     assert.equal(seed.schedule_deprecated, null);
-    assert.equal("interval_seconds" in seed, false);
+    assert.equal(seed.interval_seconds, null);
   });
 
   test("ALLOW_ENV_EDIT=0 : every setting is the environment's", async () => {
@@ -340,7 +343,7 @@ describe("the API is the admin settings'", () => {
   test("an admin reads the list, and one task ; an unknown key is 404", async () => {
     const list = await call("/api/v2/system/tasks", { showSettings: true });
     assert.equal(list.status, 200);
-    assert.equal(list.body.count, SYSTEM_TASKS.length);
+    assert.equal(list.body.count, SYSTEM_TASKS.length + HUB_LOOPS.length);
     const one = await call("/api/v2/system/tasks/jobCleanup", { showSettings: true });
     assert.equal(one.status, 200);
     assert.equal(one.body.key, "jobCleanup");

@@ -42,17 +42,19 @@ import {
   queueMinutes, inboundUrl, fingerprint, parseCertBundle, certFingerprint,
 } from "../rte/socket/protocol.js";
 import { DialReport, describeDialFailure, failureLine, safeUrl, scrub, ago } from "../rte/socket/dialReport.js";
+import { loopRun, markLoopsStarted } from "../lib/hubLoops.js";
 
 // how long a lease lasts, renewed every 20 s while the socket is open
 const LEASE_SECONDS = 60;
 const RENEW_MS = 20000;
-// how often the jobs waiting for a socket, and the aborts, are looked for
+// how often the jobs waiting for a socket, and the aborts, are looked for (the seconds of the loop
+// runnerDispatch, lib/systemTasks.js HUB_LOOPS, say the same)
 const DISPATCH_MS = 2000;
-// how often the inbound runners are looked at (a lease to take, a socket to dial)
+// how often the inbound runners are looked at (a lease to take, a socket to dial ; runnerDial)
 const DIAL_MS = 10000;
 // how long an RTE has to say claimed or refused
 const CLAIM_TIMEOUT_MS = 30000;
-// how often what this node keeps of jobs that ended elsewhere is let go (pruneEnded)
+// how often what this node keeps of jobs that ended elsewhere is let go (pruneEnded ; runnerPrune)
 const PRUNE_MS = 60000;
 // a session's answers of itemAllowed (and its refusals said once) kept at most : the oldest go
 const ALLOWED_MAX = 500;
@@ -1765,12 +1767,15 @@ export function startRteHub(httpServer) {
   httpServer.on("upgrade", (req, socket, head) => {
     if (!handleUpgrade(req, socket, head)) socket.destroy();
   });
-  const dispatchTimer = setInterval(() => dispatch().catch((e) => logger.debug(`RTE dispatch: ${e.message}`)), DISPATCH_MS);
+  // the hub's own loops, on their timers : each run kept in memory for Jobs > System, a failure
+  // warned of once per distinct error and written as a row once a minute at most (lib/hubLoops.js)
+  markLoopsStarted();
+  const dispatchTimer = setInterval(() => loopRun("runnerDispatch", dispatch), DISPATCH_MS);
   dispatchTimer.unref?.();
-  const dialTimer = setInterval(() => dialInbound().catch((e) => logger.debug(`RTE inbound dial: ${e.message}`)), DIAL_MS);
+  const dialTimer = setInterval(() => loopRun("runnerDial", dialInbound), DIAL_MS);
   dialTimer.unref?.();
   // what this node keeps of the jobs that ended elsewhere, let go now and then
-  const pruneTimer = setInterval(() => pruneEnded().catch((e) => logger.debug(`RTE prune: ${e.message}`)), PRUNE_MS);
+  const pruneTimer = setInterval(() => loopRun("runnerPrune", pruneEnded), PRUNE_MS);
   pruneTimer.unref?.();
   setTimeout(() => dialInbound().catch(() => {}), 2000).unref?.();
   logger.notice(`Taking RTE sockets on ${appConfig.baseUrl || ""}${APP_SOCKET_PATH}`);

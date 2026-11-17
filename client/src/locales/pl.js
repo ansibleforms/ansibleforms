@@ -3168,6 +3168,7 @@ export default {
     system: {
       description: 'Procesy konserwacji uruchamiane przez aplikację i ich ostatni wynik.',
       timing: 'Kiedy działa',
+      everySeconds: 'Co {n} s',
       off: 'Wyłączony',
       result: 'Wynik',
       setting: 'Stosowane ustawienie',
@@ -3175,6 +3176,7 @@ export default {
       settingEnv: 'Ustawione przez zmienną środowiskową',
       scheduleEnv: 'Ustawione przez zmienną środowiskową {env}.',
       scheduleDeprecated: 'Z przestarzałej zmiennej {env}; cron zapisany tutaj ją zastąpi.',
+      hubLoopHint: 'Własna pętla huba runnerów: działa tak często, jak runnery tego potrzebują.',
       cronFiveFields: 'Użyj 5 pól: minuta, godzina, dzień, miesiąc i dzień tygodnia.',
       revert: 'Przywróć',
       tabRuns: 'Uruchomienia',
@@ -3213,6 +3215,22 @@ export default {
         storedJobsCleanup: {
           name: 'Czyszczenie zapisanych zadań',
           description: 'Usuwa wygasłe lub nieużywane zapisane zadania oraz stare węzły.',
+        },
+        scheduleResync: {
+          name: 'Resynchronizacja harmonogramów',
+          description: 'Rejestruje harmonogramy i pulle repozytoriów zmienione na dowolnym węźle.',
+        },
+        runnerDispatch: {
+          name: 'Przekazywanie do runnerów',
+          description: 'Przekazuje runnerom oczekujące zadania i anulowania.',
+        },
+        runnerDial: {
+          name: 'Łączenie z runnerami inbound',
+          description: 'Łączy się z runnerami inbound, które ten węzeł może trzymać.',
+        },
+        runnerPrune: {
+          name: 'Czyszczenie zakończonych zadań',
+          description: 'Zwalnia to, co ten węzeł trzymał z zadań zakończonych gdzie indziej.',
         },
         configSeedReload: {
           name: 'Ponowne wczytanie config seed',

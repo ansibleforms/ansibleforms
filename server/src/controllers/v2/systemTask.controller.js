@@ -4,7 +4,7 @@ import Audit from '../../models/audit.model.js';
 import i18n from '../../lib/i18n.js';
 import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
-import { systemTask, taskCron, scheduleCronProblem } from '../../lib/systemTasks.js';
+import { systemTask, hubLoop, taskCron, scheduleCronProblem } from '../../lib/systemTasks.js';
 import { ENV_EDIT_DISABLED_REASON } from '../../lib/envSettings.js';
 import { saveEnvValues, EnvSaveError } from '../../lib/envSave.js';
 
@@ -51,14 +51,19 @@ function refuse(req, res, status, detail) {
 // PUT /api/v2/system/tasks/:key/schedule { cron } : when a task runs. Saved as the
 // settings page saves its variables (lib/envSave.js : the settings file, the other nodes told,
 // applied at once), its setting re-registering the task on its new cron on the node that runs the
-// tasks. 404 for a key no task has, 403 for a task whose variable the environment sets
+// tasks. 404 for a key no task has, 403 for a runner hub loop (it runs as often as the runners
+// need it, no cron) or a task whose variable the environment sets
 // (ALLOW_ENV_EDIT=0, or set in the process's own environment), 400 for a cron that is not 5
 // fields croner runs. Saved, it wins over a deprecated variable its cron came from (the config
 // seed reload's CONFIG_SEED_RELOAD_SECONDS). Answers the task as GET does.
 const saveSchedule = async function (req, res) {
   try {
-    // step 1 : the task
+    // step 1 : the task ; a runner hub loop has no cron to change
     const task = systemTask(req.params.key);
+    if (!task && hubLoop(req.params.key)) {
+      refuse(req, res, 403, "The runner hub's loops run as often as the runners need them, they have no schedule");
+      return;
+    }
     if (!task) {
       res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
       return;

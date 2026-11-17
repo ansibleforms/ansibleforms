@@ -12,8 +12,13 @@ import { Cron } from 'croner';
 import mysql from './db.model.js';
 import appConfig from '../../config/app.config.js';
 import logConfig from '../../config/log.config.js';
-import { SYSTEM_TASKS, systemTask, taskCron, taskEnabled, deprecatedSchedule } from '../lib/systemTasks.js';
+import { SYSTEM_TASKS, HUB_LOOPS, systemTask, hubLoop, taskCron, taskEnabled, deprecatedSchedule } from '../lib/systemTasks.js';
+import { loopState } from '../lib/hubLoops.js';
 import { readManaged, isOverridden } from '../lib/envSettings.js';
+
+// The runner hub's loops (lib/systemTasks.js HUB_LOOPS) are listed after the tasks, read only :
+// no cron, their seconds instead (interval_seconds), and what they did from the memory of the node
+// that answers (lib/hubLoops.js loopState, its name in loop.node) ; their rows are their failures.
 
 // the runs one task's page lists, its latest first
 export const RECENT_RUNS = 100;
@@ -163,7 +168,8 @@ export function settingOf(task, managed) {
  *
  * Returns:
  *   object: { key, name, description, cron, default_cron, schedule_env, editable_schedule,
- *     schedule_deprecated, enabled, last_run, next_run, next_runs, timezone, setting }.
+ *     schedule_deprecated, interval_seconds, loop, enabled, last_run, next_run, next_runs,
+ *     timezone, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -183,6 +189,10 @@ function describe(task, lastRow, managed) {
     // the deprecated variable its cron still comes from, while its own is not set (the config seed
     // reload's CONFIG_SEED_RELOAD_SECONDS) ; null for none
     schedule_deprecated: scheduleDeprecatedOf(task),
+    // a runner hub loop's seconds (describeLoop) ; null for a task timed by its cron
+    interval_seconds: null,
+    // a runner hub loop's state on the node that answers (describeLoop) ; null for a task
+    loop: null,
     enabled: taskEnabled(task.key),
     last_run: lastRun,
     next_run: nextRunOf(task),
@@ -191,6 +201,56 @@ function describe(task, lastRow, managed) {
     // the zone its cron runs in (the scheduler's), the preview's
     timezone: logConfig.tz || null,
     setting: settingOf(task, managed),
+  };
+}
+
+/**
+ * A runner hub loop as the API answers it : the fields of a task, read only and without a cron,
+ * its seconds instead ; its last run what the node that answers keeps in memory (loopState), the
+ * node named, else its latest failed row.
+ *
+ * Args:
+ *   loop (object): the loop's entry of HUB_LOOPS.
+ *   lastRow (object|undefined): its latest row of system_task_runs (a failure).
+ *
+ * Returns:
+ *   object: as describe, with interval_seconds and loop ({ node, running, since, runs, failures,
+ *     last_run_at, last_outcome, last_success_at, last_error }).
+ */
+function describeLoop(loop, lastRow) {
+  const state = loopState(loop.key);
+  // its last run : this node's, in memory (a failure's message as its result) ; a node that runs
+  // no hub has none, its latest failed row then
+  let lastRun = lastRow ? runOf(lastRow) : null;
+  if (state?.last_run_at) {
+    const failed = state.last_outcome === 'failed';
+    lastRun = {
+      id: null,
+      started_at: state.last_run_at,
+      ended_at: failed ? state.last_error.at : state.last_success_at,
+      duration_ms: null,
+      outcome: state.last_outcome || 'success',
+      result: failed ? state.last_error.message : '',
+      node: state.node,
+    };
+  }
+  return {
+    key: loop.key,
+    name: loop.name,
+    description: loop.description,
+    cron: null,
+    default_cron: null,
+    schedule_env: null,
+    editable_schedule: false,
+    schedule_deprecated: null,
+    interval_seconds: loop.seconds,
+    loop: state,
+    enabled: !!state?.running,
+    last_run: lastRun,
+    next_run: null,
+    next_runs: [],
+    timezone: logConfig.tz || null,
+    setting: null,
   };
 }
 
@@ -229,7 +289,8 @@ SystemTask.managed = managedVariables;
 SystemTask.envEditAllowed = () => !!appConfig.allowEnvEdit;
 
 /**
- * Every maintenance task, in the scheduler's order, with its last run.
+ * Every maintenance task, in the scheduler's order, with its last run, then the runner hub's
+ * loops.
  *
  * Returns:
  *   Promise<object[]>: the tasks, as describe answers them.
@@ -246,11 +307,15 @@ SystemTask.list = async function () {
   const latest = new Map((rows || []).map((row) => [row.task_key, row]));
   // step 2 : each task described
   const managed = await managedVariables();
-  return SYSTEM_TASKS.map((task) => describe(task, latest.get(task.key), managed));
+  return [
+    ...SYSTEM_TASKS.map((task) => describe(task, latest.get(task.key), managed)),
+    ...HUB_LOOPS.map((loop) => describeLoop(loop, latest.get(loop.key))),
+  ];
 };
 
 /**
- * One maintenance task, with its recent runs, the latest first.
+ * One maintenance task (or runner hub loop), with its recent runs, the latest first (a loop's :
+ * its failures).
  *
  * Args:
  *   key (string): the task's key.
@@ -261,12 +326,15 @@ SystemTask.list = async function () {
  */
 SystemTask.get = async function (key) {
   const task = systemTask(key);
-  if (!task) return null;
+  const loop = task ? null : hubLoop(key);
+  if (!task && !loop) return null;
   const rows = await mysql.do(
     'SELECT * FROM AnsibleForms.`system_task_runs` WHERE task_key = ? ORDER BY started_at DESC, id DESC LIMIT ?',
-    [task.key, RECENT_RUNS],
+    [(task || loop).key, RECENT_RUNS],
     true,
   );
+  // a loop's rows are its failures, its Runs tab lists them
+  if (loop) return { ...describeLoop(loop, rows?.[0]), runs: (rows || []).map(runOf) };
   const managed = await managedVariables();
   return { ...describe(task, rows?.[0], managed), runs: (rows || []).map(runOf) };
 };

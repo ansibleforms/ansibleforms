@@ -3193,6 +3193,7 @@ export default {
     system: {
       description: "Les tâches de maintenance que l'app exécute d'elle-même, et leur dernier résultat.",
       timing: "Quand elle s'exécute",
+      everySeconds: 'Toutes les {n} secondes',
       off: 'Désactivée',
       result: 'Résultat',
       setting: 'Paramètre appliqué',
@@ -3200,6 +3201,7 @@ export default {
       settingEnv: "Défini par une variable d'environnement",
       scheduleEnv: "Défini par la variable d'environnement {env}.",
       scheduleDeprecated: 'De {env}, obsolète ; un cron enregistré ici la remplace.',
+      hubLoopHint: "Boucle propre du hub des runners : elle tourne aussi souvent qu'ils en ont besoin.",
       cronFiveFields: 'Utilisez 5 champs : minute, heure, jour, mois et jour de semaine.',
       revert: 'Rétablir',
       tabRuns: 'Exécutions',
@@ -3238,6 +3240,22 @@ export default {
         storedJobsCleanup: {
           name: 'Nettoyage des jobs enregistrés',
           description: 'Supprime les jobs enregistrés expirés ou inutilisés, et les vieux nœuds.',
+        },
+        scheduleResync: {
+          name: 'Resync des planifications',
+          description: 'Enregistre les planifications et pulls de dépôt modifiés sur un nœud.',
+        },
+        runnerDispatch: {
+          name: 'Distribution aux runners',
+          description: 'Remet les jobs en attente et les annulations à leurs runners.',
+        },
+        runnerDial: {
+          name: 'Appel des runners entrants',
+          description: 'Appelle les runners entrants que ce nœud peut tenir.',
+        },
+        runnerPrune: {
+          name: 'Purge des jobs terminés',
+          description: 'Libère ce que ce nœud gardait des jobs terminés ailleurs.',
         },
         configSeedReload: {
           name: 'Rechargement du config seed',

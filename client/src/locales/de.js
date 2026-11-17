@@ -3200,6 +3200,7 @@ export default {
     system: {
       description: 'Die Wartungsaufgaben, die die App selbst ausführt, und ihr letztes Ergebnis.',
       timing: 'Wann sie läuft',
+      everySeconds: 'Alle {n} Sekunden',
       off: 'Aus',
       result: 'Ergebnis',
       setting: 'Angewandte Einstellung',
@@ -3207,6 +3208,7 @@ export default {
       settingEnv: 'Durch eine Umgebungsvariable gesetzt',
       scheduleEnv: 'Durch die Umgebungsvariable {env} festgelegt.',
       scheduleDeprecated: 'Aus der veralteten {env}; ein hier gespeicherter Cron ersetzt sie.',
+      hubLoopHint: 'Die eigene Schleife des Runner-Hubs: Sie läuft so oft, wie die Runner es brauchen.',
       cronFiveFields: '5 Felder angeben: Minute, Stunde, Tag, Monat und Wochentag.',
       revert: 'Zurücksetzen',
       tabRuns: 'Läufe',
@@ -3242,6 +3244,22 @@ export default {
         storedJobsCleanup: {
           name: 'Bereinigung gespeicherter Jobs',
           description: 'Entfernt abgelaufene oder ungenutzte gespeicherte Jobs und alte Knoten.',
+        },
+        scheduleResync: {
+          name: 'Zeitpläne neu abgleichen',
+          description: 'Registriert die auf einem beliebigen Knoten geänderten Zeitpläne und Repository-Pulls.',
+        },
+        runnerDispatch: {
+          name: 'Runner-Zuteilung',
+          description: 'Übergibt wartende Jobs und Abbrüche an ihre Runner.',
+        },
+        runnerDial: {
+          name: 'Inbound-Runner anwählen',
+          description: 'Wählt die Inbound-Runner an, die dieser Knoten halten darf.',
+        },
+        runnerPrune: {
+          name: 'Beendete Jobs freigeben',
+          description: 'Gibt frei, was dieser Knoten von anderswo beendeten Jobs hielt.',
         },
         configSeedReload: {
           name: 'Config-Seed neu laden',

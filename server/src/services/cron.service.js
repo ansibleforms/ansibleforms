@@ -29,9 +29,28 @@ import { endReached } from '../lib/scheduleEnd.js';
 // the maintenance tasks' crons, and the record of their runs (Jobs > System)
 import { taskCron, taskEnabled, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue } from '../lib/systemTasks.js';
 
-// the cron registry is re-read from the database this often even without a change notice
-// (lib/epochs.js), in case one was missed
-const RESYNC_SAFETY_MS = 5 * 60 * 1000;
+// the cron registry is re-read from the database even without a change notice (lib/epochs.js),
+// in case one was missed : the system task scheduleResync (SCHEDULE_RESYNC_CRON)
+
+/**
+ * What a resync did, as the scheduleResync task's result : what it added, updated and removed,
+ * or what it keeps when nothing changed ; the parts that failed first.
+ *
+ * Args:
+ *   done (object): resync's answer ({ added, updated, removed, schedules, repositories, failed }).
+ *
+ * Returns:
+ *   string: the sentence (Added 1, removed 2 ; Loaded 12 schedules and 3 repository pulls).
+ */
+export function resyncResult(done) {
+  const changes = [];
+  if (done.added) changes.push(`added ${done.added}`);
+  if (done.updated) changes.push(`updated ${done.updated}`);
+  if (done.removed) changes.push(`removed ${done.removed}`);
+  const kept = `loaded ${counted(done.schedules, 'schedule')} and ${counted(done.repositories, 'repository pull')}`;
+  const failures = (done.failed || []).map((f) => `failed on ${f}`);
+  return sentence([...failures, ...(changes.length ? changes : [kept])], 'Nothing to sync');
+}
 
 /**
  * A background task's run, tied to the worker lock : before each tick it confirms, on the lock's
@@ -101,7 +120,6 @@ class CronService {
     // (rescheduleSystemTask) with the work it was started with
     this.systemWork = new Map();
     this.lastResync = null;
-    this.safetyTimer = null;
     this.timezone = logConfig.tz;
     logger.info(`Cron service initialized with timezone: ${this.timezone}`);
   }
@@ -446,27 +464,29 @@ class CronService {
 
   /**
    * Initialize all cron jobs from database : the worker's start. From here on the registry
-   * follows the database (resync).
+   * follows the database (resync) : on each change notice, and as a safety net on the system
+   * task scheduleResync (every 5 minutes by default, SCHEDULE_RESYNC_CRON), registered with the
+   * other system tasks (initializeSystemTasks).
    */
   async initializeAll() {
     logger.info('Initializing all cron jobs from database...');
     this.active = true;
     await this.resync();
-    if (!this.safetyTimer) {
-      this.safetyTimer = setInterval(() => {
-        this.resync().catch((err) => logger.error('Cron resync failed:', err));
-      }, RESYNC_SAFETY_MS);
-      this.safetyTimer.unref?.();
-    }
     logger.info('Cron service initialization complete');
   }
 
   /**
    * Make the registry match the database : add what is new, rebuild what changed, drop what
    * is gone. A schedule or repository changed on any app node, or by the seed, gets here.
+   *
+   * Returns:
+   *   Promise<object|null>: what it did, the system task scheduleResync's result ({ added,
+   *     updated, removed, schedules, repositories, failed : the parts that failed }) ; null where
+   *     the cron service is not active.
    */
   async resync() {
-    if (!this.active) return;
+    if (!this.active) return null;
+    const done = { added: 0, updated: 0, removed: 0, schedules: 0, repositories: 0, failed: [] };
     try {
       const repositories = await mysql.do(
         "SELECT name, cron FROM AnsibleForms.`repositories` WHERE cron<>''",
@@ -475,14 +495,23 @@ class CronService {
       );
       const wanted = new Map(repositories.map(r => [r.name, r.cron]));
       for (const name of [...this.jobs.repositories.keys()]) {
-        if (!wanted.has(name)) this.removeRepository(name);
+        if (!wanted.has(name)) {
+          this.removeRepository(name);
+          done.removed++;
+        }
       }
       for (const [name, cron] of wanted) {
-        if (this.signatures.repositories.get(name) !== cron) this.addRepository(name, cron);
+        if (this.signatures.repositories.get(name) !== cron) {
+          if (this.jobs.repositories.has(name)) done.updated++;
+          else done.added++;
+          this.addRepository(name, cron);
+        }
       }
+      done.repositories = this.jobs.repositories.size;
       logger.debug(`Repository cron jobs in sync: ${this.jobs.repositories.size}`);
     } catch (err) {
       logger.error('Failed to sync the repository cron jobs:', err);
+      done.failed.push(`repositories: ${err.message || err}`);
     }
 
     try {
@@ -494,21 +523,29 @@ class CronService {
       );
       const wanted = new Map(schedules.map(r => [r.id, r]));
       for (const id of [...this.jobs.schedules.keys()]) {
-        if (!wanted.has(id)) this.removeSchedule(id);
+        if (!wanted.has(id)) {
+          this.removeSchedule(id);
+          done.removed++;
+        }
       }
       // a rrule schedule is registered once its next run is worked out : awaited, all together
       const registering = [];
       for (const [id, r] of wanted) {
         if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.rrule)) {
+          if (this.jobs.schedules.has(id)) done.updated++;
+          else done.added++;
           registering.push(this.addScheduleRow(r));
         }
       }
       await Promise.all(registering);
+      done.schedules = this.jobs.schedules.size;
       logger.debug(`Schedule cron jobs in sync: ${this.jobs.schedules.size}`);
     } catch (err) {
       logger.error('Failed to sync the schedule cron jobs:', err);
+      done.failed.push(`schedules: ${err.message || err}`);
     }
     this.lastResync = new Date();
+    return done;
   }
 
   /**
@@ -651,6 +688,23 @@ class CronService {
       }
     });
     logger.info(`Initialized the schedule end sweep (${taskCron('scheduleEnds')})`);
+
+    // 1d. The schedule resync - every 5 minutes by default (SCHEDULE_RESYNC_CRON). The registry
+    // follows the database on each change notice ; this is the safety net for a notice that was
+    // missed. Only where the cron service is active (initializeAll) : elsewhere there is no
+    // registry to keep in sync.
+    if (this.active) {
+      register('scheduleResync', async () => {
+        const done = await this.resync();
+        if (!done) return { result: 'The scheduler does not run here' };
+        return {
+          changed: done.added + done.updated + done.removed,
+          failed: done.failed.length > 0,
+          result: resyncResult(done),
+        };
+      });
+      logger.info(`Initialized the schedule resync (${taskCron('scheduleResync')})`);
+    }
 
     // 2. Token cleanup - runs daily at 3:00 AM by default (TOKEN_CLEANUP_CRON)
     register('tokenCleanup', async () => {

@@ -12,7 +12,9 @@
 /*             schedule's Schedule tab, saved with Save and       */
 /*             undone with Revert (read only when the environment */
 /*             sets it) ; a cron still read from a deprecated     */
-/*             variable says so under it                          */
+/*             variable says so under it. A runner hub loop has   */
+/*             no cron : every so many seconds, read only, one    */
+/*             line saying why, and its node on Details           */
 /*    Runs     its recent runs, the latest first                  */
 /*  No Delete, nothing else to edit - the task is the app's own.  */
 /*  The search of the title line narrows every tab at once.       */
@@ -60,6 +62,9 @@ async function load() {
 }
 
 // ─── its schedule ─────────────────────────────────────────────────────────────
+// a runner hub loop (no schedule setting) : its seconds, read only ; what it did is the memory of
+// the node that answered (task.loop), named on Details
+const isLoop = computed(() => !!task.value && !task.value.schedule_env);
 // its cron is a setting (schedule_env), in the editor : changed here, not when the environment
 // sets its variable (or ALLOW_ENV_EDIT=0), the editor then read only, saying so
 const scheduleEditable = computed(() => !!task.value?.schedule_env && !!task.value?.editable_schedule);
@@ -217,10 +222,13 @@ const tabFields = computed(() => ({
       t('settings.schedules.nextRun'),
       task.value?.next_run ? Helpers.formatServerDate(task.value.next_run) : '',
     ],
+    ['node', t('jobs.system.node'), task.value?.loop?.node],
     ['setting', t('jobs.system.setting'), setting.value?.env, setting.value?.value],
   ],
-  // its cron's editor, found by the cron or its words
-  schedule: [['cron', t('jobs.system.timing'), cronEdit.value, timing.value]],
+  // its cron's editor, found by the cron or its words ; a runner hub loop's seconds
+  schedule: isLoop.value
+    ? [['timing', t('jobs.system.timing'), timing.value]]
+    : [['cron', t('jobs.system.timing'), cronEdit.value, timing.value]],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('jobs.system.tabRuns')]],
 }));
@@ -350,6 +358,11 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.schedules.nextRun') }}</div>
                 <span>{{ task.next_run ? Helpers.formatServerDate(task.next_run) : '–' }}</span>
               </div>
+              <!-- a runner hub loop : the node whose memory answered, its last run and outcome -->
+              <div v-if="isLoop" v-show="fieldShown('node')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('jobs.system.node') }}</div>
+                <span>{{ task.loop?.node || '–' }}</span>
+              </div>
               <!-- the setting it applies : its variable and value, then where it is changed, or that
                    the environment sets it ; none, a dash. The tab's last field, no margin under it -->
               <div v-show="fieldShown('setting')" class="mb-0">
@@ -379,7 +392,13 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
                 </h6>
               </template>
-              <div v-show="fieldShown('cron')" class="af-system-cron mb-0">
+              <!-- a runner hub loop : every so many seconds, read only, one line saying why -->
+              <div v-if="isLoop" v-show="fieldShown('timing')" class="mb-0">
+                <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
+                <span>{{ timing || '–' }}</span>
+                <div class="form-text">{{ t('jobs.system.hubLoopHint') }}</div>
+              </div>
+              <div v-else v-show="fieldShown('cron')" class="af-system-cron mb-0">
                 <BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" />
                 <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
                 <div v-else-if="deprecated" class="form-text af-schedule-deprecated">

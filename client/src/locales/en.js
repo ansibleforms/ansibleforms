@@ -3147,6 +3147,7 @@ export default {
     system: {
       description: 'The maintenance tasks the app runs on its own, and how they last went.',
       timing: 'When it runs',
+      everySeconds: 'Every {n} seconds',
       off: 'Off',
       result: 'Result',
       setting: 'Setting it applies',
@@ -3154,6 +3155,7 @@ export default {
       settingEnv: 'Set by an environment variable',
       scheduleEnv: 'Set by the environment variable {env}.',
       scheduleDeprecated: 'From the deprecated {env}; a cron saved here replaces it.',
+      hubLoopHint: "The runner hub's own loop: it runs as often as the runners need it.",
       cronFiveFields: 'Use 5 fields: minute, hour, day, month and weekday.',
       revert: 'Revert',
       tabRuns: 'Runs',
@@ -3186,6 +3188,19 @@ export default {
         storedJobsCleanup: {
           name: 'Stored jobs cleanup',
           description: 'Removes expired or unused stored jobs, and forgets old nodes.',
+        },
+        scheduleResync: {
+          name: 'Schedule resync',
+          description: 'Registers the schedules and repository pulls changed on any node.',
+        },
+        runnerDispatch: {
+          name: 'Runner dispatch',
+          description: 'Hands the waiting jobs and the cancels to their runners.',
+        },
+        runnerDial: { name: 'Runner inbound dial', description: 'Dials the inbound runners this node may hold.' },
+        runnerPrune: {
+          name: 'Runner ended jobs prune',
+          description: 'Lets go what this node kept of jobs that ended elsewhere.',
         },
         configSeedReload: {
           name: 'Config seed reload',
