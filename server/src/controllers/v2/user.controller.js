@@ -276,7 +276,7 @@ const changePassword = async function(req, res) {
           if (req.body.password) await endSessions(req.user.user.username);
           res.json(RestResult.single(null));
         } catch(err) {
-          res.status(500).json(RestResult.error(err.toString()));
+          res.status(err instanceof Errors.BadRequestError ? 400 : 500).json(RestResult.error(err.message || err.toString()));
         }
     }
   }else{
