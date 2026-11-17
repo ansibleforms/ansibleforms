@@ -234,11 +234,13 @@ function describeLoop(loop, lastRow) {
       node: state.node,
     };
   }
-  // its next runs : the seconds after its last run on this node, while the hub runs here (at
-  // least a second from now, a missed tick runs then) ; none where no hub runs
+  // its next runs : the seconds after its last run on this node, or after the hub started when it
+  // has not run yet (a loop of a minute's first tick), while the hub runs here (at least a second
+  // from now, a missed tick runs then) ; none where no hub runs
   const next = [];
-  if (state?.running && state.last_run_at) {
-    const first = Math.max(new Date(state.last_run_at).getTime() + loop.seconds * 1000, Date.now() + 1000);
+  const from = state?.last_run_at || state?.since;
+  if (state?.running && from) {
+    const first = Math.max(new Date(from).getTime() + loop.seconds * 1000, Date.now() + 1000);
     for (let i = 0; i < 3; i++) next.push(new Date(first + i * loop.seconds * 1000).toISOString());
   }
   return {

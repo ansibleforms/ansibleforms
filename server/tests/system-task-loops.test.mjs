@@ -322,6 +322,13 @@ describe("the loops as the API answers them", () => {
     assert.deepEqual([next[1] - next[0], next[2] - next[1]], [10000, 10000]);
   });
 
+  test("not run yet : its first run its seconds after the hub started", async () => {
+    const res = await call("GET", "/api/v2/system/tasks/runnerPrune");
+    assert.equal(res.body.last_run, null);
+    assert.equal(new Date(res.body.next_run).getTime(), new Date(res.body.loop.since).getTime() + 60000);
+    assert.equal(res.body.next_runs.length, 3);
+  });
+
   test("no next run where no hub runs", async () => {
     resetLoopsForTests(false);
     const res = await call("GET", "/api/v2/system/tasks/runnerDial");
