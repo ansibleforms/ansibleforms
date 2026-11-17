@@ -366,7 +366,7 @@ const tabFields = computed(() => {
       edit.value?.timing === 'rrule'
         ? ['rrule', t('settings.schedules.rrule'), t('settings.schedules.rruleHelp'), edit.value?.rrule]
         : edit.value?.timing === 'once'
-          ? ['one_time_run', t('settings.schedules.oneTimeRun'), t('settings.schedules.runAtHelp')]
+          ? ['one_time_run', t('settings.schedules.oneTimeRun')]
           : [
               'cron',
               t('settings.cron.minute'),
@@ -712,7 +712,6 @@ onMounted(async () => {
                   :convertToUtc="true"
                   teleport
                 />
-                <div class="form-text">{{ t('settings.schedules.runAtHelp') }}</div>
               </div>
               <div v-else v-show="fieldShown('cron')" class="af-schedule-cron mb-0">
                 <BsCron
