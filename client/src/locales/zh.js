@@ -1483,7 +1483,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: '重复运行，使用服务器的时区',
       timingRruleHint: '重复运行，使用自身时区的 iCal 规则',
-      timingOnceHint: '在指定日期和时间运行一次，然后删除',
+      timingOnceHint: '在指定日期和时间运行一次',
       ends: '结束',
       endsNever: '从不',
       endsOnDate: '在某日期',

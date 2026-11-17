@@ -1544,7 +1544,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'recorrente, no fuso horário do servidor',
       timingRruleHint: 'recorrente, uma regra iCal no seu próprio fuso horário',
-      timingOnceHint: 'uma vez, numa data e hora, depois removida',
+      timingOnceHint: 'uma vez, numa data e hora',
       ends: 'Termina',
       endsNever: 'Nunca',
       endsOnDate: 'Numa data',

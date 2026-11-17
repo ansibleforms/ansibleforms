@@ -1539,7 +1539,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'ricorrente, nel fuso orario del server',
       timingRruleHint: 'ricorrente, una regola iCal nel proprio fuso orario',
-      timingOnceHint: 'una volta, a una data e ora, poi rimossa',
+      timingOnceHint: 'una volta, a una data e ora',
       ends: 'Termina',
       endsNever: 'Mai',
       endsOnDate: 'In una data',

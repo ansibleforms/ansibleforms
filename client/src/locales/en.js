@@ -1523,7 +1523,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'recurring, in the time zone of the server',
       timingRruleHint: 'recurring, an iCal rule in its own time zone',
-      timingOnceHint: 'once, at a date and time, then removed',
+      timingOnceHint: 'once, at a date and time',
       ends: 'Ends',
       endsNever: 'Never',
       endsOnDate: 'On a date',

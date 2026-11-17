@@ -1539,7 +1539,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'herhalend, in de tijdzone van de server',
       timingRruleHint: 'herhalend, een iCal-regel in zijn eigen tijdzone',
-      timingOnceHint: 'eenmalig, op een datum en tijd, daarna verwijderd',
+      timingOnceHint: 'eenmalig, op een datum en tijd',
       ends: 'Eindigt',
       endsNever: 'Nooit',
       endsOnDate: 'Op een datum',

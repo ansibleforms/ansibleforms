@@ -1549,7 +1549,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'wiederkehrend, in der Zeitzone des Servers',
       timingRruleHint: 'wiederkehrend, eine iCal-Regel in ihrer eigenen Zeitzone',
-      timingOnceHint: 'einmal, zu einem Datum und einer Uhrzeit, danach entfernt',
+      timingOnceHint: 'einmal, zu einem Datum und einer Uhrzeit',
       ends: 'Endet',
       endsNever: 'Nie',
       endsOnDate: 'An einem Datum',

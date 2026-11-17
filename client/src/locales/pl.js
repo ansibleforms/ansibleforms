@@ -1531,7 +1531,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'cykliczne, w strefie czasowej serwera',
       timingRruleHint: 'cykliczne, reguła iCal we własnej strefie czasowej',
-      timingOnceHint: 'raz, o określonej dacie i godzinie, potem usuwane',
+      timingOnceHint: 'raz, o określonej dacie i godzinie',
       ends: 'Koniec',
       endsNever: 'Nigdy',
       endsOnDate: 'W dniu',

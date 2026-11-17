@@ -1525,7 +1525,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: '定期実行、サーバーのタイムゾーン',
       timingRruleHint: '定期実行、独自のタイムゾーンの iCal ルール',
-      timingOnceHint: '指定日時に 1 回実行し、その後削除',
+      timingOnceHint: '指定日時に 1 回実行',
       ends: '終了',
       endsNever: 'なし',
       endsOnDate: '日付で',

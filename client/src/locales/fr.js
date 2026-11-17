@@ -1545,7 +1545,7 @@ export default {
       timingCron: 'Cron',
       timingCronHint: 'récurrent, dans le fuseau horaire du serveur',
       timingRruleHint: 'récurrent, une règle iCal dans son propre fuseau horaire',
-      timingOnceHint: 'une fois, à une date et une heure, puis supprimé',
+      timingOnceHint: 'une fois, à une date et une heure',
       ends: 'Fin',
       endsNever: 'Jamais',
       endsOnDate: 'À une date',
