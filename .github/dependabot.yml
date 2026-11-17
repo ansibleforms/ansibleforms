@@ -1,5 +1,8 @@
 version: 2
 
+# Every pending update gets its pull request at once (open-pull-requests-limit: 100 on each
+# entry, as Dependabot has no unlimited value), instead of five at a time per entry.
+
 # Dependabot proposes every version, majors included, on main : a major carries breaking
 # changes, so its pull request is read against the dependency's changelog before it is merged.
 # The maintenance line (release/6.x, below) takes patch updates only.
@@ -12,6 +15,7 @@ version: 2
 
 updates:
   - package-ecosystem: npm
+    open-pull-requests-limit: 100
     directory: /client
     schedule:
       interval: weekly
@@ -25,6 +29,8 @@ updates:
         patterns: ['vitest', '@vitest/*']
 
   - package-ecosystem: npm
+
+    open-pull-requests-limit: 100
     directory: /server
     schedule:
       interval: weekly
@@ -33,6 +39,8 @@ updates:
       include: scope
 
   - package-ecosystem: github-actions
+
+    open-pull-requests-limit: 100
     directory: /
     schedule:
       interval: weekly
@@ -44,6 +52,7 @@ updates:
   # docker/runner/rte-core takes its python from. rte-core and rte-full otherwise build FROM our
   # own layers (BASE_IMAGE).
   - package-ecosystem: docker
+    open-pull-requests-limit: 100
     directories:
       - /docker/controller
       - /docker/runner/*
@@ -56,6 +65,7 @@ updates:
   # The python packages of the RTE images (docker/runner/rte-core for ansibleforms-rte-core,
   # docker/runner/rte-full for ansibleforms-rte-full) : pinned, so an image changes only with a commit here
   - package-ecosystem: pip
+    open-pull-requests-limit: 100
     directories:
       - /docker/runner/rte-core
       - /docker/runner/rte-full
@@ -73,6 +83,7 @@ updates:
   # no business of a patch release. Dependabot reads this file from main only, so the
   # entries for the other branch live here.
   - package-ecosystem: npm
+    open-pull-requests-limit: 100
     directory: /client
     target-branch: release/6.x
     schedule:
@@ -85,6 +96,8 @@ updates:
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
 
   - package-ecosystem: npm
+
+    open-pull-requests-limit: 100
     directory: /server
     target-branch: release/6.x
     schedule:
@@ -97,6 +110,8 @@ updates:
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
 
   - package-ecosystem: docker
+
+    open-pull-requests-limit: 100
     directory: /
     target-branch: release/6.x
     schedule:
