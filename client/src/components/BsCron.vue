@@ -315,8 +315,8 @@ const DAY_MS = 86400000;
 
 // Returns the next `count` runs as real Dates, and whether the scan was cut short
 // before finding them (in which case an empty result means "unknown", not "never").
-// four : on one line in a dialog
-function getNextRuns(cronStr, count = 4) {
+// three : on one line in a dialog
+function getNextRuns(cronStr, count = 3) {
   if (!cronStr || !cronStr.trim() || expressionError.value) return { runs: [], truncated: false };
   const all = cronStr.trim().split(/\s+/);
   const [minExpr, hrExpr, domExpr, monExpr, dowExpr] = normalizeParts(all);

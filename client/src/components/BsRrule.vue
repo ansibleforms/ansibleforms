@@ -5,7 +5,7 @@
 /*                                                                */
 /*  The iCal rrule a schedule of a schedules repository is timed  */
 /*  by, written on one line (DTSTART;TZID=... RRULE:...)          */
-/*  : a text box, why it would be refused, and its next four runs */
+/*  : a text box, why it would be refused, and its next three runs */
 /*  in its own time zone, as the server works them out            */
 /*  (GET /api/v2/schedule/rrule) - the badges of BsCron.          */
 /*                                                                */

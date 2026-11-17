@@ -208,22 +208,21 @@ export function repositoryPushPill(t, repo, withDate = true) {
  *   string: the pill's HTML, escaped.
  */
 /**
- * A schedule's state as a pill : running (a run in progress) blue, queued (waiting for a
- * worker) amber, idle grey ; none an en dash.
+ * A schedule's last launch as a pill : its outcome as a job's status (success green, failed red),
+ * or Starting... blue while the scheduler is launching it now (its state queued or running, a
+ * second or so) ; never launched an en dash.
  *
  * Args:
  *   t (function): the translation function.
- *   state (string): idle, queued or running.
+ *   schedule (object): the schedule, with status (its last launch) and state (idle, queued, running).
  *
  * Returns:
  *   string: the pill's HTML, escaped.
  */
-export function schedulePill(t, state) {
-  // never run : waiting for its time, idle
-  if (!state) state = 'idle';
-  const known = { running: PILL.blue, queued: PILL.amber, idle: PILL.grey };
-  const label = known[state] ? t(`settings.schedules.state_${state}`) : state;
-  return pill(known[state], label);
+export function schedulePill(t, schedule) {
+  if (schedule?.state === 'queued' || schedule?.state === 'running')
+    return pill(PILL.blue, t('settings.schedules.starting'));
+  return statusPill(t, schedule?.status);
 }
 
 /**
@@ -1652,16 +1651,8 @@ export default function getSettings(t) {
           key: 'status',
           label: t('settings.fields.status'),
           noInput: true,
-          // the last run's outcome as a pill, as a job's status
-          render: (v) => statusPill(t, v),
-        },
-        // none yet (a schedule that never ran) : an en dash rather than an empty cell
-        {
-          key: 'state',
-          label: t('settings.fields.state'),
-          noInput: true,
-          // running blue, queued amber, idle grey
-          render: (v) => schedulePill(t, v),
+          // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
+          render: (v, row) => schedulePill(t, row),
         },
         {
           key: 'extra_vars',

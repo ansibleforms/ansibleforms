@@ -31,7 +31,7 @@ import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
-import { statusPill, schedulePill, timingKind, scheduleTiming } from '@/config/settings';
+import { schedulePill, timingKind, scheduleTiming } from '@/config/settings';
 import { editorStyle } from '@/config/editorStyle';
 import { cronValidationMessage } from '@/config/cron';
 import { rruleValidationMessage, defaultRrule } from '@/config/rrule';
@@ -261,7 +261,7 @@ const tabFields = computed(() => {
   const s = schedule.value || {};
   return {
     details: [
-      ['lastLaunch', t('settings.schedules.lastLaunch'), t('settings.schedules.lastLaunchHelp'), launchError.value],
+      ['lastLaunch', t('settings.schedules.lastLaunch'), launchError.value],
       ...(startedJob.value
         ? [
             [
@@ -272,7 +272,6 @@ const tabFields = computed(() => {
             ],
           ]
         : []),
-      ['state', t('settings.schedules.scheduleState'), t('settings.schedules.scheduleStateHelp')],
       ['lastRun', t('settings.fields.lastRun'), s.last_run ? Helpers.formatServerDate(s.last_run) : ''],
       ['nextRun', t('settings.schedules.nextRun'), s.next_run ? Helpers.formatServerDate(s.next_run) : ''],
       // only a schedule from a repository has a source to find
@@ -528,10 +527,8 @@ onMounted(async () => {
                    its name, description and form, as every record page's Details -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
-                <span v-html="statusPill(t, schedule.status)"></span>
-                <!-- why it started no job -->
-                <div v-if="launchError" class="form-text text-danger">{{ launchError }}</div>
-                <div class="form-text">{{ t('settings.schedules.lastLaunchHelp') }}</div>
+                <!-- the badge only ; why it started no job when hovered -->
+                <span :title="launchError || undefined" v-html="schedulePill(t, schedule)"></span>
               </div>
               <!-- the job it started : opened to see how it ended -->
               <div v-if="startedJob" v-show="fieldShown('startedJob')" class="mb-3">
@@ -542,11 +539,6 @@ onMounted(async () => {
                   }}</router-link
                 >
                 <div class="form-text">{{ t('settings.schedules.startedJobHelp') }}</div>
-              </div>
-              <div v-show="fieldShown('state')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.schedules.scheduleState') }}</div>
-                <span v-html="schedulePill(t, schedule.state)"></span>
-                <div class="form-text">{{ t('settings.schedules.scheduleStateHelp') }}</div>
               </div>
               <div v-show="fieldShown('lastRun')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.fields.lastRun') }}</div>

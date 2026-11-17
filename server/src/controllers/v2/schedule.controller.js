@@ -9,8 +9,8 @@ import i18n from "../../lib/i18n.js";
 import ScheduleRepo from "../../models/scheduleRepo.model.js";
 import { validateRruleAsync, nextRunsAsync, zoneOf } from "../../lib/scheduleRrule.js";
 
-// how many runs a rrule's preview shows : four, on one line in a dialog, as a cron's (BsCron)
-const PREVIEW_RUNS = 4;
+// how many runs a rrule's preview shows : three, on one line in a dialog, as a cron's (BsCron)
+const PREVIEW_RUNS = 3;
 
 const scheduleController = {
   async find(req, res) {
