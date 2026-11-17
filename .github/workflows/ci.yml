@@ -210,7 +210,7 @@ jobs:
 
       # The steps below use the DEFAULT dump and restore commands (MYSQLDUMP_COMMAND and
       # MYSQL_COMMAND unset : mariadb-dump and mariadb with --ssl-verify-server-cert=OFF), so the
-      # default is what gates the upgrade, against MySQL 8.4 too. The runner only has MySQL's
+      # default is what gates the upgrade, against MySQL 9.7 too. The runner only has MySQL's
       # client, and Ubuntu's mariadb-client is an older release than the image's : the binaries
       # are the image's own Debian trixie package (the Dockerfile installs mariadb-client on
       # node:26-trixie-slim), run from a small image through two shims on the PATH.
