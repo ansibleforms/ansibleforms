@@ -180,6 +180,8 @@ function pickSection(pi) {
                 />
               </div>
             </div>
+            <!-- its hosts on a line of their own, under its name -->
+            <div class="w-100 m-0"></div>
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.hosts') }}</label>
               <div class="input-group">
