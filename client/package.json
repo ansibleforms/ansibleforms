@@ -57,7 +57,7 @@
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
     "nodemon": "^3.1.14",
-    "pinia": "^3.0.4",
+    "pinia": "^4.1.0",
     "prettier": "^3.9.10",
     "sass": "^1.107.1",
     "unplugin-auto-import": "^21.1.0",
