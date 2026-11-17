@@ -50,7 +50,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.65.1",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "@vitejs/plugin-vue": "^6.0.10",
+    "@vitejs/plugin-vue": "^6.0.11",
     "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10.14.0",
     "eslint-plugin-vue": "^10.12.1",
