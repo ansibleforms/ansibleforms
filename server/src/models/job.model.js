@@ -361,6 +361,8 @@ var Job = function (job) {
     this.notifications = job.notifications;
     // the stored job it was launched from (lib/storedJobUse.js), only when there is one
     if (job.stored_job_id) this.stored_job_id = job.stored_job_id;
+    // the schedule that started it (Schedule.launch), only when there is one
+    if (job.schedule_id) this.schedule_id = job.schedule_id;
   }
   if (job.step && job.step != "") {
     // allow single step update
@@ -1024,8 +1026,8 @@ Job.assertReadable = async function (user, id) {
 };
 Job.findAll = async function (user, records, filter = {}) {
   logger.info("Finding all jobs");
-  // narrowed to one user's jobs (user and user_type), one runner's (a settings page's Jobs tab)
-  // or one stored job's (its Runs tab) ; within what the caller may see either way
+  // narrowed to one user's jobs (user and user_type), one runner's (a settings page's Jobs tab),
+  // one stored job's or one schedule's (their Runs tab) ; within what the caller may see either way
   const where = [];
   const vars = [];
   if (filter.user) { where.push("user=? AND user_type=?"); vars.push(String(filter.user), String(filter.userType || "local")); }
@@ -1034,6 +1036,12 @@ Job.findAll = async function (user, records, filter = {}) {
   if (filter.storedJob !== undefined && filter.storedJob !== null && filter.storedJob !== "") {
     const storedJob = Number(filter.storedJob);
     if (Number.isInteger(storedJob) && storedJob > 0) { where.push("stored_job_id=?"); vars.push(storedJob); }
+    else where.push("1=0");
+  }
+  // the jobs one schedule started (its page's Runs tab) ; an id that is no number, none
+  if (filter.schedule !== undefined && filter.schedule !== null && filter.schedule !== "") {
+    const schedule = Number(filter.schedule);
+    if (Number.isInteger(schedule) && schedule > 0) { where.push("schedule_id=?"); vars.push(schedule); }
     else where.push("1=0");
   }
   const narrowed = where.length ? where.join(" AND ") : "1=1";
@@ -1456,7 +1464,11 @@ Job.launch = async function ({
   // job it was planned from ; never a schedule's) and a relaunch (the stored job of the job
   // relaunched) : the stored job the values came from, checked below (lib/storedJobUse.js)
   // before the job keeps it and its last use is recorded.
-  storedJobId = null
+  storedJobId = null,
+  // Set ONLY by a schedule's launch (Schedule.launch) : the schedule that starts it, kept by the
+  // job (jobs.schedule_id) for the schedule's Runs tab ; a step of a multistep never names one,
+  // its parent job does
+  scheduleId = null
 }) {
   let creds = credentials; // Alias for backward compatibility internally
 
@@ -1541,6 +1553,8 @@ Job.launch = async function ({
         notifications: JSON.stringify(notifications),
         // the stored job it was launched from, checked above ; none for a launch without one
         stored_job_id: fromStoredJob,
+        // the schedule that started it ; none for a step, nor a launch of another kind
+        schedule_id: isStep ? null : scheduleId,
       })
     );
   } catch (err) {

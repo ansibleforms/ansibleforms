@@ -466,7 +466,19 @@ const crudConfigs = {
       // the stored job a planned run's values came from (Schedule.plan, checked by
       // lib/storedJobUse.js) : its last use is written when the run fires. Set ONLY by
       // Schedule.plan, never by a schedule's create or update (a schedule keeps its own copy)
-      { name: 'stored_job_id' }
+      { name: 'stored_job_id' },
+      // how it ends (lib/scheduleEnd.js, checked by Schedule.create and update) : never, on a
+      // date (end_at) or after a number of runs (end_count), then turned off or removed
+      // (end_action) ; none for a one time run
+      { name: 'ends' },
+      { name: 'end_at', isDatetime: true },
+      { name: 'end_count' },
+      { name: 'end_action' },
+      // the jobs it started (jobs.schedule_id), counted by Schedule.launch alone : a request's is
+      // dropped (lib/scheduleEnd.js checkEnd)
+      { name: 'run_count' },
+      // a one time run removed after its run (the default), else turned off and kept
+      { name: 'remove_after_run', isBoolean: true }
     ],
     allowCache: true,
     cacheTTL: 3600

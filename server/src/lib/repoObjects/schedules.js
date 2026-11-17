@@ -7,9 +7,11 @@
 // form must exist), how a row is stored, which app schedules a repository takes (every one, with
 // its own timing, never converted ; only the "Run later" jobs a user planned stay in the app : they
 // are that user's jobs, not schedules). A one-time entry whose one_time_run is past and that the app no
-// longer waits to run (it ran : the app deleted it, as it deletes every one-time schedule after
-// its run) is not imported, said in the pull output, never brought back. Making a schedule in the
-// app, editing and deleting it go through models/scheduleRepo.model.js.
+// longer waits to run (it ran : the app turned it off after its run) is not imported, said in the
+// pull output, never brought back - unless its entry says remove_after_run: false, then it is
+// kept, turned off. How a schedule ends (ends, end_at, end_count, end_action) is its entry's too
+// (lib/scheduleEnd.js) : an end only ever turns a repository's schedule off, its row is the file's.
+// Making a schedule in the app, editing and deleting it go through models/scheduleRepo.model.js.
 import YAML from "yaml";
 import logger from "../logger.js";
 import mysql from "../../models/db.model.js";
@@ -17,6 +19,7 @@ import Form from "../../models/form.model.js";
 import { KEY_ORDER, parseSchedule, newScheduleEntry, extraDataOf, promptsOf, timingOf } from "../scheduleFiles.js";
 import { isoMoment, dbMoment } from "../oneTimeRun.js";
 import { linkStore, classifyRow, nameKey } from "./engine.js";
+import { endColumns, endOfRow, endReached } from "../scheduleEnd.js";
 
 // the schedule table
 const TABLE = "AnsibleForms.`schedule`";
@@ -124,7 +127,11 @@ export function timingOfRow(row) {
 
 /**
  * A schedule of an entry as the schedule table keeps it : its launch options the entry's, and those
- * of its row no prompt of a file can give, kept in the app only (promptsOf).
+ * of its row no prompt of a file can give, kept in the app only (promptsOf) ; its end the entry's.
+ * It is kept off, whatever its entry's enabled says, once at its end (its end date passed, or its
+ * runs done : the jobs its row started) and once a
+ * one-time run the app no longer waits to run (it ran) : a pull never turns back on what its end
+ * turned off.
  *
  * Args:
  *   s (object): the schedule, as lib/scheduleFiles.js reads it.
@@ -132,19 +139,25 @@ export function timingOfRow(row) {
  *
  * Returns:
  *   object: { name, description, form, rrule, cron, one_time_run, enabled, extra_vars,
- *     launch_options }.
+ *     launch_options, ends, end_at, end_count, end_action, remove_after_run }.
  */
 export function valuesOf(s, row = null) {
+  const timing = timingColumns(s);
+  const end = endColumns(s);
+  // the jobs its row started : what its end after a number of runs counts
+  const ended = !!endReached({ ...timing, ...end, run_count: Number(row?.run_count || 0) }) || (!!s.oneTimeRun && s.pending === false);
   return {
     name: s.name,
     description: s.description,
     form: s.form,
-    ...timingColumns(s),
-    enabled: s.enabled ? 1 : 0,
+    ...timing,
+    enabled: s.enabled && !ended ? 1 : 0,
     extra_vars: extraVarsText(s.extraData),
     launch_options: launchOptionsText({ ...s.launchOptions, ...promptsOf(row?.launch_options).kept }),
+    ...end,
   };
 }
+
 
 // ===========================================================================
 // THE DESCRIPTOR
@@ -208,14 +221,16 @@ const schedules = {
   },
 
   // a one-time run already done (its one_time_run past, the app no longer waiting to run it) : not
-  // imported, its entry left in git as it is ; the app's schedule of it, if any, goes
-  notImported: (s) => (s.oneTimeRun && Date.parse(s.oneTimeRun) <= Date.now() && !s.pending ? "its one_time_run is past (already run)" : null),
+  // imported, its entry left in git as it is ; the app's schedule of it, if any, goes. One whose
+  // entry says remove_after_run: false is kept, turned off (valuesOf)
+  notImported: (s) =>
+    s.oneTimeRun && Date.parse(s.oneTimeRun) <= Date.now() && !s.pending && s.removeAfterRun !== false ? "its one_time_run is past (already run)" : null,
 
   store: {
     ...links,
     rows: () =>
       mysql.do(
-        "SELECT id, name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, owner, last_run FROM AnsibleForms.`schedule`",
+        "SELECT id, name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, owner, last_run, ends, end_at, end_count, end_action, run_count, remove_after_run FROM AnsibleForms.`schedule`",
       ),
     names: async () => ((await mysql.do("SELECT name FROM AnsibleForms.`schedule`")) || []).map((r) => r.name),
     // the app's schedules (no repository, not a job a user planned) can be taken over
@@ -223,29 +238,37 @@ const schedules = {
     changed: (row, s) => {
       const values = valuesOf(s, row);
       // a moment as the table gives it (a Date, or its text) compared in UTC to the second
-      const now = { ...row, one_time_run: dbMoment(row.one_time_run) };
+      // its end as the table gives it, a column it does not have yet as its default
+      const now = {
+        ...row,
+        one_time_run: dbMoment(row.one_time_run),
+        ends: row.ends ?? "never",
+        end_at: dbMoment(row.end_at),
+        end_action: row.end_action ?? "disable",
+        remove_after_run: row.remove_after_run ?? 1,
+      };
       return Object.keys(values).some((k) => String(now[k] ?? "") !== String(values[k] ?? ""));
     },
     insert: (s, name, file) => {
       const v = valuesOf(s);
       return mysql.do(
-        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,'idle')",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file],
+        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, ends, end_at, end_count, end_action, remove_after_run, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'idle')",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, name, file],
       );
     },
     update: (row, s) => {
       const v = valuesOf(s, row);
       return mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, row.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, ends=?, end_at=?, end_count=?, end_action=?, remove_after_run=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, row.id],
       );
     },
     // git's version replaces the app's definition ; its runs, state and history stay
     adopt: (row, s, name, file) => {
       const v = valuesOf(s, row);
       return mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file, row.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, ends=?, end_at=?, end_count=?, end_action=?, remove_after_run=?, repository=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, name, file, row.id],
       );
     },
     // its past jobs stay
@@ -254,7 +277,7 @@ const schedules = {
     // planned (owner : that user's job, run as them, never a schedule of a repository)
     appRows: () =>
       mysql.do(
-        "SELECT id, name, description, form, cron, rrule, one_time_run, enabled, extra_vars, launch_options FROM AnsibleForms.`schedule` WHERE repository IS NULL AND owner IS NULL ORDER BY name",
+        "SELECT id, name, description, form, cron, rrule, one_time_run, enabled, extra_vars, launch_options, ends, end_at, end_count, end_action, run_count, remove_after_run FROM AnsibleForms.`schedule` WHERE repository IS NULL AND owner IS NULL ORDER BY name",
       ),
   },
 
@@ -306,6 +329,8 @@ const schedules = {
       form: row.form || "",
       extraData: extraDataOf(row.extra_vars || ""),
       launchOptions: row.launch_options || "",
+      // how it ends, as the app had it
+      ...endOfRow(row),
     }),
 
   /**
@@ -324,8 +349,8 @@ const schedules = {
   linkCandidate: (c, name, file) => {
     const v = valuesOf(parseSchedule(structuredClone(schedules.entryOf(c))).schedule, c.row);
     return mysql.do(
-      "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repository=?, repo_file=? WHERE id=?",
-      [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, name, file, c.row.id],
+      "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, ends=?, end_at=?, end_count=?, end_action=?, remove_after_run=?, repository=?, repo_file=? WHERE id=?",
+      [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, name, file, c.row.id],
     );
   },
 

@@ -14,6 +14,7 @@ import { cronError } from "./cronValidate.js";
 import { parseMoment, isoMoment } from "./oneTimeRun.js";
 import { setKey as setMapKey, same, editListEntry } from "./repoObjects/yamlFile.js";
 import { fileKeyOf } from "./repoObjects/types.js";
+import { endOfEntry, endEntryKeys } from "./scheduleEnd.js";
 
 // ===========================================================================
 // CONSTANTS
@@ -23,8 +24,8 @@ import { fileKeyOf } from "./repoObjects/types.js";
 export const SCHEDULES_KEY = fileKeyOf("schedules");
 
 // the keys of a schedule in their order (its own fields, its prompts, then the form it runs,
-// enabled and its timing - rrule, cron or one_time_run - then related) : a new entry is written
-// in it, a key added to an entry goes to its place in it
+// enabled and its timing - rrule, cron or one_time_run - then how it ends, then related) : a new
+// entry is written in it, a key added to an entry goes to its place in it
 export const KEY_ORDER = [
   "name",
   "description",
@@ -48,8 +49,21 @@ export const KEY_ORDER = [
   "rrule",
   "cron",
   "one_time_run",
+  "ends",
+  "end_at",
+  "end_count",
+  "end_action",
+  "remove_after_run",
   "related",
 ];
+
+// the keys of an entry that say how it ends (lib/scheduleEnd.js) : ends with end_at or end_count
+// and end_action for a schedule timed by a cron or a rrule, remove_after_run for a one-time run
+export const END_KEYS = ["ends", "end_at", "end_count", "end_action", "remove_after_run"];
+
+// the fields of the edits written (updateScheduleEntry) and of a new entry (newScheduleEntry)
+// that hold its end
+const END_EDITS = ["ends", "endAt", "endCount", "endAction", "removeAfterRun"];
 
 // the prompts AnsibleForms has none for : checked, kept in the file, not used
 export const UNMAPPED_KEYS = ["forks", "timeout", "job_slice_count", "labels"];
@@ -377,7 +391,8 @@ export function timingOf(obj) {
 /**
  * Reads a schedule entry : what AnsibleForms runs, and why it is refused when it is not a valid
  * schedule - no name, a name longer than the schedule table keeps, no timing (rrule, cron or
- * one_time_run), more than one or a refused one, no
+ * one_time_run), more than one or a refused one, an end that is not one (lib/scheduleEnd.js
+ * endOfEntry : ends with its end_at or end_count, end_action, remove_after_run), no
  * form (the name of the form it runs), extra_data that are no dictionary, a prompt of the wrong type. Whether
  * its form exists is the caller's to check (it knows the forms). An entry with `state: absent`
  * (the module's) holds no schedule.
@@ -388,7 +403,8 @@ export function timingOf(obj) {
  * Returns:
  *   object: { errors (string[]), absent (boolean), schedule: { name, description, rrule, cron,
  *     oneTimeRun (its timing : one of them, the others null), enabled, form, extraData, launchOptions,
- *     ignored }, name (the name a refused one declares,
+ *     ignored, ends, endAt, endCount, endAction, removeAfterRun (its end) }, name (the name a
+ *     refused one declares,
  *     null when it gives none) } ; schedule is null when refused.
  */
 export function parseSchedule(obj) {
@@ -402,6 +418,9 @@ export function parseSchedule(obj) {
   // its timing : exactly one of rrule, cron and one_time_run, valid
   const { errors: timingErrors, timing } = timingOf(obj);
   errors.push(...timingErrors);
+  // how it ends : a one-time run's only whether it is removed after its run
+  const { errors: endErrors, end } = endOfEntry(obj, !!timing?.oneTimeRun);
+  errors.push(...endErrors);
   // form : the name of the form it runs
   let form = "";
   if (obj.form !== undefined && obj.form !== null && typeof obj.form === "object") errors.push("form must be the name of a form");
@@ -428,7 +447,7 @@ export function parseSchedule(obj) {
   errors.push(...promptErrors);
   // refused, its name still said : no other schedule is written beside it under that name
   if (errors.length) return { errors, absent: false, schedule: null, name: name || null };
-  return { errors: [], absent: false, schedule: { name, description, ...timing, enabled, form, extraData, launchOptions: options, ignored } };
+  return { errors: [], absent: false, schedule: { name, description, ...timing, enabled, form, extraData, launchOptions: options, ignored, ...end } };
 }
 
 // ===========================================================================
@@ -460,7 +479,8 @@ function setKey(doc, map, key, value) {
  *   edits (object): any of { name, description, rrule / cron / oneTimeRun (its timing : the one given
  *     written, the other two keys removed from the entry), enabled, form, extraData,
  *     launchOptions (the launch options : only the prompts whose value changes rewritten, those
- *     no longer given removed) }.
+ *     no longer given removed), ends, endAt, endCount, endAction, removeAfterRun (its end : the
+ *     keys that say it written, the others removed - also when its timing changes kind) }.
  */
 export function updateScheduleEntry(doc, node, edits) {
   const current = node.toJS(doc) || {};
@@ -484,6 +504,27 @@ export function updateScheduleEntry(doc, node, edits) {
     const value = timing.key === "one_time_run" ? isoMoment(edits.oneTimeRun) : edits[timing.field];
     if (timingText(timing.key, value) !== timingText(timing.key, current[timing.key])) setKey(doc, node, timing.key, value);
     for (const other of TIMINGS) if (other !== timing && node.has(other.key)) node.delete(other.key);
+  }
+  // its end : the entry's, changed by the edit, written with as few keys as say it (endEntryKeys)
+  // - for its timing after the edit (a one-time run keeps only remove_after_run)
+  if (timing || END_EDITS.some((k) => edits[k] !== undefined)) {
+    const once = timing ? timing.key === "one_time_run" : !!current.one_time_run;
+    const { end: before } = endOfEntry(current, once);
+    const next = { ...before };
+    for (const k of END_EDITS) if (edits[k] !== undefined) next[k] = edits[k];
+    const keys = endEntryKeys(next, once);
+    const text = (k, v) => (k === "end_at" ? isoMoment(v) || "" : v === undefined || v === null ? "" : String(v));
+    // a key the entry writes out that says its default (remove_after_run: true on a one-time run,
+    // ends: never, end_action: disable while it ends) : left as the file has it
+    const saysDefault = (key) =>
+      (key === "remove_after_run" && once && boolOf(current.remove_after_run) === true) ||
+      (key === "ends" && next.ends === "never" && String(current.ends).trim() === "never") ||
+      (key === "end_action" && next.ends !== "never" && next.endAction === "disable" && String(current.end_action).trim() === "disable");
+    for (const key of END_KEYS) {
+      if (keys[key] === undefined) {
+        if (node.has(key) && !saysDefault(key)) node.delete(key);
+      } else if (!node.has(key) || text(key, keys[key]) !== text(key, current[key])) setKey(doc, node, key, keys[key]);
+    }
   }
   // the prompts : compared as the file gives them now, read and written back the same way
   if (edits.launchOptions !== undefined) {
@@ -546,12 +587,13 @@ export function scheduleEntryOf(text, name) {
  * Args:
  *   values (object): { name, description, rrule / cron / oneTimeRun (its timing : the one given is
  *     written), enabled, form, extraData, launchOptions (the launch options, written as the
- *     prompts that give them : promptsOf) }.
+ *     prompts that give them : promptsOf), ends, endAt, endCount, endAction, removeAfterRun (its
+ *     end, written with as few keys as say it : none when it never ends) }.
  *
  * Returns:
  *   object: the entry, its keys in their order.
  */
-export function newScheduleEntry({ name, description = "", rrule, cron, oneTimeRun, enabled = true, form, extraData = {}, launchOptions = {} }) {
+export function newScheduleEntry({ name, description = "", rrule, cron, oneTimeRun, enabled = true, form, extraData = {}, launchOptions = {}, ends, endAt, endCount, endAction, removeAfterRun }) {
   const obj = {
     name,
     description: description || "",
@@ -560,6 +602,7 @@ export function newScheduleEntry({ name, description = "", rrule, cron, oneTimeR
     form,
     enabled: enabled !== false,
     ...(oneTimeRun ? { one_time_run: isoMoment(oneTimeRun) } : cron && String(cron).trim() ? { cron: String(cron).trim() } : { rrule: normalizeRrule(rrule) }),
+    ...endEntryKeys({ ends, endAt, endCount, endAction, removeAfterRun }, !!oneTimeRun),
   };
   const rank = (k) => (KEY_ORDER.includes(k) ? KEY_ORDER.indexOf(k) : KEY_ORDER.length);
   return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => rank(a) - rank(b)));

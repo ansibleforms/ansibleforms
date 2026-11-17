@@ -16,6 +16,8 @@ import Errors from '../lib/errors.js';
 import ScheduleRepo from './scheduleRepo.model.js';
 import { nextRun as rruleNextRun, nextRunAsync as rruleNextRunAsync, validateRruleAsync, normalizeRrule } from '../lib/scheduleRrule.js';
 import { oneTimeRunOf, tableMoment } from '../lib/oneTimeRun.js';
+// how a schedule ends : never, on a date or after a number of runs, then turned off or removed
+import { checkEnd, endReached, runsBeforeEnd, endActionOf, onceActionOf } from '../lib/scheduleEnd.js';
 
 // where a schedule comes from and what its file says : the schedules repository's to write
 // (models/scheduleRepo.model.js), never a request body's
@@ -40,6 +42,8 @@ function withNextRun(row, rruleNext = undefined) {
   let next = null;
   // turned off : it does not run next
   if (row.enabled !== undefined && row.enabled !== null && !Number(row.enabled)) return { ...row, next_run: null };
+  // at its end (its date passed, or its runs done) : it does not run again
+  if (endReached(row)) return { ...row, next_run: null };
   try {
     if (row.one_time_run) {
       // its one run, while it is ahead
@@ -54,6 +58,8 @@ function withNextRun(row, rruleNext = undefined) {
   } catch {
     next = null;
   }
+  // a run after its end (its end_at, or its runs left none) is no next run
+  if (next && !row.one_time_run && !runsBeforeEnd([next], row).length) next = null;
   return { ...row, next_run: next ? next.toISOString() : null };
 }
 
@@ -214,6 +220,9 @@ class Schedule extends CrudModel {
     if (active) return ScheduleRepo.create(active, data);
     // kept in the app : a cron, a rrule (checked) or a one time run
     await checkAppTiming(data);
+    // how it ends (checked) : never, on a date or after a number of runs ; a one time run has
+    // no end, only whether it is removed after its run
+    checkEnd(data, null, !!data.one_time_run);
     // `owner` is written by plan() alone. A request body that carries one is somebody
     // choosing which user a schedule runs as - drop it, like the internal fields below.
     delete data.owner
@@ -341,6 +350,8 @@ class Schedule extends CrudModel {
       owner: JSON.stringify(owner),
       // the stored job it was planned from, checked above ; none without one
       stored_job_id: storedJobId,
+      // the user's job : removed after its run, always (lib/scheduleEnd.js onceActionOf)
+      remove_after_run: 1,
       // it waits for its time : idle
       state: 'idle',
     });
@@ -359,6 +370,8 @@ class Schedule extends CrudModel {
     delete data.raw_form_data
     // nor the stored job it was planned from : set by plan() alone (a schedule never has one)
     delete data.stored_job_id
+    // nor the jobs it started : counted by launch() alone
+    delete data.run_count
     logger.info(`Updating schedule ${(data.name) ? data.name : id}`);
     // where it comes from is never changed by an edit
     for (const key of REPOSITORY_FIELDS) delete data[key];
@@ -372,6 +385,9 @@ class Schedule extends CrudModel {
     }
     // an app's : timed by a cron, a rrule or once (checked), exactly one
     await checkAppTiming(data, current);
+    // how it ends (checked, merged with the end it had) : none for a one time run
+    const once = data.one_time_run !== undefined ? !!data.one_time_run : !!current?.one_time_run;
+    checkEnd(data, current, once);
     return super.update(this.modelName, data, id);
   }
   static async delete(id) {
@@ -437,6 +453,8 @@ class Schedule extends CrudModel {
   static async launch(id) {
     let status = "success";
     let output;
+    // whether it started a job : run_count counts those
+    let started = false;
     const schedule = await super.findById(this.modelName, id);
     const currentDate = new Date()
 
@@ -545,7 +563,9 @@ class Schedule extends CrudModel {
       // that the run fires. A schedule names none, even one made from a stored job : it keeps
       // its own copy of the values, so its runs are no uses of that stored job.
       const storedJobId = planned ? (schedule.stored_job_id ?? null) : null;
-      const launched = await Job.launch({ form, user, extravars, rawFormData, fromClient: planned, serverExtravars: { schedule: scheduleInfo }, storedJobId });
+      // the job keeps the schedule that started it (jobs.schedule_id) : its Runs tab lists those
+      // jobs, and run_count counts them
+      const launched = await Job.launch({ form, user, extravars, rawFormData, fromClient: planned, serverExtravars: { schedule: scheduleInfo }, storedJobId, scheduleId: schedule.id });
       if (launched?.id) {
         output = `The schedule started job ${launched.id}.\nThis says the job was launched, not that it succeeded - open that job to see how it ended.`;
       } else {
@@ -555,6 +575,8 @@ class Schedule extends CrudModel {
       // no request launched it, so the audit middleware never sees it : written here, as the
       // user it ran as (a planned job's owner, or the schedule service), naming the job
       await auditScheduledLaunch(schedule, form, user, planned, launched?.id ? 'success' : 'failure', launched?.id, launched?.id ? undefined : 'no job was created');
+      // a job started : counted, toward the end after a number of runs (lib/scheduleEnd.js)
+      if (launched?.id) started = true;
     } catch (err) {
       logger.error("Errors in schedule launch: ", err);
       output = "Failed to launch: " + err.message;
@@ -567,45 +589,160 @@ class Schedule extends CrudModel {
     // moment passed and still enabled, it is exactly what the cron's every-minute check queues,
     // so a delete that failed after the idle write launched it again, every minute, for ever.
     if(schedule.one_time_run){
-      await this.endOneTime(schedule, { output, status, last_run: currentDate });
+      await this.endOneTime(schedule, { output, status, last_run: currentDate, started });
       return;
     }
     await super.update(this.modelName, { output, status, state: 'idle', last_run: currentDate }, id);
+    if (started) {
+      // counted in the row itself, never from the copy read before the launch : a run now and
+      // the scheduler's own may both count
+      await mysql.do("UPDATE AnsibleForms.`schedule` SET run_count = COALESCE(run_count,0) + 1 WHERE id=?", [id], true);
+      // that run its last one (its end_count reached) : it ends now, rather than at its next time
+      const counted = (await mysql.do("SELECT * FROM AnsibleForms.`schedule` WHERE id=?", [id], true))?.[0];
+      const reason = endReached(counted);
+      if (reason) await this.endSchedule(counted, reason);
+    }
   }
 
   /**
-   * Ends a one-time schedule after its run : deleted, and dropped from the cron registry. When
-   * the delete fails (a seeded schedule is read only, the database refused it), it is left
-   * turned off instead (enabled 0 : the cron skips it, Run now still runs it) with its outcome,
-   * in one statement - never idle and enabled, which would launch it again.
+   * Ends a schedule timed by a cron or a rrule that reached its end (lib/scheduleEnd.js
+   * endReached) : turned off (enabled 0) or removed, as its end_action says, and dropped from the
+   * cron or rrule registry either way. Written to the log and the audit, as the Schedule Service.
+   *
+   * A schedule from a schedules repository is managed by its file : it is only ever turned off
+   * here, its row never removed, even when its end_action says remove - removing the row would
+   * have the next pull bring it back from its entry, and only a change of its file removes it.
+   * Its next pull keeps it off while its end is reached (lib/repoObjects/schedules.js valuesOf).
    *
    * Args:
-   *   schedule (object): the schedule row ({ id, name }).
-   *   outcome (object): { output, status, last_run } of this run.
+   *   schedule (object): the schedule row ({ id, name, end_action, repository, ... }).
+   *   reason (string): what ended it : 'date' or 'count'.
+   *
+   * Returns:
+   *   Promise<string|null>: 'disable' or 'remove', what was done ; null when it failed (logged).
+   */
+  static async endSchedule(schedule, reason) {
+    const id = schedule.id;
+    const action = endActionOf(schedule);
+    const why = reason === 'count' ? `its ${schedule.end_count} run(s) are done` : `its end date passed`;
+    let done = null;
+    try {
+      if (action === 'remove') {
+        logger.info(`Removing schedule '${schedule.name}' (ID: ${id}): ${why}`);
+        try {
+          await super.delete(this.modelName, id);
+          done = 'remove';
+        } catch (err) {
+          // a seeded schedule is read only, the database refused it : turned off instead
+          logger.error(`Could not remove schedule '${schedule.name}', turning it off instead: ${err.message || err}`);
+        }
+      }
+      if (!done) {
+        logger.info(`Turning off schedule '${schedule.name}' (ID: ${id}): ${why}`);
+        // straight to the row : the scheduler's own state, not an edit of its configuration (the
+        // crud update refuses a seeded schedule, and a repository's is written to its file)
+        await mysql.do("UPDATE AnsibleForms.`schedule` SET enabled=0 WHERE id=?", [id], true);
+        CrudModel.changed(this.modelName);
+        done = 'disable';
+      }
+    } catch (err) {
+      logger.error(`Could not end schedule '${schedule.name}' (ID: ${id}): ${err.message || err}`);
+    }
+    // no longer fired, either way
+    cronService.removeSchedule(id);
+    await Audit.log({
+      user: { username: 'Schedule Service', type: 'schedule' },
+      action: 'schedule.end',
+      targetType: 'schedule',
+      target: schedule.name,
+      outcome: done ? 'success' : 'failure',
+      detail: { scheduleId: id, reason, action: done || action, ...(schedule.repository ? { repository: schedule.repository } : {}) },
+    });
+    return done;
+  }
+
+  /**
+   * Ends the schedules timed by a cron or a rrule whose end is reached and that are still on :
+   * their end date passed meanwhile (between two of their runs), or their runs done (a pull put
+   * one back on). The scheduler's sweep, every minute (services/cron.service.js).
+   *
+   * Returns:
+   *   Promise<number>: how many were ended.
+   */
+  static async endReachedSchedules() {
+    const rows = await mysql.do(
+      "SELECT * FROM AnsibleForms.`schedule` WHERE COALESCE(enabled,1)=1 AND one_time_run IS NULL AND " +
+        "((ends='date' AND end_at IS NOT NULL AND end_at <= ?) OR (ends='count' AND end_count IS NOT NULL AND COALESCE(run_count,0) >= end_count))",
+      [new Date()], true);
+    let ended = 0;
+    for (const row of rows || []) {
+      const reason = endReached(row);
+      if (!reason) continue;
+      if (await this.endSchedule(row, reason)) ended++;
+    }
+    return ended;
+  }
+
+  /**
+   * Ends a one-time schedule after its run, dropped from the cron registry either way : deleted
+   * when its remove_after_run says so (the default ; always a job a user planned), else turned off
+   * (enabled 0 : the cron skips it, Run now still runs it) and kept with its outcome. A schedule
+   * from a schedules repository is managed by its file : only ever turned off, never deleted here
+   * (its next pull drops it when its entry says remove_after_run, lib/scheduleEnd.js
+   * onceActionOf). When the delete fails (a seeded schedule is read only, the database refused
+   * it), it is turned off instead, with its outcome, in one statement - never idle and enabled,
+   * which would launch it again.
+   *
+   * Args:
+   *   schedule (object): the schedule row ({ id, name, remove_after_run, owner, repository }).
+   *   outcome (object): { output, status, last_run, started (whether it started a job) } of this
+   *     run.
    *
    * Returns:
    *   Promise<void>: once it is deleted or turned off (a failure of both is logged).
    */
   static async endOneTime(schedule, outcome) {
     const id = schedule.id;
-    logger.info(`Deleting one-time schedule '${schedule.name}' after execution`);
-    try {
-      await super.delete(this.modelName, id);
-    } catch (err) {
-      logger.error(`Could not delete one-time schedule '${schedule.name}', turning it off instead: ${err.message || err}`);
+    const action = onceActionOf(schedule);
+    let done = null;
+    if (action === 'remove') {
+      logger.info(`Deleting one-time schedule '${schedule.name}' after execution`);
+      try {
+        await super.delete(this.modelName, id);
+        done = 'remove';
+      } catch (err) {
+        logger.error(`Could not delete one-time schedule '${schedule.name}', turning it off instead: ${err.message || err}`);
+      }
+    } else {
+      logger.info(`Turning off one-time schedule '${schedule.name}' after execution, kept with its outcome`);
+    }
+    if (!done) {
       try {
         // straight to the row : the crud update refuses a seeded schedule, and this is the
         // scheduler's own state, not an edit of its configuration
         await mysql.do(
-          "UPDATE AnsibleForms.`schedule` SET output=?, status=?, last_run=?, state='idle', enabled=0, claim_node=NULL WHERE id=?",
-          [outcome.output, outcome.status, outcome.last_run, id], true);
+          "UPDATE AnsibleForms.`schedule` SET output=?, status=?, last_run=?, state='idle', enabled=0, claim_node=NULL, run_count=COALESCE(run_count,0)+? WHERE id=?",
+          [outcome.output, outcome.status, outcome.last_run, outcome.started ? 1 : 0, id], true);
         CrudModel.changed(this.modelName);
+        done = 'disable';
       } catch (e) {
         logger.error(`Could not turn off one-time schedule '${schedule.name}' either: ${e.message || e}`);
       }
     }
     // Remove from cron service to stop checking
     cronService.removeSchedule(id);
+    // a schedule's own end in the audit, as the other ends (endSchedule) ; a job a user planned
+    // is that user's job, its launch entry says enough
+    if (!schedule.owner) {
+      await Audit.log({
+        user: { username: 'Schedule Service', type: 'schedule' },
+        action: 'schedule.end',
+        targetType: 'schedule',
+        target: schedule.name,
+        outcome: done ? 'success' : 'failure',
+        detail: { scheduleId: id, reason: 'once', action: done || action, ...(schedule.repository ? { repository: schedule.repository } : {}) },
+      });
+    }
   }
 }
 

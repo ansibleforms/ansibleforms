@@ -694,8 +694,11 @@ const SCHEMA_MANIFEST = {
                                'stored_jobs.last_used_at',
                                'schedule.stored_job_id',
                                'jobs.stored_job_id',
-                               'stored_jobs.unused_days'],
-                     indexes: ['jobs.idx_jobs_stored_job'] },
+                               'stored_jobs.unused_days',
+                               'schedule.ends', 'schedule.end_at', 'schedule.end_count', 'schedule.end_action',
+                               'schedule.run_count', 'schedule.remove_after_run',
+                               'jobs.schedule_id'],
+                     indexes: ['jobs.idx_jobs_stored_job', 'jobs.idx_jobs_schedule'] },
   },
 };
 
@@ -1241,6 +1244,19 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("runners", "rte_cache_mb", "int(11)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("runners", "rte_files", "varchar(10)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("runners", "rte_drain_seconds", "int(11)", true, "NULL"), messages, success, failed);
+  // how a schedule ends (lib/scheduleEnd.js) : never (every schedule from before), on a date or
+  // after a number of runs, then turned off (the default) or removed ; the jobs it started are
+  // counted. A one-time run is removed after its run, as before, unless remove_after_run says not
+  await checkPromise(addColumn("schedule", "ends", "varchar(10)", false, "'never'"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "end_at", "datetime", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "end_count", "int(11)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "end_action", "varchar(10)", false, "'disable'"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "run_count", "int(11)", false, "0"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "remove_after_run", "tinyint(4)", false, "1"), messages, success, failed);
+  // the schedule a job was started by (Schedule.launch) : NULL when none, also for the jobs from
+  // before ; a schedule's Runs tab selects its jobs on it, run_count counts the same jobs
+  await checkPromise(addColumn("jobs", "schedule_id", "int(11)", true, "NULL"), messages, success, failed);
+  await checkPromise(addIndex("jobs", "idx_jobs_schedule", ["schedule_id"]), messages, success, failed);
   const leases = fs.readFileSync(`${__dirname}/../db/create_runner_leases_table.sql`);
   await checkPromise(addTable("runner_leases", leases.toString()), messages, success, failed);
   const joinTokens = fs.readFileSync(`${__dirname}/../db/create_runner_join_tokens_table.sql`);

@@ -41,7 +41,7 @@ let queued;
 let schedules;
 vi.mock("../src/models/db.model.js", () => {
   const run = async (sql) => {
-    if (/^SELECT id FROM AnsibleForms.`schedule` WHERE id=\? AND COALESCE\(enabled,1\)=1/.test(sql)) {
+    if (/^SELECT id\b[^]*? FROM AnsibleForms.`schedule` WHERE id=\? AND COALESCE\(enabled,1\)=1/.test(sql)) {
       return row.enabled && !["queued", "running"].includes(row.state) ? [{ id: row.id }] : [];
     }
     if (/^UPDATE AnsibleForms.`schedule` SET state='queued'/.test(sql)) {

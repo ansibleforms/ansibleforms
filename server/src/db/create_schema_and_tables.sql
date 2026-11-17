@@ -414,6 +414,9 @@ CREATE TABLE `jobs` (
   -- the stored job it was launched from (lib/storedJobUse.js) ; NULL when none. No foreign key :
   -- a stored job deleted later leaves its id, and the job page then names none
   `stored_job_id` int(11) DEFAULT NULL,
+  -- the schedule that started it (models/schedule.model.js launch) ; NULL when none. No foreign
+  -- key : a schedule removed later leaves its id
+  `schedule_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   -- the retention sweep selects on (parent_id, status, end) ; without this it full
   -- scans the largest table in the schema on every batch. Keep in sync with the
@@ -421,7 +424,10 @@ CREATE TABLE `jobs` (
   KEY `idx_jobs_retention` (`parent_id`, `status`, `end`),
   -- a stored job's Runs tab selects its jobs on it (Job.findAll) ; the same patch adds it to an
   -- existing install
-  KEY `idx_jobs_stored_job` (`stored_job_id`)
+  KEY `idx_jobs_stored_job` (`stored_job_id`),
+  -- a schedule's Runs tab selects its jobs on it (Job.findAll) ; the same patch adds it to an
+  -- existing install
+  KEY `idx_jobs_schedule` (`schedule_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8;
 CREATE TABLE `job_output` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -616,6 +622,16 @@ CREATE TABLE `schedule` (
   -- the stored job a planned job's values came from (lib/storedJobUse.js) : its last use is
   -- written when the run fires ; NULL for a schedule, which keeps its own copy of the values
   `stored_job_id` int(11) DEFAULT NULL,
+  -- how it ends (lib/scheduleEnd.js) : never, on a date (end_at) or after a number of runs
+  -- (end_count) ; then turned off or removed (end_action). A one-time run has none
+  `ends` VARCHAR(10) NOT NULL DEFAULT 'never',
+  `end_at` DATETIME DEFAULT NULL,
+  `end_count` INT DEFAULT NULL,
+  `end_action` VARCHAR(10) NOT NULL DEFAULT 'disable',
+  -- the jobs it started (jobs.schedule_id), counted toward end_count
+  `run_count` INT NOT NULL DEFAULT 0,
+  -- a one-time run removed after it started its job ; else turned off and kept
+  `remove_after_run` TINYINT(4) NOT NULL DEFAULT 1,
   UNIQUE KEY `uk_schedule_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

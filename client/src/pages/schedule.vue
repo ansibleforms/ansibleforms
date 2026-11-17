@@ -12,9 +12,14 @@
 /*    Schedule     how it is timed, the same three choices for a  */
 /*                 schedule of the app and one of a schedules     */
 /*                 repository : on a cron, on an iCal rrule (its  */
-/*                 next runs under it), or once at a time         */
+/*                 next runs under it), or once at a time ; then  */
+/*                 how it ends (AppScheduleEnd) : never, on a     */
+/*                 date or after some runs, then disabled or      */
+/*                 removed - a one-time run whether it is removed */
+/*                 after its run                                  */
 /*    Extra vars   what it sends the form (YAML), and a           */
 /*                 repository schedule's prompts from its file    */
+/*    Runs         the jobs it started, the latest first          */
 /*  A repository's schedule is saved into its file (the           */
 /*  repository's Push sends it to git), deleted with it.          */
 /*  Under Last launch : the job it started (a link), or why it    */
@@ -39,6 +44,10 @@ import { repositorySourceFields } from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
+import { endOf, endError, endPayload } from '@/lib/scheduleEnd';
+import Time from '@/lib/Time';
+import { durationSeconds, formatDuration } from '@/lib/jobTime';
+import { tableMatches } from '@/lib/recordSearch';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -51,7 +60,18 @@ const scheduleId = computed(() => String(route.params.id || ''));
 const schedule = ref(null); // as saved
 const edit = ref(null); // as edited
 const formNames = ref([]); // the forms it can run
-const EDITED = ['name', 'description', 'form', 'enabled', 'timing', 'cron', 'one_time_run', 'rrule', 'extra_vars'];
+const EDITED = [
+  'name',
+  'description',
+  'form',
+  'enabled',
+  'timing',
+  'cron',
+  'one_time_run',
+  'rrule',
+  'end',
+  'extra_vars',
+];
 // how a schedule may be timed, wherever it is kept : the choice of its Schedule tab
 const TIMINGS = ['cron', 'rrule', 'once'];
 
@@ -77,13 +97,25 @@ function editable(record) {
     // the moment of its one run
     one_time_run: record.one_time_run ?? '',
     rrule: record.rrule ?? '',
+    // how it ends : never, on a date or after some runs ; a one-time run's removal after its run
+    end: endOf(record),
     extra_vars: record.extra_vars ?? '',
   };
 }
 
+/**
+ * A field's value as it is compared with the one saved : an object (its end) as JSON, the rest as
+ * text.
+ *
+ * Args:
+ *   v (any): the value.
+ *
+ * Returns:
+ *   string: its text.
+ */
+const compared = (v) => (v && typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''));
 const dirty = computed(
-  () =>
-    !!schedule.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(schedule.value)[k] ?? '')),
+  () => !!schedule.value && EDITED.some((k) => compared(edit.value[k]) !== compared(editable(schedule.value)[k])),
 );
 // leaving with the schedule changed and unsaved asks first
 useUnsavedGuard(
@@ -136,6 +168,8 @@ const rruleError = computed(() =>
       : t('settings.common.fieldRequired', { field: t('settings.schedules.rrule') })
     : null,
 );
+// its end, checked as the server checks it : a date for ends date, a number for ends count
+const endProblem = computed(() => (edit.value ? endError(t, edit.value.end, edit.value.timing === 'once') : null));
 // a repository schedule's prompts from its file (limit, job_tags ...), as the extra vars the job
 // gets : shown, edited in the file
 const launchOptions = computed(() => {
@@ -211,16 +245,57 @@ function watchRun() {
       router.push('/jobs');
       return;
     }
-    if (!running.value) clearInterval(poll);
+    if (!running.value) {
+      clearInterval(poll);
+      // the job it started, in its Runs tab
+      loadRuns();
+    }
   }, 2000);
 }
 onBeforeUnmount(() => clearInterval(poll));
+
+// ─── Runs ─────────────────────────────────────────────────────────────────────
+// the jobs it started (jobs.schedule_id, what run_count counts), the latest first : only the ones
+// this user may see, the server's jobs list narrowed to this schedule ; a row opens the job
+const RUNS_SHOWN = 100;
+const runs = ref([]);
+const runColumns = computed(() => [
+  { key: 'id', label: t('settings.linked.job'), keep: true, class: 'text-end', value: (j) => `#${j.id}` },
+  // who it ran as : the Schedule Service, or the user who planned it
+  { key: 'user', label: t('jobs.launchedBy') },
+  { key: 'status', label: t('settings.linked.status'), keep: true },
+  // its times as the jobs page shows them (the server sends them in its own zone)
+  { key: 'start', label: t('jobs.startTime'), keep: true, value: (j) => j.start && Time.format(j.start) },
+  { key: 'end', label: t('jobs.endTime'), keep: true, value: (j) => j.end && Time.format(j.end) },
+  // how long it ran, as the jobs page says it (a running one : until the tab was loaded), to the
+  // right as a number
+  {
+    key: 'duration',
+    label: t('jobs.duration'),
+    keep: true,
+    class: 'text-end',
+    value: (j) => formatDuration(durationSeconds(j)),
+  },
+]);
+
+/**
+ * Loads the jobs the schedule started ; refused or failing, the tab stays empty.
+ */
+async function loadRuns() {
+  try {
+    const res = await axios.get(`/api/v2/job/?schedule=${encodeURIComponent(scheduleId.value)}&records=${RUNS_SHOWN}`);
+    runs.value = (res.data.records || res.data || []).filter((j) => !j.parent_id);
+  } catch {
+    runs.value = [];
+  }
+}
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
   { key: 'schedule', label: t('settings.schedules.stepSchedule'), icon: 'stopwatch' },
   { key: 'extra-vars', label: t('settings.schedules.stepExtraVars'), icon: 'code' },
+  { key: 'runs', label: t('settings.schedules.tabRuns'), icon: 'history', count: runs.value.length },
 ]);
 const { activeTab, tabLink } = useRouteTab('details', (key) => tabs.value.some((x) => x.key === key));
 
@@ -267,7 +342,6 @@ const tabFields = computed(() => {
             [
               'startedJob',
               t('settings.schedules.startedJobTitle'),
-              t('settings.schedules.startedJobHelp'),
               t('settings.schedules.startedJob', { id: startedJob.value }),
             ],
           ]
@@ -302,6 +376,17 @@ const tabFields = computed(() => {
               t('settings.cron.dayOfWeek'),
               edit.value?.cron,
             ],
+      // how it ends : a one-time run's removal after its run
+      edit.value?.timing === 'once'
+        ? ['end', t('settings.schedules.removeAfterRun'), t('settings.schedules.removeAfterRunHelp')]
+        : [
+            'end',
+            t('settings.schedules.ends'),
+            t('settings.schedules.endsNever'),
+            t('settings.schedules.endsOnDate'),
+            t('settings.schedules.endsRuns'),
+            t('settings.schedules.endAction'),
+          ],
     ],
     'extra-vars': [
       ['extra_vars', t('settings.fields.extraVars'), t('settings.schedules.extraVarsHelp'), edit.value?.extra_vars],
@@ -316,14 +401,18 @@ const tabFields = computed(() => {
           ]
         : []),
     ],
+    // the table : its name, or a row with the word in a cell it shows (runsMatch)
+    runs: [['runs', t('settings.schedules.tabRuns')]],
   };
 });
+// the Runs table keeps a row with the word : the tab then shows, with only those rows
+const runsMatch = computed(() => tableMatches(search.value, runs.value, runColumns.value));
 // the fields that match, per tab
 const shownFields = computed(() =>
   Object.fromEntries(
     Object.entries(tabFields.value).map(([tab, fields]) => [
       tab,
-      fields.filter(([, ...texts]) => matches(...texts)).map(([key]) => key),
+      fields.filter(([key, ...texts]) => matches(...texts) || (key === 'runs' && runsMatch.value)).map(([key]) => key),
     ]),
   ),
 );
@@ -363,8 +452,8 @@ async function save() {
     toast.warning(t('settings.schedules.fieldsRequired'));
     return;
   }
-  if (cronError.value || rruleError.value) {
-    toast.warning(cronError.value || rruleError.value);
+  if (cronError.value || rruleError.value || endProblem.value) {
+    toast.warning(cronError.value || rruleError.value || endProblem.value);
     return;
   }
   const common = {
@@ -374,7 +463,11 @@ async function save() {
     enabled: e.enabled ? 1 : 0,
     extra_vars: e.extra_vars,
   };
-  const data = scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, one_time_run: e.one_time_run });
+  const data = {
+    ...scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, one_time_run: e.one_time_run }),
+    // how it ends, for its timing : a one-time run says only whether it is removed after its run
+    ...endPayload(e.end, e.timing === 'once'),
+  };
   try {
     await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -418,6 +511,8 @@ onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
   await Promise.all([load(), loadForms()]);
+  // its runs, once it is known to be there
+  if (schedule.value) await loadRuns();
   if (running.value) watchRun();
 });
 </script>
@@ -463,6 +558,7 @@ onMounted(async () => {
               >
                 <FaIcon :icon="tab.icon" class="me-1" />
                 {{ tab.label }}
+                <span v-if="tab.count !== undefined" class="badge af-tab-count ms-1">{{ tab.count }}</span>
               </a>
             </li>
           </ul>
@@ -538,7 +634,6 @@ onMounted(async () => {
                     t('settings.schedules.startedJob', { id: startedJob })
                   }}</router-link
                 >
-                <div class="form-text">{{ t('settings.schedules.startedJobHelp') }}</div>
               </div>
               <div v-show="fieldShown('lastRun')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.fields.lastRun') }}</div>
@@ -548,15 +643,20 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.schedules.nextRun') }}</div>
                 <span>{{ schedule.next_run ? Helpers.formatServerDate(schedule.next_run) : '–' }}</span>
               </div>
-              <div v-show="fieldShown('enabled')" class="form-check form-switch mb-3">
-                <input
-                  id="af-schedule-enabled"
-                  v-model="edit.enabled"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                />
-                <label class="form-check-label" for="af-schedule-enabled">{{ t('settings.schedules.enabled') }}</label>
+              <div v-show="fieldShown('enabled')" class="mb-3">
+                <label class="form-label fw-bold d-block" for="af-schedule-enabled">{{
+                  t('settings.schedules.enabled')
+                }}</label>
+                <!-- saved with Save, as every switch of a record page -->
+                <div class="form-check form-switch mb-0">
+                  <input
+                    id="af-schedule-enabled"
+                    v-model="edit.enabled"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                  />
+                </div>
                 <div class="form-text">{{ t('settings.schedules.enabledHelp') }}</div>
               </div>
             </template>
@@ -596,7 +696,7 @@ onMounted(async () => {
               <!-- timed by a rrule : its next runs under it -->
               <div v-if="edit.timing === 'rrule'" v-show="fieldShown('rrule')" class="af-schedule-cron mb-0">
                 <label class="form-label fw-bold">{{ t('settings.schedules.rrule') }}</label>
-                <BsRrule v-model="edit.rrule" :hasError="!!rruleError" />
+                <BsRrule v-model="edit.rrule" :hasError="!!rruleError" :end="edit.end" :runCount="schedule.run_count" />
                 <div class="form-text">{{ t('settings.schedules.rruleHelp') }}</div>
               </div>
               <div
@@ -604,7 +704,7 @@ onMounted(async () => {
                 v-show="fieldShown('one_time_run')"
                 class="af-schedule-field mb-0"
               >
-                <label class="form-label">{{ t('settings.schedules.oneTimeRun') }}</label>
+                <label class="form-label fw-bold">{{ t('settings.schedules.oneTimeRun') }}</label>
                 <BsDateTime
                   v-model="edit.one_time_run"
                   icon="calendar"
@@ -615,9 +715,26 @@ onMounted(async () => {
                 <div class="form-text">{{ t('settings.schedules.runAtHelp') }}</div>
               </div>
               <div v-else v-show="fieldShown('cron')" class="af-schedule-cron mb-0">
-                <BsCron v-model="edit.cron" icon="stopwatch" :hasError="!!cronError" />
+                <BsCron
+                  v-model="edit.cron"
+                  icon="stopwatch"
+                  :hasError="!!cronError"
+                  :end="edit.end"
+                  :runCount="schedule.run_count"
+                />
                 <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
               </div>
+              <!-- how it ends, under its timing : never, on a date or after some runs, then disabled
+                   or removed ; a one-time run's switch under its date. The tab's last field, no
+                   margin under it (the tab's own padding ends it) -->
+              <AppScheduleEnd
+                v-show="fieldShown('end')"
+                v-model="edit.end"
+                class="af-schedule-field mt-3 mb-0"
+                :once="edit.timing === 'once'"
+                :repository="inRepository"
+                :runCount="schedule.run_count ?? 0"
+              />
             </template>
             <!-- Extra vars : what it sends the form -->
             <template v-if="tabShown('extra-vars')">
@@ -648,6 +765,28 @@ onMounted(async () => {
                 <pre class="af-launch-options mb-1">{{ launchOptionsText }}</pre>
                 <div class="form-text">{{ t('settings.schedules.launchOptionsHelp') }}</div>
               </div>
+            </template>
+            <!-- Runs : the jobs it started, the latest first ; a row opens the job -->
+            <template v-if="tabShown('runs')">
+              <template v-if="searching && searchHead('runs')">
+                <hr v-if="!searchHead('runs').first" class="mt-4 mb-0 af-search-line" />
+                <h6
+                  class="fw-bold text-body-secondary af-search-tab"
+                  :class="{ 'af-search-first': searchHead('runs').first }"
+                >
+                  <FaIcon :icon="searchHead('runs').tab.icon" class="me-1" />{{ searchHead('runs').tab.label }}
+                </h6>
+              </template>
+              <AppLinkedTable
+                :search="search"
+                :exportName="`${schedule.name}-runs`"
+                :columns="runColumns"
+                :rows="runs"
+                :to="(j) => `/jobs/${j.id}`"
+                :empty="t('settings.linked.noJob')"
+              >
+                <template #cell-status="{ row }"><AppStatusPill :status="row.status" /></template>
+              </AppLinkedTable>
             </template>
             <div v-if="searching && !shownTabs.length" class="text-body-secondary fst-italic">
               {{ t('settings.settingsPage.searchNone') }}
@@ -687,6 +826,12 @@ onMounted(async () => {
   border-radius: 0.375rem;
   background-color: var(--bs-tertiary-bg);
   white-space: pre-wrap;
+}
+/* the count of a tab : small and grey, as the menus' badges */
+.af-tab-count {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
 }
 /* the tab ends a little above the card's edge, as every record's page (24px in all) */
 .af-schedule-tab {

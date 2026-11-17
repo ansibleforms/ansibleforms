@@ -147,25 +147,32 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
 
   it('saves the timing chosen, the other two emptied, the dialog-only choice left out', () => {
     const item = { name: 'a', cron: '0 2 * * *', rrule: ' R ', one_time_run: '2030-01-01T00:00:00.000Z' };
+    // a recurring schedule never ends unless told ; a one time run is removed after its run
+    const never = { ends: 'never', end_at: null, end_count: null, end_action: 'disable' };
     expect(settings.schedules.beforeSave({ ...item, timing: 'cron' })).toEqual({
       name: 'a',
       cron: '0 2 * * *',
       rrule: '',
       one_time_run: null,
+      ...never,
     });
     expect(settings.schedules.beforeSave({ ...item, timing: 'rrule' })).toEqual({
       name: 'a',
       cron: '',
       rrule: 'R',
       one_time_run: null,
+      ...never,
     });
     expect(settings.schedules.beforeSave({ ...item, timing: 'once' })).toEqual({
       name: 'a',
       cron: '',
       rrule: '',
       one_time_run: '2030-01-01T00:00:00.000Z',
+      remove_after_run: 1,
     });
-    expect(scheduleTiming('cron', item)).toEqual(settings.schedules.beforeSave({ ...item, timing: 'cron' }));
+    expect({ ...scheduleTiming('cron', item), ...never }).toEqual(
+      settings.schedules.beforeSave({ ...item, timing: 'cron' }),
+    );
     expect(timingKind({ one_time_run: null, cron: '* * * * *' })).toBe('cron');
   });
 
@@ -186,7 +193,7 @@ describe('a new schedule : no "where it lives" choice, the server decides', () =
     expect(page).toMatch(/<input[^>]*v-model="edit\.timing"[^>]*type="radio"/s);
     expect(page).toMatch(/<div v-if="edit\.timing === 'rrule'" v-show="fieldShown\('rrule'\)"/);
     expect(page).toContain('<BsRrule v-model="edit.rrule"');
-    expect(page).toContain('const data = scheduleTiming(e.timing,');
+    expect(page).toContain('...scheduleTiming(e.timing, {');
     // the list page no longer asks which repository holds the schedules
     const list = readFileSync(join(import.meta.dirname, '../src/pages/admin/schedules.vue'), 'utf8');
     expect(list).not.toContain('loadScheduleRepository');

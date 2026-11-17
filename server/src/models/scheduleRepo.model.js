@@ -28,6 +28,7 @@ import { cronError } from "../lib/cronValidate.js";
 import { parseMoment, oneTimeRunOf } from "../lib/oneTimeRun.js";
 import Engine, { withWriteClaim, fileOf, writeEntries, entryFileOf, removeEntry, nameKey, filesNow, assertTypeReadable } from "../lib/repoObjects/engine.js";
 import schedules, { extraVarsText, formNames, valuesOf, timingOfRow } from "../lib/repoObjects/schedules.js";
+import { checkEnd, endOfRow, END_FIELDS } from "../lib/scheduleEnd.js";
 
 const MODEL = "schedule";
 
@@ -164,6 +165,28 @@ function timingOfRequest(data, current = null) {
 }
 
 /**
+ * The end a request gives a schedule of a repository (lib/scheduleEnd.js checkEnd : checked, merged
+ * with the end it had), as its entry writes it ; undefined when the request gives none of it.
+ *
+ * Args:
+ *   data (object): the request body.
+ *   current (object|null): the schedule's row as it is (an update), null for a new one.
+ *   once (boolean): whether it is timed by a one-time run after the request.
+ *
+ * Returns:
+ *   object|undefined: { ends, endAt, endCount, endAction, removeAfterRun }.
+ *
+ * Raises:
+ *   Errors.BadRequestError: an end refused.
+ */
+function endOfRequest(data, current, once) {
+  if (!END_FIELDS.some((k) => data[k] !== undefined)) return undefined;
+  const given = Object.fromEntries(END_FIELDS.filter((k) => data[k] !== undefined).map((k) => [k, data[k]]));
+  checkEnd(given, current, once);
+  return endOfRow({ ends: "never", end_action: "disable", remove_after_run: 1, ...(current || {}), ...given });
+}
+
+/**
  * Makes a schedule in a schedules repository : a new entry (newScheduleEntry), at the end of
  * the first file holding schedules: (else schedules.yaml, made), and its row ; pushed with
  * the repository's Push.
@@ -171,7 +194,8 @@ function timingOfRequest(data, current = null) {
  * Args:
  *   repository (string): the repository.
  *   data (object): { name, description, form, its timing (rrule, cron or one_time_run :
- *     timingOfRequest), enabled, extra_vars }.
+ *     timingOfRequest), enabled, extra_vars, its end (ends, end_at, end_count, end_action,
+ *     remove_after_run : endOfRequest) }.
  *
  * Returns:
  *   Promise<number>: the new schedule's id.
@@ -197,6 +221,8 @@ ScheduleRepo.create = async function (repository, data) {
     enabled: data.enabled === undefined || data.enabled === null ? true : data.enabled === true || Number(data.enabled) === 1,
     extra_vars: data.extra_vars ?? "",
   };
+  // how it ends, written to its entry : never when the request says nothing of it
+  Object.assign(values, endOfRequest(data, null, !!values.oneTimeRun) || {});
   const { extraData } = await checkValues(values, null);
   return withWriteClaim(repository, async () => {
     // a file that may declare it cannot be read, or an entry of the repository declaring its name
@@ -216,8 +242,8 @@ ScheduleRepo.create = async function (repository, data) {
       // stored as a pull reads its entry back : its timing's columns, its moment in UTC
       const v = valuesOf(parsed.schedule);
       const res = await mysql.do(
-        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,'idle')",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, extraVarsText(extraData), v.launch_options, repository, file],
+        "INSERT INTO AnsibleForms.`schedule` (name, description, form, rrule, cron, one_time_run, enabled, extra_vars, launch_options, ends, end_at, end_count, end_action, remove_after_run, repository, repo_file, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'idle')",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, extraVarsText(extraData), v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, repository, file],
       );
       CrudModel.changed(MODEL);
       logger.info(`Created schedule '${values.name}' in ${repository}/${file}`);
@@ -241,6 +267,7 @@ ScheduleRepo.create = async function (repository, data) {
  *   row (object): the schedule as it is.
  *   data (object): any of { name, description, form, its timing (rrule, cron or one_time_run :
  *     timingOfRequest ; a change of kind rewrites the entry's timing key), enabled,
+ *     its end (ends, end_at, end_count, end_action, remove_after_run : endOfRequest),
  *     extra_vars, launch_options
  *     (an object, or its JSON : written as the prompts that give them, those no prompt gives kept
  *     in the app only) }.
@@ -262,6 +289,9 @@ ScheduleRepo.update = async function (row, data) {
   if (timing) Object.assign(values, timing);
   if (data.enabled !== undefined) values.enabled = data.enabled === true || Number(data.enabled) === 1;
   if (data.extra_vars !== undefined) values.extra_vars = data.extra_vars ?? "";
+  // how it ends, when the edit says : for its timing after the edit
+  const once = timing ? !!timing.oneTimeRun : !!row.one_time_run;
+  Object.assign(values, endOfRequest(data, row, once) || {});
   const { extraData } = await checkValues(values, row.id);
   const edits = { ...values, extraData };
   delete edits.extra_vars;
@@ -281,7 +311,7 @@ ScheduleRepo.update = async function (row, data) {
     const file = entryFileOf(schedules, fresh.repository, fresh.name, fresh.repo_file) || fresh.repo_file;
     const abs = fileOf(fresh.repository, file);
     const before = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-    const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, ...timingOfRow(fresh), enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "" };
+    const current = { name: fresh.name, description: fresh.description || "", form: fresh.form, ...timingOfRow(fresh), enabled: !!Number(fresh.enabled ?? 1), extraData: extraDataOf(fresh.extra_vars || ""), launchOptions: fresh.launch_options || "", ...endOfRow(fresh) };
     let text;
     try {
       text = updateScheduleText(before ?? "", fresh.name, edits, newScheduleEntry({ ...current, ...edits }));
@@ -296,8 +326,8 @@ ScheduleRepo.update = async function (row, data) {
     const v = valuesOf(parsed.schedule, kept);
     try {
       await mysql.do(
-        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, repo_file=? WHERE id=?",
-        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, file, fresh.id],
+        "UPDATE AnsibleForms.`schedule` SET name=?, description=?, form=?, rrule=?, cron=?, one_time_run=?, enabled=?, extra_vars=?, launch_options=?, ends=?, end_at=?, end_count=?, end_action=?, remove_after_run=?, repo_file=? WHERE id=?",
+        [v.name, v.description, v.form, v.rrule, v.cron, v.one_time_run, v.enabled, v.extra_vars, v.launch_options, v.ends, v.end_at, v.end_count, v.end_action, v.remove_after_run, file, fresh.id],
       );
     } catch (e) {
       // the file back as it was : it and the row say the same

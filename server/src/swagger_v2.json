@@ -2183,7 +2183,8 @@
         "description": "The jobs the caller may see (every job for an admin, or with showAllJobLogs or manageAllJobs ; else their own and the ones awaiting an approval they may give), the newest first.",
         "parameters": [
           { "name": "records", "in": "query", "schema": { "type": "integer" }, "required": false },
-          { "name": "stored_job", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs launched from this stored job (POST /job with its storedJobId), among the ones the caller may see" }
+          { "name": "stored_job", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs launched from this stored job (POST /job with its storedJobId), among the ones the caller may see" },
+          { "name": "schedule", "in": "query", "schema": { "type": "integer" }, "required": false, "description": "Only the jobs this schedule started (its runs, counted in its run_count), among the ones the caller may see" }
         ],
         "responses": { "200": { "description": "Job list" } }
       },
@@ -6815,7 +6816,7 @@
                             "type": "string",
                             "format": "date-time",
                             "nullable": true,
-                            "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                            "description": "The moment of its one run (a one-time schedule, removed after its run unless remove_after_run is off); null for one timed by its cron or rrule"
                           },
                           "cron": {
                             "type": "string",
@@ -6844,6 +6845,35 @@
                             "type": "string",
                             "nullable": true,
                             "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                          },
+                          "ends": {
+                            "type": "string",
+                            "enum": ["never", "date", "count"],
+                            "description": "How it ends: never, on a date (end_at) or after a number of runs (end_count); a one-time run has none"
+                          },
+                          "end_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true,
+                            "description": "The moment it ends at (ends date): no run after it"
+                          },
+                          "end_count": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "The runs it ends after (ends count), counted in run_count"
+                          },
+                          "end_action": {
+                            "type": "string",
+                            "enum": ["disable", "remove"],
+                            "description": "What its end does: turns it off, or removes it (a repository's schedule is only turned off)"
+                          },
+                          "run_count": {
+                            "type": "integer",
+                            "description": "The jobs it started, counted toward end_count: the jobs its Runs tab lists (read only)"
+                          },
+                          "remove_after_run": {
+                            "type": "boolean",
+                            "description": "A one-time run: removed after its run, else turned off and kept"
                           },
                           "status": {
                             "type": "string"
@@ -6961,7 +6991,7 @@
           "schedule"
         ],
         "summary": "Check a rrule and preview its next runs",
-        "description": "Checks an iCal rrule and gives its next four runs, in UTC, worked out in the rrule's own time zone. A rule that never fires (no run in the 50 years after its DTSTART) is refused ; runs that cannot be worked out within a second are said in errors.",
+        "description": "Checks an iCal rrule and gives its next three runs (none after the schedule's end, when given), in UTC, worked out in the rrule's own time zone. A rule that never fires (no run in the 50 years after its DTSTART) is refused ; runs that cannot be worked out within a second are said in errors.",
         "security": [
           {
             "bearerAuth": []
@@ -6976,6 +7006,34 @@
               "type": "string"
             },
             "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "The schedule's end date: no run after it"
+          },
+          {
+            "name": "end_count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The runs the schedule ends after: at most end_count less run_count runs"
+          },
+          {
+            "name": "run_count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The jobs the schedule started already, with end_count"
           }
         ],
         "responses": {
@@ -7005,6 +7063,10 @@
                         "type": "string",
                         "format": "date-time"
                       }
+                    },
+                    "ended": {
+                      "type": "boolean",
+                      "description": "The schedule's end, not the rule, left fewer runs than asked (or none)"
                     }
                   }
                 }
@@ -7064,7 +7126,7 @@
                       "type": "string",
                       "format": "date-time",
                       "nullable": true,
-                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                      "description": "The moment of its one run (a one-time schedule, removed after its run unless remove_after_run is off); null for one timed by its cron or rrule"
                     },
                     "cron": {
                       "type": "string",
@@ -7093,6 +7155,35 @@
                       "type": "string",
                       "nullable": true,
                       "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "ends": {
+                      "type": "string",
+                      "enum": ["never", "date", "count"],
+                      "description": "How it ends: never, on a date (end_at) or after a number of runs (end_count); a one-time run has none"
+                    },
+                    "end_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment it ends at (ends date): no run after it"
+                    },
+                    "end_count": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "The runs it ends after (ends count), counted in run_count"
+                    },
+                    "end_action": {
+                      "type": "string",
+                      "enum": ["disable", "remove"],
+                      "description": "What its end does: turns it off, or removes it (a repository's schedule is only turned off)"
+                    },
+                    "run_count": {
+                      "type": "integer",
+                      "description": "The jobs it started, counted toward end_count: the jobs its Runs tab lists (read only)"
+                    },
+                    "remove_after_run": {
+                      "type": "boolean",
+                      "description": "A one-time run: removed after its run, else turned off and kept"
                     },
                     "status": {
                       "type": "string"
@@ -7181,7 +7272,7 @@
                       "type": "string",
                       "format": "date-time",
                       "nullable": true,
-                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                      "description": "The moment of its one run (a one-time schedule, removed after its run unless remove_after_run is off); null for one timed by its cron or rrule"
                     },
                     "cron": {
                       "type": "string",
@@ -7210,6 +7301,35 @@
                       "type": "string",
                       "nullable": true,
                       "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "ends": {
+                      "type": "string",
+                      "enum": ["never", "date", "count"],
+                      "description": "How it ends: never, on a date (end_at) or after a number of runs (end_count); a one-time run has none"
+                    },
+                    "end_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment it ends at (ends date): no run after it"
+                    },
+                    "end_count": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "The runs it ends after (ends count), counted in run_count"
+                    },
+                    "end_action": {
+                      "type": "string",
+                      "enum": ["disable", "remove"],
+                      "description": "What its end does: turns it off, or removes it (a repository's schedule is only turned off)"
+                    },
+                    "run_count": {
+                      "type": "integer",
+                      "description": "The jobs it started, counted toward end_count: the jobs its Runs tab lists (read only)"
+                    },
+                    "remove_after_run": {
+                      "type": "boolean",
+                      "description": "A one-time run: removed after its run, else turned off and kept"
                     },
                     "status": {
                       "type": "string"
@@ -11228,6 +11348,33 @@
           "enabled": {
             "type": "boolean",
             "description": "Off: the cron or one-time run does not fire (launch still works)"
+          },
+          "ends": {
+            "type": "string",
+            "enum": ["never", "date", "count"],
+            "description": "How a schedule timed by a cron or a rrule ends: never (the default), on a date (end_at) or after a number of runs (end_count). Ignored for a one-time run. A rrule's own UNTIL or COUNT still applies"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Required with ends date: the moment it ends at, ISO 8601 with its offset or Z (400 when missing or no time). A schedule whose end_at passed never launches",
+            "example": "2026-12-31T23:00:00Z"
+          },
+          "end_count": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true,
+            "description": "Required with ends count: the runs it ends after, at least 1 (400 otherwise). Counted in run_count, the jobs it started in all"
+          },
+          "end_action": {
+            "type": "string",
+            "enum": ["disable", "remove"],
+            "description": "What its end does: turns it off (the default) or removes it. A schedules repository's schedule is only ever turned off, its file manages it"
+          },
+          "remove_after_run": {
+            "type": "boolean",
+            "description": "A one-time run: removed after it started its job (the default), else turned off and kept with its outcome. A planned job is always removed"
           },
           "planned": {
             "type": "boolean",

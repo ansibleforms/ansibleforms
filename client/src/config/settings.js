@@ -12,6 +12,7 @@ import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
 import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
+import { endOf, endPayload } from '@/lib/scheduleEnd';
 
 // A cron field is validated with the SAME check the editor uses (config/cron.js), which
 // is the only thing that keeps the two from disagreeing.
@@ -1482,8 +1483,12 @@ export default function getSettings(t) {
       // wizard
       openPage: (item) => `/jobs/scheduled/${item.id}`,
       // the timing chosen sent, the other two emptied : a cron, a rrule, or a one time run - for a
-      // schedule of the app and one the server writes to the schedules repository alike
-      beforeSave: ({ timing, ...item }) => scheduleTiming(timing, item),
+      // schedule of the app and one the server writes to the schedules repository alike ; and how
+      // it ends, for that timing (a one time run : whether it is removed after its run)
+      beforeSave: ({ timing, end, ...item }) => ({
+        ...scheduleTiming(timing, item),
+        ...endPayload(end || endOf(), timing === 'once'),
+      }),
       // the dialog in steps : what runs (its name, the form), when (once at a time, or on a cron
       // schedule), the extra vars it sends to the form
       steps: [
@@ -1625,6 +1630,27 @@ export default function getSettings(t) {
           required: true,
           showWhen: (item) => item.timing === 'once',
         },
+        {
+          // how it ends, under its timing, as the schedule's page asks it (AppScheduleEnd) : never,
+          // on a date or after some runs, then disabled or removed ; a one time run, whether it
+          // is removed after its run. The dialog only : beforeSave sends it as its fields
+          key: 'end',
+          step: 'when',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppScheduleEnd.vue')),
+          initial: (item) => endOf(item),
+          props: (item) => ({
+            modelValue: item.end || endOf(),
+            once: item.timing === 'once',
+            'onUpdate:modelValue': (v) => {
+              item.end = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
+        },
         // when it last ran, then when it runs next
         {
           key: 'last_run',
@@ -1636,6 +1662,15 @@ export default function getSettings(t) {
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
         },
+        // how the last run ended, between it and the next one ; none yet (a schedule that never
+        // ran) : an en dash rather than an empty cell
+        {
+          key: 'status',
+          label: t('settings.fields.status'),
+          noInput: true,
+          // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
+          render: (v, row) => schedulePill(t, row),
+        },
         // when it runs next : its cron's next occurrence, or its one time run while ahead (the
         // server computes it, schedule.model.js)
         {
@@ -1645,14 +1680,6 @@ export default function getSettings(t) {
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
-        },
-        // none yet (a schedule that never ran) : an en dash rather than an empty cell
-        {
-          key: 'status',
-          label: t('settings.fields.status'),
-          noInput: true,
-          // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
-          render: (v, row) => schedulePill(t, row),
         },
         {
           key: 'extra_vars',
