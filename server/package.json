@@ -55,7 +55,7 @@
     "node-jq": "~6.3.1",
     "nodemailer": "~10.5.0",
     "openid-client": "^6.9.0",
-    "oracledb": "~7.0.1",
+    "oracledb": "~26.0.0",
     "passport": "~0.7.0",
     "passport-http": "~0.3.0",
     "passport-jwt": "~4.0.1",
