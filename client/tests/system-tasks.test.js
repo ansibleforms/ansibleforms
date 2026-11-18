@@ -2,10 +2,10 @@
 // expired tokens ...), under Future after Scheduled and Stored, for an admin only (the route's
 // showSettings, the api's guard). The list is the scheduled jobs' table, a row opening the task's
 // page : Details, Schedule then Runs, every task's cron changed on its Schedule tab as a
-// schedule's (its editor, Save and Revert), the config seed reload's too, whose cron may still come
+// schedule's (its editor and Save, no Revert as the other record pages), the config seed reload's too, whose cron may still come
 // from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). The runner hub's own loops are listed
-// too, read only : every so many seconds, one line saying why. Read from the sources and the config, as the other page
-// tests do.
+// too, read only : every so many seconds, one line saying why. Run now runs a task once, as a
+// schedule's page, never a loop. Read from the sources and the config, as the other page tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -169,7 +169,11 @@ describe("a task's page", () => {
 
   it("has no Delete, and edits nothing but the task's cron", () => {
     expect(page).not.toMatch(/icon="trash"/);
-    expect(page).not.toMatch(/axios\.(post|delete)/);
+    expect(page).not.toMatch(/axios\.delete/);
+    // its one post : Run now
+    expect([...page.matchAll(/axios\.post\(`([^`]+)`/g)].map((m) => m[1])).toEqual([
+      '/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/run',
+    ]);
     expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(['cronEdit', 'search']);
   });
 
@@ -216,8 +220,9 @@ describe("a task's Schedule tab", () => {
       /const scheduleEditable = computed\(\(\) => !!task\.value\?\.schedule_env && !!task\.value\?\.editable_schedule\);/,
     );
     expect(tab).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.schedule_env \}\)/);
-    // no Save, no Revert then
-    expect(page).toMatch(/<template v-if="task && scheduleEditable" #actions>/);
+    // no Save then, Run now still
+    expect(page).toMatch(/<template v-if="task && !isLoop" #actions>/);
+    expect(page).toMatch(/<BsButton v-if="scheduleEditable" icon="save" :disabled="!canSave" @click="save\(\)">/);
   });
 
   it('BsCron greys out every preset, field and the expression when disabled', () => {
@@ -226,12 +231,12 @@ describe("a task's Schedule tab", () => {
     expect(cron).toMatch(/<fieldset :disabled="disabled">/);
   });
 
-  it('saves with Save, orange while changed, undoes with Revert, and asks before leaving', () => {
+  it('saves with Save, orange while changed, no Revert as the other record pages, and asks before leaving', () => {
     const actions = page.slice(page.indexOf('#actions>'), page.indexOf('</AppSettings>'));
-    expect(actions).toMatch(/<BsButton icon="clock-rotate-left" :disabled="!dirty" @click="revert\(\)">/);
+    expect(actions).not.toMatch(/revert|clock-rotate-left/);
+    expect(page).not.toMatch(/function revert\(/);
     // the save icon : orange while enabled (BsButton), grey while nothing changed
-    expect(actions).toMatch(/<BsButton icon="save" :disabled="!canSave" @click="save\(\)">/);
-    expect(actions.indexOf('revert()')).toBeLessThan(actions.indexOf('save()'));
+    expect(actions).toMatch(/icon="save" :disabled="!canSave" @click="save\(\)">/);
     expect(page).toMatch(/useUnsavedGuard\(\s*dirty,/);
     expect(page).toMatch(
       /axios\.put\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/schedule`, \{\s*cron: cronEdit\.value\.trim\(\),/,
@@ -239,14 +244,14 @@ describe("a task's Schedule tab", () => {
   });
 
   it('reads the task again after a save : its last run, next run and next runs follow', () => {
-    const save = page.slice(page.indexOf('async function save()'), page.indexOf('function revert()'));
+    const save = page.slice(page.indexOf('async function save()'), page.indexOf('const runAsked'));
     expect(save).toMatch(/await axios\.put[\s\S]*await load\(\);/);
     expect(page).toMatch(/cronEdit\.value = task\.value\?\.cron \|\| '';\s*loaded\.value = true;/);
   });
 
   it('refuses a cron of other than 5 fields before sending it, as the server does', () => {
     expect(page).toMatch(/\.length !== 5\) return t\('jobs\.system\.cronFiveFields'\)/);
-    const save = page.slice(page.indexOf('async function save()'), page.indexOf('function revert()'));
+    const save = page.slice(page.indexOf('async function save()'), page.indexOf('const runAsked'));
     expect(save).toMatch(/if \(cronProblem\.value\) \{\s*toast\.warning\(cronProblem\.value\);\s*return false;/);
   });
 });
@@ -320,8 +325,60 @@ describe('the texts', () => {
       const hint = texts.jobs.system.hubLoopHint;
       const hintWidth = [...hint].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
       expect(hintWidth, lang).toBeLessThanOrEqual(90);
-      // a toolbar button : a word or two
-      expect(texts.jobs.system.revert.length * wide, lang).toBeLessThanOrEqual(14);
+      // Revert is gone, as from the other record pages
+      expect(texts.jobs.system.revert, lang).toBeUndefined();
+      // Run now's toasts, on one line : a task's name and a short result in them
+      for (const key of ['runDone', 'runFailed', 'runStarted']) {
+        const text = texts.jobs.system[key];
+        expect(text, `${lang} ${key}`).toMatch(/\{name\}/);
+        if (key !== 'runStarted') expect(text, `${lang} ${key}`).toMatch(/\{result\}/);
+        const shown = text.replace('{name}', 'Stored jobs cleanup').replace('{result}', 'Removed 2 jobs');
+        expect(shown.length * wide, `${lang} ${key}`).toBeLessThanOrEqual(90);
+      }
+      // the button : the schedules' Run now, a word or two
+      expect(texts.settings.schedules.runSchedule.length * wide, lang).toBeLessThanOrEqual(20);
+      // the audit labels of a run
+      expect(texts.audit.actionLabels.system_task_run, lang).toBeTruthy();
+      expect(texts.audit.actionLabels.system_tasks_run_create, lang).toBeTruthy();
     }
+  });
+});
+
+describe('Run now', () => {
+  const actions = page.slice(page.indexOf('#actions>'), page.indexOf('</AppSettings>'));
+  const schedule = withoutComments(read('src/pages/schedule.vue'));
+
+  it("sits top right before Save, as a schedule's page, its icon and words", () => {
+    expect(actions).toMatch(
+      /<BsButton icon="play" cssClass="text-nowrap" :disabled="!canRun" @click="runNow\(\)">\{\{\s*t\('settings\.schedules\.runSchedule'\)/,
+    );
+    expect(schedule).toMatch(/<BsButton icon="play" cssClass="text-nowrap" :disabled="running" @click="runNow\(\)">/);
+    expect(actions.indexOf('runNow()')).toBeLessThan(actions.indexOf('save()'));
+  });
+
+  it('shows for the tasks, not for the runner hub loops', () => {
+    expect(page).toMatch(/<template v-if="task && !isLoop" #actions>/);
+    expect(page).toMatch(/const isLoop = computed\(\(\) => !!task\.value && !task\.value\.schedule_env\);/);
+  });
+
+  it('is disabled while the task runs, and for a task that is off', () => {
+    expect(page).toMatch(/const running = computed\(\(\) => runAsked\.value \|\| !!task\.value\?\.running\);/);
+    expect(page).toMatch(
+      /const canRun = computed\(\(\) => !!task\.value && task\.value\.enabled !== false && !running\.value\);/,
+    );
+  });
+
+  it('posts the run, reads the task again, and says how it went ; a run still going is followed', () => {
+    const run = page.slice(page.indexOf('async function runNow()'), page.indexOf('onBeforeUnmount(() =>'));
+    expect(run).toMatch(/axios\.post\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/run`/);
+    expect(run).toMatch(/await load\(true\);/);
+    expect(run).toMatch(/res\.status === 202[\s\S]*t\('jobs\.system\.runStarted'[\s\S]*followRun\(/);
+    expect(run).toMatch(/sayRun\(task\.value\?\.last_run\)/);
+    expect(run).toMatch(/toast\.error\(Helpers\.parseAxiosResponseError\(err\)\)/);
+    expect(page).toMatch(/t\('jobs\.system\.runFailed'/);
+    expect(page).toMatch(/t\('jobs\.system\.runDone'/);
+    // a changed cron is kept when the task is read again after a run
+    expect(page).toMatch(/const keep = keepEdit && dirty\.value;/);
+    expect(page).toMatch(/onBeforeUnmount\(\(\) => clearTimeout\(followTimer\)\);/);
   });
 });

@@ -139,6 +139,7 @@ export default {
     databaseNotFound: "Database not found",
     systemTaskNotFound: "System task not found",
     systemTaskScheduleFailed: "The task's schedule could not be saved",
+    systemTaskRunFailed: "The task could not be run",
     runnerAdminOnly:
       "Only an admin can add, change or delete a runner: a runner receives the credentials of the jobs it runs",
     repositoryAdminOnly:

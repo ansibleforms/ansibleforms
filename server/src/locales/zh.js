@@ -132,6 +132,7 @@ export default {
     databaseNotFound: "未找到数据库",
     systemTaskNotFound: "未找到系统任务",
     systemTaskScheduleFailed: "无法保存任务的计划",
+    systemTaskRunFailed: "无法运行该任务",
     runnerAdminOnly:
       "只有 admin 可以添加、更改或删除运行器：运行器会收到它运行的作业的凭据",
     repositoryAdminOnly:

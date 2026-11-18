@@ -142,6 +142,7 @@ export default {
     databaseNotFound: "Database niet gevonden",
     systemTaskNotFound: "Systeemtaak niet gevonden",
     systemTaskScheduleFailed: "Het schema van de taak kon niet worden opgeslagen",
+    systemTaskRunFailed: "De taak kon niet worden uitgevoerd",
     runnerAdminOnly:
       "Alleen een admin kan een runner toevoegen, wijzigen of verwijderen: een runner ontvangt de credentials van de jobs die hij uitvoert",
     repositoryAdminOnly:

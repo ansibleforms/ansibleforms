@@ -352,10 +352,10 @@ describe("the API is the admin settings'", () => {
     assert.equal(none.status, 404);
   });
 
-  test("the routes are reads, and the nightly tasks' schedule only (tests/system-task-schedule.test.mjs)", () => {
+  test("the routes are reads, the tasks' schedule and Run now only (tests/system-task-schedule.test.mjs, system-task-run.test.mjs)", () => {
     const routes = read("src/routes/v2/system.routes.js");
     const writes = [...routes.matchAll(/router\.(post|put|patch|delete)\(\s*'([^']+)'/g)].map((m) => `${m[1]} ${m[2]}`);
-    assert.deepEqual(writes, ["put /tasks/:key/schedule"]);
+    assert.deepEqual(writes, ["put /tasks/:key/schedule", "post /tasks/:key/run"]);
   });
 
   test("both are documented, under the system tag", () => {

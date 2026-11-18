@@ -146,6 +146,7 @@ export default {
     databaseNotFound: "Datenbank nicht gefunden",
     systemTaskNotFound: "Systemaufgabe nicht gefunden",
     systemTaskScheduleFailed: "Der Zeitplan der Aufgabe konnte nicht gespeichert werden",
+    systemTaskRunFailed: "Die Aufgabe konnte nicht ausgeführt werden",
     runnerAdminOnly:
       "Nur ein Admin kann einen Runner hinzufuegen, aendern oder loeschen: ein Runner erhaelt die Zugangsdaten der Jobs, die er ausfuehrt",
     repositoryAdminOnly:

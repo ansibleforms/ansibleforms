@@ -3721,6 +3721,10 @@
                       "type": "boolean",
                       "description": "Whether it runs (configSeedReload only with CONFIG_SEED_PATH set; a runner hub loop where the node that answers runs the hub)"
                     },
+                    "running": {
+                      "type": "boolean",
+                      "description": "Whether a run of it is going now (a scheduled one or a Run now); always false for a runner hub loop"
+                    },
                     "last_run": {
                       "type": "object",
                       "properties": {
@@ -3918,6 +3922,68 @@
           },
           "404": {
             "description": "No task has that key"
+          }
+        }
+      }
+    },
+    "/system/tasks/{key}/run": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Run a maintenance task now",
+        "description": "Runs a task once now, recorded as a scheduled run is (its outcome and result on its Runs tab). It runs on the node whose scheduler runs the tasks (the worker), wherever the request comes in: another node hands it over and waits for its run a while. Answers once the run ended, or at once for the nightly backup, which may outlast a request. Never starts a run while one of the task is going. Audited (system.task.run). Requires settings access.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The task's key, e.g. jobCleanup"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run ended: the task, as GET /system/tasks/{key} answers it, with its new run as last_run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The run started and still goes (the nightly backup, or a run on another node that did not end within the wait): the task, with running true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The task is off (configSeedReload without CONFIG_SEED_PATH, or turned off by CONFIG_SEED_RELOAD_SECONDS=0)"
+          },
+          "403": {
+            "description": "No settings access, or a runner hub loop (runnerDispatch, runnerDial, runnerPrune: they run on their own timers)"
+          },
+          "404": {
+            "description": "No task has that key"
+          },
+          "409": {
+            "description": "A run of the task is going: none is started"
+          },
+          "503": {
+            "description": "No node runs the system tasks: no process holds the worker lock"
           }
         }
       }

@@ -983,6 +983,46 @@ class CronService {
   }
 
   /**
+   * Whether a system task's run is going on this node now (a scheduled one, or a Run now).
+   *
+   * Args:
+   *   key (string): the task's key.
+   *
+   * Returns:
+   *   boolean: true while its croner job runs.
+   */
+  systemTaskBusy(key) {
+    return !!this.jobs.system.get(key)?.isBusy();
+  }
+
+  /**
+   * Runs a system task once now (Run now, lib/systemTaskRun.js) : its croner job triggered, so
+   * the run is the scheduled one's (the worker lock confirmed, then recorded as a run with its
+   * outcome and result) and croner counts it busy meanwhile (a tick falling during it is
+   * skipped, protect). croner's trigger does not look whether a run is going : a busy job is
+   * refused here, none started on top of it.
+   *
+   * Args:
+   *   key (string): the task's key.
+   *
+   * Returns:
+   *   object: { status, done } :
+   *     status: 'started', 'busy' (a run of it is going) or 'off' (no job : the tasks do not run
+   *       here, or the task is off, the config seed reload without CONFIG_SEED_PATH) ;
+   *     done: a promise settled when the run ended (null when none started) ; never rejects.
+   */
+  runSystemTaskNow(key) {
+    const job = this.systemTasksStarted ? this.jobs.system.get(key) : null;
+    if (!job) return { status: 'off', done: null };
+    if (job.isBusy()) return { status: 'busy', done: null };
+    // croner marks the job busy before its first await : a second call now finds it busy
+    const done = job.trigger().catch((err) => {
+      logger.error(`Run now of the system task ${key} failed:`, err);
+    });
+    return { status: 'started', done };
+  }
+
+  /**
    * Stop all cron jobs. None starts again ; a run already going is waited for, at most
    * `waitMs`, so a stop does not close the database pool under it (the minute's stopped-node
    * sweep logged "Pool is closed" three times when a SIGTERM came on the minute).
@@ -1019,8 +1059,10 @@ class CronService {
       logger.debug(`Stopped system task: ${name}`);
     });
     this.jobs.system.clear();
-    // and their work : a schedule saved after the stop registers nothing again
+    // and their work : a schedule saved after the stop registers nothing again, and Run now
+    // finds no task running here (lib/systemTaskRun.js)
     this.systemWork.clear();
+    this.systemTasksStarted = false;
 
     // the runs already going : polled, as croner tells only whether a job is busy
     const until = Date.now() + waitMs;
@@ -1042,7 +1084,8 @@ class CronService {
     for (const [name, task] of this.jobs.system.entries()) {
       var next;
       try { next = task.nextRun?.() || null; } catch { next = null; }
-      tasks.push({ name, nextRun: next ? new Date(next).toISOString() : null });
+      // busy : a run of it going, so another node refuses a second Run now (lib/systemTaskRun.js)
+      tasks.push({ name, nextRun: next ? new Date(next).toISOString() : null, busy: !!task.isBusy?.() });
     }
     return {
       counts: {

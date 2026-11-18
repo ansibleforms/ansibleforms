@@ -144,6 +144,7 @@ export default {
     databaseNotFound: "Nie znaleziono bazy danych",
     systemTaskNotFound: "Nie znaleziono zadania systemowego",
     systemTaskScheduleFailed: "Nie udało się zapisać harmonogramu zadania",
+    systemTaskRunFailed: "Nie udało się uruchomić zadania",
     runnerAdminOnly:
       "Tylko admin może dodać, zmienić lub usunąć runner: runner otrzymuje poświadczenia zadań, które uruchamia",
     repositoryAdminOnly:

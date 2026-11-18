@@ -15,6 +15,8 @@ import Schema from "../models/schema.model.js";
 import Help from "../models/help.model.js";
 import cronService from "../services/cron.service.js";
 import { rebuildLoginStrategies } from "../auth/loginStrategies.js";
+import { SYSTEM_TASKS } from "../lib/systemTasks.js";
+import { runNotice, runNoticed } from "../lib/systemTaskRun.js";
 
 let started = false;
 // the managed .env as this process last applied it
@@ -86,6 +88,14 @@ export async function startCluster() {
       if (!holdsWorkerLock()) return;
       return reloadConfigSeed({ force: true, trigger: "SIGHUP" });
     });
+    // Run now of a system task asked on another node (lib/systemTaskRun.js) : the node that runs
+    // the tasks runs it, not awaited (a backup must not hold the other notices up)
+    for (const task of SYSTEM_TASKS) {
+      onEpoch(runNotice(task.key), () => {
+        if (!holdsWorkerLock()) return;
+        runNoticed(task.key);
+      });
+    }
     // what the Status page of any node shows about the scheduler and the seed
     setWorkerInfo(() => ({ scheduler: cronService.describe(), seed: getSeedState() }));
   }

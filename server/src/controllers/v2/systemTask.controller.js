@@ -4,7 +4,8 @@ import Audit from '../../models/audit.model.js';
 import i18n from '../../lib/i18n.js';
 import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
-import { systemTask, hubLoop, taskCron, scheduleCronProblem } from '../../lib/systemTasks.js';
+import { systemTask, hubLoop, taskCron, taskEnabled, scheduleCronProblem } from '../../lib/systemTasks.js';
+import { runNow, busyTasks } from '../../lib/systemTaskRun.js';
 import { ENV_EDIT_DISABLED_REASON } from '../../lib/envSettings.js';
 import { saveEnvValues, EnvSaveError } from '../../lib/envSave.js';
 
@@ -20,11 +21,28 @@ const list = async function (req, res) {
   }
 };
 
-// GET /api/v2/system/tasks/:key : one task, the same, with its recent runs ; 404 for a key no task
-// has
+/**
+ * One task as GET answers it, with whether a run of it is going now (running : the page's Run now
+ * waits meanwhile) ; a runner hub loop is never run from here.
+ *
+ * Args:
+ *   key (string): the task's key.
+ *
+ * Returns:
+ *   Promise<object|null>: the task, or null for a key no task has.
+ */
+async function taskWithState(key) {
+  const task = await SystemTask.get(key);
+  if (!task) return null;
+  const running = systemTask(key) ? (await busyTasks()).has(key) : false;
+  return { ...task, running };
+}
+
+// GET /api/v2/system/tasks/:key : one task, the same, with its recent runs and whether it runs
+// now ; 404 for a key no task has
 const get = async function (req, res) {
   try {
-    const task = await SystemTask.get(req.params.key);
+    const task = await taskWithState(req.params.key);
     if (!task) {
       res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
       return;
@@ -111,4 +129,65 @@ const saveSchedule = async function (req, res) {
   }
 };
 
-export default { list, get, saveSchedule };
+// what each refusal of Run now answers : its status and why, in English as the other refusals
+const RUN_REFUSED = {
+  busy: [409, 'A run of this task is going, wait for it to end'],
+  off: [400, 'This task is off and does not run'],
+  noWorker: [503, 'No node runs the system tasks now: no process holds the worker lock'],
+};
+
+// POST /api/v2/system/tasks/:key/run : runs a task once now, recorded as a scheduled run is (its
+// outcome and result on its Runs tab), on the node that runs the tasks wherever the request came
+// in (lib/systemTaskRun.js). Answers the task as GET does once the run ended (200), or at once
+// while it still runs (202) : the nightly backup, which may outlast a request, and a run handed to
+// another node that did not end within the wait. 404 for a key no task has, 403 for a runner hub
+// loop (the engine's own timers, never run from here), 400 for a task that is off (the config seed
+// reload without CONFIG_SEED_PATH), 409 while a run of it is going, 503 when no node runs the
+// tasks. Audited (system.task.run), with where it ran and how it went.
+const run = async function (req, res) {
+  const fail = (status, detail) =>
+    res.status(status).json(RestResult.error(i18n.t(req, 'resources.systemTaskRunFailed'), detail));
+  try {
+    // step 1 : the task ; a runner hub loop is not one to run
+    const task = systemTask(req.params.key);
+    if (!task && hubLoop(req.params.key)) {
+      fail(403, "The runner hub's loops run on their own timers, they cannot be run from here");
+      return;
+    }
+    if (!task) {
+      res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
+      return;
+    }
+    if (!taskEnabled(task.key)) {
+      fail(...RUN_REFUSED.off);
+      return;
+    }
+    // step 2 : run, here or on the node that runs the tasks
+    const ran = await runNow(task.key);
+    if (RUN_REFUSED[ran.status]) {
+      fail(...RUN_REFUSED[ran.status]);
+      return;
+    }
+    // step 3 : the task as it is now, its run audited (how it went, when it ended)
+    const answer = await taskWithState(task.key);
+    const done = ran.status === 'done';
+    Audit.log({
+      user: req.user?.user,
+      ip: req.ip,
+      action: 'system.task.run',
+      outcome: 'success',
+      targetType: 'system_task',
+      target: task.key,
+      detail: done
+        ? { node: ran.node, run: answer?.last_run?.outcome || null, result: answer?.last_run?.result || null }
+        : { node: ran.node, run: 'started' },
+    });
+    logger.notice(`The system task ${task.key} was run now by ${req.user?.user?.username || 'a user'} (${ran.status})`);
+    res.status(done ? 200 : 202).json(RestResult.single(done ? answer : { ...answer, running: true }));
+  } catch (err) {
+    logger.error(helpers.getError(err));
+    fail(err.status || 500, helpers.getError(err));
+  }
+};
+
+export default { list, get, saveSchedule, run };

@@ -9,18 +9,22 @@
 /*             run, and the setting it applies (where it is       */
 /*             changed, or the environment variable that sets it) */
 /*    Schedule when it runs : its cron in the editor of a        */
-/*             schedule's Schedule tab, saved with Save and       */
-/*             undone with Revert (read only when the environment */
-/*             sets it) ; a cron still read from a deprecated     */
-/*             variable says so under it. A runner hub loop has   */
-/*             no cron : every so many seconds, read only, one    */
-/*             line saying why, and its node on Details           */
+/*             schedule's Schedule tab, saved with Save (read     */
+/*             only when the environment sets it ; leaving with   */
+/*             a change asks first) ; a cron still read from a    */
+/*             deprecated variable says so under it. A runner hub */
+/*             loop has no cron : every so many seconds, read     */
+/*             only, one line saying why, and its node on Details */
 /*    Runs     its recent runs, the latest first                  */
+/*  Run now top right, beside Save, as a schedule's page : the    */
+/*  task run once at once, then read again (its last run, result  */
+/*  and Runs) ; disabled while it runs and for a task that is     */
+/*  off. A runner hub loop has none, it is the engine's own.      */
 /*  No Delete, nothing else to edit - the task is the app's own.  */
 /*  The search of the title line narrows every tab at once.       */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
@@ -48,16 +52,21 @@ const cronEdit = ref('');
 
 /**
  * Loads the task and its recent runs ; refused or failing, the page says it is not found. Its
- * cron in the editor is the saved one again.
+ * cron in the editor is the saved one again, unless it is being changed (keepEdit : read again
+ * after a run, the change not lost).
+ *
+ * Args:
+ *   keepEdit (boolean): keep a changed cron in the editor.
  */
-async function load() {
+async function load(keepEdit = false) {
+  const keep = keepEdit && dirty.value;
   try {
     const res = await axios.get(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}`);
     task.value = res.data?.key ? res.data : null;
   } catch {
     task.value = null;
   }
-  cronEdit.value = task.value?.cron || '';
+  if (!keep) cronEdit.value = task.value?.cron || '';
   loaded.value = true;
 }
 
@@ -118,12 +127,80 @@ async function save() {
   }
 }
 
+// ─── Run now ──────────────────────────────────────────────────────────────────
+// a run asked here and not ended yet ; the task's own running (a scheduled run, or one asked
+// elsewhere) disables Run now too
+const runAsked = ref(false);
+const running = computed(() => runAsked.value || !!task.value?.running);
+// a task that is off (the config seed reload without CONFIG_SEED_PATH) is not run
+const canRun = computed(() => !!task.value && task.value.enabled !== false && !running.value);
+// a run that goes on after the answer (the nightly backup) : read again every 2 seconds until it
+// is recorded, 30 minutes at most
+const FOLLOW_MS = 2000;
+const FOLLOW_MAX_MS = 30 * 60 * 1000;
+let followTimer = null;
+
 /**
- * Puts the saved cron back in the editor.
+ * Says how a run went : its result, or its error.
+ *
+ * Args:
+ *   run (object|null): the task's last run.
  */
-function revert() {
-  cronEdit.value = task.value?.cron || '';
+function sayRun(run) {
+  if (run?.outcome === 'failed')
+    toast.error(t('jobs.system.runFailed', { name: name.value, result: run.result || '' }));
+  else toast.success(t('jobs.system.runDone', { name: name.value, result: run?.result || '' }));
 }
+
+/**
+ * Reads the task again every FOLLOW_MS until the run that started is recorded (a last run other
+ * than `before`, the task no longer running), then says how it went.
+ *
+ * Args:
+ *   before (number|null): the id of its last run before the run.
+ *   until (number): when to stop following (ms since the epoch).
+ *   quiet (boolean): say nothing when it ends (a run found going when the page opened).
+ */
+function followRun(before, until, quiet = false) {
+  clearTimeout(followTimer);
+  followTimer = setTimeout(async () => {
+    await load(true);
+    const run = task.value?.last_run;
+    const ended = !!run && run.id !== before && !task.value?.running;
+    if (ended || !task.value || Date.now() > until) {
+      runAsked.value = false;
+      if (ended && !quiet) sayRun(run);
+      return;
+    }
+    followRun(before, until, quiet);
+  }, FOLLOW_MS);
+}
+
+/**
+ * Runs the task now (POST /api/v2/system/tasks/<key>/run), then reads it again : its last run,
+ * result and Runs show the new run. A run answered while it still goes (202) is followed until
+ * it ends.
+ */
+async function runNow() {
+  const before = task.value?.last_run?.id ?? null;
+  runAsked.value = true;
+  try {
+    const res = await axios.post(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/run`, {});
+    await load(true);
+    if (res.status === 202) {
+      toast.info(t('jobs.system.runStarted', { name: name.value }));
+      followRun(before, Date.now() + FOLLOW_MAX_MS);
+      return;
+    }
+    sayRun(task.value?.last_run);
+  } catch (err) {
+    toast.error(Helpers.parseAxiosResponseError(err));
+    await load(true);
+  }
+  runAsked.value = false;
+}
+
+onBeforeUnmount(() => clearTimeout(followTimer));
 
 // its name and what it does, in the user's language
 const name = computed(() => (task.value ? taskName(t, task.value) : ''));
@@ -261,6 +338,8 @@ onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
   await load();
+  // a run going as the page opens (scheduled, or asked elsewhere) : Run now waits for its end
+  if (task.value?.running) followRun(task.value.last_run?.id ?? null, Date.now() + FOLLOW_MAX_MS, true);
 });
 </script>
 <template>
@@ -435,14 +514,17 @@ onMounted(async () => {
             </div>
           </div>
         </template>
-        <!-- a task whose cron may be changed : Revert and Save, as a record page's (Save orange while
-             the cron is changed ; enabled too while the cron comes from a deprecated variable, which
-             Save replaces) -->
-        <template v-if="task && scheduleEditable" #actions>
-          <BsButton icon="clock-rotate-left" :disabled="!dirty" @click="revert()">{{
-            t('jobs.system.revert')
+        <!-- a task : Run now, as a schedule's page (disabled while it runs and for a task that is
+             off), then Save when its cron may be changed, as a record page's (orange while the cron
+             is changed ; enabled too while the cron comes from a deprecated variable, which Save
+             replaces). A runner hub loop has neither : the engine's own -->
+        <template v-if="task && !isLoop" #actions>
+          <BsButton icon="play" cssClass="text-nowrap" :disabled="!canRun" @click="runNow()">{{
+            t('settings.schedules.runSchedule')
           }}</BsButton>
-          <BsButton icon="save" :disabled="!canSave" @click="save()">{{ t('settings.common.save') }}</BsButton>
+          <BsButton v-if="scheduleEditable" icon="save" :disabled="!canSave" @click="save()">{{
+            t('settings.common.save')
+          }}</BsButton>
         </template>
       </AppSettings>
       <!-- the user being checked : the title and placeholders where the page comes -->

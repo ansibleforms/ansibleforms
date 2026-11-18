@@ -138,6 +138,7 @@ export default {
     databaseNotFound: "データベースが見つかりません",
     systemTaskNotFound: "システムタスクが見つかりません",
     systemTaskScheduleFailed: "タスクのスケジュールを保存できませんでした",
+    systemTaskRunFailed: "タスクを実行できませんでした",
     runnerAdminOnly:
       "ランナーを追加、変更、削除できるのは admin だけです：ランナーは実行するジョブの認証情報を受け取ります",
     repositoryAdminOnly:

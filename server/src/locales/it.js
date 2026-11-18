@@ -140,6 +140,7 @@ export default {
     databaseNotFound: "Database non trovato",
     systemTaskNotFound: "Attività di sistema non trovata",
     systemTaskScheduleFailed: "Non è stato possibile salvare la pianificazione dell'attività",
+    systemTaskRunFailed: "Non è stato possibile eseguire l'attività",
     runnerAdminOnly:
       "Solo un admin può aggiungere, modificare o eliminare un runner: un runner riceve le credenziali dei job che esegue",
     repositoryAdminOnly:
