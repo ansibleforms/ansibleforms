@@ -680,7 +680,7 @@ function copyLog() {
         @keydown.enter.self.prevent="toggle(group.node.index)"
         @keydown.space.self.prevent="toggle(group.node.index)"
       >
-        <FaIcon :icon="folded.has(group.node.index) ? 'chevron-right' : 'chevron-down'" class="af-node-chevron" />
+        <FaIcon :icon="folded.has(group.node.index) ? 'angle-down' : 'angle-up'" class="af-node-chevron" />
         <FaIcon v-if="group.node.kind == 'summary'" icon="flag-checkered" class="af-node-flag" />
         <FaIcon v-else-if="group.node.kind == 'job'" icon="scroll" class="af-node-flag" />
         <span class="af-node-name">{{ group.node.name }}</span>
@@ -818,7 +818,7 @@ function copyLog() {
       @keydown.enter.self.prevent="logFolded = !logFolded"
       @keydown.space.self.prevent="logFolded = !logFolded"
     >
-      <FaIcon :icon="logFolded ? 'chevron-right' : 'chevron-down'" class="af-node-chevron" />
+      <FaIcon :icon="logFolded ? 'angle-down' : 'angle-up'" class="af-node-chevron" />
       <FaIcon icon="file-lines" class="af-node-flag" />
       <span class="af-node-name">{{ t('jobs.logFile') }}</span>
       <span class="af-node-meta">

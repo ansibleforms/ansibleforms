@@ -1809,7 +1809,7 @@ onMounted(async () => {
                   :aria-expanded="!summaryCollapsed"
                   @click="summaryCollapsed = !summaryCollapsed"
                 >
-                  <FaIcon :icon="summaryCollapsed ? 'angles-down' : 'angles-up'" />
+                  <FaIcon :icon="summaryCollapsed ? 'angle-down' : 'angle-up'" />
                 </button>
                 <h3 class="af-job-number">{{ job.form || t('jobs.jobTitle', { id: '#' + jobId }) }}</h3>
                 <AppStatusPill :status="job.status" />
@@ -2070,7 +2070,7 @@ onMounted(async () => {
                       @keydown.enter.self.prevent="toggleOutput('main')"
                       @keydown.space.self.prevent="toggleOutput('main')"
                     >
-                      <FaIcon :icon="foldedOutputs.main ? 'chevron-right' : 'chevron-down'" class="af-job-chevron" />
+                      <FaIcon :icon="foldedOutputs.main ? 'angle-down' : 'angle-up'" class="af-job-chevron" />
                       {{ t('jobs.mainJob') }} {{ t('jobs.jobIdNote', { id: jobId }) }}
                       <AppStatusPill :status="job.status" />
                     </h3>
@@ -2103,10 +2103,7 @@ onMounted(async () => {
                       @keydown.enter.self.prevent="toggleOutput(step.id)"
                       @keydown.space.self.prevent="toggleOutput(step.id)"
                     >
-                      <FaIcon
-                        :icon="foldedOutputs[step.id] ? 'chevron-right' : 'chevron-down'"
-                        class="af-job-chevron"
-                      />
+                      <FaIcon :icon="foldedOutputs[step.id] ? 'angle-down' : 'angle-up'" class="af-job-chevron" />
                       {{ t('jobs.stepN', { n: i + 1 }) }}<template v-if="step.target"> · {{ step.target }}</template>
                       {{ t('jobs.jobIdNote', { id: step.id }) }}
                       <AppStatusPill :status="step.status" />
@@ -2252,6 +2249,10 @@ onMounted(async () => {
   margin-left: calc(-0.5rem - 1px);
   svg {
     width: 0.75rem;
+    /* 1px lower than its box's middle : an up or down caret reads high beside a mostly lowercase
+       title (its weight in its point, the title's in its x-height) */
+    position: relative;
+    top: 1px;
   }
 }
 .af-job-summary-collapsed .af-job-heading {
