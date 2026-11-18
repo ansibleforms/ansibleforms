@@ -19,7 +19,7 @@ import CrudModel from './crud.model.js';
  * here: most options default to true, a few to isAdmin, and BOTH showExtravars spellings
  * are filled - see the notes in client/src/config/roles.js.
  */
-function applyOptionDefaults(options, isAdmin) {
+export function applyOptionDefaults(options, isAdmin) {
   if (options.allowVerboseMode === undefined) options.allowVerboseMode = true;
   if (options.showSettings === undefined) options.showSettings = isAdmin;
   if (options.showDesigner === undefined) options.showDesigner = isAdmin;
@@ -35,10 +35,12 @@ function applyOptionDefaults(options, isAdmin) {
   // use and those no form uses (lib/designerForms.js) : as designAllForms
   if (options.designAllPlaybooks === undefined || isAdmin) options.designAllPlaybooks = true;
   if (options.designAllWorkflows === undefined || isAdmin) options.designAllWorkflows = true;
-  // api tokens (lib/tokenLifetime.js) : off unless a role turns them on - a role from before this
-  // option, with only extendedTokenExpiration (then the token permission), keeps them ;
-  // extendedTokenExpiration (with them, one that never expires) off as well
-  if (options.allowApiTokens === undefined) options.allowApiTokens = !!options.extendedTokenExpiration;
+  // api tokens (lib/tokenLifetime.js) : an admin's, as every other right of theirs, unless a role
+  // turns them off ; off for the others unless a role turns them on - a role from before this
+  // option, with only extendedTokenExpiration (then the token permission), keeps them.
+  // extendedTokenExpiration (with them, one that never expires) off for every role, admins too :
+  // a token that never expires is a choice to make, not a default
+  if (options.allowApiTokens === undefined) options.allowApiTokens = isAdmin || !!options.extendedTokenExpiration;
   if (options.extendedTokenExpiration === undefined) options.extendedTokenExpiration = false;
   if (options.allowWorkflowDesign === undefined) options.allowWorkflowDesign = true;
   if (options.allowInventoryDesign === undefined) options.allowInventoryDesign = true;
