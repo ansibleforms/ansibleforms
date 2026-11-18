@@ -101,10 +101,10 @@ export function fieldError(expr, field) {
       }
       if (nth !== null && !/^(?:[1-5]|L)$/i.test(nth)) return { key: 'invalid' };
     } else if (field === 'dom' && /L/i.test(token)) {
-      // croner strips every 'L' from the day-of-month field and matches the last day
-      // of the month in addition to whatever remains
-      token = token.replace(/L/gi, '');
-      if (token === '') continue; // 'L' on its own
+      // 'L' (the month's last day) is a value of its own in the day-of-month field ('1,L') ;
+      // croner refuses it glued to a number ('5L'), which only the weekday field takes
+      if (/^L$/i.test(token)) continue;
+      return { key: 'invalid' };
     }
     if (token === '*') continue;
     let range = token;
