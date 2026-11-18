@@ -109,6 +109,13 @@ describe('what croner accepts, the validator accepts too', () => {
     }
   });
 
+  it("the last day of the month is 'L' on its own, never glued to a day ('5L', which croner 11.0.1 refuses)", () => {
+    for (const expr of ['0 0 L * *', '0 0 1,L * *']) expect(cronError(expr), `${expr} should be accepted`).toBeNull();
+    for (const expr of ['0 0 5L * *', '0 0 15L * *', '0 0 1,5L * *']) {
+      expect(cronError(expr), `${expr} should be refused`).not.toBeNull();
+    }
+  });
+
   it('and refuses only what it means to refuse', () => {
     for (const expr of DELIBERATELY_UNSUPPORTED) {
       expect(cronError(expr), `${expr} should be refused`).not.toBeNull();
