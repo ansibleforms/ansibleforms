@@ -143,6 +143,12 @@ function handleActionClick(actionKey) {
   </div>
 </template>
 <style scoped>
+/* the caret while its menu is open : filled with the button's colour (Bootstrap's .show), its
+   caret white on it. The theme writes an outline button's colour with !important
+   (textColors.scss), which left a blue caret on blue */
+.dropdown-toggle-split.show {
+  color: #fff !important;
+}
 /* an action's hint : under its label, muted, on one line */
 .af-dropdown-hint {
   display: block;
