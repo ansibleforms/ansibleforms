@@ -229,6 +229,11 @@ export const adminByDefaultOptions = [
   'allowScheduledJobs',
   'allowStoredJobsShare',
   'allowStoredJobsViewAll',
+  // as the server's role defaults (models/user.model.js applyOptionDefaults) : every right of an
+  // admin's on, API tokens too (never-expiring ones not : extendedTokenExpiration stays off)
+  'showAuditLog',
+  'manageAllJobs',
+  'allowApiTokens',
 ];
 
 // Effective value of every option for a role that does not spell it out.
