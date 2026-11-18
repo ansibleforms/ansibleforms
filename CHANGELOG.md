@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.7.0](https://github.com/ansibleforms/ansibleforms/compare/7.6.0...7.7.0) (2026-11-18)
+
+
+### Added
+
+* a job names the stored job it was launched from ([#1442](https://github.com/ansibleforms/ansibleforms/issues/1442)) ([c95eb4f](https://github.com/ansibleforms/ansibleforms/commit/c95eb4f126dd6bc4f3927b2400dab482e6cc2b71))
+* a Push all button beside Pull all on the repositories list ([#1438](https://github.com/ansibleforms/ansibleforms/issues/1438)) ([ac6e39e](https://github.com/ansibleforms/ansibleforms/commit/ac6e39e8c5c64c223232fdc876814555a382a65c))
+* a setting for the Server log page's lines ([#1422](https://github.com/ansibleforms/ansibleforms/issues/1422)) ([eb388c0](https://github.com/ansibleforms/ansibleforms/commit/eb388c0466c12b7d95bb7d53da11aa02db0ddc94))
+* a stored job lists its runs ([#1443](https://github.com/ansibleforms/ansibleforms/issues/1443)) ([41faa87](https://github.com/ansibleforms/ansibleforms/commit/41faa871912eb8e8eb595dfadf3acc2d9efa9ed2))
+* logs filtered by year, month and day ([#1423](https://github.com/ansibleforms/ansibleforms/issues/1423)) ([26eaa61](https://github.com/ansibleforms/ansibleforms/commit/26eaa61e0b65bc536816de8012b897c3b85a94dd))
+* relaunch a job on its failed hosts ([#1427](https://github.com/ansibleforms/ansibleforms/issues/1427)) ([ab4f05e](https://github.com/ansibleforms/ansibleforms/commit/ab4f05e6b75f9dd415dca852dd8f47beb669742e))
+* relaunch a workflow from its failed node ([#1430](https://github.com/ansibleforms/ansibleforms/issues/1430)) ([281307f](https://github.com/ansibleforms/ansibleforms/commit/281307f1f8bb07dedd5a29388ec945236f99b1aa)), closes [#1082](https://github.com/ansibleforms/ansibleforms/issues/1082)
+* stored jobs record and show when they were last used ([#1441](https://github.com/ansibleforms/ansibleforms/issues/1441)) ([7f8fc51](https://github.com/ansibleforms/ansibleforms/commit/7f8fc51e751e40b9076fd7618853718ef74c82d3))
+* stored jobs unused for N days expire ([#1444](https://github.com/ansibleforms/ansibleforms/issues/1444)) ([0750d80](https://github.com/ansibleforms/ansibleforms/commit/0750d80c9848f873fa7a6b7cac4fcd163e800c9e))
+* the Audit log downloads as CSV ([#1424](https://github.com/ansibleforms/ansibleforms/issues/1424)) ([23e4549](https://github.com/ansibleforms/ansibleforms/commit/23e4549ae4fb2c5b08cb4a15a2855f3826f9e874))
+
+
+### Fixed
+
+* a cron's day of the month glued to L ('5L') is refused, as croner refuses it ([#1493](https://github.com/ansibleforms/ansibleforms/issues/1493)) ([dda20e5](https://github.com/ansibleforms/ansibleforms/commit/dda20e565aea269375c913aacd4397c4f30c83bc))
+* a form name in two forms repositories names both copies ([#1439](https://github.com/ansibleforms/ansibleforms/issues/1439)) ([75a34b0](https://github.com/ansibleforms/ansibleforms/commit/75a34b07ae52da244ad6b4dcce2890a33f236f8f))
+* a form save keeps another repository's duplicate copy ([#1440](https://github.com/ansibleforms/ansibleforms/issues/1440)) ([8b48639](https://github.com/ansibleforms/ansibleforms/commit/8b4863983165c39732d4efe3ec2d47751b0ab0a3))
+* a job of a form without fields can be relaunched ([#1426](https://github.com/ansibleforms/ansibleforms/issues/1426)) ([45346f0](https://github.com/ansibleforms/ansibleforms/commit/45346f0d09f9b06189803c52bd36c366877c8928))
+* a split button's caret is white while its menu is open ([#1495](https://github.com/ansibleforms/ansibleforms/issues/1495)) ([bee48f3](https://github.com/ansibleforms/ansibleforms/commit/bee48f3d044ba8568889dc4f202e507a2d5b752c))
+* an Entra ID certificate credential keeps an SSO secret ([#1421](https://github.com/ansibleforms/ansibleforms/issues/1421)) ([ddcce63](https://github.com/ansibleforms/ansibleforms/commit/ddcce63650c30e39a58ade07f34d660827bcf586))
+* an RTE with its own clones runs the controller's playbooks ([#1434](https://github.com/ansibleforms/ansibleforms/issues/1434)) ([5b10e0d](https://github.com/ansibleforms/ansibleforms/commit/5b10e0d8c6367925120b814484c0eb1f224d495c))
+* an update with nothing to change says so, not an SQL error ([#1484](https://github.com/ansibleforms/ansibleforms/issues/1484)) ([d4e49b8](https://github.com/ansibleforms/ansibleforms/commit/d4e49b85c1fc96a9e39dc299e0daeecc072f4fd1))
+* small translation fixes ([#1418](https://github.com/ansibleforms/ansibleforms/issues/1418)) ([8b8181b](https://github.com/ansibleforms/ansibleforms/commit/8b8181bf1a7ee3cda90ad89726d23abf34dff499))
+* task result padding in a workflow node ([#1428](https://github.com/ansibleforms/ansibleforms/issues/1428)) ([f88d56b](https://github.com/ansibleforms/ansibleforms/commit/f88d56b0af74fc458047cabf3bf9769acf63bdca))
+* the Audit log sorts by its columns ([#1425](https://github.com/ansibleforms/ansibleforms/issues/1425)) ([5fe7b04](https://github.com/ansibleforms/ansibleforms/commit/5fe7b04edabba286485af61a930ec839483a0ee3))
+
+
+### Changed
+
+* a record page's Enabled, Default and Sign-in switches wait for Save ([#1486](https://github.com/ansibleforms/ansibleforms/issues/1486)) ([08c681e](https://github.com/ansibleforms/ansibleforms/commit/08c681efa885556d4e5c2e261c2ea9ed60d9a5c3))
+* an admin has API tokens by default, as every other right ([#1494](https://github.com/ansibleforms/ansibleforms/issues/1494)) ([28451d2](https://github.com/ansibleforms/ansibleforms/commit/28451d22cc071871241007642ad395647c41ada3))
+* external link icon on workflow nodes ([#1429](https://github.com/ansibleforms/ansibleforms/issues/1429)) ([30d6a30](https://github.com/ansibleforms/ansibleforms/commit/30d6a302c2b7934140afcabd447fb54b6263297b))
+* record pages start with name, description optional ([#1446](https://github.com/ansibleforms/ansibleforms/issues/1446)) ([796a9eb](https://github.com/ansibleforms/ansibleforms/commit/796a9eb4869bf87edf812fc3fd31151a9d292748))
+* the About dialog shows the AnsibleForms logo and version ([#1432](https://github.com/ansibleforms/ansibleforms/issues/1432)) ([0cdebaf](https://github.com/ansibleforms/ansibleforms/commit/0cdebafea1c868cef60e59f040df213e4fe0198d))
+* the job delete and relaunch dialogs are narrower, confirm dialogs evenly spaced ([#1485](https://github.com/ansibleforms/ansibleforms/issues/1485)) ([b9acef6](https://github.com/ansibleforms/ansibleforms/commit/b9acef698556a62c620d9fecb41c592b29376b5e))
+* the new runner wizard offers no database mode ([#1433](https://github.com/ansibleforms/ansibleforms/issues/1433)) ([8f7b6ef](https://github.com/ansibleforms/ansibleforms/commit/8f7b6ef86ba919ecc0c744f6adf78388abf22813))
+
 ## [7.6.0](https://github.com/ansibleforms/ansibleforms/compare/7.5.0...7.6.0) (2026-11-14)
 
 
