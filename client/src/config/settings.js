@@ -4227,7 +4227,9 @@ export default function getSettings(t) {
                 ? 'settings.secretStores.writeEnabledHelpCyberArk'
                 : 'settings.secretStores.writeEnabledHelp',
             ),
-          initial: (r) => !!Number(r?.write_enabled),
+          // on for a new store (both types can write) ; off is chosen here, its write prefix
+          // still keeps writes below one path
+          initial: (r) => (r?.write_enabled === undefined ? true : !!Number(r.write_enabled)),
           noTable: true,
           hidden: true,
         },
