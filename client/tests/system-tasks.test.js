@@ -198,10 +198,17 @@ describe("a task's page", () => {
       'result',
       'node',
     ]);
-    // its end time, before the duration, empty while it runs
+    // its times as the other Runs tabs' (Time.format), the end before the duration, empty while it runs
     expect(cols).toMatch(
-      /key: 'ended_at',\s*label: t\('jobs\.endTime'\),\s*keep: true,\s*value: \(r\) => \(r\.ended_at \? Helpers\.formatServerDate\(r\.ended_at\) : ''\)/,
+      /key: 'started_at',\s*label: t\('jobs\.startTime'\),\s*keep: true,\s*value: \(r\) => r\.started_at && Time\.format\(r\.started_at\)/,
     );
+    expect(cols).toMatch(
+      /key: 'ended_at',\s*label: t\('jobs\.endTime'\),\s*keep: true,\s*value: \(r\) => r\.ended_at && Time\.format\(r\.ended_at\)/,
+    );
+    expect(cols).not.toContain('formatServerDate');
+    for (const other of ['pages/schedule.vue', 'pages/stored-job.vue', 'pages/admin/runner.vue']) {
+      expect(read(`src/${other}`), other).toContain('value: (j) => j.start && Time.format(j.start)');
+    }
     expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
   });
 

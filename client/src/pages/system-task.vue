@@ -33,6 +33,7 @@ import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
+import Time from '@/lib/Time';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { cronValidationMessage } from '@/config/cron';
@@ -254,18 +255,20 @@ const runs = computed(() => task.value?.runs || []);
 const runColumns = computed(() => [
   // who clicked Run now, or Schedule for a timed run (and for a run recorded before this column)
   { key: 'launched_by', label: t('jobs.launchedBy'), value: (r) => runLauncher(t, r) },
+  // its times as the other Runs tabs' (a schedule's, a stored job's, a runner's) : Time.format, the
+  // server sending ISO strings in UTC ('Z') that it puts in the user's zone
   {
     key: 'started_at',
     label: t('jobs.startTime'),
     keep: true,
-    value: (r) => (r.started_at ? Helpers.formatServerDate(r.started_at) : ''),
+    value: (r) => r.started_at && Time.format(r.started_at),
   },
   // when it ended ; empty while it runs
   {
     key: 'ended_at',
     label: t('jobs.endTime'),
     keep: true,
-    value: (r) => (r.ended_at ? Helpers.formatServerDate(r.ended_at) : ''),
+    value: (r) => r.ended_at && Time.format(r.ended_at),
   },
   // how long it ran, to the right as a number
   {
