@@ -322,12 +322,19 @@ SystemTask.envEditAllowed = () => !!appConfig.allowEnvEdit;
  *   Promise<object[]>: the tasks, as describe answers them.
  */
 SystemTask.list = async function () {
-  // step 1 : each task's latest row, in one query (the latest started, the highest id on a tie)
+  // step 1 : each task's latest row, in one query (the latest started, the highest id on a tie) :
+  // one indexed read per task (idx_system_task_runs_task), so it stays as quick with a long
+  // history ; a subquery per row of the table took most of a second with a few thousand runs
+  const keys = [...SYSTEM_TASKS, ...HUB_LOOPS].map((x) => x.key);
   const rows = await mysql.do(
-    'SELECT r.* FROM AnsibleForms.`system_task_runs` r WHERE r.id = (' +
-      'SELECT r2.id FROM AnsibleForms.`system_task_runs` r2 WHERE r2.task_key = r.task_key ' +
-      'ORDER BY r2.started_at DESC, r2.id DESC LIMIT 1)',
-    undefined,
+    keys
+      .map(
+        (_, i) =>
+          'SELECT * FROM (SELECT * FROM AnsibleForms.`system_task_runs` WHERE task_key = ? ' +
+          `ORDER BY started_at DESC, id DESC LIMIT 1) latest${i}`,
+      )
+      .join(' UNION ALL '),
+    keys,
     true,
   );
   const latest = new Map((rows || []).map((row) => [row.task_key, row]));

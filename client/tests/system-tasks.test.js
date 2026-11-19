@@ -37,7 +37,15 @@ describe('the Jobs menu', () => {
     expect(future).toMatch(/title: t\('jobs\.menu\.system'\),\s*icon: 'gears',/);
     expect(future).toMatch(/badge: futureCounts\.value\.system,/);
     // the count : the tasks the api lists
-    expect(sidebar).toMatch(/read\('\/jobs\/system', '\/api\/v2\/system\/tasks'\)/);
+    expect(sidebar).toMatch(/show\('system', '\/jobs\/system', '\/api\/v2\/system\/tasks'\)/);
+  });
+
+  it('shows each future count as soon as its own answer comes, a slow one holding up no other', () => {
+    expect(sidebar).toMatch(/futureCounts\.value = \{ \.\.\.futureCounts\.value, \[key\]: count \}/);
+    expect(sidebar).toMatch(/show\('schedules', '\/jobs\/scheduled', '\/api\/v2\/schedule\/'\)/);
+    expect(sidebar).toMatch(/show\('stored', '\/jobs\/stored', '\/api\/v2\/stored-jobs\/'\)/);
+    // not all three set together once the slowest has answered
+    expect(sidebar).not.toMatch(/futureCounts\.value = \{ schedules, stored, system \}/);
   });
 
   it('shows it to an admin only : the route asks for the settings, as the api', () => {

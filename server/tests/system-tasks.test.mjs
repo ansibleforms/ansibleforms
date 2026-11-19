@@ -288,6 +288,24 @@ describe("the tasks as the API answers them", () => {
     assert.equal(seed.interval_seconds, null);
   });
 
+  test("each task's last run read by its own indexed lookup, never a subquery per row", async () => {
+    answer = () => [];
+    queries.length = 0;
+    await SystemTask.list();
+    const reads = queries.filter((q) => /system_task_runs/.test(q.sql));
+    assert.equal(reads.length, 1, "one query for every task");
+    const keys = [...SYSTEM_TASKS, ...HUB_LOOPS].map((t) => t.key);
+    // one latest row per task, by task_key and started_at (idx_system_task_runs_task)
+    assert.deepEqual(reads[0].params, keys);
+    const parts = reads[0].sql.split(" UNION ALL ");
+    assert.equal(parts.length, keys.length);
+    for (const part of parts) {
+      assert.match(part, /WHERE task_key = \? ORDER BY started_at DESC, id DESC LIMIT 1\)/);
+    }
+    // the slow form : a subquery run again for every row of the table
+    assert.doesNotMatch(reads[0].sql, /r2\.task_key = r\.task_key/);
+  });
+
   test("ALLOW_ENV_EDIT=0 : every setting is the environment's", async () => {
     appConfig.allowEnvEdit = false;
     try {

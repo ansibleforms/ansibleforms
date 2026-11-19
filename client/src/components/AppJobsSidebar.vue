@@ -196,12 +196,16 @@ async function loadFutureCounts() {
       return null;
     }
   };
-  const [schedules, stored, system] = await Promise.all([
-    read('/jobs/scheduled', '/api/v2/schedule/'),
-    read('/jobs/stored', '/api/v2/stored-jobs/'),
-    read('/jobs/system', '/api/v2/system/tasks'),
+  // each count shown as soon as its own answer comes : a slow one never holds up the others
+  const show = (key, link, url) =>
+    read(link, url).then((count) => {
+      futureCounts.value = { ...futureCounts.value, [key]: count };
+    });
+  await Promise.all([
+    show('schedules', '/jobs/scheduled', '/api/v2/schedule/'),
+    show('stored', '/jobs/stored', '/api/v2/stored-jobs/'),
+    show('system', '/jobs/system', '/api/v2/system/tasks'),
   ]);
-  futureCounts.value = { schedules, stored, system };
 }
 
 // MOUNT
