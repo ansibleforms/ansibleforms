@@ -247,7 +247,8 @@ const launchError = computed(() => (lastRun.value?.outcome === 'failed' ? lastRu
 const setting = computed(() => task.value?.setting || null);
 
 // ─── Runs ─────────────────────────────────────────────────────────────────────
-// its recent runs, the latest first (the server keeps a month of them) : when, how long, how it
+// its recent runs, the latest first (the server keeps a month of them) : when it started and ended,
+// how long, how it
 // went, what it did, and the node that ran it ; a row opens nothing
 const runs = computed(() => task.value?.runs || []);
 const runColumns = computed(() => [
@@ -256,6 +257,13 @@ const runColumns = computed(() => [
     label: t('jobs.startTime'),
     keep: true,
     value: (r) => (r.started_at ? Helpers.formatServerDate(r.started_at) : ''),
+  },
+  // when it ended ; empty while it runs
+  {
+    key: 'ended_at',
+    label: t('jobs.endTime'),
+    keep: true,
+    value: (r) => (r.ended_at ? Helpers.formatServerDate(r.ended_at) : ''),
   },
   // how long it ran, to the right as a number
   {

@@ -188,7 +188,18 @@ describe("a task's page", () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'runs\')"'), page.indexOf('searchNone'));
     expect(tab).not.toMatch(/isLoop/);
     const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
-    expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual(['started_at', 'duration', 'outcome', 'result', 'node']);
+    expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual([
+      'started_at',
+      'ended_at',
+      'duration',
+      'outcome',
+      'result',
+      'node',
+    ]);
+    // its end time, before the duration, empty while it runs
+    expect(cols).toMatch(
+      /key: 'ended_at',\s*label: t\('jobs\.endTime'\),\s*keep: true,\s*value: \(r\) => \(r\.ended_at \? Helpers\.formatServerDate\(r\.ended_at\) : ''\)/,
+    );
     expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
   });
 
