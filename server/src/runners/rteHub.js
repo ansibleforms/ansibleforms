@@ -1768,8 +1768,9 @@ export function startRteHub(httpServer) {
     if (!handleUpgrade(req, socket, head)) socket.destroy();
   });
   // the hub's own loops, on their timers : each run kept in memory for Jobs > System, a failure
-  // warned of once per distinct error and written as a row once a minute at most (lib/hubLoops.js)
-  markLoopsStarted();
+  // warned of once per distinct error and written as a row once a minute at most ; Run now runs
+  // one pass of the same work (lib/hubLoops.js)
+  markLoopsStarted({ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded });
   const dispatchTimer = setInterval(() => loopRun("runnerDispatch", dispatch), DISPATCH_MS);
   dispatchTimer.unref?.();
   const dialTimer = setInterval(() => loopRun("runnerDial", dialInbound), DIAL_MS);

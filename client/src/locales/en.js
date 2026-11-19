@@ -3160,6 +3160,7 @@ export default {
       hubLoopHint: "The runner hub's own loop: it runs as often as the runners need it.",
       cronFiveFields: 'Use 5 fields: minute, hour, day, month and weekday.',
       runDone: '{name} ran: {result}',
+      runSucceeded: '{name} ran successfully.',
       runFailed: '{name} failed: {result}',
       runStarted: '{name} started, it may take a while.',
       tabRuns: 'Runs',

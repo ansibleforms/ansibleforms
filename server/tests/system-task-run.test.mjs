@@ -6,8 +6,10 @@
 //     and result, the task answered as GET answers it once the run ended (200) ;
 //   - the nightly backup is answered at once (202), its run going on ;
 //   - no second run while one runs (409), and a scheduled tick during it is skipped (croner busy) ;
-//   - an unknown key is 404, a runner hub loop 403, a task that is off 400, a user without the
-//     settings 403 ;
+//   - an unknown key is 404, a task that is off 400, a user without the settings 403 ;
+//   - a runner hub loop runs one pass on the node that received the request, through its own
+//     loopRun : counted, a failure recorded as a timed one's ; 409 on a node whose hub does not
+//     run, and while a pass of it goes, no second one started ;
 //   - on a node that does not run the tasks, the run is handed to the worker through its change
 //     notice (lib/epochs.js), which the worker reacts to (init/cluster.js) ; the request waits
 //     for its row, refuses while the worker says it runs (409), and answers 503 without a worker ;
@@ -85,6 +87,8 @@ const cronService = (await import("../src/services/cron.service.js")).default;
 const Middleware = (await import("../src/lib/middleware.js")).default;
 const systemRoutes = (await import("../src/routes/v2/system.routes.js")).default;
 const TaskRun = await import("../src/lib/systemTaskRun.js");
+const HubLoops = await import("../src/lib/hubLoops.js");
+const { nodeId } = await import("../src/lib/role.js");
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 
 // the work of the abandoned jobs sweep : how many it abandons, and a gate it may wait on
@@ -148,6 +152,7 @@ beforeEach(() => {
   appConfig.configSeedPath = "";
   appConfig.configSeedReloadSeconds = "";
   TaskRun.resetRunsForTests();
+  HubLoops.resetLoopsForTests(false);
 });
 
 afterEach(async () => {
@@ -239,16 +244,6 @@ describe("Run now refused", () => {
     assert.equal((await runNow("notATask")).status, 404);
   });
 
-  test("a runner hub loop is 403 : the engine's own timers", async () => {
-    await startTasks();
-    for (const key of ["runnerDispatch", "runnerDial", "runnerPrune"]) {
-      const res = await runNow(key);
-      assert.equal(res.status, 403, key);
-      assert.match(res.body.details, /runner hub's loops/);
-    }
-    assert.equal(db.runs.length, 0);
-  });
-
   test("a task that is off is 400 : the config seed reload without CONFIG_SEED_PATH", async () => {
     await startTasks();
     const res = await runNow("configSeedReload");
@@ -262,6 +257,106 @@ describe("Run now refused", () => {
     const res = await runNow("abandonedJobs", { showJobs: true, allowScheduledJobs: true });
     assert.equal(res.status, 403);
     assert.equal(work.calls, 0);
+  });
+});
+
+// ------------------------------------------------------------------
+// a runner hub loop
+// ------------------------------------------------------------------
+describe("Run now of a runner hub loop", () => {
+  /** The hub started here, each loop's work counting its passes ; a gate its work may wait on. */
+  const passes = { runnerDispatch: 0, runnerDial: 0, runnerPrune: 0 };
+  const loopWork = { gate: null, error: null };
+  const startHub = () => {
+    for (const key of Object.keys(passes)) passes[key] = 0;
+    loopWork.gate = null;
+    loopWork.error = null;
+    const fn = (key) => async () => {
+      passes[key]++;
+      if (loopWork.gate) await loopWork.gate;
+      if (loopWork.error) throw new Error(loopWork.error);
+    };
+    HubLoops.resetLoopsForTests(true, Object.fromEntries(Object.keys(passes).map((k) => [k, fn(k)])));
+  };
+
+  test("runs one pass of each loop here, counted as a timed one, and answers the loop", async () => {
+    startHub();
+    for (const key of Object.keys(passes)) {
+      const res = await runNow(key);
+      assert.equal(res.status, 200, key);
+      assert.equal(passes[key], 1, key);
+      assert.equal(res.body.key, key);
+      assert.equal(res.body.running, false);
+      assert.equal(res.body.loop.runs, 1);
+      assert.equal(res.body.loop.node, nodeId);
+      assert.equal(res.body.last_run.outcome, "success");
+      assert.equal(res.body.last_run.node, nodeId);
+    }
+    // a success writes no row, as a timed one ; nothing handed to another node
+    assert.equal(db.runs.length, 0);
+    assert.deepEqual(notices.sent, []);
+  });
+
+  test("a pass that fails is recorded as a timed one's : counted, its error kept and written", async () => {
+    startHub();
+    loopWork.error = "no socket";
+    const res = await runNow("runnerDial");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.last_run.outcome, "failed");
+    assert.equal(res.body.last_run.result, "no socket");
+    assert.equal(res.body.loop.failures, 1);
+    assert.deepEqual(db.runs.map((r) => [r.task_key, r.outcome, r.result]), [["runnerDial", "failed", "no socket"]]);
+  });
+
+  test("audited as a task's run : the loop, this node and how it went", async () => {
+    startHub();
+    await runNow("runnerPrune");
+    const entry = audits.find((a) => a.action === "system.task.run");
+    assert.ok(entry);
+    assert.equal(entry.target, "runnerPrune");
+    assert.equal(entry.targetType, "system_task");
+    assert.deepEqual(entry.detail, { node: nodeId, run: "success", result: null });
+  });
+
+  test("409 on a node whose hub does not run, no pass run", async () => {
+    HubLoops.resetLoopsForTests(false);
+    for (const key of Object.keys(passes)) {
+      const res = await runNow(key);
+      assert.equal(res.status, 409, key);
+      assert.match(res.body.details, /runner hub does not run on this node/);
+      assert.equal(HubLoops.loopState(key).runs, 0);
+    }
+    assert.equal(audits.length, 0);
+  });
+
+  test("no overlapping pass : 409 while one goes, its timer's or a Run now's", async () => {
+    startHub();
+    const g = gate();
+    loopWork.gate = g.promise;
+    // a pass going (the timer's, or a first Run now)
+    const first = runNow("runnerDispatch");
+    await vi.waitFor(() => assert.equal(passes.runnerDispatch, 1));
+    assert.equal(HubLoops.loopBusy("runnerDispatch"), true);
+    const second = await runNow("runnerDispatch");
+    assert.equal(second.status, 409);
+    assert.match(second.body.details, /A pass of this loop is going/);
+    // a pass of one loop does not hold the others
+    assert.equal(HubLoops.loopBusy("runnerDial"), false);
+    g.open();
+    assert.equal((await first).status, 200);
+    assert.equal(passes.runnerDispatch, 1);
+    assert.equal(HubLoops.loopState("runnerDispatch").runs, 1);
+    assert.equal(HubLoops.loopBusy("runnerDispatch"), false);
+    // then a pass runs again
+    assert.equal((await runNow("runnerDispatch")).status, 200);
+    assert.equal(passes.runnerDispatch, 2);
+  });
+
+  test("a user without the settings is 403, no pass run", async () => {
+    startHub();
+    const res = await runNow("runnerDispatch", { showJobs: true, allowScheduledJobs: true });
+    assert.equal(res.status, 403);
+    assert.equal(passes.runnerDispatch, 0);
   });
 });
 

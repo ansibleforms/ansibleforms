@@ -3192,6 +3192,7 @@ export default {
       hubLoopHint: 'De eigen lus van de runner-hub: hij draait zo vaak als de runners nodig hebben.',
       cronFiveFields: 'Gebruik 5 velden: minuut, uur, dag, maand en weekdag.',
       runDone: '{name} uitgevoerd: {result}',
+      runSucceeded: '{name} met succes uitgevoerd.',
       runFailed: '{name} mislukt: {result}',
       runStarted: '{name} gestart, dit kan even duren.',
       tabRuns: 'Runs',

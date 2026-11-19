@@ -3156,6 +3156,7 @@ export default {
       hubLoopHint: 'ランナーハブ自身のループです。ランナーが必要とする頻度で実行されます。',
       cronFiveFields: '分、時、日、月、曜日の 5 つのフィールドを使用します。',
       runDone: '{name} を実行しました: {result}',
+      runSucceeded: '{name} を正常に実行しました。',
       runFailed: '{name} が失敗しました: {result}',
       runStarted: '{name} を開始しました。しばらくかかることがあります。',
       tabRuns: '実行履歴',

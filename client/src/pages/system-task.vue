@@ -19,7 +19,8 @@
 /*  Run now top right, beside Save, as a schedule's page : the    */
 /*  task run once at once, then read again (its last run, result  */
 /*  and Runs) ; disabled while it runs and for a task that is     */
-/*  off. A runner hub loop has none, it is the engine's own.      */
+/*  off. A runner hub loop runs one pass on the node that answers */
+/*  (disabled where its hub does not run), in milliseconds.       */
 /*  No Delete, nothing else to edit - the task is the app's own.  */
 /*  The search of the title line narrows every tab at once.       */
 /*                                                                */
@@ -132,7 +133,8 @@ async function save() {
 // elsewhere) disables Run now too
 const runAsked = ref(false);
 const running = computed(() => runAsked.value || !!task.value?.running);
-// a task that is off (the config seed reload without CONFIG_SEED_PATH) is not run
+// a task that is off (the config seed reload without CONFIG_SEED_PATH) is not run, nor a runner hub
+// loop on a node whose hub does not run (its enabled false)
 const canRun = computed(() => !!task.value && task.value.enabled !== false && !running.value);
 // a run that goes on after the answer (the nightly backup) : read again every 2 seconds until it
 // is recorded, 30 minutes at most
@@ -149,7 +151,9 @@ let followTimer = null;
 function sayRun(run) {
   if (run?.outcome === 'failed')
     toast.error(t('jobs.system.runFailed', { name: name.value, result: run.result || '' }));
-  else toast.success(t('jobs.system.runDone', { name: name.value, result: run?.result || '' }));
+  // a run without a result (a runner hub loop's pass) : its outcome alone
+  else if (!run?.result) toast.success(t('jobs.system.runSucceeded', { name: name.value }));
+  else toast.success(t('jobs.system.runDone', { name: name.value, result: run.result }));
 }
 
 /**
@@ -514,11 +518,11 @@ onMounted(async () => {
             </div>
           </div>
         </template>
-        <!-- a task : Run now, as a schedule's page (disabled while it runs and for a task that is
-             off), then Save when its cron may be changed, as a record page's (orange while the cron
-             is changed ; enabled too while the cron comes from a deprecated variable, which Save
-             replaces). A runner hub loop has neither : the engine's own -->
-        <template v-if="task && !isLoop" #actions>
+        <!-- Run now, as a schedule's page (disabled while it runs, for a task that is off and for
+             a runner hub loop whose hub does not run on this node), then Save when its cron may be
+             changed, as a record page's (orange while the cron is changed ; enabled too while the
+             cron comes from a deprecated variable, which Save replaces). A loop has no Save -->
+        <template v-if="task" #actions>
           <BsButton icon="play" cssClass="text-nowrap" :disabled="!canRun" @click="runNow()">{{
             t('settings.schedules.runSchedule')
           }}</BsButton>

@@ -3931,8 +3931,8 @@
         "tags": [
           "system"
         ],
-        "summary": "Run a maintenance task now",
-        "description": "Runs a task once now, recorded as a scheduled run is (its outcome and result on its Runs tab). It runs on the node whose scheduler runs the tasks (the worker), wherever the request comes in: another node hands it over and waits for its run a while. Answers once the run ended, or at once for the nightly backup, which may outlast a request. Never starts a run while one of the task is going. Audited (system.task.run). Requires settings access.",
+        "summary": "Run a maintenance task or a runner hub loop now",
+        "description": "Runs a task once now, recorded as a scheduled run is (its outcome and result on its Runs tab). It runs on the node whose scheduler runs the tasks (the worker), wherever the request comes in: another node hands it over and waits for its run a while. Answers once the run ended, or at once for the nightly backup, which may outlast a request. A runner hub loop (runnerDispatch, runnerDial, runnerPrune) runs one pass on the node that received the request, as its timer runs it: counted in its loop state, a failure recorded as a timed one's; answered once the pass ended. Never starts a run while one of the task or loop is going. Audited (system.task.run). Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3951,7 +3951,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The run ended: the task, as GET /system/tasks/{key} answers it, with its new run as last_run",
+            "description": "The run ended: the task or loop, as GET /system/tasks/{key} answers it, with its new run as last_run",
             "content": {
               "application/json": {
                 "schema": {
@@ -3974,13 +3974,13 @@
             "description": "The task is off (configSeedReload without CONFIG_SEED_PATH, or turned off by CONFIG_SEED_RELOAD_SECONDS=0)"
           },
           "403": {
-            "description": "No settings access, or a runner hub loop (runnerDispatch, runnerDial, runnerPrune: they run on their own timers)"
+            "description": "No settings access"
           },
           "404": {
             "description": "No task has that key"
           },
           "409": {
-            "description": "A run of the task is going: none is started"
+            "description": "A run of the task or a pass of the loop is going, or the runner hub does not run on this node (a loop): none is started"
           },
           "503": {
             "description": "No node runs the system tasks: no process holds the worker lock"

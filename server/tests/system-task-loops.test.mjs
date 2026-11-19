@@ -16,7 +16,9 @@
 //   - a failure is a warning once per distinct error, and a row once a minute at most per
 //     distinct error ; a success writes no row ;
 //   - the API lists the loops after the tasks, every so many seconds, read only (403 on PUT),
-//     their Runs their failures.
+//     their Runs their failures ;
+//   - Run now runs one pass of a loop with the work its timer runs (runLoopNow), never two at
+//     once, never where the hub does not run.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import { readFileSync, promises as fs } from "fs";
@@ -71,7 +73,9 @@ vi.mock("croner", async (importOriginal) => {
 const logger = (await import("../src/lib/logger.js")).default;
 const EnvSettings = (await import("../src/lib/envSettings.js")).default;
 const { SYSTEM_TASKS, HUB_LOOPS, resetPruneForTests } = await import("../src/lib/systemTasks.js");
-const { loopRun, loopState, resetLoopsForTests, FAILURE_ROW_EVERY_MS } = await import("../src/lib/hubLoops.js");
+const { loopRun, loopState, loopBusy, runLoopNow, resetLoopsForTests, FAILURE_ROW_EVERY_MS } = await import(
+  "../src/lib/hubLoops.js"
+);
 const cronModule = await import("../src/services/cron.service.js");
 const cronService = cronModule.default;
 const { resyncResult } = cronModule;
@@ -202,6 +206,11 @@ describe("the runner hub's loops", () => {
     assert.match(hub, /setInterval\(\(\) => loopRun\("runnerDispatch", dispatch\), DISPATCH_MS\)/);
     assert.match(hub, /setInterval\(\(\) => loopRun\("runnerDial", dialInbound\), DIAL_MS\)/);
     assert.match(hub, /setInterval\(\(\) => loopRun\("runnerPrune", pruneEnded\), PRUNE_MS\)/);
+    // Run now runs the same work as the timers
+    assert.match(
+      hub,
+      /markLoopsStarted\(\{ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded \}\);/,
+    );
     // no failure said at debug only any more
     assert.doesNotMatch(hub, /logger\.debug\(`RTE (dispatch|inbound dial|prune):/);
   });
@@ -249,6 +258,53 @@ describe("the runner hub's loops", () => {
     vi.setSystemTime(new Date(Date.now() + FAILURE_ROW_EVERY_MS));
     await fail("one");
     assert.equal(inserts().length, 3);
+  });
+
+  test("Run now : one pass of the loop's own work, counted as a timed one", async () => {
+    let passes = 0;
+    resetLoopsForTests(true, { runnerDial: async () => passes++ });
+    assert.deepEqual(await runLoopNow("runnerDial"), { status: "done", ok: true });
+    assert.equal(passes, 1);
+    assert.equal(loopState("runnerDial").runs, 1);
+    assert.equal(loopState("runnerDial").last_outcome, "success");
+  });
+
+  test("Run now : a failed pass is said as a timed one's, a row and a warning", async () => {
+    const warn = vi.spyOn(logger, "warning").mockImplementation(() => {});
+    resetLoopsForTests(true, { runnerPrune: async () => { throw new Error("gone"); } });
+    assert.deepEqual(await runLoopNow("runnerPrune"), { status: "done", ok: false });
+    assert.equal(loopState("runnerPrune").failures, 1);
+    assert.equal(inserts().length, 1);
+    assert.ok(warn.mock.calls.some((c) => /Runner ended jobs prune failed: gone/.test(c[0])));
+  });
+
+  test("Run now : never two passes of a loop at once, a timed one going included", async () => {
+    let open;
+    const gate = new Promise((resolve) => (open = resolve));
+    let passes = 0;
+    const work = async () => {
+      passes++;
+      await gate;
+    };
+    resetLoopsForTests(true, { runnerDispatch: work });
+    // the timer's pass, going
+    const timed = loopRun("runnerDispatch", work);
+    assert.equal(loopBusy("runnerDispatch"), true);
+    assert.deepEqual(await runLoopNow("runnerDispatch"), { status: "busy" });
+    // once it ended, Run now runs one
+    open();
+    await timed;
+    assert.equal(loopBusy("runnerDispatch"), false);
+    assert.deepEqual(await runLoopNow("runnerDispatch"), { status: "done", ok: true });
+    assert.equal(passes, 2);
+    assert.equal(loopState("runnerDispatch").runs, 2);
+  });
+
+  test("Run now : refused where the hub does not run, and for a key no loop has", async () => {
+    resetLoopsForTests(false);
+    assert.deepEqual(await runLoopNow("runnerDispatch"), { status: "noHub" });
+    assert.equal(loopState("runnerDispatch").runs, 0);
+    assert.deepEqual(await runLoopNow("notALoop"), { status: "unknown" });
   });
 
   test("an unknown loop is refused at the hub's start", () => {

@@ -3077,6 +3077,7 @@ export default {
       hubLoopHint: '运行器中心自身的循环：按运行器的需要频繁运行。',
       cronFiveFields: '请使用 5 个字段：分、时、日、月和星期。',
       runDone: '已运行 {name}：{result}',
+      runSucceeded: '已成功运行 {name}。',
       runFailed: '{name} 失败：{result}',
       runStarted: '已启动 {name}，可能需要一些时间。',
       tabRuns: '运行记录',

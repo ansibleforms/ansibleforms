@@ -5,7 +5,7 @@
 // schedule's (its editor and Save, no Revert as the other record pages), the config seed reload's too, whose cron may still come
 // from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). The runner hub's own loops are listed
 // too, read only : every so many seconds, one line saying why. Run now runs a task once, as a
-// schedule's page, never a loop. Read from the sources and the config, as the other page tests do.
+// schedule's page, and a loop's pass. Read from the sources and the config, as the other page tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -221,7 +221,7 @@ describe("a task's Schedule tab", () => {
     );
     expect(tab).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.schedule_env \}\)/);
     // no Save then, Run now still
-    expect(page).toMatch(/<template v-if="task && !isLoop" #actions>/);
+    expect(page).toMatch(/<template v-if="task" #actions>/);
     expect(page).toMatch(/<BsButton v-if="scheduleEditable" icon="save" :disabled="!canSave" @click="save\(\)">/);
   });
 
@@ -328,10 +328,10 @@ describe('the texts', () => {
       // Revert is gone, as from the other record pages
       expect(texts.jobs.system.revert, lang).toBeUndefined();
       // Run now's toasts, on one line : a task's name and a short result in them
-      for (const key of ['runDone', 'runFailed', 'runStarted']) {
+      for (const key of ['runDone', 'runFailed', 'runStarted', 'runSucceeded']) {
         const text = texts.jobs.system[key];
         expect(text, `${lang} ${key}`).toMatch(/\{name\}/);
-        if (key !== 'runStarted') expect(text, `${lang} ${key}`).toMatch(/\{result\}/);
+        if (key === 'runDone' || key === 'runFailed') expect(text, `${lang} ${key}`).toMatch(/\{result\}/);
         const shown = text.replace('{name}', 'Stored jobs cleanup').replace('{result}', 'Removed 2 jobs');
         expect(shown.length * wide, `${lang} ${key}`).toBeLessThanOrEqual(90);
       }
@@ -356,9 +356,20 @@ describe('Run now', () => {
     expect(actions.indexOf('runNow()')).toBeLessThan(actions.indexOf('save()'));
   });
 
-  it('shows for the tasks, not for the runner hub loops', () => {
-    expect(page).toMatch(/<template v-if="task && !isLoop" #actions>/);
-    expect(page).toMatch(/const isLoop = computed\(\(\) => !!task\.value && !task\.value\.schedule_env\);/);
+  it('shows for the tasks and the runner hub loops alike, a loop without Save', () => {
+    expect(page).toMatch(/<template v-if="task" #actions>/);
+    expect(actions).not.toMatch(/isLoop/);
+    // a loop has no schedule setting : scheduleEditable is false, no Save
+    expect(page).toMatch(
+      /const scheduleEditable = computed\(\(\) => !!task\.value\?\.schedule_env && !!task\.value\?\.editable_schedule\);/,
+    );
+  });
+
+  it("says a loop's pass by its outcome, a pass having no result", () => {
+    const say = page.slice(page.indexOf('function sayRun(run)'), page.indexOf('function followRun('));
+    expect(say).toMatch(
+      /else if \(!run\?\.result\) toast\.success\(t\('jobs\.system\.runSucceeded', \{ name: name\.value \}\)\)/,
+    );
   });
 
   it('is disabled while the task runs, and for a task that is off', () => {

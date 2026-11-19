@@ -6,6 +6,8 @@ import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
 import { systemTask, hubLoop, taskCron, taskEnabled, scheduleCronProblem } from '../../lib/systemTasks.js';
 import { runNow, busyTasks } from '../../lib/systemTaskRun.js';
+import { runLoopNow } from '../../lib/hubLoops.js';
+import { nodeId } from '../../lib/role.js';
 import { ENV_EDIT_DISABLED_REASON } from '../../lib/envSettings.js';
 import { saveEnvValues, EnvSaveError } from '../../lib/envSave.js';
 
@@ -23,7 +25,7 @@ const list = async function (req, res) {
 
 /**
  * One task as GET answers it, with whether a run of it is going now (running : the page's Run now
- * waits meanwhile) ; a runner hub loop is never run from here.
+ * waits meanwhile) ; a runner hub loop's pass takes milliseconds, never said running.
  *
  * Args:
  *   key (string): the task's key.
@@ -132,6 +134,8 @@ const saveSchedule = async function (req, res) {
 // what each refusal of Run now answers : its status and why, in English as the other refusals
 const RUN_REFUSED = {
   busy: [409, 'A run of this task is going, wait for it to end'],
+  loopBusy: [409, 'A pass of this loop is going, run it again in a moment'],
+  noHub: [409, "The runner hub does not run on this node, its loops run on the nodes that serve the runners"],
   off: [400, 'This task is off and does not run'],
   noWorker: [503, 'No node runs the system tasks now: no process holds the worker lock'],
 };
@@ -140,18 +144,18 @@ const RUN_REFUSED = {
 // outcome and result on its Runs tab), on the node that runs the tasks wherever the request came
 // in (lib/systemTaskRun.js). Answers the task as GET does once the run ended (200), or at once
 // while it still runs (202) : the nightly backup, which may outlast a request, and a run handed to
-// another node that did not end within the wait. 404 for a key no task has, 403 for a runner hub
-// loop (the engine's own timers, never run from here), 400 for a task that is off (the config seed
-// reload without CONFIG_SEED_PATH), 409 while a run of it is going, 503 when no node runs the
-// tasks. Audited (system.task.run), with where it ran and how it went.
+// another node that did not end within the wait. A runner hub loop runs one pass on this node
+// (runLoop). 404 for a key no task has, 400 for a task that is off (the config seed reload without
+// CONFIG_SEED_PATH), 409 while a run of it is going, 503 when no node runs the tasks. Audited
+// (system.task.run), with where it ran and how it went.
 const run = async function (req, res) {
   const fail = (status, detail) =>
     res.status(status).json(RestResult.error(i18n.t(req, 'resources.systemTaskRunFailed'), detail));
   try {
-    // step 1 : the task ; a runner hub loop is not one to run
+    // step 1 : the task ; a runner hub loop runs a pass of its own
     const task = systemTask(req.params.key);
     if (!task && hubLoop(req.params.key)) {
-      fail(403, "The runner hub's loops run on their own timers, they cannot be run from here");
+      await runLoop(req, res, hubLoop(req.params.key), fail);
       return;
     }
     if (!task) {
@@ -189,5 +193,42 @@ const run = async function (req, res) {
     fail(err.status || 500, helpers.getError(err));
   }
 };
+
+/**
+ * Run now of a runner hub loop : one pass now, on the node that received the request (each node
+ * runs its own hub's loops, their state in its memory), through the loop's own loopRun as its
+ * timer runs it, so it is counted and its failure said as a timed one's (lib/hubLoops.js). 409 on
+ * a node whose hub does not run, and while a pass of that loop goes : waiting for that pass would
+ * answer one that started before the click, and a pass hung on a runner would hold the request.
+ * Answers the loop as GET does once the pass ended (it takes milliseconds) ; audited as a task's
+ * run (system.task.run).
+ *
+ * Args:
+ *   req (object): the request.
+ *   res (object): the response.
+ *   loop (object): the loop's entry of HUB_LOOPS.
+ *   fail (function): answers a refusal : (status, detail).
+ */
+async function runLoop(req, res, loop, fail) {
+  // step 1 : one pass, here
+  const ran = await runLoopNow(loop.key);
+  if (ran.status === 'noHub' || ran.status === 'busy') {
+    fail(...RUN_REFUSED[ran.status === 'busy' ? 'loopBusy' : 'noHub']);
+    return;
+  }
+  // step 2 : the loop as it is now, its pass audited (how it went)
+  const answer = await taskWithState(loop.key);
+  Audit.log({
+    user: req.user?.user,
+    ip: req.ip,
+    action: 'system.task.run',
+    outcome: 'success',
+    targetType: 'system_task',
+    target: loop.key,
+    detail: { node: nodeId, run: answer?.last_run?.outcome || null, result: answer?.last_run?.result || null },
+  });
+  logger.notice(`The runner hub loop ${loop.key} was run now by ${req.user?.user?.username || 'a user'} (${ran.ok ? 'success' : 'failed'})`);
+  res.json(RestResult.single(answer));
+}
 
 export default { list, get, saveSchedule, run };

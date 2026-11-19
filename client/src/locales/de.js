@@ -3213,6 +3213,7 @@ export default {
       hubLoopHint: 'Die eigene Schleife des Runner-Hubs: Sie läuft so oft, wie die Runner es brauchen.',
       cronFiveFields: '5 Felder angeben: Minute, Stunde, Tag, Monat und Wochentag.',
       runDone: '{name} ausgeführt: {result}',
+      runSucceeded: '{name} erfolgreich ausgeführt.',
       runFailed: '{name} fehlgeschlagen: {result}',
       runStarted: '{name} gestartet, das kann eine Weile dauern.',
       tabRuns: 'Läufe',

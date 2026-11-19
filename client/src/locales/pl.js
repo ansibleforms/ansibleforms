@@ -3181,6 +3181,7 @@ export default {
       hubLoopHint: 'Własna pętla huba runnerów: działa tak często, jak runnery tego potrzebują.',
       cronFiveFields: 'Użyj 5 pól: minuta, godzina, dzień, miesiąc i dzień tygodnia.',
       runDone: 'Wykonano {name}: {result}',
+      runSucceeded: 'Wykonano {name} pomyślnie.',
       runFailed: '{name} nie powiodło się: {result}',
       runStarted: 'Uruchomiono {name}, może to chwilę potrwać.',
       tabRuns: 'Uruchomienia',

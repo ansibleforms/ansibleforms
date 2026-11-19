@@ -3199,6 +3199,7 @@ export default {
       hubLoopHint: 'Bucle propio del hub de runners: se ejecuta tan a menudo como lo necesitan.',
       cronFiveFields: 'Usa 5 campos: minuto, hora, día, mes y día de la semana.',
       runDone: '{name} ejecutada: {result}',
+      runSucceeded: '{name} ejecutada con éxito.',
       runFailed: '{name} falló: {result}',
       runStarted: '{name} iniciada, puede tardar un rato.',
       tabRuns: 'Ejecuciones',

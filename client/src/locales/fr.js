@@ -3206,6 +3206,7 @@ export default {
       hubLoopHint: "Boucle propre du hub des runners : elle tourne aussi souvent qu'ils en ont besoin.",
       cronFiveFields: 'Utilisez 5 champs : minute, heure, jour, mois et jour de semaine.',
       runDone: '{name} exécutée : {result}',
+      runSucceeded: '{name} exécutée avec succès.',
       runFailed: '{name} a échoué : {result}',
       runStarted: '{name} a démarré, cela peut prendre un moment.',
       tabRuns: 'Exécutions',

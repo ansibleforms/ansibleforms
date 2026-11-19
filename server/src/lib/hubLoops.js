@@ -11,6 +11,10 @@
 //     would fill it) ;
 //   - as a failed row of system_task_runs, so the loop's Runs tab lists its failures : one per
 //     distinct error of a loop a minute at most.
+//
+// Run now (POST /api/v2/system/tasks/:key/run) runs one pass of a loop at once on the node that
+// received it (runLoopNow), through the same loopRun as its timer : counted, its failure said as
+// a timed one's. Never while a pass of that loop goes, nor on a node whose hub does not run.
 import logger from './logger.js';
 import { nodeId } from './role.js';
 import { HUB_LOOPS, hubLoop, recordRun } from './systemTasks.js';
@@ -38,6 +42,8 @@ function emptyState() {
     lastOutcome: null,
     lastSuccessAt: null,
     lastError: null,
+    // the passes of the loop going now (a slow one may still go at the next tick)
+    active: 0,
     // the errors warned of : message -> true (once each)
     warned: new Map(),
     // when each error was last written as a row : message -> ms
@@ -50,11 +56,18 @@ const states = new Map(HUB_LOOPS.map((loop) => [loop.key, emptyState()]));
 // whether the hub runs its loops on this node (runners/rteHub.js startRteHub) : a node that
 // serves no runner sockets has none running
 let started = false;
+// each loop's work, by its key, as the hub's timers run it : Run now runs the same
+let works = new Map();
 
 /**
- * Marks the loops as running on this node : the hub started them (startRteHub).
+ * Marks the loops as running on this node : the hub started them (startRteHub), with the work
+ * of each, which Run now runs too.
+ *
+ * Args:
+ *   fns (object): each loop's work by its key ({ runnerDispatch: dispatch, ... }), async.
  */
-export function markLoopsStarted() {
+export function markLoopsStarted(fns = {}) {
+  works = new Map(Object.entries(fns));
   started = true;
 }
 
@@ -124,8 +137,10 @@ export function loopRun(key, fn) {
   return (async () => {
     const state = states.get(key);
     const startedAt = new Date();
+    // counted at once, before any wait : a pass asked now sees this one going (runLoopNow)
     state.runs += 1;
     state.lastRunAt = startedAt;
+    state.active += 1;
     try {
       await fn();
       state.lastOutcome = 'success';
@@ -134,8 +149,46 @@ export function loopRun(key, fn) {
     } catch (err) {
       await failed(key, err, startedAt).catch(() => false);
       return false;
+    } finally {
+      state.active -= 1;
     }
   })();
+}
+
+/**
+ * Whether a pass of a loop goes now on this node.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   boolean: false for a key no loop has.
+ */
+export function loopBusy(key) {
+  return (states.get(key)?.active || 0) > 0;
+}
+
+/**
+ * Runs one pass of a loop now on this node (Run now), through loopRun as its timer runs it :
+ * counted, its failure said as a timed one's. Refused while a pass of that loop goes : a second
+ * one at the same time would hand the same jobs over twice, and the pass going is the one the
+ * timer just started, so a few milliseconds later Run now runs a fresh one.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   Promise<object>: { status } : 'done' (with ok, whether the pass succeeded), 'noHub' when the
+ *     hub does not run on this node, 'busy' while a pass of it goes, 'unknown' for a key no loop
+ *     has.
+ */
+export async function runLoopNow(key) {
+  if (!states.has(key)) return { status: 'unknown' };
+  const fn = works.get(key);
+  if (!started || !fn) return { status: 'noHub' };
+  if (loopBusy(key)) return { status: 'busy' };
+  // loopRun counts the pass before its first wait : a second Run now sees it busy
+  return { status: 'done', ok: await loopRun(key, fn) };
 }
 
 /**
@@ -165,10 +218,11 @@ export function loopState(key) {
   };
 }
 
-// tests only : every loop as at start
-export function resetLoopsForTests(running = false) {
+// tests only : every loop as at start, the hub running here or not, with each loop's work
+export function resetLoopsForTests(running = false, fns = {}) {
   for (const loop of HUB_LOOPS) states.set(loop.key, emptyState());
+  works = new Map(Object.entries(fns));
   started = running;
 }
 
-export default { FAILURE_ROW_EVERY_MS, markLoopsStarted, loopRun, loopState };
+export default { FAILURE_ROW_EVERY_MS, markLoopsStarted, loopRun, loopBusy, runLoopNow, loopState };
