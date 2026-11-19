@@ -1244,6 +1244,7 @@ export default {
       stepGroup: '组',
       noGroup: '尚无组。',
       noRole: '尚无角色。',
+      rolesNotGiven: '用户已创建，但未授予这些角色：{names}',
       signInHelp: '开启：使用其密码登录。\n关闭：其会话立即结束，每次登录都会被拒绝。',
       noStoredJob: '尚无已保存的作业。',
       noSchedule: '尚无计划的作业：用户的计划是其通过“稍后运行”安排的作业。',

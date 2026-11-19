@@ -1275,6 +1275,7 @@ export default {
       stepGroup: 'Grupo',
       noGroup: 'Ainda sem grupo.',
       noRole: 'Ainda nenhuma função.',
+      rolesNotGiven: 'O utilizador foi criado, mas sem estas funções: {names}',
       signInHelp:
         'Ligado: inicia sessão com a sua palavra-passe.\nDesligado: as sessões terminam agora e cada início de sessão é recusado.',
       noStoredJob: 'Ainda sem tarefas guardadas.',

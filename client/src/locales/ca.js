@@ -1275,6 +1275,7 @@ export default {
       stepGroup: 'Grup',
       noGroup: 'Encara sense grup.',
       noRole: 'Encara cap rol.',
+      rolesNotGiven: "L'usuari s'ha creat, però sense aquests rols: {names}",
       signInHelp:
         'Activat: inicia sessió amb la seva contrasenya.\nDesactivat: les seves sessions acaben ara i es rebutja cada inici de sessió.',
       noStoredJob: 'Encara sense tasques desades.',

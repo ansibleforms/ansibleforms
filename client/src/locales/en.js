@@ -1265,6 +1265,7 @@ export default {
       stepGroup: 'Group',
       noGroup: 'No group yet.',
       noRole: 'No role yet.',
+      rolesNotGiven: 'The user was created, but not given these roles: {names}',
       signInHelp:
         "On: the user signs in with a password.\nOff: the user's sessions end now and every sign-in is refused.",
       noStoredJob: 'No stored job yet.',

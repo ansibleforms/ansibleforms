@@ -1270,6 +1270,7 @@ export default {
       stepGroup: 'Grupa',
       noGroup: 'Brak grupy.',
       noRole: 'Brak ról.',
+      rolesNotGiven: 'Użytkownik został utworzony, ale bez tych ról: {names}',
       signInHelp:
         'Włączone: logowanie własnym hasłem.\nWyłączone: sesje kończą się teraz, a każde logowanie jest odrzucane.',
       noStoredJob: 'Brak zapisanych zadań.',

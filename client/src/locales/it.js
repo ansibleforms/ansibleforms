@@ -1273,6 +1273,7 @@ export default {
       stepGroup: 'Gruppo',
       noGroup: 'Nessun gruppo ancora.',
       noRole: 'Ancora nessun ruolo.',
+      rolesNotGiven: "L'utente è stato creato, ma senza questi ruoli: {names}",
       signInHelp:
         'Attivo: accede con la propria password.\nDisattivo: le sue sessioni terminano ora e ogni accesso viene rifiutato.',
       noStoredJob: 'Nessun job salvato ancora.',

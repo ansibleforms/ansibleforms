@@ -1273,6 +1273,7 @@ export default {
       stepGroup: 'Groep',
       noGroup: 'Nog geen groep.',
       noRole: 'Nog geen rol.',
+      rolesNotGiven: 'De gebruiker is gemaakt, maar zonder deze rollen: {names}',
       signInHelp:
         'Aan: aanmelden met het eigen wachtwoord.\nUit: de sessies eindigen nu en elke aanmelding wordt geweigerd.',
       noStoredJob: 'Nog geen opgeslagen job.',

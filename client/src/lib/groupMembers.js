@@ -4,7 +4,8 @@
 /*  wizard has created it, each user picked is added to it and    */
 /*  it is given the roles picked, through the APIs its own page   */
 /*  uses. One that fails leaves the group as it is : what failed  */
-/*  is returned, for the page to say.                             */
+/*  is returned, for the page to say. A new user's roles, picked  */
+/*  in the New user wizard, are given the same way (giveRoles).   */
 /*                                                                */
 /******************************************************************/
 
@@ -35,13 +36,27 @@ export async function addGroupMembers({ groupId, userIds = [], roleNames = [], a
     }
   }
   // ─── its roles, in one save of the forms config ──────────────────────────────
-  let failedRoles = [];
-  if (roleNames.length) {
-    // refused (false) or failed (a throw) : none of them given
-    const saved = await Promise.resolve()
-      .then(() => addRoles(roleNames))
-      .catch(() => false);
-    if (!saved) failedRoles = [...roleNames];
-  }
+  const failedRoles = await giveRoles(roleNames, addRoles);
   return { failedUsers, failedRoles };
+}
+
+/**
+ * Gives the roles picked to a group or a user just created, in one save of the forms config.
+ *
+ * Args:
+ *   roleNames (string[]): the roles to give it.
+ *   addRoles (Function): (roleNames) => Promise<boolean>, names it in those roles of the forms
+ *     config, in one save ; false when it was not saved.
+ *
+ * Returns:
+ *   Promise<string[]>: the role names not given, all of them when the save failed, none when
+ *     nothing was picked.
+ */
+export async function giveRoles(roleNames = [], addRoles) {
+  if (!roleNames.length) return [];
+  // refused (false) or failed (a throw) : none of them given
+  const saved = await Promise.resolve()
+    .then(() => addRoles(roleNames))
+    .catch(() => false);
+  return saved ? [] : [...roleNames];
 }

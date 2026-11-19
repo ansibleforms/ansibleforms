@@ -718,12 +718,16 @@ export default function getSettings(t) {
       openPage: (item) =>
         !item.source || item.source === 'local' ? `/settings/users/${item.id}` : directoryPath('users', item),
       // the dialog in steps : who the user is, the password (editing : left empty, it stays), the
-      // group that gives the roles
+      // group that gives the roles, then the roles given to the user itself (pages/admin/users.vue
+      // gives the roles to pick from, and gives those picked once the user is created)
       steps: [
         { key: 'user', label: t('settings.users.stepUser') },
         { key: 'password', label: t('settings.users.stepPassword') },
         { key: 'group', label: t('settings.users.stepGroup') },
+        { key: 'roles', label: t('settings.settingsPage.roles'), count: (item) => (item.role_names || []).length },
       ],
+      // the roles picked are not the user's own field : given after it is created
+      beforeSave: ({ role_names: _roles, ...user }) => user,
       // in the row menu : editing, the groups, the password, then Delete last, each apart
       actions: [
         { name: 'edit', title: t('common.edit'), icon: 'pencil', color: 'edit' },
@@ -857,6 +861,28 @@ export default function getSettings(t) {
           values: 'group',
           valueKey: 'id',
           labelKey: 'name',
+        },
+        // the New wizard's Roles step : the roles to give the user, each in its dropdown
+        // (AppPickList) ; the dialog only, given once the user is created
+        {
+          key: 'role_names',
+          step: 'roles',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.role_names || [],
+            icon: 'user-shield',
+            addLabel: t('settings.settingsPage.addRole'),
+            emptyText: t('settings.users.noRole'),
+            'onUpdate:modelValue': (v) => {
+              item.role_names = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
         },
         // its latest sign-in, local or LDAP or SSO, in the user's zone : an account no one uses
         // stands out ; none recorded yet, an en dash
