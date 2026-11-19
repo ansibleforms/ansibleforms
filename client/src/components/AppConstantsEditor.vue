@@ -228,14 +228,17 @@ defineExpose({ add: addConstant, locked });
   <BsModal v-if="newConstant" size="lg" @close="newConstant = null" icon="sliders-h">
     <template #title> {{ t('settings.settingsPage.newConstant') }} </template>
     <template #default>
-      <BsInput :isFloating="false" v-model="newConstant.key" :label="t('settings.settingsPage.key')" />
+      <BsInput :isFloating="false" v-model="newConstant.key" :label="t('settings.settingsPage.key')" icon="tag" />
       <label class="form-label fw-bold">{{ t('settings.settingsPage.value') }}</label>
-      <textarea
-        class="form-control"
-        :rows="Math.max(3, constantValueRows(newConstant.value))"
-        v-model="newConstant.value"
-        :placeholder="t('settings.settingsPage.constantValuePlaceholder')"
-      ></textarea>
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+        <textarea
+          class="form-control"
+          :rows="Math.max(3, constantValueRows(newConstant.value))"
+          v-model="newConstant.value"
+          :placeholder="t('settings.settingsPage.constantValuePlaceholder')"
+        ></textarea>
+      </div>
     </template>
     <template #footer>
       <BsButton icon="plus" :disabled="!newConstant.key.trim()" @click="createConstant()">{{

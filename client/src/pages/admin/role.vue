@@ -338,23 +338,31 @@ onMounted(async () => {
     </template>
     <template #default>
       <label class="form-label fw-bold">{{ t('settings.settingsPage.provider') }}</label>
-      <select
-        v-model="adding.provider"
-        class="form-select mb-3"
-        @change="adding.name = localChoices(adding.kind, adding.provider)[0] || ''"
-      >
-        <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-      </select>
+      <div class="input-group mb-3">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="right-to-bracket" /></span>
+        <select
+          v-model="adding.provider"
+          class="form-select"
+          @change="adding.name = localChoices(adding.kind, adding.provider)[0] || ''"
+        >
+          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+        </select>
+      </div>
       <label class="form-label fw-bold">{{ t('settings.settingsPage.name') }}</label>
-      <select v-if="adding.provider === 'local'" v-model="adding.name" class="form-select">
-        <option v-for="n in localChoices(adding.kind, 'local')" :key="n" :value="n">{{ n }}</option>
-      </select>
-      <input
-        v-else
-        v-model="adding.name"
-        class="form-control"
-        :placeholder="adding.kind === 'users' ? 'username' : 'groupname'"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"
+          ><FaIcon :fixedwidth="true" :icon="adding.kind === 'users' ? 'user' : 'users'"
+        /></span>
+        <select v-if="adding.provider === 'local'" v-model="adding.name" class="form-select">
+          <option v-for="n in localChoices(adding.kind, 'local')" :key="n" :value="n">{{ n }}</option>
+        </select>
+        <input
+          v-else
+          v-model="adding.name"
+          class="form-control"
+          :placeholder="adding.kind === 'users' ? 'username' : 'groupname'"
+        />
+      </div>
       <div v-if="addingTaken" class="text-danger small mt-1">
         {{ t('settings.settingsPage.roleMemberTaken', { name: adding.name, role: role?.name }) }}
       </div>

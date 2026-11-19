@@ -221,6 +221,7 @@ function removeUser(index) {
       <BsInput
         class="af-role-name"
         :isFloating="false"
+        icon="user-shield"
         v-model="role.name"
         :label="t('settings.settingsPage.name')"
         :placeholder="t('settings.settingsPage.roleNamePlaceholder')"
@@ -231,6 +232,7 @@ function removeUser(index) {
         v-if="role._required"
         class="af-role-description"
         :isFloating="false"
+        icon="info-circle"
         :modelValue="requiredRoleDescription(t, role.name)"
         :label="t('settings.fields.description')"
         :disabled="true"
@@ -239,6 +241,7 @@ function removeUser(index) {
         v-else
         class="af-role-description"
         :isFloating="false"
+        icon="info-circle"
         v-model="role.description"
         :label="t('settings.fields.description')"
         :placeholder="t('settings.settingsPage.roleDescriptionPlaceholder')"
@@ -303,29 +306,32 @@ function removeUser(index) {
         {{ t('settings.settingsPage.roleNoUsers') }}
       </p>
       <div v-for="(usr, uIdx) in tab ? [] : role.users" :key="usr._uid" class="d-flex align-items-center gap-2 mb-2">
-        <select
-          class="form-select provider-select"
-          v-model="usr.provider"
-          :disabled="readOnly || role._default"
-          @change="onProviderChange(usr, 'user')"
-        >
-          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-        </select>
-        <select
-          v-if="usr.provider === 'local'"
-          class="form-select"
-          v-model="usr.name"
-          :disabled="readOnly || role._default"
-        >
-          <option v-for="u in localUsers" :key="u" :value="u">{{ u }}</option>
-        </select>
-        <input
-          v-else
-          class="form-control"
-          v-model="usr.name"
-          placeholder="username"
-          :disabled="readOnly || role._default"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="user" /></span>
+          <select
+            class="form-select provider-select"
+            v-model="usr.provider"
+            :disabled="readOnly || role._default"
+            @change="onProviderChange(usr, 'user')"
+          >
+            <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+          </select>
+          <select
+            v-if="usr.provider === 'local'"
+            class="form-select"
+            v-model="usr.name"
+            :disabled="readOnly || role._default"
+          >
+            <option v-for="u in localUsers" :key="u" :value="u">{{ u }}</option>
+          </select>
+          <input
+            v-else
+            class="form-control"
+            v-model="usr.name"
+            placeholder="username"
+            :disabled="readOnly || role._default"
+          />
+        </div>
         <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeUser(uIdx)">
           <FaIcon icon="times" />
         </button>
@@ -343,29 +349,32 @@ function removeUser(index) {
         {{ t('settings.settingsPage.roleNoGroups') }}
       </p>
       <div v-for="(grp, gIdx) in tab ? [] : role.groups" :key="grp._uid" class="d-flex align-items-center gap-2 mb-2">
-        <select
-          class="form-select provider-select"
-          v-model="grp.provider"
-          :disabled="readOnly || role._default"
-          @change="onProviderChange(grp, 'group')"
-        >
-          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-        </select>
-        <select
-          v-if="grp.provider === 'local'"
-          class="form-select"
-          v-model="grp.name"
-          :disabled="readOnly || role._default"
-        >
-          <option v-for="g in localGroups" :key="g" :value="g">{{ g }}</option>
-        </select>
-        <input
-          v-else
-          class="form-control"
-          v-model="grp.name"
-          placeholder="groupname"
-          :disabled="readOnly || role._default"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="users" /></span>
+          <select
+            class="form-select provider-select"
+            v-model="grp.provider"
+            :disabled="readOnly || role._default"
+            @change="onProviderChange(grp, 'group')"
+          >
+            <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+          </select>
+          <select
+            v-if="grp.provider === 'local'"
+            class="form-select"
+            v-model="grp.name"
+            :disabled="readOnly || role._default"
+          >
+            <option v-for="g in localGroups" :key="g" :value="g">{{ g }}</option>
+          </select>
+          <input
+            v-else
+            class="form-control"
+            v-model="grp.name"
+            placeholder="groupname"
+            :disabled="readOnly || role._default"
+          />
+        </div>
         <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeGroup(gIdx)">
           <FaIcon icon="times" />
         </button>
@@ -380,8 +389,8 @@ function removeUser(index) {
 <style scoped>
 /* the wide fields' width of the settings pages (AppEnvField, a path or a command) : the name and
    its description alike, room for a sentence */
-.af-role-name :deep(input),
-.af-role-description :deep(input) {
+.af-role-name :deep(.input-group),
+.af-role-description :deep(.input-group) {
   max-width: 40rem;
 }
 .af-role-tabs .nav-link {
@@ -395,7 +404,7 @@ function removeUser(index) {
 }
 .provider-select {
   width: 130px;
-  flex-shrink: 0;
+  flex: 0 0 130px;
 }
 /* the remove button of a group or a user : as tall as the dropdowns beside it, and square */
 .af-remove {

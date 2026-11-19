@@ -270,13 +270,18 @@ function leaveVar(event) {
           {{ t('inventoryEditor.in', { group: naming.parent.join(' / ') }) }}
         </div>
         <label class="form-label fw-bold">{{ t('inventoryEditor.name') }}</label>
-        <input
-          v-model="naming.name"
-          class="form-control"
-          spellcheck="false"
-          :placeholder="naming.kind === 'group' ? 'webservers' : 'web1.example.com'"
-          @keyup.enter="addNamed()"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"
+            ><FaIcon :fixedwidth="true" :icon="naming.kind === 'group' ? 'folder' : 'server'"
+          /></span>
+          <input
+            v-model="naming.name"
+            class="form-control"
+            spellcheck="false"
+            :placeholder="naming.kind === 'group' ? 'webservers' : 'web1.example.com'"
+            @keyup.enter="addNamed()"
+          />
+        </div>
       </template>
       <template #footer>
         <BsButton icon="check" :disabled="!naming.name.trim()" @click="addNamed()">{{
@@ -299,30 +304,40 @@ function leaveVar(event) {
       }}</template>
       <template #default>
         <label class="form-label fw-bold">{{ t('inventoryEditor.name') }}</label>
-        <input
-          class="form-control mb-3 af-ie-half"
-          :value="openName"
-          :disabled="readOnly"
-          spellcheck="false"
-          @change="rename($event.target.value.trim())"
-        />
+        <div class="input-group mb-3 af-ie-half">
+          <span class="input-group-text text-gray-500"
+            ><FaIcon :fixedwidth="true" :icon="open.host ? 'server' : 'folder'"
+          /></span>
+          <input
+            class="form-control"
+            :value="openName"
+            :disabled="readOnly"
+            spellcheck="false"
+            @change="rename($event.target.value.trim())"
+          />
+        </div>
         <label class="form-label fw-bold">{{ t('inventoryEditor.variables') }}</label>
         <div v-for="v in vars" :key="v.key" class="d-flex gap-2 mb-2">
-          <input
-            class="form-control font-monospace af-ie-key"
-            :value="v.key"
-            :disabled="readOnly"
-            spellcheck="false"
-            @change="apply((text) => editRenameVar(text, target, v.key, $event.target.value.trim()))"
-          />
-          <input
-            v-if="!v.complex"
-            class="form-control"
-            :value="v.value"
-            :disabled="readOnly"
-            spellcheck="false"
-            @change="apply((text) => editSetVar(text, target, v.key, $event.target.value))"
-          />
+          <div class="input-group af-ie-key">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
+            <input
+              class="form-control font-monospace"
+              :value="v.key"
+              :disabled="readOnly"
+              spellcheck="false"
+              @change="apply((text) => editRenameVar(text, target, v.key, $event.target.value.trim()))"
+            />
+          </div>
+          <div v-if="!v.complex" class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+            <input
+              class="form-control"
+              :value="v.value"
+              :disabled="readOnly"
+              spellcheck="false"
+              @change="apply((text) => editSetVar(text, target, v.key, $event.target.value))"
+            />
+          </div>
           <button
             v-else
             type="button"
@@ -345,20 +360,26 @@ function leaveVar(event) {
         </div>
         <!-- the new variable's row, once Add variable is clicked -->
         <div v-if="newVar && !readOnly" ref="newVarRow" class="d-flex gap-2 mb-2" @focusout="leaveVar">
-          <input
-            v-model="newVar.key"
-            class="form-control font-monospace af-ie-key"
-            :placeholder="t('inventoryEditor.varName')"
-            spellcheck="false"
-            @keyup.enter="addVar()"
-          />
-          <input
-            v-model="newVar.value"
-            class="form-control"
-            :placeholder="t('playbookEditor.argValue')"
-            spellcheck="false"
-            @keyup.enter="addVar()"
-          />
+          <div class="input-group af-ie-key">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
+            <input
+              v-model="newVar.key"
+              class="form-control font-monospace"
+              :placeholder="t('inventoryEditor.varName')"
+              spellcheck="false"
+              @keyup.enter="addVar()"
+            />
+          </div>
+          <div class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+            <input
+              v-model="newVar.value"
+              class="form-control"
+              :placeholder="t('playbookEditor.argValue')"
+              spellcheck="false"
+              @keyup.enter="addVar()"
+            />
+          </div>
           <BsButton
             icon="xmark"
             colorClass="danger"

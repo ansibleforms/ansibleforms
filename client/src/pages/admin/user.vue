@@ -519,9 +519,12 @@ onMounted(async () => {
     <template #title> {{ t('settings.settingsPage.addGroup') }} </template>
     <template #default>
       <label class="form-label fw-bold">{{ t('settings.fields.group') }}</label>
-      <select v-model="addingGroup" class="form-select">
-        <option v-for="g in freeGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
-      </select>
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="users" /></span>
+        <select v-model="addingGroup" class="form-select">
+          <option v-for="g in freeGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
+        </select>
+      </div>
       <div v-if="!freeGroups.length" class="text-muted small mt-1">{{ t('settings.users.inEveryGroup') }}</div>
     </template>
     <template #footer>

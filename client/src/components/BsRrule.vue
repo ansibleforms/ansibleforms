@@ -15,6 +15,8 @@
 /*      end: Object - the schedule's end (lib/scheduleEnd.js      */
 /*           endOf) : the runs shown stop at it                   */
 /*      runCount: Number - the jobs the schedule started          */
+/*      icon: String - an icon before the box, as BsCron's (none  */
+/*            when empty)                                         */
 /*                                                                */
 /*  @emits:                                                       */
 /*      update:modelValue: String - the rrule typed               */
@@ -33,6 +35,7 @@ const props = defineProps({
   hasError: { type: Boolean, default: false },
   end: { type: Object, default: null },
   runCount: { type: [Number, String], default: 0 },
+  icon: { type: String, default: '' },
 });
 
 // what the server said : its next runs, its zone, or why it is refused
@@ -135,15 +138,19 @@ function formatDate(d) {
 </script>
 <template>
   <div class="bs-rrule">
-    <textarea
-      class="form-control font-monospace af-rrule-input"
-      :class="{ 'is-invalid': hasError || !!problem }"
-      rows="2"
-      spellcheck="false"
-      :value="modelValue"
-      placeholder="DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
-      @input="emit('update:modelValue', $event.target.value.replace(/\s*\n\s*/g, ' '))"
-    ></textarea>
+    <!-- its icon before it (a dialog's field), as BsCron's expression -->
+    <div :class="{ 'input-group': icon }">
+      <span v-if="icon" class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" :icon="icon" /></span>
+      <textarea
+        class="form-control font-monospace af-rrule-input"
+        :class="{ 'is-invalid': hasError || !!problem }"
+        rows="2"
+        spellcheck="false"
+        :value="modelValue"
+        placeholder="DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+        @input="emit('update:modelValue', $event.target.value.replace(/\s*\n\s*/g, ' '))"
+      ></textarea>
+    </div>
     <small v-if="problem" class="text-danger d-block mt-1">{{
       t('settings.schedules.rruleInvalid', { reason: problem })
     }}</small>

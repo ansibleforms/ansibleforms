@@ -1949,6 +1949,7 @@ defineExpose({
           <div>
             <BsRrule
               v-model="$v.item[field.key].$model"
+              :icon="field.icon || 'repeat'"
               :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
             />
             <div v-if="field.help" class="form-text">{{ textOf(field.help) }}</div>

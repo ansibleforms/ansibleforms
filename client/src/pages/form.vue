@@ -2592,15 +2592,18 @@ onBeforeUnmount(() => {
     <template #default>
       <div class="mb-3">
         <label class="form-label">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
-        <input
-          type="text"
-          class="form-control"
-          v-model="scheduleForm.name"
-          :placeholder="
-            scheduleAction === 'schedule' ? t('form.scheduleNamePlaceholder') : t('form.jobNamePlaceholder')
-          "
-          :disabled="scheduleSubmitting"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
+          <input
+            type="text"
+            class="form-control"
+            v-model="scheduleForm.name"
+            :placeholder="
+              scheduleAction === 'schedule' ? t('form.scheduleNamePlaceholder') : t('form.jobNamePlaceholder')
+            "
+            :disabled="scheduleSubmitting"
+          />
+        </div>
         <small class="form-text text-muted">{{
           scheduleAction === 'schedule' ? t('form.scheduleNameHint') : t('form.jobNameHint')
         }}</small>
@@ -2651,24 +2654,30 @@ onBeforeUnmount(() => {
     <template #default>
       <div class="mb-3">
         <label class="form-label">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
-        <input
-          type="text"
-          class="form-control"
-          v-model="storeForm.name"
-          :placeholder="t('form.storeNamePlaceholder')"
-          :disabled="storeSubmitting"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
+          <input
+            type="text"
+            class="form-control"
+            v-model="storeForm.name"
+            :placeholder="t('form.storeNamePlaceholder')"
+            :disabled="storeSubmitting"
+          />
+        </div>
       </div>
 
       <div class="mb-3">
         <label class="form-label">{{ t('form.description') }}</label>
-        <textarea
-          class="form-control"
-          rows="3"
-          v-model="storeForm.description"
-          placeholder=""
-          :disabled="storeSubmitting"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="info-circle" /></span>
+          <textarea
+            class="form-control"
+            rows="3"
+            v-model="storeForm.description"
+            placeholder=""
+            :disabled="storeSubmitting"
+          />
+        </div>
       </div>
 
       <!-- when it is removed : never, on a date or when unused for some days -->

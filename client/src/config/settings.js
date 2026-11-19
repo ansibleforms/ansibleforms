@@ -1603,6 +1603,7 @@ export default function getSettings(t) {
           step: 'when',
           label: t('settings.schedules.rrule'),
           type: 'rrule',
+          icon: 'repeat',
           help: t('settings.schedules.rruleHelp'),
           hidden: true,
           noTable: true,
@@ -1923,7 +1924,14 @@ export default function getSettings(t) {
       fields: [
         { key: 'id', label: t('settings.knownhosts.hostEntry'), filterable: true, hidden: true, noInput: true },
         { key: 'name', label: t('settings.knownhosts.hostEntry'), required: false, filterable: true, noInput: true },
-        { key: 'host', label: t('settings.fields.host'), required: true, filterable: true, hidden: true },
+        {
+          key: 'host',
+          label: t('settings.fields.host'),
+          required: true,
+          filterable: true,
+          hidden: true,
+          icon: 'server',
+        },
       ],
     },
     credentials: {
@@ -3521,6 +3529,7 @@ export default function getSettings(t) {
           rows: 3,
           label: t('settings.notificationChannels.headers'),
           help: t('settings.notificationChannels.headersHelp'),
+          icon: 'list',
           placeholder: '{ "X-Source": "ansibleforms" }',
           hidden: true,
           showWhen: (i) => channelType(i) === 'webhook',
@@ -3532,6 +3541,7 @@ export default function getSettings(t) {
           rows: 9,
           label: t('settings.notificationChannels.payload'),
           help: t('settings.notificationChannels.payloadHelp', { placeholders: PAYLOAD_PLACEHOLDERS }),
+          icon: 'code',
           placeholder: DEFAULT_PAYLOAD,
           hidden: true,
           showWhen: (i) => channelType(i) === 'webhook',
@@ -4413,7 +4423,7 @@ export default function getSettings(t) {
           noInput: true,
           render: (v) => Helpers.formatServerDate(v),
         },
-        { key: 'description', label: t('settings.fields.description'), type: 'text' },
+        { key: 'description', label: t('settings.fields.description'), type: 'text', icon: 'info-circle' },
       ],
     },
   };

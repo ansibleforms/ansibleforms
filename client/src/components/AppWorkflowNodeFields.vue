@@ -133,113 +133,134 @@ function removeCredential(name) {
   <div v-if="section === 'runs'">
     <div class="af-wf-half">
       <label class="form-label fw-bold">{{ t('workflowEditor.identifier') }}</label>
-      <input
-        class="form-control"
-        :class="{ 'is-invalid': identifierError }"
-        :value="node.identifier"
-        :disabled="readOnly"
-        spellcheck="false"
-        @change="emit('set', 'identifier', $event.target.value.trim())"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="i-cursor" /></span>
+        <input
+          class="form-control"
+          :class="{ 'is-invalid': identifierError }"
+          :value="node.identifier"
+          :disabled="readOnly"
+          spellcheck="false"
+          @change="emit('set', 'identifier', $event.target.value.trim())"
+        />
+      </div>
       <div v-if="identifierError" class="invalid-feedback d-block">{{ identifierError }}</div>
     </div>
     <div class="af-wf-half">
       <label class="form-label fw-bold">{{ t('workflowEditor.runs') }}</label>
-      <select class="form-select" :value="runsValue" :disabled="readOnly" @change="setRuns($event.target.value)">
-        <option v-for="where in targets" :key="where" :value="`job_template:${where}`">
-          {{ t(`workflowEditor.runsOn.${where}`) }}
-        </option>
-        <option v-if="target === '?'" value="job_template:?">
-          {{ t('workflowEditor.runsOn.unknown', { runner: node.runner }) }}
-        </option>
-        <option v-for="type in NODE_TYPES.filter((n) => n !== 'job_template')" :key="type" :value="type">
-          {{ t(`workflowEditor.types.${type}`) }}
-        </option>
-      </select>
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="rocket" /></span>
+        <select class="form-select" :value="runsValue" :disabled="readOnly" @change="setRuns($event.target.value)">
+          <option v-for="where in targets" :key="where" :value="`job_template:${where}`">
+            {{ t(`workflowEditor.runsOn.${where}`) }}
+          </option>
+          <option v-if="target === '?'" value="job_template:?">
+            {{ t('workflowEditor.runsOn.unknown', { runner: node.runner }) }}
+          </option>
+          <option v-for="type in NODE_TYPES.filter((n) => n !== 'job_template')" :key="type" :value="type">
+            {{ t(`workflowEditor.types.${type}`) }}
+          </option>
+        </select>
+      </div>
     </div>
     <div class="af-wf-half">
       <label class="form-label fw-bold">{{ runNameLabel }}</label>
-      <select
-        v-if="runChoices"
-        class="form-select"
-        :class="{ 'is-invalid': !node.name }"
-        :value="node.name"
-        :disabled="readOnly"
-        @change="emit('set', 'name', $event.target.value)"
-      >
-        <option value="">-</option>
-        <option v-for="c in withCurrent(runChoices, node.name)" :key="c" :value="c">{{ c }}</option>
-      </select>
-      <input
-        v-else
-        class="form-control"
-        :class="{ 'is-invalid': !node.name }"
-        :value="node.name"
-        :disabled="readOnly"
-        @change="emit('set', 'name', $event.target.value)"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="file-code" /></span>
+        <select
+          v-if="runChoices"
+          class="form-select"
+          :class="{ 'is-invalid': !node.name }"
+          :value="node.name"
+          :disabled="readOnly"
+          @change="emit('set', 'name', $event.target.value)"
+        >
+          <option value="">-</option>
+          <option v-for="c in withCurrent(runChoices, node.name)" :key="c" :value="c">{{ c }}</option>
+        </select>
+        <input
+          v-else
+          class="form-control"
+          :class="{ 'is-invalid': !node.name }"
+          :value="node.name"
+          :disabled="readOnly"
+          @change="emit('set', 'name', $event.target.value)"
+        />
+      </div>
     </div>
     <!-- a playbook node : the runner of where it runs (on the RTE : the default one, or one named) -->
     <div v-if="node.type === 'job_template'" class="af-wf-half">
       <label class="form-label fw-bold">{{ t('workflowEditor.runner') }}</label>
-      <select
-        v-if="refs.runners"
-        class="form-select"
-        :value="node.runner || ''"
-        :disabled="readOnly"
-        @change="emit('set', 'runner', $event.target.value)"
-      >
-        <option v-if="target === 'rte'" value="">{{ t('workflowEditor.runnerNone') }}</option>
-        <option v-if="node.runner && !runnerChoices.some((r) => r.name === node.runner)" :value="node.runner">
-          {{ node.runner }}
-        </option>
-        <option v-for="r in runnerChoices" :key="r.name" :value="r.name">{{ runnerLabel(r) }}</option>
-      </select>
-      <input
-        v-else
-        class="form-control"
-        :value="node.runner"
-        :disabled="readOnly"
-        spellcheck="false"
-        @change="emit('set', 'runner', $event.target.value.trim())"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="server" /></span>
+        <select
+          v-if="refs.runners"
+          class="form-select"
+          :value="node.runner || ''"
+          :disabled="readOnly"
+          @change="emit('set', 'runner', $event.target.value)"
+        >
+          <option v-if="target === 'rte'" value="">{{ t('workflowEditor.runnerNone') }}</option>
+          <option v-if="node.runner && !runnerChoices.some((r) => r.name === node.runner)" :value="node.runner">
+            {{ node.runner }}
+          </option>
+          <option v-for="r in runnerChoices" :key="r.name" :value="r.name">{{ runnerLabel(r) }}</option>
+        </select>
+        <input
+          v-else
+          class="form-control"
+          :value="node.runner"
+          :disabled="readOnly"
+          spellcheck="false"
+          @change="emit('set', 'runner', $event.target.value.trim())"
+        />
+      </div>
     </div>
     <!-- when it runs, and what it gets : as a multistep's step ifExtraVar and key -->
     <template v-if="node.type !== 'workflow_approval_template'">
       <div class="af-wf-half">
         <label class="form-label fw-bold">{{ t('workflowEditor.condition') }}</label>
-        <input
-          class="form-control"
-          :value="node.if_extra_var"
-          :disabled="readOnly"
-          spellcheck="false"
-          @change="emit('set', 'if_extra_var', $event.target.value.trim())"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="code-branch" /></span>
+          <input
+            class="form-control"
+            :value="node.if_extra_var"
+            :disabled="readOnly"
+            spellcheck="false"
+            @change="emit('set', 'if_extra_var', $event.target.value.trim())"
+          />
+        </div>
         <div class="form-text">{{ t('workflowEditor.conditionHint') }}</div>
       </div>
       <div class="af-wf-half">
         <label class="form-label fw-bold">{{ t('workflowEditor.valuesKey') }}</label>
-        <input
-          class="form-control"
-          :value="node.extra_vars_key"
-          :disabled="readOnly"
-          spellcheck="false"
-          @change="emit('set', 'extra_vars_key', $event.target.value.trim())"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
+          <input
+            class="form-control"
+            :value="node.extra_vars_key"
+            :disabled="readOnly"
+            spellcheck="false"
+            @change="emit('set', 'extra_vars_key', $event.target.value.trim())"
+          />
+        </div>
         <div class="form-text">{{ t('workflowEditor.valuesKeyHint') }}</div>
       </div>
     </template>
     <!-- an approval : how long it waits -->
     <div v-if="node.type === 'workflow_approval_template'" class="af-wf-half">
       <label class="form-label fw-bold">{{ t('workflowEditor.timeout') }}</label>
-      <input
-        class="form-control"
-        type="number"
-        min="0"
-        :value="node.timeout"
-        :disabled="readOnly"
-        @change="emit('set', 'timeout', $event.target.value)"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="clock" /></span>
+        <input
+          class="form-control"
+          type="number"
+          min="0"
+          :value="node.timeout"
+          :disabled="readOnly"
+          @change="emit('set', 'timeout', $event.target.value)"
+        />
+      </div>
       <div class="form-text">{{ t('workflowEditor.timeoutHint') }}</div>
     </div>
   </div>
@@ -249,64 +270,79 @@ function removeCredential(name) {
     <div class="row g-3 mb-3">
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.inventory') }}</label>
-        <select
-          v-if="refs.inventories && !onRunner"
-          class="form-select"
-          :value="node.inventory"
-          :disabled="readOnly"
-          @change="emit('set', 'inventory', $event.target.value)"
-        >
-          <option value="">{{ t('designer.visualNoInventory') }}</option>
-          <option v-for="i in withCurrent(sorted(refs.inventories), node.inventory)" :key="i" :value="i">
-            {{ i }}
-          </option>
-        </select>
-        <input
-          v-else
-          class="form-control"
-          :value="node.inventory"
-          :disabled="readOnly"
-          @change="emit('set', 'inventory', $event.target.value)"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="list" /></span>
+          <select
+            v-if="refs.inventories && !onRunner"
+            class="form-select"
+            :value="node.inventory"
+            :disabled="readOnly"
+            @change="emit('set', 'inventory', $event.target.value)"
+          >
+            <option value="">{{ t('designer.visualNoInventory') }}</option>
+            <option v-for="i in withCurrent(sorted(refs.inventories), node.inventory)" :key="i" :value="i">
+              {{ i }}
+            </option>
+          </select>
+          <input
+            v-else
+            class="form-control"
+            :value="node.inventory"
+            :disabled="readOnly"
+            @change="emit('set', 'inventory', $event.target.value)"
+          />
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.limit') }}</label>
-        <input
-          class="form-control"
-          :value="node.limit"
-          :disabled="readOnly"
-          @change="emit('set', 'limit', $event.target.value)"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="filter" /></span>
+          <input
+            class="form-control"
+            :value="node.limit"
+            :disabled="readOnly"
+            @change="emit('set', 'limit', $event.target.value)"
+          />
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.jobTags') }}</label>
-        <input
-          class="form-control"
-          :value="node.job_tags"
-          :disabled="readOnly"
-          @change="emit('set', 'job_tags', $event.target.value)"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tags" /></span>
+          <input
+            class="form-control"
+            :value="node.job_tags"
+            :disabled="readOnly"
+            @change="emit('set', 'job_tags', $event.target.value)"
+          />
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.skipTags') }}</label>
-        <input
-          class="form-control"
-          :value="node.skip_tags"
-          :disabled="readOnly"
-          @change="emit('set', 'skip_tags', $event.target.value)"
-        />
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tags" /></span>
+          <input
+            class="form-control"
+            :value="node.skip_tags"
+            :disabled="readOnly"
+            @change="emit('set', 'skip_tags', $event.target.value)"
+          />
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.verbosity') }}</label>
-        <select
-          class="form-select"
-          :value="String(node.verbosity || '')"
-          :disabled="readOnly"
-          @change="emit('set', 'verbosity', $event.target.value)"
-        >
-          <option value="">0</option>
-          <option v-for="v in [1, 2, 3, 4, 5]" :key="v" :value="String(v)">{{ v }}</option>
-        </select>
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="signal" /></span>
+          <select
+            class="form-select"
+            :value="String(node.verbosity || '')"
+            :disabled="readOnly"
+            @change="emit('set', 'verbosity', $event.target.value)"
+          >
+            <option value="">0</option>
+            <option v-for="v in [1, 2, 3, 4, 5]" :key="v" :value="String(v)">{{ v }}</option>
+          </select>
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.credentials') }}</label>
@@ -324,6 +360,7 @@ function removeCredential(name) {
         </div>
         <div v-if="!readOnly" class="input-group">
           <!-- picked is added : no button to press after the choice (it was missed) -->
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
           <select
             v-model="credentialToAdd"
             class="form-select"
