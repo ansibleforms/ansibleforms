@@ -35,7 +35,9 @@ const TAB_NAMES = { retention: 'Retention', configuration: 'Configuration' };
  *   row (object): a row of system_task_runs.
  *
  * Returns:
- *   object: { id, started_at, ended_at, duration_ms, outcome, result, node }.
+ *   object: { id, started_at, ended_at, duration_ms, outcome, result, node, launched_by } :
+ *     launched_by is who started it with Run now ("admin (local)"), null for a timed run (and for
+ *     a run recorded before the column was there).
  */
 function runOf(row) {
   const started = row.started_at ? new Date(row.started_at) : null;
@@ -48,6 +50,7 @@ function runOf(row) {
     outcome: row.outcome,
     result: row.result ?? '',
     node: row.node ?? null,
+    launched_by: row.launched_by ?? null,
   };
 }
 
@@ -243,6 +246,8 @@ function describeLoop(loop, lastRow, managed) {
       outcome: state.last_outcome || 'success',
       result: failed ? state.last_error.message : '',
       node: state.node,
+      // the memory keeps no launcher : the Runs tab's rows say who launched each
+      launched_by: null,
     };
   }
   // its next runs : its seconds after its last run on this node, or after its timer was armed

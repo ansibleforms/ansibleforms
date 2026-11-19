@@ -4,7 +4,7 @@ import Audit from '../../models/audit.model.js';
 import i18n from '../../lib/i18n.js';
 import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
-import { systemTask, hubLoop, taskCron, taskEnabled, scheduleCronProblem, loopSeconds, loopSecondsProblem } from '../../lib/systemTasks.js';
+import { systemTask, hubLoop, launcherName, taskCron, taskEnabled, scheduleCronProblem, loopSeconds, loopSecondsProblem } from '../../lib/systemTasks.js';
 import { runNow, busyTasks } from '../../lib/systemTaskRun.js';
 import { runLoopNow } from '../../lib/hubLoops.js';
 import { nodeId } from '../../lib/role.js';
@@ -227,7 +227,7 @@ const run = async function (req, res) {
       return;
     }
     // step 2 : run, here or on the node that runs the tasks
-    const ran = await runNow(task.key);
+    const ran = await runNow(task.key, launcherName(req.user?.user));
     if (RUN_REFUSED[ran.status]) {
       fail(...RUN_REFUSED[ran.status]);
       return;
@@ -271,7 +271,7 @@ const run = async function (req, res) {
  */
 async function runLoop(req, res, loop, fail) {
   // step 1 : one pass, here
-  const ran = await runLoopNow(loop.key);
+  const ran = await runLoopNow(loop.key, launcherName(req.user?.user));
   if (ran.status === 'noHub' || ran.status === 'busy') {
     fail(...RUN_REFUSED[ran.status === 'busy' ? 'loopBusy' : 'noHub']);
     return;

@@ -38,7 +38,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { cronValidationMessage } from '@/config/cron';
 import { tableMatches } from '@/lib/recordSearch';
 import { statusPill } from '@/config/settings';
-import { taskName, taskDescription, taskTiming, runDuration } from '@/lib/systemTasks';
+import { taskName, taskDescription, taskTiming, runDuration, runLauncher } from '@/lib/systemTasks';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -274,6 +274,8 @@ const runColumns = computed(() => [
     value: (r) => runDuration(r.duration_ms),
   },
   { key: 'outcome', label: t('settings.fields.status'), keep: true },
+  // who clicked Run now, or Schedule for a timed run (and for a run recorded before this column)
+  { key: 'launched_by', label: t('jobs.launchedBy'), value: (r) => runLauncher(t, r) },
   { key: 'result', label: t('jobs.system.result') },
   { key: 'node', label: t('jobs.system.node') },
 ]);

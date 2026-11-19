@@ -14,7 +14,7 @@ import { withoutComments } from './vueSource.js';
 import { routePermission, mayOpen } from '@/lib/routePermission';
 import getSettings from '@/config/settings';
 import i18n from '@/plugins/i18n';
-import { taskName, taskDescription, taskTiming, taskTimingCell, runDuration } from '@/lib/systemTasks';
+import { taskName, taskDescription, taskTiming, taskTimingCell, runDuration, runLauncher } from '@/lib/systemTasks';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(path.join(here, '..', p), 'utf8');
@@ -193,6 +193,7 @@ describe("a task's page", () => {
       'ended_at',
       'duration',
       'outcome',
+      'launched_by',
       'result',
       'node',
     ]);
@@ -201,6 +202,21 @@ describe("a task's page", () => {
       /key: 'ended_at',\s*label: t\('jobs\.endTime'\),\s*keep: true,\s*value: \(r\) => \(r\.ended_at \? Helpers\.formatServerDate\(r\.ended_at\) : ''\)/,
     );
     expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
+  });
+
+  it("says who launched each run after its Status : the user of a Run now, else Schedule", async () => {
+    const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
+    expect(cols).toMatch(/key: 'launched_by', label: t\('jobs\.launchedBy'\), value: \(r\) => runLauncher\(t, r\)/);
+    expect(runLauncher(t, { launched_by: 'admin (local)' })).toBe('admin (local)');
+    // a timed run, and a run recorded before the column was there
+    expect(runLauncher(t, { launched_by: null })).toBe('jobs.system.timing');
+    expect(runLauncher(t, {})).toBe('jobs.system.timing');
+    // Schedule, one word in every language
+    for (const lang of LANGUAGES) {
+      const word = (await import(`../src/locales/${lang}.js`)).default.jobs.system.timing;
+      expect(word, lang).toBeTruthy();
+      expect(word.trim().split(/\s+/), lang).toHaveLength(1);
+    }
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {

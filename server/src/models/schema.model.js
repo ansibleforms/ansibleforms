@@ -699,7 +699,7 @@ const SCHEMA_MANIFEST = {
                                'stored_jobs.unused_days',
                                'schedule.ends', 'schedule.end_at', 'schedule.end_count', 'schedule.end_action',
                                'schedule.run_count', 'schedule.remove_after_run',
-                               'jobs.schedule_id'],
+                               'jobs.schedule_id', 'system_task_runs.launched_by'],
                      indexes: ['jobs.idx_jobs_stored_job', 'jobs.idx_jobs_schedule'] },
   },
 };
@@ -1345,6 +1345,9 @@ async function patchVersion7(messages, success, failed) {
   // run that did something, and each task's latest run
   const taskRuns = fs.readFileSync(`${__dirname}/../db/create_system_task_runs_table.sql`);
   await checkPromise(addTable("system_task_runs", taskRuns.toString()), messages, success, failed);
+  // who started a run with Run now (lib/systemTasks.js launcherName) : NULL for a timed run, also
+  // for the runs from before
+  await checkPromise(addColumn("system_task_runs", "launched_by", "varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

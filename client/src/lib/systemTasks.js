@@ -112,4 +112,20 @@ export function runDuration(ms) {
   return n < 1000 ? `${n} ms` : formatDuration(Math.round(n / 1000));
 }
 
-export default { taskName, taskDescription, taskTiming, taskTimingCell, runDuration };
+/**
+ * Who launched a run, as its Runs tab's Launched by says it : the user who clicked Run now, as the
+ * Jobs list names one ("admin (local)"), or Schedule for a timed run. A run recorded before the
+ * server kept who launched it has none either, so it says Schedule too, even one a user ran now.
+ *
+ * Args:
+ *   t (function): the translate function.
+ *   run (object): the run, as the API answers it ({ launched_by, ... }).
+ *
+ * Returns:
+ *   string: the user, or the word Schedule.
+ */
+export function runLauncher(t, run) {
+  return run?.launched_by || t('jobs.system.timing');
+}
+
+export default { taskName, taskDescription, taskTiming, taskTimingCell, runDuration, runLauncher };
