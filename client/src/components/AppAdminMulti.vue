@@ -55,8 +55,7 @@
 /*      field for this record (an ldap credential's TLS fields    */
 /*      before its bind user) ; null : in its own place           */
 /*  field.flush: a component with its own titles in it (no label */
-/*      above it, a schedule's end) ; a switch takes no notice,   */
-/*      its bold title is above it as every switch's              */
+/*      above it, a schedule's end) ; for a component only        */
 /*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
 /*      its own, instead of field.dependency (the dropdowns'      */
 /*      lists : the credential chosen, its type)                  */
@@ -2179,7 +2178,7 @@ defineExpose({
         </div>
 
         <!-- A SWITCH (type checkbox) : its bold title above it, its help under it, as a record page's
-             Enabled ; every switch so, a flush one too (every field has its title) -->
+             Enabled ; every switch so (every field has its title) -->
         <div v-else-if="showField(field) && field.type === 'checkbox'" class="mb-3">
           <label class="form-label fw-bold d-block" :for="'af-switch-' + field.key">{{ field.label }}</label>
           <BsSwitch

@@ -46,7 +46,7 @@ describe("a list's dialogs : each label above its field", () => {
     expect(fields).toContain(':isFloating="false"');
   });
 
-  it('puts every switch under its bold title, as a record page, a flush one too', () => {
+  it('puts every switch under its bold title, as a record page', () => {
     const at = fields.indexOf('field.type === \'checkbox\'" class="mb-3">');
     expect(at).toBeGreaterThan(-1);
     const block = fields.slice(at, fields.indexOf('</div>\n        </div>', at));
@@ -57,6 +57,18 @@ describe("a list's dialogs : each label above its field", () => {
     // no switch with its label beside it and no title above (the old flush switch)
     expect(fields).not.toContain('af-flush-switch');
     expect(fields).not.toMatch(/field\.type === 'checkbox' && field\.flush/);
+  });
+
+  it("sets flush on no switch, only on a component with its own titles (a schedule's End)", () => {
+    const settings = getSettings((k) => k);
+    const flushed = [];
+    for (const [name, list] of Object.entries(settings)) {
+      for (const f of list?.fields || []) {
+        if (f.type === 'checkbox') expect(f.flush, `${name}.${f.key}`).toBeUndefined();
+        if (f.flush) flushed.push(`${name}.${f.key}:${f.type}`);
+      }
+    }
+    expect(flushed).toEqual(['schedules.end:component']);
   });
 
   it('puts a New button under its label or its dropdown, on its own line', () => {
