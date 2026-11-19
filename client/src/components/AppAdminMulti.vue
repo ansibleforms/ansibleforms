@@ -313,7 +313,10 @@ function getRules() {
     if (typeof field.validator === 'function') {
       const check = field.validator;
       rule.custom = helpers.withMessage(
-        ({ $response }) => $response || t('settings.common.fieldInvalid', { field: field.label }),
+        // $response is what the rule returned ({ $valid, $response }) : its message is inside it
+        ({ $response }) =>
+          (typeof $response === 'string' ? $response : $response?.$response) ||
+          t('settings.common.fieldInvalid', { field: field.label }),
         (value) => {
           if (!helpers.req(value)) return true;
           let message;

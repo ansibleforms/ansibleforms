@@ -173,3 +173,12 @@ describe("a new user's password step", () => {
     });
   });
 });
+
+describe("a field validator's message", () => {
+  it('is the text the rule returned, never the object around it', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const multi = readFileSync(resolve(__dirname, '../src/components/AppAdminMulti.vue'), 'utf8');
+    expect(multi).toMatch(/typeof \$response === 'string' \? \$response : \$response\?\.\$response/);
+  });
+});
