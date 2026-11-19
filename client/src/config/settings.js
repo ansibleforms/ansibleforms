@@ -1705,6 +1705,8 @@ export default function getSettings(t) {
           step: 'when',
           icon: 'calendar',
           label: t('settings.schedules.oneTimeRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.oneTimeRunColumn'),
           type: 'datetime',
           convertToUtc: true,
           help: t('settings.schedules.runAtHelp'),
@@ -1744,6 +1746,8 @@ export default function getSettings(t) {
           // more ; the Columns menu still shows it)
           hideBelow: 1200,
           label: t('settings.fields.lastRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.lastRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
@@ -1754,6 +1758,8 @@ export default function getSettings(t) {
           key: 'next_run',
           // a date with its time and zone, in full
           label: t('settings.schedules.nextRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.nextRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
@@ -1772,6 +1778,8 @@ export default function getSettings(t) {
           step: 'extra-vars',
           type: 'editor',
           label: t('settings.fields.extraVars'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.extraVarsColumn'),
           hidden: true,
           lang: 'yaml',
           style: editorStyle('40vh'),
@@ -1975,6 +1983,8 @@ export default function getSettings(t) {
           key: 'last_run',
           hideBelow: 1200,
           label: t('settings.fields.lastRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.lastRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v?.started_at ? escapeHtml(Helpers.formatServerDate(v.started_at)) : '–'),
@@ -1983,6 +1993,8 @@ export default function getSettings(t) {
         {
           key: 'next_run',
           label: t('settings.schedules.nextRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.nextRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),

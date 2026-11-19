@@ -1091,7 +1091,11 @@ export default {
       caBundle: 'CA バンドル',
       schedule: 'スケジュール',
       extraVars: 'Extra vars (YAML)',
+      // its column header in a table (Title Case in English)
+      extraVarsColumn: 'Extra vars (YAML)',
       lastRun: '最終実行',
+      // its column header in a table (Title Case in English)
+      lastRunColumn: '最終実行',
       createdAt: '作成日時',
       expiresAt: '有効期限',
     },
@@ -1514,10 +1518,14 @@ export default {
       stepSchedule: 'スケジュール',
       stepExtraVars: 'Extra vars',
       nextRun: '次回実行',
+      // its column header in a table (Title Case in English)
+      nextRunColumn: '次回実行',
       runSchedule: '今すぐ実行',
       oneTimeRanRemoved: '1 回限りのスケジュールが実行され、削除されました。そのジョブはジョブページにあります。',
       placeholderName: 'スケジュール名',
       oneTimeRun: '1 回限りの実行',
+      // its column header in a table (Title Case in English)
+      oneTimeRunColumn: '1 回限りの実行',
       runAt: '実行日時',
       runAtHelp: 'このジョブを 1 回だけ実行する日時',
       extraVarsHelp: 'extra vars を指定するフォームの項目がないため、ここで追加する必要があります。',

@@ -1073,7 +1073,11 @@ export default {
       caBundle: 'CA 证书包',
       schedule: '调度',
       extraVars: 'Extra vars（YAML）',
+      // its column header in a table (Title Case in English)
+      extraVarsColumn: 'Extra vars（YAML）',
       lastRun: '上次运行',
+      // its column header in a table (Title Case in English)
+      lastRunColumn: '上次运行',
       createdAt: '创建时间',
       expiresAt: '过期时间',
     },
@@ -1472,10 +1476,14 @@ export default {
       stepSchedule: '计划',
       stepExtraVars: 'Extra vars',
       nextRun: '下次运行',
+      // its column header in a table (Title Case in English)
+      nextRunColumn: '下次运行',
       runSchedule: '立即运行',
       oneTimeRanRemoved: '一次性计划已运行并被删除：其作业在作业页面上。',
       placeholderName: '调度名称',
       oneTimeRun: '一次性运行',
+      // its column header in a table (Title Case in English)
+      oneTimeRunColumn: '一次性运行',
       runAt: '运行时间',
       runAtHelp: '运行此作业一次的日期和时间',
       extraVarsHelp: '没有表单字段提供 extra vars，您必须在此处添加。',

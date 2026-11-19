@@ -1101,7 +1101,11 @@ export default {
       caBundle: 'CA-Bundle',
       schedule: 'Zeitplan',
       extraVars: 'Extra-Variablen (YAML)',
+      // its column header in a table (Title Case in English)
+      extraVarsColumn: 'Extra-Variablen (YAML)',
       lastRun: 'Letzter Lauf',
+      // its column header in a table (Title Case in English)
+      lastRunColumn: 'Letzter Lauf',
       createdAt: 'Erstellt am',
       expiresAt: 'Laeuft ab am',
     },
@@ -1538,10 +1542,14 @@ export default {
       stepSchedule: 'Zeitplan',
       stepExtraVars: 'Extra-Variablen',
       nextRun: 'Nächster Lauf',
+      // its column header in a table (Title Case in English)
+      nextRunColumn: 'Nächster Lauf',
       runSchedule: 'Jetzt ausführen',
       oneTimeRanRemoved: 'Der einmalige Zeitplan wurde ausgeführt und entfernt: sein Job steht auf der Seite Jobs.',
       placeholderName: 'Name des Zeitplans',
       oneTimeRun: 'Einmaliger Lauf',
+      // its column header in a table (Title Case in English)
+      oneTimeRunColumn: 'Einmaliger Lauf',
       runAt: 'Ausfuehren um',
       runAtHelp: 'Datum und Uhrzeit fuer die einmalige Ausfuehrung dieses Jobs',
       extraVarsHelp: 'Es gibt keine Formularfelder für die Extra-Variablen, Sie müssen sie hier hinzufügen.',
@@ -3111,7 +3119,7 @@ export default {
     user: 'Benutzer',
     jobTitle: 'Job {id}',
     output: 'Ausgabe',
-    launchedBy: 'gestartet von',
+    launchedBy: 'Gestartet von',
     playbook: 'Playbook',
     template: 'Vorlage',
     awxJob: 'AWX-Job',
