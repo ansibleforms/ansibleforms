@@ -45,6 +45,10 @@ describe('the Status column of every job table', () => {
     expect(system.slice(1, 5)).toEqual(['started_at', 'ended_at', 'duration', 'outcome']);
   });
 
+  it("names the jobs list's user column Launched by, as the Runs tabs", () => {
+    expect(read('src/pages/jobs.vue')).toMatch(/key: 'user',\s*label: t\('jobs\.launchedBy'\),/);
+  });
+
   it('follows the last and next run in the Scheduled and System lists', () => {
     for (const name of ['schedules', 'system_tasks']) {
       const keys = shown(all[name]);

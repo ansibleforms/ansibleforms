@@ -200,7 +200,7 @@ const columnDefs = computed(() => [
   { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: statusWidth() },
   {
     key: 'user',
-    label: t('jobs.user'),
+    label: t('jobs.launchedBy'),
     filterable: true,
     sortable: true,
     render: (j) => `${j.user || ''}${j.user_type ? ' (' + j.user_type + ')' : ''}`,
