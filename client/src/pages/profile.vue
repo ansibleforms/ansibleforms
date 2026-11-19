@@ -1105,11 +1105,10 @@ async function changePassword() {
                 <pre class="af-token-example mb-4"><code>{{ tokenExample }}</code></pre>
               </div>
               <!-- the request : a lifetime and the password -->
-              <!-- its fields as every dialog's : the name at the left, the field and its help at the right -->
+              <!-- its fields as every dialog's : the name above the field, bold, the help under it -->
               <div v-else-if="tokenStep === 0">
                 <BsInput
                   v-model="tokenForm.name"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="text"
                   icon="tag"
@@ -1120,7 +1119,6 @@ async function changePassword() {
                 />
                 <BsInput
                   v-model="tokenForm.days"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="select"
                   icon="hourglass-half"
@@ -1141,7 +1139,6 @@ async function changePassword() {
                 <BsInput
                   v-else
                   v-model="tokenForm.password"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="password"
                   icon="lock"

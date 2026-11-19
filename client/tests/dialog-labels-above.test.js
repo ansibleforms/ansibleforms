@@ -94,3 +94,20 @@ describe("a list's dialogs : each label above its field", () => {
     expect(read('components/BsInputList.vue')).not.toContain('af-label-tall');
   });
 });
+
+describe("the profile's API token dialog : each label above its field", () => {
+  const profile = read('pages/profile.vue');
+  // the request's two steps : a name and a lifetime, then the password
+  const dialog = profile.slice(profile.indexOf('v-else-if="tokenStep === 0"'), profile.indexOf('<template #footer>'));
+
+  it('draws its fields in the labels-above layout, bold, with their left icons', () => {
+    expect(dialog).not.toMatch(COLUMNS);
+    // three BsInput, none horizontal : BsInput then puts a bold label above its field
+    expect(dialog.match(/<BsInput\b/g)).toHaveLength(3);
+    expect(dialog.match(/:isFloating="false"/g)).toHaveLength(3);
+    for (const icon of ['tag', 'hourglass-half', 'lock']) expect(dialog).toContain(`icon="${icon}"`);
+    const input = readFileSync(join(import.meta.dirname, '../src/components/BsInput.vue'), 'utf8');
+    const above = input.slice(input.lastIndexOf('<template v-else>'));
+    expect(above).toContain('<label :for="uid" class="form-label fw-bold"');
+  });
+});
