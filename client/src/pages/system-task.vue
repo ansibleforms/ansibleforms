@@ -252,6 +252,8 @@ const setting = computed(() => task.value?.setting || null);
 // went, what it did, and the node that ran it ; a row opens nothing
 const runs = computed(() => task.value?.runs || []);
 const runColumns = computed(() => [
+  // who clicked Run now, or Schedule for a timed run (and for a run recorded before this column)
+  { key: 'launched_by', label: t('jobs.launchedBy'), value: (r) => runLauncher(t, r) },
   {
     key: 'started_at',
     label: t('jobs.startTime'),
@@ -274,8 +276,6 @@ const runColumns = computed(() => [
     value: (r) => runDuration(r.duration_ms),
   },
   { key: 'outcome', label: t('settings.fields.status'), keep: true },
-  // who clicked Run now, or Schedule for a timed run (and for a run recorded before this column)
-  { key: 'launched_by', label: t('jobs.launchedBy'), value: (r) => runLauncher(t, r) },
   { key: 'result', label: t('jobs.system.result') },
   { key: 'node', label: t('jobs.system.node') },
 ]);

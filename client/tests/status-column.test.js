@@ -42,7 +42,7 @@ describe('the Status column of every job table', () => {
       'status',
     ]);
     const system = keysOf(read('src/pages/system-task.vue'), 'const runColumns', ']);');
-    expect(system.slice(0, 4)).toEqual(['started_at', 'ended_at', 'duration', 'outcome']);
+    expect(system.slice(1, 5)).toEqual(['started_at', 'ended_at', 'duration', 'outcome']);
   });
 
   it('follows the last and next run in the Scheduled and System lists', () => {

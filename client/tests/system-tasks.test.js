@@ -188,12 +188,13 @@ describe("a task's page", () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'runs\')"'), page.indexOf('searchNone'));
     expect(tab).not.toMatch(/isLoop/);
     const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
+    // who launched it first, as the other Runs tabs put who ran a job before its times
     expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual([
+      'launched_by',
       'started_at',
       'ended_at',
       'duration',
       'outcome',
-      'launched_by',
       'result',
       'node',
     ]);
@@ -204,7 +205,7 @@ describe("a task's page", () => {
     expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
   });
 
-  it("says who launched each run after its Status : the user of a Run now, else Schedule", async () => {
+  it('says who launched each run after its Status : the user of a Run now, else Schedule', async () => {
     const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
     expect(cols).toMatch(/key: 'launched_by', label: t\('jobs\.launchedBy'\), value: \(r\) => runLauncher\(t, r\)/);
     expect(runLauncher(t, { launched_by: 'admin (local)' })).toBe('admin (local)');
