@@ -1887,13 +1887,13 @@ export default {
       defaultMountHelp: 'Se usa cuando una referencia no empieza por un montaje visible para el token.',
       writeEnabled: 'Permitir la escritura',
       writeEnabledHelp:
-        'El usuario y la contraseña de una credencial introducidos en AnsibleForms se pueden escribir aquí al guardar. El token necesita las capacidades read, create y update bajo el prefijo de escritura.',
+        'Las credenciales escritas se guardan aquí al guardar; el token necesita read, create y update.',
       writePrefix: 'Prefijo de escritura',
       writePrefixHelp: 'Las credenciales solo se escriben en esta ruta o por debajo, p. ej. secret/ansibleforms.',
       writePrefixRequired:
         'La escritura necesita un prefijo: indica bajo qué ruta se pueden escribir las credenciales.',
       writeEnabledHelpCyberArk:
-        'El usuario y la contraseña de una credencial introducidos en AnsibleForms se pueden escribir aquí al guardar, como cuenta de una caja fuerte, a través del PVWA (el CCP solo lee).',
+        'Las credenciales escritas se guardan aquí al guardar, como cuentas de una safe vía la PVWA.',
       writeSafes: 'Cajas fuertes donde escribir',
       writeSafesHelp: 'Las cuentas solo se escriben en estas cajas fuertes, separadas por comas, p. ej. Linux, DB.',
       writeSafesRequired: 'La escritura necesita al menos una caja fuerte.',

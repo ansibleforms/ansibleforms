@@ -1861,13 +1861,11 @@ export default {
       defaultMount: 'Default mount',
       defaultMountHelp: 'Used when a reference does not start with a mount the token can see.',
       writeEnabled: 'Allow writing',
-      writeEnabledHelp:
-        "A credential's user and password typed in AnsibleForms can be written here on Save. The token needs the read, create and update capabilities below the write prefix.",
+      writeEnabledHelp: 'Typed logins are written here on Save; the token needs read, create and update there.',
       writePrefix: 'Write prefix',
       writePrefixHelp: 'Credentials are written only at this path or below it, e.g. secret/ansibleforms.',
       writePrefixRequired: 'Writing needs a write prefix: say below which path credentials may be written.',
-      writeEnabledHelpCyberArk:
-        "A credential's user and password typed in AnsibleForms can be written here on Save, as an account of a safe, through the PVWA (the CCP only reads).",
+      writeEnabledHelpCyberArk: 'Typed logins are written here on Save, as accounts of a safe, through the PVWA.',
       writeSafes: 'Safes to write to',
       writeSafesHelp: 'Accounts are written only to these safes, comma separated, e.g. Linux, DB.',
       writeSafesRequired: 'Writing needs at least one safe to write to.',

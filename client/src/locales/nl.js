@@ -1879,14 +1879,12 @@ export default {
       defaultMount: 'Standaard mount',
       defaultMountHelp: 'Gebruikt wanneer een referentie niet begint met een mount die het token kan zien.',
       writeEnabled: 'Schrijven toestaan',
-      writeEnabledHelp:
-        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan worden geschreven. Het token heeft de mogelijkheden read, create en update onder het schrijfprefix nodig.',
+      writeEnabledHelp: 'Ingevoerde logins komen hier bij Opslaan; het token heeft read, create en update nodig.',
       writePrefix: 'Schrijfprefix',
       writePrefixHelp: 'Referenties worden alleen op dit pad of eronder geschreven, bijv. secret/ansibleforms.',
       writePrefixRequired:
         'Schrijven heeft een schrijfprefix nodig: geef aan onder welk pad referenties mogen worden geschreven.',
-      writeEnabledHelpCyberArk:
-        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan als account van een kluis worden geschreven, via de PVWA (de CCP leest alleen).',
+      writeEnabledHelpCyberArk: 'Ingevoerde logins komen hier bij Opslaan, als accounts van een safe via de PVWA.',
       writeSafes: 'Kluizen om naar te schrijven',
       writeSafesHelp: "Accounts worden alleen naar deze kluizen geschreven, gescheiden door komma's, bijv. Linux, DB.",
       writeSafesRequired: 'Schrijven heeft minstens één kluis nodig.',

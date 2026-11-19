@@ -1734,13 +1734,11 @@ export default {
       defaultMount: 'Domyślny punkt montowania',
       defaultMountHelp: 'Używany, gdy odwołanie nie zaczyna się od punktu montowania widocznego dla tokenu.',
       writeEnabled: 'Zezwól na zapis',
-      writeEnabledHelp:
-        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane po kliknięciu Zapisz. Token potrzebuje uprawnień read, create i update poniżej prefiksu zapisu.',
+      writeEnabledHelp: 'Wpisane loginy są zapisywane tu przy zapisie; token potrzebuje read, create i update.',
       writePrefix: 'Prefiks zapisu',
       writePrefixHelp: 'Poświadczenia są zapisywane tylko w tej ścieżce lub poniżej, np. secret/ansibleforms.',
       writePrefixRequired: 'Zapis wymaga prefiksu: wskaż, poniżej której ścieżki można zapisywać poświadczenia.',
-      writeEnabledHelpCyberArk:
-        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane po kliknięciu Zapisz, jako konto sejfu, przez PVWA (CCP tylko odczytuje).',
+      writeEnabledHelpCyberArk: 'Wpisane loginy są zapisywane tu przy zapisie, jako konta sejfu przez PVWA.',
       writeSafes: 'Sejfy do zapisu',
       writeSafesHelp: 'Konta są zapisywane tylko w tych sejfach, oddzielonych przecinkami, np. Linux, DB.',
       writeSafesRequired: 'Zapis wymaga co najmniej jednego sejfu.',

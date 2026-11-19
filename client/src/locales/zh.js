@@ -1674,13 +1674,11 @@ export default {
       defaultMount: '默认挂载点',
       defaultMountHelp: '当引用不以 token 可见的挂载点开头时使用。',
       writeEnabled: '允许写入',
-      writeEnabledHelp:
-        '在 AnsibleForms 中输入的凭据用户和密码可在保存时写入此处。令牌需要在写入前缀下具有 read、create 和 update 权限。',
+      writeEnabledHelp: '输入的登录信息在保存时写入此处；令牌需要 read、create 和 update 权限。',
       writePrefix: '写入前缀',
       writePrefixHelp: '凭据只写入此路径或其下级，例如 secret/ansibleforms。',
       writePrefixRequired: '写入需要前缀：请说明凭据可以写入哪个路径之下。',
-      writeEnabledHelpCyberArk:
-        '在 AnsibleForms 中输入的凭据用户和密码可在保存时通过 PVWA 以保险箱账户的形式写入此处（CCP 只能读取）。',
+      writeEnabledHelpCyberArk: '输入的登录信息在保存时通过 PVWA 作为保险库账户写入此处。',
       writeSafes: '写入的保险箱',
       writeSafesHelp: '账户只写入这些保险箱，以逗号分隔，例如 Linux, DB。',
       writeSafesRequired: '写入至少需要一个保险箱。',

@@ -1893,14 +1893,12 @@ export default {
       defaultMount: 'Montage par défaut',
       defaultMountHelp: 'Utilisé quand une référence ne commence pas par un montage visible pour le jeton.',
       writeEnabled: "Autoriser l'écriture",
-      writeEnabledHelp:
-        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement. Le jeton a besoin des capacités read, create et update sous le préfixe d'écriture.",
+      writeEnabledHelp: "Les identifiants saisis y sont écrits à l'enregistrement ; jeton avec read, create et update.",
       writePrefix: "Préfixe d'écriture",
       writePrefixHelp: "Les identifiants ne sont écrits qu'à ce chemin ou en dessous, p. ex. secret/ansibleforms.",
       writePrefixRequired:
         "L'écriture demande un préfixe : indiquez sous quel chemin les identifiants peuvent être écrits.",
-      writeEnabledHelpCyberArk:
-        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement, comme compte d'un coffre, via le PVWA (le CCP ne fait que lire).",
+      writeEnabledHelpCyberArk: "Identifiants saisis écrits ici à l'enregistrement, en comptes de coffre via la PVWA.",
       writeSafes: 'Coffres où écrire',
       writeSafesHelp: 'Les comptes ne sont écrits que dans ces coffres, séparés par des virgules, p. ex. Linux, DB.',
       writeSafesRequired: "L'écriture demande au moins un coffre.",

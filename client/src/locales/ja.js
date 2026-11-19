@@ -1726,12 +1726,11 @@ export default {
       defaultMountHelp: '参照がトークンから見えるマウントで始まらない場合に使用されます。',
       writeEnabled: '書き込みを許可',
       writeEnabledHelp:
-        'AnsibleForms で入力した認証情報のユーザーとパスワードを、保存時にここへ書き込めます。トークンには書き込みプレフィックス以下で read、create、update の権限が必要です。',
+        '入力したログインは保存時にここへ書き込まれます。トークンには read・create・update が必要です。',
       writePrefix: '書き込みプレフィックス',
       writePrefixHelp: '認証情報はこのパスかその配下にのみ書き込まれます。例: secret/ansibleforms。',
       writePrefixRequired: '書き込みにはプレフィックスが必要です。認証情報を書き込めるパスを指定してください。',
-      writeEnabledHelpCyberArk:
-        'AnsibleForms で入力した認証情報のユーザーとパスワードを、保存時に PVWA 経由でセーフのアカウントとしてここへ書き込めます（CCP は読み取り専用）。',
+      writeEnabledHelpCyberArk: '入力したログインは保存時に PVWA 経由で金庫のアカウントとしてここへ書き込まれます。',
       writeSafes: '書き込み先のセーフ',
       writeSafesHelp: 'アカウントはこれらのセーフにのみ書き込まれます。カンマ区切り、例: Linux, DB。',
       writeSafesRequired: '書き込みには少なくとも 1 つのセーフが必要です。',

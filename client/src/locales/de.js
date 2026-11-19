@@ -1891,14 +1891,12 @@ export default {
       defaultMount: 'Standard-Mount',
       defaultMountHelp: 'Wird verwendet, wenn eine Referenz nicht mit einem für das Token sichtbaren Mount beginnt.',
       writeEnabled: 'Schreiben erlauben',
-      writeEnabledHelp:
-        'Benutzer und Passwort von Anmeldedaten, in AnsibleForms eingegeben, können beim Speichern hierhin geschrieben werden. Das Token braucht die Fähigkeiten read, create und update unterhalb des Schreibpräfixes.',
+      writeEnabledHelp: 'Logins werden beim Speichern hier geschrieben; das Token braucht read, create und update.',
       writePrefix: 'Schreibpräfix',
       writePrefixHelp: 'Anmeldedaten werden nur in diesen Pfad oder darunter geschrieben, z. B. secret/ansibleforms.',
       writePrefixRequired:
         'Schreiben braucht ein Schreibpräfix: Geben Sie an, unterhalb welches Pfades Anmeldedaten geschrieben werden dürfen.',
-      writeEnabledHelpCyberArk:
-        'Benutzer und Passwort von Anmeldedaten, in AnsibleForms eingegeben, können beim Speichern als Konto eines Safes über den PVWA hierhin geschrieben werden (der CCP liest nur).',
+      writeEnabledHelpCyberArk: 'Logins werden beim Speichern hier als Konten eines Safes über die PVWA geschrieben.',
       writeSafes: 'Safes zum Schreiben',
       writeSafesHelp: 'Konten werden nur in diese Safes geschrieben, durch Kommas getrennt, z. B. Linux, DB.',
       writeSafesRequired: 'Schreiben braucht mindestens einen Safe.',

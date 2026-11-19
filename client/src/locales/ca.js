@@ -1748,12 +1748,12 @@ export default {
       defaultMountHelp: "S'utilitza quan una referència no comença amb un punt de muntatge que el token pugui veure.",
       writeEnabled: "Permet l'escriptura",
       writeEnabledHelp:
-        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar. El token necessita les capacitats read, create i update sota el prefix d'escriptura.",
+        'Les credencials escrites es desen aquí en desar; el testimoni necessita read, create i update.',
       writePrefix: "Prefix d'escriptura",
       writePrefixHelp: "Les credencials només s'escriuen en aquest camí o per sota, p. ex. secret/ansibleforms.",
       writePrefixRequired: "L'escriptura necessita un prefix: indica sota quin camí es poden escriure les credencials.",
       writeEnabledHelpCyberArk:
-        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar, com a compte d'una caixa forta, a través del PVWA (el CCP només llegeix).",
+        "Les credencials escrites es desen aquí en desar, com a comptes d'una safe via la PVWA.",
       writeSafes: 'Caixes fortes on escriure',
       writeSafesHelp: "Els comptes només s'escriuen en aquestes caixes fortes, separades per comes, p. ex. Linux, DB.",
       writeSafesRequired: "L'escriptura necessita almenys una caixa forta.",

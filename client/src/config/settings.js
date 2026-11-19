@@ -4177,11 +4177,12 @@ export default function getSettings(t) {
           dependency: 'vault_enterprise',
         },
         {
-          // KV v2 or v1 : radio buttons
+          // KV v2 or v1 : radio buttons, titled Version above them (among the step's other fields)
           key: 'kv_version',
           step: 'options',
           label: t('settings.secretStores.kvVersion'),
           type: 'radio',
+          titled: true,
           options: [
             { value: 2, label: 'KV v2', hint: t('settings.secretStores.kv2Hint') },
             { value: 1, label: 'KV v1', hint: t('settings.secretStores.kv1Hint') },

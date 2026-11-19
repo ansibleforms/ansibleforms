@@ -1884,13 +1884,13 @@ export default {
       defaultMountHelp: 'Usato quando un riferimento non inizia con un mount visibile al token.',
       writeEnabled: 'Consenti la scrittura',
       writeEnabledHelp:
-        'Utente e password di una credenziale digitati in AnsibleForms possono essere scritti qui al salvataggio. Il token richiede le capacità read, create e update sotto il prefisso di scrittura.',
+        'Le credenziali inserite sono scritte qui al salvataggio; il token serve read, create e update.',
       writePrefix: 'Prefisso di scrittura',
       writePrefixHelp: 'Le credenziali vengono scritte solo in questo percorso o sotto, es. secret/ansibleforms.',
       writePrefixRequired:
         'La scrittura richiede un prefisso: indica sotto quale percorso possono essere scritte le credenziali.',
       writeEnabledHelpCyberArk:
-        'Utente e password di una credenziale digitati in AnsibleForms possono essere scritti qui al salvataggio, come account di una safe, tramite il PVWA (il CCP legge soltanto).',
+        'Le credenziali inserite sono scritte qui al salvataggio, come account di una safe via PVWA.',
       writeSafes: 'Safe in cui scrivere',
       writeSafesHelp: 'Gli account vengono scritti solo in queste safe, separate da virgole, es. Linux, DB.',
       writeSafesRequired: 'La scrittura richiede almeno una safe.',
