@@ -150,3 +150,26 @@ describe('the New user wizard : a failed save of its roles', () => {
     }
   });
 });
+
+describe("a new user's password step", () => {
+  it('asks the password twice, the second checked against the first', async () => {
+    const getSettings = (await import('@/config/settings')).default;
+    const users = getSettings((key) => key).users;
+    const step = users.fields.filter((f) => f.step === 'password').map((f) => f.key);
+    expect(step).toEqual(['password', 'password_repeat']);
+    const repeat = users.fields.find((f) => f.key === 'password_repeat');
+    expect(repeat.required).toBe(true);
+    expect(repeat.label).toBe('settings.common.repeatPassword');
+    expect(repeat.validator('abc', { password: 'abc' })).toBe('');
+    expect(repeat.validator('abd', { password: 'abc' })).toBe('settings.common.passwordsDiffer');
+  });
+
+  it('never sends the repeated password', async () => {
+    const getSettings = (await import('@/config/settings')).default;
+    const users = getSettings((key) => key).users;
+    expect(users.beforeSave({ username: 'bob', password: 'x', password_repeat: 'x', role_names: [] })).toEqual({
+      username: 'bob',
+      password: 'x',
+    });
+  });
+});

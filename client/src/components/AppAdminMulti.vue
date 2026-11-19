@@ -318,7 +318,8 @@ function getRules() {
           if (!helpers.req(value)) return true;
           let message;
           try {
-            message = check(value) || '';
+            // the value, and the record for a rule across fields (a repeated password)
+            message = check(value, item.value || {}) || '';
           } catch (e) {
             // a throwing validator must not take the whole form down, as
             // the regex branch above already guards against

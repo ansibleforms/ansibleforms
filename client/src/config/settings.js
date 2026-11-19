@@ -727,7 +727,7 @@ export default function getSettings(t) {
         { key: 'roles', label: t('settings.settingsPage.roles'), count: (item) => (item.role_names || []).length },
       ],
       // the roles picked are not the user's own field : given after it is created
-      beforeSave: ({ role_names: _roles, ...user }) => user,
+      beforeSave: ({ role_names: _roles, password_repeat: _repeat, ...user }) => user,
       // in the row menu : editing, the groups, the password, then Delete last, each apart
       actions: [
         { name: 'edit', title: t('common.edit'), icon: 'pencil', color: 'edit' },
@@ -836,6 +836,18 @@ export default function getSettings(t) {
           filterable: false,
           hidden: true,
           icon: 'lock',
+        },
+        {
+          // typed twice when the user is made : the dialog's only, never sent (beforeSave)
+          key: 'password_repeat',
+          step: 'password',
+          label: t('settings.common.repeatPassword'),
+          type: 'password',
+          required: true,
+          noTable: true,
+          hidden: true,
+          icon: 'lock',
+          validator: (value, item) => (value === item.password ? '' : t('settings.common.passwordsDiffer')),
         },
         {
           key: 'email',
