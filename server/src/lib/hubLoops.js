@@ -13,15 +13,23 @@
 // its runs and failures since this process started, its last success, and its last error with
 // its time - and the API (models/systemTask.model.js) answers it with the node's name.
 //
-// A failure is said, as the loops never said one above debug before :
-//   - in the log, a warning once per distinct error of a loop (the same error every 2 seconds
-//     would fill it) ;
-//   - as a failed row of system_task_runs, so the loop's Runs tab lists its failures : one per
-//     distinct error of a loop a minute at most.
+// Its Runs tab lists three kinds of rows of system_task_runs, each with the node that wrote it :
+//   - an hourly summary : every hour, at the top of the clock's hour, the node whose hub runs
+//     writes a row per loop of the passes of that hour ("1,800 passes, 0 failed" ; failed when
+//     one of them failed), started_at the window's start (the hour's, or the hub's start for the
+//     first one), ended_at its end ; then the hour's counts start again from nothing. No row for
+//     an hour without a pass (the hub stopped). Its own timer (SUMMARY_EVERY_MS), apart from the
+//     loops' : a loop's seconds changed (rearmLoop) leave it as it is, stopLoops clears it. A
+//     row that cannot be written is logged once a window, never thrown into the loop ;
+//   - a Run now pass : its own row, success ("Run now: done") or failed (the error) ;
+//   - a timed pass's failure, said as the loops never said one above debug before : a warning in
+//     the log once per distinct error of a loop (the same error every 2 seconds would fill it),
+//     and a failed row once a minute at most per distinct error of a loop.
 //
 // Run now (POST /api/v2/system/tasks/:key/run) runs one pass of a loop at once on the node that
-// received it (runLoopNow), through the same loopRun as its timer : counted, its failure said as
-// a timed one's. Never while a pass of that loop goes, nor on a node whose hub does not run.
+// received it (runLoopNow), through the same pass as its timer : counted (in the hour's summary
+// too), its failure warned of as a timed one's but written once, as its own row. Never while a
+// pass of that loop goes, nor on a node whose hub does not run.
 import logger from './logger.js';
 import { nodeId } from './role.js';
 import { HUB_LOOPS, hubLoop, recordRun, loopSeconds } from './systemTasks.js';
@@ -32,17 +40,22 @@ export const FAILURE_ROW_EVERY_MS = 60 * 1000;
 const ERRORS_KEPT = 100;
 // the longest error kept
 const ERROR_MAX = 1000;
+// a loop's summary row this often : at the top of each hour of the clock
+export const SUMMARY_EVERY_MS = 60 * 60 * 1000;
+// a Run now pass's result when it succeeded
+export const RUN_NOW_DONE = 'Run now: done';
 
 /**
  * A loop's state, empty : started now, no run yet.
  *
  * Returns:
- *   object: { since, runs, failures, lastRunAt, lastOutcome, lastSuccessAt, lastError, warned,
- *     recorded }.
+ *   object: { since, runs, failures, lastRunAt, lastOutcome, lastSuccessAt, lastError, active,
+ *     warned, recorded, hourFrom, hourPasses, hourFailures }.
  */
 function emptyState() {
+  const now = new Date();
   return {
-    since: new Date(),
+    since: now,
     runs: 0,
     failures: 0,
     lastRunAt: null,
@@ -55,6 +68,10 @@ function emptyState() {
     warned: new Map(),
     // when each error was last written as a row : message -> ms
     recorded: new Map(),
+    // the window of its next summary row : since when, its passes ended and the failed ones
+    hourFrom: now,
+    hourPasses: 0,
+    hourFailures: 0,
   };
 }
 
@@ -67,6 +84,8 @@ let started = false;
 let works = new Map();
 // each loop's timer on this node, by its key : { timer, seconds, armedAt }
 const timers = new Map();
+// the summary rows' timer on this node (null : none, the hub does not run here)
+let summaryTimer = null;
 
 /**
  * Marks the loops as running on this node : the hub started them (startRteHub), with the work
@@ -113,16 +132,115 @@ function armLoop(key) {
  */
 export function startLoops(fns = {}) {
   markLoopsStarted(fns);
-  for (const loop of HUB_LOOPS) armLoop(loop.key);
+  // the first summary window starts now, the hub's start
+  const now = new Date();
+  for (const loop of HUB_LOOPS) {
+    const state = states.get(loop.key);
+    state.hourFrom = now;
+    state.hourPasses = 0;
+    state.hourFailures = 0;
+    armLoop(loop.key);
+  }
+  armSummary();
 }
 
 /**
- * Stops the hub's loops on this node : every timer cleared (the process stops).
+ * Stops the hub's loops on this node : every timer cleared, the summary rows' too (the process
+ * stops).
  */
 export function stopLoops() {
   for (const { timer } of timers.values()) clearInterval(timer);
   timers.clear();
+  clearTimeout(summaryTimer);
+  summaryTimer = null;
   started = false;
+}
+
+// ─── the hourly summary ──────────────────────────────────────────────────────
+
+/**
+ * A summary row's result : its passes and the failed ones, counted in en-US ("1,800 passes,
+ * 0 failed").
+ *
+ * Args:
+ *   passes (number): the passes of the window.
+ *   failures (number): the failed ones.
+ *
+ * Returns:
+ *   string: the result.
+ */
+export function summaryText(passes, failures) {
+  const n = (x) => x.toLocaleString('en-US');
+  return `${n(passes)} ${passes === 1 ? 'pass' : 'passes'}, ${n(failures)} failed`;
+}
+
+/**
+ * Arms the summary rows' timer : once, at the next top of the clock's hour, it writes them
+ * (writeSummaries) then arms itself again. Its own timer, never the loops' : a loop armed again
+ * (rearmLoop) leaves it as it is. Unref'd : it never keeps the process alive.
+ */
+function armSummary() {
+  clearTimeout(summaryTimer);
+  const now = Date.now();
+  const next = Math.floor(now / SUMMARY_EVERY_MS) * SUMMARY_EVERY_MS + SUMMARY_EVERY_MS;
+  summaryTimer = setTimeout(() => {
+    writeSummaries()
+      .catch(() => {})
+      .finally(() => {
+        // stopped meanwhile : no timer again
+        if (started && summaryTimer) armSummary();
+      });
+  }, next - now);
+  summaryTimer.unref?.();
+}
+
+/**
+ * Writes each loop's summary row of the window that ends now : its passes and failed ones since
+ * the window started, success when none failed ; then its counts start again from nothing, the
+ * next window from now. A loop without a pass in the window writes none. Never throws : a row
+ * that cannot be written is logged, once for the window whatever the loops.
+ *
+ * Args:
+ *   endedAt (Date): the window's end (now).
+ *
+ * Returns:
+ *   Promise<number>: the rows written.
+ */
+export async function writeSummaries(endedAt = new Date()) {
+  let written = 0;
+  let problem = null;
+  try {
+    // step 1 : every loop's window counts taken at once, and started again from nothing
+    const windows = HUB_LOOPS.map((loop) => {
+      const state = states.get(loop.key);
+      const window = { loop, from: state.hourFrom, passes: state.hourPasses, failures: state.hourFailures };
+      state.hourFrom = endedAt;
+      state.hourPasses = 0;
+      state.hourFailures = 0;
+      return window;
+    });
+    // step 2 : a row each, for a loop that made a pass
+    for (const window of windows) {
+      if (window.passes === 0) continue;
+      const ok = await recordRun(
+        window.loop,
+        {
+          startedAt: window.from,
+          endedAt,
+          outcome: window.failures === 0 ? 'success' : 'failed',
+          result: summaryText(window.passes, window.failures),
+          changed: 0,
+        },
+        { onError: (err) => (problem ||= err) },
+      );
+      if (ok) written += 1;
+    }
+  } catch (err) {
+    problem ||= err;
+  }
+  // step 3 : a problem said once for the window
+  if (problem) logger.warning(`Could not record the hourly summary of the runner hub loops: ${problem?.message || problem}`);
+  return written;
 }
 
 /**
@@ -178,11 +296,12 @@ function remember(map, key, value) {
  *   key (string): the loop's key.
  *   err (Error|string): what failed.
  *   startedAt (Date): when the run started.
+ *   manual (boolean): a Run now pass : no throttled row, Run now writes its own (runLoopNow).
  *
  * Returns:
- *   Promise<boolean>: whether a row was written.
+ *   Promise<object>: { written (whether a row was written), message (the error, as kept) }.
  */
-async function failed(key, err, startedAt) {
+async function failed(key, err, startedAt, manual = false) {
   const state = states.get(key);
   const loop = hubLoop(key);
   const message = String(err?.message || err || 'failed').slice(0, ERROR_MAX);
@@ -196,11 +315,48 @@ async function failed(key, err, startedAt) {
     remember(state.warned, message, true);
     logger.warning(`${loop.name} failed: ${message}`);
   }
-  // step 3 : a row, once a minute at most per distinct error
+  // step 3 : a row, once a minute at most per distinct error ; a Run now pass writes its own
+  if (manual) return { written: false, message };
   const last = state.recorded.get(message);
-  if (last !== undefined && now.getTime() - last < FAILURE_ROW_EVERY_MS) return false;
+  if (last !== undefined && now.getTime() - last < FAILURE_ROW_EVERY_MS) return { written: false, message };
   remember(state.recorded, message, now.getTime());
-  return recordRun(loop, { startedAt, endedAt: now, outcome: 'failed', result: message, changed: 0 });
+  const written = await recordRun(loop, { startedAt, endedAt: now, outcome: 'failed', result: message, changed: 0 });
+  return { written, message };
+}
+
+/**
+ * One pass of a loop, kept : its work, then its outcome in the loop's state and in the hour's
+ * counts ; a failure is said (failed). Never throws.
+ *
+ * Args:
+ *   key (string): the loop's key (runnerDispatch).
+ *   fn (function): the pass's work, async.
+ *   manual (boolean): a Run now pass (its failure gets no throttled row).
+ *
+ * Returns:
+ *   Promise<object>: { ok, startedAt, endedAt, message (the error ; null on success) }.
+ */
+async function pass(key, fn, manual = false) {
+  const state = states.get(key);
+  const startedAt = new Date();
+  // counted at once, before any wait : a pass asked now sees this one going (runLoopNow)
+  state.runs += 1;
+  state.lastRunAt = startedAt;
+  state.active += 1;
+  try {
+    await fn();
+    state.lastOutcome = 'success';
+    state.lastSuccessAt = new Date();
+    state.hourPasses += 1;
+    return { ok: true, startedAt, endedAt: state.lastSuccessAt, message: null };
+  } catch (err) {
+    state.hourPasses += 1;
+    state.hourFailures += 1;
+    const said = await failed(key, err, startedAt, manual).catch(() => null);
+    return { ok: false, startedAt, endedAt: new Date(), message: said?.message || String(err?.message || err || 'failed') };
+  } finally {
+    state.active -= 1;
+  }
 }
 
 /**
@@ -219,25 +375,7 @@ async function failed(key, err, startedAt) {
  */
 export function loopRun(key, fn) {
   if (!states.has(key)) throw new Error(`No runner hub loop is named ${key}`);
-  return (async () => {
-    const state = states.get(key);
-    const startedAt = new Date();
-    // counted at once, before any wait : a pass asked now sees this one going (runLoopNow)
-    state.runs += 1;
-    state.lastRunAt = startedAt;
-    state.active += 1;
-    try {
-      await fn();
-      state.lastOutcome = 'success';
-      state.lastSuccessAt = new Date();
-      return true;
-    } catch (err) {
-      await failed(key, err, startedAt).catch(() => false);
-      return false;
-    } finally {
-      state.active -= 1;
-    }
-  })();
+  return pass(key, fn).then((done) => done.ok);
 }
 
 /**
@@ -254,10 +392,12 @@ export function loopBusy(key) {
 }
 
 /**
- * Runs one pass of a loop now on this node (Run now), through loopRun as its timer runs it :
- * counted, its failure said as a timed one's. Refused while a pass of that loop goes : a second
- * one at the same time would hand the same jobs over twice, and the pass going is the one the
- * timer just started, so a few milliseconds later Run now runs a fresh one.
+ * Runs one pass of a loop now on this node (Run now), as its timer runs it : counted (in the
+ * hour's summary too), its failure warned of as a timed one's ; then its own row, success
+ * (RUN_NOW_DONE) or failed (the error), its failure written there only, never also as a
+ * throttled timed one's. Refused while a pass of that loop goes : a second one at the same time
+ * would hand the same jobs over twice, and the pass going is the one the timer just started, so a
+ * few milliseconds later Run now runs a fresh one.
  *
  * Args:
  *   key (string): the loop's key.
@@ -272,8 +412,17 @@ export async function runLoopNow(key) {
   const fn = works.get(key);
   if (!started || !fn) return { status: 'noHub' };
   if (loopBusy(key)) return { status: 'busy' };
-  // loopRun counts the pass before its first wait : a second Run now sees it busy
-  return { status: 'done', ok: await loopRun(key, fn) };
+  // step 1 : the pass (counted before its first wait : a second Run now sees it busy)
+  const done = await pass(key, fn, true);
+  // step 2 : its row (recordRun never throws)
+  await recordRun(hubLoop(key), {
+    startedAt: done.startedAt,
+    endedAt: done.endedAt,
+    outcome: done.ok ? 'success' : 'failed',
+    result: done.ok ? RUN_NOW_DONE : done.message,
+    changed: 0,
+  });
+  return { status: 'done', ok: done.ok };
 }
 
 /**
@@ -305,14 +454,21 @@ export function loopState(key) {
   };
 }
 
-// tests only : every loop as at start, its timer cleared, the hub running here or not, with each
+// tests only : the summary rows' timer (null : none)
+export function summaryTimerForTests() {
+  return summaryTimer;
+}
+
+// tests only : every loop as at start, its timer cleared (the summary rows' too), the hub running here or not, with each
 // loop's work
 export function resetLoopsForTests(running = false, fns = {}) {
   for (const { timer } of timers.values()) clearInterval(timer);
   timers.clear();
+  clearTimeout(summaryTimer);
+  summaryTimer = null;
   for (const loop of HUB_LOOPS) states.set(loop.key, emptyState());
   works = new Map(Object.entries(fns));
   started = running;
 }
 
-export default { FAILURE_ROW_EVERY_MS, markLoopsStarted, startLoops, stopLoops, rearmLoop, loopTimer, loopRun, loopBusy, runLoopNow, loopState };
+export default { FAILURE_ROW_EVERY_MS, SUMMARY_EVERY_MS, RUN_NOW_DONE, summaryText, writeSummaries, markLoopsStarted, startLoops, stopLoops, rearmLoop, loopTimer, loopRun, loopBusy, runLoopNow, loopState };

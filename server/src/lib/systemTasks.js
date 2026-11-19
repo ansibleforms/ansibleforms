@@ -15,8 +15,8 @@
 // listed beside them (HUB_LOOPS) : they run every few seconds on their own timers (lib/hubLoops.js),
 // each as often as its setting of seconds says (RUNNER_DISPATCH_SECONDS and the like, on the
 // loop's Schedule tab : a cron's smallest step, a minute, is too coarse for them). What they did
-// is kept in memory on each node (lib/hubLoops.js) ; only their failures are written as rows, one
-// per distinct error a minute at most.
+// is kept in memory on each node (lib/hubLoops.js) ; their rows are a summary of each hour per
+// node, a Run now pass each, and their timed failures, one per distinct error a minute at most.
 //
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
 // result (removed 120 jobs, or the error) and the node that ran it ; every run, the ones of every
@@ -474,17 +474,20 @@ export async function pruneRuns() {
 
 /**
  * Writes one run of a task, a row of its own. Never throws : a run that cannot be written is
- * logged, the task itself has run.
+ * logged (unless quiet : its caller says it), the task itself has run.
  *
  * Args:
- *   task (object): the task's entry of SYSTEM_TASKS (or a loop's of HUB_LOOPS : its failures).
+ *   task (object): the task's entry of SYSTEM_TASKS (or a loop's of HUB_LOOPS : its hourly
+ *     summary, a Run now pass or a timed failure).
  *   run (object): { startedAt (Date), endedAt (Date), outcome (success, failed), result (string),
  *     changed (number : what the run changed, 0 for nothing) }.
+ *   options (object): { onError (function|null) : a row that cannot be written is handed to it,
+ *     (err) => ..., instead of logged here : the caller logs it (lib/hubLoops.js, once an hour) }.
  *
  * Returns:
  *   Promise<boolean>: whether the run was written.
  */
-export async function recordRun(task, run) {
+export async function recordRun(task, run, { onError = null } = {}) {
   const result = String(run.result ?? '').slice(0, RESULT_MAX);
   try {
     // step 1 : its row
@@ -495,7 +498,8 @@ export async function recordRun(task, run) {
       true,
     );
   } catch (err) {
-    logger.warning(`Could not record the run of the system task ${task.key}: ${err.message || err}`);
+    if (onError) onError(err);
+    else logger.warning(`Could not record the run of the system task ${task.key}: ${err.message || err}`);
     return false;
   }
   // step 2 : the table kept small, once an hour at most

@@ -14,13 +14,19 @@
 //     added, updated and removed, or what it keeps ; no setInterval is left ;
 //   - its cron is a setting like the others, applied live ;
 //   - a loop's runs, failures, last success and last error are kept, with the node's name ;
-//   - a failure is a warning once per distinct error, and a row once a minute at most per
-//     distinct error ; a success writes no row ;
+//   - a timed failure is a warning once per distinct error, and a row once a minute at most per
+//     distinct error ; a timed success writes no row of its own ;
+//   - every hour, at the top of the clock's hour, a summary row per loop of the passes of that
+//     hour (its counts, its outcome, its window), the counts started again ; none for an hour
+//     without a pass ; its timer apart from the loops', kept through a re-arm, cleared by
+//     stopLoops, unref'd ; a database error logged once a window, never thrown ;
+//   - a Run now pass writes its own row, success or failed, its failure never also a throttled
+//     row ; the loops' rows are pruned as a task's ;
 //   - a loop's seconds are a whole number within its bounds, refused otherwise ; changed, its
 //     timer is armed again at once at the new seconds (the old one cleared), on the node that saved
 //     it and on every other through the env change notice ; pinned by the environment, read only ;
 //   - the API lists the loops after the tasks, every so many seconds, their seconds changed with
-//     PUT { seconds } (400 out of bounds, 403 pinned, audited), their Runs their failures ;
+//     PUT { seconds } (400 out of bounds, 403 pinned, audited), their Runs their rows ;
 //   - Run now runs one pass of a loop with the work its timer runs (runLoopNow), never two at
 //     once, never where the hub does not run.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
@@ -80,12 +86,25 @@ vi.mock("croner", async (importOriginal) => {
 
 const logger = (await import("../src/lib/logger.js")).default;
 const EnvSettings = (await import("../src/lib/envSettings.js")).default;
-const { SYSTEM_TASKS, HUB_LOOPS, LOOP_SETTINGS, loopSeconds, loopSecondsProblem, hubLoop, resetPruneForTests } = await import(
-  "../src/lib/systemTasks.js"
-);
-const { loopRun, loopState, loopBusy, runLoopNow, resetLoopsForTests, startLoops, loopTimer, FAILURE_ROW_EVERY_MS } = await import(
-  "../src/lib/hubLoops.js"
-);
+const { SYSTEM_TASKS, HUB_LOOPS, LOOP_SETTINGS, loopSeconds, loopSecondsProblem, hubLoop, resetPruneForTests, pruneRuns, RUNS_KEEP_PER_TASK } =
+  await import("../src/lib/systemTasks.js");
+const {
+  loopRun,
+  loopState,
+  loopBusy,
+  runLoopNow,
+  resetLoopsForTests,
+  startLoops,
+  stopLoops,
+  rearmLoop,
+  loopTimer,
+  writeSummaries,
+  summaryText,
+  summaryTimerForTests,
+  FAILURE_ROW_EVERY_MS,
+  SUMMARY_EVERY_MS,
+  RUN_NOW_DONE,
+} = await import("../src/lib/hubLoops.js");
 const { applyChangedEnv } = await import("../src/init/cluster.js");
 const cronModule = await import("../src/services/cron.service.js");
 const cronService = cronModule.default;
@@ -274,22 +293,35 @@ describe("the runner hub's loops", () => {
     assert.equal(inserts().length, 3);
   });
 
-  test("Run now : one pass of the loop's own work, counted as a timed one", async () => {
+  test("Run now : one pass of the loop's own work, counted as a timed one, its own row", async () => {
     let passes = 0;
     resetLoopsForTests(true, { runnerDial: async () => passes++ });
     assert.deepEqual(await runLoopNow("runnerDial"), { status: "done", ok: true });
     assert.equal(passes, 1);
     assert.equal(loopState("runnerDial").runs, 1);
     assert.equal(loopState("runnerDial").last_outcome, "success");
+    // its row : its start and end, success, Run now: done, this node
+    const rows = inserts();
+    assert.equal(rows.length, 1);
+    const [key, startedAt, endedAt, outcome, result, node] = rows[0].params;
+    assert.deepEqual([key, outcome, result, node], ["runnerDial", "success", "Run now: done", nodeId]);
+    assert.equal(RUN_NOW_DONE, "Run now: done");
+    assert.ok(startedAt instanceof Date && endedAt instanceof Date && endedAt >= startedAt);
   });
 
-  test("Run now : a failed pass is said as a timed one's, a row and a warning", async () => {
+  test("Run now : a failed pass is warned of as a timed one's, written once, as its own row", async () => {
     const warn = vi.spyOn(logger, "warning").mockImplementation(() => {});
     resetLoopsForTests(true, { runnerPrune: async () => { throw new Error("gone"); } });
     assert.deepEqual(await runLoopNow("runnerPrune"), { status: "done", ok: false });
     assert.equal(loopState("runnerPrune").failures, 1);
-    assert.equal(inserts().length, 1);
+    // one row, the Run now's : no throttled failure row beside it
+    assert.deepEqual(inserts().map((q) => [q.params[0], q.params[3], q.params[4], q.params[5]]), [
+      ["runnerPrune", "failed", "gone", nodeId],
+    ]);
     assert.ok(warn.mock.calls.some((c) => /Runner ended jobs prune failed: gone/.test(c[0])));
+    // each Run now its row, the same error within the minute included
+    await runLoopNow("runnerPrune");
+    assert.equal(inserts().length, 2);
   });
 
   test("Run now : never two passes of a loop at once, a timed one going included", async () => {
@@ -323,6 +355,146 @@ describe("the runner hub's loops", () => {
 
   test("an unknown loop is refused at the hub's start", () => {
     assert.throws(() => loopRun("notALoop", async () => {}), /No runner hub loop/);
+  });
+});
+
+// ------------------------------------------------------------------
+// the hourly summary rows
+// ------------------------------------------------------------------
+describe("the loops' hourly summary", () => {
+  const summaries = () => inserts().filter((q) => /passes?, \d/.test(q.params[4]));
+  const row = (q) => ({ key: q.params[0], from: q.params[1].toISOString(), to: q.params[2].toISOString(), outcome: q.params[3], result: q.params[4], node: q.params[5] });
+
+  test("its text : the passes and the failed ones, counted in en-US", () => {
+    assert.equal(summaryText(1800, 0), "1,800 passes, 0 failed");
+    assert.equal(summaryText(1, 1), "1 pass, 1 failed");
+    assert.equal(summaryText(12345, 1200), "12,345 passes, 1,200 failed");
+  });
+
+  test("a row per loop at the top of each hour : its counts, outcome and window, then reset", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-17T10:30:00Z"));
+    vi.spyOn(logger, "warning").mockImplementation(() => {});
+    resetLoopsForTests(false);
+    let dials = 0;
+    startLoops({
+      runnerDispatch: async () => {},
+      // one dial in 30 fails
+      runnerDial: async () => {
+        if (++dials === 30) throw new Error("refused");
+      },
+      runnerPrune: async () => {},
+    });
+    // the hub's first window : from its start to the top of the hour (the passes due at 11:00
+    // exactly go after the summary : the next window's)
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    assert.deepEqual(summaries().map(row), [
+      { key: "runnerDispatch", from: "2026-11-17T10:30:00.000Z", to: "2026-11-17T11:00:00.000Z", outcome: "success", result: "899 passes, 0 failed", node: nodeId },
+      { key: "runnerDial", from: "2026-11-17T10:30:00.000Z", to: "2026-11-17T11:00:00.000Z", outcome: "failed", result: "179 passes, 1 failed", node: nodeId },
+      { key: "runnerPrune", from: "2026-11-17T10:30:00.000Z", to: "2026-11-17T11:00:00.000Z", outcome: "success", result: "29 passes, 0 failed", node: nodeId },
+    ]);
+    // the next one : a whole hour, its counts from nothing again
+    queries.length = 0;
+    await vi.advanceTimersByTimeAsync(SUMMARY_EVERY_MS);
+    assert.deepEqual(summaries().map(row), [
+      { key: "runnerDispatch", from: "2026-11-17T11:00:00.000Z", to: "2026-11-17T12:00:00.000Z", outcome: "success", result: "1,800 passes, 0 failed", node: nodeId },
+      { key: "runnerDial", from: "2026-11-17T11:00:00.000Z", to: "2026-11-17T12:00:00.000Z", outcome: "success", result: "360 passes, 0 failed", node: nodeId },
+      { key: "runnerPrune", from: "2026-11-17T11:00:00.000Z", to: "2026-11-17T12:00:00.000Z", outcome: "success", result: "60 passes, 0 failed", node: nodeId },
+    ]);
+    // the in-memory counts since start are not reset
+    assert.equal(loopState("runnerDispatch").runs, 2700);
+  });
+
+  test("Run now passes are counted in the hour's summary", async () => {
+    resetLoopsForTests(true, { runnerPrune: async () => {} });
+    await runLoopNow("runnerPrune");
+    await loopRun("runnerPrune", async () => { throw new Error("x"); });
+    queries.length = 0;
+    vi.spyOn(logger, "warning").mockImplementation(() => {});
+    assert.equal(await writeSummaries(), 1);
+    assert.deepEqual(summaries().map((q) => [q.params[0], q.params[3], q.params[4]]), [["runnerPrune", "failed", "2 passes, 1 failed"]]);
+  });
+
+  test("no row for a loop without a pass in the window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-17T10:00:00Z"));
+    resetLoopsForTests(false);
+    // only the dispatch has work : the others make no pass
+    startLoops({ runnerDispatch: async () => {} });
+    await vi.advanceTimersByTimeAsync(SUMMARY_EVERY_MS);
+    assert.deepEqual(summaries().map((q) => q.params[0]), ["runnerDispatch"]);
+    // the hub stopped : nothing at all
+    queries.length = 0;
+    resetLoopsForTests(true);
+    assert.equal(await writeSummaries(), 0);
+    assert.equal(inserts().length, 0);
+  });
+
+  test("its timer : apart from the loops', kept through a re-arm, cleared by stopLoops", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-17T10:59:00Z"));
+    vi.spyOn(logger, "notice").mockImplementation(() => {});
+    resetLoopsForTests(false);
+    startLoops({ runnerDispatch: async () => {} });
+    const timer = summaryTimerForTests();
+    assert.ok(timer);
+    // a loop armed again leaves it as it is
+    assert.equal(rearmLoop("runnerDispatch"), true);
+    assert.equal(EnvSettings.applyLive("RUNNER_DISPATCH_SECONDS", "5", "2"), true);
+    assert.equal(summaryTimerForTests(), timer);
+    // every 5 seconds now : 11 passes before 11:00, the one due at 11:00 after the summary
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    assert.deepEqual(summaries().map((q) => [q.params[0], q.params[1].toISOString(), q.params[4]]), [
+      ["runnerDispatch", "2026-11-17T10:59:00.000Z", "11 passes, 0 failed"],
+    ]);
+    // armed again for the next hour
+    assert.ok(summaryTimerForTests());
+    // stopped : no timer, no row any more
+    stopLoops();
+    assert.equal(summaryTimerForTests(), null);
+    queries.length = 0;
+    await vi.advanceTimersByTimeAsync(3 * SUMMARY_EVERY_MS);
+    assert.equal(inserts().length, 0);
+    EnvSettings.applyLive("RUNNER_DISPATCH_SECONDS", "", "5");
+  });
+
+  test("its timer never keeps the process alive", () => {
+    resetLoopsForTests(false);
+    startLoops({});
+    assert.equal(summaryTimerForTests().hasRef(), false);
+    stopLoops();
+  });
+
+  test("a database error : logged once a window, never thrown", async () => {
+    const warn = vi.spyOn(logger, "warning").mockImplementation(() => {});
+    answer = (sql) => {
+      if (/^INSERT/.test(sql)) throw new Error("the database is gone");
+      return [];
+    };
+    for (const loop of HUB_LOOPS) await loopRun(loop.key, async () => {});
+    assert.equal(await writeSummaries(), 0);
+    const said = () => warn.mock.calls.map((c) => c[0]).filter((m) => /hourly summary/.test(m));
+    assert.deepEqual(said(), ["Could not record the hourly summary of the runner hub loops: the database is gone"]);
+    // its counts reset all the same ; the next window says it again, once
+    for (const loop of HUB_LOOPS) await loopRun(loop.key, async () => {});
+    await writeSummaries();
+    assert.equal(said().length, 2);
+  });
+
+  test("the loops' rows are pruned as a task's : its latest ones kept", async () => {
+    await pruneRuns();
+    const deletes = queries.filter((q) => /^DELETE/.test(q.sql) && /task_key = \?/.test(q.sql));
+    for (const loop of HUB_LOOPS) {
+      const q = deletes.find((d) => d.params[0] === loop.key);
+      assert.ok(q, loop.key);
+      assert.deepEqual(q.params, [loop.key, loop.key, RUNS_KEEP_PER_TASK]);
+    }
+    // a summary row prunes the table as a task's run does (once an hour at most)
+    queries.length = 0;
+    resetPruneForTests();
+    await loopRun("runnerDial", async () => {});
+    await writeSummaries();
+    assert.ok(queries.some((q) => /^DELETE/.test(q.sql)));
   });
 });
 
@@ -519,7 +691,7 @@ describe("the loops as the API answers them", () => {
     assert.deepEqual(res.body.next_runs, []);
   });
 
-  test("its Runs are its failures, the rows of its key", async () => {
+  test("its Runs are its rows : summaries, Run now passes and failures", async () => {
     answer = (sql, params) =>
       /^SELECT \* FROM AnsibleForms\.`system_task_runs` WHERE task_key = \?/.test(sql) && params[0] === "runnerDial"
         ? [{ id: 9, task_key: "runnerDial", started_at: new Date(), ended_at: new Date(), outcome: "failed", result: "refused", node: "af-x" }]

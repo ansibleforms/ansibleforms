@@ -7,8 +7,8 @@
 //   - the nightly backup is answered at once (202), its run going on ;
 //   - no second run while one runs (409), and a scheduled tick during it is skipped (croner busy) ;
 //   - an unknown key is 404, a task that is off 400, a user without the settings 403 ;
-//   - a runner hub loop runs one pass on the node that received the request, through its own
-//     loopRun : counted, a failure recorded as a timed one's ; 409 on a node whose hub does not
+//   - a runner hub loop runs one pass on the node that received the request, as its timer runs
+//     it : counted, written as its own row, success or failed (once) ; 409 on a node whose hub does not
 //     run, and while a pass of it goes, no second one started ;
 //   - on a node that does not run the tasks, the run is handed to the worker through its change
 //     notice (lib/epochs.js), which the worker reacts to (init/cluster.js) ; the request waits
@@ -279,7 +279,7 @@ describe("Run now of a runner hub loop", () => {
     HubLoops.resetLoopsForTests(true, Object.fromEntries(Object.keys(passes).map((k) => [k, fn(k)])));
   };
 
-  test("runs one pass of each loop here, counted as a timed one, and answers the loop", async () => {
+  test("runs one pass of each loop here, counted as a timed one, its own row, and answers the loop", async () => {
     startHub();
     for (const key of Object.keys(passes)) {
       const res = await runNow(key);
@@ -292,12 +292,15 @@ describe("Run now of a runner hub loop", () => {
       assert.equal(res.body.last_run.outcome, "success");
       assert.equal(res.body.last_run.node, nodeId);
     }
-    // a success writes no row, as a timed one ; nothing handed to another node
-    assert.equal(db.runs.length, 0);
+    // each pass its own row, Run now: done ; nothing handed to another node
+    assert.deepEqual(
+      db.runs.map((r) => [r.task_key, r.outcome, r.result, r.node]),
+      Object.keys(passes).map((key) => [key, "success", "Run now: done", nodeId]),
+    );
     assert.deepEqual(notices.sent, []);
   });
 
-  test("a pass that fails is recorded as a timed one's : counted, its error kept and written", async () => {
+  test("a pass that fails : counted, its error kept and written once, as its own row", async () => {
     startHub();
     loopWork.error = "no socket";
     const res = await runNow("runnerDial");

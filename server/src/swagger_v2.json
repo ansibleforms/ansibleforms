@@ -3393,7 +3393,7 @@
           "system"
         ],
         "summary": "The app's maintenance tasks (Jobs > System)",
-        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Each task's schedule is changed with PUT /system/tasks/{key}/schedule. The runner hub's own loops (runnerDispatch, runnerDial, runnerPrune) are listed after the tasks: timed by seconds (interval_seconds, changed with the same PUT), what they did kept in memory by the node that answers (loop), their failures recorded as runs. Requires settings access.",
+        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Each task's schedule is changed with PUT /system/tasks/{key}/schedule. The runner hub's own loops (runnerDispatch, runnerDial, runnerPrune) are listed after the tasks: timed by seconds (interval_seconds, changed with the same PUT), what they did kept in memory by the node that answers (loop), recorded as runs: an hourly summary per node, each Run now pass and their failures. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3967,7 +3967,7 @@
           "system"
         ],
         "summary": "Run a maintenance task or a runner hub loop now",
-        "description": "Runs a task once now, recorded as a scheduled run is (its outcome and result on its Runs tab). It runs on the node whose scheduler runs the tasks (the worker), wherever the request comes in: another node hands it over and waits for its run a while. Answers once the run ended, or at once for the nightly backup, which may outlast a request. A runner hub loop (runnerDispatch, runnerDial, runnerPrune) runs one pass on the node that received the request, as its timer runs it: counted in its loop state, a failure recorded as a timed one's; answered once the pass ended. Never starts a run while one of the task or loop is going. Audited (system.task.run). Requires settings access.",
+        "description": "Runs a task once now, recorded as a scheduled run is (its outcome and result on its Runs tab). It runs on the node whose scheduler runs the tasks (the worker), wherever the request comes in: another node hands it over and waits for its run a while. Answers once the run ended, or at once for the nightly backup, which may outlast a request. A runner hub loop (runnerDispatch, runnerDial, runnerPrune) runs one pass on the node that received the request, as its timer runs it: counted in its loop state, recorded as its own run (success or failed); answered once the pass ended. Never starts a run while one of the task or loop is going. Audited (system.task.run). Requires settings access.",
         "security": [
           {
             "bearerAuth": []

@@ -151,7 +151,7 @@ describe("the table keeps itself small", () => {
     assert.match(old.sql, /WHERE started_at < UTC_TIMESTAMP\(\) - INTERVAL \? DAY/);
     assert.deepEqual(old.params, [RUNS_KEEP_DAYS]);
     assert.equal(RUNS_KEEP_DAYS, 30);
-    // the runner hub's loops' rows (their failures) too
+    // the runner hub's loops' rows (hourly summaries, Run now passes, failures) too
     assert.equal(perTask.length, SYSTEM_TASKS.length + HUB_LOOPS.length);
     for (const q of perTask) {
       assert.match(q.sql, /id NOT IN \(SELECT id FROM \(SELECT id FROM AnsibleForms\.`system_task_runs` WHERE task_key = \? ORDER BY started_at DESC, id DESC LIMIT \?\) kept\)/);

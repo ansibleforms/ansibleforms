@@ -184,6 +184,14 @@ describe("a task's page", () => {
     expect(page).toMatch(/\{\{ task\.loop\?\.node \|\| '–' \}\}/);
   });
 
+  it("lists a runner hub loop's rows on its Runs tab as a task's : an hourly summary's hour too", () => {
+    const tab = page.slice(page.indexOf('v-if="tabShown(\'runs\')"'), page.indexOf('searchNone'));
+    expect(tab).not.toMatch(/isLoop/);
+    const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
+    expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual(['started_at', 'duration', 'outcome', 'result', 'node']);
+    expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
+  });
+
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
     expect(page).toMatch(
       /<span :title="launchError \|\| undefined" v-html="statusPill\(t, lastRun\?\.outcome\)"><\/span>/,

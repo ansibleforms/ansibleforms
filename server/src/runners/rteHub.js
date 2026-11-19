@@ -1766,9 +1766,9 @@ export function startRteHub(httpServer) {
     if (!handleUpgrade(req, socket, head)) socket.destroy();
   });
   // the hub's own loops, on their timers at their settings' seconds, armed again when one changes :
-  // each run kept in memory for Jobs > System, a failure warned of once per distinct error and
-  // written as a row once a minute at most ; Run now runs one pass of the same work
-  // (lib/hubLoops.js)
+  // each run kept in memory for Jobs > System and summed in a row every hour, a failure warned of
+  // once per distinct error and written as a row once a minute at most ; Run now runs one pass of
+  // the same work, written as its own row (lib/hubLoops.js)
   startLoops({ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded });
   setTimeout(() => dialInbound().catch(() => {}), 2000).unref?.();
   logger.notice(`Taking RTE sockets on ${appConfig.baseUrl || ""}${APP_SOCKET_PATH}`);

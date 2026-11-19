@@ -19,7 +19,8 @@ import { readManaged, isOverridden } from '../lib/envSettings.js';
 // The runner hub's loops (lib/systemTasks.js HUB_LOOPS) are listed after the tasks : no cron,
 // their seconds instead (interval_seconds, a setting changed as a task's cron, within
 // interval_min and interval_max), and what they did from the memory of the node that answers
-// (lib/hubLoops.js loopState, its name in loop.node) ; their rows are their failures.
+// (lib/hubLoops.js loopState, its name in loop.node) ; their rows are each node's hourly summary,
+// the Run now passes and the timed failures.
 
 // the runs one task's page lists, its latest first
 export const RECENT_RUNS = 100;
@@ -213,12 +214,12 @@ function describe(task, lastRow, managed) {
 /**
  * A runner hub loop as the API answers it : the fields of a task without a cron, its seconds
  * instead (its setting's, changed as a task's cron unless the environment sets it) ; its last run
- * what the node that answers keeps in memory (loopState), the node named, else its latest failed
- * row.
+ * what the node that answers keeps in memory (loopState), the node named, else its latest row.
  *
  * Args:
  *   loop (object): the loop's entry of HUB_LOOPS.
- *   lastRow (object|undefined): its latest row of system_task_runs (a failure).
+ *   lastRow (object|undefined): its latest row of system_task_runs (a summary, a Run now pass or
+ *     a failure).
  *   managed (Map): the variables of the settings file.
  *
  * Returns:
@@ -230,7 +231,7 @@ function describeLoop(loop, lastRow, managed) {
   const seconds = loopSeconds(loop.key);
   const state = loopState(loop.key);
   // its last run : this node's, in memory (a failure's message as its result) ; a node that runs
-  // no hub has none, its latest failed row then
+  // no hub has none, its latest row then
   let lastRun = lastRow ? runOf(lastRow) : null;
   if (state?.last_run_at) {
     const failed = state.last_outcome === 'failed';
@@ -348,7 +349,7 @@ SystemTask.list = async function () {
 
 /**
  * One maintenance task (or runner hub loop), with its recent runs, the latest first (a loop's :
- * its failures).
+ * its hourly summaries, Run now passes and failures).
  *
  * Args:
  *   key (string): the task's key.
@@ -367,7 +368,7 @@ SystemTask.get = async function (key) {
     true,
   );
   const managed = await managedVariables();
-  // a loop's rows are its failures, its Runs tab lists them
+  // a loop's rows (hourly summaries, Run now passes, failures), its Runs tab lists them
   if (loop) return { ...describeLoop(loop, rows?.[0], managed), runs: (rows || []).map(runOf) };
   return { ...describe(task, rows?.[0], managed), runs: (rows || []).map(runOf) };
 };
