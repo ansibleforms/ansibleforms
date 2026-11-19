@@ -167,9 +167,6 @@ const columnDefs = computed(() => [
     // a template job : where it ran (jenkins, semaphore, aap ...), its runner's kind
     render: (j) => jobTypeLabel(j),
   },
-  // as wide as its widest pill in the language shown (or its header) : no room kept for a
-  // longer translation
-  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: statusWidth() },
   {
     key: 'start',
     label: t('jobs.startTime'),
@@ -198,6 +195,9 @@ const columnDefs = computed(() => [
     align: 'end',
     sortValue: (j) => durationSeconds(j) ?? -1,
   },
+  // as wide as its widest pill in the language shown (or its header) : no room kept for a
+  // longer translation
+  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: statusWidth() },
   {
     key: 'user',
     label: t('jobs.user'),

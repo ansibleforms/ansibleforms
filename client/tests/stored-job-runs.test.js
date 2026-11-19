@@ -37,10 +37,10 @@ describe('the Runs tab of a stored job', () => {
     expect(tab).toMatch(/<template #cell-status="\{ row \}"><AppStatusPill :status="row\.status" \/><\/template>/);
   });
 
-  it('has the columns of the job tabs : number, who, status, start, end and the duration to the right', () => {
+  it('has the columns of the job tabs : number, who, start, end, the duration to the right, then status', () => {
     const columns = page.slice(page.indexOf('const runColumns'), page.indexOf('async function loadRuns'));
     const keys = [...columns.matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
-    expect(keys).toEqual(['id', 'user', 'status', 'start', 'end', 'duration']);
+    expect(keys).toEqual(['id', 'user', 'start', 'end', 'duration', 'status']);
     expect(columns).toMatch(/key: 'duration',\s*label: t\('jobs\.duration'\),\s*keep: true,\s*class: 'text-end'/);
   });
 

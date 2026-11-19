@@ -264,7 +264,6 @@ const runColumns = computed(() => [
   { key: 'id', label: t('settings.linked.job'), keep: true, class: 'text-end', value: (j) => `#${j.id}` },
   // who it ran as : the Schedule Service, or the user who planned it
   { key: 'user', label: t('jobs.launchedBy') },
-  { key: 'status', label: t('settings.linked.status'), keep: true },
   // its times as the jobs page shows them (the server sends them in its own zone)
   { key: 'start', label: t('jobs.startTime'), keep: true, value: (j) => j.start && Time.format(j.start) },
   { key: 'end', label: t('jobs.endTime'), keep: true, value: (j) => j.end && Time.format(j.end) },
@@ -277,6 +276,7 @@ const runColumns = computed(() => [
     class: 'text-end',
     value: (j) => formatDuration(durationSeconds(j)),
   },
+  { key: 'status', label: t('settings.linked.status'), keep: true },
 ]);
 
 /**

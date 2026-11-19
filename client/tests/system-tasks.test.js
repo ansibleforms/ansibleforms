@@ -99,9 +99,9 @@ describe('the list', () => {
     expect(list.selectable).toBe(false);
   });
 
-  it("has the scheduled jobs' columns : name, when it runs, last run, status, next run", () => {
+  it("has the scheduled jobs' columns : name, when it runs, last run, next run, status", () => {
     const shown = list.fields.filter((f) => !f.hidden).map((f) => f.key);
-    expect(shown).toEqual(['name', 'cron', 'last_run', 'status', 'next_run']);
+    expect(shown).toEqual(['name', 'cron', 'last_run', 'next_run', 'status']);
   });
 
   it('says when a task runs in words, its cron on hover', () => {
@@ -211,9 +211,9 @@ describe("a task's page", () => {
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
   });
 
-  it("has the Scheduled list's columns in its order : Last run, Status, Next run", () => {
+  it("has the Scheduled list's columns in its order : Last run, Next run, Status", () => {
     const list = getSettings(t).system_tasks.fields.map((f) => f.key);
-    expect(list.slice(list.indexOf('last_run'))).toEqual(['last_run', 'status', 'next_run']);
+    expect(list.slice(list.indexOf('last_run'))).toEqual(['last_run', 'next_run', 'status']);
   });
 
   it('says where its setting is changed, or that the environment sets it', () => {

@@ -1751,15 +1751,6 @@ export default function getSettings(t) {
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
         },
-        // how the last run ended, between it and the next one ; none yet (a schedule that never
-        // ran) : an en dash rather than an empty cell
-        {
-          key: 'status',
-          label: t('settings.fields.status'),
-          noInput: true,
-          // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
-          render: (v, row) => schedulePill(t, row),
-        },
         // when it runs next : its cron's next occurrence, or its one time run while ahead (the
         // server computes it, schedule.model.js)
         {
@@ -1769,6 +1760,15 @@ export default function getSettings(t) {
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
+        },
+        // how the last run ended, between it and the next one ; none yet (a schedule that never
+        // ran) : an en dash rather than an empty cell
+        {
+          key: 'status',
+          label: t('settings.fields.status'),
+          noInput: true,
+          // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
+          render: (v, row) => schedulePill(t, row),
         },
         {
           key: 'extra_vars',
@@ -1984,19 +1984,19 @@ export default function getSettings(t) {
           sortValue: (row) => row.last_run?.started_at || '',
         },
         {
+          key: 'next_run',
+          label: t('settings.schedules.nextRun'),
+          type: 'datetime',
+          noInput: true,
+          render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),
+        },
+        {
           // how the last run went, as a schedule's last launch : success green, failed red, none a dash
           key: 'status',
           label: t('settings.fields.status'),
           noInput: true,
           render: (v, row) => statusPill(t, row?.last_run?.outcome),
           sortValue: (row) => row.last_run?.outcome || '',
-        },
-        {
-          key: 'next_run',
-          label: t('settings.schedules.nextRun'),
-          type: 'datetime',
-          noInput: true,
-          render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),
         },
       ],
     },
