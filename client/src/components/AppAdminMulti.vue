@@ -649,13 +649,7 @@ function newItem(defaults = {}) {
     if (field.type === 'editor' && item.value[field.key] === undefined) {
       item.value[field.key] = '';
     }
-    // the first of its list ; a credential dropdown's is the first of its kind (preselectCredentials)
-    if (field.type === 'select' && field.parent && field.valueKey && !isCredentialSelect(field)) {
-      const list = parentLists.value[field.parent] || [];
-      if (list.length > 0 && item.value[field.key] === undefined) {
-        item.value[field.key] = list[0][field.valueKey];
-      }
-    }
+    // a dropdown of a list : its first choice is set by preselectChoices, the first it offers
   });
   // the defaults of a field that follows another set from the start (an SSO provider is Entra ID
   // at first : its redirect URL, on the first step, from the app's address)
@@ -1004,78 +998,79 @@ watch(action, () => {
   stepReached.value = 0;
 });
 
-// ─── A new record's credentials : the first of its kind chosen ─────────────────
-// a credential dropdown of a new record (parent 'credentials') starts on the first credential its
-// choicesWhen keeps (an Entra ID provider's entraid ones), or of the kind its New button makes (a
-// repository's git ones) when it lists every kind, not on an empty choice nor on the first
-// credential of all (another kind, which the dropdown cannot show : it looked empty). Chosen again
-// when its kind changes (a provider switched on an earlier step) ; one the user emptied stays
-// empty.
-const credentialsCleared = new Set();
+// ─── A new record's dropdowns : the first choice they offer ────────────────────
+// a dropdown of a list (field.parent) of a new record starts on the first choice it offers : what
+// its choicesWhen keeps (an Entra ID provider's entraid credentials, the secret stores that allow
+// writing), for a credential dropdown that lists every kind the kind its New button makes (a
+// repository's git ones) ; never on its empty choice nor on the first record of its list that it
+// does not offer (it looked empty). None to offer : empty, its emptyText or its New button saying
+// so. Chosen again when what it offers changes (a provider switched on an earlier step) ; one the
+// user emptied stays empty.
+const choicesCleared = new Set();
 // what the choosing itself last wrote in each, so its own emptying is not taken for the user's
-const credentialsChosen = new Map();
+const choicesChosen = new Map();
 
 /**
- * Whether a dropdown lists credentials : a select whose list is the credentials.
+ * Whether a dropdown lists the records of a list (its parent) : a select with a parent and the
+ * key of its value.
  *
  * Args:
  *   field (object): the field.
  *
  * Returns:
- *   boolean: true for a credential dropdown.
+ *   boolean: true for such a dropdown.
  */
-function isCredentialSelect(field) {
-  return field?.type === 'select' && field.parent === 'credentials' && !!field.valueKey;
+function isListSelect(field) {
+  return field?.type === 'select' && !!field.parent && !!field.valueKey;
 }
 
 /**
- * Chooses, on a new record, the first credential of its kind in every credential dropdown shown
- * that has none of its kind : empty, or one of another kind its choices do not keep.
+ * Chooses, on a new record, the first choice of every dropdown shown that has none it offers :
+ * empty, or a record its choices do not keep.
  */
-function preselectCredentials() {
+function preselectChoices() {
   if (action.value !== 'new') return;
   for (const field of fields.value) {
-    if (!isCredentialSelect(field) || credentialsCleared.has(field.key) || !showField(field)) continue;
+    if (!isListSelect(field) || choicesCleared.has(field.key) || !showField(field)) continue;
     // its kind : what its choicesWhen keeps, else the kind its New button makes (a repository's
     // git credential) when its dropdown lists every kind ; none of that kind : left empty
-    const kind = field.choicesWhen ? null : textOf(field.createDefaults)?.credential_type;
+    const kind =
+      field.parent === 'credentials' && !field.choicesWhen ? textOf(field.createDefaults)?.credential_type : null;
     const offered = choicesOf(field).filter((c) => c?.[field.valueKey]);
     // one it offers, chosen or picked : kept, whatever its kind
     const current = item.value[field.key];
     if (current && offered.some((c) => c[field.valueKey] === current)) continue;
     const choices = offered.filter((c) => !kind || c.credential_type === kind);
     const chosen = choices.length ? choices[0][field.valueKey] : '';
-    credentialsChosen.set(field.key, chosen);
+    choicesChosen.set(field.key, chosen);
     item.value[field.key] = chosen;
   }
 }
 
 // a new record : nothing emptied yet
 watch(action, () => {
-  credentialsCleared.clear();
-  credentialsChosen.clear();
+  choicesCleared.clear();
+  choicesChosen.clear();
 });
-// on every step shown, when the credentials are read, and when what decides their kind changes
+// on every step shown, when a list is read, and when what decides what they offer changes
 watch(
   () => [
     action.value,
     stepIndex.value,
-    (parentLists.value?.credentials || []).length,
-    JSON.stringify(
-      fields.value
-        .filter((f) => !isCredentialSelect(f))
-        .map((f) => (typeof item.value[f.key] === 'object' ? null : item.value[f.key])),
-    ),
+    Object.values(parentLists.value || {})
+      .map((list) => (Array.isArray(list) ? list.length : 0))
+      .join(','),
+    JSON.stringify(fields.value.map((f) => (typeof item.value[f.key] === 'object' ? null : item.value[f.key]))),
   ],
-  () => nextTick(preselectCredentials),
+  () => nextTick(preselectChoices),
 );
 // one the user emptied (its clear button) : left empty
 watch(
-  () => fields.value.filter(isCredentialSelect).map((f) => item.value[f.key] || ''),
+  () => fields.value.filter(isListSelect).map((f) => item.value[f.key] || ''),
   (now, before) => {
     if (action.value !== 'new' || !before) return;
-    fields.value.filter(isCredentialSelect).forEach((f, i) => {
-      if (before[i] && !now[i] && credentialsChosen.get(f.key) !== '') credentialsCleared.add(f.key);
+    fields.value.filter(isListSelect).forEach((f, i) => {
+      if (before[i] && !now[i] && choicesChosen.get(f.key) !== '') choicesCleared.add(f.key);
     });
   },
 );

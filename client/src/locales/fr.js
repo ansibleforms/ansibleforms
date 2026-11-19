@@ -1999,6 +1999,7 @@ export default {
       secretRefPlaceholder: 'ex. secret/myapp/prod',
       newSecretStore: 'Ajouter un coffre de secrets',
       noWritableStore: "Aucun coffre de secrets n'autorise encore l'écriture",
+      noSecretStore: 'Aucun coffre de secrets pour le moment',
       secretFromStore: 'Coffre de secrets',
       secretFromStoreHint: 'HashiCorp Vault ou CyberArk',
       secretPoint: 'Pointer vers une clé',

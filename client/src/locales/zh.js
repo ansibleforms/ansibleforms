@@ -1775,6 +1775,7 @@ export default {
       secretRefPlaceholder: '例如 secret/myapp/prod',
       newSecretStore: '添加密钥库',
       noWritableStore: '尚无允许写入的密钥库',
+      noSecretStore: '还没有密钥库',
       secretFromStore: '密钥库',
       secretFromStoreHint: 'HashiCorp Vault 或 CyberArk',
       secretPoint: '指向键',

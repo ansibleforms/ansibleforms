@@ -1850,6 +1850,7 @@ export default {
       secretRefPlaceholder: 'ex. secret/myapp/prod',
       newSecretStore: 'Adicionar cofre de segredos',
       noWritableStore: 'Nenhum cofre de segredos permite escrever ainda',
+      noSecretStore: 'Ainda não há cofre de segredos',
       secretFromStore: 'Cofre de segredos',
       secretFromStoreHint: 'HashiCorp Vault ou CyberArk',
       secretPoint: 'Apontar para uma chave',

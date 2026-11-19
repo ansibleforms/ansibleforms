@@ -1996,6 +1996,7 @@ export default {
       secretRefPlaceholder: 'z.B. secret/myapp/prod',
       newSecretStore: 'Secret Store hinzufügen',
       noWritableStore: 'Noch kein Secret Store erlaubt das Schreiben',
+      noSecretStore: 'Noch kein Secret Store',
       secretFromStore: 'Secret Store',
       secretFromStoreHint: 'HashiCorp Vault oder CyberArk',
       secretPoint: 'Auf einen Schlüssel verweisen',

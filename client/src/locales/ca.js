@@ -1852,6 +1852,7 @@ export default {
       secretRefPlaceholder: 'p. ex. secret/myapp/prod',
       newSecretStore: 'Afegeix un magatzem de secrets',
       noWritableStore: 'Encara cap magatzem de secrets no permet escriure',
+      noSecretStore: 'Encara no hi ha cap magatzem de secrets',
       secretFromStore: 'Magatzem de secrets',
       secretFromStoreHint: 'HashiCorp Vault o CyberArk',
       secretPoint: 'Apunta a una clau',

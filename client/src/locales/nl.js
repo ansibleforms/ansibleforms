@@ -1983,6 +1983,7 @@ export default {
       secretRefPlaceholder: 'bv. secret/myapp/prod',
       newSecretStore: 'Secret store toevoegen',
       noWritableStore: 'Nog geen secret store staat schrijven toe',
+      noSecretStore: 'Nog geen secret store',
       secretFromStore: 'Geheimenkluis',
       secretFromStoreHint: 'HashiCorp Vault of CyberArk',
       secretPoint: 'Verwijzen naar een sleutel',

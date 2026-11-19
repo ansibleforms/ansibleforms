@@ -1828,6 +1828,7 @@ export default {
       secretRefPlaceholder: '例: secret/myapp/prod',
       newSecretStore: 'シークレットストアを追加',
       noWritableStore: '書き込みを許可するシークレットストアはまだありません',
+      noSecretStore: 'シークレットストアはまだありません',
       secretFromStore: 'シークレットストア',
       secretFromStoreHint: 'HashiCorp Vault または CyberArk',
       secretPoint: 'キーを指す',

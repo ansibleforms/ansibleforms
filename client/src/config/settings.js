@@ -2590,8 +2590,10 @@ export default function getSettings(t) {
           choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
           // a New one while writing : writing already on, so it is offered once made
           createDefaults: (r) => (writesToStore(r) ? { write_enabled: true } : {}),
-          // written to, none allows writing yet : the dropdown still shown, saying so, over its button
-          emptyText: (r) => (writesToStore(r) ? t('settings.credentials.noWritableStore') : ''),
+          // none to choose : the dropdown still shown, saying so, over its button (written to : none
+          // allows writing yet ; read from : no store yet)
+          emptyText: (r) =>
+            writesToStore(r) ? t('settings.credentials.noWritableStore') : t('settings.credentials.noSecretStore'),
           label: t('settings.credentials.secretStore'),
           help: t('settings.credentials.secretStoreHelp'),
           type: 'select',

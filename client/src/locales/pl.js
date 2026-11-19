@@ -1837,6 +1837,7 @@ export default {
       secretRefPlaceholder: 'np. secret/myapp/prod',
       newSecretStore: 'Dodaj magazyn sekretów',
       noWritableStore: 'Żaden magazyn sekretów nie pozwala jeszcze na zapis',
+      noSecretStore: 'Brak jeszcze magazynu sekretów',
       secretFromStore: 'Magazyn sekretów',
       secretFromStoreHint: 'HashiCorp Vault lub CyberArk',
       secretPoint: 'Wskaż klucz',

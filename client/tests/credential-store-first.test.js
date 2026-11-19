@@ -127,9 +127,11 @@ describe('writing a credential to a secret store', () => {
     expect(choices({ ...item, secret_action: 'point' })).toEqual(['', 'vault', 'ro']);
   });
 
-  it('none allows writing : the dropdown still shown, saying so ; pointed to, its button only', () => {
+  it('none to choose : the dropdown still shown, saying so, written to or pointed to', () => {
     expect(field('secret_store').emptyText(item)).toBe('settings.credentials.noWritableStore');
-    expect(field('secret_store').emptyText({ ...item, secret_action: 'point' })).toBe('');
+    expect(field('secret_store').emptyText({ ...item, secret_action: 'point' })).toBe(
+      'settings.credentials.noSecretStore',
+    );
   });
 
   it('the reference shown before a store is chosen when writing, as when pointing once one is', () => {

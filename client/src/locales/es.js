@@ -1993,6 +1993,7 @@ export default {
       secretRefPlaceholder: 'ej. secret/myapp/prod',
       newSecretStore: 'Añadir almacén de secretos',
       noWritableStore: 'Ningún almacén de secretos permite escribir todavía',
+      noSecretStore: 'Aún no hay almacén de secretos',
       secretFromStore: 'Almacén de secretos',
       secretFromStoreHint: 'HashiCorp Vault o CyberArk',
       secretPoint: 'Apuntar a una clave',
