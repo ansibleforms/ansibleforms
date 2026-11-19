@@ -510,12 +510,6 @@ textarea:focus::placeholder {
   margin-bottom: 0 !important;
 }
 
-// Switches one under the other in a dialog : 8px apart, not the 16px between two fields - a
-// switch's row is far lower than a field's
-.modal-body > .row.mb-3:has(.form-switch):has(+ .row .form-switch) {
-  margin-bottom: 0.5rem !important;
-}
-
 // The title line's controls (AppSettings) : the view controls (#headerActions, a table's
 // toolbar moved there) and the page's buttons (#actions) in one box at the right, wrapping as
 // a whole - on a narrow screen they share the same rows, right aligned, the search narrowing
@@ -685,23 +679,6 @@ textarea:focus::placeholder {
   border: 1px solid var(--bs-danger-border-subtle);
   color: var(--bs-danger-text-emphasis);
   font-weight: 600;
-}
-
-// The users list's change password dialog (AppAdminMulti, BsOffCanvas dialogClass) : its labels a
-// width of their own, each on one line ("Repeat password") with room before the field, and the
-// dialog that much wider, so the fields keep their width
-.af-password-dialog {
-  max-width: 37.5rem;
-  .modal-body .col-sm-2 {
-    flex: 0 0 auto;
-    width: 10.5rem;
-    padding-right: 1rem;
-    white-space: nowrap;
-  }
-  .modal-body .col-sm-10 {
-    flex: 1 1 0;
-    width: auto;
-  }
 }
 
 // ─── colour swatches : the Color theme's (Interface), the environment label's (Environment) ───

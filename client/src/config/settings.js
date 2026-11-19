@@ -2252,8 +2252,8 @@ export default function getSettings(t) {
           // password. Not stored : a user kept is the choice
           key: 'awx_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.awxSignIn'),
           type: 'radio',
           options: awxAuthOptionList(t),
@@ -2269,8 +2269,8 @@ export default function getSettings(t) {
           // or a user and its password. Not stored : a user kept is the choice
           key: 'git_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.gitSignIn'),
           type: 'radio',
           options: gitAuthOptionList(t),
@@ -2286,8 +2286,8 @@ export default function getSettings(t) {
           // its password. Not stored : a user kept is the choice
           key: 'smtp_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.smtpSignIn'),
           type: 'radio',
           options: smtpAuthOptionList(t),
@@ -2336,8 +2336,8 @@ export default function getSettings(t) {
           // kept is the choice
           key: 'entra_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.entraSignIn'),
           type: 'radio',
           options: entraAuthOptionList(t),
@@ -2354,8 +2354,8 @@ export default function getSettings(t) {
           // passphrase). Not stored : a private key kept is the choice
           key: 'ssh_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.sshSignIn'),
           type: 'radio',
           options: sshAuthOptionList(t),

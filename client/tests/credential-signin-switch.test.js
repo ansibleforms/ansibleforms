@@ -96,7 +96,6 @@ describe('a credential written to a secret store', () => {
     const dialog = read('src/components/AppAdminMulti.vue');
     expect(dialog).toContain('props.settings.adjust(item.value, parentLists.value || {})');
     expect(dialog).toContain('v-show="optionShown(field, opt)"');
-    expect(dialog).toContain(':shown="(opt) => optionShown(field, opt)"');
   });
 
   it('the credential page does the same', () => {

@@ -13,8 +13,6 @@
 /*  @props:                                             */
 /*      label, help, icon, placeholder, required,       */
 /*      disabled, hasError, errors - as BsInput's       */
-/*      isHorizontal: Boolean - the label beside the    */
-/*                    inputs (a dialog), else above     */
 /*      addLabel: String - the add button's text        */
 /*                                                      */
 /********************************************************/
@@ -31,7 +29,6 @@ defineProps({
   disabled: { type: Boolean, default: false },
   hasError: { type: Boolean, default: false },
   errors: { type: Array, default: () => [] },
-  isHorizontal: { type: Boolean, default: false },
   addLabel: { type: String, default: '' },
 });
 const { t } = useI18n();
@@ -92,14 +89,11 @@ function remove(index) {
 }
 </script>
 <template>
-  <div :class="isHorizontal ? 'row mb-3' : 'mb-3'">
-    <label
-      :for="`${uid}-0`"
-      class="form-label fw-bold"
-      :class="{ 'col-form-label col-sm-2 af-label-tall': isHorizontal }"
+  <div class="mb-3">
+    <label :for="`${uid}-0`" class="form-label fw-bold"
       >{{ label }}<span v-if="required" class="text-danger ms-1">*</span></label
     >
-    <div :class="{ 'col-sm-10': isHorizontal }">
+    <div>
       <div v-for="(value, i) in values" :key="i" class="input-group af-input-list-row">
         <span v-if="icon" class="input-group-text text-gray-500">
           <FaIcon :fixedwidth="true" :icon="icon" />
@@ -137,9 +131,5 @@ function remove(index) {
 /* the inputs a little apart, as the rows of a list */
 .af-input-list-row + .af-input-list-row {
   margin-top: 0.5rem;
-}
-/* beside the first input, its label level with it */
-.af-label-tall {
-  padding-top: 0.2rem;
 }
 </style>

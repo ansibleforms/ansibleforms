@@ -11,7 +11,7 @@ describe('what an AWX, AAP or Ascender credential signs in with', () => {
   it('asks Token or User and password, a token by default, a user kept meaning password', () => {
     const choice = field('awx_auth');
     expect(choice.type).toBe('radio');
-    expect(choice.alignHints).toBe(true);
+    expect(choice.titled).toBe(true);
     expect(choice.dependencyValues).toEqual(AWX_CREDENTIAL_TYPES);
     expect(choice.options.map((o) => o.value)).toEqual(AWX_AUTH);
     expect(choice.initial({})).toBe('token');
@@ -52,7 +52,7 @@ describe('what a git credential signs in with', () => {
   it('asks Token or Password : a token without a user, a user kept meaning password', () => {
     const choice = credentials.fields.find((f) => f.key === 'git_auth');
     expect(choice.type).toBe('radio');
-    expect(choice.alignHints).toBe(true);
+    expect(choice.titled).toBe(true);
     expect(choice.options.map((o) => o.value)).toEqual(['token', 'password']);
     expect(choice.initial({})).toBe('token');
     expect(choice.initial({ user: 'me' })).toBe('password');

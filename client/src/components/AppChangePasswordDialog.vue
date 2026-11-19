@@ -1,7 +1,7 @@
 <script setup>
 /******************************************************************/
 /*                                                                */
-/*  The Change password dialog : the password typed twice, beside */
+/*  The Change password dialog : the password typed twice, under  */
 /*  its label, and Change Password once both match. One dialog    */
 /*  for every place a password or a secret is changed (the users  */
 /*  list's row menu, a user's page, an SSO provider's page) ; the */
@@ -18,7 +18,7 @@
 /*      close - Close, the cross, Escape or the backdrop          */
 /*                                                                */
 /******************************************************************/
-import { ref, computed } from 'vue';
+import { ref, computed, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
@@ -32,6 +32,7 @@ const { t } = useI18n();
 
 const password = ref('');
 const repeated = ref(''); // the password typed again
+const repeatId = `af-repeat-${useId()}`; // its input, its label pointing at it
 // the second one typed differs from the first : said under it, and nothing is saved
 const differs = computed(() => props.repeat && !!repeated.value && repeated.value !== password.value);
 const ready = computed(() => !!password.value && (!props.repeat || repeated.value === password.value));
@@ -45,7 +46,7 @@ function save() {
 </script>
 
 <template>
-  <BsModal size="md" dialogClass="af-password-dialog" @close="emit('close')" :icon="icon">
+  <BsModal size="md" @close="emit('close')" :icon="icon">
     <template #title> {{ title || t('settings.common.changePassword') }} </template>
     <template #default>
       <BsInput
@@ -53,19 +54,19 @@ function save() {
         type="password"
         icon="lock"
         :isFloating="false"
-        :isHorizontal="true"
         :required="true"
         :label="label || t('settings.fields.password')"
         @keyup.enter="!repeat && save()"
       />
-      <div v-if="repeat" class="row mb-3">
-        <label class="col-sm-2 col-form-label fw-bold"
+      <div v-if="repeat" class="mb-3">
+        <label class="form-label fw-bold" :for="repeatId"
           >{{ t('settings.common.repeatPassword') }}<span class="text-danger ms-1">*</span></label
         >
-        <div class="col-sm-10">
+        <div>
           <div class="input-group">
             <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="lock" /></span>
             <input
+              :id="repeatId"
               v-model="repeated"
               type="password"
               class="form-control"
