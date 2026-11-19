@@ -879,9 +879,8 @@ export default function getSettings(t) {
         {
           key: 'role_names',
           step: 'roles',
-          label: '',
+          label: t('settings.settingsPage.roles'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({
@@ -1050,9 +1049,8 @@ export default function getSettings(t) {
         {
           key: 'user_ids',
           step: 'users',
-          label: '',
+          label: t('settings.settingsPage.users'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({
@@ -1071,9 +1069,8 @@ export default function getSettings(t) {
         {
           key: 'role_names',
           step: 'roles',
-          label: '',
+          label: t('settings.settingsPage.roles'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({

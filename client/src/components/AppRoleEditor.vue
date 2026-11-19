@@ -282,6 +282,8 @@ function removeUser(index) {
 
   <!-- Users : the users of the role, each with the provider they sign in with -->
   <template v-else-if="section === 'users'">
+    <!-- the wizard's step titles its list, as every field ; the page's tab has its own table -->
+    <div v-if="!tab" class="form-label fw-bold">{{ t('settings.settingsPage.users') }}</div>
     <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
     <p v-else-if="!tab && role.users.length === 0" class="text-muted small mb-3">
       {{ t('settings.settingsPage.roleNoUsers') }}
@@ -325,6 +327,7 @@ function removeUser(index) {
 
   <!-- Groups : the groups of the role, each with the provider it comes from -->
   <template v-else>
+    <div v-if="!tab" class="form-label fw-bold">{{ t('settings.settingsPage.groups') }}</div>
     <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
     <p v-else-if="!tab && role.groups.length === 0" class="text-muted small mb-3">
       {{ t('settings.settingsPage.roleNoGroups') }}
