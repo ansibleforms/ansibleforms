@@ -646,7 +646,8 @@ function newItem(defaults = {}) {
     if (field.type === 'editor' && item.value[field.key] === undefined) {
       item.value[field.key] = '';
     }
-    if (field.type === 'select' && field.parent && field.valueKey) {
+    // the first of its list ; a credential dropdown's is the first of its kind (preselectCredentials)
+    if (field.type === 'select' && field.parent && field.valueKey && !isCredentialSelect(field)) {
       const list = parentLists.value[field.parent] || [];
       if (list.length > 0 && item.value[field.key] === undefined) {
         item.value[field.key] = list[0][field.valueKey];
@@ -999,6 +1000,82 @@ watch(action, () => {
   stepIndex.value = 0;
   stepReached.value = 0;
 });
+
+// ─── A new record's credentials : the first of its kind chosen ─────────────────
+// a credential dropdown of a new record (parent 'credentials') starts on the first credential its
+// choicesWhen keeps (an Entra ID provider's entraid ones), or of the kind its New button makes (a
+// repository's git ones) when it lists every kind, not on an empty choice nor on the first
+// credential of all (another kind, which the dropdown cannot show : it looked empty). Chosen again
+// when its kind changes (a provider switched on an earlier step) ; one the user emptied stays
+// empty.
+const credentialsCleared = new Set();
+// what the choosing itself last wrote in each, so its own emptying is not taken for the user's
+const credentialsChosen = new Map();
+
+/**
+ * Whether a dropdown lists credentials : a select whose list is the credentials.
+ *
+ * Args:
+ *   field (object): the field.
+ *
+ * Returns:
+ *   boolean: true for a credential dropdown.
+ */
+function isCredentialSelect(field) {
+  return field?.type === 'select' && field.parent === 'credentials' && !!field.valueKey;
+}
+
+/**
+ * Chooses, on a new record, the first credential of its kind in every credential dropdown shown
+ * that has none of its kind : empty, or one of another kind its choices do not keep.
+ */
+function preselectCredentials() {
+  if (action.value !== 'new') return;
+  for (const field of fields.value) {
+    if (!isCredentialSelect(field) || credentialsCleared.has(field.key) || !showField(field)) continue;
+    // its kind : what its choicesWhen keeps, else the kind its New button makes (a repository's
+    // git credential) when its dropdown lists every kind ; none of that kind : left empty
+    const kind = field.choicesWhen ? null : textOf(field.createDefaults)?.credential_type;
+    const offered = choicesOf(field).filter((c) => c?.[field.valueKey]);
+    // one it offers, chosen or picked : kept, whatever its kind
+    const current = item.value[field.key];
+    if (current && offered.some((c) => c[field.valueKey] === current)) continue;
+    const choices = offered.filter((c) => !kind || c.credential_type === kind);
+    const chosen = choices.length ? choices[0][field.valueKey] : '';
+    credentialsChosen.set(field.key, chosen);
+    item.value[field.key] = chosen;
+  }
+}
+
+// a new record : nothing emptied yet
+watch(action, () => {
+  credentialsCleared.clear();
+  credentialsChosen.clear();
+});
+// on every step shown, when the credentials are read, and when what decides their kind changes
+watch(
+  () => [
+    action.value,
+    stepIndex.value,
+    (parentLists.value?.credentials || []).length,
+    JSON.stringify(
+      fields.value
+        .filter((f) => !isCredentialSelect(f))
+        .map((f) => (typeof item.value[f.key] === 'object' ? null : item.value[f.key])),
+    ),
+  ],
+  () => nextTick(preselectCredentials),
+);
+// one the user emptied (its clear button) : left empty
+watch(
+  () => fields.value.filter(isCredentialSelect).map((f) => item.value[f.key] || ''),
+  (now, before) => {
+    if (action.value !== 'new' || !before) return;
+    fields.value.filter(isCredentialSelect).forEach((f, i) => {
+      if (before[i] && !now[i] && credentialsChosen.get(f.key) !== '') credentialsCleared.add(f.key);
+    });
+  },
+);
 
 // ─── Change password : the shared dialog ──────────────────────────────────────
 // a record's password (a user's, a credential's) changes in AppChangePasswordDialog, typed twice ;
