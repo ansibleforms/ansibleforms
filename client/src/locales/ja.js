@@ -3144,7 +3144,7 @@ export default {
     // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
     system: {
       description: 'アプリが自動で実行するメンテナンス処理と、その直近の結果です。',
-      timing: '実行タイミング',
+      timing: 'スケジュール',
       everySeconds: '{n} 秒ごと',
       off: 'オフ',
       result: '結果',

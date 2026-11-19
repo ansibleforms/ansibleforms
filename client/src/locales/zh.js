@@ -3065,7 +3065,7 @@ export default {
     // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
     system: {
       description: '应用自动运行的维护任务，以及它们最近一次的结果。',
-      timing: '运行时间',
+      timing: '计划',
       everySeconds: '每 {n} 秒',
       off: '关闭',
       result: '结果',

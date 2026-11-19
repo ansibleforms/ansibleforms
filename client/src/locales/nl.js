@@ -3180,7 +3180,7 @@ export default {
     // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
     system: {
       description: 'De onderhoudstaken die de app zelf uitvoert, en hun laatste resultaat.',
-      timing: 'Wanneer hij draait',
+      timing: 'Planning',
       everySeconds: 'Elke {n} seconden',
       off: 'Uit',
       result: 'Resultaat',

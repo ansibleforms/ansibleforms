@@ -3169,7 +3169,7 @@ export default {
     // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
     system: {
       description: 'Procesy konserwacji uruchamiane przez aplikację i ich ostatni wynik.',
-      timing: 'Kiedy działa',
+      timing: 'Harmonogram',
       everySeconds: 'Co {n} s',
       off: 'Wyłączony',
       result: 'Wynik',

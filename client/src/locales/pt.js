@@ -3185,7 +3185,7 @@ export default {
     // Jobs > System : the app's own maintenance tasks, their names and descriptions by task key
     system: {
       description: 'Os processos de manutenção que a app executa sozinha, e o seu último resultado.',
-      timing: 'Quando é executado',
+      timing: 'Agendamento',
       everySeconds: 'A cada {n} segundos',
       off: 'Desativado',
       result: 'Resultado',

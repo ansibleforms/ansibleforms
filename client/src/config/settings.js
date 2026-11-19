@@ -4,9 +4,9 @@ import { editorStyle } from './editorStyle';
 import YAML from 'yaml';
 import axios from 'axios';
 import Helpers from '@/lib/Helpers';
-import { cronCell } from '@/lib/cronCell';
+import { scheduleCell } from '@/lib/scheduleCell';
 import { cronValidationMessage } from './cron';
-import { rruleValidationMessage, defaultRrule, rruleCell } from './rrule';
+import { rruleValidationMessage, defaultRrule } from './rrule';
 import { USAGE_FLAGS, confirmUsageChange, confirmUsageDelete, usageToast } from '@/lib/repositoryUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
@@ -1588,14 +1588,11 @@ export default function getSettings(t) {
           type: 'cron',
           // a recurring schedule needs its cron ; hidden (one time run), it is not checked
           required: true,
-          // in the table : hovering the cron says it in words, in the app's language ; a one-time
-          // run has none, it runs once ; a repository's schedule shows its rrule
+          // in the table : the cron said in words, the cron itself on hover, in the app's language
+          // (as Jobs > System's Schedule column) ; a one-time run has none, it runs once ; a
+          // repository's schedule shows its rrule
           render: (v, row) =>
-            row?.one_time_run
-              ? escapeHtml(t('settings.schedules.oneTimeRun'))
-              : row?.rrule
-                ? rruleCell(row.rrule)
-                : cronCell(v),
+            row?.one_time_run ? escapeHtml(t('settings.schedules.oneTimeRun')) : scheduleCell(row?.rrule || v),
           validator: cronValidator(t),
           // timed by a cron
           showWhen: (item) => item.timing === 'cron',

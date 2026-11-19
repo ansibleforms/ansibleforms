@@ -13,7 +13,7 @@
 /*                                                                */
 /******************************************************************/
 import i18n from '@/plugins/i18n';
-import { describeCron } from '@/config/cronDescribe';
+import { scheduleWords, scheduleCell } from '@/lib/scheduleCell';
 import { esc } from '@/lib/tableCells';
 import { formatDuration } from '@/lib/jobTime';
 
@@ -75,14 +75,14 @@ export function taskDescription(t, task) {
  */
 export function taskTiming(t, task, locale = i18n.global.locale.value) {
   if (task?.enabled === false) return t('jobs.system.off');
-  if (task?.cron) return describeCron(task.cron, locale) || task.cron;
+  if (task?.cron) return scheduleWords(task.cron, locale) || task.cron;
   if (task?.interval_seconds) return t('jobs.system.everySeconds', { n: task.interval_seconds });
   return '';
 }
 
 /**
- * When a task runs, as a table cell : the words, its cron in a popover on hover (as the
- * schedules' Schedule column has it the other way round, lib/cronCell.js).
+ * When a task runs, as a table cell : its cron as every schedule's (lib/scheduleCell.js, the
+ * words, the cron on hover) ; Off, or every so many seconds for a runner hub loop, as words.
  *
  * Args:
  *   t (function): the vue-i18n translate function.
@@ -92,9 +92,8 @@ export function taskTiming(t, task, locale = i18n.global.locale.value) {
  *   string: the cell's HTML, escaped.
  */
 export function taskTimingCell(t, task) {
-  const words = esc(taskTiming(t, task));
-  if (!task?.cron || task?.enabled === false) return words;
-  return `<span class="af-has-popover" data-af-popover="${esc(task.cron)}">${words}</span>`;
+  if (task?.cron && task?.enabled !== false) return scheduleCell(task.cron);
+  return esc(taskTiming(t, task));
 }
 
 /**

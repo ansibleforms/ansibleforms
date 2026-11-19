@@ -113,13 +113,16 @@ function polishEnglish(words) {
  * Args:
  *   expression (string): the cron expression.
  *   locale (string): the app's language code (en, de, pt, zh ...).
+ *   options (object): built (true) for a cron the app built itself from an rrule
+ *     (config/rrule.js rruleToCron), which may use what a schedule's own cron may not (LW, 5L,
+ *     2#2) : not checked against the schedules' cron rules.
  *
  * Returns:
  *   string: the description, or '' for an empty or invalid expression.
  */
-export function describeCron(expression, locale = 'en') {
+export function describeCron(expression, locale = 'en', { built = false } = {}) {
   const expr = String(expression ?? '').trim();
-  if (!expr || cronError(expr)) return '';
+  if (!expr || (!built && cronError(expr))) return '';
   try {
     const words = cronstrue.toString(expr, {
       locale: CRONSTRUE_LOCALES[locale] || locale,
