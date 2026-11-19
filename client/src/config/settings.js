@@ -5087,6 +5087,8 @@ function ldapDirectories(t, ldap) {
           ...(NEW_DIRECTORY[f.key] !== undefined ? { initial: () => NEW_DIRECTORY[f.key] } : {}),
           // a new one binds with a credential (one from before credentials may have its own account)
           ...(f.key === 'credential' ? { required: true } : {}),
+          // a new one is on (NEW_DIRECTORY) : no switch to ask it in New, it is turned off on its page
+          ...(f.key === 'enable' ? { noInput: true } : {}),
         })),
     ],
   };
