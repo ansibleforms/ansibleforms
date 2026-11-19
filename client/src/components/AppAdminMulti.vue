@@ -49,6 +49,9 @@
 /*      (a credential's sign-in) - its label above it, as theirs ;*/
 /*      without it a radio group is its step's whole choice, the  */
 /*      step naming it                                            */
+/*  field.placeBefore: (item) => key - shown just before that    */
+/*      field for this record (an ldap credential's TLS fields    */
+/*      before its bind user) ; null : in its own place           */
 /*  field.flush: a component with its own titles in it (no label */
 /*      above it, a schedule's end) ; a switch takes no notice,   */
 /*      its bold title is above it as every switch's              */
@@ -1147,7 +1150,20 @@ const dialogFields = computed(() => {
   const list = fields.value.filter(onStep);
   const isShort = (f) => f.type === 'checkbox' && f.shortLabel;
   const sorted = list.filter(isShort).sort((a, b) => a.shortLabel.localeCompare(b.shortLabel, locale.value));
-  return list.map((f) => (isShort(f) ? sorted.shift() : f));
+  const shown = list.map((f) => (isShort(f) ? sorted.shift() : f));
+  // a field placed before another for this record (field.placeBefore) : an ldap credential's TLS
+  // fields right after its Use TLS, before its bind user ; in their own order
+  const moving = shown.filter((f) => typeof f.placeBefore === 'function' && f.placeBefore(item.value || {}));
+  if (!moving.length) return shown;
+  const rest = shown.filter((f) => !moving.includes(f));
+  for (const f of moving) {
+    const target = f.placeBefore(item.value || {});
+    const at = rest.findIndex((x) => x.key === target);
+    const last = rest.findLastIndex((x) => moving.includes(x) && x.placeBefore(item.value || {}) === target);
+    if (at === -1) rest.push(f);
+    else rest.splice(last === -1 ? at : last + 1, 0, f);
+  }
+  return rest;
 });
 
 /**

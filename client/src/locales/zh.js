@@ -1968,6 +1968,7 @@ export default {
       mailAttribute: '邮件属性',
       mailAttributeDesc: '保存用户电子邮件地址的 LDAP 属性（例如 mail）。',
       bindUserDn: '绑定用户 DN',
+      bindPassword: '绑定用户的密码',
       bindUserDnDesc: '用于搜索目录的服务账户的 DN。',
       bindUserPasswordDesc: '绑定服务账户的密码。',
       usernameAttribute: '用户名属性',

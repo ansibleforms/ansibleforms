@@ -2188,6 +2188,7 @@ export default {
       mailAttribute: 'Atributo de correo',
       mailAttributeDesc: 'Atributo LDAP con la dirección de correo del usuario (ej. mail).',
       bindUserDn: 'DN de usuario de vinculación',
+      bindPassword: 'Contraseña del usuario de enlace',
       bindUserDnDesc: 'DN de la cuenta de servicio usada para buscar en el directorio.',
       bindUserPasswordDesc: 'Contraseña de la cuenta de servicio de vinculación.',
       usernameAttribute: 'Atributo de nombre de usuario',

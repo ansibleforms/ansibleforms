@@ -2193,6 +2193,7 @@ export default {
       mailAttribute: 'Attribut mail',
       mailAttributeDesc: "Attribut LDAP contenant l'adresse e-mail de l'utilisateur (ex. mail).",
       bindUserDn: "DN de l'utilisateur de bind",
+      bindPassword: "Mot de passe de l'utilisateur de liaison",
       bindUserDnDesc: "DN du compte de service utilisé pour interroger l'annuaire.",
       bindUserPasswordDesc: 'Mot de passe du compte de service bind.',
       usernameAttribute: "Attribut nom d'utilisateur",

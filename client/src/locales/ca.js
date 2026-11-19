@@ -2046,6 +2046,7 @@ export default {
       mailAttribute: 'Atribut de correu',
       mailAttributeDesc: "Atribut LDAP que conté l'adreça de correu de l'usuari (p. ex. mail).",
       bindUserDn: "DN de l'usuari de bind",
+      bindPassword: "Contrasenya de l'usuari d'enllaç",
       bindUserDnDesc: "DN del compte de servei que s'utilitza per cercar al directori.",
       bindUserPasswordDesc: 'Contrasenya del compte de servei de bind.',
       usernameAttribute: "Atribut del nom d'usuari",

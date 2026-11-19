@@ -2031,6 +2031,7 @@ export default {
       mailAttribute: 'Atrybut poczty',
       mailAttributeDesc: 'Atrybut LDAP zawierający adres e-mail użytkownika (np. mail).',
       bindUserDn: 'DN użytkownika bind',
+      bindPassword: 'Hasło użytkownika powiązania',
       bindUserDnDesc: 'DN konta usługi używanego do przeszukiwania katalogu.',
       bindUserPasswordDesc: 'Hasło konta usługi bind.',
       usernameAttribute: 'Atrybut nazwy użytkownika',

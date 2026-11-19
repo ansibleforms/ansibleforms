@@ -561,8 +561,8 @@ export function credentialLabels(t, type, awxAuth = 'token', gitAuth = 'token') 
       }[type] || null,
     password:
       {
-        // its bind user's password : plain Password, the field above names the bind user
-        ldap: t('settings.fields.password'),
+        // its bind user's password
+        ldap: t('settings.ldap.bindPassword'),
         entraid: t('settings.oauth2.clientSecret'),
         oidc: t('settings.oauth2.clientSecret'),
         vault: t('settings.fields.token'),
@@ -2479,6 +2479,8 @@ export default function getSettings(t) {
           // userpass or cyberark one with an address) : its certificate not checked
           key: 'ignore_certs',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           label: t('settings.ldap.ignoreCerts'),
           dialogLabel: (r) => (credentialServer(r) ? t('settings.runners.skipVerify') : null),
           help: (r) => (credentialServer(r) ? null : t('settings.ldap.ignoreCertsDesc')),
@@ -2495,6 +2497,8 @@ export default function getSettings(t) {
           // an entraid one signing in with a certificate : the one uploaded to its app registration
           key: 'client_cert',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           icon: 'certificate',
           type: 'textarea',
           label: t('settings.secretStores.clientCert'),
@@ -2518,6 +2522,8 @@ export default function getSettings(t) {
           // checked against
           key: 'ca_bundle',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           icon: 'certificate',
           type: 'textarea',
           label: t('settings.fields.caBundle'),

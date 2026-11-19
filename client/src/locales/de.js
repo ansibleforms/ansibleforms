@@ -2191,6 +2191,7 @@ export default {
       mailAttribute: 'Mail-Attribut',
       mailAttributeDesc: 'LDAP-Attribut mit der E-Mail-Adresse des Benutzers (z.B. mail).',
       bindUserDn: 'Bind-User-DN',
+      bindPassword: 'Passwort des Bind-Benutzers',
       bindUserDnDesc: 'DN des Dienstkontos für die Verzeichnissuche.',
       bindUserPasswordDesc: 'Passwort für das Bind-Dienstkonto.',
       usernameAttribute: 'Benutzername-Attribut',

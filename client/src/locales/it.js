@@ -2184,6 +2184,7 @@ export default {
       mailAttribute: 'Attributo mail',
       mailAttributeDesc: "Attributo LDAP contenente l'indirizzo email dell'utente (es. mail).",
       bindUserDn: 'Bind user DN',
+      bindPassword: "Password dell'utente di bind",
       bindUserDnDesc: "DN dell'account di servizio utilizzato per interrogare la directory.",
       bindUserPasswordDesc: "Password dell'account di servizio bind.",
       usernameAttribute: 'Attributo nome utente',

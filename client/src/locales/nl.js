@@ -2177,6 +2177,7 @@ export default {
       mailAttribute: 'Mail attribuut',
       mailAttributeDesc: 'LDAP-attribuut met het e-mailadres van de gebruiker (bijv. mail).',
       bindUserDn: 'Bind gebruiker DN',
+      bindPassword: 'Wachtwoord van de bind-gebruiker',
       bindUserDnDesc: 'DN van het serviceaccount dat wordt gebruikt om de directory te doorzoeken.',
       bindUserPasswordDesc: 'Wachtwoord voor het bind-serviceaccount.',
       usernameAttribute: 'Gebruikersnaam attribuut',

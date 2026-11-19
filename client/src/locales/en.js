@@ -2159,6 +2159,7 @@ export default {
       mailAttribute: 'Mail attribute',
       mailAttributeDesc: "LDAP attribute that holds the user's email address (e.g. mail).",
       bindUserDn: 'Bind user DN',
+      bindPassword: "Bind user's password",
       bindUserDnDesc: 'DN of the service account used to search the directory.',
       bindUserPasswordDesc: 'Password for the bind service account.',
       usernameAttribute: 'Username attribute',

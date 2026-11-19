@@ -2022,6 +2022,7 @@ export default {
       mailAttribute: 'メール属性',
       mailAttributeDesc: 'ユーザーのメールアドレスを保持する LDAP 属性です (例: mail)。',
       bindUserDn: 'バインドユーザー DN',
+      bindPassword: 'バインドユーザーのパスワード',
       bindUserDnDesc: 'ディレクトリの検索に使用するサービスアカウントの DN です。',
       bindUserPasswordDesc: 'バインド用サービスアカウントのパスワードです。',
       usernameAttribute: 'ユーザー名属性',
