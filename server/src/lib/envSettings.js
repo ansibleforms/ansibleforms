@@ -15,7 +15,8 @@ import { MIN_HEADER_SIZE, MAX_HEADER_SIZE } from './httpServerOptions.js';
 import authConfig, { entraEnv } from '../../config/auth.config.js';
 import logConfig, { parseRetentionDays, parseViewLines, validViewLines, knownLogLevel, LOG_LEVEL_DEFAULTS, LOG_LEVELS } from '../../config/log.config.js';
 import ansibleConfig from '../../config/ansible.config.js';
-import { SCHEDULE_SETTINGS, scheduleCronProblem } from './systemTasks.js';
+import { SCHEDULE_SETTINGS, LOOP_SETTINGS, scheduleCronProblem, hubLoop, loopSecondsProblem } from './systemTasks.js';
+import { rearmLoop } from './hubLoops.js';
 
 // Editing environment variables from the settings page.
 //
@@ -82,8 +83,9 @@ export const REFUSED = {
 // The system tasks' crons (JOB_CLEANUP_CRON and the like, lib/systemTasks.js) are changed on each
 // task's own page (Jobs > System > the task > Schedule), beside its next runs ; so is the config
 // seed reload's, and its deprecated CONFIG_SEED_RELOAD_SECONDS goes with it (still read, not shown).
+// So are the runner hub's loops' seconds (RUNNER_DISPATCH_SECONDS and the like).
 export const OWNED_ELSEWHERE =
-  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|CONTROLLER_URL|CONTROLLER_TLS_VERIFY|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\}|(TOKEN|AUDIT|JOB|STORED_JOB)_CLEANUP_CRON|NIGHTLY_BACKUP_CRON|ABANDONED_JOBS_CRON|DEAD_NODES_CRON|SCHEDULE_ENDS_CRON|SCHEDULE_RESYNC_CRON|CONFIG_SEED_RELOAD_(CRON|SECONDS))$/;
+  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|CONTROLLER_URL|CONTROLLER_TLS_VERIFY|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\}|(TOKEN|AUDIT|JOB|STORED_JOB)_CLEANUP_CRON|NIGHTLY_BACKUP_CRON|ABANDONED_JOBS_CRON|DEAD_NODES_CRON|SCHEDULE_ENDS_CRON|SCHEDULE_RESYNC_CRON|CONFIG_SEED_RELOAD_(CRON|SECONDS)|RUNNER_(DISPATCH|DIAL|PRUNE)_SECONDS)$/;
 
 // Names whose VALUE must never be sent to the client. A bare 'TOKEN' would be too broad -
 // ACCESS_TOKEN_EXPIRATION and ACCESS_TOKEN_ISSUER are not secrets and are worth seeing -
@@ -312,10 +314,25 @@ const LIVE_SCHEDULES = Object.fromEntries(
   ]),
 );
 
+// The runner hub's loops' seconds (lib/systemTasks.js LOOP_SETTINGS) : appConfig takes the new
+// value, which the API answers at once, then the loop's timer is armed again at it, the old one
+// cleared (lib/hubLoops.js rearmLoop : nothing where the hub does not run). Cleared, appConfig holds
+// none : the loop's own seconds apply.
+const LIVE_LOOP_SECONDS = Object.fromEntries(
+  LOOP_SETTINGS.map((setting) => [
+    setting.env,
+    (v) => {
+      appConfig[setting.config] = process.env[setting.env] === undefined ? '' : String(v ?? '').trim();
+      rearmLoop(setting.key);
+    },
+  ]),
+);
+
 // Live, but needing more than an appConfig field or process.env : a function that
 // reconfigures something already constructed.
 const LIVE_CUSTOM = {
   ...LIVE_SCHEDULES,
+  ...LIVE_LOOP_SECONDS,
   // jwt.sign() reads these off authConfig at call time (token.controller, login.controller),
   // so updating the object is enough - the next token issued uses the new value
   ACCESS_TOKEN_EXPIRATION: (v) => { authConfig.jwtExpiration = v; },
@@ -531,6 +548,13 @@ export function validate(name, value, doc) {
   // rather than passed over by the scheduler for the default (lib/systemTasks.js taskCron)
   if (SCHEDULE_SETTINGS.some((s) => s.env === name) && v !== '') {
     const problem = scheduleCronProblem(v);
+    if (problem) return `${name} ${problem}`;
+  }
+  // a runner hub loop's seconds : a whole number within its bounds, refused here rather than
+  // passed over by the hub for the default (lib/systemTasks.js loopSeconds)
+  const loopSetting = LOOP_SETTINGS.find((s) => s.env === name);
+  if (loopSetting && v !== '') {
+    const problem = loopSecondsProblem(hubLoop(loopSetting.key), v);
     if (problem) return `${name} ${problem}`;
   }
   if (name === 'LAUNCH_VALIDATION' && v !== '' && !['off', 'log', 'enforce'].includes(v.trim().toLowerCase())) {

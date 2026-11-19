@@ -12,10 +12,11 @@
 // (CONFIG_SEED_RELOAD_SECONDS) : still read, deprecated, as a cron (lib/seedReloadCron.js).
 //
 // The runner hub's own loops (runners/rteHub.js : dispatch, inbound dial, ended jobs prune) are
-// listed beside them, read only (HUB_LOOPS) : they run every few seconds on their own timers, as
-// often as the runners need them, with no cron to change. What they did is kept in memory on each
-// node (lib/hubLoops.js) ; only their failures are written as rows, one per distinct error a
-// minute at most.
+// listed beside them (HUB_LOOPS) : they run every few seconds on their own timers (lib/hubLoops.js),
+// each as often as its setting of seconds says (RUNNER_DISPATCH_SECONDS and the like, on the
+// loop's Schedule tab : a cron's smallest step, a minute, is too coarse for them). What they did
+// is kept in memory on each node (lib/hubLoops.js) ; only their failures are written as rows, one
+// per distinct error a minute at most.
 //
 // Each run writes one row : when it started and ended, its outcome (success or failed), a short
 // result (removed 120 jobs, or the error) and the node that ran it ; every run, the ones of every
@@ -155,13 +156,31 @@ export const SYSTEM_TASKS = [
 const TASKS = new Map(SYSTEM_TASKS.map((task) => [task.key, task]));
 
 /**
- * The runner hub's own loops (runners/rteHub.js), listed read only after the tasks : each runs
- * every so many seconds on its own timer, on every controller node, with no setting.
+ * A runner hub loop's schedule setting : the environment variable of its seconds (changed on the
+ * loop's own page, Jobs > System > the loop > Schedule), its appConfig key, and the seconds it
+ * takes, whole, from min to max.
+ *
+ * Args:
+ *   env (string): the variable (RUNNER_DISPATCH_SECONDS).
+ *   config (string): its appConfig key (runnerDispatchSeconds).
+ *   min (number): the fewest seconds.
+ *   max (number): the most seconds.
+ *
+ * Returns:
+ *   object: { env, config, min, max }.
+ */
+const secondsSetting = (env, config, min, max) => ({ env, config, min, max });
+
+/**
+ * The runner hub's own loops (runners/rteHub.js), listed after the tasks : each runs every so many
+ * seconds on its own timer (lib/hubLoops.js), on every controller node, its seconds a setting.
  *
  *   key: the loop's name in the table of runs (its failures) and in the API
- *   seconds: how often it runs
+ *   seconds: how often it runs by default
  *   name, description: what it is, in English, as the API answers it (the GUI says it in the
  *     user's language : client/src/locales, jobs.system.tasks)
+ *   schedule: the setting of its seconds and their bounds (secondsSetting), the seconds above then
+ *     only its default
  */
 export const HUB_LOOPS = [
   {
@@ -169,18 +188,21 @@ export const HUB_LOOPS = [
     seconds: 2,
     name: 'Runner dispatch',
     description: 'Hands the waiting jobs and the cancels to their runners.',
+    schedule: secondsSetting('RUNNER_DISPATCH_SECONDS', 'runnerDispatchSeconds', 1, 60),
   },
   {
     key: 'runnerDial',
     seconds: 10,
     name: 'Runner inbound dial',
     description: 'Dials the inbound runners this node may hold.',
+    schedule: secondsSetting('RUNNER_DIAL_SECONDS', 'runnerDialSeconds', 2, 300),
   },
   {
     key: 'runnerPrune',
     seconds: 60,
     name: 'Runner ended jobs prune',
     description: 'Lets go what this node kept of jobs that ended elsewhere.',
+    schedule: secondsSetting('RUNNER_PRUNE_SECONDS', 'runnerPruneSeconds', 10, 3600),
   },
 ];
 
@@ -198,6 +220,57 @@ const LOOPS = new Map(HUB_LOOPS.map((loop) => [loop.key, loop]));
  */
 export function hubLoop(key) {
   return LOOPS.get(String(key)) || null;
+}
+
+// every loop's setting of seconds, by its variable
+export const LOOP_SETTINGS = HUB_LOOPS.map((loop) => ({
+  key: loop.key,
+  env: loop.schedule.env,
+  config: loop.schedule.config,
+  default: loop.seconds,
+  min: loop.schedule.min,
+  max: loop.schedule.max,
+}));
+
+/**
+ * Why a value cannot be a loop's seconds, or null when it can : a whole number from the loop's
+ * fewest seconds to its most.
+ *
+ * Args:
+ *   loop (object): the loop's entry of HUB_LOOPS.
+ *   value (number|string): the seconds.
+ *
+ * Returns:
+ *   string|null: the problem, in English, or null.
+ */
+export function loopSecondsProblem(loop, value) {
+  const { min, max } = loop.schedule;
+  const text = typeof value === 'number' ? String(value) : String(value ?? '').trim();
+  const n = /^\d+$/.test(text) ? parseInt(text, 10) : NaN;
+  if (!Number.isInteger(n) || n < min || n > max) return `must be a whole number of seconds from ${min} to ${max}`;
+  return null;
+}
+
+/**
+ * How often a loop runs : its setting's seconds when set and valid, else its default. A value
+ * out of its bounds (written by hand in the environment, never through the app, which checks it)
+ * is passed over for the default.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   number: its seconds.
+ *
+ * Raises:
+ *   Error: when no loop has that key.
+ */
+export function loopSeconds(key) {
+  const loop = hubLoop(key);
+  if (!loop) throw new Error(`No runner hub loop is named ${key}`);
+  const set = scheduleValue(loop);
+  if (!set || loopSecondsProblem(loop, set)) return loop.seconds;
+  return parseInt(set, 10);
 }
 
 /**
@@ -304,10 +377,11 @@ export function taskEnabled(key) {
 }
 
 /**
- * The cron a task's schedule setting holds, as it is set ('' : not set, the default applies).
+ * The value a task's schedule setting holds, as it is set ('' : not set, the default applies) : a
+ * task's cron, or a runner hub loop's seconds.
  *
  * Args:
- *   task (object): the task's entry of SYSTEM_TASKS.
+ *   task (object): the task's entry of SYSTEM_TASKS, or a loop's of HUB_LOOPS.
  *
  * Returns:
  *   string: the setting's value, trimmed ; '' for a task without one.
@@ -480,4 +554,4 @@ export function resetPruneForTests() {
   lastPrune = 0;
 }
 
-export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, systemTask, hubLoop, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };
+export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, LOOP_SETTINGS, systemTask, hubLoop, loopSeconds, loopSecondsProblem, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };

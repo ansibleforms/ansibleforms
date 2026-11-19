@@ -117,6 +117,12 @@ var app_config = {
   jobCleanupCron: (process.env.JOB_CLEANUP_CRON || "").trim(),
   nightlyBackupCron: (process.env.NIGHTLY_BACKUP_CRON || "").trim(),
   storedJobCleanupCron: (process.env.STORED_JOB_CLEANUP_CRON || "").trim(),
+  // How often the runner hub's own loops run, each a whole number of seconds (changed on the loop's
+  // page, Jobs > System). Empty : the loop's own default (server/src/lib/systemTasks.js HUB_LOOPS),
+  // so the defaults and the bounds are declared in one place only.
+  runnerDispatchSeconds: (process.env.RUNNER_DISPATCH_SECONDS || "").trim(),
+  runnerDialSeconds: (process.env.RUNNER_DIAL_SECONDS || "").trim(),
+  runnerPruneSeconds: (process.env.RUNNER_PRUNE_SECONDS || "").trim(),
   // Serve the MCP server for AI agents on /api/v2/mcp. Off by default : it is a new way
   // in, and an operator should opt in to it.
   enableMcp: (process.env.ENABLE_MCP ?? 0) == 1,

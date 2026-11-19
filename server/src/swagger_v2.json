@@ -3393,7 +3393,7 @@
           "system"
         ],
         "summary": "The app's maintenance tasks (Jobs > System)",
-        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Each task's schedule is changed with PUT /system/tasks/{key}/schedule. The runner hub's own loops (runnerDispatch, runnerDial, runnerPrune) are listed after the tasks, read only: timed by seconds, what they did kept in memory by the node that answers (loop), their failures recorded as runs. Requires settings access.",
+        "description": "The internal tasks the worker runs on its own (job retention, nightly backup, expired tokens...), each with when it runs, its last run, its next run and the setting it applies. A task of every minute records only the runs that changed something, plus its latest run. Each task's schedule is changed with PUT /system/tasks/{key}/schedule. The runner hub's own loops (runnerDispatch, runnerDial, runnerPrune) are listed after the tasks: timed by seconds (interval_seconds, changed with the same PUT), what they did kept in memory by the node that answers (loop), their failures recorded as runs. Requires settings access.",
         "security": [
           {
             "bearerAuth": []
@@ -3439,11 +3439,11 @@
                           "schedule_env": {
                             "type": "string",
                             "nullable": true,
-                            "description": "The environment variable of its cron (JOB_CLEANUP_CRON); null for a runner hub loop"
+                            "description": "The environment variable of its cron (JOB_CLEANUP_CRON), or of a runner hub loop's seconds (RUNNER_DISPATCH_SECONDS)"
                           },
                           "editable_schedule": {
                             "type": "boolean",
-                            "description": "Whether PUT /system/tasks/{key}/schedule may change it: its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
+                            "description": "Whether PUT /system/tasks/{key}/schedule may change it (a runner hub loop's seconds too): its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                           },
                           "schedule_deprecated": {
                             "type": "object",
@@ -3476,7 +3476,22 @@
                           "interval_seconds": {
                             "type": "integer",
                             "nullable": true,
-                            "description": "How often a runner hub loop runs, in seconds; null for a task timed by its cron"
+                            "description": "How often a runner hub loop runs, in seconds: its setting's (schedule_env) when set, else its default; null for a task timed by its cron"
+                          },
+                          "default_interval_seconds": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "A runner hub loop's own seconds, in force while its setting is not set (runnerDispatch 2, runnerDial 10, runnerPrune 60); null for a task"
+                          },
+                          "interval_min": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "The fewest seconds a runner hub loop's setting takes (runnerDispatch 1, runnerDial 2, runnerPrune 10); null for a task"
+                          },
+                          "interval_max": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "The most seconds a runner hub loop's setting takes (runnerDispatch 60, runnerDial 300, runnerPrune 3600); null for a task"
                           },
                           "loop": {
                             "type": "object",
@@ -3486,6 +3501,7 @@
                               "node": { "type": "string", "description": "The node that answers" },
                               "running": { "type": "boolean", "description": "Whether the hub runs its loops on that node" },
                               "since": { "type": "string", "format": "date-time" },
+                              "armed_at": { "type": "string", "format": "date-time", "nullable": true, "description": "When its timer was last armed, at its seconds since then (its seconds changed re-arm it); null where it has none" },
                               "runs": { "type": "integer" },
                               "failures": { "type": "integer" },
                               "last_run_at": { "type": "string", "format": "date-time", "nullable": true },
@@ -3655,11 +3671,11 @@
                     "schedule_env": {
                       "type": "string",
                       "nullable": true,
-                      "description": "The environment variable of its cron (JOB_CLEANUP_CRON); null for a runner hub loop"
+                      "description": "The environment variable of its cron (JOB_CLEANUP_CRON), or of a runner hub loop's seconds (RUNNER_DISPATCH_SECONDS)"
                     },
                     "editable_schedule": {
                       "type": "boolean",
-                      "description": "Whether PUT /system/tasks/{key}/schedule may change it: its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
+                      "description": "Whether PUT /system/tasks/{key}/schedule may change it (a runner hub loop's seconds too): its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                     },
                     "schedule_deprecated": {
                       "type": "object",
@@ -3692,7 +3708,22 @@
                     "interval_seconds": {
                       "type": "integer",
                       "nullable": true,
-                      "description": "How often a runner hub loop runs, in seconds; null for a task timed by its cron"
+                      "description": "How often a runner hub loop runs, in seconds: its setting's (schedule_env) when set, else its default; null for a task timed by its cron"
+                    },
+                    "default_interval_seconds": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "A runner hub loop's own seconds, in force while its setting is not set (runnerDispatch 2, runnerDial 10, runnerPrune 60); null for a task"
+                    },
+                    "interval_min": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "The fewest seconds a runner hub loop's setting takes (runnerDispatch 1, runnerDial 2, runnerPrune 10); null for a task"
+                    },
+                    "interval_max": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "The most seconds a runner hub loop's setting takes (runnerDispatch 60, runnerDial 300, runnerPrune 3600); null for a task"
                     },
                     "loop": {
                       "type": "object",
@@ -3702,6 +3733,7 @@
                         "node": { "type": "string", "description": "The node that answers" },
                         "running": { "type": "boolean", "description": "Whether the hub runs its loops on that node" },
                         "since": { "type": "string", "format": "date-time" },
+                        "armed_at": { "type": "string", "format": "date-time", "nullable": true, "description": "When its timer was last armed, at its seconds since then (its seconds changed re-arm it); null where it has none" },
                         "runs": { "type": "integer" },
                         "failures": { "type": "integer" },
                         "last_run_at": { "type": "string", "format": "date-time", "nullable": true },
@@ -3865,8 +3897,8 @@
         "tags": [
           "system"
         ],
-        "summary": "Change when a maintenance task runs",
-        "description": "Saves the cron of a task as its environment variable (ABANDONED_JOBS_CRON, DEAD_NODES_CRON, SCHEDULE_ENDS_CRON, SCHEDULE_RESYNC_CRON, TOKEN_CLEANUP_CRON, AUDIT_CLEANUP_CRON, JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON, STORED_JOB_CLEANUP_CRON, CONFIG_SEED_RELOAD_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. Saved, CONFIG_SEED_RELOAD_CRON wins over the deprecated CONFIG_SEED_RELOAD_SECONDS. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
+        "summary": "Change when a maintenance task or a runner hub loop runs",
+        "description": "Saves the cron of a task as its environment variable (ABANDONED_JOBS_CRON, DEAD_NODES_CRON, SCHEDULE_ENDS_CRON, SCHEDULE_RESYNC_CRON, TOKEN_CLEANUP_CRON, AUDIT_CLEANUP_CRON, JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON, STORED_JOB_CLEANUP_CRON, CONFIG_SEED_RELOAD_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. Saved, CONFIG_SEED_RELOAD_CRON wins over the deprecated CONFIG_SEED_RELOAD_SECONDS. A runner hub loop takes seconds instead (runnerDispatch: RUNNER_DISPATCH_SECONDS, 1 to 60; runnerDial: RUNNER_DIAL_SECONDS, 2 to 300; runnerPrune: RUNNER_PRUNE_SECONDS, 10 to 3600), saved the same way: every node that runs the hub arms the loop's timer again at once at the new seconds. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
         "security": [
           {
             "bearerAuth": []
@@ -3889,14 +3921,17 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "cron"
-                ],
+                "description": "{ cron } for a task, { seconds } for a runner hub loop",
                 "properties": {
                   "cron": {
                     "type": "string",
-                    "description": "A cron of 5 fields (minute hour day month weekday) in the app's timezone (LOG_TZ) that runs again, e.g. 30 2 * * *",
+                    "description": "A task's cron: 5 fields (minute hour day month weekday) in the app's timezone (LOG_TZ) that runs again, e.g. 30 2 * * *",
                     "example": "30 2 * * *"
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "description": "A runner hub loop's seconds, a whole number within its bounds (interval_min to interval_max)",
+                    "example": 5
                   }
                 }
               }
@@ -3915,10 +3950,10 @@
             }
           },
           "400": {
-            "description": "Not a cron of 5 fields that croner runs"
+            "description": "Not a cron of 5 fields that croner runs, or for a runner hub loop not a whole number of seconds within its bounds"
           },
           "403": {
-            "description": "No settings access, a runner hub loop (runnerDispatch, runnerDial, runnerPrune: no schedule), or its variable set by the environment (or ALLOW_ENV_EDIT=0)"
+            "description": "No settings access, or its variable set by the environment (or ALLOW_ENV_EDIT=0)"
           },
           "404": {
             "description": "No task has that key"

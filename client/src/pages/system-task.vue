@@ -13,8 +13,9 @@
 /*             only when the environment sets it ; leaving with   */
 /*             a change asks first) ; a cron still read from a    */
 /*             deprecated variable says so under it. A runner hub */
-/*             loop has no cron : every so many seconds, read     */
-/*             only, one line saying why, and its node on Details */
+/*             loop has no cron : every so many seconds, a number */
+/*             within its bounds, saved the same way, and its     */
+/*             node on Details                                    */
 /*    Runs     its recent runs, the latest first                  */
 /*  Run now top right, beside Save, as a schedule's page : the    */
 /*  task run once at once, then read again (its last run, result  */
@@ -50,11 +51,13 @@ const taskKey = computed(() => String(route.params.key || ''));
 const task = ref(null);
 // its cron as edited on the Schedule tab, the saved one until changed
 const cronEdit = ref('');
+// a runner hub loop's seconds as edited on the Schedule tab, the saved ones until changed
+const secondsEdit = ref('');
 
 /**
  * Loads the task and its recent runs ; refused or failing, the page says it is not found. Its
- * cron in the editor is the saved one again, unless it is being changed (keepEdit : read again
- * after a run, the change not lost).
+ * cron in the editor (a loop's seconds in their field) is the saved one again, unless it is being
+ * changed (keepEdit : read again after a run, the change not lost).
  *
  * Args:
  *   keepEdit (boolean): keep a changed cron in the editor.
@@ -67,30 +70,53 @@ async function load(keepEdit = false) {
   } catch {
     task.value = null;
   }
-  if (!keep) cronEdit.value = task.value?.cron || '';
+  if (!keep) {
+    cronEdit.value = task.value?.cron || '';
+    secondsEdit.value = String(task.value?.interval_seconds ?? '');
+  }
   loaded.value = true;
 }
 
 // ─── its schedule ─────────────────────────────────────────────────────────────
-// a runner hub loop (no schedule setting) : its seconds, read only ; what it did is the memory of
-// the node that answered (task.loop), named on Details
-const isLoop = computed(() => !!task.value && !task.value.schedule_env);
-// its cron is a setting (schedule_env), in the editor : changed here, not when the environment
-// sets its variable (or ALLOW_ENV_EDIT=0), the editor then read only, saying so
+// a runner hub loop (its seconds, no cron) : its seconds in a number field ; what it did is the
+// memory of the node that answered (task.loop), named on Details
+const isLoop = computed(() => !!task.value && task.value.interval_seconds != null);
+// its cron (a loop's seconds) is a setting (schedule_env), in the editor : changed here, not when
+// the environment sets its variable (or ALLOW_ENV_EDIT=0), the editor then read only, saying so
 const scheduleEditable = computed(() => !!task.value?.schedule_env && !!task.value?.editable_schedule);
+// a loop's bounds, as the server takes them, said under its field
+const secondsMin = computed(() => task.value?.interval_min ?? 1);
+const secondsMax = computed(() => task.value?.interval_max ?? 60);
+const secondsBounds = computed(() => t('jobs.system.intervalBounds', { min: secondsMin.value, max: secondsMax.value }));
+// why a loop's seconds cannot be saved : a whole number within its bounds, as the server checks
+const secondsProblem = computed(() => {
+  if (!isLoop.value || !scheduleEditable.value) return '';
+  const text = String(secondsEdit.value ?? '').trim();
+  const n = /^\d+$/.test(text) ? Number(text) : NaN;
+  return Number.isInteger(n) && n >= secondsMin.value && n <= secondsMax.value ? '' : secondsBounds.value;
+});
+// the line under a loop's field : the environment's variable when it sets it, else its bounds
+const secondsHelp = computed(() =>
+  scheduleEditable.value ? secondsBounds.value : t('jobs.system.scheduleEnv', { env: task.value?.schedule_env }),
+);
 // the deprecated variable its cron still comes from (the config seed reload's
 // CONFIG_SEED_RELOAD_SECONDS, maybe a cron of 6 fields) : the editor shows the cron it reads as,
 // and a cron saved here replaces it ; null for none
 const deprecated = computed(() => task.value?.schedule_deprecated || null);
 // why the cron cannot be saved : 5 fields (the server takes no seconds), then croner's own rules
 const cronProblem = computed(() => {
+  if (isLoop.value) return secondsProblem.value;
   if (!scheduleEditable.value) return '';
   const cron = cronEdit.value.trim();
   if (cron.split(/\s+/).filter(Boolean).length !== 5) return t('jobs.system.cronFiveFields');
   return cronValidationMessage(t, cron);
 });
-// the cron changed and not saved : Save turns orange, leaving asks first
-const dirty = computed(() => scheduleEditable.value && cronEdit.value.trim() !== (task.value?.cron || ''));
+// the cron (a loop's seconds) changed and not saved : Save turns orange, leaving asks first
+const dirty = computed(() => {
+  if (!scheduleEditable.value) return false;
+  if (isLoop.value) return String(secondsEdit.value ?? '').trim() !== String(task.value?.interval_seconds ?? '');
+  return cronEdit.value.trim() !== (task.value?.cron || '');
+});
 // the problem said under the editor : once the cron is changed, so a cron of 6 fields read from
 // the deprecated variable is shown without an error
 const cronError = computed(() => (dirty.value ? cronProblem.value : ''));
@@ -104,8 +130,8 @@ useUnsavedGuard(
 );
 
 /**
- * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), then reads the task again : its
- * next run and next runs follow the new cron.
+ * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), a runner hub loop's seconds,
+ * then reads the task again : its next run and next runs follow the new cron or seconds.
  *
  * Returns:
  *   Promise<boolean>: false when the cron was refused (the leave dialog then stays).
@@ -116,9 +142,8 @@ async function save() {
     return false;
   }
   try {
-    await axios.put(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/schedule`, {
-      cron: cronEdit.value.trim(),
-    });
+    const body = isLoop.value ? { seconds: Number(String(secondsEdit.value).trim()) } : { cron: cronEdit.value.trim() };
+    await axios.put(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/schedule`, body);
     toast.success(t('settings.common.nameUpdated', { name: name.value }));
     await load();
     return true;
@@ -306,9 +331,9 @@ const tabFields = computed(() => ({
     ['node', t('jobs.system.node'), task.value?.loop?.node],
     ['setting', t('jobs.system.setting'), setting.value?.env, setting.value?.value],
   ],
-  // its cron's editor, found by the cron or its words ; a runner hub loop's seconds
+  // its cron's editor, found by the cron or its words ; a runner hub loop's seconds, or their words
   schedule: isLoop.value
-    ? [['timing', t('jobs.system.timing'), timing.value]]
+    ? [['seconds', t('jobs.system.intervalLabel'), secondsEdit.value, timing.value]]
     : [['cron', t('jobs.system.timing'), cronEdit.value, timing.value]],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('jobs.system.tabRuns')]],
@@ -475,12 +500,22 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
                 </h6>
               </template>
-              <!-- a runner hub loop : every so many seconds, read only, one line saying why -->
-              <div v-if="isLoop" v-show="fieldShown('timing')" class="mb-0">
-                <div class="form-label fw-bold">{{ t('jobs.system.timing') }}</div>
-                <span>{{ timing || '–' }}</span>
-                <div class="form-text">{{ t('jobs.system.hubLoopHint') }}</div>
-              </div>
+              <!-- a runner hub loop : every so many seconds, a number within its bounds (the line under
+                   it names them, or the variable that sets it, read only then) -->
+              <BsInput
+                v-if="isLoop"
+                v-show="fieldShown('seconds')"
+                class="af-system-seconds"
+                v-model="secondsEdit"
+                type="number"
+                icon="stopwatch"
+                :isFloating="false"
+                :disabled="!scheduleEditable"
+                :hasError="!!cronError"
+                :suffix="t('jobs.system.intervalUnit')"
+                :help="secondsHelp"
+                :label="t('jobs.system.intervalLabel')"
+              />
               <div v-else v-show="fieldShown('cron')" class="af-system-cron mb-0">
                 <BsCron v-model="cronEdit" icon="stopwatch" :hasError="!!cronError" :disabled="!scheduleEditable" />
                 <div v-if="cronError" class="invalid-feedback d-block">{{ cronError }}</div>
@@ -519,9 +554,9 @@ onMounted(async () => {
           </div>
         </template>
         <!-- Run now, as a schedule's page (disabled while it runs, for a task that is off and for
-             a runner hub loop whose hub does not run on this node), then Save when its cron may be
-             changed, as a record page's (orange while the cron is changed ; enabled too while the
-             cron comes from a deprecated variable, which Save replaces). A loop has no Save -->
+             a runner hub loop whose hub does not run on this node), then Save when its cron (a
+             loop's seconds) may be changed, as a record page's (orange while it is changed ;
+             enabled too while the cron comes from a deprecated variable, which Save replaces) -->
         <template v-if="task" #actions>
           <BsButton icon="play" cssClass="text-nowrap" :disabled="!canRun" @click="runNow()">{{
             t('settings.schedules.runSchedule')
@@ -542,6 +577,13 @@ onMounted(async () => {
 .af-system-field,
 .af-system-cron {
   max-width: 40rem;
+}
+/* a loop's seconds : a short number, narrower ; the tab's last field, no margin under it */
+.af-system-seconds :deep(.input-group) {
+  max-width: 16rem;
+}
+.af-system-seconds.mb-3 {
+  margin-bottom: 0 !important;
 }
 /* the count of a tab : small and grey, as the menus' badges */
 .af-tab-count {

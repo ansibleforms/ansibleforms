@@ -14,7 +14,8 @@
 //     environment sets (403) and an unknown key (404), and is audited ;
 //   - the seed reload runs on its croner job only with a seed, its deprecated seconds read as a
 //     cron while CONFIG_SEED_RELOAD_CRON is not set, which a save on its page writes and wins ;
-//   - the API says which task may be changed (editable_schedule) and its variable ;
+//   - the API says which task may be changed (editable_schedule) and its variable, a runner hub
+//     loop's seconds too (tests/system-task-loops.test.mjs) ;
 //   - it is documented.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
 import assert from "node:assert/strict";
@@ -271,13 +272,13 @@ const ADMIN = { showSettings: true };
 const put = (key, cron, options = ADMIN) => call("PUT", `/api/v2/system/tasks/${key}/schedule`, options, { cron });
 
 describe("which task may be changed, as the API says it", () => {
-  test("every task, with its variable ; the runner hub's loops read only", async () => {
+  test("every task, with its variable ; the runner hub's loops too, their seconds", async () => {
     const all = await SystemTask.list();
     const loops = all.filter((t) => t.interval_seconds);
     assert.deepEqual(loops.map((t) => [t.key, t.interval_seconds, t.editable_schedule, t.schedule_env]), [
-      ["runnerDispatch", 2, false, null],
-      ["runnerDial", 10, false, null],
-      ["runnerPrune", 60, false, null],
+      ["runnerDispatch", 2, true, "RUNNER_DISPATCH_SECONDS"],
+      ["runnerDial", 10, true, "RUNNER_DIAL_SECONDS"],
+      ["runnerPrune", 60, true, "RUNNER_PRUNE_SECONDS"],
     ]);
     const list = all.filter((t) => !t.interval_seconds);
     assert.deepEqual(list.map((t) => t.key).sort(), Object.keys(TASKS).sort());
@@ -385,7 +386,10 @@ describe("PUT /api/v2/system/tasks/:key/schedule", () => {
     const op = doc.paths["/system/tasks/{key}/schedule"]?.put;
     assert.ok(op, "documented");
     assert.deepEqual(op.tags, ["system"]);
-    assert.deepEqual(op.requestBody.content["application/json"].schema.required, ["cron"]);
+    // { cron } for a task, { seconds } for a runner hub loop
+    const body = op.requestBody.content["application/json"].schema;
+    assert.equal(body.properties.cron.type, "string");
+    assert.equal(body.properties.seconds.type, "integer");
     for (const status of ["200", "400", "403", "404"]) assert.ok(op.responses[status], status);
     for (const p of ["/system/tasks", "/system/tasks/{key}"]) {
       const schema = doc.paths[p].get.responses["200"].content["application/json"].schema;

@@ -12,13 +12,14 @@ import { Cron } from 'croner';
 import mysql from './db.model.js';
 import appConfig from '../../config/app.config.js';
 import logConfig from '../../config/log.config.js';
-import { SYSTEM_TASKS, HUB_LOOPS, systemTask, hubLoop, taskCron, taskEnabled, deprecatedSchedule } from '../lib/systemTasks.js';
+import { SYSTEM_TASKS, HUB_LOOPS, systemTask, hubLoop, taskCron, taskEnabled, deprecatedSchedule, loopSeconds } from '../lib/systemTasks.js';
 import { loopState } from '../lib/hubLoops.js';
 import { readManaged, isOverridden } from '../lib/envSettings.js';
 
-// The runner hub's loops (lib/systemTasks.js HUB_LOOPS) are listed after the tasks, read only :
-// no cron, their seconds instead (interval_seconds), and what they did from the memory of the node
-// that answers (lib/hubLoops.js loopState, its name in loop.node) ; their rows are their failures.
+// The runner hub's loops (lib/systemTasks.js HUB_LOOPS) are listed after the tasks : no cron,
+// their seconds instead (interval_seconds, a setting changed as a task's cron, within
+// interval_min and interval_max), and what they did from the memory of the node that answers
+// (lib/hubLoops.js loopState, its name in loop.node) ; their rows are their failures.
 
 // the runs one task's page lists, its latest first
 export const RECENT_RUNS = 100;
@@ -65,11 +66,12 @@ export function cronOf(task) {
 
 /**
  * Whether an admin may change when a task runs (PUT /api/v2/system/tasks/:key/schedule) : a task
- * with a schedule setting (every one), the settings file writable (ALLOW_ENV_EDIT), and its
- * variable not set in the process's own environment, which the file cannot override.
+ * with a schedule setting (every one, its cron ; a runner hub loop's, its seconds), the settings
+ * file writable (ALLOW_ENV_EDIT), and its variable not set in the process's own environment, which
+ * the file cannot override.
  *
  * Args:
- *   task (object): the task's entry of SYSTEM_TASKS.
+ *   task (object): the task's entry of SYSTEM_TASKS, or a loop's of HUB_LOOPS.
  *   managed (Map): the variables of the settings file (envSettings readManaged).
  *
  * Returns:
@@ -168,8 +170,8 @@ export function settingOf(task, managed) {
  *
  * Returns:
  *   object: { key, name, description, cron, default_cron, schedule_env, editable_schedule,
- *     schedule_deprecated, interval_seconds, loop, enabled, last_run, next_run, next_runs,
- *     timezone, setting }.
+ *     schedule_deprecated, interval_seconds, default_interval_seconds, interval_min, interval_max,
+ *     loop, enabled, last_run, next_run, next_runs, timezone, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -189,8 +191,12 @@ function describe(task, lastRow, managed) {
     // the deprecated variable its cron still comes from, while its own is not set (the config seed
     // reload's CONFIG_SEED_RELOAD_SECONDS) ; null for none
     schedule_deprecated: scheduleDeprecatedOf(task),
-    // a runner hub loop's seconds (describeLoop) ; null for a task timed by its cron
+    // a runner hub loop's seconds, its default and bounds (describeLoop) ; null for a task timed
+    // by its cron
     interval_seconds: null,
+    default_interval_seconds: null,
+    interval_min: null,
+    interval_max: null,
     // a runner hub loop's state on the node that answers (describeLoop) ; null for a task
     loop: null,
     enabled: taskEnabled(task.key),
@@ -205,19 +211,23 @@ function describe(task, lastRow, managed) {
 }
 
 /**
- * A runner hub loop as the API answers it : the fields of a task, read only and without a cron,
- * its seconds instead ; its last run what the node that answers keeps in memory (loopState), the
- * node named, else its latest failed row.
+ * A runner hub loop as the API answers it : the fields of a task without a cron, its seconds
+ * instead (its setting's, changed as a task's cron unless the environment sets it) ; its last run
+ * what the node that answers keeps in memory (loopState), the node named, else its latest failed
+ * row.
  *
  * Args:
  *   loop (object): the loop's entry of HUB_LOOPS.
  *   lastRow (object|undefined): its latest row of system_task_runs (a failure).
+ *   managed (Map): the variables of the settings file.
  *
  * Returns:
- *   object: as describe, with interval_seconds and loop ({ node, running, since, runs, failures,
- *     last_run_at, last_outcome, last_success_at, last_error }).
+ *   object: as describe, with interval_seconds, default_interval_seconds, interval_min,
+ *     interval_max and loop ({ node, running, since, armed_at, runs, failures, last_run_at,
+ *     last_outcome, last_success_at, last_error }).
  */
-function describeLoop(loop, lastRow) {
+function describeLoop(loop, lastRow, managed) {
+  const seconds = loopSeconds(loop.key);
   const state = loopState(loop.key);
   // its last run : this node's, in memory (a failure's message as its result) ; a node that runs
   // no hub has none, its latest failed row then
@@ -234,14 +244,16 @@ function describeLoop(loop, lastRow) {
       node: state.node,
     };
   }
-  // its next runs : the seconds after its last run on this node, or after the hub started when it
-  // has not run yet (a loop of a minute's first tick), while the hub runs here (at least a second
-  // from now, a missed tick runs then) ; none where no hub runs
+  // its next runs : its seconds after its last run on this node, or after its timer was armed
+  // when that came later (its seconds changed : the new pace from then), or after the hub started
+  // when it has not run yet (a loop of a minute's first tick), while the hub runs here (at least a
+  // second from now, a missed tick runs then) ; none where no hub runs
   const next = [];
-  const from = state?.last_run_at || state?.since;
+  const marks = [state?.last_run_at, state?.armed_at].filter(Boolean).map((d) => new Date(d).getTime());
+  const from = marks.length ? Math.max(...marks) : state?.since ? new Date(state.since).getTime() : null;
   if (state?.running && from) {
-    const first = Math.max(new Date(from).getTime() + loop.seconds * 1000, Date.now() + 1000);
-    for (let i = 0; i < 3; i++) next.push(new Date(first + i * loop.seconds * 1000).toISOString());
+    const first = Math.max(from + seconds * 1000, Date.now() + 1000);
+    for (let i = 0; i < 3; i++) next.push(new Date(first + i * seconds * 1000).toISOString());
   }
   return {
     key: loop.key,
@@ -249,10 +261,15 @@ function describeLoop(loop, lastRow) {
     description: loop.description,
     cron: null,
     default_cron: null,
-    schedule_env: null,
-    editable_schedule: false,
+    // the variable of its seconds, and whether it may be changed here (as a task's cron)
+    schedule_env: loop.schedule.env,
+    editable_schedule: scheduleEditable(loop, managed),
     schedule_deprecated: null,
-    interval_seconds: loop.seconds,
+    // its seconds in force, its own, and the bounds a change keeps within
+    interval_seconds: seconds,
+    default_interval_seconds: loop.seconds,
+    interval_min: loop.schedule.min,
+    interval_max: loop.schedule.max,
     loop: state,
     enabled: !!state?.running,
     last_run: lastRun,
@@ -318,7 +335,7 @@ SystemTask.list = async function () {
   const managed = await managedVariables();
   return [
     ...SYSTEM_TASKS.map((task) => describe(task, latest.get(task.key), managed)),
-    ...HUB_LOOPS.map((loop) => describeLoop(loop, latest.get(loop.key))),
+    ...HUB_LOOPS.map((loop) => describeLoop(loop, latest.get(loop.key), managed)),
   ];
 };
 
@@ -342,9 +359,9 @@ SystemTask.get = async function (key) {
     [(task || loop).key, RECENT_RUNS],
     true,
   );
-  // a loop's rows are its failures, its Runs tab lists them
-  if (loop) return { ...describeLoop(loop, rows?.[0]), runs: (rows || []).map(runOf) };
   const managed = await managedVariables();
+  // a loop's rows are its failures, its Runs tab lists them
+  if (loop) return { ...describeLoop(loop, rows?.[0], managed), runs: (rows || []).map(runOf) };
   return { ...describe(task, rows?.[0], managed), runs: (rows || []).map(runOf) };
 };
 

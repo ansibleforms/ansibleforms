@@ -1,6 +1,13 @@
 'use strict';
-// What the runner hub's own loops did on this node (lib/systemTasks.js HUB_LOOPS : dispatch every
-// 2 seconds, inbound dial every 10, ended jobs prune every 60), for Jobs > System.
+// The runner hub's own loops on this node (lib/systemTasks.js HUB_LOOPS : dispatch every 2 seconds,
+// inbound dial every 10, ended jobs prune every 60 by default), their timers and what they did, for
+// Jobs > System.
+//
+// Each loop's timer runs it every so many seconds, its setting's (RUNNER_DISPATCH_SECONDS and the
+// like, lib/systemTasks.js loopSeconds) : the hub starts them (startLoops), and a setting changed
+// re-arms its loop's timer at once (rearmLoop, from lib/envSettings.js applyLive, on the node that
+// saved it and on every other through the env change notice), the old timer cleared, the new one at
+// the new pace from now.
 //
 // A loop runs far too often for a row a run : what it did is kept here, in memory, per node -
 // its runs and failures since this process started, its last success, and its last error with
@@ -17,7 +24,7 @@
 // a timed one's. Never while a pass of that loop goes, nor on a node whose hub does not run.
 import logger from './logger.js';
 import { nodeId } from './role.js';
-import { HUB_LOOPS, hubLoop, recordRun } from './systemTasks.js';
+import { HUB_LOOPS, hubLoop, recordRun, loopSeconds } from './systemTasks.js';
 
 // one row per distinct error of a loop this often at most
 export const FAILURE_ROW_EVERY_MS = 60 * 1000;
@@ -58,6 +65,8 @@ const states = new Map(HUB_LOOPS.map((loop) => [loop.key, emptyState()]));
 let started = false;
 // each loop's work, by its key, as the hub's timers run it : Run now runs the same
 let works = new Map();
+// each loop's timer on this node, by its key : { timer, seconds, armedAt }
+const timers = new Map();
 
 /**
  * Marks the loops as running on this node : the hub started them (startRteHub), with the work
@@ -69,6 +78,82 @@ let works = new Map();
 export function markLoopsStarted(fns = {}) {
   works = new Map(Object.entries(fns));
   started = true;
+}
+
+/**
+ * Arms a loop's timer, at the seconds its setting says now (loopSeconds) : the timer it had is
+ * cleared first, so the loop runs at the new pace from now on, never at both.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   object|null: its timer ({ timer, seconds, armedAt }), or null when the hub does not run its
+ *     loops on this node or the loop has no work.
+ */
+function armLoop(key) {
+  const fn = works.get(key);
+  if (!started || !fn) return null;
+  clearInterval(timers.get(key)?.timer);
+  const seconds = loopSeconds(key);
+  const timer = setInterval(() => loopRun(key, fn), seconds * 1000);
+  // a loop's timer never keeps the process alive
+  timer.unref?.();
+  const armed = { timer, seconds, armedAt: new Date() };
+  timers.set(key, armed);
+  return armed;
+}
+
+/**
+ * Starts the hub's loops on this node (runners/rteHub.js startRteHub) : each one's work kept for
+ * Run now, and its timer armed at its setting's seconds.
+ *
+ * Args:
+ *   fns (object): each loop's work by its key ({ runnerDispatch: dispatch, ... }), async.
+ */
+export function startLoops(fns = {}) {
+  markLoopsStarted(fns);
+  for (const loop of HUB_LOOPS) armLoop(loop.key);
+}
+
+/**
+ * Stops the hub's loops on this node : every timer cleared (the process stops).
+ */
+export function stopLoops() {
+  for (const { timer } of timers.values()) clearInterval(timer);
+  timers.clear();
+  started = false;
+}
+
+/**
+ * Its setting of seconds changed (lib/envSettings.js, on this node or on another through the env
+ * change notice) : the loop's timer is armed again at once at the new seconds, the old one cleared.
+ * Nothing on a node whose hub does not run : its loops have no timer.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   boolean: whether a timer was armed again.
+ */
+export function rearmLoop(key) {
+  if (!timers.has(key)) return false;
+  const armed = armLoop(key);
+  if (armed) logger.notice(`The runner hub loop ${key} runs every ${armed.seconds} seconds now`);
+  return !!armed;
+}
+
+/**
+ * A loop's timer on this node, for a check : its seconds and when it was armed.
+ *
+ * Args:
+ *   key (string): the loop's key.
+ *
+ * Returns:
+ *   object|null: { timer, seconds, armedAt }, or null when it has none.
+ */
+export function loopTimer(key) {
+  return timers.get(key) || null;
 }
 
 /**
@@ -198,8 +283,9 @@ export async function runLoopNow(key) {
  *   key (string): the loop's key.
  *
  * Returns:
- *   object|null: { node, running, since, runs, failures, last_run_at, last_outcome,
- *     last_success_at, last_error ({ at, message } or null) } ; null for a key no loop has.
+ *   object|null: { node, running, since, armed_at (when its timer was last armed, its pace
+ *     since then ; null for none), runs, failures, last_run_at, last_outcome, last_success_at,
+ *     last_error ({ at, message } or null) } ; null for a key no loop has.
  */
 export function loopState(key) {
   const state = states.get(key);
@@ -209,6 +295,7 @@ export function loopState(key) {
     node: nodeId,
     running: started,
     since: iso(state.since),
+    armed_at: iso(timers.get(key)?.armedAt),
     runs: state.runs,
     failures: state.failures,
     last_run_at: iso(state.lastRunAt),
@@ -218,11 +305,14 @@ export function loopState(key) {
   };
 }
 
-// tests only : every loop as at start, the hub running here or not, with each loop's work
+// tests only : every loop as at start, its timer cleared, the hub running here or not, with each
+// loop's work
 export function resetLoopsForTests(running = false, fns = {}) {
+  for (const { timer } of timers.values()) clearInterval(timer);
+  timers.clear();
   for (const loop of HUB_LOOPS) states.set(loop.key, emptyState());
   works = new Map(Object.entries(fns));
   started = running;
 }
 
-export default { FAILURE_ROW_EVERY_MS, markLoopsStarted, loopRun, loopBusy, runLoopNow, loopState };
+export default { FAILURE_ROW_EVERY_MS, markLoopsStarted, startLoops, stopLoops, rearmLoop, loopTimer, loopRun, loopBusy, runLoopNow, loopState };

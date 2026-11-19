@@ -5,8 +5,9 @@
 // setting (SCHEDULE_RESYNC_CRON), each run recorded with what it did.
 //
 // The runner hub's loops (runners/rteHub.js : dispatch every 2 seconds, inbound dial every 10,
-// ended jobs prune every 60) stay on their timers and have no setting : they are listed read only
-// (lib/systemTasks.js HUB_LOOPS), what they did kept in memory per node (lib/hubLoops.js).
+// ended jobs prune every 60 by default) stay on their timers (lib/hubLoops.js), each one's seconds a
+// setting (RUNNER_DISPATCH_SECONDS, RUNNER_DIAL_SECONDS, RUNNER_PRUNE_SECONDS, lib/systemTasks.js
+// HUB_LOOPS), what they did kept in memory per node (lib/hubLoops.js).
 //
 // What has to hold :
 //   - the resync runs on its cron where the cron service is active only, its result says what it
@@ -15,8 +16,11 @@
 //   - a loop's runs, failures, last success and last error are kept, with the node's name ;
 //   - a failure is a warning once per distinct error, and a row once a minute at most per
 //     distinct error ; a success writes no row ;
-//   - the API lists the loops after the tasks, every so many seconds, read only (403 on PUT),
-//     their Runs their failures ;
+//   - a loop's seconds are a whole number within its bounds, refused otherwise ; changed, its
+//     timer is armed again at once at the new seconds (the old one cleared), on the node that saved
+//     it and on every other through the env change notice ; pinned by the environment, read only ;
+//   - the API lists the loops after the tasks, every so many seconds, their seconds changed with
+//     PUT { seconds } (400 out of bounds, 403 pinned, audited), their Runs their failures ;
 //   - Run now runs one pass of a loop with the work its timer runs (runLoopNow), never two at
 //     once, never where the hub does not run.
 import { test, describe, beforeEach, afterEach, vi } from "vitest";
@@ -48,7 +52,11 @@ vi.mock("../src/models/db.model.js", () => ({
     },
   },
 }));
-vi.mock("../src/models/audit.model.js", () => ({ default: { log: async () => {}, removeOlderThan: async () => 0 } }));
+// the audit entries written
+const audits = [];
+vi.mock("../src/models/audit.model.js", () => ({
+  default: { log: async (entry) => audits.push(entry), removeOlderThan: async () => 0 },
+}));
 vi.mock("../src/lib/workerLock.js", () => ({ confirmWorkerLock: async () => true, holdsWorkerLock: () => true }));
 vi.mock("../src/models/help.model.js", async () => {
   const yaml = await import("yaml");
@@ -72,10 +80,13 @@ vi.mock("croner", async (importOriginal) => {
 
 const logger = (await import("../src/lib/logger.js")).default;
 const EnvSettings = (await import("../src/lib/envSettings.js")).default;
-const { SYSTEM_TASKS, HUB_LOOPS, resetPruneForTests } = await import("../src/lib/systemTasks.js");
-const { loopRun, loopState, loopBusy, runLoopNow, resetLoopsForTests, FAILURE_ROW_EVERY_MS } = await import(
+const { SYSTEM_TASKS, HUB_LOOPS, LOOP_SETTINGS, loopSeconds, loopSecondsProblem, hubLoop, resetPruneForTests } = await import(
+  "../src/lib/systemTasks.js"
+);
+const { loopRun, loopState, loopBusy, runLoopNow, resetLoopsForTests, startLoops, loopTimer, FAILURE_ROW_EVERY_MS } = await import(
   "../src/lib/hubLoops.js"
 );
+const { applyChangedEnv } = await import("../src/init/cluster.js");
 const cronModule = await import("../src/services/cron.service.js");
 const cronService = cronModule.default;
 const { resyncResult } = cronModule;
@@ -95,9 +106,16 @@ async function startTasks() {
   await cronService.initializeSystemTasks(Job, Token, Backup, appConfig);
 }
 
+// the loops' settings and their variables, as at start : nothing set
+const LOOP_ENVS = ["RUNNER_DISPATCH_SECONDS", "RUNNER_DIAL_SECONDS", "RUNNER_PRUNE_SECONDS"];
+const LOOP_CONFIGS = ["runnerDispatchSeconds", "runnerDialSeconds", "runnerPruneSeconds"];
+
 beforeEach(async () => {
   queries.length = 0;
+  audits.length = 0;
   answer = () => [];
+  for (const env of LOOP_ENVS) delete process.env[env];
+  for (const key of LOOP_CONFIGS) appConfig[key] = "";
   appConfig.allowEnvEdit = true;
   appConfig.scheduleResyncCron = "";
   delete process.env.SCHEDULE_RESYNC_CRON;
@@ -108,6 +126,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  resetLoopsForTests(false);
   vi.useRealTimers();
   vi.restoreAllMocks();
   await cronService.stopAll(0);
@@ -193,24 +212,19 @@ describe("the schedule resync", () => {
 // the runner hub's loops
 // ------------------------------------------------------------------
 describe("the runner hub's loops", () => {
-  test("three, read only, every 2, 10 and 60 seconds as the hub's timers", () => {
-    assert.deepEqual(HUB_LOOPS.map((l) => [l.key, l.seconds]), [
-      ["runnerDispatch", 2],
-      ["runnerDial", 10],
-      ["runnerPrune", 60],
+  test("three, every 2, 10 and 60 seconds by default, each a setting with its bounds", () => {
+    assert.deepEqual(HUB_LOOPS.map((l) => [l.key, l.seconds, l.schedule]), [
+      ["runnerDispatch", 2, { env: "RUNNER_DISPATCH_SECONDS", config: "runnerDispatchSeconds", min: 1, max: 60 }],
+      ["runnerDial", 10, { env: "RUNNER_DIAL_SECONDS", config: "runnerDialSeconds", min: 2, max: 300 }],
+      ["runnerPrune", 60, { env: "RUNNER_PRUNE_SECONDS", config: "runnerPruneSeconds", min: 10, max: 3600 }],
     ]);
+    assert.deepEqual(LOOP_SETTINGS.map((l) => l.env), LOOP_ENVS);
     const hub = read("src/runners/rteHub.js");
-    assert.match(hub, /const DISPATCH_MS = 2000;/);
-    assert.match(hub, /const DIAL_MS = 10000;/);
-    assert.match(hub, /const PRUNE_MS = 60000;/);
-    assert.match(hub, /setInterval\(\(\) => loopRun\("runnerDispatch", dispatch\), DISPATCH_MS\)/);
-    assert.match(hub, /setInterval\(\(\) => loopRun\("runnerDial", dialInbound\), DIAL_MS\)/);
-    assert.match(hub, /setInterval\(\(\) => loopRun\("runnerPrune", pruneEnded\), PRUNE_MS\)/);
+    // the timers are the loops' own (lib/hubLoops.js), no fixed pace left in the hub
+    assert.doesNotMatch(hub, /DISPATCH_MS|DIAL_MS|PRUNE_MS|loopRun/);
     // Run now runs the same work as the timers
-    assert.match(
-      hub,
-      /markLoopsStarted\(\{ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded \}\);/,
-    );
+    assert.match(hub, /startLoops\(\{ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded \}\);/);
+    assert.match(hub, /stopLoops\(\);/);
     // no failure said at debug only any more
     assert.doesNotMatch(hub, /logger\.debug\(`RTE (dispatch|inbound dial|prune):/);
   });
@@ -313,6 +327,114 @@ describe("the runner hub's loops", () => {
 });
 
 // ------------------------------------------------------------------
+// the loops' seconds : settings, applied live
+// ------------------------------------------------------------------
+describe("the loops' seconds", () => {
+  test("a whole number within the loop's bounds", () => {
+    const dispatch = hubLoop("runnerDispatch");
+    for (const ok of [1, 60, "2", " 30 "]) assert.equal(loopSecondsProblem(dispatch, ok), null, String(ok));
+    for (const bad of [0, 61, -1, 2.5, "2.5", "abc", "", null, undefined]) {
+      assert.equal(loopSecondsProblem(dispatch, bad), "must be a whole number of seconds from 1 to 60", String(bad));
+    }
+    assert.equal(loopSecondsProblem(hubLoop("runnerDial"), 1), "must be a whole number of seconds from 2 to 300");
+    assert.equal(loopSecondsProblem(hubLoop("runnerPrune"), 3601), "must be a whole number of seconds from 10 to 3600");
+  });
+
+  test("validated as a setting, documented, edited on the loop's page only", async () => {
+    const help = (await import("../src/models/help.model.js")).default;
+    const docs = new Map(((await help.get()).find((x) => x.name == "Environment Variables").items || []).map((x) => [x.name, x]));
+    for (const [env, def, min, max] of [
+      ["RUNNER_DISPATCH_SECONDS", "2", 1, 60],
+      ["RUNNER_DIAL_SECONDS", "10", 2, 300],
+      ["RUNNER_PRUNE_SECONDS", "60", 10, 3600],
+    ]) {
+      const doc = docs.get(env);
+      assert.ok(doc, env);
+      assert.equal(doc.type, "number");
+      assert.equal(doc.default, def);
+      assert.equal(doc.allowed, `a whole number of seconds from ${min} to ${max}`);
+      assert.equal(EnvSettings.validate(env, String(min), doc), null);
+      assert.equal(EnvSettings.validate(env, String(max), doc), null);
+      assert.equal(EnvSettings.validate(env, "", doc), null);
+      assert.equal(EnvSettings.validate(env, String(min - 1), doc), `${env} must be a whole number of seconds from ${min} to ${max}`);
+      assert.equal(EnvSettings.validate(env, String(max + 1), doc), `${env} must be a whole number of seconds from ${min} to ${max}`);
+      assert.match(EnvSettings.validate(env, "abc", doc), /must be a whole number/);
+      assert.ok(EnvSettings.OWNED_ELSEWHERE.test(env), env);
+    }
+  });
+
+  test("its default while not set, or set out of its bounds by hand", () => {
+    assert.equal(loopSeconds("runnerDispatch"), 2);
+    appConfig.runnerDispatchSeconds = "7";
+    assert.equal(loopSeconds("runnerDispatch"), 7);
+    appConfig.runnerDispatchSeconds = "600";
+    assert.equal(loopSeconds("runnerDispatch"), 2);
+    assert.throws(() => loopSeconds("notALoop"), /No runner hub loop/);
+  });
+
+  test("the hub's start arms each loop at its seconds", async () => {
+    vi.useFakeTimers();
+    appConfig.runnerPruneSeconds = "15";
+    resetLoopsForTests(false);
+    const passes = { runnerDispatch: 0, runnerDial: 0, runnerPrune: 0 };
+    startLoops(Object.fromEntries(Object.keys(passes).map((k) => [k, async () => passes[k]++])));
+    assert.deepEqual(HUB_LOOPS.map((l) => loopTimer(l.key).seconds), [2, 10, 15]);
+    await vi.advanceTimersByTimeAsync(30000);
+    assert.deepEqual(passes, { runnerDispatch: 15, runnerDial: 3, runnerPrune: 2 });
+    assert.ok(loopState("runnerPrune").armed_at);
+  });
+
+  test("changed : the old timer cleared, the new one at the new pace from now", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(logger, "notice").mockImplementation(() => {});
+    const cleared = vi.spyOn(globalThis, "clearInterval");
+    resetLoopsForTests(false);
+    let passes = 0;
+    startLoops({ runnerDispatch: async () => passes++ });
+    await vi.advanceTimersByTimeAsync(4000);
+    assert.equal(passes, 2);
+    const old = loopTimer("runnerDispatch").timer;
+    assert.equal(EnvSettings.applyLive("RUNNER_DISPATCH_SECONDS", "5", "2"), true);
+    assert.equal(appConfig.runnerDispatchSeconds, "5");
+    assert.ok(cleared.mock.calls.some((c) => c[0] === old), "the old timer cleared");
+    assert.equal(loopTimer("runnerDispatch").seconds, 5);
+    // none at the old pace any more : the next pass 5 seconds after the change
+    await vi.advanceTimersByTimeAsync(4999);
+    assert.equal(passes, 2);
+    await vi.advanceTimersByTimeAsync(1);
+    assert.equal(passes, 3);
+    await vi.advanceTimersByTimeAsync(10000);
+    assert.equal(passes, 5);
+    // cleared : back to its default
+    EnvSettings.applyLive("RUNNER_DISPATCH_SECONDS", "", "2");
+    assert.equal(appConfig.runnerDispatchSeconds, "");
+    assert.equal(loopTimer("runnerDispatch").seconds, 2);
+  });
+
+  test("changed on another node : the env change notice re-arms it here", async () => {
+    vi.spyOn(logger, "notice").mockImplementation(() => {});
+    resetLoopsForTests(false);
+    startLoops({ runnerDial: async () => {} });
+    await applyChangedEnv();
+    // the other node saved the file : this one reads it and applies what changed
+    await EnvSettings.writeManaged(new Map([["RUNNER_DIAL_SECONDS", "45"]]));
+    await applyChangedEnv();
+    assert.equal(process.env.RUNNER_DIAL_SECONDS, "45");
+    assert.equal(loopSeconds("runnerDial"), 45);
+    assert.equal(loopTimer("runnerDial").seconds, 45);
+    await EnvSettings.writeManaged(new Map());
+    await applyChangedEnv();
+  });
+
+  test("a node whose hub does not run has no timer to arm", () => {
+    resetLoopsForTests(false);
+    assert.equal(EnvSettings.applyLive("RUNNER_PRUNE_SECONDS", "30", "60"), true);
+    assert.equal(loopTimer("runnerPrune"), null);
+    assert.equal(loopSeconds("runnerPrune"), 30);
+  });
+});
+
+// ------------------------------------------------------------------
 // the API
 // ------------------------------------------------------------------
 /** Answers a request to the system routes, as an admin. */
@@ -338,20 +460,25 @@ async function call(method, url, body) {
 }
 
 describe("the loops as the API answers them", () => {
-  test("listed after the tasks : every so many seconds, read only, no cron", async () => {
+  test("listed after the tasks : every so many seconds, editable, no cron", async () => {
     const res = await call("GET", "/api/v2/system/tasks");
     const keys = res.body.records.map((t) => t.key);
     assert.deepEqual(keys.slice(-3), ["runnerDispatch", "runnerDial", "runnerPrune"]);
     const dispatch = res.body.records.find((t) => t.key === "runnerDispatch");
     assert.equal(dispatch.interval_seconds, 2);
+    assert.equal(dispatch.default_interval_seconds, 2);
+    assert.equal(dispatch.interval_min, 1);
+    assert.equal(dispatch.interval_max, 60);
     assert.equal(dispatch.cron, null);
-    assert.equal(dispatch.schedule_env, null);
-    assert.equal(dispatch.editable_schedule, false);
+    assert.equal(dispatch.schedule_env, "RUNNER_DISPATCH_SECONDS");
+    assert.equal(dispatch.editable_schedule, true);
     assert.equal(dispatch.enabled, true);
     assert.equal(dispatch.loop.node, nodeId);
     // the tasks : no seconds, no loop
     const job = res.body.records.find((t) => t.key === "jobCleanup");
     assert.equal(job.interval_seconds, null);
+    assert.equal(job.interval_min, null);
+    assert.equal(job.interval_max, null);
     assert.equal(job.loop, null);
   });
 
@@ -412,10 +539,80 @@ describe("the loops as the API answers them", () => {
     assert.equal(res.body.last_run.node, "af-y");
   });
 
-  test("a loop's schedule cannot be changed : 403", async () => {
-    const res = await call("PUT", "/api/v2/system/tasks/runnerDispatch/schedule", { cron: "* * * * *" });
+  test("its seconds changed : its timing and next runs follow", async () => {
+    appConfig.runnerDialSeconds = "30";
+    await loopRun("runnerDial", async () => {});
+    const res = await call("GET", "/api/v2/system/tasks/runnerDial");
+    assert.equal(res.body.interval_seconds, 30);
+    assert.equal(res.body.default_interval_seconds, 10);
+    const next = res.body.next_runs.map((d) => new Date(d).getTime());
+    assert.deepEqual([next[1] - next[0], next[2] - next[1]], [30000, 30000]);
+  });
+
+  test("PUT { seconds } : saved, applied at once, its timer armed again, audited", async () => {
+    vi.spyOn(logger, "notice").mockImplementation(() => {});
+    resetLoopsForTests(false);
+    startLoops({ runnerDispatch: async () => {}, runnerDial: async () => {}, runnerPrune: async () => {} });
+    const old = loopTimer("runnerDispatch").timer;
+    const res = await call("PUT", "/api/v2/system/tasks/runnerDispatch/schedule", { seconds: 5 });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.interval_seconds, 5);
+    assert.equal(loopSeconds("runnerDispatch"), 5);
+    assert.equal(loopTimer("runnerDispatch").seconds, 5);
+    assert.notEqual(loopTimer("runnerDispatch").timer, old);
+    // in the settings file, as Settings > System > General writes it
+    assert.match(await fs.readFile(process.env.MANAGED_ENV_PATH, "utf8"), /^RUNNER_DISPATCH_SECONDS='?5'?$/m);
+    const audit = audits.find((a) => a.action === "system.task.schedule");
+    assert.deepEqual(
+      { target: audit.target, detail: audit.detail },
+      { target: "runnerDispatch", detail: { env: "RUNNER_DISPATCH_SECONDS", from: 2, to: 5 } },
+    );
+  });
+
+  test("PUT { seconds } : 400 outside its bounds or not a whole number", async () => {
+    for (const [key, seconds] of [
+      ["runnerDispatch", 0],
+      ["runnerDispatch", 61],
+      ["runnerDial", 1],
+      ["runnerDial", 301],
+      ["runnerPrune", 9],
+      ["runnerPrune", 3601],
+      ["runnerDispatch", 2.5],
+      ["runnerDispatch", "abc"],
+      ["runnerDispatch", undefined],
+    ]) {
+      const res = await call("PUT", `/api/v2/system/tasks/${key}/schedule`, { seconds });
+      assert.equal(res.status, 400, `${key} ${seconds}`);
+      assert.match(res.body.details, /The interval must be a whole number of seconds from \d+ to \d+/);
+    }
+    // a cron is not seconds
+    assert.equal((await call("PUT", "/api/v2/system/tasks/runnerDial/schedule", { cron: "* * * * *" })).status, 400);
+    assert.equal(audits.length, 0);
+    assert.equal(loopSeconds("runnerDial"), 10);
+  });
+
+  test("PUT { seconds } : its bounds themselves are taken", async () => {
+    vi.spyOn(logger, "notice").mockImplementation(() => {});
+    assert.equal((await call("PUT", "/api/v2/system/tasks/runnerPrune/schedule", { seconds: 10 })).status, 200);
+    assert.equal((await call("PUT", "/api/v2/system/tasks/runnerPrune/schedule", { seconds: "3600" })).status, 200);
+    assert.equal(loopSeconds("runnerPrune"), 3600);
+  });
+
+  test("pinned by the environment, or ALLOW_ENV_EDIT=0 : read only, 403", async () => {
+    process.env.RUNNER_DIAL_SECONDS = "20";
+    appConfig.runnerDialSeconds = "20";
+    let res = await call("GET", "/api/v2/system/tasks/runnerDial");
+    assert.equal(res.body.editable_schedule, false);
+    assert.equal(res.body.schedule_env, "RUNNER_DIAL_SECONDS");
+    assert.equal(res.body.interval_seconds, 20);
+    res = await call("PUT", "/api/v2/system/tasks/runnerDial/schedule", { seconds: 30 });
     assert.equal(res.status, 403);
-    assert.match(res.body.details, /runner hub's loops run as often as the runners need them/);
+    assert.match(res.body.details, /RUNNER_DIAL_SECONDS is set in the environment/);
+    delete process.env.RUNNER_DIAL_SECONDS;
+    appConfig.allowEnvEdit = false;
+    assert.equal((await call("GET", "/api/v2/system/tasks/runnerDial")).body.editable_schedule, false);
+    assert.equal((await call("PUT", "/api/v2/system/tasks/runnerDial/schedule", { seconds: 30 })).status, 403);
+    assert.equal(loopSeconds("runnerDial"), 20);
   });
 
   test("documented : interval_seconds and loop on both reads", () => {
@@ -423,7 +620,18 @@ describe("the loops as the API answers them", () => {
     for (const p of ["/system/tasks", "/system/tasks/{key}"]) {
       const schema = doc.paths[p].get.responses["200"].content["application/json"].schema;
       const props = schema.properties.records?.items?.properties || schema.properties;
-      for (const field of ["interval_seconds", "loop"]) assert.ok(props[field], `${p} ${field}`);
+      for (const field of ["interval_seconds", "default_interval_seconds", "interval_min", "interval_max", "loop"]) {
+        assert.ok(props[field], `${p} ${field}`);
+      }
+      assert.ok(props.loop.properties.armed_at, `${p} loop.armed_at`);
     }
+    // PUT takes { seconds } for a loop, its 400 says so, its 403 no longer refuses a loop
+    const op = doc.paths["/system/tasks/{key}/schedule"].put;
+    assert.equal(op.requestBody.content["application/json"].schema.properties.seconds.type, "integer");
+    assert.match(op.description, /RUNNER_DISPATCH_SECONDS, 1 to 60/);
+    assert.match(op.description, /RUNNER_DIAL_SECONDS, 2 to 300/);
+    assert.match(op.description, /RUNNER_PRUNE_SECONDS, 10 to 3600/);
+    assert.match(op.responses["400"].description, /whole number of seconds/);
+    assert.doesNotMatch(op.responses["403"].description, /runner hub loop/);
   });
 });

@@ -4,8 +4,8 @@
 // page : Details, Schedule then Runs, every task's cron changed on its Schedule tab as a
 // schedule's (its editor and Save, no Revert as the other record pages), the config seed reload's too, whose cron may still come
 // from its deprecated seconds (CONFIG_SEED_RELOAD_SECONDS). The runner hub's own loops are listed
-// too, read only : every so many seconds, one line saying why. Run now runs a task once, as a
-// schedule's page, and a loop's pass. Read from the sources and the config, as the other page tests do.
+// too : every so many seconds, a number field within their bounds saved the same way. Run now runs
+// a task once, as a schedule's page, and a loop's pass. Read from the sources and the config, as the other page tests do.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -134,13 +134,14 @@ describe("a task's page", () => {
     expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(6);
   });
 
-  it("shows on its Schedule tab the editor, or a runner hub loop's seconds read only with one line", () => {
+  it("shows on its Schedule tab the editor, or a runner hub loop's seconds in a number field", () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'schedule\')"'), page.indexOf('v-if="tabShown(\'runs\')"'));
-    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['timing', 'cron']);
-    expect(page).toMatch(/const isLoop = computed\(\(\) => !!task\.value && !task\.value\.schedule_env\);/);
-    const loop = tab.slice(tab.indexOf('<div v-if="isLoop"'), tab.indexOf('<div v-else'));
-    expect(loop).toMatch(/<div class="form-text">\{\{ t\('jobs\.system\.hubLoopHint'\) \}\}<\/div>/);
-    expect(loop).not.toMatch(/<input|<select|v-model|BsCron/);
+    expect([...tab.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1])).toEqual(['seconds', 'cron']);
+    expect(page).toMatch(/const isLoop = computed\(\(\) => !!task\.value && task\.value\.interval_seconds != null\);/);
+    const loop = tab.slice(tab.indexOf('v-if="isLoop"'), tab.indexOf('<div v-else'));
+    expect(loop).not.toMatch(/BsCron/);
+    // the read only line is gone
+    expect(page).not.toMatch(/hubLoopHint/);
     expect(page).not.toMatch(/scheduleOwned|nextRunsLabel/);
   });
 
@@ -174,7 +175,11 @@ describe("a task's page", () => {
     expect([...page.matchAll(/axios\.post\(`([^`]+)`/g)].map((m) => m[1])).toEqual([
       '/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/run',
     ]);
-    expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(['cronEdit', 'search']);
+    expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual([
+      'cronEdit',
+      'search',
+      'secondsEdit',
+    ]);
   });
 
   it('lists the runs in the linked table of the other Runs tabs, a row opening nothing', () => {
@@ -193,11 +198,61 @@ describe("a task's Schedule tab", () => {
     .slice(1)
     .map((chunk) => ({ key: chunk.slice(0, chunk.indexOf("'")), schedule: /schedule: scheduleSetting\(/.test(chunk) }));
 
-  it("every task has a cron setting ; the runner hub's loops none, the one exception", () => {
+  it("every task has a cron setting ; the runner hub's loops a setting of seconds", () => {
     expect(declared.filter((d) => d.schedule).map((d) => d.key)).toEqual(
       TASK_KEYS.filter((k) => !LOOP_KEYS.includes(k)),
     );
     expect(declared.filter((d) => !d.schedule).map((d) => d.key)).toEqual(LOOP_KEYS);
+    for (const [env, min, max] of [
+      ['RUNNER_DISPATCH_SECONDS', 1, 60],
+      ['RUNNER_DIAL_SECONDS', 2, 300],
+      ['RUNNER_PRUNE_SECONDS', 10, 3600],
+    ]) {
+      expect(serverTasks).toMatch(new RegExp(`schedule: secondsSetting\\('${env}', '\\w+', ${min}, ${max}\\),`));
+    }
+  });
+
+  it("a runner hub loop's seconds : a number field with the page's icon, its bounds, one line naming them", () => {
+    const loop = tab.slice(tab.indexOf('<BsInput'), tab.indexOf('<div v-else'));
+    expect(loop).toMatch(/v-if="isLoop"/);
+    expect(loop).toMatch(/v-model="secondsEdit"/);
+    expect(loop).toMatch(/type="number"/);
+    expect(loop).toMatch(/icon="stopwatch"/);
+    expect(loop).toMatch(/:isFloating="false"/);
+    expect(loop).toMatch(/:disabled="!scheduleEditable"/);
+    expect(loop).toMatch(/:hasError="!!cronError"/);
+    expect(loop).toMatch(/:suffix="t\('jobs\.system\.intervalUnit'\)"/);
+    expect(loop).toMatch(/:help="secondsHelp"/);
+    expect(loop).toMatch(/:label="t\('jobs\.system\.intervalLabel'\)"/);
+    // its bounds the server's, said under it
+    expect(page).toMatch(/const secondsMin = computed\(\(\) => task\.value\?\.interval_min \?\? 1\);/);
+    expect(page).toMatch(/const secondsMax = computed\(\(\) => task\.value\?\.interval_max \?\? 60\);/);
+    expect(page).toMatch(/t\('jobs\.system\.intervalBounds', \{ min: secondsMin\.value, max: secondsMax\.value \}\)/);
+    expect(page).toMatch(/n >= secondsMin\.value && n <= secondsMax\.value/);
+    // its bounds in words : From 1 to 60 seconds.
+    expect(i18n.global.t('jobs.system.intervalBounds', { min: 1, max: 60 })).toBe('From 1 to 60 seconds.');
+    expect(i18n.global.t('jobs.system.intervalLabel')).toBe('Every');
+    expect(i18n.global.t('jobs.system.intervalUnit')).toBe('seconds');
+  });
+
+  it('a runner hub loop pinned by the environment : the field disabled, the line naming the variable', () => {
+    expect(page).toMatch(
+      /const secondsHelp = computed\(\(\) =>\s*scheduleEditable\.value \? secondsBounds\.value : t\('jobs\.system\.scheduleEnv', \{ env: task\.value\?\.schedule_env \}\),\s*\);/,
+    );
+  });
+
+  it("a runner hub loop's Save, orange while changed, and the leave guard : the cron tasks' own", () => {
+    expect(page).toMatch(
+      /if \(isLoop\.value\) return String\(secondsEdit\.value \?\? ''\)\.trim\(\) !== String\(task\.value\?\.interval_seconds \?\? ''\);/,
+    );
+    expect(page).toMatch(/if \(isLoop\.value\) return secondsProblem\.value;/);
+    expect(page).toMatch(
+      /\? \{ seconds: Number\(String\(secondsEdit\.value\)\.trim\(\)\) \}\s*: \{ cron: cronEdit\.value\.trim\(\) \};/,
+    );
+    expect(page).toMatch(/secondsEdit\.value = String\(task\.value\?\.interval_seconds \?\? ''\);/);
+    // one Save and one guard for both
+    expect((page.match(/useUnsavedGuard\(/g) || []).length).toBe(1);
+    expect((page.match(/icon="save"/g) || []).length).toBe(1);
   });
 
   it("shows the task's cron in a schedule's editor, no line under it while it may be changed", () => {
@@ -239,14 +294,17 @@ describe("a task's Schedule tab", () => {
     expect(actions).toMatch(/icon="save" :disabled="!canSave" @click="save\(\)">/);
     expect(page).toMatch(/useUnsavedGuard\(\s*dirty,/);
     expect(page).toMatch(
-      /axios\.put\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/schedule`, \{\s*cron: cronEdit\.value\.trim\(\),/,
+      /axios\.put\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/schedule`, body\);/,
     );
+    expect(page).toMatch(/: \{ cron: cronEdit\.value\.trim\(\) \};/);
   });
 
   it('reads the task again after a save : its last run, next run and next runs follow', () => {
     const save = page.slice(page.indexOf('async function save()'), page.indexOf('const runAsked'));
     expect(save).toMatch(/await axios\.put[\s\S]*await load\(\);/);
-    expect(page).toMatch(/cronEdit\.value = task\.value\?\.cron \|\| '';\s*loaded\.value = true;/);
+    expect(page).toMatch(
+      /cronEdit\.value = task\.value\?\.cron \|\| '';\s*secondsEdit\.value = [^;]+;\s*\}\s*loaded\.value = true;/,
+    );
   });
 
   it('refuses a cron of other than 5 fields before sending it, as the server does', () => {
@@ -320,11 +378,16 @@ describe('the texts', () => {
       const shown = old.replace('{env}', 'CONFIG_SEED_RELOAD_SECONDS');
       const width = [...shown].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
       expect(width, lang).toBeLessThanOrEqual(90);
-      // a runner hub loop's timing, and the line of its Schedule tab, on one line
+      // a runner hub loop's timing, and its field : a word or two around the number, its bounds on
+      // one line (the widest : 10 to 3600) ; the read only line is gone
       expect(texts.jobs.system.everySeconds, lang).toMatch(/\{n\}/);
-      const hint = texts.jobs.system.hubLoopHint;
-      const hintWidth = [...hint].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
-      expect(hintWidth, lang).toBeLessThanOrEqual(90);
+      const cjkWidth = (text) => [...text].reduce((w, c) => w + (/[\u3000-\u9fff\uff00-\uffef]/.test(c) ? 2 : 1), 0);
+      expect(texts.jobs.system.hubLoopHint, lang).toBeUndefined();
+      expect(cjkWidth(texts.jobs.system.intervalLabel), lang).toBeLessThanOrEqual(12);
+      expect(cjkWidth(texts.jobs.system.intervalUnit), lang).toBeLessThanOrEqual(12);
+      const bounds = texts.jobs.system.intervalBounds;
+      expect(bounds, lang).toMatch(/\{min\}[\s\S]*\{max\}/);
+      expect(cjkWidth(bounds.replace('{min}', '10').replace('{max}', '3600')), lang).toBeLessThanOrEqual(80);
       // Revert is gone, as from the other record pages
       expect(texts.jobs.system.revert, lang).toBeUndefined();
       // Run now's toasts, on one line : a task's name and a short result in them
@@ -356,10 +419,10 @@ describe('Run now', () => {
     expect(actions.indexOf('runNow()')).toBeLessThan(actions.indexOf('save()'));
   });
 
-  it('shows for the tasks and the runner hub loops alike, a loop without Save', () => {
+  it('shows for the tasks and the runner hub loops alike, Save for both', () => {
     expect(page).toMatch(/<template v-if="task" #actions>/);
     expect(actions).not.toMatch(/isLoop/);
-    // a loop has no schedule setting : scheduleEditable is false, no Save
+    // a loop's seconds are a setting : Save while it may be changed, as a task's cron
     expect(page).toMatch(
       /const scheduleEditable = computed\(\(\) => !!task\.value\?\.schedule_env && !!task\.value\?\.editable_schedule\);/,
     );

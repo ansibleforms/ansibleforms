@@ -821,6 +821,42 @@
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: RUNNER_DISPATCH_SECONDS
+    version: 7.8.0
+    type: number
+    allowed: a whole number of seconds from 1 to 60
+    short: Runner dispatch interval (seconds)
+    default: "2"
+    description: |
+      How often the Runner dispatch loop of the runner hub runs, in seconds: it hands the waiting jobs and the cancels to their runners.
+      A job or a cancel launched on another node reaches its runner at the next round; the default runs it every 2 seconds.
+      Changed on the loop's own page, Jobs > System > the loop > Schedule, which saves it to the
+      managed settings file and applies it at once on every node that runs the hub, without a
+      restart. Set in the real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: RUNNER_DIAL_SECONDS
+    version: 7.8.0
+    type: number
+    allowed: a whole number of seconds from 2 to 300
+    short: Runner inbound dial interval (seconds)
+    default: "10"
+    description: |
+      How often the Runner inbound dial loop of the runner hub runs, in seconds: it dials the inbound runners this node may hold.
+      An inbound runner that lost its socket is dialed again at the next round; the default runs it every 10 seconds.
+      Changed on the loop's own page, Jobs > System > the loop > Schedule, which saves it to the
+      managed settings file and applies it at once on every node that runs the hub, without a
+      restart. Set in the real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: RUNNER_PRUNE_SECONDS
+    version: 7.8.0
+    type: number
+    allowed: a whole number of seconds from 10 to 3600
+    short: Runner ended jobs prune interval (seconds)
+    default: "60"
+    description: |
+      How often the Runner ended jobs prune loop of the runner hub runs, in seconds: it lets go what a node kept of jobs that ended elsewhere.
+      The default runs it every 60 seconds.
+      Changed on the loop's own page, Jobs > System > the loop > Schedule, which saves it to the
+      managed settings file and applies it at once on every node that runs the hub, without a
+      restart. Set in the real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: ENTRA_AUTHORITY_URI
     version: 7.3.0
     type: string

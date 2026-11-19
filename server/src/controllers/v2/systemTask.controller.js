@@ -4,7 +4,7 @@ import Audit from '../../models/audit.model.js';
 import i18n from '../../lib/i18n.js';
 import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
-import { systemTask, hubLoop, taskCron, taskEnabled, scheduleCronProblem } from '../../lib/systemTasks.js';
+import { systemTask, hubLoop, taskCron, taskEnabled, scheduleCronProblem, loopSeconds, loopSecondsProblem } from '../../lib/systemTasks.js';
 import { runNow, busyTasks } from '../../lib/systemTaskRun.js';
 import { runLoopNow } from '../../lib/hubLoops.js';
 import { nodeId } from '../../lib/role.js';
@@ -68,20 +68,21 @@ function refuse(req, res, status, detail) {
   res.status(status).json(RestResult.error(i18n.t(req, 'resources.systemTaskScheduleFailed'), detail));
 }
 
-// PUT /api/v2/system/tasks/:key/schedule { cron } : when a task runs. Saved as the
-// settings page saves its variables (lib/envSave.js : the settings file, the other nodes told,
-// applied at once), its setting re-registering the task on its new cron on the node that runs the
-// tasks. 404 for a key no task has, 403 for a runner hub loop (it runs as often as the runners
-// need it, no cron) or a task whose variable the environment sets
-// (ALLOW_ENV_EDIT=0, or set in the process's own environment), 400 for a cron that is not 5
-// fields croner runs. Saved, it wins over a deprecated variable its cron came from (the config
-// seed reload's CONFIG_SEED_RELOAD_SECONDS). Answers the task as GET does.
+// PUT /api/v2/system/tasks/:key/schedule { cron } : when a task runs ; { seconds } for a runner hub
+// loop, how often it runs (saveLoopSeconds). Saved as the settings page saves its variables
+// (lib/envSave.js : the settings file, the other nodes told, applied at once), its setting
+// re-registering the task on its new cron on the node that runs the tasks. 404 for a key no task
+// has, 403 for a task whose variable the environment sets (ALLOW_ENV_EDIT=0, or set in the
+// process's own environment), 400 for a cron that is not 5 fields croner runs. Saved, it wins over
+// a deprecated variable its cron came from (the config seed reload's CONFIG_SEED_RELOAD_SECONDS).
+// Answers the task as GET does.
 const saveSchedule = async function (req, res) {
   try {
-    // step 1 : the task ; a runner hub loop has no cron to change
+    // step 1 : the task ; a runner hub loop has seconds instead of a cron
     const task = systemTask(req.params.key);
-    if (!task && hubLoop(req.params.key)) {
-      refuse(req, res, 403, "The runner hub's loops run as often as the runners need them, they have no schedule");
+    const loop = task ? null : hubLoop(req.params.key);
+    if (loop) {
+      await saveLoopSeconds(req, res, loop);
       return;
     }
     if (!task) {
@@ -130,6 +131,65 @@ const saveSchedule = async function (req, res) {
     refuse(req, res, err.status || 500, helpers.getError(err));
   }
 };
+
+/**
+ * Saves how often a runner hub loop runs ({ seconds }) : its setting of seconds
+ * (RUNNER_DISPATCH_SECONDS and the like), saved as a task's cron is, applied at once on every node
+ * that runs the hub, its timer armed again at the new seconds (lib/hubLoops.js rearmLoop). 400 for
+ * seconds that are not a whole number within the loop's bounds, 403 when the environment sets its
+ * variable (ALLOW_ENV_EDIT=0, or set in the process's own environment). Audited as a task's cron
+ * (system.task.schedule). Answers the loop as GET does.
+ *
+ * Args:
+ *   req (object): the request ({ seconds }).
+ *   res (object): the response.
+ *   loop (object): the loop's entry of HUB_LOOPS.
+ */
+async function saveLoopSeconds(req, res, loop) {
+  try {
+    // step 1 : the seconds, whole and within its bounds
+    const value = req.body?.seconds;
+    const problem = loopSecondsProblem(loop, value);
+    if (problem) {
+      refuse(req, res, 400, `The interval ${problem}`);
+      return;
+    }
+    const seconds = parseInt(String(value).trim(), 10);
+    // step 2 : the settings file ours to write, the variable not the environment's
+    const env = loop.schedule.env;
+    if (!SystemTask.envEditAllowed()) {
+      refuse(req, res, 403, ENV_EDIT_DISABLED_REASON);
+      return;
+    }
+    if (!scheduleEditable(loop, await SystemTask.managed())) {
+      refuse(req, res, 403, `${env} is set in the environment and cannot be changed from here`);
+      return;
+    }
+    // step 3 : saved as the settings page saves (its own audit names the variable), then the
+    // change itself audited
+    const before = loopSeconds(loop.key);
+    await saveEnvValues({ [env]: String(seconds) }, { user: req.user?.user, ip: req.ip });
+    Audit.log({
+      user: req.user?.user,
+      ip: req.ip,
+      action: 'system.task.schedule',
+      outcome: 'success',
+      targetType: 'system_task',
+      target: loop.key,
+      detail: { env, from: before, to: seconds },
+    });
+    logger.notice(`The runner hub loop ${loop.key} runs every ${seconds} seconds now (was ${before})`);
+    res.json(RestResult.single(await SystemTask.get(loop.key)));
+  } catch (err) {
+    if (err instanceof EnvSaveError) {
+      // set in the environment meanwhile (409 there) : not editable here, as step 2 answers
+      refuse(req, res, err.status === 409 ? 403 : err.status, err.message);
+      return;
+    }
+    logger.error(helpers.getError(err));
+    refuse(req, res, err.status || 500, helpers.getError(err));
+  }
+}
 
 // what each refusal of Run now answers : its status and why, in English as the other refusals
 const RUN_REFUSED = {
