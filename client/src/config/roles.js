@@ -87,7 +87,8 @@ export const roleOptionGroups = [
 // i18n key ; count, the users or groups of the role the step shows beside its name
 export const roleWizardSteps = [
   { key: 'details', label: 'settings.common.tabDetails' },
-  { key: 'permissions', label: 'settings.settingsPage.permissions' },
+  // its many switches, three a line : a wider dialog on this step only
+  { key: 'permissions', label: 'settings.settingsPage.permissions', dialogSize: 'xl' },
   { key: 'users', label: 'settings.settingsPage.users', count: 'users' },
   { key: 'groups', label: 'settings.settingsPage.groups', count: 'groups' },
 ];

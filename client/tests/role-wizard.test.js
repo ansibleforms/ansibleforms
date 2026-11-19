@@ -155,3 +155,15 @@ describe('the texts of the wizard', () => {
     }
   });
 });
+
+describe("the New role dialog's width", () => {
+  it('is wider on the Permissions step only', async () => {
+    const { roleWizardSteps } = await import('@/config/roles');
+    expect(roleWizardSteps.map((s) => s.dialogSize || 'lg')).toEqual(['lg', 'xl', 'lg', 'lg']);
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const page = readFileSync(resolve(__dirname, '../src/pages/admin/roles.vue'), 'utf8');
+    expect(page).toMatch(/<BsModal v-if="newRole" :size="roleDialogSize"/);
+    expect(page).toMatch(/roleWizardSteps\[roleStep\.value\]\?\.dialogSize \|\| 'lg'/);
+  });
+});

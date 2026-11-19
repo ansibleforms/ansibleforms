@@ -90,6 +90,8 @@ const newRoleNameError = computed(() => {
   return roleNameProblem(t, newRole.value.name, taken) || '';
 });
 // the steps, each with its label, and Users and Groups with their count
+// the dialog's width : wider on the Permissions step (its dialogSize), large on the others
+const roleDialogSize = computed(() => roleWizardSteps[roleStep.value]?.dialogSize || 'lg');
 const roleSteps = computed(() =>
   roleWizardSteps.map((step) => ({
     key: step.key,
@@ -295,7 +297,7 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="newRole" size="lg" @close="newRole = null" icon="user-shield">
+  <BsModal v-if="newRole" :size="roleDialogSize" @close="newRole = null" icon="user-shield">
     <template #title> {{ t('settings.settingsPage.newRole') }} </template>
     <!-- its steps, above the fields and out of their scroll ; back to a step reached -->
     <template #top>
