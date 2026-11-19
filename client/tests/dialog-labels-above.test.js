@@ -51,7 +51,8 @@ describe("a list's dialogs : each label above its field", () => {
     expect(at).toBeGreaterThan(-1);
     const block = fields.slice(at, fields.indexOf('</div>\n        </div>', at));
     expect(block).toContain('<label class="form-label fw-bold d-block" :for="\'af-switch-\' + field.key">');
-    expect(block).toContain('<div class="form-check form-switch mb-0">');
+    // the switch says On or Off beside it (BsSwitch), its title above, no text of its own beside
+    expect(block).toMatch(/<BsSwitch\s+:id="'af-switch-' \+ field\.key"/);
     expect(block).not.toContain('form-check-label');
     // no switch with its label beside it and no title above (the old flush switch)
     expect(fields).not.toContain('af-flush-switch');

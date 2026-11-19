@@ -61,6 +61,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { textsMatch } from '@/lib/recordSearch';
 import { useRoute } from 'vue-router';
+import BsSwitch from './BsSwitch.vue';
 
 const { t } = useI18n();
 
@@ -514,16 +515,7 @@ defineExpose({
             class="mb-3"
           >
             <label class="form-label fw-bold af-toggle-title" :for="'tg-' + field.key">{{ field.label }}</label>
-            <div class="form-check form-switch mb-0">
-              <input
-                :id="'tg-' + field.key"
-                v-model="item[field.key]"
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                :disabled="isManaged || locked"
-              />
-            </div>
+            <BsSwitch :id="'tg-' + field.key" v-model="item[field.key]" :disabled="isManaged || locked" class="mb-0" />
             <div v-if="field.help" class="form-text">{{ field.help }}</div>
           </div>
         </template>
@@ -577,16 +569,7 @@ defineExpose({
             class="mb-3"
           >
             <label class="form-label fw-bold af-toggle-title" :for="'tg-' + field.key">{{ field.label }}</label>
-            <div class="form-check form-switch mb-0">
-              <input
-                :id="'tg-' + field.key"
-                v-model="item[field.key]"
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                :disabled="isManaged || locked"
-              />
-            </div>
+            <BsSwitch :id="'tg-' + field.key" v-model="item[field.key]" :disabled="isManaged || locked" class="mb-0" />
             <div v-if="field.help" class="form-text">{{ field.help }}</div>
           </div>
         </template>
@@ -603,16 +586,7 @@ defineExpose({
         <!-- a toggle as the switches of the MCP and chat pages : its title, the switch, its help -->
         <div v-for="field in toggleFields" :key="field.key" class="mb-3">
           <label class="form-label fw-bold af-toggle-title" :for="'tg-' + field.key">{{ field.label }}</label>
-          <div class="form-check form-switch mb-0">
-            <input
-              :id="'tg-' + field.key"
-              v-model="item[field.key]"
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              :disabled="isManaged || locked"
-            />
-          </div>
+          <BsSwitch :id="'tg-' + field.key" v-model="item[field.key]" :disabled="isManaged || locked" class="mb-0" />
           <div v-if="field.help" class="form-text">{{ field.help }}</div>
         </div>
         <template v-for="(cols, rIdx) in rows" :key="rIdx">

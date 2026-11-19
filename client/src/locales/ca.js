@@ -791,6 +791,9 @@ export default {
       'Aquesta pàgina encara executa una compilació més antiga que la del servidor. Torna a carregar la pàgina per obtenir la versió nova.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Activat',
+    switchOff: 'Desactivat',
     help: 'Ajuda',
     name: 'Nom',
     orDivider: 'o',

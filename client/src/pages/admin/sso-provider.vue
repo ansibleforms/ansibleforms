@@ -30,6 +30,7 @@ import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import Helpers from '@/lib/Helpers';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -367,16 +368,7 @@ onMounted(async () => {
                  with it, whether the login page is skipped for it -->
             <div v-for="sw in switches" v-show="fieldShown(sw.key)" :key="sw.key" class="mb-3 af-provider-switch">
               <label class="form-label fw-bold d-block" :for="'af-provider-' + sw.key">{{ sw.label }}</label>
-              <div class="form-check form-switch mb-0">
-                <input
-                  :id="'af-provider-' + sw.key"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  v-model="edit[sw.key]"
-                  :disabled="sw.disabled"
-                />
-              </div>
+              <BsSwitch :id="'af-provider-' + sw.key" v-model="edit[sw.key]" :disabled="sw.disabled" class="mb-0" />
               <div class="form-text">{{ sw.help }}</div>
             </div>
           </template>

@@ -20,6 +20,7 @@ import YAML from 'yaml';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import { varsRows, setVar, deleteVar, addVar, renameVar } from '@/config/varsFile';
+import BsSwitch from './BsSwitch.vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -156,17 +157,14 @@ defineExpose({ add: () => startAdd() });
         <span v-if="row.type === 'map' || row.type === 'seq'" class="text-muted fst-italic small align-self-center">{{
           row.type === 'map' ? t('designer.files.keysCount', row.count) : t('designer.files.itemsCount', row.count)
         }}</span>
-        <div v-else-if="row.type === 'boolean'" class="form-check form-switch align-self-center mb-0">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            role="switch"
-            :checked="row.value"
-            :disabled="readOnly"
-            :aria-label="String(row.key)"
-            @change="change(row, $event.target.checked)"
-          />
-        </div>
+        <BsSwitch
+          v-else-if="row.type === 'boolean'"
+          :model-value="row.value"
+          :disabled="readOnly"
+          :aria-label="String(row.key)"
+          @change="change(row, $event.target.checked)"
+          class="align-self-center mb-0"
+        />
         <input
           v-else
           class="form-control"

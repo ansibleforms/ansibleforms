@@ -791,6 +791,9 @@ export default {
       'Deze pagina draait nog een oudere build dan de server. Herlaad de pagina om de nieuwe versie te krijgen.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Aan',
+    switchOff: 'Uit',
     help: 'Help',
     name: 'Naam',
     orDivider: 'of',

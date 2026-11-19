@@ -41,6 +41,7 @@ import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { reloadKeepingEdits } from '@/lib/keepEdits';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -633,16 +634,7 @@ onMounted(async () => {
               <label class="form-label fw-bold d-block" for="af-sign-in">{{
                 t('settings.directory.allowSignIn')
               }}</label>
-              <div class="form-check form-switch mb-0">
-                <input
-                  id="af-sign-in"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  v-model="edit.signIn"
-                  :disabled="isAdminUser && !user.blocked"
-                />
-              </div>
+              <BsSwitch id="af-sign-in" v-model="edit.signIn" :disabled="isAdminUser && !user.blocked" class="mb-0" />
               <!-- On, then Off on its own line -->
               <div class="form-text af-help-lines">
                 {{ !edit.signIn ? t('settings.directory.blockedNote') : t('settings.users.signInHelp') }}

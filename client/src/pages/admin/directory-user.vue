@@ -37,6 +37,7 @@ import { useUserLinks } from '@/composables/useUserLinks';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -535,9 +536,7 @@ onMounted(async () => {
               <label class="form-label fw-bold d-block" for="af-sign-in">{{
                 t('settings.directory.allowSignIn')
               }}</label>
-              <div class="form-check form-switch mb-0">
-                <input id="af-sign-in" class="form-check-input" type="checkbox" role="switch" v-model="signIn" />
-              </div>
+              <BsSwitch id="af-sign-in" v-model="signIn" class="mb-0" />
               <!-- On, then Off on its own line -->
               <div class="form-text af-help-lines">
                 {{

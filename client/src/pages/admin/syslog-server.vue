@@ -29,6 +29,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -378,15 +379,7 @@ onMounted(async () => {
                   t('settings.syslogServers.enabled')
                 }}</label>
                 <!-- saved with Save, as every record's Enabled -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-syslog-enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    v-model="edit.enabled"
-                  />
-                </div>
+                <BsSwitch id="af-syslog-enabled" v-model="edit.enabled" class="mb-0" />
                 <div class="form-text">{{ t('settings.syslogServers.enabledHelp') }}</div>
               </div>
             </template>

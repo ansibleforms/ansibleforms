@@ -42,6 +42,7 @@ import {
   turnNotificationsOn,
   turnNotificationsOff,
 } from '@/lib/jobNotifications';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 // INIT
 
@@ -941,17 +942,13 @@ async function changePassword() {
               <label class="form-label fw-bold d-block" for="af-job-notifications">{{
                 t('profilePage.notifications')
               }}</label>
-              <div class="form-check form-switch mb-0">
-                <input
-                  id="af-job-notifications"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  :checked="draft.notify"
-                  :disabled="!canNotify"
-                  @change="draft.notify = $event.target.checked"
-                />
-              </div>
+              <BsSwitch
+                id="af-job-notifications"
+                :model-value="draft.notify"
+                :disabled="!canNotify"
+                @change="draft.notify = $event.target.checked"
+                class="mb-0"
+              />
               <div class="form-text">
                 {{
                   !canNotify

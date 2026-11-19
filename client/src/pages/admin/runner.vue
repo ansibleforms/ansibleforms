@@ -46,6 +46,7 @@ import { useRecordSearch } from '@/composables/useRecordSearch';
 import { reloadKeepingEdits } from '@/lib/keepEdits';
 import { askConfirm } from '@/lib/confirmPrompt';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -693,16 +694,12 @@ onMounted(async () => {
                   t('settings.runners.isDefault')
                 }}</label>
                 <!-- turned on, saved with Save ; turned off by making another the default -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-runner-default"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    v-model="edit.is_default"
-                    :disabled="!!Number(runner.is_default)"
-                  />
-                </div>
+                <BsSwitch
+                  id="af-runner-default"
+                  v-model="edit.is_default"
+                  :disabled="!!Number(runner.is_default)"
+                  class="mb-0"
+                />
                 <div class="form-text">{{ t('settings.runners.defaultHelp', { forms: defaultFor }) }}</div>
               </div>
               <div v-show="fieldShown('enabled')" class="mb-3">
@@ -710,16 +707,7 @@ onMounted(async () => {
                   t('settings.runners.enabled')
                 }}</label>
                 <!-- saved with Save, as the default ; turned off, no job goes to it -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-runner-enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    v-model="edit.enabled"
-                    :disabled="readOnly"
-                  />
-                </div>
+                <BsSwitch id="af-runner-enabled" v-model="edit.enabled" :disabled="readOnly" class="mb-0" />
                 <div class="form-text">{{ t('settings.runners.enabledHelp') }}</div>
               </div>
             </template>

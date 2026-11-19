@@ -146,6 +146,7 @@ import { inSentence } from '@/lib/inSentence';
 import { rememberRows } from '@/lib/recordButtons';
 import { tableControls } from '@/lib/listControls';
 import { askConfirm } from '@/lib/confirmPrompt';
+import BsSwitch from './BsSwitch.vue';
 
 // INIT
 
@@ -2080,16 +2081,12 @@ defineExpose({
              Enabled ; every switch so, a flush one too (every field has its title) -->
         <div v-else-if="showField(field) && field.type === 'checkbox'" class="mb-3">
           <label class="form-label fw-bold d-block" :for="'af-switch-' + field.key">{{ field.label }}</label>
-          <div class="form-check form-switch mb-0">
-            <input
-              :id="'af-switch-' + field.key"
-              v-model="$v.item[field.key].$model"
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              :disabled="!!field.readonly"
-            />
-          </div>
+          <BsSwitch
+            :id="'af-switch-' + field.key"
+            v-model="$v.item[field.key].$model"
+            :disabled="!!field.readonly"
+            class="mb-0"
+          />
           <div v-if="textOf(field.help)" class="form-text">{{ textOf(field.help) }}</div>
           <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
             <div v-for="error in $v.item[field.key].$errors" :key="error.$uid">

@@ -793,6 +793,9 @@ export default {
       'Diese Seite läuft noch mit einem älteren Build als der Server. Laden Sie die Seite neu, um die neue Version zu erhalten.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'An',
+    switchOff: 'Aus',
     help: 'Hilfe',
     name: 'Name',
     orDivider: 'oder',

@@ -99,7 +99,8 @@ describe('where it is asked', () => {
     const c = read('src/components/AppScheduleEnd.vue');
     expect(c).toMatch(/<AppEndChoice/);
     expect(c).toMatch(/<label :class="\[labelClass, 'd-block'\]" :for="uid \+ '-remove'">/);
-    expect(c).toMatch(/<div class="form-check form-switch mb-0">/);
+    // the switch says On or Off beside it
+    expect(c).toMatch(/<BsSwitch\s+:id="uid \+ '-remove'"/);
     expect(read('src/components/AppStoredJobRemoval.vue')).toMatch(/<AppEndChoice/);
   });
 

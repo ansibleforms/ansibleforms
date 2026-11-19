@@ -786,6 +786,9 @@ export default {
       'このページはサーバーより古いビルドで動作しています。ページを再読み込みして新しいバージョンを取得してください。',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'オン',
+    switchOff: 'オフ',
     help: 'ヘルプ',
     name: '名前',
     orDivider: 'または',

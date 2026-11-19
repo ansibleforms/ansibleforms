@@ -22,6 +22,7 @@ import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
 import { languages } from '@/config/languages';
 import { envEditable } from '@/composables/useEnvVars';
+import BsSwitch from './BsSwitch.vue';
 
 const props = defineProps({
   e: { type: Object, required: true },
@@ -126,16 +127,7 @@ function envHelp(e) {
     <!-- a switch : the bold title of every field above it, the switch, then the help -->
     <template v-else-if="editable && asSwitch">
       <label class="form-label fw-bold af-switch-title" :for="'sw-' + e.name">{{ e.short || e.name }}</label>
-      <div class="form-check form-switch mb-0">
-        <input
-          :id="'sw-' + e.name"
-          v-model="switchModel"
-          class="form-check-input"
-          type="checkbox"
-          role="switch"
-          :disabled="disabled"
-        />
-      </div>
+      <BsSwitch :id="'sw-' + e.name" v-model="switchModel" :disabled="disabled" class="mb-0" />
       <div v-if="envHelp(e)" class="form-text">{{ envHelp(e) }}</div>
     </template>
     <BsInput

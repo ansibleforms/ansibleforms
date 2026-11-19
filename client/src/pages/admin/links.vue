@@ -28,6 +28,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { useSeedManaged } from '@/composables/useSeedManaged';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const authenticated = ref(false);
@@ -512,15 +513,11 @@ onMounted(async () => {
                     spellcheck="false"
                   />
                 </div>
-                <div class="form-check form-switch d-flex justify-content-center mb-0">
-                  <input
-                    v-model="l.newTab"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    :aria-label="t('settings.interface.linkNewTab')"
-                  />
-                </div>
+                <BsSwitch
+                  v-model="l.newTab"
+                  :aria-label="t('settings.interface.linkNewTab')"
+                  class="d-flex justify-content-center mb-0"
+                />
                 <div class="d-flex gap-2 justify-content-end">
                   <!-- the moves : one group of outlined buttons, as tall as the fields ; blue as the page's
                        buttons when they may be pressed, grey when not -->

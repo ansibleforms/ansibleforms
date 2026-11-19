@@ -789,6 +789,9 @@ export default {
       'Ta strona nadal działa na starszej kompilacji niż serwer. Przeładuj stronę, aby uzyskać nową wersję.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Włączone',
+    switchOff: 'Wyłączone',
     help: 'Pomoc',
     name: 'Nazwa',
     orDivider: 'lub',

@@ -783,6 +783,9 @@ export default {
     cacheMismatchMsg: 'This page still runs an older build than the server. Reload the page to get the new version.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'On',
+    switchOff: 'Off',
     help: 'Help',
     name: 'Name',
     orDivider: 'or',

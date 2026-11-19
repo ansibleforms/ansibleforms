@@ -792,6 +792,9 @@ export default {
       'Esta página aún ejecuta una build más antigua que el servidor. Recarga la página para obtener la nueva versión.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Activado',
+    switchOff: 'Desactivado',
     help: 'Ayuda',
     name: 'Nombre',
     orDivider: 'o',

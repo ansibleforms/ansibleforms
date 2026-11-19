@@ -772,6 +772,9 @@ export default {
     cacheMismatchMsg: '此页面运行的构建仍比服务器的旧。请重新加载页面以获取新版本。',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: '开启',
+    switchOff: '关闭',
     help: '帮助',
     name: '名称',
     orDivider: '或',
