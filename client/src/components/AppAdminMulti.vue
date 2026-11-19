@@ -49,9 +49,9 @@
 /*      (a credential's sign-in) - its label above it, as theirs ;*/
 /*      without it a radio group is its step's whole choice, the  */
 /*      step naming it                                            */
-/*  field.flush: a switch with its label beside it, not above,    */
-/*      its help under it ; a component with its own titles in it */
-/*      (no label above it)                                       */
+/*  field.flush: a component with its own titles in it (no label */
+/*      above it, a schedule's end) ; a switch takes no notice,   */
+/*      its bold title is above it as every switch's              */
 /*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
 /*      its own, instead of field.dependency (the dropdowns'      */
 /*      lists : the credential chosen, its type)                  */
@@ -2076,25 +2076,8 @@ defineExpose({
           </div>
         </div>
 
-        <!-- A SWITCH WITH ITS LABEL BESIDE IT (flush) : no title above it, its help under it -->
-        <div
-          v-else-if="showField(field) && field.type === 'checkbox' && field.flush"
-          class="form-check form-switch af-flush-switch mb-3"
-        >
-          <input
-            :id="'af-switch-' + field.key"
-            v-model="$v.item[field.key].$model"
-            class="form-check-input"
-            type="checkbox"
-            role="switch"
-            :disabled="field.readonly"
-          />
-          <label class="form-check-label" :for="'af-switch-' + field.key">{{ field.label }}</label>
-          <div v-if="textOf(field.help)" class="form-text mt-1">{{ textOf(field.help) }}</div>
-        </div>
-
-        <!-- A SWITCH (type checkbox) : its label above it, its help under it, as a record page's
-             Enabled -->
+        <!-- A SWITCH (type checkbox) : its bold title above it, its help under it, as a record page's
+             Enabled ; every switch so, a flush one too (every field has its title) -->
         <div v-else-if="showField(field) && field.type === 'checkbox'" class="mb-3">
           <label class="form-label fw-bold d-block" :for="'af-switch-' + field.key">{{ field.label }}</label>
           <div class="form-check form-switch mb-0">

@@ -46,14 +46,16 @@ describe("a list's dialogs : each label above its field", () => {
     expect(fields).toContain(':isFloating="false"');
   });
 
-  it('puts a switch under its label, as a record page ; a flush one keeps its label beside it', () => {
+  it('puts every switch under its bold title, as a record page, a flush one too', () => {
     const at = fields.indexOf('field.type === \'checkbox\'" class="mb-3">');
     expect(at).toBeGreaterThan(-1);
     const block = fields.slice(at, fields.indexOf('</div>\n        </div>', at));
     expect(block).toContain('<label class="form-label fw-bold d-block" :for="\'af-switch-\' + field.key">');
     expect(block).toContain('<div class="form-check form-switch mb-0">');
     expect(block).not.toContain('form-check-label');
-    expect(fields).toContain('class="form-check form-switch af-flush-switch mb-3"');
+    // no switch with its label beside it and no title above (the old flush switch)
+    expect(fields).not.toContain('af-flush-switch');
+    expect(fields).not.toMatch(/field\.type === 'checkbox' && field\.flush/);
   });
 
   it('puts a New button under its label or its dropdown, on its own line', () => {
