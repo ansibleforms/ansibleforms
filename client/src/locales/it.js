@@ -1297,6 +1297,8 @@ export default {
       nameRequired: 'È richiesto un nome',
       stillHasUsers: 'Rimuovi prima i suoi utenti: un gruppo con utenti non può essere eliminato',
       noRole: 'Nessun ruolo nomina questo gruppo.',
+      usersNotAdded: 'Il gruppo è stato creato, ma questi utenti non sono stati aggiunti: {names}',
+      rolesNotGiven: 'Il gruppo è stato creato, ma senza questi ruoli: {names}',
     },
     repositories: {
       label: 'Repository',

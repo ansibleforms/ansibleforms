@@ -1290,6 +1290,8 @@ export default {
       nameRequired: '名前が必要です',
       stillHasUsers: '先にユーザーを削除してください: ユーザーがいるグループは削除できません',
       noRole: 'このグループを指定するロールはありません。',
+      usersNotAdded: 'グループは作成されましたが、次のユーザーは追加されませんでした: {names}',
+      rolesNotGiven: 'グループは作成されましたが、次のロールは付与されませんでした: {names}',
     },
     repositories: {
       label: 'リポジトリ',

@@ -1293,6 +1293,8 @@ export default {
       nameRequired: 'Nazwa jest wymagana',
       stillHasUsers: 'Najpierw usuń jej użytkowników: grupy z użytkownikami nie można usunąć',
       noRole: 'Żadna rola nie wymienia tej grupy.',
+      usersNotAdded: 'Grupa została utworzona, ale tych użytkowników nie dodano: {names}',
+      rolesNotGiven: 'Grupa została utworzona, ale bez tych ról: {names}',
     },
     repositories: {
       label: 'Repozytorium',

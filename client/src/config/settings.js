@@ -932,6 +932,15 @@ export default function getSettings(t) {
       ],
       // the LDAP and SSO groups beside the local ones (seen at a sign-in, or named by a role)
       listQuery: '?directory=1',
+      // New in steps : what the group is, its users, its roles (pages/admin/groups.vue gives the
+      // users and roles to pick from, and adds those picked once the group is created)
+      steps: [
+        { key: 'details', label: t('settings.common.tabDetails') },
+        { key: 'users', label: t('settings.settingsPage.users'), count: (item) => (item.user_ids || []).length },
+        { key: 'roles', label: t('settings.settingsPage.roles'), count: (item) => (item.role_names || []).length },
+      ],
+      // the users and roles picked are not the group's own fields : added after it is created
+      beforeSave: ({ user_ids: _users, role_names: _roles, ...group }) => group,
       // a group has its own page (pages/admin/group.vue ; an LDAP or SSO group's
       // pages/admin/directory-group.vue) : its row and Edit open it, New the dialog
       openPage: (item) =>
@@ -997,6 +1006,49 @@ export default function getSettings(t) {
           required: false,
           filterable: true,
           icon: 'info-circle',
+        },
+        // the New wizard's Users step : the local users to put in the group, each in its dropdown
+        // (AppPickList) ; the dialog only, added once the group is created
+        {
+          key: 'user_ids',
+          step: 'users',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.user_ids || [],
+            icon: 'user',
+            addLabel: t('settings.settingsPage.addUser'),
+            emptyText: t('settings.groups.noUsers'),
+            'onUpdate:modelValue': (v) => {
+              item.user_ids = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
+        },
+        // the New wizard's Roles step : the roles to give the group, as its users
+        {
+          key: 'role_names',
+          step: 'roles',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.role_names || [],
+            icon: 'user-shield',
+            addLabel: t('settings.settingsPage.addRole'),
+            emptyText: t('settings.groups.noRole'),
+            'onUpdate:modelValue': (v) => {
+              item.role_names = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
         },
         // how many users are in the group (the server counts them) : a column, last, to the right
         {

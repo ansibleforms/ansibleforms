@@ -16,7 +16,7 @@ import { EVERYONE_ROLES } from '@/composables/useRoleSupport';
  * The roles a user or a group can be added to or removed from, from its page.
  *
  * Returns:
- *   object: { roleNames, readOnly, ready, addTo, removeFrom }.
+ *   object: { roleNames, readOnly, ready, addTo, addToAll, removeFrom }.
  */
 export function useRoleMembership() {
   const { roles, load, save, nextUid, parseError, isTemplated, loadError } = useFormsConfig();
@@ -70,6 +70,34 @@ export function useRoleMembership() {
   }
 
   /**
+   * Names a user or a group in several roles, in one save (a new group's roles).
+   *
+   * Args:
+   *   roleNames (string[]): the roles.
+   *   kind (string): users or groups.
+   *   provider (string): where it comes from (local, ldap, azuread, oidc).
+   *   name (string): its name, as the roles name it.
+   *
+   * Returns:
+   *   Promise<boolean>: whether it was saved.
+   */
+  async function addToAll(roleNames, kind, provider, name) {
+    await ready();
+    const added = [];
+    for (const role of roles.value) {
+      if (!roleNames.includes(role.name)) continue;
+      if (role[kind].some((e) => e.provider === provider && e.name === name)) continue;
+      const entry = { _uid: nextUid(), provider, name };
+      role[kind].push(entry);
+      added.push([role, entry]);
+    }
+    if (!added.length || (await saveRoles())) return true;
+    // refused : the roles as they were
+    for (const [role, entry] of added) role[kind].splice(role[kind].indexOf(entry), 1);
+    return false;
+  }
+
+  /**
    * Takes a user or a group out of roles, and saves.
    *
    * Args:
@@ -97,5 +125,5 @@ export function useRoleMembership() {
   // read at once : Add role offers them as soon as the page shows
   ready();
 
-  return { roleNames, readOnly, ready, addTo, removeFrom };
+  return { roleNames, readOnly, ready, addTo, addToAll, removeFrom };
 }

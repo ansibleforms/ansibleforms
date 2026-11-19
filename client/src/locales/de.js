@@ -1302,6 +1302,8 @@ export default {
       nameRequired: 'Ein Name ist erforderlich',
       stillHasUsers: 'Zuerst die Benutzer entfernen: eine Gruppe mit Benutzern kann nicht gelöscht werden',
       noRole: 'Keine Rolle nennt diese Gruppe.',
+      usersNotAdded: 'Die Gruppe wurde erstellt, diese Benutzer aber nicht hinzugefügt: {names}',
+      rolesNotGiven: 'Die Gruppe wurde erstellt, diese Rollen aber nicht vergeben: {names}',
     },
     repositories: {
       label: 'Repository',

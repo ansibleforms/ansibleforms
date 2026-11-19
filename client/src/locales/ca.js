@@ -1299,6 +1299,8 @@ export default {
       nameRequired: 'Cal un nom',
       stillHasUsers: 'Treu primer els seus usuaris: un grup amb usuaris no es pot suprimir',
       noRole: 'Cap rol no anomena aquest grup.',
+      usersNotAdded: "El grup s'ha creat, però aquests usuaris no s'hi han afegit: {names}",
+      rolesNotGiven: "El grup s'ha creat, però sense aquests rols: {names}",
     },
     repositories: {
       label: 'Repositori',

@@ -1266,6 +1266,8 @@ export default {
       nameRequired: '需要名称',
       stillHasUsers: '请先移除其用户：有用户的组无法删除',
       noRole: '没有角色指定此组。',
+      usersNotAdded: '组已创建，但未添加这些用户：{names}',
+      rolesNotGiven: '组已创建，但未授予这些角色：{names}',
     },
     repositories: {
       label: '仓库',

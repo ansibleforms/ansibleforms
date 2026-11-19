@@ -14,9 +14,11 @@
 /*      preview: Object                                           */
 /*      trigger: Object                                           */
 /*                                                                */
-/*  settings.steps: [{ key, label, when, dialogSize }] - the      */
-/*      record dialog in steps (a wizard) : a field names its     */
+/*  settings.steps: [{ key, label, when, dialogSize, count }] -   */
+/*      the record dialog in steps (a wizard) : a field names its */
 /*      step (field.step, the first one when it names none) ;     */
+/*      count(item) puts a number beside a step's label (a new    */
+/*      group's users picked) ;                                   */
 /*      when(item) keeps a step to the records it applies to ;    */
 /*      dialogSize widens the dialog on it. Creating walks the    */
 /*      steps with Previous / Next and saves on the last ;        */
@@ -92,8 +94,10 @@
 /*  settings.confirmSave: async (body, original) => Boolean - a   */
 /*      question before a create (original null) or an update ;   */
 /*      false saves nothing (a repository's object usages)        */
-/*  settings.afterSave: (answer) => void - after a create, an     */
-/*      update or a delete, with the server's answer              */
+/*  settings.afterSave: (answer, values) => void|Promise - after  */
+/*      a create, an update or a delete, with the server's answer */
+/*      ; a create's is waited for before the list is read again, */
+/*      and gets the dialog's values too (a new group's users)    */
 /*  settings.confirmDelete: async (item) => Boolean|null - a      */
 /*      question of its own before a delete ; null asks the usual */
 /*  field.type 'usage': a repository's usage types under their    */
@@ -669,7 +673,9 @@ async function createItem() {
     try {
       const res = await axios.post(`/api/v${props.apiVersion}/${objectType}/`, body);
       toast.success(t('settings.common.nameCreated', { name: objectTitle('') }));
-      props.settings.afterSave?.(res.data);
+      // waited for, with the dialog's values : what it adds to the record (a new group's users
+      // and roles) is in the list read after it
+      await props.settings.afterSave?.(res.data, item.value);
       // the dialog that asked for it (a dropdown's New button) selects what was created
       emit('created', item.value.name ?? item.value[idKey]);
       if (props.dialogOnly) unselectItem();
@@ -1974,6 +1980,9 @@ defineExpose({
             ><FaIcon v-if="i < stepIndex" icon="check" /><template v-else>{{ i + 1 }}</template></span
           >
           <span class="af-wizard-label">{{ step.label }}</span>
+          <span v-if="typeof step.count === 'function'" class="badge af-wizard-count">{{
+            step.count(item || {})
+          }}</span>
         </li>
       </ol>
     </template>
@@ -2363,6 +2372,13 @@ defineExpose({
 .af-wizard-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* the count of a step : small and grey, as the tabs' counts (AppWizardSteps) */
+.af-wizard-count {
+  flex-shrink: 0;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
 }
 /* .af-taken, .af-short-check and .af-short-label : global (styles/bootstrap-override.scss) */
 /* a follow-up radio group : indented to the labels of the group above, its title small and

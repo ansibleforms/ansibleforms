@@ -1297,6 +1297,8 @@ export default {
       nameRequired: 'Een naam is verplicht',
       stillHasUsers: 'Verwijder eerst de gebruikers: een groep met gebruikers kan niet worden verwijderd',
       noRole: 'Geen rol noemt deze groep.',
+      usersNotAdded: 'De groep is gemaakt, maar deze gebruikers zijn niet toegevoegd: {names}',
+      rolesNotGiven: 'De groep is gemaakt, maar zonder deze rollen: {names}',
     },
     repositories: {
       label: 'Repository',

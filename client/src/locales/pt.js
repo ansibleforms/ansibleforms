@@ -1299,6 +1299,8 @@ export default {
       nameRequired: 'É necessário um nome',
       stillHasUsers: 'Remova primeiro os seus utilizadores: um grupo com utilizadores não pode ser eliminado',
       noRole: 'Nenhuma função nomeia este grupo.',
+      usersNotAdded: 'O grupo foi criado, mas estes utilizadores não foram adicionados: {names}',
+      rolesNotGiven: 'O grupo foi criado, mas sem estas funções: {names}',
     },
     repositories: {
       label: 'Repositório',
