@@ -19,6 +19,8 @@ import { taskName, taskDescription, taskTiming, taskTimingCell, runDuration } fr
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(path.join(here, '..', p), 'utf8');
 const sidebar = read('src/components/AppJobsSidebar.vue');
+const menuCounts = read('src/lib/jobsMenuCounts.js');
+const nav = read('src/components/AppNav.vue');
 const page = withoutComments(read('src/pages/system-task.vue'));
 const LANGUAGES = ['en', 'de', 'fr', 'it', 'es', 'nl', 'ca', 'pt', 'ja', 'zh', 'pl'];
 // the tasks the server declares (server/src/lib/systemTasks.js SYSTEM_TASKS)
@@ -35,17 +37,41 @@ describe('the Jobs menu', () => {
     const links = [...future.matchAll(/link: '([^']+)'/g)].map((m) => m[1]);
     expect(links).toEqual(['/jobs/scheduled', '/jobs/stored', '/jobs/system']);
     expect(future).toMatch(/title: t\('jobs\.menu\.system'\),\s*icon: 'gears',/);
-    expect(future).toMatch(/badge: futureCounts\.value\.system,/);
+    expect(future).toMatch(/badge: badgesShown\.value \? futureCounts\.value\.system : null,/);
     // the count : the tasks the api lists
-    expect(sidebar).toMatch(/show\('system', '\/jobs\/system', '\/api\/v2\/system\/tasks'\)/);
+    expect(menuCounts).toMatch(/show\('system', '\/jobs\/system', '\/api\/v2\/system\/tasks'\)/);
+  });
+
+  it('shows every badge of the menu at once, the jobs counts and the future ones all known', () => {
+    expect(sidebar).toMatch(
+      /const badgesShown = computed\(\(\) => \(!can\('showJobs'\) \|\| countsKnown\.value\) && futureKnown\.value\)/,
+    );
+    // each badge, past, present and future : a grey pill until then
+    expect((sidebar.match(/badgeLoading: !badgesShown\.value,/g) || []).length).toBe(4);
   });
 
   it('shows each future count as soon as its own answer comes, a slow one holding up no other', () => {
-    expect(sidebar).toMatch(/futureCounts\.value = \{ \.\.\.futureCounts\.value, \[key\]: count \}/);
-    expect(sidebar).toMatch(/show\('schedules', '\/jobs\/scheduled', '\/api\/v2\/schedule\/'\)/);
-    expect(sidebar).toMatch(/show\('stored', '\/jobs\/stored', '\/api\/v2\/stored-jobs\/'\)/);
+    expect(menuCounts).toMatch(/counts\.value = \{ \.\.\.counts\.value, \[key\]: count \}/);
+    expect(menuCounts).toMatch(/show\('schedules', '\/jobs\/scheduled', '\/api\/v2\/schedule\/'\)/);
+    expect(menuCounts).toMatch(/show\('stored', '\/jobs\/stored', '\/api\/v2\/stored-jobs\/'\)/);
     // not all three set together once the slowest has answered
-    expect(sidebar).not.toMatch(/futureCounts\.value = \{ schedules, stored, system \}/);
+    expect(menuCounts).not.toMatch(/= \{ schedules, stored, system \}/);
+  });
+
+  it('has its counts read as the user enters the site, not when a jobs page opens', () => {
+    // the header, on every page, starts it once the user's options are known
+    expect(nav).toMatch(/import \{ preloadJobsMenu \} from '@\/lib\/jobsMenuCounts'/);
+    expect(nav).toMatch(
+      /watch\(\s*\(\) => store\.profile\?\.options,\s*\(options\) => preloadJobsMenu\(options\),\s*\{ immediate: true \}/,
+    );
+    // into the menu's memory, which the menu reads : the same counts, forgotten at logout
+    expect(sidebar).toMatch(/const lastJobs = lastJobsRef\(\);/);
+    expect(sidebar).toMatch(/const futureCounts = futureCountsRef\(\);/);
+    expect(menuCounts).toMatch(/return remembered\('jobs', null\);/);
+    expect(menuCounts).toMatch(/return remembered\('jobsFuture',/);
+    // once : not again while something is read, nor when it was read already
+    expect(menuCounts).toMatch(/if \(preloading\) return preloading;/);
+    expect(menuCounts).toMatch(/if \(!needJobs && !needFuture\) return Promise\.resolve\(\);/);
   });
 
   it('shows it to an admin only : the route asks for the settings, as the api', () => {

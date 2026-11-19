@@ -30,6 +30,7 @@ function setLanguage(code) {
 
 import axios from 'axios';
 import { useLiveEvent } from '@/composables/useLiveEvent';
+import { preloadJobsMenu } from '@/lib/jobsMenuCounts';
 import { jobsPath } from '@/lib/jobsPath';
 import { iconOrDefault } from '@/lib/iconName';
 import { useRouter } from 'vue-router';
@@ -81,6 +82,13 @@ function refreshRunnerApprovals() {
 useLiveEvent('runners', refreshRunnerApprovals);
 onMounted(refreshRunnerApprovals);
 watch(() => store.profile, refreshRunnerApprovals);
+// the Jobs menu's counts, read as the user enters the site (lib/jobsMenuCounts.js) : the jobs
+// pages open with every badge already there. Once per sign-in, the menu keeps them fresh after
+watch(
+  () => store.profile?.options,
+  (options) => preloadJobsMenu(options),
+  { immediate: true },
+);
 // the bell : jobs and runners waiting for approval. One kind waiting (or none) : the bell opens its
 // page ; both : a menu with each and its count
 const bellItems = computed(() =>

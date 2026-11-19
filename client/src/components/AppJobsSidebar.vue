@@ -33,7 +33,11 @@ import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { useAppStore } from '@/stores/app';
 import { mayOpen } from '@/lib/routePermission';
-import { remembered } from '@/lib/menuMemory';
+import {
+  lastJobs as lastJobsRef,
+  futureCounts as futureCountsRef,
+  loadFutureCounts as readFutureCounts,
+} from '@/lib/jobsMenuCounts';
 import { useLiveEvent } from '@/composables/useLiveEvent';
 
 // PROPS
@@ -62,7 +66,7 @@ const ownJobs = ref([]);
 const ownLoaded = ref(false);
 // the jobs counted last in this tab (lib/menuMemory.js) : the counts while the page's own jobs
 // load, instead of zeros then the numbers
-const lastJobs = remembered('jobs', null);
+const lastJobs = lastJobsRef();
 const pageJobs = computed(() => props.jobs ?? ownJobs.value);
 const ready = computed(() => (props.jobs !== null ? props.loaded : ownLoaded.value));
 const countedJobs = computed(() => (ready.value ? pageJobs.value : (lastJobs.value ?? pageJobs.value)));
@@ -80,7 +84,7 @@ watch(
 // the future jobs' counts : the schedules and the stored jobs the user may see, and the app's own
 // maintenance tasks for an admin (undefined until read : a grey pill ; null when they could not be
 // read : none ; then the count of last time while they are read again)
-const futureCounts = remembered('jobsFuture', { schedules: undefined, stored: undefined, system: undefined });
+const futureCounts = futureCountsRef();
 
 // the statuses of the menu, with their names and icons, in the same order and with the
 // same icons as the jobs list's page titles (pages/jobs.vue). The labels are spelled out,
@@ -114,6 +118,11 @@ function pick(status) {
 // the jobs in time : the past ones (ended), the present ones (running, waiting for an approval)
 // and the future ones (on a schedule, or stored to be submitted again). Every job is at the
 // header's Jobs link (/jobs/all).
+// every badge shown at once : the jobs' counts and the future ones all known (each future count
+// is read, or null when the user may not open its page), grey pills until then
+const futureKnown = computed(() => Object.values(futureCounts.value).every((v) => v !== undefined));
+const badgesShown = computed(() => (!can('showJobs') || countsKnown.value) && futureKnown.value);
+
 const sections = computed(() => {
   const sections = [];
   if (can('showJobs')) {
@@ -123,10 +132,10 @@ const sections = computed(() => {
       list.map((m) => ({
         title: m.label(),
         icon: m.icon,
-        badge: countsKnown.value ? count(m.status) : null,
-        badgeLoading: !countsKnown.value,
+        badge: badgesShown.value ? count(m.status) : null,
+        badgeLoading: !badgesShown.value,
         // a job waiting for approval needs someone : its count stands out, in the orange of its status
-        badgeAlert: countsKnown.value && m.status === 'approve' && count(m.status) > 0,
+        badgeAlert: badgesShown.value && m.status === 'approve' && count(m.status) > 0,
         active: isJobsList.value && props.status === m.status,
         action: () => pick(m.status),
       }));
@@ -140,15 +149,15 @@ const sections = computed(() => {
       title: t('jobs.menu.scheduled'),
       icon: 'clock',
       link: '/jobs/scheduled',
-      badge: futureCounts.value.schedules,
-      badgeLoading: futureCounts.value.schedules === undefined,
+      badge: badgesShown.value ? futureCounts.value.schedules : null,
+      badgeLoading: !badgesShown.value,
     },
     {
       title: t('jobs.menu.stored'),
       icon: 'floppy-disk',
       link: '/jobs/stored',
-      badge: futureCounts.value.stored,
-      badgeLoading: futureCounts.value.stored === undefined,
+      badge: badgesShown.value ? futureCounts.value.stored : null,
+      badgeLoading: !badgesShown.value,
     },
     // the app's own maintenance tasks (the job retention, the nightly backup ...) : an admin's,
     // as their route says (showSettings)
@@ -156,8 +165,8 @@ const sections = computed(() => {
       title: t('jobs.menu.system'),
       icon: 'gears',
       link: '/jobs/system',
-      badge: futureCounts.value.system,
-      badgeLoading: futureCounts.value.system === undefined,
+      badge: badgesShown.value ? futureCounts.value.system : null,
+      badgeLoading: !badgesShown.value,
     },
   ].filter((i) => mayOpen(i.link, store.profile?.options));
   if (future.length) sections.push({ title: t('jobs.menu.future'), items: future });
@@ -180,32 +189,10 @@ async function loadCounts() {
 }
 
 /**
- * Reads how many schedules and stored jobs the user has, and how many maintenance tasks the app
- * runs, for the Future badges : only those the user may open (the same role options as their
- * pages).
+ * Reads the Future badges' counts again (lib/jobsMenuCounts.js), as the user may see them.
  */
-async function loadFutureCounts() {
-  const options = store.profile?.options;
-  const read = async (link, url) => {
-    if (!mayOpen(link, options)) return null;
-    try {
-      const result = await axios.get(url);
-      return result.data?.count ?? result.data?.records?.length ?? null;
-    } catch {
-      // a hint : without it the menu still works
-      return null;
-    }
-  };
-  // each count shown as soon as its own answer comes : a slow one never holds up the others
-  const show = (key, link, url) =>
-    read(link, url).then((count) => {
-      futureCounts.value = { ...futureCounts.value, [key]: count };
-    });
-  await Promise.all([
-    show('schedules', '/jobs/scheduled', '/api/v2/schedule/'),
-    show('stored', '/jobs/stored', '/api/v2/stored-jobs/'),
-    show('system', '/jobs/system', '/api/v2/system/tasks'),
-  ]);
+function loadFutureCounts() {
+  return readFutureCounts(store.profile?.options);
 }
 
 // MOUNT
