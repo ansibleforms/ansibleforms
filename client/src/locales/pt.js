@@ -3102,7 +3102,6 @@ export default {
     status: 'Estado',
     startTime: 'Hora de início',
     endTime: 'Hora de fim',
-    user: 'utilizador',
     jobTitle: 'Tarefa {id}',
     output: 'Saída',
     launchedBy: 'Iniciado por',

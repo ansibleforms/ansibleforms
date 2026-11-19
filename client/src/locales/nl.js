@@ -3095,7 +3095,6 @@ export default {
     status: 'Status',
     startTime: 'Starttijd',
     endTime: 'Eindtijd',
-    user: 'gebruiker',
     jobTitle: 'Job {id}',
     output: 'Uitvoer',
     launchedBy: 'Gestart door',

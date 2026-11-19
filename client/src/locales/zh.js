@@ -2980,7 +2980,6 @@ export default {
     status: '状态',
     startTime: '开始时间',
     endTime: '结束时间',
-    user: '用户',
     jobTitle: '作业 {id}',
     output: '输出',
     launchedBy: '启动者',

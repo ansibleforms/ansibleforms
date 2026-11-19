@@ -3116,7 +3116,6 @@ export default {
     status: 'Status',
     startTime: 'Startzeit',
     endTime: 'Endzeit',
-    user: 'Benutzer',
     jobTitle: 'Job {id}',
     output: 'Ausgabe',
     launchedBy: 'Gestartet von',

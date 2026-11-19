@@ -3063,7 +3063,6 @@ export default {
     status: 'Status',
     startTime: 'Start Time',
     endTime: 'End Time',
-    user: 'user',
     jobTitle: 'Job {id}',
     output: 'Output',
     launchedBy: 'Launched By',

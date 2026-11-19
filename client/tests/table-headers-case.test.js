@@ -103,3 +103,18 @@ describe("the job tables' column headers", () => {
     expect(TABLES.schedules).not.toContain('settings.fields.lastRun');
   });
 });
+
+describe('the old user header (jobs.user)', () => {
+  it('is gone from every language : the user column is headed Launched By', () => {
+    for (const lang of LANGS) expect(locales[lang].jobs, lang).not.toHaveProperty('user');
+    for (const file of [
+      'pages/jobs.vue',
+      'pages/schedule.vue',
+      'pages/stored-job.vue',
+      'pages/admin/runner.vue',
+      'composables/useUserLinks.js',
+    ]) {
+      expect(read(file), file).not.toMatch(/jobs\.user\b/);
+    }
+  });
+});

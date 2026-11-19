@@ -3084,7 +3084,6 @@ export default {
     status: 'Stan',
     startTime: 'Czas rozpoczęcia',
     endTime: 'Czas zakończenia',
-    user: 'użytkownik',
     jobTitle: 'Zadanie {id}',
     output: 'Wynik',
     launchedBy: 'Uruchomione przez',

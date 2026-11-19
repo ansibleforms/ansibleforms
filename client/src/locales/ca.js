@@ -3104,7 +3104,6 @@ export default {
     status: 'Estat',
     startTime: "Hora d'inici",
     endTime: 'Hora de finalització',
-    user: 'usuari',
     jobTitle: 'Tasca {id}',
     output: 'Sortida',
     launchedBy: 'Llançat per',

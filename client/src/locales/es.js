@@ -3104,7 +3104,6 @@ export default {
     status: 'Estado',
     startTime: 'Hora de inicio',
     endTime: 'Hora de finalización',
-    user: 'usuario',
     jobTitle: 'Trabajo {id}',
     output: 'Salida',
     launchedBy: 'Lanzado por',

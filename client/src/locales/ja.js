@@ -3060,7 +3060,6 @@ export default {
     status: 'ステータス',
     startTime: '開始時刻',
     endTime: '終了時刻',
-    user: 'ユーザー',
     jobTitle: 'ジョブ {id}',
     output: '出力',
     launchedBy: '実行者',

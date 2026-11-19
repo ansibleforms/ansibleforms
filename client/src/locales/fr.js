@@ -3109,7 +3109,6 @@ export default {
     status: 'Statut',
     startTime: 'Heure de début',
     endTime: 'Heure de fin',
-    user: 'utilisateur',
     jobTitle: 'Job {id}',
     output: 'Sortie',
     launchedBy: 'Lancé par',
