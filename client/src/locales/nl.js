@@ -2330,7 +2330,7 @@ export default {
       icon: 'Icoon',
       groups: 'Groepen',
       users: 'Gebruikers',
-      options: 'Opties',
+      permissions: 'Rechten',
       key: 'Sleutel',
       value: 'Waarde',
       addCategory: 'Categorie toevoegen',

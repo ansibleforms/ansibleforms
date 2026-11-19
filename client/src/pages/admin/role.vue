@@ -2,7 +2,7 @@
 /******************************************************************/
 /*                                                                */
 /*  A role's page (/settings/roles/<name>), opened from the roles    */
-/*  list : its Details tab (name and options), its Users, its     */
+/*  list : its Details tab (name and permissions), its Users, its */
 /*  Groups and the Forms that name it, the tab kept in the        */
 /*  address (/users). Saving writes                               */
 /*  the forms config, as the list does ; a renamed role's page    */
@@ -79,7 +79,7 @@ const userCount = computed(() => {
 });
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
-// Details (the name, its description and the options), Users, Groups, Forms ; the tab kept in
+// Details (the name, its description and the permissions), Users, Groups, Forms ; the tab kept in
 // the url. Default has no count of users or groups : it is everyone's.
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
@@ -279,7 +279,7 @@ const detailsMatch = computed(() =>
   matches(
     t('settings.settingsPage.name'),
     t('settings.fields.description'),
-    t('settings.settingsPage.options'),
+    t('settings.settingsPage.permissions'),
     ...roleOptionGroups.map((g) => t(g.title)),
     ...roleOptionKeys.map((k) => roleOptionLabel(k)),
   ),
@@ -427,7 +427,7 @@ onMounted(async () => {
         <!-- the role loading : its fields as grey placeholders, where they come -->
         <AppSkeleton v-else-if="!loaded && !role" shape="form" :count="3" />
         <template v-if="role && !loadError">
-          <!-- Details : the name, its description and the options -->
+          <!-- Details : the name, its description and the permissions -->
           <template v-if="tabShown('details')">
             <h6
               v-if="searching && searchHead('details')"

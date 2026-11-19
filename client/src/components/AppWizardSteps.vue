@@ -7,7 +7,8 @@
 /*  The look of the list pages' wizards (AppAdminMulti).          */
 /*                                                                */
 /*  @props:                                                       */
-/*      steps: Array - [{ key, label }]                           */
+/*      steps: Array - [{ key, label, count }] ; count, optional, */
+/*         a number shown beside the label (a role's users)       */
 /*      current: Number - the step shown                          */
 /*      reached: Number - the furthest step reached (clickable    */
 /*         up to it)                                              */
@@ -45,6 +46,7 @@ function go(i) {
         ><FaIcon v-if="i < current" icon="check" /><template v-else>{{ i + 1 }}</template></span
       >
       <span class="af-wizard-label">{{ step.label }}</span>
+      <span v-if="step.count !== undefined && step.count !== null" class="badge af-wizard-count">{{ step.count }}</span>
     </li>
   </ol>
 </template>
@@ -98,5 +100,12 @@ function go(i) {
 .af-wizard-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* the count of a step : small and grey, as the tabs' counts */
+.af-wizard-count {
+  flex-shrink: 0;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
 }
 </style>

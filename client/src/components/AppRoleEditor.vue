@@ -1,11 +1,12 @@
 <script setup>
 /******************************************************************/
 /*                                                                */
-/*  One role of the forms config, in three tabs : General (its    */
-/*  name and options), Users and Groups (each with the auth       */
-/*  provider it comes from). Shown under an opened role of the    */
-/*  roles page, and in the New role dialog. The role is edited    */
-/*  in place.                                                     */
+/*  One role of the forms config : its name, its description, its */
+/*  permissions (the role options), its users and its groups      */
+/*  (each with the auth provider it comes from). Shown in the     */
+/*  Details tab of a role's page (name, description and           */
+/*  permissions), and one step at a time in the New role wizard.  */
+/*  The role is edited in place.                                  */
 /*                                                                */
 /*  @model role: the role edited ({ _uid, _required, _default,     */
 /*      name, groups, users, options })                           */
@@ -19,13 +20,18 @@
 /*      optionKeys: Array - the role options, in their order      */
 /*      optionLabel: Function - an option's label                 */
 /*      nextUid: Function - a new _uid for a group or a user      */
-/*      tab: String - the tab shown, chosen by the page (its tabs */
-/*         in its title line, the role's page) : no tab strip of  */
-/*         its own then                                           */
+/*      tab: String - the role's page tab shown : 'general', its  */
+/*         name, description and permissions (the page has its    */
+/*         own tables of users and groups)                        */
+/*      step: String - the New role wizard's step shown (config/  */
+/*         roles.js roleWizardSteps) : details, permissions,      */
+/*         users or groups                                        */
+/*      nameError: String - why the name cannot be saved, shown   */
+/*         under it ('' : none)                                   */
 /*                                                                */
 /******************************************************************/
 
-import { ref, computed, h } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   requiredRoleDescription,
@@ -46,6 +52,8 @@ const props = defineProps({
   optionLabel: { type: Function, required: true },
   nextUid: { type: Function, required: true },
   tab: { type: String, default: '' },
+  step: { type: String, default: '' },
+  nameError: { type: String, default: '' },
 });
 
 // the options in their groups (config/roles.js), each with its title, only those the page passes
@@ -108,12 +116,6 @@ const optionGroups = computed(() => {
   return groups;
 });
 
-// what holds the tabs' content : under the editor's own tab strip (a dialog), a card the tabs
-// open into, as a settings page's ; with the page's tabs (tab given), the content as it is
-const TabCard = (_, { slots }) =>
-  h('div', { class: 'card tab-card-flush-card' }, [h('div', { class: 'card-body' }, slots.default?.())]);
-const Bare = (_, { slots }) => slots.default?.();
-
 const role = defineModel('role', { type: Object, required: true });
 // a user or a group removed (its X) : the page may save at once
 const emit = defineEmits(['removed']);
@@ -128,30 +130,12 @@ const adminFixed = computed(() => (role.value._required ? !role.value._default :
 // of its Admin option : its options stay as they are (composables/useAdminDefaults.js)
 useAdminDefaults(role);
 
-// ─── tabs ─────────────────────────────────────────────────────────────────────
-// the role in three tabs : General (its name and options), its users and its groups, each of
-// those with its count (the default role is everyone's : no count)
-const ownTab = ref('general');
-// the page's tab when it chooses one, else the editor's own strip
-const activeTab = computed({
-  get: () => props.tab || ownTab.value,
-  set: (key) => (ownTab.value = key),
-});
-const tabs = computed(() => [
-  { key: 'general', label: t('settings.common.tabDetails'), icon: 'sliders' },
-  {
-    key: 'users',
-    label: t('settings.settingsPage.users'),
-    icon: 'user',
-    count: role.value._default ? undefined : role.value.users.length,
-  },
-  {
-    key: 'groups',
-    label: t('settings.settingsPage.groups'),
-    icon: 'users',
-    count: role.value._default ? undefined : role.value.groups.length,
-  },
-]);
+// ─── what is shown ────────────────────────────────────────────────────────────
+// the role's page tab (general : the name, the description and the permissions) or the wizard's
+// step (details : the name and the description ; permissions ; users ; groups)
+const section = computed(() => props.tab || props.step || 'details');
+const showsDetails = computed(() => ['general', 'details'].includes(section.value));
+const showsPermissions = computed(() => ['general', 'permissions'].includes(section.value));
 
 // ─── groups and users ─────────────────────────────────────────────────────────
 
@@ -205,19 +189,11 @@ function removeUser(index) {
 </script>
 
 <template>
-  <!-- three tabs : the role itself (its name and options), its users, its groups -->
-  <ul v-if="!tab" class="nav nav-tabs af-role-tabs mb-0">
-    <li v-for="tab in tabs" :key="tab.key" class="nav-item">
-      <a class="nav-link" :class="{ active: activeTab === tab.key }" href="#" @click.prevent="activeTab = tab.key"
-        ><FaIcon :icon="tab.icon" class="me-1" />{{ tab.label
-        }}<span v-if="tab.count !== undefined" class="badge af-role-tab-count ms-2">{{ tab.count }}</span></a
-      >
-    </li>
-  </ul>
-
-  <component :is="tab ? Bare : TabCard">
-    <!-- General : the name and the options -->
-    <template v-if="activeTab === 'general'">
+  <!-- the steps' content as it is, straight in the dialog's body or the page's tab : a field last
+       ends at the dialog's padding -->
+  <!-- Details : the name and the description (on the role's page, the permissions under them) -->
+  <template v-if="showsDetails || showsPermissions">
+    <template v-if="showsDetails">
       <BsInput
         class="af-role-name"
         :isFloating="false"
@@ -226,6 +202,8 @@ function removeUser(index) {
         :label="t('settings.settingsPage.name')"
         :placeholder="t('settings.settingsPage.roleNamePlaceholder')"
         :disabled="role._required || readOnly"
+        :hasError="!!nameError"
+        :errors="nameError ? [nameError] : []"
       />
       <!-- admin and default : a fixed description, greyed out as their name -->
       <BsInput
@@ -247,8 +225,10 @@ function removeUser(index) {
         :placeholder="t('settings.settingsPage.roleDescriptionPlaceholder')"
         :disabled="readOnly"
       />
-      <label class="form-label fw-bold af-role-options-title">{{ t('settings.settingsPage.options') }}</label>
-      <!-- the options in their groups (config/roles.js), each under its title -->
+    </template>
+    <template v-if="showsPermissions">
+      <label class="form-label fw-bold af-role-options-title">{{ t('settings.settingsPage.permissions') }}</label>
+      <!-- the permissions (the role options) in their groups (config/roles.js), each under its title -->
       <div v-for="group in optionGroups" :key="group.name" class="af-role-option-group">
         <div class="af-role-option-group-title">{{ group.title }}</div>
         <div class="row row-cols-2 row-cols-md-3 g-0 role-options">
@@ -298,92 +278,92 @@ function removeUser(index) {
         </div>
       </div>
     </template>
+  </template>
 
-    <!-- Users : the users of the role, each with the provider they sign in with -->
-    <template v-else-if="activeTab === 'users'">
-      <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
-      <p v-else-if="!tab && role.users.length === 0" class="text-muted small mb-3">
-        {{ t('settings.settingsPage.roleNoUsers') }}
-      </p>
-      <div v-for="(usr, uIdx) in tab ? [] : role.users" :key="usr._uid" class="d-flex align-items-center gap-2 mb-2">
-        <div class="input-group">
-          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="user" /></span>
-          <select
-            class="form-select provider-select"
-            v-model="usr.provider"
-            :disabled="readOnly || role._default"
-            @change="onProviderChange(usr, 'user')"
-          >
-            <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-          </select>
-          <select
-            v-if="usr.provider === 'local'"
-            class="form-select"
-            v-model="usr.name"
-            :disabled="readOnly || role._default"
-          >
-            <option v-for="u in localUsers" :key="u" :value="u">{{ u }}</option>
-          </select>
-          <input
-            v-else
-            class="form-control"
-            v-model="usr.name"
-            placeholder="username"
-            :disabled="readOnly || role._default"
-          />
-        </div>
-        <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeUser(uIdx)">
-          <FaIcon icon="times" />
-        </button>
+  <!-- Users : the users of the role, each with the provider they sign in with -->
+  <template v-else-if="section === 'users'">
+    <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
+    <p v-else-if="!tab && role.users.length === 0" class="text-muted small mb-3">
+      {{ t('settings.settingsPage.roleNoUsers') }}
+    </p>
+    <div v-for="(usr, uIdx) in tab ? [] : role.users" :key="usr._uid" class="d-flex align-items-center gap-2 mb-2">
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="user" /></span>
+        <select
+          class="form-select provider-select"
+          v-model="usr.provider"
+          :disabled="readOnly || role._default"
+          @change="onProviderChange(usr, 'user')"
+        >
+          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+        </select>
+        <select
+          v-if="usr.provider === 'local'"
+          class="form-select"
+          v-model="usr.name"
+          :disabled="readOnly || role._default"
+        >
+          <option v-for="u in localUsers" :key="u" :value="u">{{ u }}</option>
+        </select>
+        <input
+          v-else
+          class="form-control"
+          v-model="usr.name"
+          placeholder="username"
+          :disabled="readOnly || role._default"
+        />
       </div>
-      <!-- the page has its own Add user (top right) : the dialog keeps this one -->
-      <div v-if="!tab && !readOnly && !role._default" :class="[role.users.length > 0 ? 'mt-3' : 'mt-1', 'mb-3']">
-        <BsButton icon="plus" @click="addUser()">{{ t('settings.settingsPage.addUser') }}</BsButton>
-      </div>
-    </template>
+      <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeUser(uIdx)">
+        <FaIcon icon="times" />
+      </button>
+    </div>
+    <!-- the page has its own Add user (top right) : the wizard keeps this one -->
+    <div v-if="!tab && !readOnly && !role._default" :class="[role.users.length > 0 ? 'mt-3' : 'mt-1']">
+      <BsButton icon="plus" @click="addUser()">{{ t('settings.settingsPage.addUser') }}</BsButton>
+    </div>
+  </template>
 
-    <!-- Groups : the groups of the role, each with the provider it comes from -->
-    <template v-else>
-      <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
-      <p v-else-if="!tab && role.groups.length === 0" class="text-muted small mb-3">
-        {{ t('settings.settingsPage.roleNoGroups') }}
-      </p>
-      <div v-for="(grp, gIdx) in tab ? [] : role.groups" :key="grp._uid" class="d-flex align-items-center gap-2 mb-2">
-        <div class="input-group">
-          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="users" /></span>
-          <select
-            class="form-select provider-select"
-            v-model="grp.provider"
-            :disabled="readOnly || role._default"
-            @change="onProviderChange(grp, 'group')"
-          >
-            <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-          </select>
-          <select
-            v-if="grp.provider === 'local'"
-            class="form-select"
-            v-model="grp.name"
-            :disabled="readOnly || role._default"
-          >
-            <option v-for="g in localGroups" :key="g" :value="g">{{ g }}</option>
-          </select>
-          <input
-            v-else
-            class="form-control"
-            v-model="grp.name"
-            placeholder="groupname"
-            :disabled="readOnly || role._default"
-          />
-        </div>
-        <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeGroup(gIdx)">
-          <FaIcon icon="times" />
-        </button>
+  <!-- Groups : the groups of the role, each with the provider it comes from -->
+  <template v-else>
+    <p v-if="role._default" class="text-muted small mb-3">{{ t('settings.settingsPage.defaultEveryone') }}</p>
+    <p v-else-if="!tab && role.groups.length === 0" class="text-muted small mb-3">
+      {{ t('settings.settingsPage.roleNoGroups') }}
+    </p>
+    <div v-for="(grp, gIdx) in tab ? [] : role.groups" :key="grp._uid" class="d-flex align-items-center gap-2 mb-2">
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="users" /></span>
+        <select
+          class="form-select provider-select"
+          v-model="grp.provider"
+          :disabled="readOnly || role._default"
+          @change="onProviderChange(grp, 'group')"
+        >
+          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+        </select>
+        <select
+          v-if="grp.provider === 'local'"
+          class="form-select"
+          v-model="grp.name"
+          :disabled="readOnly || role._default"
+        >
+          <option v-for="g in localGroups" :key="g" :value="g">{{ g }}</option>
+        </select>
+        <input
+          v-else
+          class="form-control"
+          v-model="grp.name"
+          placeholder="groupname"
+          :disabled="readOnly || role._default"
+        />
       </div>
-      <div v-if="!tab && !readOnly && !role._default" :class="[role.groups.length > 0 ? 'mt-3' : 'mt-1', 'mb-3']">
-        <BsButton icon="plus" @click="addGroup()">{{ t('settings.settingsPage.addGroup') }}</BsButton>
-      </div>
-    </template>
-  </component>
+      <button v-if="!readOnly" class="btn btn-outline-danger align-self-stretch af-remove" @click="removeGroup(gIdx)">
+        <FaIcon icon="times" />
+      </button>
+    </div>
+    <div v-if="!tab && !readOnly && !role._default" :class="[role.groups.length > 0 ? 'mt-3' : 'mt-1']">
+      <BsButton icon="plus" @click="addGroup()">{{ t('settings.settingsPage.addGroup') }}</BsButton>
+    </div>
+  </template>
 </template>
 
 <style scoped>
@@ -392,15 +372,6 @@ function removeUser(index) {
 .af-role-name :deep(.input-group),
 .af-role-description :deep(.input-group) {
   max-width: 40rem;
-}
-.af-role-tabs .nav-link {
-  cursor: pointer;
-}
-/* the count of a tab : small and grey, as the menus' badges */
-.af-role-tab-count {
-  background: var(--bs-secondary-bg);
-  color: var(--bs-secondary-color);
-  font-weight: 600;
 }
 .provider-select {
   width: 130px;

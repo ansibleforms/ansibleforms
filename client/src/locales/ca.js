@@ -2341,7 +2341,7 @@ export default {
       icon: 'Icona',
       groups: 'Grups',
       users: 'Usuaris',
-      options: 'Opcions',
+      permissions: 'Permisos',
       key: 'Clau',
       value: 'Valor',
       addCategory: 'Afegeix una categoria',

@@ -2300,7 +2300,7 @@ export default {
       icon: 'アイコン',
       groups: 'グループ',
       users: 'ユーザー',
-      options: 'オプション',
+      permissions: '権限',
       key: 'キー',
       value: '値',
       addCategory: 'カテゴリを追加',

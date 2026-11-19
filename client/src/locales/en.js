@@ -2307,7 +2307,7 @@ export default {
       icon: 'Icon',
       groups: 'Groups',
       users: 'Users',
-      options: 'Options',
+      permissions: 'Permissions',
       key: 'Key',
       value: 'Value',
       addCategory: 'Add category',

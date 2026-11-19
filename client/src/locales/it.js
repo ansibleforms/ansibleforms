@@ -2334,7 +2334,7 @@ export default {
       icon: 'Icona',
       groups: 'Gruppi',
       users: 'Utenti',
-      options: 'Opzioni',
+      permissions: 'Permessi',
       key: 'Chiave',
       value: 'Valore',
       addCategory: 'Aggiungi categoria',

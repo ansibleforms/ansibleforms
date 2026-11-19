@@ -2346,7 +2346,7 @@ export default {
       icon: 'Symbol',
       groups: 'Gruppen',
       users: 'Benutzer',
-      options: 'Optionen',
+      permissions: 'Berechtigungen',
       key: 'Schluessel',
       value: 'Wert',
       addCategory: 'Kategorie hinzufuegen',

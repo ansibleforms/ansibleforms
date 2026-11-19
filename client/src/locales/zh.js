@@ -2240,7 +2240,7 @@ export default {
       icon: '图标',
       groups: '组',
       users: '用户',
-      options: '选项',
+      permissions: '权限',
       key: '键',
       value: '值',
       addCategory: '添加类别',
