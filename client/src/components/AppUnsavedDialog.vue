@@ -4,8 +4,9 @@
 /*  The Unsaved changes dialog : asked when a page with unsaved   */
 /*  changes is left (useUnsavedGuard). Save and leave saves, then */
 /*  goes on (a page that says how it saves) ; Leave without       */
-/*  saving goes on ; Close, the cross, Escape or the backdrop     */
-/*  stay.                                                         */
+/*  saving goes on ; Cancel, the cross, Escape or the backdrop    */
+/*  stay. Where nothing can save, it says so and offers only to   */
+/*  leave without saving or to stay.                              */
 /*                                                                */
 /******************************************************************/
 import { useI18n } from 'vue-i18n';
@@ -19,6 +20,7 @@ const { t } = useI18n();
     v-if="unsavedPrompt.open"
     size="md"
     :dialogClass="unsavedPrompt.save ? 'af-unsaved-dialog' : ''"
+    :footerClose="false"
     @close="answerUnsaved(false)"
     icon="triangle-exclamation"
     iconClass="text-warning"
@@ -29,7 +31,7 @@ const { t } = useI18n();
     <template #default>
       <!-- with Save and leave the question is whether to save ; without, whether to lose them -->
       <p class="mb-0 fs-6">
-        {{ unsavedPrompt.save ? t('settings.common.unsavedSaveQuestion') : unsavedPrompt.message }}
+        {{ unsavedPrompt.save ? t('settings.common.unsavedSaveQuestion') : t('settings.common.unsavedChanges') }}
       </p>
     </template>
     <template #footer>
@@ -44,6 +46,10 @@ const { t } = useI18n();
       >
       <BsButton icon="right-from-bracket" :disabled="unsavedPrompt.saving" @click="answerUnsaved(true)">{{
         t('settings.common.unsavedLeave')
+      }}</BsButton>
+      <!-- stay on the page, the changes kept -->
+      <BsButton icon="times" :disabled="unsavedPrompt.saving" @click="answerUnsaved(false)">{{
+        t('common.cancel')
       }}</BsButton>
     </template>
   </BsModal>

@@ -57,11 +57,7 @@ function comparable(key, value) {
 const dirty = computed(
   () => !!record.value && FIELDS.some((k) => comparable(k, edit.value[k]) !== comparable(k, record.value[k])),
 );
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the announcement.

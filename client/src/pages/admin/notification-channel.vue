@@ -126,11 +126,7 @@ const dirty = computed(
     edited.value.some((k) => String(edit.value[k] ?? '') !== String(editable(channel.value)[k] ?? '')),
 );
 // leaving with the channel changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 // the credentials its logins and tokens are : smtp and entraid ones for mail, api ones for a token ;
 // none first

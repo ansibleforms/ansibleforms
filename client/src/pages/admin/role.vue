@@ -54,11 +54,7 @@ const {
 } = useRoleSupport(roles, save);
 
 // leaving with the role changed and unsaved asks first
-useUnsavedGuard(
-  isRolesDirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveRoles(),
-);
+useUnsavedGuard(isRolesDirty, () => saveRoles());
 
 // read only when the config can't be loaded, can't be parsed or is a ytt template
 const readOnly = computed(() => parseError.value || isTemplated.value || !!loadError.value);

@@ -71,11 +71,7 @@ const detailsDirty = computed(
 const signInDirty = computed(() => !!user.value && !!edit.value && edit.value.signIn === !!user.value.blocked);
 const dirty = computed(() => detailsDirty.value || signInDirty.value);
 // leaving with the details changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveDetails(),
-);
+useUnsavedGuard(dirty, () => saveDetails());
 
 // the groups the user belongs to : its first (group_id) and the others (group_ids)
 const userGroups = computed(() => {

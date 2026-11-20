@@ -40,11 +40,7 @@ function nameOf(row) {
   return { app_name: row?.app_name || '' };
 }
 const { edit: look, dirty, load, save } = useSettingsRow(nameOf);
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(t('settings.common.nameUpdated', { name: title.value })),
-);
+useUnsavedGuard(dirty, () => save(t('settings.common.nameUpdated', { name: title.value })));
 
 const title = computed(() => t('sidebar.name'));
 

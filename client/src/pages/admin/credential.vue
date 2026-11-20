@@ -336,11 +336,7 @@ const dirty = computed(
       !!newPassword.value),
 );
 // leaving with the credential changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the credential and the secret stores it can read from.

@@ -46,11 +46,7 @@ const wordsDirty = computed(
 );
 const enabledDirty = computed(() => !!record.value && !!edit.value.enabled !== !!Number(record.value.enabled));
 const dirty = computed(() => wordsDirty.value || enabledDirty.value);
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the disclaimer and who accepted it.

@@ -303,7 +303,6 @@ const isManaged = computed(() => !!item.value?.managed);
 // them, nothing can be saved) or what the page adds to it (extraDirty)
 useUnsavedGuard(
   computed(() => (isDirty.value && !isManaged.value) || props.extraDirty),
-  () => t('settings.common.unsavedChanges'),
   () => saveAll(),
 );
 

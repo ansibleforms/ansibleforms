@@ -77,11 +77,7 @@ const dirty = computed(
 );
 
 // leaving with the provider changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the provider.

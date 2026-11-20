@@ -124,11 +124,7 @@ const cronError = computed(() => (dirty.value ? cronProblem.value : ''));
 // Save : a changed cron, or the deprecated variable's cron as it is when it has 5 fields, saved as
 // the new variable
 const canSave = computed(() => dirty.value || (scheduleEditable.value && !!deprecated.value && !cronProblem.value));
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), a runner hub loop's seconds,

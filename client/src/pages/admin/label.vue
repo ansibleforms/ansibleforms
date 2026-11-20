@@ -54,11 +54,7 @@ const editable = (rec) => ({
 const dirty = computed(
   () => !!record.value && FIELDS.some((k) => String(edit.value[k] ?? '') !== String(editable(record.value)[k] ?? '')),
 );
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the label, and every label for the preview.

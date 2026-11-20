@@ -104,11 +104,7 @@ const dirty = computed(
   () => !!server.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(server.value)[k] ?? '')),
 );
 // leaving with the server changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the server.

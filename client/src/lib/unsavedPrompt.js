@@ -5,15 +5,15 @@
 /*  when a page with unsaved changes is left. A page that says    */
 /*  how it saves also gets Save and leave : the page is left once */
 /*  the save went through, else it stays with its error shown.    */
+/*  One wording for all : the dialog says it, the callers do not. */
 /*                                                                */
 /******************************************************************/
 import { reactive } from 'vue';
 
-// what the dialog shows : open or not, its message, and who waits for the answer
-// and, for a page that can save, how (save) and whether it still has changes after (isDirty)
+// what the dialog shows : open or not, and who waits for the answer and, for a page that can
+// save, how (save) and whether it still has changes after (isDirty)
 export const unsavedPrompt = reactive({
   open: false,
-  message: '',
   resolve: null,
   save: null,
   isDirty: null,
@@ -21,21 +21,21 @@ export const unsavedPrompt = reactive({
 });
 
 /**
- * Asks whether to leave the page and lose its unsaved changes.
+ * Asks whether to leave the page and lose its unsaved changes : whether to save them first when
+ * the page can save, else whether to lose them.
  *
  * Args:
- *   message (string): the question.
  *   save (Function|null): the page's own save (its Save button) ; none : no Save and leave.
  *   isDirty (Function|null): whether the page still has unsaved changes, read after a save.
  *
  * Returns:
  *   Promise<boolean>: true to leave, false to stay.
  */
-export function askToLeave(message, save = null, isDirty = null) {
+export function askToLeave(save = null, isDirty = null) {
   // a question still open (a second navigation before the first was answered) : it stays
   unsavedPrompt.resolve?.(false);
   return new Promise((resolve) => {
-    Object.assign(unsavedPrompt, { open: true, message, resolve, save, isDirty, saving: false });
+    Object.assign(unsavedPrompt, { open: true, resolve, save, isDirty, saving: false });
   });
 }
 
@@ -47,7 +47,7 @@ export function askToLeave(message, save = null, isDirty = null) {
  */
 export function answerUnsaved(leave) {
   const resolve = unsavedPrompt.resolve;
-  Object.assign(unsavedPrompt, { open: false, message: '', resolve: null, save: null, isDirty: null, saving: false });
+  Object.assign(unsavedPrompt, { open: false, resolve: null, save: null, isDirty: null, saving: false });
   resolve?.(leave);
 }
 

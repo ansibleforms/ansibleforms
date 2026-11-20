@@ -621,11 +621,11 @@ async function savePreferences() {
   savedPrefs.value = currentPreferences();
   toast.success(t('profilePage.preferencesSaved'));
 }
-useUnsavedGuard(prefsDirty, () => t('settings.common.unsavedChanges'), savePreferences);
+useUnsavedGuard(prefsDirty, savePreferences);
 // another view of the profile (its menu) is the same page to the router : asked there too
 onBeforeRouteUpdate((to, from) => {
   if (from.params.view !== 'preferences' || to.params.view === 'preferences' || !prefsDirty.value) return true;
-  return askToLeave(t('settings.common.unsavedChanges'), savePreferences, () => prefsDirty.value);
+  return askToLeave(savePreferences, () => prefsDirty.value);
 });
 
 // ─── account and permissions : searched ───────────────────────────────────────

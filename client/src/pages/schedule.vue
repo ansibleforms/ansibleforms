@@ -119,11 +119,7 @@ const dirty = computed(
   () => !!schedule.value && EDITED.some((k) => compared(edit.value[k]) !== compared(editable(schedule.value)[k])),
 );
 // leaving with the schedule changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 const running = computed(() => ['running', 'queued'].includes(schedule.value?.state));
 // kept in the schedules repository : saved into its file

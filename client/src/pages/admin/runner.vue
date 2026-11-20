@@ -181,11 +181,7 @@ const dirty = computed(
   () => !!runner.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(runner.value)[k] ?? '')),
 );
 // leaving with the runner changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the runner.

@@ -37,11 +37,7 @@ const { sortedLocalGroups, sortedLocalUsers, loadLocalNames, usersThroughGroups,
   useRoleSupport(roles, save);
 
 // a role removed here is only gone once saved : leaving with it unsaved asks first
-useUnsavedGuard(
-  isRolesDirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveRoles(),
-);
+useUnsavedGuard(isRolesDirty, () => saveRoles());
 
 // Read-only when the config can't be loaded, can't be parsed or is a ytt template.
 const readOnly = computed(() => parseError.value || isTemplated.value || !!loadError.value);

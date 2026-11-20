@@ -34,6 +34,7 @@ import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
+import { askToLeave } from '@/lib/unsavedPrompt';
 import { varsKind } from '@/config/varsFile';
 import { workflowSkeleton } from '@/config/workflowFile';
 import {
@@ -77,13 +78,12 @@ const listed = ref(false);
 // a section with nothing in it shows no explorer (its New file is in the toolbar)
 const sectionEmpty = computed(() => listed.value && !listing.value.files.length && !extraFolders.value.length);
 
-// the dialogs : a new file, a new folder, a delete, leaving a file with changes
+// the dialogs : a new file, a new folder, a delete (leaving a file with changes : the app's
+// Unsaved changes dialog, see askThenGo)
 // { kind: 'file' | 'folder', path } ; an inventory's : { kind: 'inventory', name, repo }, or
 // { kind: 'group_vars' | 'host_vars', inventory, name }
 const creating = ref(null);
 const deleting = ref('');
-const leavingFor = ref(null); // the file to open once the changes are dropped
-const leavingTo = ref(null); // what to do once the changes are dropped : go to a page, a section
 
 // ─── the explorer ─────────────────────────────────────────────────────────────
 const collapsed = ref(new Set());
@@ -233,10 +233,9 @@ async function loadList() {
 async function open(path, force = false) {
   if (path === selected.value) return;
   if (dirty.value && !force) {
-    leavingFor.value = path;
+    askThenGo(() => open(path, true));
     return;
   }
-  leavingFor.value = null;
   loading.value = true;
   try {
     const result = await axios.get(`${api.value}/file`, { params: { path } });
@@ -482,8 +481,24 @@ function clearSearch() {
 }
 
 // ─── leaving with changes ─────────────────────────────────────────────────────
-// another page, or another section or tab of the designer : asked first, as another file is.
-// The designer asks before it switches (leave, exposed) ; an address asks through the router.
+// another file, another page, or another section or tab of the designer : asked first, in the
+// app's Unsaved changes dialog as every page that saves. The designer asks before it switches
+// (leave, exposed) ; an address asks through the router.
+/**
+ * Asks before a step that closes the file open with changes : Save and leave (unless the
+ * designer is read only : the dialog then says the changes cannot be saved here), Leave
+ * without saving (the changes dropped), or Cancel to stay.
+ *
+ * Args:
+ *   go (function): the step (open another file, switch the section, the tab, go to a page).
+ */
+async function askThenGo(go) {
+  const leave = await askToLeave(props.readOnly ? null : save, () => dirty.value);
+  if (!leave) return;
+  // left without saving : the changes dropped, so the step finds the file clean
+  content.value = loadedContent.value;
+  go();
+}
 /**
  * Runs a step that closes the file open : at once without changes, after the question with.
  *
@@ -498,7 +513,7 @@ function leave(go) {
     go();
     return true;
   }
-  leavingTo.value = go;
+  askThenGo(go);
   return false;
 }
 function guard(to, from) {
@@ -507,7 +522,7 @@ function guard(to, from) {
   // (/designer/inventories/yaml, /visual), so no question, and the tab never moves without it
   const section = (r) => r.path.split('/')[2];
   if (section(to) === section(from) && to.path.startsWith('/designer/')) return true;
-  leavingTo.value = () => router.push(to.fullPath);
+  askThenGo(() => router.push(to.fullPath));
   return false;
 }
 onBeforeRouteUpdate(guard);
@@ -517,25 +532,6 @@ function onBeforeUnload(e) {
 }
 window.addEventListener('beforeunload', onBeforeUnload);
 onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
-
-/** Saves the changes, then goes where the dialog was opened for ; a failed save stays. */
-async function saveAndGo() {
-  await save();
-  if (dirty.value) return;
-  if (leavingFor.value) return open(leavingFor.value, true);
-  const go = leavingTo.value;
-  leavingTo.value = null;
-  go();
-}
-
-/** Drops the changes and goes where the dialog was opened for : a file, or a page. */
-function discardAndGo() {
-  if (leavingFor.value) return open(leavingFor.value, true);
-  const go = leavingTo.value;
-  leavingTo.value = null;
-  content.value = loadedContent.value;
-  go();
-}
 
 /**
  * Loads the files and opens the first the explorer lists (for the inventories, the first
@@ -888,25 +884,6 @@ defineExpose({
       </template>
       <template #footer>
         <BsButton icon="trash" :disabled="working" @click="remove()">{{ t('common.delete') }}</BsButton>
-      </template>
-    </BsModal>
-    <!-- another file, section or page chosen while this file has changes -->
-    <BsModal
-      v-if="leavingFor || leavingTo"
-      size="md"
-      icon="triangle-exclamation"
-      @close="leavingFor = leavingTo = null"
-    >
-      <template #title>{{ t('designer.unsavedChanges') }}</template>
-      <template #default>
-        <p class="mb-0 fs-6">{{ t('designer.files.leaveConfirm', { path: selected }) }}</p>
-      </template>
-      <template #footer>
-        <!-- the likely answer first : keep the changes -->
-        <BsButton v-if="!readOnly" icon="save" colorClass="primary" :disabled="working" @click="saveAndGo()">{{
-          t('designer.saveAndClose')
-        }}</BsButton>
-        <BsButton icon="xmark" :disabled="working" @click="discardAndGo()">{{ t('designer.files.discard') }}</BsButton>
       </template>
     </BsModal>
   </div>

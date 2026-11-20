@@ -114,11 +114,7 @@ const dirty = computed(() => {
   );
 });
 // leaving with the repository changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 const running = computed(() => repo.value?.status === 'running');
 /**
