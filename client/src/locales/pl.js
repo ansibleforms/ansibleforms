@@ -278,7 +278,6 @@ export default {
   // the header search
   search: {
     title: 'Szukaj',
-    placeholder: 'Szukaj formularzy i stron',
     close: 'Zamknij wyszukiwanie',
     noResults: 'Brak wyników dla „{query}”',
     kind: {
@@ -801,14 +800,13 @@ export default {
     switchTheme: 'Zmień motyw',
     pagination: 'Stronicowanie',
     goToPage: 'Przejdź do strony {n}',
-    searchPlaceholder: 'Szukaj...',
+    search: 'Szukaj',
     edit: 'Edytuj',
     open: 'Otwórz',
     abort: 'Przerwij',
     downloadFailed: 'Pobieranie nie powiodło się.',
     jumpToLatest: 'Przejdź do najnowszych',
     newLines: 'Nowe wiersze',
-    filter: 'Filtr',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'O tej stronie',
     clear: 'Wyczyść',
@@ -2480,7 +2478,6 @@ export default {
       'Formularze, które możesz uruchomić. Wybierz kategorię po lewej stronie lub filtruj po nazwie, a następnie otwórz formularz, aby go wypełnić i uruchomić.',
     categories: 'Kategorie',
     allForms: 'Wszystkie formularze',
-    search: 'Szukaj',
     name: 'Nazwa',
     description: 'Opis',
     list: 'Lista',
@@ -3106,7 +3103,6 @@ export default {
     implicit: 'domyślny',
     copy: 'Kopiuj',
     lines: '{count} wierszy',
-    findInOutput: 'Szukaj w wyniku',
     findInOutputHint: 'Wyróżnia każde miejsce, w którym ten tekst jest w wyniku; Enter przechodzi do następnego',
     foundInOutput: '{current} z {count}',
     notFoundInOutput: 'Nie znaleziono',
@@ -3328,7 +3324,6 @@ export default {
     hideOutput: 'Ukryj wynik',
     reloadForm: 'Przeładuj ten formularz',
     loadFromStore: 'Wczytaj z zapisanych',
-    findField: 'Znajdź pole',
     findFieldHint: 'Wyróżnia pola, których nazwa zawiera ten tekst; Enter przechodzi do następnego',
     back: 'Wstecz',
     submit: 'Wyślij',

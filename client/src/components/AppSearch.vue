@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
           role="combobox"
           aria-controls="af-search-results"
           :aria-expanded="results.length > 0"
-          :placeholder="t('search.placeholder')"
+          :placeholder="t('common.search')"
           :aria-label="t('search.title')"
           @keydown="onInputKey"
         />

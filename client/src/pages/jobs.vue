@@ -1398,7 +1398,6 @@ onMounted(async () => {
           <BsSearch
             v-if="isJobPage && job"
             v-model="outputSearch"
-            :placeholder="t('jobs.findInOutput')"
             :title="t('jobs.findInOutputHint')"
             @keydown.enter.prevent="nextInOutput()"
           />

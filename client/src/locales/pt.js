@@ -277,7 +277,6 @@ export default {
   // the header search
   search: {
     title: 'Pesquisar',
-    placeholder: 'Pesquisar formulários e páginas',
     close: 'Fechar a pesquisa',
     noResults: 'Sem resultados para "{query}"',
     kind: {
@@ -804,14 +803,13 @@ export default {
     switchTheme: 'Mudar o tema',
     pagination: 'Paginação',
     goToPage: 'Ir para a página {n}',
-    searchPlaceholder: 'Pesquisar...',
+    search: 'Pesquisar',
     edit: 'Editar',
     open: 'Abrir',
     abort: 'Interromper',
     downloadFailed: 'A transferência falhou.',
     jumpToLatest: 'Ir para as mais recentes',
     newLines: 'Linhas novas',
-    filter: 'Filtrar',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'Sobre esta página',
     clear: 'Limpar',
@@ -2498,7 +2496,6 @@ export default {
       'Os formulários que pode executar. Escolha uma categoria à esquerda ou filtre pelo nome e abra um formulário para o preencher e iniciar.',
     categories: 'Categorias',
     allForms: 'Todos os formulários',
-    search: 'Pesquisar',
     name: 'Nome',
     description: 'Descrição',
     list: 'Lista',
@@ -3124,7 +3121,6 @@ export default {
     implicit: 'implícito',
     copy: 'Copiar',
     lines: '{count} linhas',
-    findInOutput: 'Procurar na saída',
     findInOutputHint: 'Destaca cada sítio onde este texto está na saída; Enter vai para o seguinte',
     foundInOutput: '{current} de {count}',
     notFoundInOutput: 'Não encontrado',
@@ -3345,7 +3341,6 @@ export default {
     hideOutput: 'Ocultar resultado',
     reloadForm: 'Recarregar este formulário',
     loadFromStore: 'Carregar dos guardados',
-    findField: 'Procurar um campo',
     findFieldHint: 'Destaca os campos cujo nome tem este texto; Enter vai para o seguinte',
     back: 'Voltar',
     submit: 'Submeter',

@@ -2032,7 +2032,6 @@ onBeforeUnmount(() => {
             <div class="af-title-controls af-form-controls">
               <BsSearch
                 v-model="fieldSearch"
-                :placeholder="t('form.findField')"
                 :title="t('form.findFieldHint')"
                 @keydown.enter.prevent="nextFieldMatch()"
               />

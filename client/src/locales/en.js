@@ -276,7 +276,6 @@ export default {
   // the header search
   search: {
     title: 'Search',
-    placeholder: 'Search forms and pages',
     close: 'Close the search',
     noResults: 'No results for "{query}"',
     kind: {
@@ -795,14 +794,13 @@ export default {
     switchTheme: 'Switch theme',
     pagination: 'Pagination',
     goToPage: 'Go to page {n}',
-    searchPlaceholder: 'Search...',
+    search: 'Search',
     edit: 'Edit',
     open: 'Open',
     abort: 'Abort',
     downloadFailed: 'The download failed.',
     jumpToLatest: 'Jump to latest',
     newLines: 'New lines',
-    filter: 'Filter',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'About this page',
     clear: 'Clear',
@@ -2465,7 +2463,6 @@ export default {
       'The forms you can run. Pick a category on the left or filter by name, then open a form to fill it in and launch it.',
     categories: 'Categories',
     allForms: 'All forms',
-    search: 'Search',
     name: 'Name',
     description: 'Description',
     list: 'List',
@@ -3085,7 +3082,6 @@ export default {
     implicit: 'implicit',
     copy: 'Copy',
     lines: '{count} lines',
-    findInOutput: 'Find in the output',
     findInOutputHint: 'Highlights every place this text is in the output; Enter goes to the next',
     foundInOutput: '{current} of {count}',
     notFoundInOutput: 'Not found',
@@ -3297,7 +3293,6 @@ export default {
     hideOutput: 'Hide output',
     reloadForm: 'Reload this form',
     loadFromStore: 'Load from store',
-    findField: 'Find a field',
     findFieldHint: 'Highlights the fields whose name has this text; Enter goes to the next',
     back: 'Back',
     submit: 'Submit',

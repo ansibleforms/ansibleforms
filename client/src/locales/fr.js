@@ -278,7 +278,6 @@ export default {
   // the header search
   search: {
     title: 'Rechercher',
-    placeholder: 'Rechercher des formulaires et des pages',
     close: 'Fermer la recherche',
     noResults: 'Aucun résultat pour "{query}"',
     kind: {
@@ -806,14 +805,13 @@ export default {
     switchTheme: 'Changer de thème',
     pagination: 'Pagination',
     goToPage: 'Aller à la page {n}',
-    searchPlaceholder: 'Rechercher...',
+    search: 'Rechercher',
     edit: 'Modifier',
     open: 'Ouvrir',
     abort: 'Arrêter',
     downloadFailed: 'Le téléchargement a échoué.',
     jumpToLatest: 'Aller aux dernières',
     newLines: 'Nouvelles lignes',
-    filter: 'Filtrer',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'À propos de cette page',
     clear: 'Effacer',
@@ -2505,7 +2503,6 @@ export default {
       'Les formulaires que vous pouvez exécuter. Choisissez une catégorie à gauche ou filtrez par nom, puis ouvrez un formulaire pour le remplir et le lancer.',
     categories: 'Catégories',
     allForms: 'Tous les formulaires',
-    search: 'Rechercher',
     name: 'Nom',
     description: 'Description',
     list: 'Liste',
@@ -3131,7 +3128,6 @@ export default {
     implicit: 'implicite',
     copy: 'Copier',
     lines: '{count} lignes',
-    findInOutput: 'Chercher dans la sortie',
     findInOutputHint: 'Met en évidence chaque endroit où ce texte apparaît dans la sortie ; Entrée passe au suivant',
     foundInOutput: '{current} sur {count}',
     notFoundInOutput: 'Introuvable',
@@ -3352,7 +3348,6 @@ export default {
     hideOutput: 'Masquer la sortie',
     reloadForm: 'Recharger ce formulaire',
     loadFromStore: 'Charger depuis le stockage',
-    findField: 'Trouver un champ',
     findFieldHint: 'Met en évidence les champs dont le nom contient ce texte ; Entrée passe au suivant',
     back: 'Retour',
     submit: 'Soumettre',

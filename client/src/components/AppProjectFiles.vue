@@ -738,7 +738,7 @@ defineExpose({
               v-model="filter"
               type="text"
               class="form-control form-control-sm"
-              :placeholder="t('designer.search') + '...'"
+              :placeholder="t('common.search')"
               @keydown.esc="clearSearch()"
             />
             <button

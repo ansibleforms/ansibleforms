@@ -4242,7 +4242,7 @@ onBeforeUnmount(() => {
               v-model="iconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              :placeholder="t('common.searchPlaceholder')"
+              :placeholder="t('common.search')"
             />
             <div class="icon-grid mt-2">
               <div
@@ -4406,7 +4406,7 @@ onBeforeUnmount(() => {
             v-model="catIconSearch"
             :label="t('designer.searchIcons')"
             icon="magnifying-glass"
-            :placeholder="t('common.searchPlaceholder')"
+            :placeholder="t('common.search')"
             class="mb-2"
           />
           <div class="icon-grid">
@@ -4565,7 +4565,7 @@ onBeforeUnmount(() => {
               v-model="editCatIconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              :placeholder="t('common.searchPlaceholder')"
+              :placeholder="t('common.search')"
               class="mb-2"
             />
             <div class="icon-grid">
@@ -5426,7 +5426,7 @@ onBeforeUnmount(() => {
                         type="text"
                         class="form-control form-control-sm"
                         v-model="treeFilter"
-                        :placeholder="t('designer.search') + '...'"
+                        :placeholder="t('common.search')"
                         ref="treeSearchInput"
                         @keydown.esc="clearTreeSearch()"
                       />

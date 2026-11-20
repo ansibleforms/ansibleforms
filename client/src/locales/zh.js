@@ -274,7 +274,6 @@ export default {
   // the header search
   search: {
     title: '搜索',
-    placeholder: '搜索表单和页面',
     close: '关闭搜索',
     noResults: '没有与“{query}”匹配的结果',
     kind: {
@@ -784,14 +783,13 @@ export default {
     switchTheme: '切换主题',
     pagination: '分页',
     goToPage: '转到第 {n} 页',
-    searchPlaceholder: '搜索...',
+    search: '搜索',
     edit: '编辑',
     open: '打开',
     abort: '中止',
     downloadFailed: '下载失败。',
     jumpToLatest: '跳到最新',
     newLines: '新行',
-    filter: '筛选',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: '关于此页面',
     clear: '清除',
@@ -2395,7 +2393,6 @@ export default {
     pageDescription: '您可以运行的表单。在左侧选择类别或按名称筛选，然后打开表单填写并启动。',
     categories: '类别',
     allForms: '所有表单',
-    search: '搜索',
     name: '名称',
     description: '描述',
     list: '列表',
@@ -3002,7 +2999,6 @@ export default {
     implicit: '隐式',
     copy: '复制',
     lines: '{count} 行',
-    findInOutput: '在输出中查找',
     findInOutputHint: '突出显示输出中出现此文本的每一处；按 Enter 转到下一个',
     foundInOutput: '第 {current} 个，共 {count} 个',
     notFoundInOutput: '未找到',
@@ -3182,7 +3178,6 @@ export default {
     hideOutput: '隐藏输出',
     reloadForm: '重新加载此表单',
     loadFromStore: '从已保存项加载',
-    findField: '查找字段',
     findFieldHint: '突出显示名称包含此文本的字段；按 Enter 转到下一个',
     back: '返回',
     submit: '提交',

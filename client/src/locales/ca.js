@@ -278,7 +278,6 @@ export default {
   // the header search
   search: {
     title: 'Cerca',
-    placeholder: 'Cerca formularis i pàgines',
     close: 'Tanca la cerca',
     noResults: 'No hi ha resultats per a "{query}"',
     kind: {
@@ -803,14 +802,13 @@ export default {
     switchTheme: 'Canvia el tema',
     pagination: 'Paginació',
     goToPage: 'Ves a la pàgina {n}',
-    searchPlaceholder: 'Cerca...',
+    search: 'Cerca',
     edit: 'Edita',
     open: 'Obre',
     abort: 'Avorta',
     downloadFailed: 'La baixada ha fallat.',
     jumpToLatest: 'Ves al més recent',
     newLines: 'Línies noves',
-    filter: 'Filtre',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'Quant a aquesta pàgina',
     clear: 'Esborra',
@@ -2501,7 +2499,6 @@ export default {
       "Els formularis que pots executar. Tria una categoria a l'esquerra o filtra pel nom i obre un formulari per omplir-lo i llançar-lo.",
     categories: 'Categories',
     allForms: 'Tots els formularis',
-    search: 'Cerca',
     name: 'Nom',
     description: 'Descripció',
     list: 'Llista',
@@ -3126,7 +3123,6 @@ export default {
     implicit: 'implícit',
     copy: 'Copia',
     lines: '{count} línies',
-    findInOutput: 'Cerca a la sortida',
     findInOutputHint: 'Ressalta cada lloc on és aquest text a la sortida; Retorn va al següent',
     foundInOutput: '{current} de {count}',
     notFoundInOutput: 'No trobat',
@@ -3348,7 +3344,6 @@ export default {
     hideOutput: 'Amaga la sortida',
     reloadForm: 'Torna a carregar aquest formulari',
     loadFromStore: 'Carrega des de les desades',
-    findField: 'Cerca un camp',
     findFieldHint: 'Ressalta els camps amb aquest text al nom; Retorn va al següent',
     back: 'Enrere',
     submit: 'Envia',

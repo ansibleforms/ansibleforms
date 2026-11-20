@@ -279,7 +279,6 @@ export default {
   // the header search
   search: {
     title: 'Zoeken',
-    placeholder: "Formulieren en pagina's zoeken",
     close: 'Zoeken sluiten',
     noResults: 'Geen resultaten voor "{query}"',
     kind: {
@@ -803,14 +802,13 @@ export default {
     switchTheme: 'Thema wisselen',
     pagination: 'Paginering',
     goToPage: 'Ga naar pagina {n}',
-    searchPlaceholder: 'Zoeken...',
+    search: 'Zoeken',
     edit: 'Bewerken',
     open: 'Openen',
     abort: 'Afbreken',
     downloadFailed: 'Het downloaden is mislukt.',
     jumpToLatest: 'Naar nieuwste',
     newLines: 'Nieuwe regels',
-    filter: 'Filter',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'Over deze pagina',
     clear: 'Wissen',
@@ -2489,7 +2487,6 @@ export default {
       'De formulieren die u kunt uitvoeren. Kies links een categorie of filter op naam, en open dan een formulier om het in te vullen en te starten.',
     categories: 'Categorie\u00ebn',
     allForms: 'Alle formulieren',
-    search: 'Zoeken',
     name: 'Naam',
     description: 'Beschrijving',
     list: 'Lijst',
@@ -3116,7 +3113,6 @@ export default {
     implicit: 'impliciet',
     copy: 'Kopiëren',
     lines: '{count} regels',
-    findInOutput: 'Zoeken in de uitvoer',
     findInOutputHint: 'Markeert elke plek waar deze tekst in de uitvoer staat; Enter gaat naar de volgende',
     foundInOutput: '{current} van {count}',
     notFoundInOutput: 'Niet gevonden',
@@ -3338,7 +3334,6 @@ export default {
     hideOutput: 'Verberg output',
     reloadForm: 'Formulier herladen',
     loadFromStore: 'Laden uit opslag',
-    findField: 'Veld zoeken',
     findFieldHint: 'Markeert de velden waarvan de naam deze tekst bevat; Enter gaat naar de volgende',
     back: 'Terug',
     submit: 'Verzenden',

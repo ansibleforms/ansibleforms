@@ -277,7 +277,6 @@ export default {
   // the header search
   search: {
     title: '検索',
-    placeholder: 'フォームとページを検索',
     close: '検索を閉じる',
     noResults: '「{query}」に一致する結果はありません',
     kind: {
@@ -798,14 +797,13 @@ export default {
     switchTheme: 'テーマを切り替える',
     pagination: 'ページ送り',
     goToPage: '{n} ページへ移動',
-    searchPlaceholder: '検索...',
+    search: '検索',
     edit: '編集',
     open: '開く',
     abort: '中止',
     downloadFailed: 'ダウンロードに失敗しました。',
     jumpToLatest: '最新へ移動',
     newLines: '新しい行',
-    filter: 'フィルター',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'このページについて',
     clear: 'クリア',
@@ -2459,7 +2457,6 @@ export default {
       '実行できるフォームです。左側でカテゴリを選ぶか名前で絞り込み、フォームを開いて入力し、起動します。',
     categories: 'カテゴリ',
     allForms: 'すべてのフォーム',
-    search: '検索',
     name: '名前',
     description: '説明',
     list: 'リスト',
@@ -3082,7 +3079,6 @@ export default {
     implicit: '暗黙',
     copy: 'コピー',
     lines: '{count} 行',
-    findInOutput: '出力を検索',
     findInOutputHint: '出力内でこのテキストがある箇所をすべて強調表示します。Enter で次へ移動します',
     foundInOutput: '{current} / {count}',
     notFoundInOutput: '見つかりません',
@@ -3291,7 +3287,6 @@ export default {
     hideOutput: '出力を非表示',
     reloadForm: 'このフォームを再読み込み',
     loadFromStore: '保存済みデータから読み込む',
-    findField: 'フィールドを検索',
     findFieldHint: '名前にこのテキストを含むフィールドを強調表示します。Enter で次へ移動します',
     back: '戻る',
     submit: '送信',

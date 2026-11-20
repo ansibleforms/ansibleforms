@@ -606,7 +606,7 @@ function exportCsv() {
           type="search"
           class="form-control form-control-sm"
           style="max-width: 220px"
-          :placeholder="t('common.filter')"
+          :placeholder="t('common.search')"
         />
 
         <!-- Selection info + bulk helpers -->

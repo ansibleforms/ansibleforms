@@ -279,7 +279,6 @@ export default {
   // the header search
   search: {
     title: 'Suchen',
-    placeholder: 'Formulare und Seiten suchen',
     close: 'Suche schließen',
     noResults: 'Keine Ergebnisse für "{query}"',
     kind: {
@@ -805,14 +804,13 @@ export default {
     switchTheme: 'Design wechseln',
     pagination: 'Seitennavigation',
     goToPage: 'Gehe zu Seite {n}',
-    searchPlaceholder: 'Suchen...',
+    search: 'Suchen',
     edit: 'Bearbeiten',
     open: 'Öffnen',
     abort: 'Abbrechen',
     downloadFailed: 'Der Download ist fehlgeschlagen.',
     jumpToLatest: 'Zum Neuesten springen',
     newLines: 'Neue Zeilen',
-    filter: 'Filtern',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'Über diese Seite',
     clear: 'Leeren',
@@ -2508,7 +2506,6 @@ export default {
       'Die Formulare, die Sie ausführen können. Wählen Sie links eine Kategorie oder filtern Sie nach Namen und öffnen Sie dann ein Formular, um es auszufüllen und zu starten.',
     categories: 'Kategorien',
     allForms: 'Alle Formulare',
-    search: 'Suchen',
     name: 'Name',
     description: 'Beschreibung',
     list: 'Liste',
@@ -3138,7 +3135,6 @@ export default {
     implicit: 'implizit',
     copy: 'Kopieren',
     lines: '{count} Zeilen',
-    findInOutput: 'In der Ausgabe suchen',
     findInOutputHint: 'Hebt jede Stelle hervor, an der dieser Text in der Ausgabe steht; Enter springt zur nächsten',
     foundInOutput: '{current} von {count}',
     notFoundInOutput: 'Nicht gefunden',
@@ -3359,7 +3355,6 @@ export default {
     hideOutput: 'Ausgabe ausblenden',
     reloadForm: 'Dieses Formular neu laden',
     loadFromStore: 'Aus Speicher laden',
-    findField: 'Feld suchen',
     findFieldHint: 'Hebt die Felder hervor, deren Name diesen Text enthält; Enter springt zum nächsten',
     back: 'Zurueck',
     submit: 'Senden',

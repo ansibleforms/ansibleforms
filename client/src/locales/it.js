@@ -279,7 +279,6 @@ export default {
   // the header search
   search: {
     title: 'Cerca',
-    placeholder: 'Cerca moduli e pagine',
     close: 'Chiudi la ricerca',
     noResults: 'Nessun risultato per "{query}"',
     kind: {
@@ -803,14 +802,13 @@ export default {
     switchTheme: 'Cambia tema',
     pagination: 'Paginazione',
     goToPage: 'Vai alla pagina {n}',
-    searchPlaceholder: 'Cerca...',
+    search: 'Cerca',
     edit: 'Modifica',
     open: 'Apri',
     abort: 'Interrompi',
     downloadFailed: 'Il download non è riuscito.',
     jumpToLatest: 'Vai alle ultime',
     newLines: 'Nuove righe',
-    filter: 'Filtra',
     // the info icon after a page title, that shows the page's description
     aboutThisPage: 'Informazioni su questa pagina',
     clear: 'Cancella',
@@ -2494,7 +2492,6 @@ export default {
       'I moduli che puoi eseguire. Scegli una categoria a sinistra o filtra per nome, poi apri un modulo per compilarlo e avviarlo.',
     categories: 'Categorie',
     allForms: 'Tutti i moduli',
-    search: 'Cerca',
     name: 'Nome',
     description: 'Descrizione',
     list: 'Lista',
@@ -3121,7 +3118,6 @@ export default {
     implicit: 'implicito',
     copy: 'Copia',
     lines: '{count} righe',
-    findInOutput: "Cerca nell'output",
     findInOutputHint: "Evidenzia ogni punto dell'output in cui c'è questo testo; Invio va al successivo",
     foundInOutput: '{current} di {count}',
     notFoundInOutput: 'Non trovato',
@@ -3344,7 +3340,6 @@ export default {
     hideOutput: 'Nascondi output',
     reloadForm: 'Ricarica questo modulo',
     loadFromStore: 'Carica da archivio',
-    findField: 'Trova un campo',
     findFieldHint: 'Evidenzia i campi il cui nome contiene questo testo; Invio va al successivo',
     back: 'Indietro',
     submit: 'Invia',
