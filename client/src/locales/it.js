@@ -1952,6 +1952,7 @@ export default {
       private: 'Privato',
       openInForm: 'Apri nel modulo',
       tabValues: 'Valori',
+      valuesLabel: 'Valori (YAML)',
       valuesNotMap: 'I valori devono essere una mappa di nomi di campo e valori.',
       notFound: "Non esiste alcun job salvato con l'id '{id}'.",
       nameRequired: 'Un nome è obbligatorio.',

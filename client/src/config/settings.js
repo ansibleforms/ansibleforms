@@ -1871,7 +1871,7 @@ export default function getSettings(t) {
           step: 'values',
           type: 'editor',
           lang: 'yaml',
-          label: t('settings.storedJobs.tabValues'),
+          label: t('settings.storedJobs.valuesLabel'),
           help: t('settings.storedJobs.valuesHelpNew'),
           style: editorStyle('30vh'),
           hidden: true,

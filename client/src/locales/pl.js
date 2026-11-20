@@ -1800,6 +1800,7 @@ export default {
       private: 'Prywatne',
       openInForm: 'Otwórz w formularzu',
       tabValues: 'Wartości',
+      valuesLabel: 'Wartości (YAML)',
       valuesNotMap: 'Wartości muszą być mapą nazw pól i wartości.',
       notFound: "Nie ma zapisanego zadania o id '{id}'.",
       nameRequired: 'Nazwa jest wymagana.',

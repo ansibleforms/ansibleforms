@@ -1930,6 +1930,7 @@ export default {
       private: 'Private',
       openInForm: 'Open in form',
       tabValues: 'Values',
+      valuesLabel: 'Values (YAML)',
       valuesNotMap: 'The values must be a map of field names and values.',
       notFound: "There is no stored job with the id '{id}'.",
       nameRequired: 'A name is required.',

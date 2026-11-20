@@ -224,7 +224,7 @@ const tabFields = computed(() => ({
       t('settings.storedJobs.removedWhenUnused'),
     ],
   ],
-  values: [['values', t('settings.storedJobs.tabValues'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
+  values: [['values', t('settings.storedJobs.valuesLabel'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('settings.storedJobs.tabRuns')]],
 }));
@@ -500,7 +500,7 @@ onMounted(async () => {
                 :style="editorStyle('40vh')"
                 :isFloating="false"
                 :help="t('settings.storedJobs.valuesHelp')"
-                :label="t('settings.storedJobs.tabValues')"
+                :label="t('settings.storedJobs.valuesLabel')"
               />
               <div v-if="valuesError" class="invalid-feedback d-block mt-n2">{{ valuesError }}</div>
             </template>

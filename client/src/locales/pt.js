@@ -1814,6 +1814,7 @@ export default {
       private: 'Privada',
       openInForm: 'Abrir no formulário',
       tabValues: 'Valores',
+      valuesLabel: 'Valores (YAML)',
       valuesNotMap: 'Os valores têm de ser um mapa de nomes de campo e valores.',
       notFound: "Não existe nenhuma tarefa guardada com o id '{id}'.",
       nameRequired: 'É necessário um nome.',

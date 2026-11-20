@@ -1791,6 +1791,7 @@ export default {
       private: '非公開',
       openInForm: 'フォームで開く',
       tabValues: '値',
+      valuesLabel: '値 (YAML)',
       valuesNotMap: '値はフィールド名と値のマップである必要があります。',
       notFound: "ID '{id}' の保存したジョブはありません。",
       nameRequired: '名前は必須です。',

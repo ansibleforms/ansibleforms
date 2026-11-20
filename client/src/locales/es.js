@@ -1957,6 +1957,7 @@ export default {
       private: 'Privado',
       openInForm: 'Abrir en el formulario',
       tabValues: 'Valores',
+      valuesLabel: 'Valores (YAML)',
       valuesNotMap: 'Los valores deben ser un mapa de nombres de campo y valores.',
       notFound: "No hay ningún job guardado con el id '{id}'.",
       nameRequired: 'Se necesita un nombre.',

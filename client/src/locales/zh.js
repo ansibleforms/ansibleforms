@@ -1739,6 +1739,7 @@ export default {
       private: '私有',
       openInForm: '在表单中打开',
       tabValues: '值',
+      valuesLabel: '值（YAML）',
       valuesNotMap: '值必须是字段名与值的映射。',
       notFound: "没有 ID 为 '{id}' 的已存储作业。",
       nameRequired: '名称为必填项。',

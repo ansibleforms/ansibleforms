@@ -1816,6 +1816,7 @@ export default {
       private: 'Privada',
       openInForm: 'Obre al formulari',
       tabValues: 'Valors',
+      valuesLabel: 'Valors (YAML)',
       valuesNotMap: 'Els valors han de ser un mapa de noms de camp i valors.',
       notFound: "No hi ha cap tasca desada amb l'id '{id}'.",
       nameRequired: 'Cal un nom.',

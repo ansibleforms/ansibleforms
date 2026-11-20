@@ -1961,6 +1961,7 @@ export default {
       private: 'Privat',
       openInForm: 'Im Formular öffnen',
       tabValues: 'Werte',
+      valuesLabel: 'Werte (YAML)',
       valuesNotMap: 'Die Werte müssen eine Zuordnung von Feldnamen und Werten sein.',
       notFound: "Es gibt keinen gespeicherten Job mit der ID '{id}'.",
       nameRequired: 'Ein Name ist erforderlich.',

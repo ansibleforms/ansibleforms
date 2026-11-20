@@ -1947,6 +1947,7 @@ export default {
       private: 'Privé',
       openInForm: 'Openen in formulier',
       tabValues: 'Waarden',
+      valuesLabel: 'Waarden (YAML)',
       valuesNotMap: 'De waarden moeten een map van veldnamen en waarden zijn.',
       notFound: "Er is geen opgeslagen job met id '{id}'.",
       nameRequired: 'Een naam is verplicht.',
