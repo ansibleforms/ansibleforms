@@ -137,7 +137,7 @@ const name = computed(() => {
 // the title's step : the first 12 characters of its message, then ... (a whole message is long)
 const shortName = computed(() => {
   const text = String(record.value?.message || '');
-  return text.length > 12 ? `${text.slice(0, 12)}...` : text;
+  return text.length > 12 ? `${text.slice(0, 12)}…` : text;
 });
 const pageCrumbs = computed(() => [
   { title: t('sidebar.announcement'), icon: 'bullhorn', to: '/settings/announcements' },

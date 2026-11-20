@@ -369,7 +369,7 @@ function removeCredential(name) {
           >
             <option value="">
               {{
-                credentialChoices.length ? `${t('workflowEditor.addCredential')}...` : t('workflowEditor.noCredentials')
+                credentialChoices.length ? `${t('workflowEditor.addCredential')}…` : t('workflowEditor.noCredentials')
               }}
             </option>
             <option v-for="c in credentialChoices" :key="c" :value="c">{{ c }}</option>

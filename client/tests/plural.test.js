@@ -111,7 +111,7 @@ describe('a counted text shows the right form', () => {
   it('with other values next to the count', () => {
     expect(t('en', 'designer.importDone', { file: 'a.yaml' }, 1)).toBe('Imported 1 form into a.yaml');
     expect(t('pl', 'designer.importDone', { file: 'a.yaml' }, 4)).toBe('Zaimportowano 4 formularze do a.yaml');
-    expect(t('en', 'form.unevaluated', { fields: 'host' }, 1)).toBe('host is unevaluated...');
-    expect(t('en', 'form.unevaluated', { fields: 'host, port' }, 2)).toBe('host, port are unevaluated...');
+    expect(t('en', 'form.unevaluated', { fields: 'host' }, 1)).toBe('host is unevaluated…');
+    expect(t('en', 'form.unevaluated', { fields: 'host, port' }, 2)).toBe('host, port are unevaluated…');
   });
 });
