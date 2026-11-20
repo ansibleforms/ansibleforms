@@ -3200,7 +3200,7 @@ export default {
       settingEnv: 'Definido por uma variável de ambiente',
       scheduleEnv: 'Definido pela variável de ambiente {env}.',
       scheduleDeprecated: 'Da variável obsoleta {env}; um cron guardado aqui substitui-a.',
-      intervalLabel: 'A cada',
+      intervalLabel: 'Intervalo',
       intervalUnit: 'segundos',
       intervalBounds: 'De {min} a {max} segundos.',
       cronFiveFields: 'Use 5 campos: minuto, hora, dia, mês e dia da semana.',

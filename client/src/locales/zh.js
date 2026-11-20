@@ -3076,7 +3076,7 @@ export default {
       settingEnv: '由环境变量设置',
       scheduleEnv: '由环境变量 {env} 设置。',
       scheduleDeprecated: '来自已弃用的变量 {env}；在此保存的 cron 将替换它。',
-      intervalLabel: '每',
+      intervalLabel: '间隔',
       intervalUnit: '秒',
       intervalBounds: '{min} 到 {max} 秒。',
       cronFiveFields: '请使用 5 个字段：分、时、日、月和星期。',

@@ -3201,7 +3201,7 @@ export default {
       settingEnv: "Definit per una variable d'entorn",
       scheduleEnv: "Definit per la variable d'entorn {env}.",
       scheduleDeprecated: 'De {env}, obsoleta; un cron desat aquí la substitueix.',
-      intervalLabel: 'Cada',
+      intervalLabel: 'Interval',
       intervalUnit: 'segons',
       intervalBounds: 'De {min} a {max} segons.',
       cronFiveFields: 'Fes servir 5 camps: minut, hora, dia, mes i dia de la setmana.',

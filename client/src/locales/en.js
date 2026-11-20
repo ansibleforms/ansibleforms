@@ -3161,7 +3161,7 @@ export default {
       settingEnv: 'Set by an environment variable',
       scheduleEnv: 'Set by the environment variable {env}.',
       scheduleDeprecated: 'From the deprecated {env}; a cron saved here replaces it.',
-      intervalLabel: 'Every',
+      intervalLabel: 'Interval',
       intervalUnit: 'seconds',
       intervalBounds: 'From {min} to {max} seconds.',
       cronFiveFields: 'Use 5 fields: minute, hour, day, month and weekday.',

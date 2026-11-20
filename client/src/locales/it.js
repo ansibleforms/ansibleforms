@@ -3195,7 +3195,7 @@ export default {
       settingEnv: "Impostata da una variabile d'ambiente",
       scheduleEnv: "Impostato dalla variabile d'ambiente {env}.",
       scheduleDeprecated: 'Da {env}, deprecata; un cron salvato qui la sostituisce.',
-      intervalLabel: 'Ogni',
+      intervalLabel: 'Intervallo',
       intervalUnit: 'secondi',
       intervalBounds: 'Da {min} a {max} secondi.',
       cronFiveFields: 'Usa 5 campi: minuto, ora, giorno, mese e giorno della settimana.',

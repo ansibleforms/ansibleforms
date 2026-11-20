@@ -308,7 +308,7 @@ describe("a task's Schedule tab", () => {
     expect(page).toMatch(/n >= secondsMin\.value && n <= secondsMax\.value/);
     // its bounds in words : From 1 to 60 seconds.
     expect(i18n.global.t('jobs.system.intervalBounds', { min: 1, max: 60 })).toBe('From 1 to 60 seconds.');
-    expect(i18n.global.t('jobs.system.intervalLabel')).toBe('Every');
+    expect(i18n.global.t('jobs.system.intervalLabel')).toBe('Interval');
     expect(i18n.global.t('jobs.system.intervalUnit')).toBe('seconds');
   });
 

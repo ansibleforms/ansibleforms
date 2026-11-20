@@ -3192,7 +3192,7 @@ export default {
       settingEnv: 'Ingesteld door een omgevingsvariabele',
       scheduleEnv: 'Ingesteld door de omgevingsvariabele {env}.',
       scheduleDeprecated: 'Uit de verouderde {env}; een hier opgeslagen cron vervangt die.',
-      intervalLabel: 'Elke',
+      intervalLabel: 'Interval',
       intervalUnit: 'seconden',
       intervalBounds: 'Van {min} tot {max} seconden.',
       cronFiveFields: 'Gebruik 5 velden: minuut, uur, dag, maand en weekdag.',
