@@ -1757,7 +1757,11 @@ defineExpose({
     <template #title> {{ t('common.delete') }} {{ objectLabelInSentence }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ deleteLabel }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ deleteLabel }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

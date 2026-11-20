@@ -518,7 +518,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ schedule?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ schedule?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ schedule?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
       <!-- a repository's : its file goes too, for the repository's Push -->
       <p v-if="inRepository" class="mt-2 mb-0 small text-body-secondary user-select-none">

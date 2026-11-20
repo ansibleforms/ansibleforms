@@ -1757,7 +1757,11 @@ defineExpose({
       <template #title> {{ t('designer.visualDeleteField') }} </template>
       <template #default>
         <p class="py-3 fs-6 user-select-none">
-          {{ t('designer.deleteConfirm') }} <strong>{{ rowToDelete.name || '?' }}</strong>?
+          <i18n-t keypath="designer.deleteConfirm" scope="global">
+            <template #name
+              ><strong>{{ rowToDelete.name || '?' }}</strong></template
+            >
+          </i18n-t>
         </p>
       </template>
       <template #footer>

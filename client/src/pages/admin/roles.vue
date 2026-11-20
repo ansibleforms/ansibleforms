@@ -275,7 +275,7 @@ async function bulkDelete() {
 async function deleteOne(item) {
   if (item.required) return;
   if (
-    !(await askConfirm(`${t('settings.common.deleteConfirm')} ${item.name}?`, {
+    !(await askConfirm(t('settings.common.deleteConfirm', { name: item.name }), {
       title: t('common.delete'),
       icon: 'trash',
     }))

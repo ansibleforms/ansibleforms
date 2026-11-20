@@ -879,7 +879,11 @@ defineExpose({
       <template #title>{{ t('designer.deleteFile') }}</template>
       <template #default>
         <p class="mb-0 fs-6">
-          {{ t('designer.files.deleteConfirm') }} <strong>{{ deleting }}</strong>?
+          <i18n-t keypath="designer.files.deleteConfirm" scope="global">
+            <template #name
+              ><strong>{{ deleting }}</strong></template
+            >
+          </i18n-t>
         </p>
       </template>
       <template #footer>

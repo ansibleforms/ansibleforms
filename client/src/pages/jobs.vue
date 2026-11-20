@@ -1210,7 +1210,11 @@ onMounted(async () => {
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="py-3 fs-6 user-select-none">
-          {{ t('jobs.deleteConfirm') }} <strong>{{ tempJobId }}</strong>?
+          <i18n-t keypath="jobs.deleteConfirm" scope="global">
+            <template #id
+              ><strong>{{ tempJobId }}</strong></template
+            >
+          </i18n-t>
         </p></template
       >
       <template #footer

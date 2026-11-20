@@ -3879,7 +3879,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteForm') }} {{ currentFormName }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteConfirm') }} <strong>{{ currentFormName }}</strong>?
+            <i18n-t keypath="designer.deleteConfirm" scope="global">
+              <template #name
+                ><strong>{{ currentFormName }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
@@ -3900,7 +3904,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteFile') }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteFileConfirm') }} <strong>{{ fileToDelete }}</strong>?
+            <i18n-t keypath="designer.deleteFileConfirm" scope="global">
+              <template #name
+                ><strong>{{ fileToDelete }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
@@ -3921,7 +3929,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteFolder') }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteFolderConfirm') }} <strong>{{ fileToDelete }}</strong>?
+            <i18n-t keypath="designer.deleteFolderConfirm" scope="global">
+              <template #name
+                ><strong>{{ fileToDelete }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
