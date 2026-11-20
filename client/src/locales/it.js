@@ -856,7 +856,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} di {total}',
-    selected: 'selezionati',
+    selected: '{n} selezionato | {n} selezionati',
     clearSelection: 'Annulla selezione',
     selectAll: 'Seleziona tutti ({count})',
     columns: 'Colonne',
@@ -1024,9 +1024,9 @@ export default {
       deleteConfirm: 'Eliminare {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Predefinito',
-      bulkDeleteConfirm: 'Eliminare {count} elemento/i?',
-      bulkDeleteConfirmSkip:
-        'Eliminare {count} elemento/i? {skipped} elemento/i selezionato/i non può/possono essere eliminato/i e viene/vengono lasciato/i.',
+      bulkDeleteConfirm: 'Eliminare {count} elemento? | Eliminare {count} elementi?',
+      bulkDeleteSkipped:
+        '{skipped} elemento selezionato non può essere eliminato e viene lasciato. | {skipped} elementi selezionati non possono essere eliminati e vengono lasciati.',
       bulkDeleteNone: 'Nessuno degli elementi selezionati può essere eliminato.',
       newItem: 'Nuovo {item}',
       addItem: 'Aggiungi {item}',
@@ -1753,16 +1753,16 @@ export default {
       browser: 'Browser',
       askAgain: 'Richiedi di nuovo',
       askAgainConfirm:
-        "Chiedere a {count} utente/i di accettare di nuovo l'avviso? La loro accettazione viene cancellata.",
+        "Chiedere a {count} utente di accettare di nuovo l'avviso? La sua accettazione viene cancellata. | Chiedere a {count} utenti di accettare di nuovo l'avviso? La loro accettazione viene cancellata.",
       askAgainDone:
-        "{count} utente/i accetteranno di nuovo l'avviso la prossima volta che useranno l'app (la prossima pagina o azione).",
+        "{count} utente accetterà di nuovo l'avviso la prossima volta che userà l'app (la prossima pagina o azione). | {count} utenti accetteranno di nuovo l'avviso la prossima volta che useranno l'app (la prossima pagina o azione).",
       versionEnabled: 'Abilitato',
       label: 'Avviso',
       labelPlural: 'Avvisi',
       enabledHelpVersion:
         'Attivo: gli utenti accettano questo avviso alla prossima richiesta, e gli altri sono disattivati. Disattivo: nessun avviso viene richiesto.',
       askAgainTextVersion:
-        '{count} utente/i hanno accettato questo testo. Chiedere di accettarlo di nuovo, o tenerlo come correzione (a nessuno viene richiesto di nuovo)?',
+        '{count} utente ha accettato questo testo. Chiedere di accettarlo di nuovo, o tenerlo come correzione (a nessuno viene richiesto di nuovo)? | {count} utenti hanno accettato questo testo. Chiedere di accettarlo di nuovo, o tenerlo come correzione (a nessuno viene richiesto di nuovo)?',
       notFound: 'Nessun avviso {id}.',
       restoreConfirm: "Abilitare la versione {version}? A chi l'ha già accettata non viene richiesto di nuovo.",
       restoreDone: 'La versione {version} è abilitata.',
@@ -3055,8 +3055,8 @@ export default {
     openJob: 'Apri job',
     openInRunner: 'Apri #{id} in {product}',
     deleteSelected: 'Elimina ({count})',
-    deleteSelectedConfirm: 'Eliminare {count} job selezionati?',
-    deletedSelected: '{count} job eliminati',
+    deleteSelectedConfirm: 'Eliminare {count} job selezionato? | Eliminare {count} job selezionati?',
+    deletedSelected: '{count} job eliminato | {count} job eliminati',
     deleteConfirm: 'Eliminare il job {id}?',
     abortJob: 'Interrompi job',
     abortConfirm: 'Sei sicuro di voler interrompere il job',

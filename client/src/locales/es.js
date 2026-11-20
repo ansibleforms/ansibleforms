@@ -857,7 +857,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} de {total}',
-    selected: 'seleccionado',
+    selected: '{n} seleccionado | {n} seleccionados',
     clearSelection: 'Limpiar selección',
     selectAll: 'Seleccionar todos ({count})',
     columns: 'Columnas',
@@ -1025,9 +1025,9 @@ export default {
       deleteConfirm: '¿Eliminar {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Predeterminado',
-      bulkDeleteConfirm: '¿Eliminar {count} elemento(s)?',
-      bulkDeleteConfirmSkip:
-        '¿Eliminar {count} elemento(s)? {skipped} elemento(s) seleccionado(s) no se pueden eliminar y se dejan como están.',
+      bulkDeleteConfirm: '¿Eliminar {count} elemento? | ¿Eliminar {count} elementos?',
+      bulkDeleteSkipped:
+        '{skipped} elemento seleccionado no se puede eliminar y se deja como está. | {skipped} elementos seleccionados no se pueden eliminar y se dejan como están.',
       bulkDeleteNone: 'Ninguno de los elementos seleccionados se puede eliminar.',
       newItem: 'Nuevo {item}',
       addItem: 'Añadir {item}',
@@ -1757,16 +1757,17 @@ export default {
       ip: 'Dirección IP',
       browser: 'Navegador',
       askAgain: 'Volver a pedir',
-      askAgainConfirm: '¿Pedir a {count} usuario(s) que acepten de nuevo el aviso? Su aceptación se borra.',
+      askAgainConfirm:
+        '¿Pedir a {count} usuario que acepte de nuevo el aviso? Su aceptación se borra. | ¿Pedir a {count} usuarios que acepten de nuevo el aviso? Su aceptación se borra.',
       askAgainDone:
-        '{count} usuario(s) aceptarán el aviso de nuevo la próxima vez que usen la aplicación (su próxima página o acción).',
+        '{count} usuario aceptará el aviso de nuevo la próxima vez que use la aplicación (su próxima página o acción). | {count} usuarios aceptarán el aviso de nuevo la próxima vez que usen la aplicación (su próxima página o acción).',
       versionEnabled: 'Habilitado',
       label: 'Aviso',
       labelPlural: 'Avisos',
       enabledHelpVersion:
         'Activado: los usuarios aceptan este aviso en su próxima petición, y los demás se desactivan. Desactivado: no se pide ningún aviso.',
       askAgainTextVersion:
-        '{count} usuario(s) aceptaron este texto. ¿Pedirles que lo acepten de nuevo, o mantenerlo como corrección (no se pide a nadie de nuevo)?',
+        '{count} usuario aceptó este texto. ¿Pedirle que lo acepte de nuevo, o mantenerlo como corrección (no se pide a nadie de nuevo)? | {count} usuarios aceptaron este texto. ¿Pedirles que lo acepten de nuevo, o mantenerlo como corrección (no se pide a nadie de nuevo)?',
       notFound: 'Ningún aviso {id}.',
       restoreConfirm: '¿Habilitar la versión {version}? A quienes ya la aceptaron no se les vuelve a pedir.',
       restoreDone: 'La versión {version} está habilitada.',
@@ -3060,8 +3061,8 @@ export default {
     openJob: 'Abrir job',
     openInRunner: 'Abrir #{id} en {product}',
     deleteSelected: 'Eliminar ({count})',
-    deleteSelectedConfirm: '¿Eliminar {count} jobs seleccionados?',
-    deletedSelected: '{count} jobs eliminados',
+    deleteSelectedConfirm: '¿Eliminar {count} job seleccionado? | ¿Eliminar {count} jobs seleccionados?',
+    deletedSelected: '{count} job eliminado | {count} jobs eliminados',
     deleteConfirm: '¿Eliminar el trabajo {id}?',
     abortJob: 'Abortar trabajo',
     abortConfirm: '¿Está seguro de que desea abortar el trabajo?',

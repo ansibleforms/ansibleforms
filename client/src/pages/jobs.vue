@@ -1023,7 +1023,7 @@ async function deleteSelected() {
       toast.error(Helpers.parseAxiosResponseError(err) || `Failed to delete job ${id}`);
     }
   }
-  if (done) toast.success(t('jobs.deletedSelected', { count: done }));
+  if (done) toast.success(t('jobs.deletedSelected', { count: done }, done));
   selected.value = new Set();
   await loadJobs();
 }
@@ -1233,7 +1233,7 @@ onMounted(async () => {
       <template #title> {{ t('jobs.deleteSelected', { count: selected.size }) }} </template>
       <template #default
         ><p class="py-3 fs-6 user-select-none">
-          {{ t('jobs.deleteSelectedConfirm', { count: selected.size }) }}
+          {{ t('jobs.deleteSelectedConfirm', { count: selected.size }, selected.size) }}
         </p></template
       >
       <template #footer
@@ -1469,9 +1469,9 @@ onMounted(async () => {
             <!-- the search, as every table's on the title line -->
             <BsSearch v-model="search" class="af-table-search me-2" />
             <!-- the selection, as the other tables' : how many, clear it, or tick every job on all pages -->
-            <span v-if="selected.size" class="text-muted small me-2 text-nowrap"
-              >{{ selected.size }} {{ t('dataTable.selected') }}</span
-            >
+            <span v-if="selected.size" class="text-muted small me-2 text-nowrap">{{
+              t('dataTable.selected', selected.size)
+            }}</span>
             <BsButton v-if="selected.size" icon="xmark" cssClass="me-2 text-nowrap" @click="selected = new Set()">{{
               t('dataTable.clearSelection')
             }}</BsButton>

@@ -848,7 +848,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} of {total}',
-    selected: 'selected',
+    selected: '{n} selected | {n} selected',
     clearSelection: 'Clear selection',
     selectAll: 'Select all {count}',
     columns: 'Columns',
@@ -1018,8 +1018,9 @@ export default {
       deleteConfirm: 'Delete {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Default',
-      bulkDeleteConfirm: 'Delete {count} item(s)?',
-      bulkDeleteConfirmSkip: 'Delete {count} item(s)? {skipped} selected item(s) cannot be deleted and are left alone.',
+      bulkDeleteConfirm: 'Delete {count} item? | Delete {count} items?',
+      bulkDeleteSkipped:
+        '{skipped} selected item cannot be deleted and is left alone. | {skipped} selected items cannot be deleted and are left alone.',
       bulkDeleteNone: 'None of the selected items can be deleted.',
       newItem: 'New {item}',
       addItem: 'Add {item}',
@@ -1733,16 +1734,17 @@ export default {
       ip: 'IP address',
       browser: 'Browser',
       askAgain: 'Ask again',
-      askAgainConfirm: 'Ask {count} user(s) to accept the disclaimer again? Their acceptance is cleared.',
+      askAgainConfirm:
+        'Ask {count} user to accept the disclaimer again? Their acceptance is cleared. | Ask {count} users to accept the disclaimer again? Their acceptance is cleared.',
       askAgainDone:
-        '{count} user(s) will accept the disclaimer again the next time they use the app (their next page or action).',
+        '{count} user will accept the disclaimer again the next time they use the app (their next page or action). | {count} users will accept the disclaimer again the next time they use the app (their next page or action).',
       versionEnabled: 'Enabled',
       label: 'Disclaimer',
       labelPlural: 'Disclaimers',
       enabledHelpVersion:
         'On: users accept this disclaimer at their next request, and the others are off. Off: no disclaimer is asked.',
       askAgainTextVersion:
-        '{count} user(s) accepted this text. Ask them to accept it again, or keep it as a correction (no one is asked again)?',
+        '{count} user accepted this text. Ask them to accept it again, or keep it as a correction (no one is asked again)? | {count} users accepted this text. Ask them to accept it again, or keep it as a correction (no one is asked again)?',
       notFound: 'No disclaimer {id}.',
       restoreConfirm: 'Enable version {version}? Users who accepted it are not asked again.',
       restoreDone: 'Version {version} is enabled.',
@@ -3019,8 +3021,8 @@ export default {
     openJob: 'Open job',
     openInRunner: 'Open #{id} in {product}',
     deleteSelected: 'Delete ({count})',
-    deleteSelectedConfirm: 'Delete {count} selected jobs?',
-    deletedSelected: '{count} jobs deleted',
+    deleteSelectedConfirm: 'Delete {count} selected job? | Delete {count} selected jobs?',
+    deletedSelected: '{count} job deleted | {count} jobs deleted',
     deleteConfirm: 'Delete job {id}?',
     abortJob: 'Abort job',
     abortConfirm: 'Are you sure you want to abort job',

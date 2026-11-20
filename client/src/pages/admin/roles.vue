@@ -259,9 +259,13 @@ async function bulkDelete() {
     if (skipped) toast.warning(t('settings.common.bulkDeleteNone'));
     return;
   }
-  const question = skipped
-    ? t('settings.common.bulkDeleteConfirmSkip', { count: ids.length, skipped })
-    : t('settings.common.bulkDeleteConfirm', { count: ids.length });
+  // each sentence counted on its own : "Delete 3 items? 1 selected item cannot be deleted"
+  const question = [
+    t('settings.common.bulkDeleteConfirm', { count: ids.length }, ids.length),
+    skipped ? t('settings.common.bulkDeleteSkipped', { skipped }, skipped) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   if (!(await askConfirm(question, { title: t('common.delete'), icon: 'trash' }))) return;
   await deleteRoles(ids);
 }

@@ -859,7 +859,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} sur {total}',
-    selected: 'sélectionné(s)',
+    selected: '{n} sélectionné | {n} sélectionnés',
     clearSelection: 'Effacer la sélection',
     selectAll: 'Tout sélectionner ({count})',
     columns: 'Colonnes',
@@ -1028,9 +1028,9 @@ export default {
       deleteConfirm: 'Supprimer {name} ?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Par défaut',
-      bulkDeleteConfirm: 'Supprimer {count} élément(s) ?',
-      bulkDeleteConfirmSkip:
-        'Supprimer {count} élément(s) ? {skipped} élément(s) sélectionné(s) ne peuvent pas être supprimés et sont laissés tels quels.',
+      bulkDeleteConfirm: 'Supprimer {count} élément ? | Supprimer {count} éléments ?',
+      bulkDeleteSkipped:
+        '{skipped} élément sélectionné ne peut pas être supprimé et est laissé tel quel. | {skipped} éléments sélectionnés ne peuvent pas être supprimés et sont laissés tels quels.',
       bulkDeleteNone: 'Aucun des éléments sélectionnés ne peut être supprimé.',
       newItem: 'Nouveau {item}',
       addItem: 'Ajouter {item}',
@@ -1762,16 +1762,16 @@ export default {
       browser: 'Navigateur',
       askAgain: 'Redemander',
       askAgainConfirm:
-        "Demander à {count} utilisateur(s) d'accepter de nouveau l'avertissement ? Leur acceptation est effacée.",
+        "Demander à {count} utilisateur d'accepter de nouveau l'avertissement ? Son acceptation est effacée. | Demander à {count} utilisateurs d'accepter de nouveau l'avertissement ? Leur acceptation est effacée.",
       askAgainDone:
-        "{count} utilisateur(s) accepteront de nouveau l'avertissement la prochaine fois qu'ils utiliseront l'application (leur prochaine page ou action).",
+        "{count} utilisateur acceptera de nouveau l'avertissement la prochaine fois qu'il utilisera l'application (sa prochaine page ou action). | {count} utilisateurs accepteront de nouveau l'avertissement la prochaine fois qu'ils utiliseront l'application (leur prochaine page ou action).",
       versionEnabled: 'Activé',
       label: 'Avertissement',
       labelPlural: 'Avertissements',
       enabledHelpVersion:
         "Activé : les utilisateurs acceptent cet avertissement à leur prochaine requête, les autres sont désactivés. Désactivé : aucun avertissement n'est demandé.",
       askAgainTextVersion:
-        "{count} utilisateur(s) ont accepté ce texte. Leur demander de l'accepter de nouveau, ou le garder comme correction (personne n'est redemandé) ?",
+        "{count} utilisateur a accepté ce texte. Lui demander de l'accepter de nouveau, ou le garder comme correction (personne n'est redemandé) ? | {count} utilisateurs ont accepté ce texte. Leur demander de l'accepter de nouveau, ou le garder comme correction (personne n'est redemandé) ?",
       notFound: 'Aucun avertissement {id}.',
       restoreConfirm: "Activer la version {version} ? Ceux qui l'ont acceptée ne sont pas redemandés.",
       restoreDone: 'La version {version} est activée.',
@@ -3065,8 +3065,8 @@ export default {
     openJob: 'Ouvrir le job',
     openInRunner: 'Ouvrir #{id} dans {product}',
     deleteSelected: 'Supprimer ({count})',
-    deleteSelectedConfirm: 'Supprimer {count} jobs sélectionnés ?',
-    deletedSelected: '{count} jobs supprimés',
+    deleteSelectedConfirm: 'Supprimer {count} job sélectionné ? | Supprimer {count} jobs sélectionnés ?',
+    deletedSelected: '{count} job supprimé | {count} jobs supprimés',
     deleteConfirm: 'Supprimer le job {id} ?',
     abortJob: 'Arrêter le job',
     abortConfirm: 'Êtes-vous sûr de vouloir arrêter le job',

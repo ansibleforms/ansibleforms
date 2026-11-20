@@ -837,7 +837,7 @@ export default {
   },
   dataTable: {
     rangeOf: '第 {from}–{to} 项，共 {total} 项',
-    selected: '已选择',
+    selected: '已选择 {n} 项',
     clearSelection: '清除选择',
     selectAll: '全选 {count} 项',
     columns: '列',
@@ -1005,7 +1005,7 @@ export default {
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: '默认',
       bulkDeleteConfirm: '删除 {count} 项？',
-      bulkDeleteConfirmSkip: '删除 {count} 项？所选的 {skipped} 项无法删除，将保持不变。',
+      bulkDeleteSkipped: '所选的 {skipped} 项无法删除，将保持不变。',
       bulkDeleteNone: '所选项目均无法删除。',
       newItem: '新建{item}',
       addItem: '添加{item}',

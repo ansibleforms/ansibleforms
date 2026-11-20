@@ -857,7 +857,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} de {total}',
-    selected: 'selecionados',
+    selected: '{n} selecionado | {n} selecionados',
     clearSelection: 'Limpar seleção',
     selectAll: 'Selecionar todos os {count}',
     columns: 'Colunas',
@@ -1025,9 +1025,9 @@ export default {
       deleteConfirm: 'Eliminar {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Predefinido',
-      bulkDeleteConfirm: 'Eliminar {count} item(ns)?',
-      bulkDeleteConfirmSkip:
-        'Eliminar {count} item(ns)? {skipped} item(ns) selecionado(s) não pode(m) ser eliminado(s) e fica(m) como está(ão).',
+      bulkDeleteConfirm: 'Eliminar {count} item? | Eliminar {count} itens?',
+      bulkDeleteSkipped:
+        '{skipped} item selecionado não pode ser eliminado e fica como está. | {skipped} itens selecionados não podem ser eliminados e ficam como estão.',
       bulkDeleteNone: 'Nenhum dos itens selecionados pode ser eliminado.',
       newItem: 'Novo {item}',
       addItem: 'Adicionar {item}',
@@ -1616,16 +1616,17 @@ export default {
       ip: 'Endereço IP',
       browser: 'Navegador',
       askAgain: 'Pedir novamente',
-      askAgainConfirm: 'Pedir a {count} utilizador(es) que aceitem novamente o aviso? A aceitação é apagada.',
+      askAgainConfirm:
+        'Pedir a {count} utilizador que aceite novamente o aviso? A aceitação é apagada. | Pedir a {count} utilizadores que aceitem novamente o aviso? A aceitação é apagada.',
       askAgainDone:
-        '{count} utilizador(es) aceitarão o aviso novamente da próxima vez que usarem a aplicação (a próxima página ou ação).',
+        '{count} utilizador aceitará o aviso novamente da próxima vez que usar a aplicação (a próxima página ou ação). | {count} utilizadores aceitarão o aviso novamente da próxima vez que usarem a aplicação (a próxima página ou ação).',
       versionEnabled: 'Ativada',
       label: 'Aviso',
       labelPlural: 'Avisos',
       enabledHelpVersion:
         'Ligado: os utilizadores aceitam este aviso no próximo pedido, e os outros ficam desligados. Desligado: nenhum aviso é pedido.',
       askAgainTextVersion:
-        '{count} utilizador(es) aceitaram este texto. Pedir-lhes que o aceitem novamente, ou mantê-lo como correção (ninguém volta a ser solicitado)?',
+        '{count} utilizador aceitou este texto. Pedir-lhe que o aceite novamente, ou mantê-lo como correção (ninguém volta a ser solicitado)? | {count} utilizadores aceitaram este texto. Pedir-lhes que o aceitem novamente, ou mantê-lo como correção (ninguém volta a ser solicitado)?',
       notFound: 'Nenhum aviso {id}.',
       restoreConfirm: 'Ativar a versão {version}? Quem já a aceitou não volta a ser solicitado.',
       restoreDone: 'A versão {version} está ativada.',
@@ -3058,8 +3059,8 @@ export default {
     openJob: 'Abrir tarefa',
     openInRunner: 'Abrir #{id} em {product}',
     deleteSelected: 'Eliminar ({count})',
-    deleteSelectedConfirm: 'Eliminar {count} tarefas selecionadas?',
-    deletedSelected: '{count} tarefas eliminadas',
+    deleteSelectedConfirm: 'Eliminar {count} tarefa selecionada? | Eliminar {count} tarefas selecionadas?',
+    deletedSelected: '{count} tarefa eliminada | {count} tarefas eliminadas',
     deleteConfirm: 'Eliminar a tarefa {id}?',
     abortJob: 'Interromper tarefa',
     abortConfirm: 'Tem a certeza de que pretende interromper a tarefa',

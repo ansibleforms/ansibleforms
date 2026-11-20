@@ -858,7 +858,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} von {total}',
-    selected: 'ausgewählt',
+    selected: '{n} ausgewählt',
     clearSelection: 'Auswahl aufheben',
     selectAll: 'Alle {count} auswählen',
     columns: 'Spalten',
@@ -1029,9 +1029,9 @@ export default {
       deleteConfirm: '{name} löschen?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Standard',
-      bulkDeleteConfirm: '{count} Element(e) löschen?',
-      bulkDeleteConfirmSkip:
-        '{count} Element(e) löschen? {skipped} ausgewählte(s) Element(e) können nicht gelöscht werden und bleiben bestehen.',
+      bulkDeleteConfirm: '{count} Element löschen? | {count} Elemente löschen?',
+      bulkDeleteSkipped:
+        '{skipped} ausgewähltes Element kann nicht gelöscht werden und bleibt bestehen. | {skipped} ausgewählte Elemente können nicht gelöscht werden und bleiben bestehen.',
       bulkDeleteNone: 'Keines der ausgewählten Elemente kann gelöscht werden.',
       newItem: 'Neues {item}',
       addItem: '{item} hinzufügen',
@@ -1761,16 +1761,17 @@ export default {
       ip: 'IP-Adresse',
       browser: 'Browser',
       askAgain: 'Erneut anfragen',
-      askAgainConfirm: '{count} Benutzer bitten, den Hinweis erneut zu akzeptieren? Ihre Zustimmung wird gelöscht.',
+      askAgainConfirm:
+        '{count} Benutzer bitten, den Hinweis erneut zu akzeptieren? Seine Zustimmung wird gelöscht. | {count} Benutzer bitten, den Hinweis erneut zu akzeptieren? Ihre Zustimmung wird gelöscht.',
       askAgainDone:
-        '{count} Benutzer akzeptieren den Hinweis erneut, sobald sie die App das nächste Mal verwenden (ihre nächste Seite oder Aktion).',
+        '{count} Benutzer akzeptiert den Hinweis erneut, sobald er die App das nächste Mal verwendet (seine nächste Seite oder Aktion). | {count} Benutzer akzeptieren den Hinweis erneut, sobald sie die App das nächste Mal verwenden (ihre nächste Seite oder Aktion).',
       versionEnabled: 'Aktiviert',
       label: 'Hinweis',
       labelPlural: 'Hinweise',
       enabledHelpVersion:
         'An: Benutzer akzeptieren diesen Hinweis bei der nächsten Anfrage, die anderen sind aus. Aus: kein Hinweis wird verlangt.',
       askAgainTextVersion:
-        '{count} Benutzer haben diesen Text akzeptiert. Sie erneut fragen, oder als Korrektur behalten (niemand wird erneut gefragt)?',
+        '{count} Benutzer hat diesen Text akzeptiert. Ihn erneut fragen, oder als Korrektur behalten (niemand wird erneut gefragt)? | {count} Benutzer haben diesen Text akzeptiert. Sie erneut fragen, oder als Korrektur behalten (niemand wird erneut gefragt)?',
       notFound: 'Kein Hinweis {id}.',
       restoreConfirm: 'Version {version} aktivieren? Wer sie akzeptiert hat, wird nicht erneut gefragt.',
       restoreDone: 'Version {version} ist aktiviert.',
@@ -3072,8 +3073,8 @@ export default {
     openJob: 'Job öffnen',
     openInRunner: '#{id} in {product} öffnen',
     deleteSelected: 'Löschen ({count})',
-    deleteSelectedConfirm: '{count} ausgewählte Jobs löschen?',
-    deletedSelected: '{count} Jobs gelöscht',
+    deleteSelectedConfirm: '{count} ausgewählten Job löschen? | {count} ausgewählte Jobs löschen?',
+    deletedSelected: '{count} Job gelöscht | {count} Jobs gelöscht',
     deleteConfirm: 'Job {id} löschen?',
     abortJob: 'Job abbrechen',
     abortConfirm: 'Sind Sie sicher, dass Sie den Job abbrechen möchten',

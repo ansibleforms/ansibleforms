@@ -856,7 +856,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} van {total}',
-    selected: 'geselecteerd',
+    selected: '{n} geselecteerd',
     clearSelection: 'Selectie wissen',
     selectAll: 'Alle {count} selecteren',
     columns: 'Kolommen',
@@ -1025,9 +1025,9 @@ export default {
       deleteConfirm: '{name} verwijderen?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Standaard',
-      bulkDeleteConfirm: '{count} item(s) verwijderen?',
-      bulkDeleteConfirmSkip:
-        '{count} item(s) verwijderen? {skipped} geselecteerde item(s) kunnen niet verwijderd worden en blijven staan.',
+      bulkDeleteConfirm: '{count} item verwijderen? | {count} items verwijderen?',
+      bulkDeleteSkipped:
+        '{skipped} geselecteerd item kan niet verwijderd worden en blijft staan. | {skipped} geselecteerde items kunnen niet verwijderd worden en blijven staan.',
       bulkDeleteNone: 'Geen van de geselecteerde items kan verwijderd worden.',
       newItem: 'Nieuwe {item}',
       addItem: '{item} toevoegen',
@@ -1750,16 +1750,17 @@ export default {
       ip: 'IP-adres',
       browser: 'Browser',
       askAgain: 'Opnieuw vragen',
-      askAgainConfirm: '{count} gebruiker(s) vragen de disclaimer opnieuw te accepteren? Hun acceptatie wordt gewist.',
+      askAgainConfirm:
+        '{count} gebruiker vragen de disclaimer opnieuw te accepteren? De acceptatie wordt gewist. | {count} gebruikers vragen de disclaimer opnieuw te accepteren? Hun acceptatie wordt gewist.',
       askAgainDone:
-        '{count} gebruiker(s) accepteren de disclaimer opnieuw zodra ze de app weer gebruiken (hun volgende pagina of actie).',
+        '{count} gebruiker accepteert de disclaimer opnieuw zodra die de app weer gebruikt (de volgende pagina of actie). | {count} gebruikers accepteren de disclaimer opnieuw zodra ze de app weer gebruiken (hun volgende pagina of actie).',
       versionEnabled: 'Ingeschakeld',
       label: 'Disclaimer',
       labelPlural: 'Disclaimers',
       enabledHelpVersion:
         'Aan: gebruikers accepteren deze disclaimer bij hun volgende verzoek, de andere zijn uit. Uit: er wordt geen disclaimer gevraagd.',
       askAgainTextVersion:
-        '{count} gebruiker(s) accepteerden deze tekst. Hen opnieuw vragen, of bewaren als correctie (niemand wordt opnieuw gevraagd)?',
+        '{count} gebruiker accepteerde deze tekst. Opnieuw vragen, of bewaren als correctie (niemand wordt opnieuw gevraagd)? | {count} gebruikers accepteerden deze tekst. Hen opnieuw vragen, of bewaren als correctie (niemand wordt opnieuw gevraagd)?',
       notFound: 'Geen disclaimer {id}.',
       restoreConfirm: 'Versie {version} inschakelen? Wie hem al accepteerde, wordt niet opnieuw gevraagd.',
       restoreDone: 'Versie {version} is ingeschakeld.',
@@ -3050,8 +3051,8 @@ export default {
     openJob: 'Job openen',
     openInRunner: '#{id} openen in {product}',
     deleteSelected: 'Verwijderen ({count})',
-    deleteSelectedConfirm: '{count} geselecteerde jobs verwijderen?',
-    deletedSelected: '{count} jobs verwijderd',
+    deleteSelectedConfirm: '{count} geselecteerde job verwijderen? | {count} geselecteerde jobs verwijderen?',
+    deletedSelected: '{count} job verwijderd | {count} jobs verwijderd',
     deleteConfirm: 'Job {id} verwijderen?',
     abortJob: 'Job afbreken',
     abortConfirm: 'Weet u zeker dat u job wilt afbreken',

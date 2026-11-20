@@ -45,11 +45,7 @@ const ONE = {
 };
 
 // the confirmations of several things, with their count
-const SEVERAL = [
-  'settings.common.bulkDeleteConfirm',
-  'settings.common.bulkDeleteConfirmSkip',
-  'jobs.deleteSelectedConfirm',
-];
+const SEVERAL = ['settings.common.bulkDeleteConfirm', 'jobs.deleteSelectedConfirm'];
 
 /**
  * Lists the source files of the client, recursively.

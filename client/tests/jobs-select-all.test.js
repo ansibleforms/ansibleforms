@@ -19,7 +19,7 @@ describe('the jobs list selection', () => {
   });
 
   it('shows the count, Clear selection and Select all as the other tables', () => {
-    expect(page).toContain("{{ selected.size }} {{ t('dataTable.selected') }}");
+    expect(page).toContain("t('dataTable.selected', selected.size)");
     expect(page).toContain("t('dataTable.clearSelection')");
     expect(page).toContain("t('dataTable.selectAll', { count: allSelectable.length })");
     // offered only while something is left to tick

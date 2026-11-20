@@ -24,7 +24,7 @@ import { askConfirm } from '@/lib/confirmPrompt';
  */
 export async function deleteRecords(t, urls) {
   if (!urls.length) return false;
-  const question = t('settings.common.bulkDeleteConfirm', { count: urls.length });
+  const question = t('settings.common.bulkDeleteConfirm', { count: urls.length }, urls.length);
   if (!(await askConfirm(question, { title: t('common.delete'), icon: 'trash' }))) return false;
   const results = await Promise.allSettled(urls.map((url) => axios.delete(url)));
   const failed = results.filter((r) => r.status === 'rejected');

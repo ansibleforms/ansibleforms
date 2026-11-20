@@ -856,7 +856,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} de {total}',
-    selected: 'seleccionats',
+    selected: '{n} seleccionat | {n} seleccionats',
     clearSelection: 'Esborra la selecció',
     selectAll: "Selecciona'ls tots ({count})",
     columns: 'Columnes',
@@ -1024,9 +1024,9 @@ export default {
       deleteConfirm: 'Suprimir {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Predeterminat',
-      bulkDeleteConfirm: 'Eliminar {count} element(s)?',
-      bulkDeleteConfirmSkip:
-        'Eliminar {count} element(s)? {skipped} element(s) seleccionat(s) no es poden eliminar i es deixen com estan.',
+      bulkDeleteConfirm: 'Eliminar {count} element? | Eliminar {count} elements?',
+      bulkDeleteSkipped:
+        '{skipped} element seleccionat no es pot eliminar i es deixa com està. | {skipped} elements seleccionats no es poden eliminar i es deixen com estan.',
       bulkDeleteNone: 'Cap dels elements seleccionats es pot eliminar.',
       newItem: 'Nou element: {item}',
       addItem: 'Afegeix {item}',
@@ -1616,16 +1616,17 @@ export default {
       ip: 'Adreça IP',
       browser: 'Navegador',
       askAgain: 'Torna a demanar',
-      askAgainConfirm: "Vols demanar a {count} usuari(s) que tornin a acceptar l'avís? La seva acceptació s'esborra.",
+      askAgainConfirm:
+        "Vols demanar a {count} usuari que torni a acceptar l'avís? La seva acceptació s'esborra. | Vols demanar a {count} usuaris que tornin a acceptar l'avís? La seva acceptació s'esborra.",
       askAgainDone:
-        "{count} usuari(s) tornaran a acceptar l'avís la propera vegada que facin servir l'aplicació (la propera pàgina o acció).",
+        "{count} usuari tornarà a acceptar l'avís la propera vegada que faci servir l'aplicació (la propera pàgina o acció). | {count} usuaris tornaran a acceptar l'avís la propera vegada que facin servir l'aplicació (la propera pàgina o acció).",
       versionEnabled: 'Activat',
       label: 'Avís',
       labelPlural: 'Avisos',
       enabledHelpVersion:
         'Activat: els usuaris accepten aquest avís a la propera petició, i els altres es desactiven. Desactivat: no es demana cap avís.',
       askAgainTextVersion:
-        '{count} usuari(s) han acceptat aquest text. Vols demanar-los que el tornin a acceptar, o conservar-lo com a correcció (no es torna a demanar a ningú)?',
+        '{count} usuari ha acceptat aquest text. Vols demanar-li que el torni a acceptar, o conservar-lo com a correcció (no es torna a demanar a ningú)? | {count} usuaris han acceptat aquest text. Vols demanar-los que el tornin a acceptar, o conservar-lo com a correcció (no es torna a demanar a ningú)?',
       notFound: 'Cap avís {id}.',
       restoreConfirm:
         "Vols activar la versió {version}? Als usuaris que ja l'havien acceptada no se'ls torna a demanar.",
@@ -3060,8 +3061,8 @@ export default {
     openJob: 'Obre la tasca',
     openInRunner: 'Obre #{id} a {product}',
     deleteSelected: 'Suprimeix ({count})',
-    deleteSelectedConfirm: 'Suprimir {count} tasques seleccionades?',
-    deletedSelected: '{count} tasques suprimides',
+    deleteSelectedConfirm: 'Suprimir {count} tasca seleccionada? | Suprimir {count} tasques seleccionades?',
+    deletedSelected: '{count} tasca suprimida | {count} tasques suprimides',
     deleteConfirm: 'Suprimir la tasca {id}?',
     abortJob: 'Avorta la tasca',
     abortConfirm: 'Segur que vols avortar la tasca',

@@ -854,7 +854,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{from}–{to} z {total}',
-    selected: 'zaznaczono',
+    selected: '{n} zaznaczony | {n} zaznaczone | {n} zaznaczonych',
     clearSelection: 'Wyczyść zaznaczenie',
     selectAll: 'Zaznacz wszystkie ({count})',
     columns: 'Kolumny',
@@ -1022,9 +1022,9 @@ export default {
       deleteConfirm: 'Usunąć {name}?',
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: 'Domyślny',
-      bulkDeleteConfirm: 'Usunąć {count} element(y)?',
-      bulkDeleteConfirmSkip:
-        'Usunąć {count} element(y)? {skipped} zaznaczonych elementów nie można usunąć i pozostaną bez zmian.',
+      bulkDeleteConfirm: 'Usunąć {count} element? | Usunąć {count} elementy? | Usunąć {count} elementów?',
+      bulkDeleteSkipped:
+        '{skipped} zaznaczony element nie może zostać usunięty i pozostanie bez zmian. | {skipped} zaznaczone elementy nie mogą zostać usunięte i pozostaną bez zmian. | {skipped} zaznaczonych elementów nie można usunąć i pozostaną bez zmian.',
       bulkDeleteNone: 'Żadnego z zaznaczonych elementów nie można usunąć.',
       newItem: 'Nowy element: {item}',
       addItem: 'Dodaj {item}',
@@ -1605,16 +1605,16 @@ export default {
       browser: 'Przeglądarka',
       askAgain: 'Poproś ponownie',
       askAgainConfirm:
-        'Poprosić {count} użytkownika(ów) o ponowną akceptację zastrzeżenia? Ich akceptacja zostanie usunięta.',
+        'Poprosić {count} użytkownika o ponowną akceptację zastrzeżenia? Jego akceptacja zostanie usunięta. | Poprosić {count} użytkowników o ponowną akceptację zastrzeżenia? Ich akceptacja zostanie usunięta. | Poprosić {count} użytkowników o ponowną akceptację zastrzeżenia? Ich akceptacja zostanie usunięta.',
       askAgainDone:
-        '{count} użytkownik(ów) zaakceptuje zastrzeżenie ponownie przy następnym użyciu aplikacji (następna strona lub akcja).',
+        '{count} użytkownik zaakceptuje zastrzeżenie ponownie przy następnym użyciu aplikacji (następna strona lub akcja). | {count} użytkownicy zaakceptują zastrzeżenie ponownie przy następnym użyciu aplikacji (następna strona lub akcja). | {count} użytkowników zaakceptuje zastrzeżenie ponownie przy następnym użyciu aplikacji (następna strona lub akcja).',
       versionEnabled: 'Włączona',
       label: 'Zastrzeżenie',
       labelPlural: 'Zastrzeżenia',
       enabledHelpVersion:
         'Włączone: użytkownicy akceptują to zastrzeżenie przy następnym żądaniu, a pozostałe są wyłączone. Wyłączone: żadne zastrzeżenie nie jest wymagane.',
       askAgainTextVersion:
-        '{count} użytkownik(ów) zaakceptowało ten tekst. Poprosić ich o ponowną akceptację, czy zachować jako poprawkę (nikt nie jest proszony ponownie)?',
+        '{count} użytkownik zaakceptował ten tekst. Poprosić go o ponowną akceptację, czy zachować jako poprawkę (nikt nie jest proszony ponownie)? | {count} użytkownicy zaakceptowali ten tekst. Poprosić ich o ponowną akceptację, czy zachować jako poprawkę (nikt nie jest proszony ponownie)? | {count} użytkowników zaakceptowało ten tekst. Poprosić ich o ponowną akceptację, czy zachować jako poprawkę (nikt nie jest proszony ponownie)?',
       notFound: 'Brak zastrzeżenia {id}.',
       restoreConfirm: 'Włączyć wersję {version}? Ci, którzy ją zaakceptowali, nie zostaną poproszeni ponownie.',
       restoreDone: 'Wersja {version} jest włączona.',
@@ -3040,8 +3040,9 @@ export default {
     openJob: 'Otwórz zadanie',
     openInRunner: 'Otwórz #{id} w {product}',
     deleteSelected: 'Usuń ({count})',
-    deleteSelectedConfirm: 'Usunąć {count} zaznaczonych zadań?',
-    deletedSelected: 'Usunięto zadania: {count}',
+    deleteSelectedConfirm:
+      'Usunąć {count} zaznaczone zadanie? | Usunąć {count} zaznaczone zadania? | Usunąć {count} zaznaczonych zadań?',
+    deletedSelected: 'Usunięto {count} zadanie | Usunięto {count} zadania | Usunięto {count} zadań',
     deleteConfirm: 'Usunąć zadanie {id}?',
     abortJob: 'Przerwij zadanie',
     abortConfirm: 'Czy na pewno chcesz przerwać zadanie',

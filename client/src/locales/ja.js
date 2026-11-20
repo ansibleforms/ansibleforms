@@ -851,7 +851,7 @@ export default {
   },
   dataTable: {
     rangeOf: '{total} 件中 {from}–{to}',
-    selected: '件を選択中',
+    selected: '{n} 件を選択中',
     clearSelection: '選択を解除',
     selectAll: '{count} 件すべてを選択',
     columns: '列',
@@ -1021,7 +1021,7 @@ export default {
       // the badge after a record's type or name that is the default (defaultNote)
       defaultNote: '既定',
       bulkDeleteConfirm: '{count} 件を削除しますか？',
-      bulkDeleteConfirmSkip: '{count} 件を削除しますか？選択した {skipped} 件は削除できないため、そのまま残ります。',
+      bulkDeleteSkipped: '選択した {skipped} 件は削除できないため、そのまま残ります。',
       bulkDeleteNone: '選択した項目はどれも削除できません。',
       newItem: '新しい{item}',
       addItem: '{item}を追加',
