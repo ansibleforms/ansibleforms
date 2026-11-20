@@ -751,7 +751,7 @@ defineExpose({
         <div class="af-form-span2">
           <label class="form-label fw-bold">{{ t('designer.formName') }}</label>
           <div class="input-group">
-            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
             <input
               class="form-control"
               :class="{ 'is-invalid': !form.name.trim() }"
@@ -778,7 +778,7 @@ defineExpose({
           <label class="form-label fw-bold">{{ t('designer.formDescription') }}</label>
           <!-- a sentence or two : as tall as two lines, as the help below -->
           <div class="input-group">
-            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="circle-info" /></span>
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="info-circle" /></span>
             <textarea
               class="form-control af-text-box"
               rows="3"

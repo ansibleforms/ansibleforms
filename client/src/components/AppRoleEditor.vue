@@ -197,7 +197,7 @@ function removeUser(index) {
       <BsInput
         class="af-role-name"
         :isFloating="false"
-        icon="user-shield"
+        icon="heading"
         v-model="role.name"
         :label="t('settings.settingsPage.name')"
         :placeholder="t('settings.settingsPage.roleNamePlaceholder')"

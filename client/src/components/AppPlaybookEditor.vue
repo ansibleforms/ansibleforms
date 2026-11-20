@@ -188,7 +188,7 @@ function pickSection(pi) {
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   class="form-control"
                   :value="play.name"
@@ -372,7 +372,7 @@ function pickSection(pi) {
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   class="form-control"
                   :value="task.name"

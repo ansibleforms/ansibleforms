@@ -1111,7 +1111,7 @@ async function changePassword() {
                   v-model="tokenForm.name"
                   :isFloating="false"
                   type="text"
-                  icon="tag"
+                  icon="heading"
                   :required="true"
                   :label="t('profilePage.token.name')"
                   :help="t('profilePage.token.nameHint')"

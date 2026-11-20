@@ -117,7 +117,7 @@ describe("the profile's API token dialog : each label above its field", () => {
     // three BsInput, none horizontal : BsInput then puts a bold label above its field
     expect(dialog.match(/<BsInput\b/g)).toHaveLength(3);
     expect(dialog.match(/:isFloating="false"/g)).toHaveLength(3);
-    for (const icon of ['tag', 'hourglass-half', 'lock']) expect(dialog).toContain(`icon="${icon}"`);
+    for (const icon of ['heading', 'hourglass-half', 'lock']) expect(dialog).toContain(`icon="${icon}"`);
     const input = readFileSync(join(import.meta.dirname, '../src/components/BsInput.vue'), 'utf8');
     const above = input.slice(input.lastIndexOf('<template v-else>'));
     expect(above).toContain('<label :for="uid" class="form-label fw-bold"');

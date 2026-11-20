@@ -1024,7 +1024,7 @@ export default function getSettings(t) {
           sortable: true,
           required: true,
           filterable: true,
-          icon: 'users',
+          icon: 'heading',
         },
         // where the group comes from : local, or its directory (LDAP, Entra ID, OIDC)
         {
@@ -2147,7 +2147,7 @@ export default function getSettings(t) {
           sortable: true,
           required: true,
           filterable: true,
-          icon: 'lock',
+          icon: 'heading',
           isKey: true,
         },
         {
@@ -5291,7 +5291,7 @@ function databaseSettings(t) {
         sortable: true,
         required: true,
         filterable: true,
-        icon: 'database',
+        icon: 'heading',
         isKey: true,
       },
       {

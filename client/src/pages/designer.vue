@@ -4330,7 +4330,7 @@ onBeforeUnmount(() => {
             :isFloating="false"
             v-model="newCatName"
             :label="t('designer.categoryName')"
-            icon="tag"
+            icon="heading"
             :placeholder="t('designer.categoryNamePlaceholder')"
             class="mb-3"
           />
@@ -4426,7 +4426,7 @@ onBeforeUnmount(() => {
             <div class="flex-grow-1">
               <label v-if="idx === 0" class="form-label fw-bold">{{ t('designer.categoryName') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tag" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   type="text"
                   class="form-control"
