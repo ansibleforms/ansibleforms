@@ -1,9 +1,12 @@
 // The empty texts of the lists, tables, editors and pick lists share one form.
 //
 // They had drifted apart: "no form" and "no facts" in lower case without a period, "No task
-// yet." and "No roles configured yet." with one. Each now starts with a capital letter and
-// ends without a final period (or 。), in every language; where it means that none was made
-// yet, the English says so as "No X yet".
+// yet." and "No roles configured yet." with one. Each now starts with a capital letter, in
+// every language. The short ones ("No roles yet") end without a final period (or 。); the
+// longer ones that are real sentences, a second clause after a colon or a statement of their
+// own ("No jobs yet: they appear here as soon as a form is run."), end with one, as every
+// sentence of the app does. Where it means that none was made yet, the English says so as
+// "No X yet".
 import { describe, it, expect } from 'vitest';
 
 const LANGS = ['en', 'de', 'fr', 'it', 'es', 'nl', 'ca', 'pt', 'ja', 'zh', 'pl'];
@@ -84,6 +87,22 @@ const EMPTY_TEXTS = [
   'designer.files.noFolder',
 ];
 
+// Those that are real sentences, and end with a period.
+const SENTENCES = [
+  'workflowEditor.noWorkflowHint',
+  'settings.users.noSchedule',
+  'settings.repositories.noOutput',
+  'settings.repositories.noPushOutput',
+  'settings.repositories.noPushTarget',
+  'designer.files.noInventories',
+  'designer.files.noVars',
+  'designer.files.noFiles',
+  'designer.files.inventoryEmpty',
+  'designer.files.noFolder',
+  'designer.visualNoFields',
+  'jobs.empty.none',
+];
+
 // Those that mean none was made yet.
 const NONE_YET = [
   'inventoryEditor.noVar',
@@ -145,13 +164,14 @@ describe('the empty texts', () => {
     expect(missing).toEqual([]);
   });
 
-  it('start with a capital letter and end without a period, in every language', () => {
+  it('start with a capital letter, the short ones without a final period, in every language', () => {
     const wrong = [];
     for (const lang of LANGS) {
       for (const key of EMPTY_TEXTS) {
         const text = textAt(locales[lang], key) ?? '';
         const first = text[0] ?? '';
-        if (first !== first.toUpperCase() || /[.。．]$/.test(text)) wrong.push(`${lang} ${key}: ${text}`);
+        const period = /[.。．]$/.test(text);
+        if (first !== first.toUpperCase() || period !== SENTENCES.includes(key)) wrong.push(`${lang} ${key}: ${text}`);
       }
     }
     expect(wrong).toEqual([]);
