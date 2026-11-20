@@ -2444,7 +2444,7 @@ export default {
     },
     mail: {
       mailTo: 'Mail to',
-      enterDestination: 'Enter you mail destination.',
+      enterDestination: 'Enter your mail destination.',
       validEmail: 'Must be a valid email',
     },
     oauth2: {
