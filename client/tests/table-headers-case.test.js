@@ -34,10 +34,12 @@ function pageHeaders(file, from, to) {
 }
 
 // a list's columns as AppAdminMulti draws them : a column's own title, else the field's label
-const listHeaders = (list) =>
-  getSettings((k) => k)
-    [list].fields.filter((f) => !f.noTable && (f.columnLabel || f.label))
+const listHeaders = (list) => {
+  const settings = getSettings((k) => k);
+  return settings[list].fields
+    .filter((f) => !f.noTable && (f.columnLabel || f.label))
     .map((f) => f.columnLabel || f.label);
+};
 
 const TABLES = {
   jobs: pageHeaders('pages/jobs.vue', 'const columnDefs', 'const hiddenColumns'),
