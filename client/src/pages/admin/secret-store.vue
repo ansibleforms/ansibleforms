@@ -612,7 +612,7 @@ onMounted(async () => {
                   :label="t('settings.secretStores.namespace')"
                 />
                 <div v-show="fieldShown('kv_version')" class="mb-3">
-                  <div class="form-label">{{ t('settings.secretStores.kvVersion') }}</div>
+                  <div class="form-label fw-bold">{{ t('settings.secretStores.kvVersion') }}</div>
                   <div
                     v-for="opt in [
                       { value: 2, label: 'KV v2', hint: t('settings.secretStores.kv2Hint') },

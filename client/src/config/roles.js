@@ -23,7 +23,7 @@ export function providerPrefix(provider) {
 }
 
 // the role options in their groups, in the order they show : the role's page and its New role
-// dialog (AppRoleEditor) and the profile's Permissions view, each group under its title
+// wizard (AppRoleEditor) and the profile's Permissions view, each group under its title
 export const roleOptionGroups = [
   {
     name: 'settings',
@@ -80,6 +80,17 @@ export const roleOptionGroups = [
     // admin : the role's users are admins, as the admin role's (issue #1313) - first, as it gives most
     keys: ['admin', 'allowLogin', 'allowChat', 'allowMcp', 'allowApiTokens', 'extendedTokenExpiration'],
   },
+];
+
+// the steps of the New role wizard (pages/admin/roles.vue, AppRoleEditor's step) : its name and
+// description, its permissions (the options above), then its users and its groups. label is an
+// i18n key ; count, the users or groups of the role the step shows beside its name
+export const roleWizardSteps = [
+  { key: 'details', label: 'settings.common.tabDetails' },
+  // its many switches, three a line : a wider dialog on this step only
+  { key: 'permissions', label: 'settings.settingsPage.permissions', dialogSize: 'xl' },
+  { key: 'users', label: 'settings.settingsPage.users', count: 'users' },
+  { key: 'groups', label: 'settings.settingsPage.groups', count: 'groups' },
 ];
 
 /**

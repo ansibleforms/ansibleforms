@@ -52,6 +52,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -597,15 +598,7 @@ onMounted(async () => {
                   t('settings.notificationChannels.enabled')
                 }}</label>
                 <!-- saved with Save, as every record's Enabled -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-channel-enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    v-model="edit.enabled"
-                  />
-                </div>
+                <BsSwitch id="af-channel-enabled" v-model="edit.enabled" class="mb-0" />
                 <div class="form-text">{{ t('settings.notificationChannels.enabledHelp') }}</div>
               </div>
               <div v-if="type === 'mail'" v-show="fieldShown('is_active')" class="mb-3">
@@ -613,16 +606,12 @@ onMounted(async () => {
                   t('settings.notificationChannels.active')
                 }}</label>
                 <!-- turned on, saved with Save ; turned off by making another the default -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-channel-active"
-                    v-model="edit.is_active"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    :disabled="!!channel.is_active"
-                  />
-                </div>
+                <BsSwitch
+                  id="af-channel-active"
+                  v-model="edit.is_active"
+                  :disabled="!!channel.is_active"
+                  class="mb-0"
+                />
                 <div class="form-text">{{ t('settings.notificationChannels.activeHelp') }}</div>
               </div>
             </template>

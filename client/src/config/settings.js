@@ -561,8 +561,8 @@ export function credentialLabels(t, type, awxAuth = 'token', gitAuth = 'token') 
       }[type] || null,
     password:
       {
-        // its bind user's password : plain Password, the field above names the bind user
-        ldap: t('settings.fields.password'),
+        // its bind user's password
+        ldap: t('settings.ldap.bindPassword'),
         entraid: t('settings.oauth2.clientSecret'),
         oidc: t('settings.oauth2.clientSecret'),
         vault: t('settings.fields.token'),
@@ -718,12 +718,16 @@ export default function getSettings(t) {
       openPage: (item) =>
         !item.source || item.source === 'local' ? `/settings/users/${item.id}` : directoryPath('users', item),
       // the dialog in steps : who the user is, the password (editing : left empty, it stays), the
-      // group that gives the roles
+      // group that gives the roles, then the roles given to the user itself (pages/admin/users.vue
+      // gives the roles to pick from, and gives those picked once the user is created)
       steps: [
         { key: 'user', label: t('settings.users.stepUser') },
         { key: 'password', label: t('settings.users.stepPassword') },
         { key: 'group', label: t('settings.users.stepGroup') },
+        { key: 'roles', label: t('settings.settingsPage.roles'), count: (item) => (item.role_names || []).length },
       ],
+      // the roles picked are not the user's own field : given after it is created
+      beforeSave: ({ role_names: _roles, password_repeat: _repeat, ...user }) => user,
       // in the row menu : editing, the groups, the password, then Delete last, each apart
       actions: [
         { name: 'edit', title: t('common.edit'), icon: 'pencil', color: 'edit' },
@@ -834,6 +838,18 @@ export default function getSettings(t) {
           icon: 'lock',
         },
         {
+          // typed twice when the user is made : the dialog's only, never sent (beforeSave)
+          key: 'password_repeat',
+          step: 'password',
+          label: t('settings.common.repeatPassword'),
+          type: 'password',
+          required: true,
+          noTable: true,
+          hidden: true,
+          icon: 'lock',
+          validator: (value, item) => (value === item.password ? '' : t('settings.common.passwordsDiffer')),
+        },
+        {
           key: 'email',
           label: t('settings.fields.email'),
           type: 'email',
@@ -857,6 +873,28 @@ export default function getSettings(t) {
           values: 'group',
           valueKey: 'id',
           labelKey: 'name',
+        },
+        // the New wizard's Roles step : the roles to give the user, each in its dropdown
+        // (AppPickList) ; the dialog only, given once the user is created
+        {
+          key: 'role_names',
+          step: 'roles',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.role_names || [],
+            icon: 'user-shield',
+            addLabel: t('settings.settingsPage.addRole'),
+            emptyText: t('settings.users.noRole'),
+            'onUpdate:modelValue': (v) => {
+              item.role_names = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
         },
         // its latest sign-in, local or LDAP or SSO, in the user's zone : an account no one uses
         // stands out ; none recorded yet, an en dash
@@ -932,6 +970,15 @@ export default function getSettings(t) {
       ],
       // the LDAP and SSO groups beside the local ones (seen at a sign-in, or named by a role)
       listQuery: '?directory=1',
+      // New in steps : what the group is, its users, its roles (pages/admin/groups.vue gives the
+      // users and roles to pick from, and adds those picked once the group is created)
+      steps: [
+        { key: 'details', label: t('settings.common.tabDetails') },
+        { key: 'users', label: t('settings.settingsPage.users'), count: (item) => (item.user_ids || []).length },
+        { key: 'roles', label: t('settings.settingsPage.roles'), count: (item) => (item.role_names || []).length },
+      ],
+      // the users and roles picked are not the group's own fields : added after it is created
+      beforeSave: ({ user_ids: _users, role_names: _roles, ...group }) => group,
       // a group has its own page (pages/admin/group.vue ; an LDAP or SSO group's
       // pages/admin/directory-group.vue) : its row and Edit open it, New the dialog
       openPage: (item) =>
@@ -997,6 +1044,49 @@ export default function getSettings(t) {
           required: false,
           filterable: true,
           icon: 'info-circle',
+        },
+        // the New wizard's Users step : the local users to put in the group, each in its dropdown
+        // (AppPickList) ; the dialog only, added once the group is created
+        {
+          key: 'user_ids',
+          step: 'users',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.user_ids || [],
+            icon: 'user',
+            addLabel: t('settings.settingsPage.addUser'),
+            emptyText: t('settings.groups.noUsers'),
+            'onUpdate:modelValue': (v) => {
+              item.user_ids = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
+        },
+        // the New wizard's Roles step : the roles to give the group, as its users
+        {
+          key: 'role_names',
+          step: 'roles',
+          label: '',
+          type: 'component',
+          flush: true,
+          component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
+          initial: () => [],
+          props: (item) => ({
+            modelValue: item.role_names || [],
+            icon: 'user-shield',
+            addLabel: t('settings.settingsPage.addRole'),
+            emptyText: t('settings.groups.noRole'),
+            'onUpdate:modelValue': (v) => {
+              item.role_names = v;
+            },
+          }),
+          hidden: true,
+          noTable: true,
         },
         // how many users are in the group (the server counts them) : a column, last, to the right
         {
@@ -1603,6 +1693,7 @@ export default function getSettings(t) {
           step: 'when',
           label: t('settings.schedules.rrule'),
           type: 'rrule',
+          icon: 'repeat',
           help: t('settings.schedules.rruleHelp'),
           hidden: true,
           noTable: true,
@@ -1923,7 +2014,14 @@ export default function getSettings(t) {
       fields: [
         { key: 'id', label: t('settings.knownhosts.hostEntry'), filterable: true, hidden: true, noInput: true },
         { key: 'name', label: t('settings.knownhosts.hostEntry'), required: false, filterable: true, noInput: true },
-        { key: 'host', label: t('settings.fields.host'), required: true, filterable: true, hidden: true },
+        {
+          key: 'host',
+          label: t('settings.fields.host'),
+          required: true,
+          filterable: true,
+          hidden: true,
+          icon: 'server',
+        },
       ],
     },
     credentials: {
@@ -2252,8 +2350,8 @@ export default function getSettings(t) {
           // password. Not stored : a user kept is the choice
           key: 'awx_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.awxSignIn'),
           type: 'radio',
           options: awxAuthOptionList(t),
@@ -2269,8 +2367,8 @@ export default function getSettings(t) {
           // or a user and its password. Not stored : a user kept is the choice
           key: 'git_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.gitSignIn'),
           type: 'radio',
           options: gitAuthOptionList(t),
@@ -2286,8 +2384,8 @@ export default function getSettings(t) {
           // its password. Not stored : a user kept is the choice
           key: 'smtp_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.smtpSignIn'),
           type: 'radio',
           options: smtpAuthOptionList(t),
@@ -2336,8 +2434,8 @@ export default function getSettings(t) {
           // kept is the choice
           key: 'entra_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.entraSignIn'),
           type: 'radio',
           options: entraAuthOptionList(t),
@@ -2354,8 +2452,8 @@ export default function getSettings(t) {
           // passphrase). Not stored : a private key kept is the choice
           key: 'ssh_auth',
           step: 'login',
-          // among the Login step's fields : its hints where their inputs start
-          alignHints: true,
+          // among the Login step's fields : its label above it, as theirs
+          titled: true,
           label: t('settings.credentials.sshSignIn'),
           type: 'radio',
           options: sshAuthOptionList(t),
@@ -2471,6 +2569,8 @@ export default function getSettings(t) {
           // userpass or cyberark one with an address) : its certificate not checked
           key: 'ignore_certs',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           label: t('settings.ldap.ignoreCerts'),
           dialogLabel: (r) => (credentialServer(r) ? t('settings.runners.skipVerify') : null),
           help: (r) => (credentialServer(r) ? null : t('settings.ldap.ignoreCertsDesc')),
@@ -2487,6 +2587,8 @@ export default function getSettings(t) {
           // an entraid one signing in with a certificate : the one uploaded to its app registration
           key: 'client_cert',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           icon: 'certificate',
           type: 'textarea',
           label: t('settings.secretStores.clientCert'),
@@ -2510,6 +2612,8 @@ export default function getSettings(t) {
           // checked against
           key: 'ca_bundle',
           step: 'login',
+          // an ldap one's : right after its Use TLS, before its bind user
+          placeBefore: (r) => (r.credential_type === 'ldap' ? 'user' : null),
           icon: 'certificate',
           type: 'textarea',
           label: t('settings.fields.caBundle'),
@@ -2576,8 +2680,10 @@ export default function getSettings(t) {
           choicesWhen: (store, r) => !writesToStore(r) || !store?.name || !!Number(store.write_enabled),
           // a New one while writing : writing already on, so it is offered once made
           createDefaults: (r) => (writesToStore(r) ? { write_enabled: true } : {}),
-          // written to, none allows writing yet : the dropdown still shown, saying so, over its button
-          emptyText: (r) => (writesToStore(r) ? t('settings.credentials.noWritableStore') : ''),
+          // none to choose : the dropdown still shown, saying so, over its button (written to : none
+          // allows writing yet ; read from : no store yet)
+          emptyText: (r) =>
+            writesToStore(r) ? t('settings.credentials.noWritableStore') : t('settings.credentials.noSecretStore'),
           label: t('settings.credentials.secretStore'),
           help: t('settings.credentials.secretStoreHelp'),
           type: 'select',
@@ -3521,6 +3627,7 @@ export default function getSettings(t) {
           rows: 3,
           label: t('settings.notificationChannels.headers'),
           help: t('settings.notificationChannels.headersHelp'),
+          icon: 'list',
           placeholder: '{ "X-Source": "ansibleforms" }',
           hidden: true,
           showWhen: (i) => channelType(i) === 'webhook',
@@ -3532,6 +3639,7 @@ export default function getSettings(t) {
           rows: 9,
           label: t('settings.notificationChannels.payload'),
           help: t('settings.notificationChannels.payloadHelp', { placeholders: PAYLOAD_PLACEHOLDERS }),
+          icon: 'code',
           placeholder: DEFAULT_PAYLOAD,
           hidden: true,
           showWhen: (i) => channelType(i) === 'webhook',
@@ -4167,11 +4275,12 @@ export default function getSettings(t) {
           dependency: 'vault_enterprise',
         },
         {
-          // KV v2 or v1 : radio buttons
+          // KV v2 or v1 : radio buttons, titled Version above them (among the step's other fields)
           key: 'kv_version',
           step: 'options',
           label: t('settings.secretStores.kvVersion'),
           type: 'radio',
+          titled: true,
           options: [
             { value: 2, label: 'KV v2', hint: t('settings.secretStores.kv2Hint') },
             { value: 1, label: 'KV v1', hint: t('settings.secretStores.kv1Hint') },
@@ -4210,7 +4319,9 @@ export default function getSettings(t) {
                 ? 'settings.secretStores.writeEnabledHelpCyberArk'
                 : 'settings.secretStores.writeEnabledHelp',
             ),
-          initial: (r) => !!Number(r?.write_enabled),
+          // on for a new store (both types can write) ; off is chosen here, its write prefix
+          // still keeps writes below one path
+          initial: (r) => (r?.write_enabled === undefined ? true : !!Number(r.write_enabled)),
           noTable: true,
           hidden: true,
         },
@@ -4413,7 +4524,7 @@ export default function getSettings(t) {
           noInput: true,
           render: (v) => Helpers.formatServerDate(v),
         },
-        { key: 'description', label: t('settings.fields.description'), type: 'text' },
+        { key: 'description', label: t('settings.fields.description'), type: 'text', icon: 'info-circle' },
       ],
     },
   };
@@ -5076,6 +5187,8 @@ function ldapDirectories(t, ldap) {
           ...(NEW_DIRECTORY[f.key] !== undefined ? { initial: () => NEW_DIRECTORY[f.key] } : {}),
           // a new one binds with a credential (one from before credentials may have its own account)
           ...(f.key === 'credential' ? { required: true } : {}),
+          // a new one is on (NEW_DIRECTORY) : no switch to ask it in New, it is turned off on its page
+          ...(f.key === 'enable' ? { noInput: true } : {}),
         })),
     ],
   };

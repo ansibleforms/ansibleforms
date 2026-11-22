@@ -20,6 +20,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -279,15 +280,7 @@ onMounted(async () => {
           <!-- enabled or not : a switch, after the fields as on the other records' pages, saved with Save -->
           <div v-show="fieldShown('enabled')" class="mb-3">
             <label class="form-label fw-bold d-block" for="af-label-enabled">{{ t('settings.labels.enabled') }}</label>
-            <div class="form-check form-switch mb-0">
-              <input
-                id="af-label-enabled"
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                v-model="edit.enabled"
-              />
-            </div>
+            <BsSwitch id="af-label-enabled" v-model="edit.enabled" class="mb-0" />
             <div class="form-text">{{ t('settings.labels.enabledHelp') }}</div>
           </div>
           <!-- the preview : the header's logo and every label shown, as the header shows them -->

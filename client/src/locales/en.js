@@ -783,6 +783,9 @@ export default {
     cacheMismatchMsg: 'This page still runs an older build than the server. Reload the page to get the new version.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'On',
+    switchOff: 'Off',
     help: 'Help',
     name: 'Name',
     orDivider: 'or',
@@ -1262,6 +1265,7 @@ export default {
       stepGroup: 'Group',
       noGroup: 'No group yet.',
       noRole: 'No role yet.',
+      rolesNotGiven: 'The user was created, but not given these roles: {names}',
       signInHelp:
         "On: the user signs in with a password.\nOff: the user's sessions end now and every sign-in is refused.",
       noStoredJob: 'No stored job yet.',
@@ -1285,6 +1289,8 @@ export default {
       nameRequired: 'A name is required',
       stillHasUsers: 'Remove its users first: a group with users cannot be deleted',
       noRole: 'No role names this group.',
+      usersNotAdded: 'The group was created, but these users were not added: {names}',
+      rolesNotGiven: 'The group was created, but not given these roles: {names}',
     },
     repositories: {
       label: 'Repository',
@@ -1858,13 +1864,11 @@ export default {
       defaultMount: 'Default mount',
       defaultMountHelp: 'Used when a reference does not start with a mount the token can see.',
       writeEnabled: 'Allow writing',
-      writeEnabledHelp:
-        "A credential's user and password typed in AnsibleForms can be written here on Save. The token needs the read, create and update capabilities below the write prefix.",
+      writeEnabledHelp: 'Typed logins are written here on Save; the token needs read, create and update there.',
       writePrefix: 'Write prefix',
       writePrefixHelp: 'Credentials are written only at this path or below it, e.g. secret/ansibleforms.',
       writePrefixRequired: 'Writing needs a write prefix: say below which path credentials may be written.',
-      writeEnabledHelpCyberArk:
-        "A credential's user and password typed in AnsibleForms can be written here on Save, as an account of a safe, through the PVWA (the CCP only reads).",
+      writeEnabledHelpCyberArk: 'Typed logins are written here on Save, as accounts of a safe, through the PVWA.',
       writeSafes: 'Safes to write to',
       writeSafesHelp: 'Accounts are written only to these safes, comma separated, e.g. Linux, DB.',
       writeSafesRequired: 'Writing needs at least one safe to write to.',
@@ -1964,6 +1968,7 @@ export default {
       secretRefPlaceholder: 'e.g. secret/myapp/prod',
       newSecretStore: 'Add secret store',
       noWritableStore: 'No secret store allows writing yet',
+      noSecretStore: 'No secret store yet',
       secretFromStore: 'Secret store',
       secretFromStoreHint: 'HashiCorp Vault or CyberArk',
       secretPoint: 'Point to a key',
@@ -2158,6 +2163,7 @@ export default {
       mailAttribute: 'Mail attribute',
       mailAttributeDesc: "LDAP attribute that holds the user's email address (e.g. mail).",
       bindUserDn: 'Bind user DN',
+      bindPassword: "Bind user's password",
       bindUserDnDesc: 'DN of the service account used to search the directory.',
       bindUserPasswordDesc: 'Password for the bind service account.',
       usernameAttribute: 'Username attribute',
@@ -2304,7 +2310,7 @@ export default {
       icon: 'Icon',
       groups: 'Groups',
       users: 'Users',
-      options: 'Options',
+      permissions: 'Permissions',
       key: 'Key',
       value: 'Value',
       addCategory: 'Add category',

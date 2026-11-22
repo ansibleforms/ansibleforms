@@ -2,7 +2,7 @@
 /******************************************************************/
 /*                                                                */
 /*  A role's page (/settings/roles/<name>), opened from the roles    */
-/*  list : its Details tab (name and options), its Users, its     */
+/*  list : its Details tab (name and permissions), its Users, its */
 /*  Groups and the Forms that name it, the tab kept in the        */
 /*  address (/users). Saving writes                               */
 /*  the forms config, as the list does ; a renamed role's page    */
@@ -79,7 +79,7 @@ const userCount = computed(() => {
 });
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
-// Details (the name, its description and the options), Users, Groups, Forms ; the tab kept in
+// Details (the name, its description and the permissions), Users, Groups, Forms ; the tab kept in
 // the url. Default has no count of users or groups : it is everyone's.
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
@@ -279,7 +279,7 @@ const detailsMatch = computed(() =>
   matches(
     t('settings.settingsPage.name'),
     t('settings.fields.description'),
-    t('settings.settingsPage.options'),
+    t('settings.settingsPage.permissions'),
     ...roleOptionGroups.map((g) => t(g.title)),
     ...roleOptionKeys.map((k) => roleOptionLabel(k)),
   ),
@@ -338,23 +338,31 @@ onMounted(async () => {
     </template>
     <template #default>
       <label class="form-label fw-bold">{{ t('settings.settingsPage.provider') }}</label>
-      <select
-        v-model="adding.provider"
-        class="form-select mb-3"
-        @change="adding.name = localChoices(adding.kind, adding.provider)[0] || ''"
-      >
-        <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
-      </select>
+      <div class="input-group mb-3">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="right-to-bracket" /></span>
+        <select
+          v-model="adding.provider"
+          class="form-select"
+          @change="adding.name = localChoices(adding.kind, adding.provider)[0] || ''"
+        >
+          <option v-for="p in authProviders" :key="p" :value="p">{{ providerPrefix(p) }}</option>
+        </select>
+      </div>
       <label class="form-label fw-bold">{{ t('settings.settingsPage.name') }}</label>
-      <select v-if="adding.provider === 'local'" v-model="adding.name" class="form-select">
-        <option v-for="n in localChoices(adding.kind, 'local')" :key="n" :value="n">{{ n }}</option>
-      </select>
-      <input
-        v-else
-        v-model="adding.name"
-        class="form-control"
-        :placeholder="adding.kind === 'users' ? 'username' : 'groupname'"
-      />
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"
+          ><FaIcon :fixedwidth="true" :icon="adding.kind === 'users' ? 'user' : 'users'"
+        /></span>
+        <select v-if="adding.provider === 'local'" v-model="adding.name" class="form-select">
+          <option v-for="n in localChoices(adding.kind, 'local')" :key="n" :value="n">{{ n }}</option>
+        </select>
+        <input
+          v-else
+          v-model="adding.name"
+          class="form-control"
+          :placeholder="adding.kind === 'users' ? 'username' : 'groupname'"
+        />
+      </div>
       <div v-if="addingTaken" class="text-danger small mt-1">
         {{ t('settings.settingsPage.roleMemberTaken', { name: adding.name, role: role?.name }) }}
       </div>
@@ -419,7 +427,7 @@ onMounted(async () => {
         <!-- the role loading : its fields as grey placeholders, where they come -->
         <AppSkeleton v-else-if="!loaded && !role" shape="form" :count="3" />
         <template v-if="role && !loadError">
-          <!-- Details : the name, its description and the options -->
+          <!-- Details : the name, its description and the permissions -->
           <template v-if="tabShown('details')">
             <h6
               v-if="searching && searchHead('details')"

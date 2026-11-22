@@ -793,6 +793,9 @@ export default {
       'Diese Seite läuft noch mit einem älteren Build als der Server. Laden Sie die Seite neu, um die neue Version zu erhalten.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'An',
+    switchOff: 'Aus',
     help: 'Hilfe',
     name: 'Name',
     orDivider: 'oder',
@@ -1275,6 +1278,7 @@ export default {
       stepGroup: 'Gruppe',
       noGroup: 'Noch keine Gruppe.',
       noRole: 'Noch keine Rolle.',
+      rolesNotGiven: 'Der Benutzer wurde erstellt, diese Rollen aber nicht vergeben: {names}',
       signInHelp:
         'An: Anmeldung mit dem eigenen Passwort.\nAus: die Sitzungen enden jetzt und jede Anmeldung wird abgelehnt.',
       noStoredJob: 'Noch kein gespeicherter Job.',
@@ -1299,6 +1303,8 @@ export default {
       nameRequired: 'Ein Name ist erforderlich',
       stillHasUsers: 'Zuerst die Benutzer entfernen: eine Gruppe mit Benutzern kann nicht gelöscht werden',
       noRole: 'Keine Rolle nennt diese Gruppe.',
+      usersNotAdded: 'Die Gruppe wurde erstellt, diese Benutzer aber nicht hinzugefügt: {names}',
+      rolesNotGiven: 'Die Gruppe wurde erstellt, diese Rollen aber nicht vergeben: {names}',
     },
     repositories: {
       label: 'Repository',
@@ -1888,14 +1894,12 @@ export default {
       defaultMount: 'Standard-Mount',
       defaultMountHelp: 'Wird verwendet, wenn eine Referenz nicht mit einem für das Token sichtbaren Mount beginnt.',
       writeEnabled: 'Schreiben erlauben',
-      writeEnabledHelp:
-        'Benutzer und Passwort von Anmeldedaten, in AnsibleForms eingegeben, können beim Speichern hierhin geschrieben werden. Das Token braucht die Fähigkeiten read, create und update unterhalb des Schreibpräfixes.',
+      writeEnabledHelp: 'Logins werden beim Speichern hier geschrieben; das Token braucht read, create und update.',
       writePrefix: 'Schreibpräfix',
       writePrefixHelp: 'Anmeldedaten werden nur in diesen Pfad oder darunter geschrieben, z. B. secret/ansibleforms.',
       writePrefixRequired:
         'Schreiben braucht ein Schreibpräfix: Geben Sie an, unterhalb welches Pfades Anmeldedaten geschrieben werden dürfen.',
-      writeEnabledHelpCyberArk:
-        'Benutzer und Passwort von Anmeldedaten, in AnsibleForms eingegeben, können beim Speichern als Konto eines Safes über den PVWA hierhin geschrieben werden (der CCP liest nur).',
+      writeEnabledHelpCyberArk: 'Logins werden beim Speichern hier als Konten eines Safes über die PVWA geschrieben.',
       writeSafes: 'Safes zum Schreiben',
       writeSafesHelp: 'Konten werden nur in diese Safes geschrieben, durch Kommas getrennt, z. B. Linux, DB.',
       writeSafesRequired: 'Schreiben braucht mindestens einen Safe.',
@@ -1995,6 +1999,7 @@ export default {
       secretRefPlaceholder: 'z.B. secret/myapp/prod',
       newSecretStore: 'Secret Store hinzufügen',
       noWritableStore: 'Noch kein Secret Store erlaubt das Schreiben',
+      noSecretStore: 'Noch kein Secret Store',
       secretFromStore: 'Secret Store',
       secretFromStoreHint: 'HashiCorp Vault oder CyberArk',
       secretPoint: 'Auf einen Schlüssel verweisen',
@@ -2190,6 +2195,7 @@ export default {
       mailAttribute: 'Mail-Attribut',
       mailAttributeDesc: 'LDAP-Attribut mit der E-Mail-Adresse des Benutzers (z.B. mail).',
       bindUserDn: 'Bind-User-DN',
+      bindPassword: 'Passwort des Bind-Benutzers',
       bindUserDnDesc: 'DN des Dienstkontos für die Verzeichnissuche.',
       bindUserPasswordDesc: 'Passwort für das Bind-Dienstkonto.',
       usernameAttribute: 'Benutzername-Attribut',
@@ -2343,7 +2349,7 @@ export default {
       icon: 'Symbol',
       groups: 'Gruppen',
       users: 'Benutzer',
-      options: 'Optionen',
+      permissions: 'Berechtigungen',
       key: 'Schluessel',
       value: 'Wert',
       addCategory: 'Kategorie hinzufuegen',

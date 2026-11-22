@@ -72,6 +72,7 @@ import {
   orderFor,
 } from '@/lib/formDoc';
 import { yamlText } from '@/lib/yamlBlock';
+import BsSwitch from './BsSwitch.vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -1097,17 +1098,13 @@ defineExpose({
           <label class="form-label fw-bold af-switch-title" for="af-notif">{{
             t('designer.visualNotifications')
           }}</label>
-          <div class="form-check form-switch mb-0">
-            <input
-              id="af-notif"
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              :checked="nested('notifications') !== undefined"
-              :disabled="locked || nested('notifications') === null"
-              @change="toggleNested('notifications', $event.target.checked)"
-            />
-          </div>
+          <BsSwitch
+            id="af-notif"
+            :model-value="nested('notifications') !== undefined"
+            :disabled="locked || nested('notifications') === null"
+            @change="toggleNested('notifications', $event.target.checked)"
+            class="mb-0"
+          />
           <div class="form-text">{{ t('designer.visualNotificationsHelp') }}</div>
           <div v-if="nested('notifications') === null" class="text-body-secondary fst-italic">
             {{ t('designer.visualInYaml') }}
@@ -1250,17 +1247,13 @@ defineExpose({
         <!-- approval : on or off ; on, its title, message, the roles that approve, who is told -->
         <div v-if="allows('approval')" class="af-form-span2">
           <label class="form-label fw-bold af-switch-title" for="af-appr">{{ t('designer.visualApproval') }}</label>
-          <div class="form-check form-switch mb-0">
-            <input
-              id="af-appr"
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              :checked="nested('approval') !== undefined"
-              :disabled="locked || nested('approval') === null"
-              @change="toggleNested('approval', $event.target.checked)"
-            />
-          </div>
+          <BsSwitch
+            id="af-appr"
+            :model-value="nested('approval') !== undefined"
+            :disabled="locked || nested('approval') === null"
+            @change="toggleNested('approval', $event.target.checked)"
+            class="mb-0"
+          />
           <div class="form-text">{{ t('designer.visualApprovalHelp') }}</div>
           <div v-if="nested('approval') === null" class="text-body-secondary fst-italic">
             {{ t('designer.visualInYaml') }}
@@ -1586,17 +1579,13 @@ defineExpose({
                 @change="change(() => setFieldText(f.node, 'label', $event.target.value))"
               />
             </div>
-            <div class="form-check form-switch d-flex justify-content-center mb-0">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                :checked="f.required"
-                :disabled="!fieldsEditable"
-                :aria-label="t('designer.visualRequired')"
-                @change="change(() => setFieldRequired(f.node, $event.target.checked))"
-              />
-            </div>
+            <BsSwitch
+              :model-value="f.required"
+              :disabled="!fieldsEditable"
+              :aria-label="t('designer.visualRequired')"
+              @change="change(() => setFieldRequired(f.node, $event.target.checked))"
+              class="d-flex justify-content-center mb-0"
+            />
             <div class="d-flex gap-2 justify-content-end">
               <div class="btn-group" role="group" :aria-label="t('settings.interface.linkMoves')">
                 <button
@@ -1698,16 +1687,12 @@ defineExpose({
                   @click="change(() => f.node.delete(pr.key))"
                 ></button>
               </label>
-              <div v-if="pr.kind === 'switch'" class="form-check form-switch">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  :checked="fieldPropValue(f.node, pr)"
-                  :disabled="!fieldsEditable"
-                  @change="setProp(f, pr, $event.target.checked)"
-                />
-              </div>
+              <BsSwitch
+                v-if="pr.kind === 'switch'"
+                :model-value="fieldPropValue(f.node, pr)"
+                :disabled="!fieldsEditable"
+                @change="setProp(f, pr, $event.target.checked)"
+              />
               <select
                 @mouseenter="fullTitle"
                 v-else-if="pr.kind === 'select'"

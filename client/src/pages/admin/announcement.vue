@@ -19,6 +19,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { repositorySourceFields } from '@/lib/repositoryUsage';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -280,15 +281,7 @@ onMounted(async () => {
             <label class="form-label fw-bold d-block" for="af-announcement-enabled">{{
               t('settings.interface.announcementEnabled')
             }}</label>
-            <div class="form-check form-switch mb-0">
-              <input
-                id="af-announcement-enabled"
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                v-model="edit.enabled"
-              />
-            </div>
+            <BsSwitch id="af-announcement-enabled" v-model="edit.enabled" class="mb-0" />
             <div class="form-text">{{ t('settings.interface.announcementEnabledHelp') }}</div>
           </div>
         </div>

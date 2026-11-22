@@ -100,17 +100,21 @@ const uid = `af-end-${useId()}`;
           @change="emit('update:mode', props.values.count)"
         />
         <label class="form-check-label" :for="uid + '-count'">{{ labels.count }}</label>
-        <input
-          :value="count"
-          type="number"
-          min="1"
-          :max="countMax || undefined"
-          step="1"
-          class="form-control form-control-sm af-end-count mx-2"
-          :aria-label="labels.countAria"
-          :disabled="disabled || mode !== props.values.count"
-          @input="(e) => emit('update:count', e.target.value)"
-        />
+        <!-- its icon before it, as every number of a dialog -->
+        <div class="input-group input-group-sm af-end-count mx-2">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="hashtag" /></span>
+          <input
+            :value="count"
+            type="number"
+            min="1"
+            :max="countMax || undefined"
+            step="1"
+            class="form-control"
+            :aria-label="labels.countAria"
+            :disabled="disabled || mode !== props.values.count"
+            @input="(e) => emit('update:count', e.target.value)"
+          />
+        </div>
         <span>{{ labels.unit }}</span>
       </div>
     </div>
@@ -143,6 +147,7 @@ const uid = `af-end-${useId()}`;
 }
 /* the number : a few digits */
 .af-end-count {
-  width: 5.5rem;
+  width: 7.5rem;
+  flex-wrap: nowrap;
 }
 </style>

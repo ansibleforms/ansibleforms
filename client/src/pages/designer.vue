@@ -4113,6 +4113,7 @@ onBeforeUnmount(() => {
           <template v-else>
             <BsInput
               type="select_advanced"
+              icon="box-archive"
               v-model="backupToRestore"
               :values="backups"
               :required="true"
@@ -4455,35 +4456,34 @@ onBeforeUnmount(() => {
             />
             <div class="flex-shrink-0">
               <label v-if="idx === 0" class="form-label fw-bold">{{ t('designer.categoryIcon') }}</label>
-              <div class="d-flex align-items-center gap-3">
+              <!-- the icon chosen before its dropdown, as the input-group icon of every dialog's
+                   field : clicked, it opens the icon grid -->
+              <div class="input-group" style="width: 14.5rem">
                 <span
                   :role="isDefaultEditCat(row.cat, row.depth) ? undefined : 'button'"
-                  class="d-flex align-items-center justify-content-center rounded flex-shrink-0"
-                  :class="{ 'border border-primary': editCatIconIdx === idx }"
-                  style="width: 2.5rem; height: calc(2.25rem + 2px); background: var(--bs-tertiary-bg)"
+                  class="input-group-text"
+                  :class="{ 'border-primary': editCatIconIdx === idx }"
                   :title="t('designer.chooseIcon')"
                   @click="editCatPickIcon(idx)"
                 >
-                  <FaIcon :icon="row.cat.icon" size="lg" />
+                  <FaIcon :fixedwidth="true" :icon="row.cat.icon" />
                 </span>
-                <select
-                  class="form-select"
-                  style="width: 12rem"
-                  v-model="row.cat.icon"
-                  :disabled="isDefaultEditCat(row.cat, row.depth)"
-                >
+                <select class="form-select" v-model="row.cat.icon" :disabled="isDefaultEditCat(row.cat, row.depth)">
                   <option v-for="ic in availableIcons" :key="'selicon-' + idx + '-' + ic" :value="ic">{{ ic }}</option>
                 </select>
               </div>
             </div>
             <div class="flex-grow-1">
               <label v-if="idx === 0" class="form-label fw-bold">{{ t('designer.categoryName') }}</label>
-              <input
-                type="text"
-                class="form-control"
-                v-model="row.cat.name"
-                :disabled="isDefaultEditCat(row.cat, row.depth)"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tag" /></span>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="row.cat.name"
+                  :disabled="isDefaultEditCat(row.cat, row.depth)"
+                />
+              </div>
             </div>
             <!-- the schema pins the Default category : no rename, no restyle, no
                  delete and no subcategories (same rule as the settings page) -->
@@ -4598,12 +4598,15 @@ onBeforeUnmount(() => {
         <template #default>
           <div class="mb-3">
             <label class="form-label fw-bold">{{ t('designer.parentConstant') }}</label>
-            <select class="form-select" v-model="newConstParent" :disabled="!hasAnyConstants">
-              <option value="">{{ t('designer.topLevel') }}</option>
-              <option v-for="(p, idx) in addConstParents" :key="'constparent-' + idx" :value="String(idx)">
-                {{ p.label }}
-              </option>
-            </select>
+            <div class="input-group">
+              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="sitemap" /></span>
+              <select class="form-select" v-model="newConstParent" :disabled="!hasAnyConstants">
+                <option value="">{{ t('designer.topLevel') }}</option>
+                <option v-for="(p, idx) in addConstParents" :key="'constparent-' + idx" :value="String(idx)">
+                  {{ p.label }}
+                </option>
+              </select>
+            </div>
           </div>
           <BsInput
             :isFloating="false"
@@ -4651,7 +4654,10 @@ onBeforeUnmount(() => {
               <label v-if="idx === 0 || flatEditConsts[idx - 1].depth !== entry.depth" class="form-label fw-bold">{{
                 t('settings.settingsPage.key')
               }}</label>
-              <input type="text" class="form-control" v-model="entry.row.key" />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tag" /></span>
+                <input type="text" class="form-control" v-model="entry.row.key" />
+              </div>
             </div>
             <div class="flex-grow-1">
               <template v-if="entry.row.children && entry.row.children.length > 0">
@@ -4666,12 +4672,15 @@ onBeforeUnmount(() => {
                 <label v-if="idx === 0 || flatEditConsts[idx - 1].depth !== entry.depth" class="form-label fw-bold">{{
                   t('settings.settingsPage.value')
                 }}</label>
-                <textarea
-                  class="form-control"
-                  :rows="constantValueRows(entry.row.value)"
-                  v-model="entry.row.value"
-                  :placeholder="t('settings.settingsPage.constantValuePlaceholder')"
-                ></textarea>
+                <div class="input-group">
+                  <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+                  <textarea
+                    class="form-control"
+                    :rows="constantValueRows(entry.row.value)"
+                    v-model="entry.row.value"
+                    :placeholder="t('settings.settingsPage.constantValuePlaceholder')"
+                  ></textarea>
+                </div>
               </template>
             </div>
             <div class="d-flex gap-2 flex-shrink-0" style="margin-bottom: 1px">

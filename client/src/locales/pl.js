@@ -789,6 +789,9 @@ export default {
       'Ta strona nadal działa na starszej kompilacji niż serwer. Przeładuj stronę, aby uzyskać nową wersję.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Włączone',
+    switchOff: 'Wyłączone',
     help: 'Pomoc',
     name: 'Nazwa',
     orDivider: 'lub',
@@ -1267,6 +1270,7 @@ export default {
       stepGroup: 'Grupa',
       noGroup: 'Brak grupy.',
       noRole: 'Brak ról.',
+      rolesNotGiven: 'Użytkownik został utworzony, ale bez tych ról: {names}',
       signInHelp:
         'Włączone: logowanie własnym hasłem.\nWyłączone: sesje kończą się teraz, a każde logowanie jest odrzucane.',
       noStoredJob: 'Brak zapisanych zadań.',
@@ -1290,6 +1294,8 @@ export default {
       nameRequired: 'Nazwa jest wymagana',
       stillHasUsers: 'Najpierw usuń jej użytkowników: grupy z użytkownikami nie można usunąć',
       noRole: 'Żadna rola nie wymienia tej grupy.',
+      usersNotAdded: 'Grupa została utworzona, ale tych użytkowników nie dodano: {names}',
+      rolesNotGiven: 'Grupa została utworzona, ale bez tych ról: {names}',
     },
     repositories: {
       label: 'Repozytorium',
@@ -1731,13 +1737,11 @@ export default {
       defaultMount: 'Domyślny punkt montowania',
       defaultMountHelp: 'Używany, gdy odwołanie nie zaczyna się od punktu montowania widocznego dla tokenu.',
       writeEnabled: 'Zezwól na zapis',
-      writeEnabledHelp:
-        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane po kliknięciu Zapisz. Token potrzebuje uprawnień read, create i update poniżej prefiksu zapisu.',
+      writeEnabledHelp: 'Wpisane loginy są zapisywane tu przy zapisie; token potrzebuje read, create i update.',
       writePrefix: 'Prefiks zapisu',
       writePrefixHelp: 'Poświadczenia są zapisywane tylko w tej ścieżce lub poniżej, np. secret/ansibleforms.',
       writePrefixRequired: 'Zapis wymaga prefiksu: wskaż, poniżej której ścieżki można zapisywać poświadczenia.',
-      writeEnabledHelpCyberArk:
-        'Użytkownik i hasło poświadczenia wpisane w AnsibleForms mogą zostać tu zapisane po kliknięciu Zapisz, jako konto sejfu, przez PVWA (CCP tylko odczytuje).',
+      writeEnabledHelpCyberArk: 'Wpisane loginy są zapisywane tu przy zapisie, jako konta sejfu przez PVWA.',
       writeSafes: 'Sejfy do zapisu',
       writeSafesHelp: 'Konta są zapisywane tylko w tych sejfach, oddzielonych przecinkami, np. Linux, DB.',
       writeSafesRequired: 'Zapis wymaga co najmniej jednego sejfu.',
@@ -1836,6 +1840,7 @@ export default {
       secretRefPlaceholder: 'np. secret/myapp/prod',
       newSecretStore: 'Dodaj magazyn sekretów',
       noWritableStore: 'Żaden magazyn sekretów nie pozwala jeszcze na zapis',
+      noSecretStore: 'Brak jeszcze magazynu sekretów',
       secretFromStore: 'Magazyn sekretów',
       secretFromStoreHint: 'HashiCorp Vault lub CyberArk',
       secretPoint: 'Wskaż klucz',
@@ -2030,6 +2035,7 @@ export default {
       mailAttribute: 'Atrybut poczty',
       mailAttributeDesc: 'Atrybut LDAP zawierający adres e-mail użytkownika (np. mail).',
       bindUserDn: 'DN użytkownika bind',
+      bindPassword: 'Hasło użytkownika powiązania',
       bindUserDnDesc: 'DN konta usługi używanego do przeszukiwania katalogu.',
       bindUserPasswordDesc: 'Hasło konta usługi bind.',
       usernameAttribute: 'Atrybut nazwy użytkownika',
@@ -2318,7 +2324,7 @@ export default {
       icon: 'Ikona',
       groups: 'Grupy',
       users: 'Użytkownicy',
-      options: 'Opcje',
+      permissions: 'Uprawnienia',
       key: 'Klucz',
       value: 'Wartość',
       addCategory: 'Dodaj kategorię',

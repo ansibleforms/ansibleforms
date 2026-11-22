@@ -791,6 +791,9 @@ export default {
       'Aquesta pàgina encara executa una compilació més antiga que la del servidor. Torna a carregar la pàgina per obtenir la versió nova.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Activat',
+    switchOff: 'Desactivat',
     help: 'Ajuda',
     name: 'Nom',
     orDivider: 'o',
@@ -1272,6 +1275,7 @@ export default {
       stepGroup: 'Grup',
       noGroup: 'Encara sense grup.',
       noRole: 'Encara cap rol.',
+      rolesNotGiven: "L'usuari s'ha creat, però sense aquests rols: {names}",
       signInHelp:
         'Activat: inicia sessió amb la seva contrasenya.\nDesactivat: les seves sessions acaben ara i es rebutja cada inici de sessió.',
       noStoredJob: 'Encara sense tasques desades.',
@@ -1296,6 +1300,8 @@ export default {
       nameRequired: 'Cal un nom',
       stillHasUsers: 'Treu primer els seus usuaris: un grup amb usuaris no es pot suprimir',
       noRole: 'Cap rol no anomena aquest grup.',
+      usersNotAdded: "El grup s'ha creat, però aquests usuaris no s'hi han afegit: {names}",
+      rolesNotGiven: "El grup s'ha creat, però sense aquests rols: {names}",
     },
     repositories: {
       label: 'Repositori',
@@ -1745,12 +1751,12 @@ export default {
       defaultMountHelp: "S'utilitza quan una referència no comença amb un punt de muntatge que el token pugui veure.",
       writeEnabled: "Permet l'escriptura",
       writeEnabledHelp:
-        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar. El token necessita les capacitats read, create i update sota el prefix d'escriptura.",
+        'Les credencials escrites es desen aquí en desar; el testimoni necessita read, create i update.',
       writePrefix: "Prefix d'escriptura",
       writePrefixHelp: "Les credencials només s'escriuen en aquest camí o per sota, p. ex. secret/ansibleforms.",
       writePrefixRequired: "L'escriptura necessita un prefix: indica sota quin camí es poden escriure les credencials.",
       writeEnabledHelpCyberArk:
-        "L'usuari i la contrasenya d'una credencial escrits a AnsibleForms es poden escriure aquí en desar, com a compte d'una caixa forta, a través del PVWA (el CCP només llegeix).",
+        "Les credencials escrites es desen aquí en desar, com a comptes d'una safe via la PVWA.",
       writeSafes: 'Caixes fortes on escriure',
       writeSafesHelp: "Els comptes només s'escriuen en aquestes caixes fortes, separades per comes, p. ex. Linux, DB.",
       writeSafesRequired: "L'escriptura necessita almenys una caixa forta.",
@@ -1849,6 +1855,7 @@ export default {
       secretRefPlaceholder: 'p. ex. secret/myapp/prod',
       newSecretStore: 'Afegeix un magatzem de secrets',
       noWritableStore: 'Encara cap magatzem de secrets no permet escriure',
+      noSecretStore: 'Encara no hi ha cap magatzem de secrets',
       secretFromStore: 'Magatzem de secrets',
       secretFromStoreHint: 'HashiCorp Vault o CyberArk',
       secretPoint: 'Apunta a una clau',
@@ -2043,6 +2050,7 @@ export default {
       mailAttribute: 'Atribut de correu',
       mailAttributeDesc: "Atribut LDAP que conté l'adreça de correu de l'usuari (p. ex. mail).",
       bindUserDn: "DN de l'usuari de bind",
+      bindPassword: "Contrasenya de l'usuari d'enllaç",
       bindUserDnDesc: "DN del compte de servei que s'utilitza per cercar al directori.",
       bindUserPasswordDesc: 'Contrasenya del compte de servei de bind.',
       usernameAttribute: "Atribut del nom d'usuari",
@@ -2336,7 +2344,7 @@ export default {
       icon: 'Icona',
       groups: 'Grups',
       users: 'Usuaris',
-      options: 'Opcions',
+      permissions: 'Permisos',
       key: 'Clau',
       value: 'Valor',
       addCategory: 'Afegeix una categoria',

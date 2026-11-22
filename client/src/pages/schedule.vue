@@ -48,6 +48,7 @@ import { endOf, endError, endPayload } from '@/lib/scheduleEnd';
 import Time from '@/lib/Time';
 import { durationSeconds, formatDuration } from '@/lib/jobTime';
 import { tableMatches } from '@/lib/recordSearch';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -648,15 +649,7 @@ onMounted(async () => {
                   t('settings.schedules.enabled')
                 }}</label>
                 <!-- saved with Save, as every switch of a record page -->
-                <div class="form-check form-switch mb-0">
-                  <input
-                    id="af-schedule-enabled"
-                    v-model="edit.enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                  />
-                </div>
+                <BsSwitch id="af-schedule-enabled" v-model="edit.enabled" class="mb-0" />
                 <div class="form-text">{{ t('settings.schedules.enabledHelp') }}</div>
               </div>
             </template>

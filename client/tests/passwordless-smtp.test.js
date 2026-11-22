@@ -20,7 +20,7 @@ describe('an smtp credential without a login', () => {
   it('asks No login or Password : a relay by default, a user kept meaning password', () => {
     const choice = credentialField('smtp_auth');
     expect(choice.type).toBe('radio');
-    expect(choice.alignHints).toBe(true);
+    expect(choice.titled).toBe(true);
     expect(choice.options.map((o) => o.value)).toEqual(SMTP_AUTH);
     expect(choice.initial({})).toBe('none');
     expect(choice.initial({ user: 'mailer' })).toBe('password');

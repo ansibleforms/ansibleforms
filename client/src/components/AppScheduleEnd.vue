@@ -22,6 +22,7 @@
 /******************************************************************/
 import { computed, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
+import BsSwitch from './BsSwitch.vue';
 
 const { t } = useI18n();
 const props = defineProps({
@@ -73,17 +74,13 @@ const ACTIONS = computed(() => [
   <!-- a one-time run : removed after its run or kept, turned off ; its title above it -->
   <div v-if="once">
     <label :class="[labelClass, 'd-block']" :for="uid + '-remove'">{{ t('settings.schedules.removeAfterRun') }}</label>
-    <div class="form-check form-switch mb-0">
-      <input
-        :id="uid + '-remove'"
-        class="form-check-input"
-        type="checkbox"
-        role="switch"
-        :checked="modelValue.remove_after_run"
-        :disabled="disabled"
-        @change="(e) => set('remove_after_run', e.target.checked)"
-      />
-    </div>
+    <BsSwitch
+      :id="uid + '-remove'"
+      :model-value="modelValue.remove_after_run"
+      :disabled="disabled"
+      @change="(e) => set('remove_after_run', e.target.checked)"
+      class="mb-0"
+    />
     <div class="form-text">
       {{ repository ? t('settings.schedules.removeAfterRunRepository') : t('settings.schedules.removeAfterRunHelp') }}
     </div>

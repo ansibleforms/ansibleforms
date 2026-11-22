@@ -791,6 +791,9 @@ export default {
       'Deze pagina draait nog een oudere build dan de server. Herlaad de pagina om de nieuwe versie te krijgen.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Aan',
+    switchOff: 'Uit',
     help: 'Help',
     name: 'Naam',
     orDivider: 'of',
@@ -1270,6 +1273,7 @@ export default {
       stepGroup: 'Groep',
       noGroup: 'Nog geen groep.',
       noRole: 'Nog geen rol.',
+      rolesNotGiven: 'De gebruiker is gemaakt, maar zonder deze rollen: {names}',
       signInHelp:
         'Aan: aanmelden met het eigen wachtwoord.\nUit: de sessies eindigen nu en elke aanmelding wordt geweigerd.',
       noStoredJob: 'Nog geen opgeslagen job.',
@@ -1294,6 +1298,8 @@ export default {
       nameRequired: 'Een naam is verplicht',
       stillHasUsers: 'Verwijder eerst de gebruikers: een groep met gebruikers kan niet worden verwijderd',
       noRole: 'Geen rol noemt deze groep.',
+      usersNotAdded: 'De groep is gemaakt, maar deze gebruikers zijn niet toegevoegd: {names}',
+      rolesNotGiven: 'De groep is gemaakt, maar zonder deze rollen: {names}',
     },
     repositories: {
       label: 'Repository',
@@ -1876,14 +1882,12 @@ export default {
       defaultMount: 'Standaard mount',
       defaultMountHelp: 'Gebruikt wanneer een referentie niet begint met een mount die het token kan zien.',
       writeEnabled: 'Schrijven toestaan',
-      writeEnabledHelp:
-        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan worden geschreven. Het token heeft de mogelijkheden read, create en update onder het schrijfprefix nodig.',
+      writeEnabledHelp: 'Ingevoerde logins komen hier bij Opslaan; het token heeft read, create en update nodig.',
       writePrefix: 'Schrijfprefix',
       writePrefixHelp: 'Referenties worden alleen op dit pad of eronder geschreven, bijv. secret/ansibleforms.',
       writePrefixRequired:
         'Schrijven heeft een schrijfprefix nodig: geef aan onder welk pad referenties mogen worden geschreven.',
-      writeEnabledHelpCyberArk:
-        'Gebruiker en wachtwoord van een referentie, getypt in AnsibleForms, kunnen hier bij Opslaan als account van een kluis worden geschreven, via de PVWA (de CCP leest alleen).',
+      writeEnabledHelpCyberArk: 'Ingevoerde logins komen hier bij Opslaan, als accounts van een safe via de PVWA.',
       writeSafes: 'Kluizen om naar te schrijven',
       writeSafesHelp: "Accounts worden alleen naar deze kluizen geschreven, gescheiden door komma's, bijv. Linux, DB.",
       writeSafesRequired: 'Schrijven heeft minstens één kluis nodig.',
@@ -1982,6 +1986,7 @@ export default {
       secretRefPlaceholder: 'bv. secret/myapp/prod',
       newSecretStore: 'Secret store toevoegen',
       noWritableStore: 'Nog geen secret store staat schrijven toe',
+      noSecretStore: 'Nog geen secret store',
       secretFromStore: 'Geheimenkluis',
       secretFromStoreHint: 'HashiCorp Vault of CyberArk',
       secretPoint: 'Verwijzen naar een sleutel',
@@ -2176,6 +2181,7 @@ export default {
       mailAttribute: 'Mail attribuut',
       mailAttributeDesc: 'LDAP-attribuut met het e-mailadres van de gebruiker (bijv. mail).',
       bindUserDn: 'Bind gebruiker DN',
+      bindPassword: 'Wachtwoord van de bind-gebruiker',
       bindUserDnDesc: 'DN van het serviceaccount dat wordt gebruikt om de directory te doorzoeken.',
       bindUserPasswordDesc: 'Wachtwoord voor het bind-serviceaccount.',
       usernameAttribute: 'Gebruikersnaam attribuut',
@@ -2327,7 +2333,7 @@ export default {
       icon: 'Icoon',
       groups: 'Groepen',
       users: 'Gebruikers',
-      options: 'Opties',
+      permissions: 'Rechten',
       key: 'Sleutel',
       value: 'Waarde',
       addCategory: 'Categorie toevoegen',

@@ -28,9 +28,12 @@ const picked = ref(props.choices[0] || '');
     <template #title>{{ t('settings.settingsPage.addRole') }}</template>
     <template #default>
       <label class="form-label fw-bold" for="af-add-role">{{ t('settings.common.role') }}</label>
-      <select id="af-add-role" v-model="picked" class="form-select" :disabled="!choices.length">
-        <option v-for="n in choices" :key="n" :value="n">{{ n }}</option>
-      </select>
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="user-shield" /></span>
+        <select id="af-add-role" v-model="picked" class="form-select" :disabled="!choices.length">
+          <option v-for="n in choices" :key="n" :value="n">{{ n }}</option>
+        </select>
+      </div>
       <div v-if="!choices.length" class="text-muted small mt-1">{{ t('settings.settingsPage.noRoleLeft') }}</div>
     </template>
     <template #footer>

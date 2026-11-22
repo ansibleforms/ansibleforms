@@ -731,20 +731,26 @@ function startAt(i) {
           <div v-else class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('workflowEditor.runsAfter') }}</label>
-              <select v-model="wizard.parent" class="form-select">
-                <option value="">{{ t('workflowEditor.atStart') }}</option>
-                <option v-for="n in workflows[wizard.wi]?.nodes || []" :key="n.identifier" :value="n.identifier">
-                  {{ n.identifier }}
-                </option>
-              </select>
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="sitemap" /></span>
+                <select v-model="wizard.parent" class="form-select">
+                  <option value="">{{ t('workflowEditor.atStart') }}</option>
+                  <option v-for="n in workflows[wizard.wi]?.nodes || []" :key="n.identifier" :value="n.identifier">
+                    {{ n.identifier }}
+                  </option>
+                </select>
+              </div>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('workflowEditor.runsWhen') }}</label>
-              <select v-model="wizard.kind" class="form-select" :disabled="!wizard.parent">
-                <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
-                  {{ t(`workflowEditor.kinds.${kind}`) }}
-                </option>
-              </select>
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="link" /></span>
+                <select v-model="wizard.kind" class="form-select" :disabled="!wizard.parent">
+                  <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
+                    {{ t(`workflowEditor.kinds.${kind}`) }}
+                  </option>
+                </select>
+              </div>
             </div>
             <div class="col-12">
               <label class="form-label fw-bold">{{ t('workflowEditor.parents') }}</label>
@@ -862,15 +868,21 @@ function startAt(i) {
                   <!-- a node there already : linked -->
                   <label class="form-label mb-2">{{ t('workflowEditor.linkExisting') }}</label>
                   <div class="d-flex align-items-center gap-2 mb-3">
-                    <select v-model="linkKind" class="form-select af-wf-kind">
-                      <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
-                        {{ t(`workflowEditor.kinds.${kind}`) }}
-                      </option>
-                    </select>
-                    <select v-model="linkTo" class="form-select">
-                      <option value="">{{ t('workflowEditor.linkTo') }}</option>
-                      <option v-for="id in linkTargets" :key="id" :value="id">{{ id }}</option>
-                    </select>
+                    <div class="input-group af-wf-kind">
+                      <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="link" /></span>
+                      <select v-model="linkKind" class="form-select">
+                        <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
+                          {{ t(`workflowEditor.kinds.${kind}`) }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="input-group">
+                      <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="sitemap" /></span>
+                      <select v-model="linkTo" class="form-select">
+                        <option value="">{{ t('workflowEditor.linkTo') }}</option>
+                        <option v-for="id in linkTargets" :key="id" :value="id">{{ id }}</option>
+                      </select>
+                    </div>
                     <BsButton icon="link" cssClass="text-nowrap" @click="addLink()">{{
                       t('workflowEditor.link')
                     }}</BsButton>
@@ -904,16 +916,19 @@ function startAt(i) {
         <template #title>{{ t('workflowEditor.linkTitle', { from: link.from, to: link.to }) }}</template>
         <template #default>
           <label class="form-label fw-bold">{{ t('workflowEditor.runsWhen') }}</label>
-          <select
-            class="form-select"
-            :value="link.kind"
-            :disabled="readOnly"
-            @change="setLinkKind($event.target.value)"
-          >
-            <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
-              {{ t(`workflowEditor.kinds.${kind}`) }}
-            </option>
-          </select>
+          <div class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="link" /></span>
+            <select
+              class="form-select"
+              :value="link.kind"
+              :disabled="readOnly"
+              @change="setLinkKind($event.target.value)"
+            >
+              <option v-for="kind in LINK_KINDS" :key="kind" :value="kind">
+                {{ t(`workflowEditor.kinds.${kind}`) }}
+              </option>
+            </select>
+          </div>
         </template>
         <template #footer>
           <BsButton v-if="!readOnly" icon="trash" @click="removeLink()">{{ t('workflowEditor.unlink') }}</BsButton>
@@ -1042,7 +1057,7 @@ function startAt(i) {
   padding: 0.25rem 0;
 }
 .af-wf-kind {
-  max-width: 11rem;
+  max-width: 13rem;
 }
 /* the wizard's steps : as the repositories' dialog's (AppAdminMulti) */
 .af-wizard-steps {

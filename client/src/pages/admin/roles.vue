@@ -5,8 +5,9 @@ import Profile from '@/lib/Profile';
 import { useI18n } from 'vue-i18n';
 import { useFormsConfig } from '@/composables/useFormsConfig';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
-import { useRoleSupport } from '@/composables/useRoleSupport';
-import { requiredRoleDescription } from '@/config/roles';
+import { useRoleSupport, roleNameProblem } from '@/composables/useRoleSupport';
+import { useWizard } from '@/composables/useWizard';
+import { requiredRoleDescription, roleWizardSteps } from '@/config/roles';
 import { toast } from 'vue-sonner';
 import BsDataTable from '@/components/BsDataTable.vue';
 import { tableControls } from '@/lib/listControls';
@@ -74,15 +75,49 @@ const sortedRoles = computed(() =>
     .sort((a, b) => (a.role._sortName ?? '').localeCompare(b.role._sortName ?? '', undefined, { sensitivity: 'base' })),
 );
 
-// ─── the New role dialog ──────────────────────────────────────────────────────
+// ─── the New role wizard ──────────────────────────────────────────────────────
 // A new role is filled in a dialog, not as an empty row at the end of the list : it joins the
-// list, and the config is saved, only when the dialog is saved.
+// list, and the config is saved, only when the dialog is saved. The dialog is a wizard, as the
+// other New dialogs : Details (its name and description), Permissions, Users, Groups ; Next
+// leaves Details only with a name a save takes, Save is on the last step.
 const newRole = ref(null);
+// the name checked once Next or Save was tried : its problem shown under it from then on, as typed
+const nameTouched = ref(false);
+// why the new role's name cannot be saved, or '' : the checks of a save (useRoleSupport)
+const newRoleNameError = computed(() => {
+  if (!newRole.value || !nameTouched.value) return '';
+  const taken = new Set(roles.value.filter((r) => r !== newRole.value).map((r) => (r.name || '').trim()));
+  return roleNameProblem(t, newRole.value.name, taken) || '';
+});
+// the steps, each with its label, and Users and Groups with their count
+// the dialog's width : wider on the Permissions step (its dialogSize), large on the others
+const roleDialogSize = computed(() => roleWizardSteps[roleStep.value]?.dialogSize || 'lg');
+const roleSteps = computed(() =>
+  roleWizardSteps.map((step) => ({
+    key: step.key,
+    label: t(step.label),
+    count: step.count && newRole.value ? newRole.value[step.count].length : undefined,
+  })),
+);
+const {
+  stepIndex: roleStep,
+  stepReached: roleStepReached,
+  step: roleStepShown,
+  isLastStep: roleLastStep,
+  goToStep: goToRoleStep,
+  reset: resetRoleSteps,
+} = useWizard(roleSteps, (step) => {
+  if (step.key !== 'details') return true;
+  nameTouched.value = true;
+  return !newRoleNameError.value;
+});
 
 /**
- * Opens the New role dialog on an empty role.
+ * Opens the New role wizard on an empty role, at its first step.
  */
 function addRole() {
+  resetRoleSteps();
+  nameTouched.value = false;
   newRole.value = {
     _uid: nextUid(),
     _required: false,
@@ -262,11 +297,17 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <BsModal v-if="newRole" size="lg" @close="newRole = null" icon="user-shield">
+  <BsModal v-if="newRole" :size="roleDialogSize" @close="newRole = null" icon="user-shield">
     <template #title> {{ t('settings.settingsPage.newRole') }} </template>
+    <!-- its steps, above the fields and out of their scroll ; back to a step reached -->
+    <template #top>
+      <AppWizardSteps :steps="roleSteps" :current="roleStep" :reached="roleStepReached" @go="goToRoleStep" />
+    </template>
     <template #default>
       <AppRoleEditor
         v-model:role="newRole"
+        :step="roleStepShown.key"
+        :nameError="newRoleNameError"
         :authProviders="authProviders"
         :localGroups="sortedLocalGroups"
         :localUsers="sortedLocalUsers"
@@ -275,8 +316,15 @@ onMounted(async () => {
         :nextUid="nextUid"
       />
     </template>
+    <!-- Previous / Next, and Save on the last step -->
     <template #footer>
-      <BsButton icon="save" @click="createRole()">{{ t('settings.common.save') }}</BsButton>
+      <BsButton v-if="roleStep > 0" icon="arrow-left" @click="goToRoleStep(roleStep - 1)">{{
+        t('common.previous')
+      }}</BsButton>
+      <BsButton v-if="!roleLastStep" icon="arrow-right" @click="goToRoleStep(roleStep + 1)">{{
+        t('common.next')
+      }}</BsButton>
+      <BsButton v-if="roleLastStep" icon="save" @click="createRole()">{{ t('settings.common.save') }}</BsButton>
     </template>
   </BsModal>
   <AppSettingsPage>

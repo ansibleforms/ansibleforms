@@ -786,6 +786,9 @@ export default {
       'このページはサーバーより古いビルドで動作しています。ページを再読み込みして新しいバージョンを取得してください。',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'オン',
+    switchOff: 'オフ',
     help: 'ヘルプ',
     name: '名前',
     orDivider: 'または',
@@ -1264,6 +1267,7 @@ export default {
       stepGroup: 'グループ',
       noGroup: 'まだグループがありません。',
       noRole: 'ロールはまだありません。',
+      rolesNotGiven: 'ユーザーは作成されましたが、次のロールは付与されませんでした: {names}',
       signInHelp:
         'オン：パスワードでサインインします。\nオフ：セッションは直ちに終了し、すべてのサインインが拒否されます。',
       noStoredJob: '保存されたジョブはまだありません。',
@@ -1287,6 +1291,8 @@ export default {
       nameRequired: '名前が必要です',
       stillHasUsers: '先にユーザーを削除してください: ユーザーがいるグループは削除できません',
       noRole: 'このグループを指定するロールはありません。',
+      usersNotAdded: 'グループは作成されましたが、次のユーザーは追加されませんでした: {names}',
+      rolesNotGiven: 'グループは作成されましたが、次のロールは付与されませんでした: {names}',
     },
     repositories: {
       label: 'リポジトリ',
@@ -1723,12 +1729,11 @@ export default {
       defaultMountHelp: '参照がトークンから見えるマウントで始まらない場合に使用されます。',
       writeEnabled: '書き込みを許可',
       writeEnabledHelp:
-        'AnsibleForms で入力した認証情報のユーザーとパスワードを、保存時にここへ書き込めます。トークンには書き込みプレフィックス以下で read、create、update の権限が必要です。',
+        '入力したログインは保存時にここへ書き込まれます。トークンには read・create・update が必要です。',
       writePrefix: '書き込みプレフィックス',
       writePrefixHelp: '認証情報はこのパスかその配下にのみ書き込まれます。例: secret/ansibleforms。',
       writePrefixRequired: '書き込みにはプレフィックスが必要です。認証情報を書き込めるパスを指定してください。',
-      writeEnabledHelpCyberArk:
-        'AnsibleForms で入力した認証情報のユーザーとパスワードを、保存時に PVWA 経由でセーフのアカウントとしてここへ書き込めます（CCP は読み取り専用）。',
+      writeEnabledHelpCyberArk: '入力したログインは保存時に PVWA 経由で金庫のアカウントとしてここへ書き込まれます。',
       writeSafes: '書き込み先のセーフ',
       writeSafesHelp: 'アカウントはこれらのセーフにのみ書き込まれます。カンマ区切り、例: Linux, DB。',
       writeSafesRequired: '書き込みには少なくとも 1 つのセーフが必要です。',
@@ -1826,6 +1831,7 @@ export default {
       secretRefPlaceholder: '例: secret/myapp/prod',
       newSecretStore: 'シークレットストアを追加',
       noWritableStore: '書き込みを許可するシークレットストアはまだありません',
+      noSecretStore: 'シークレットストアはまだありません',
       secretFromStore: 'シークレットストア',
       secretFromStoreHint: 'HashiCorp Vault または CyberArk',
       secretPoint: 'キーを指す',
@@ -2020,6 +2026,7 @@ export default {
       mailAttribute: 'メール属性',
       mailAttributeDesc: 'ユーザーのメールアドレスを保持する LDAP 属性です (例: mail)。',
       bindUserDn: 'バインドユーザー DN',
+      bindPassword: 'バインドユーザーのパスワード',
       bindUserDnDesc: 'ディレクトリの検索に使用するサービスアカウントの DN です。',
       bindUserPasswordDesc: 'バインド用サービスアカウントのパスワードです。',
       usernameAttribute: 'ユーザー名属性',
@@ -2296,7 +2303,7 @@ export default {
       icon: 'アイコン',
       groups: 'グループ',
       users: 'ユーザー',
-      options: 'オプション',
+      permissions: '権限',
       key: 'キー',
       value: '値',
       addCategory: 'カテゴリを追加',

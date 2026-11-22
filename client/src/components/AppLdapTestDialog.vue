@@ -71,6 +71,8 @@ const testResultYaml = computed(() => (testResult.value ? yaml.stringify(testRes
       </p>
       <BsInput
         v-model="testUser"
+        :isFloating="false"
+        icon="user"
         :label="t('admin.ldap.testUsername')"
         type="text"
         :placeholder="t('admin.ldap.testUsernamePlaceholder')"
@@ -78,6 +80,8 @@ const testResultYaml = computed(() => (testResult.value ? yaml.stringify(testRes
       />
       <BsInput
         v-model="testPassword"
+        :isFloating="false"
+        icon="lock"
         :label="t('admin.ldap.testPassword')"
         type="password"
         :placeholder="t('admin.ldap.testPasswordPlaceholder')"

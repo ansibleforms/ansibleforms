@@ -791,6 +791,9 @@ export default {
       'Questa pagina usa ancora una build più vecchia del server. Ricarica la pagina per ottenere la nuova versione.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Attivo',
+    switchOff: 'Disattivo',
     help: 'Guida',
     name: 'Nome',
     orDivider: 'oppure',
@@ -1270,6 +1273,7 @@ export default {
       stepGroup: 'Gruppo',
       noGroup: 'Nessun gruppo ancora.',
       noRole: 'Ancora nessun ruolo.',
+      rolesNotGiven: "L'utente è stato creato, ma senza questi ruoli: {names}",
       signInHelp:
         'Attivo: accede con la propria password.\nDisattivo: le sue sessioni terminano ora e ogni accesso viene rifiutato.',
       noStoredJob: 'Nessun job salvato ancora.',
@@ -1294,6 +1298,8 @@ export default {
       nameRequired: 'È richiesto un nome',
       stillHasUsers: 'Rimuovi prima i suoi utenti: un gruppo con utenti non può essere eliminato',
       noRole: 'Nessun ruolo nomina questo gruppo.',
+      usersNotAdded: 'Il gruppo è stato creato, ma questi utenti non sono stati aggiunti: {names}',
+      rolesNotGiven: 'Il gruppo è stato creato, ma senza questi ruoli: {names}',
     },
     repositories: {
       label: 'Repository',
@@ -1881,13 +1887,13 @@ export default {
       defaultMountHelp: 'Usato quando un riferimento non inizia con un mount visibile al token.',
       writeEnabled: 'Consenti la scrittura',
       writeEnabledHelp:
-        'Utente e password di una credenziale digitati in AnsibleForms possono essere scritti qui al salvataggio. Il token richiede le capacità read, create e update sotto il prefisso di scrittura.',
+        'Le credenziali inserite sono scritte qui al salvataggio; il token serve read, create e update.',
       writePrefix: 'Prefisso di scrittura',
       writePrefixHelp: 'Le credenziali vengono scritte solo in questo percorso o sotto, es. secret/ansibleforms.',
       writePrefixRequired:
         'La scrittura richiede un prefisso: indica sotto quale percorso possono essere scritte le credenziali.',
       writeEnabledHelpCyberArk:
-        'Utente e password di una credenziale digitati in AnsibleForms possono essere scritti qui al salvataggio, come account di una safe, tramite il PVWA (il CCP legge soltanto).',
+        'Le credenziali inserite sono scritte qui al salvataggio, come account di una safe via PVWA.',
       writeSafes: 'Safe in cui scrivere',
       writeSafesHelp: 'Gli account vengono scritti solo in queste safe, separate da virgole, es. Linux, DB.',
       writeSafesRequired: 'La scrittura richiede almeno una safe.',
@@ -1986,6 +1992,7 @@ export default {
       secretRefPlaceholder: 'es. secret/myapp/prod',
       newSecretStore: 'Aggiungi archivio di segreti',
       noWritableStore: 'Nessun archivio di segreti consente ancora la scrittura',
+      noSecretStore: 'Ancora nessun archivio di segreti',
       secretFromStore: 'Archivio di segreti',
       secretFromStoreHint: 'HashiCorp Vault o CyberArk',
       secretPoint: 'Punta a una chiave',
@@ -2181,6 +2188,7 @@ export default {
       mailAttribute: 'Attributo mail',
       mailAttributeDesc: "Attributo LDAP contenente l'indirizzo email dell'utente (es. mail).",
       bindUserDn: 'Bind user DN',
+      bindPassword: "Password dell'utente di bind",
       bindUserDnDesc: "DN dell'account di servizio utilizzato per interrogare la directory.",
       bindUserPasswordDesc: "Password dell'account di servizio bind.",
       usernameAttribute: 'Attributo nome utente',
@@ -2329,7 +2337,7 @@ export default {
       icon: 'Icona',
       groups: 'Gruppi',
       users: 'Utenti',
-      options: 'Opzioni',
+      permissions: 'Permessi',
       key: 'Chiave',
       value: 'Valore',
       addCategory: 'Aggiungi categoria',

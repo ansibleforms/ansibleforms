@@ -14,9 +14,11 @@
 /*      preview: Object                                           */
 /*      trigger: Object                                           */
 /*                                                                */
-/*  settings.steps: [{ key, label, when, dialogSize }] - the      */
-/*      record dialog in steps (a wizard) : a field names its     */
+/*  settings.steps: [{ key, label, when, dialogSize, count }] -   */
+/*      the record dialog in steps (a wizard) : a field names its */
 /*      step (field.step, the first one when it names none) ;     */
+/*      count(item) puts a number beside a step's label (a new    */
+/*      group's users picked) ;                                   */
 /*      when(item) keeps a step to the records it applies to ;    */
 /*      dialogSize widens the dialog on it. Creating walks the    */
 /*      steps with Previous / Next and saves on the last ;        */
@@ -45,9 +47,16 @@
 /*      a choice no longer offered)                               */
 /*  field.nested: a radio group that follows up the one above it  */
 /*      (AWX : which product) - indented, with its label as title */
-/*  field.flush: a switch at the dialog's left edge, its help the */
-/*      full width under it ; a component the full width, its own */
-/*      title in it (no label column)                             */
+/*  field.titled: a radio group among other fields of its step    */
+/*      (a credential's sign-in) - its label above it, as theirs ;*/
+/*      without it a radio group is its step's whole choice, the  */
+/*      step naming it                                            */
+/*  field.placeBefore: (item) => key - shown just before that    */
+/*      field for this record (an ldap credential's TLS fields    */
+/*      before its bind user) ; null : in its own place           */
+/*  field.flush: a component with its own titles in it (no label */
+/*      above it, a schedule's end) ; a switch takes no notice,   */
+/*      its bold title is above it as every switch's              */
 /*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
 /*      its own, instead of field.dependency (the dropdowns'      */
 /*      lists : the credential chosen, its type)                  */
@@ -85,8 +94,10 @@
 /*  settings.confirmSave: async (body, original) => Boolean - a   */
 /*      question before a create (original null) or an update ;   */
 /*      false saves nothing (a repository's object usages)        */
-/*  settings.afterSave: (answer) => void - after a create, an     */
-/*      update or a delete, with the server's answer              */
+/*  settings.afterSave: (answer, values) => void|Promise - after  */
+/*      a create, an update or a delete, with the server's answer */
+/*      ; a create's is waited for before the list is read again, */
+/*      and gets the dialog's values too (a new group's users)    */
 /*  settings.confirmDelete: async (item) => Boolean|null - a      */
 /*      question of its own before a delete ; null asks the usual */
 /*  field.type 'usage': a repository's usage types under their    */
@@ -137,12 +148,12 @@ import yaml from 'yaml';
 import { required, requiredIf, helpers, email, sameAs } from '@vuelidate/validators';
 import { useI18n } from 'vue-i18n';
 import BsDataTable from './BsDataTable.vue';
-import BsRadioChoice from './BsRadioChoice.vue';
 import getSettings, { noCredentialsText } from '@/config/settings';
 import { inSentence } from '@/lib/inSentence';
 import { rememberRows } from '@/lib/recordButtons';
 import { tableControls } from '@/lib/listControls';
 import { askConfirm } from '@/lib/confirmPrompt';
+import BsSwitch from './BsSwitch.vue';
 
 // INIT
 
@@ -302,12 +313,16 @@ function getRules() {
     if (typeof field.validator === 'function') {
       const check = field.validator;
       rule.custom = helpers.withMessage(
-        ({ $response }) => $response || t('settings.common.fieldInvalid', { field: field.label }),
+        // $response is what the rule returned ({ $valid, $response }) : its message is inside it
+        ({ $response }) =>
+          (typeof $response === 'string' ? $response : $response?.$response) ||
+          t('settings.common.fieldInvalid', { field: field.label }),
         (value) => {
           if (!helpers.req(value)) return true;
           let message;
           try {
-            message = check(value) || '';
+            // the value, and the record for a rule across fields (a repeated password)
+            message = check(value, item.value || {}) || '';
           } catch (e) {
             // a throwing validator must not take the whole form down, as
             // the regex branch above already guards against
@@ -642,12 +657,7 @@ function newItem(defaults = {}) {
     if (field.type === 'editor' && item.value[field.key] === undefined) {
       item.value[field.key] = '';
     }
-    if (field.type === 'select' && field.parent && field.valueKey) {
-      const list = parentLists.value[field.parent] || [];
-      if (list.length > 0 && item.value[field.key] === undefined) {
-        item.value[field.key] = list[0][field.valueKey];
-      }
-    }
+    // a dropdown of a list : its first choice is set by preselectChoices, the first it offers
   });
   // the defaults of a field that follows another set from the start (an SSO provider is Entra ID
   // at first : its redirect URL, on the first step, from the app's address)
@@ -667,7 +677,9 @@ async function createItem() {
     try {
       const res = await axios.post(`/api/v${props.apiVersion}/${objectType}/`, body);
       toast.success(t('settings.common.nameCreated', { name: objectTitle('') }));
-      props.settings.afterSave?.(res.data);
+      // waited for, with the dialog's values : what it adds to the record (a new group's users
+      // and roles) is in the list read after it
+      await props.settings.afterSave?.(res.data, item.value);
       // the dialog that asked for it (a dropdown's New button) selects what was created
       emit('created', item.value.name ?? item.value[idKey]);
       if (props.dialogOnly) unselectItem();
@@ -996,6 +1008,83 @@ watch(action, () => {
   stepReached.value = 0;
 });
 
+// ─── A new record's dropdowns : the first choice they offer ────────────────────
+// a dropdown of a list (field.parent) of a new record starts on the first choice it offers : what
+// its choicesWhen keeps (an Entra ID provider's entraid credentials, the secret stores that allow
+// writing), for a credential dropdown that lists every kind the kind its New button makes (a
+// repository's git ones) ; never on its empty choice nor on the first record of its list that it
+// does not offer (it looked empty). None to offer : empty, its emptyText or its New button saying
+// so. Chosen again when what it offers changes (a provider switched on an earlier step) ; one the
+// user emptied stays empty.
+const choicesCleared = new Set();
+// what the choosing itself last wrote in each, so its own emptying is not taken for the user's
+const choicesChosen = new Map();
+
+/**
+ * Whether a dropdown lists the records of a list (its parent) : a select with a parent and the
+ * key of its value.
+ *
+ * Args:
+ *   field (object): the field.
+ *
+ * Returns:
+ *   boolean: true for such a dropdown.
+ */
+function isListSelect(field) {
+  return field?.type === 'select' && !!field.parent && !!field.valueKey;
+}
+
+/**
+ * Chooses, on a new record, the first choice of every dropdown shown that has none it offers :
+ * empty, or a record its choices do not keep.
+ */
+function preselectChoices() {
+  if (action.value !== 'new') return;
+  for (const field of fields.value) {
+    if (!isListSelect(field) || choicesCleared.has(field.key) || !showField(field)) continue;
+    // its kind : what its choicesWhen keeps, else the kind its New button makes (a repository's
+    // git credential) when its dropdown lists every kind ; none of that kind : left empty
+    const kind =
+      field.parent === 'credentials' && !field.choicesWhen ? textOf(field.createDefaults)?.credential_type : null;
+    const offered = choicesOf(field).filter((c) => c?.[field.valueKey]);
+    // one it offers, chosen or picked : kept, whatever its kind
+    const current = item.value[field.key];
+    if (current && offered.some((c) => c[field.valueKey] === current)) continue;
+    const choices = offered.filter((c) => !kind || c.credential_type === kind);
+    const chosen = choices.length ? choices[0][field.valueKey] : '';
+    choicesChosen.set(field.key, chosen);
+    item.value[field.key] = chosen;
+  }
+}
+
+// a new record : nothing emptied yet
+watch(action, () => {
+  choicesCleared.clear();
+  choicesChosen.clear();
+});
+// on every step shown, when a list is read, and when what decides what they offer changes
+watch(
+  () => [
+    action.value,
+    stepIndex.value,
+    Object.values(parentLists.value || {})
+      .map((list) => (Array.isArray(list) ? list.length : 0))
+      .join(','),
+    JSON.stringify(fields.value.map((f) => (typeof item.value[f.key] === 'object' ? null : item.value[f.key]))),
+  ],
+  () => nextTick(preselectChoices),
+);
+// one the user emptied (its clear button) : left empty
+watch(
+  () => fields.value.filter(isListSelect).map((f) => item.value[f.key] || ''),
+  (now, before) => {
+    if (action.value !== 'new' || !before) return;
+    fields.value.filter(isListSelect).forEach((f, i) => {
+      if (before[i] && !now[i] && choicesChosen.get(f.key) !== '') choicesCleared.add(f.key);
+    });
+  },
+);
+
 // ─── Change password : the shared dialog ──────────────────────────────────────
 // a record's password (a user's, a credential's) changes in AppChangePasswordDialog, typed twice ;
 // an SSO provider's client secret too, asked once (pasted from the provider's console) and named
@@ -1066,7 +1155,20 @@ const dialogFields = computed(() => {
   const list = fields.value.filter(onStep);
   const isShort = (f) => f.type === 'checkbox' && f.shortLabel;
   const sorted = list.filter(isShort).sort((a, b) => a.shortLabel.localeCompare(b.shortLabel, locale.value));
-  return list.map((f) => (isShort(f) ? sorted.shift() : f));
+  const shown = list.map((f) => (isShort(f) ? sorted.shift() : f));
+  // a field placed before another for this record (field.placeBefore) : an ldap credential's TLS
+  // fields right after its Use TLS, before its bind user ; in their own order
+  const moving = shown.filter((f) => typeof f.placeBefore === 'function' && f.placeBefore(item.value || {}));
+  if (!moving.length) return shown;
+  const rest = shown.filter((f) => !moving.includes(f));
+  for (const f of moving) {
+    const target = f.placeBefore(item.value || {});
+    const at = rest.findIndex((x) => x.key === target);
+    const last = rest.findLastIndex((x) => moving.includes(x) && x.placeBefore(item.value || {}) === target);
+    if (at === -1) rest.push(f);
+    else rest.splice(last === -1 ? at : last + 1, 0, f);
+  }
+  return rest;
 });
 
 /**
@@ -1784,15 +1886,15 @@ defineExpose({
   <BsModal v-if="defaultPicker && defaultsOpen" size="lg" @close="cancelDefaults" :icon="objectIcon">
     <template #title> {{ defaultPicker.title }} </template>
     <template #default>
-      <!-- 16px between two groups, none after the last : the dialog's padding ends it -->
+      <!-- each group its label above its dropdown, its help under it ; 16px between two groups,
+           none after the last : the dialog's padding ends it -->
       <div
         v-for="(group, i) in defaultPicker.groups"
         :key="group.key"
-        class="row"
         :class="i < defaultPicker.groups.length - 1 ? 'mb-3' : 'mb-0'"
       >
-        <label class="col-sm-3 col-form-label fw-bold" :for="'af-default-' + group.key">{{ group.label }}</label>
-        <div class="col-sm-9">
+        <label class="form-label fw-bold" :for="'af-default-' + group.key">{{ group.label }}</label>
+        <div>
           <div class="input-group">
             <span class="input-group-text"
               ><FaIcon :icon="groupLocked(group.key) ? 'lock' : group.icon || objectIcon"
@@ -1882,6 +1984,9 @@ defineExpose({
             ><FaIcon v-if="i < stepIndex" icon="check" /><template v-else>{{ i + 1 }}</template></span
           >
           <span class="af-wizard-label">{{ step.label }}</span>
+          <span v-if="typeof step.count === 'function'" class="badge af-wizard-count">{{
+            step.count(item || {})
+          }}</span>
         </li>
       </ol>
     </template>
@@ -1896,12 +2001,11 @@ defineExpose({
       </div>
       <template v-for="field in dialogFields" :key="field.key">
         <!-- DATETIME FIELD -->
-        <div v-if="showField(field) && field.type === 'datetime'" class="row mb-3">
-          <label class="col-sm-2 col-form-label fw-bold">
-            {{ field.label }}
-            <span v-if="field.required" class="text-danger">*</span>
-          </label>
-          <div class="col-sm-10">
+        <div v-if="showField(field) && field.type === 'datetime'" class="mb-3">
+          <label class="form-label fw-bold"
+            >{{ field.label }}<span v-if="field.required" class="text-danger ms-1">*</span></label
+          >
+          <div>
             <BsDateTime
               v-model="$v.item[field.key].$model"
               :icon="field.icon || 'calendar'"
@@ -1911,7 +2015,7 @@ defineExpose({
               dateType="datetime"
               teleport
             />
-            <small v-if="field.help" class="form-text text-muted d-block mt-1">{{ field.help }}</small>
+            <div v-if="field.help" class="form-text">{{ field.help }}</div>
             <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
               <div v-for="error in $v.item[field.key].$errors" :key="error.$uid">
                 {{ error.$message }}
@@ -1921,12 +2025,11 @@ defineExpose({
         </div>
 
         <!-- CRON FIELD -->
-        <div v-if="showField(field) && field.type === 'cron'" class="row mb-3">
-          <label class="col-sm-2 col-form-label fw-bold">
-            {{ field.label }}
-            <span v-if="field.required" class="text-danger">*</span>
-          </label>
-          <div class="col-sm-10">
+        <div v-if="showField(field) && field.type === 'cron'" class="mb-3">
+          <label class="form-label fw-bold"
+            >{{ field.label }}<span v-if="field.required" class="text-danger ms-1">*</span></label
+          >
+          <div>
             <BsCron
               v-model="$v.item[field.key].$model"
               :icon="field.icon || 'stopwatch'"
@@ -1941,17 +2044,17 @@ defineExpose({
         </div>
 
         <!-- RRULE FIELD : the iCal rrule of a repository schedule, its next runs under it -->
-        <div v-if="showField(field) && field.type === 'rrule'" class="row mb-3">
-          <label class="col-sm-2 col-form-label fw-bold">
-            {{ field.label }}
-            <span v-if="field.required" class="text-danger">*</span>
-          </label>
-          <div class="col-sm-10">
+        <div v-if="showField(field) && field.type === 'rrule'" class="mb-3">
+          <label class="form-label fw-bold"
+            >{{ field.label }}<span v-if="field.required" class="text-danger ms-1">*</span></label
+          >
+          <div>
             <BsRrule
               v-model="$v.item[field.key].$model"
+              :icon="field.icon || 'repeat'"
               :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
             />
-            <small v-if="field.help" class="form-text text-muted d-block mt-1">{{ textOf(field.help) }}</small>
+            <div v-if="field.help" class="form-text">{{ textOf(field.help) }}</div>
             <!-- why it is refused, BsRrule says under its box : here only the other errors (required),
                  not the validator's same reason a second time -->
             <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
@@ -1999,17 +2102,6 @@ defineExpose({
 
         <!-- RADIO BUTTONS (type radio) : one choice of field.options, at the dialog's left edge,
              each its label and a few grey words (hint) on one line -->
-        <!-- A CHOICE AMONG THE FIELDS (type radio, alignHints) : each option a row like theirs, the
-             radio in the label column, its hint where their inputs start (BsRadioChoice) -->
-        <BsRadioChoice
-          v-else-if="showField(field) && field.type === 'radio' && field.alignHints"
-          v-model="$v.item[field.key].$model"
-          :options="field.options"
-          :name="field.key"
-          :shown="(opt) => optionShown(field, opt)"
-          :disabled="!!field.readonly"
-          aligned
-        />
         <div
           v-else-if="showField(field) && field.type === 'radio'"
           class="mb-3 af-radio-group"
@@ -2020,6 +2112,8 @@ defineExpose({
           <!-- a follow-up choice (nested) : under the option it follows, with its own title when it
                has one -->
           <div v-if="field.nested && field.label" class="af-radio-title">{{ field.label }}</div>
+          <!-- among other fields (titled) : its label above it, as theirs -->
+          <div v-else-if="field.titled && field.label" class="form-label fw-bold">{{ field.label }}</div>
           <div
             v-for="opt in field.options"
             v-show="optionShown(field, opt)"
@@ -2044,29 +2138,27 @@ defineExpose({
         </div>
 
         <!-- A COMPONENT (type component) : something to see while the record is made (the labels'
-             preview), field.component with the props field.props(item, items) gives ; its title in
-             the label column, as the other fields -->
-        <!-- flush : the whole width, its own title in it (a schedule's end, AppScheduleEnd) -->
+             preview), field.component with the props field.props(item, items) gives ; its title
+             above it, as the other fields, none when it has no label (a note under the login) -->
+        <!-- flush : its own titles in it (a schedule's end, AppScheduleEnd) -->
         <div v-else-if="showField(field) && field.type === 'component' && field.flush" class="mb-3">
           <component :is="field.component" v-bind="field.props ? field.props($v.item.$model, itemList) : {}" />
         </div>
-        <div v-else-if="showField(field) && field.type === 'component'" class="row mb-3">
-          <label class="form-label fw-bold col-form-label col-sm-2">{{ field.label }}</label>
-          <div class="col-sm-10">
-            <component :is="field.component" v-bind="field.props ? field.props($v.item.$model, itemList) : {}" />
-            <div v-if="field.help" class="form-text">{{ field.help }}</div>
-          </div>
+        <div v-else-if="showField(field) && field.type === 'component'" class="mb-3">
+          <div v-if="field.label" class="form-label fw-bold">{{ field.label }}</div>
+          <component :is="field.component" v-bind="field.props ? field.props($v.item.$model, itemList) : {}" />
+          <div v-if="field.help" class="form-text">{{ field.help }}</div>
         </div>
 
         <!-- COLOUR SWATCHES (type swatches) : one choice of field.options, round buttons in their
              colour (opt.cls), the chosen one ringed and ticked, as a label's page (label.vue) -->
-        <div v-else-if="showField(field) && field.type === 'swatches'" class="row mb-3">
-          <!-- its title in the label column, the circles and the help beside it, as the other fields -->
-          <label class="form-label fw-bold col-form-label col-sm-2"
-            >{{ field.label }}<span v-if="field.required" class="text-danger ms-1">*</span></label
-          >
-          <div class="col-sm-10">
-            <div class="d-flex flex-wrap gap-2 ms-1 af-swatch-row" role="radiogroup" :aria-label="field.label">
+        <div v-else-if="showField(field) && field.type === 'swatches'" class="mb-3">
+          <!-- its title above the circles, the help under them, as the other fields -->
+          <div class="form-label fw-bold">
+            {{ field.label }}<span v-if="field.required" class="text-danger ms-1">*</span>
+          </div>
+          <div>
+            <div class="d-flex flex-wrap gap-2 ms-1" role="radiogroup" :aria-label="field.label">
               <button
                 v-for="opt in field.options"
                 :key="String(opt.value)"
@@ -2086,36 +2178,34 @@ defineExpose({
           </div>
         </div>
 
-        <!-- A SWITCH AT THE LEFT EDGE (flush) : no label column before it, its help the full
-             width of the dialog under it -->
-        <div
-          v-else-if="showField(field) && field.type === 'checkbox' && field.flush"
-          class="form-check form-switch af-flush-switch mb-3"
-        >
-          <input
+        <!-- A SWITCH (type checkbox) : its bold title above it, its help under it, as a record page's
+             Enabled ; every switch so, a flush one too (every field has its title) -->
+        <div v-else-if="showField(field) && field.type === 'checkbox'" class="mb-3">
+          <label class="form-label fw-bold d-block" :for="'af-switch-' + field.key">{{ field.label }}</label>
+          <BsSwitch
             :id="'af-switch-' + field.key"
             v-model="$v.item[field.key].$model"
-            class="form-check-input"
-            type="checkbox"
-            role="switch"
-            :disabled="field.readonly"
+            :disabled="!!field.readonly"
+            class="mb-0"
           />
-          <label class="form-check-label" :for="'af-switch-' + field.key">{{ field.label }}</label>
-          <div v-if="textOf(field.help)" class="form-text mt-1">{{ textOf(field.help) }}</div>
+          <div v-if="textOf(field.help)" class="form-text">{{ textOf(field.help) }}</div>
+          <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
+            <div v-for="error in $v.item[field.key].$errors" :key="error.$uid">
+              {{ error.$message }}
+            </div>
+          </div>
         </div>
 
-        <!-- A DROPDOWN WITH NOTHING TO CHOOSE YET (createWith, an empty list) : only its New
-             button, where the dropdown would be -->
+        <!-- A DROPDOWN WITH NOTHING TO CHOOSE YET (createWith, an empty list) : its label, then only
+             its New button where the dropdown would be -->
         <div
           v-else-if="showField(field) && noChoices(field) && !emptyTextOf(field) && action !== 'select'"
-          class="row mb-3"
+          class="mb-3"
         >
-          <label class="col-sm-2 col-form-label fw-bold">{{ field.label }}</label>
-          <div class="col-sm-10 d-flex align-items-center">
-            <BsButton icon="plus" @click="creators[field.key]?.newItem(textOf(field.createDefaults))">{{
-              field.createLabel
-            }}</BsButton>
-          </div>
+          <div class="form-label fw-bold">{{ field.label }}</div>
+          <BsButton icon="plus" @click="creators[field.key]?.newItem(textOf(field.createDefaults))">{{
+            field.createLabel
+          }}</BsButton>
         </div>
 
         <!-- SEVERAL VALUES, ONE PER INPUT (an LDAP directory's servers ; listWhen : a field that is
@@ -2123,7 +2213,6 @@ defineExpose({
         <BsInputList
           v-else-if="showField(field) && (field.type === 'list' || field.listWhen?.(item))"
           v-model="$v.item[field.key].$model"
-          :isHorizontal="true"
           :label="textOf(field.dialogLabel) || field.label"
           :help="textOf(field.help)"
           :icon="field.icon"
@@ -2145,7 +2234,6 @@ defineExpose({
             field.type !== 'usage' &&
             !field.listWhen?.(item)
           "
-          :isHorizontal="true"
           :type="field.type"
           :placeholder="action == 'edit' && field.onEdit ? '********' : textOf(field.placeholder)"
           :suffix="textOf(field.suffix)"
@@ -2179,13 +2267,11 @@ defineExpose({
             action !== 'select' &&
             (!noChoices(field) || emptyTextOf(field))
           "
-          class="row mb-3 mt-n2"
+          class="mb-3 mt-n2"
         >
-          <div class="offset-sm-2 col-sm-10">
-            <BsButton icon="plus" @click="creators[field.key]?.newItem(textOf(field.createDefaults))">{{
-              field.createLabel
-            }}</BsButton>
-          </div>
+          <BsButton icon="plus" @click="creators[field.key]?.newItem(textOf(field.createDefaults))">{{
+            field.createLabel
+          }}</BsButton>
         </div>
       </template>
       <div v-if="action == 'select' && childLists">
@@ -2224,11 +2310,6 @@ defineExpose({
   </div>
 </template>
 <style scoped>
-/* the colour circles as tall as a field's input, so they sit on the line of their title */
-.af-swatch-row {
-  min-height: calc(1.5em + 0.75rem + 2px);
-  align-items: center;
-}
 /* a dialog opened from this one's (a New button under a dropdown) : above it, its backdrop
    dimming this dialog as this one's dims the page (Bootstrap's modal is 1055, its backdrop 1050) */
 .af-nested-dialogs :deep(.modal) {
@@ -2295,6 +2376,13 @@ defineExpose({
 .af-wizard-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* the count of a step : small and grey, as the tabs' counts (AppWizardSteps) */
+.af-wizard-count {
+  flex-shrink: 0;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+  font-weight: 600;
 }
 /* .af-taken, .af-short-check and .af-short-label : global (styles/bootstrap-override.scss) */
 /* a follow-up radio group : indented to the labels of the group above, its title small and

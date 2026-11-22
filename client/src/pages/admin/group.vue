@@ -311,9 +311,12 @@ onMounted(async () => {
     <template #title> {{ t('settings.settingsPage.addUser') }} </template>
     <template #default>
       <label class="form-label fw-bold">{{ t('settings.fields.username') }}</label>
-      <select v-model="addingUser" class="form-select">
-        <option v-for="u in others" :key="u.id" :value="u.id">{{ u.username }}</option>
-      </select>
+      <div class="input-group">
+        <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="user" /></span>
+        <select v-model="addingUser" class="form-select">
+          <option v-for="u in others" :key="u.id" :value="u.id">{{ u.username }}</option>
+        </select>
+      </div>
       <div v-if="!others.length" class="text-muted small mt-1">{{ t('settings.groups.everyUserIn') }}</div>
     </template>
     <template #footer>

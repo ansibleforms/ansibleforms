@@ -794,6 +794,9 @@ export default {
       'Cette page utilise encore une build plus ancienne que le serveur. Rechargez la page pour obtenir la nouvelle version.',
   },
   common: {
+    // the word beside a switch with no text of its own, as it stands
+    switchOn: 'Activé',
+    switchOff: 'Désactivé',
     help: 'Aide',
     name: 'Nom',
     orDivider: 'ou',
@@ -1274,6 +1277,7 @@ export default {
       stepGroup: 'Groupe',
       noGroup: 'Pas encore de groupe.',
       noRole: 'Aucun rôle pour l’instant.',
+      rolesNotGiven: "L'utilisateur a été créé, mais sans ces rôles : {names}",
       signInHelp:
         'Activé : connexion avec son mot de passe.\nDésactivé : ses sessions se terminent maintenant et chaque connexion est refusée.',
       noStoredJob: 'Pas encore de job enregistré.',
@@ -1298,6 +1302,8 @@ export default {
       nameRequired: 'Un nom est requis',
       stillHasUsers: "Retirez d'abord ses utilisateurs : un groupe avec des utilisateurs ne peut pas être supprimé",
       noRole: 'Aucun rôle ne nomme ce groupe.',
+      usersNotAdded: "Le groupe a été créé, mais ces utilisateurs n'ont pas été ajoutés : {names}",
+      rolesNotGiven: 'Le groupe a été créé, mais sans ces rôles : {names}',
     },
     repositories: {
       label: 'Depot',
@@ -1890,14 +1896,12 @@ export default {
       defaultMount: 'Montage par défaut',
       defaultMountHelp: 'Utilisé quand une référence ne commence pas par un montage visible pour le jeton.',
       writeEnabled: "Autoriser l'écriture",
-      writeEnabledHelp:
-        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement. Le jeton a besoin des capacités read, create et update sous le préfixe d'écriture.",
+      writeEnabledHelp: "Les identifiants saisis y sont écrits à l'enregistrement ; jeton avec read, create et update.",
       writePrefix: "Préfixe d'écriture",
       writePrefixHelp: "Les identifiants ne sont écrits qu'à ce chemin ou en dessous, p. ex. secret/ansibleforms.",
       writePrefixRequired:
         "L'écriture demande un préfixe : indiquez sous quel chemin les identifiants peuvent être écrits.",
-      writeEnabledHelpCyberArk:
-        "L'utilisateur et le mot de passe d'un identifiant saisis dans AnsibleForms peuvent être écrits ici à l'enregistrement, comme compte d'un coffre, via le PVWA (le CCP ne fait que lire).",
+      writeEnabledHelpCyberArk: "Identifiants saisis écrits ici à l'enregistrement, en comptes de coffre via la PVWA.",
       writeSafes: 'Coffres où écrire',
       writeSafesHelp: 'Les comptes ne sont écrits que dans ces coffres, séparés par des virgules, p. ex. Linux, DB.',
       writeSafesRequired: "L'écriture demande au moins un coffre.",
@@ -1998,6 +2002,7 @@ export default {
       secretRefPlaceholder: 'ex. secret/myapp/prod',
       newSecretStore: 'Ajouter un coffre de secrets',
       noWritableStore: "Aucun coffre de secrets n'autorise encore l'écriture",
+      noSecretStore: 'Aucun coffre de secrets pour le moment',
       secretFromStore: 'Coffre de secrets',
       secretFromStoreHint: 'HashiCorp Vault ou CyberArk',
       secretPoint: 'Pointer vers une clé',
@@ -2192,6 +2197,7 @@ export default {
       mailAttribute: 'Attribut mail',
       mailAttributeDesc: "Attribut LDAP contenant l'adresse e-mail de l'utilisateur (ex. mail).",
       bindUserDn: "DN de l'utilisateur de bind",
+      bindPassword: "Mot de passe de l'utilisateur de liaison",
       bindUserDnDesc: "DN du compte de service utilisé pour interroger l'annuaire.",
       bindUserPasswordDesc: 'Mot de passe du compte de service bind.',
       usernameAttribute: "Attribut nom d'utilisateur",
@@ -2342,7 +2348,7 @@ export default {
       icon: 'Icone',
       groups: 'Groupes',
       users: 'Utilisateurs',
-      options: 'Options',
+      permissions: 'Autorisations',
       key: 'Cle',
       value: 'Valeur',
       addCategory: 'Ajouter une categorie',

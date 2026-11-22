@@ -18,6 +18,28 @@ export const RESERVED_ROLES = ['admin', 'default', 'public'];
 export const EVERYONE_ROLES = ['default', 'public'];
 
 /**
+ * Why a role's name cannot be saved, or null : empty, the name of another role, or 'admin' on a
+ * role that is not the admin role. The checks of a save (validateRoles), and of the New role
+ * wizard's Next on its Details step.
+ *
+ * Args:
+ *   t (Function): vue-i18n's t.
+ *   name (string): the name typed.
+ *   taken (Set<string>): the names of the other roles, trimmed.
+ *   required (boolean): whether the role is one the config must keep (admin, default).
+ *
+ * Returns:
+ *   string|null: the message, or null when the name can be saved.
+ */
+export function roleNameProblem(t, name, taken, required = false) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return t('settings.settingsPage.roleNameRequired');
+  if (taken.has(trimmed)) return t('settings.settingsPage.duplicateRoleName', { name: trimmed });
+  if (!required && trimmed === 'admin') return t('settings.settingsPage.reservedRoleName', { name: trimmed });
+  return null;
+}
+
+/**
  * The roles' shared support, around the roles of useFormsConfig.
  *
  * Args:
@@ -132,12 +154,9 @@ export function useRoleSupport(roles, save) {
     const seen = new Set();
     for (const role of roles.value) {
       const name = (role.name || '').trim();
-      if (!name) return t('settings.settingsPage.roleNameRequired');
-      if (seen.has(name)) return t('settings.settingsPage.duplicateRoleName', { name });
+      const problem = roleNameProblem(t, name, seen, role._required);
+      if (problem) return problem;
       seen.add(name);
-      if (!role._required && name === 'admin') {
-        return t('settings.settingsPage.reservedRoleName', { name });
-      }
       // a user or a group listed twice in a role : the same entry, written twice
       for (const kind of ['users', 'groups']) {
         const entries = new Set();
