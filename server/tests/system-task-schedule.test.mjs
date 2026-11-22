@@ -152,10 +152,13 @@ describe("the cron settings", () => {
     // the runner hub's loops are no task : read only, on their own timers (HUB_LOOPS)
   });
 
+  // a text matched as it is inside a regex : every character a regex reads specially escaped
+  const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   test("documented in help.yaml with their default, applied live, shown on the task's page only", () => {
     const help = read("help.yaml");
     for (const [env, cron] of Object.values(TASKS)) {
-      assert.match(help, new RegExp(`- name: ${env}\\n    version: 7\\.8\\.0\\n    type: string\\n[\\s\\S]*?default: "${cron.replace(/\*/g, "\\*")}"`), env);
+      assert.match(help, new RegExp(`- name: ${env}\\n    version: 7\\.8\\.0\\n    type: string\\n[\\s\\S]*?default: "${escapeRegex(cron)}"`), env);
       assert.equal(EnvSettings.classify(env), "live", env);
       // not on Settings > System > General, nor in a General repository's file
       assert.ok(EnvSettings.OWNED_ELSEWHERE.test(env), env);
