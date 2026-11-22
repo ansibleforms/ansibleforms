@@ -1372,6 +1372,7 @@ export default {
         syslog: 'Syslog-servers, items van een controller_syslog:-lijst in een van zijn YAML-bestanden',
         chat_assistant:
           'De schakelaar en instellingen van de chat-assistent, onder controller_chat_assistant: in een van zijn YAML-bestanden, de sleutel alleen als omgevingsverwijzing',
+        ssh: 'De SSH-sleutel en bekende hosts, onder controller_ssh: in een van zijn YAML-bestanden, de sleutel alleen als omgevingsverwijzing',
         mcp: 'De MCP-instellingen op hun omgevingsnaam, onder controller_mcp: in een van zijn YAML-bestanden',
         defaults:
           'Het thema, de kleur, de formulierweergave, de tijdzone, de datumnotatie en de taal, onder controller_defaults: in een van zijn YAML-bestanden',

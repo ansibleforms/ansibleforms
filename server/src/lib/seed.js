@@ -901,13 +901,14 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("chat_assistant");
   }
 
-  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements,
-  // the disclaimer versions, the local groups and the users : read through the descriptors a
+  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the SSH key and
+  // known hosts, the announcements, the disclaimer versions, the local groups and the users : read through the descriptors a
   // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted ;
   // the groups before the users, whose new local ones take the groups listing them
   const sections = [
     ...Object.keys(APPEARANCE_SECTIONS).map((key) => [key, key, key]),
     ["mcp", "mcp", "MCP"],
+    ["ssh", "ssh", "SSH"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
     ["groups", "groups", "group"],

@@ -1377,6 +1377,7 @@ export default {
         syslog: "Servidors syslog, entrades d'una llista controller_syslog: en qualsevol dels seus fitxers YAML",
         chat_assistant:
           "L'interruptor i la configuració de l'assistent de xat, sota controller_chat_assistant: en un dels seus fitxers YAML, la clau només com a referència d'entorn",
+        ssh: "La clau SSH i els hosts coneguts, sota controller_ssh: en un dels seus fitxers YAML, la clau només com a referència d'entorn",
         mcp: "Els ajustos de MCP pel seu nom d'entorn, sota controller_mcp: en un dels seus fitxers YAML",
         defaults:
           "El tema, el color, la vista dels formularis, la zona horària, el format de data i l'idioma, sota controller_defaults: en un dels seus fitxers YAML",

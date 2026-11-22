@@ -803,6 +803,19 @@ export const APPEARANCE_KEYS = { defaults: { default_forms_view: "forms_view" } 
 // controller_mcp: map holds them.
 // What the seed declares is its own, variable by variable, as the Appearance pages' fields
 // (lib/seedManaged.js) ; each checked as the page's Save checks it when applied.
+// The SSH page (Settings > Connections > SSH) : the app's private key (its public key made from
+// it) and the known hosts, the servers it trusts, one line of a known_hosts file each. A repository's
+// controller_ssh: map holds the same, its private key an ${ENV} reference only ; either left out
+// stays as the app has it, an empty known_hosts list clears them.
+export const sshSection = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    private_key: { type: "string", minLength: 1 },
+    known_hosts: { type: "array", items: { type: "string", minLength: 1 } },
+  },
+};
+
 export const mcpSection = {
   type: "object",
   propertyNames: { pattern: "^(enable_mcp|mcp_[a-z0-9_]+)$" },
@@ -963,6 +976,7 @@ export const seedSchema = {
     name: nameSection,
     links: linksSection,
     mcp: mcpSection,
+    ssh: sshSection,
     announcements: itemsSection(announcementItem),
     disclaimer: itemsSection(disclaimerItem),
   },

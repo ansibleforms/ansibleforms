@@ -215,6 +215,16 @@ export const USAGE_TYPES = [
     objects: true,
     oneOnly: true,
   },
+  // named as its menu item names it (SSH) : the key and the known hosts, one map
+  {
+    key: 'ssh',
+    flag: 'use_for_ssh',
+    category: 'connections',
+    labelKey: 'sidebar.ssh',
+    objects: true,
+    oneOnly: true,
+    single: true,
+  },
   {
     key: 'notifications',
     flag: 'use_for_notifications',
@@ -262,6 +272,8 @@ export const USAGE_FLAGS = USAGE_TYPES.map((u) => u.flag);
 export const APPLY_ORDER = [
   'credentials',
   'repositories',
+  // the SSH key and known hosts right after : the repositories are cloned once the pass is done
+  'ssh',
   'secret_stores',
   'databases',
   'runners',

@@ -546,6 +546,7 @@ CREATE TABLE `repositories` (
   `use_for_syslog` tinyint(4) DEFAULT 0,
   `use_for_chat_assistant` tinyint(4) DEFAULT 0,
   `use_for_mcp` tinyint(4) DEFAULT 0,
+  `use_for_ssh` tinyint(4) DEFAULT 0,
   -- the local groups and their members, the users (local, LDAP and SSO)
   `use_for_groups` tinyint(4) DEFAULT 0,
   `use_for_users` tinyint(4) DEFAULT 0,

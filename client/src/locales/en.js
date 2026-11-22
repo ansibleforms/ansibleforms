@@ -1363,6 +1363,7 @@ export default {
         syslog: 'Syslog servers, entries of a controller_syslog: list in any of its YAML files',
         chat_assistant:
           "The chat assistant's switch and settings, under controller_chat_assistant: in one of its YAML files, the key only as an environment reference",
+        ssh: 'The SSH key and known hosts, under controller_ssh: in one of its YAML files, the key only as an environment reference',
         mcp: 'The MCP settings by their environment name, under controller_mcp: in one of its YAML files',
         defaults:
           'The theme, colour, forms view, time zone, date format and language, under controller_defaults: in one of its YAML files',

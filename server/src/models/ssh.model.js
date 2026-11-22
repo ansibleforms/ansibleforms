@@ -77,6 +77,21 @@ Ssh.update = function (record) {
       throw e
     }
 };
+/**
+ * The app's private key, as its file holds it : what a repository holding the SSH page compares
+ * a file's key with (lib/repoObjects/ssh.js), never written to it.
+ *
+ * Returns:
+ *   Promise<string>: the key ; empty when there is none.
+ */
+Ssh.privateKey = async function () {
+  try {
+    return await fs.promises.readFile(privateKeyPath(), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
 // get private & public key info
 Ssh.find = function () {
   logger.info("Reading sshkey key")

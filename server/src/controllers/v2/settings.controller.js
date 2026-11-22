@@ -45,7 +45,7 @@ const refuseWhileDesignerLocked = async function(req, res) {
 const configHash = auditConfigHash;
 
 // the types kept in one file of a repository, whose page says which (source_<type> in the settings)
-const SINGLE_FILE_TYPES = ['general', 'defaults', 'logo', 'icon', 'name', 'links', 'mcp', 'chat_assistant'];
+const SINGLE_FILE_TYPES = ['general', 'defaults', 'logo', 'icon', 'name', 'links', 'mcp', 'chat_assistant', 'ssh'];
 // the types holding fields of the settings row this endpoint saves, one per Appearance page : a
 // save writes the file of the page whose fields it changed, never another's
 const ROW_TYPES = ['defaults', 'name', 'links'];

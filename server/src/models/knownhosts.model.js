@@ -84,4 +84,20 @@ KnownHosts.add = async function (host) {
   }
 };
 
+/**
+ * Replaces the known hosts with these lines, in this order : what a repository holding the SSH page
+ * declares (lib/repoObjects/ssh.js). The lines are checked there.
+ *
+ * Args:
+ *   lines (string[]): the known_hosts lines.
+ *
+ * Returns:
+ *   Promise<void>
+ */
+KnownHosts.replaceAll = async function (lines) {
+  const file = hostsFile();
+  await fs.promises.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  await fs.promises.writeFile(file, lines.length ? lines.join('\n') + '\n' : '', 'utf8');
+};
+
 export default KnownHosts;
