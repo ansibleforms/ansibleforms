@@ -29,6 +29,7 @@ Removed in 8.0.0. Each logs a warning when it is used.
 | `APP_URL` on an RTE (still read when `CONTROLLER_URL` is not set, with a warning at the RTE's start ; `CONTROLLER_URL` wins when both are set) | `CONTROLLER_URL` | 7.8.0 |
 | `APP_TLS_VERIFY` on an RTE (still read the same way) | `CONTROLLER_TLS_VERIFY` | 7.8.0 |
 | `AF_ROLE=app` (still read as `controller`, with a warning at start ; a node started with it keeps its `app-` name, so it finds its jobs again) | `AF_ROLE=controller` | 7.8.0 |
+| `CONFIG_SEED_RELOAD_SECONDS` (still read when `CONFIG_SEED_RELOAD_CRON` is not set, as a cron, with a warning at start : 60 as `* * * * *`, a multiple of 60 up to 3600 as `*/N * * * *` in minutes, a divisor of 60 as `*/N * * * * *` in seconds, 0 still off, any other number as the nearest of these ; `CONFIG_SEED_RELOAD_CRON` wins when both are set) | `CONFIG_SEED_RELOAD_CRON`, set on the Config seed reload task's Schedule tab (Jobs > System) | 7.8.0 |
 
 ## Upgrading from 6.5 to 7.0.0 - read first
 

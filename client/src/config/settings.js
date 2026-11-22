@@ -4,15 +4,16 @@ import { editorStyle } from './editorStyle';
 import YAML from 'yaml';
 import axios from 'axios';
 import Helpers from '@/lib/Helpers';
-import { cronCell } from '@/lib/cronCell';
+import { scheduleCell } from '@/lib/scheduleCell';
 import { cronValidationMessage } from './cron';
-import { rruleValidationMessage, defaultRrule, rruleCell } from './rrule';
+import { rruleValidationMessage, defaultRrule } from './rrule';
 import { USAGE_FLAGS, confirmUsageChange, confirmUsageDelete, usageToast } from '@/lib/repositoryUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
 import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
 import { endOf, endPayload } from '@/lib/scheduleEnd';
+import { taskName, taskDescription, taskTimingCell } from '@/lib/systemTasks';
 
 // A cron field is validated with the SAME check the editor uses (config/cron.js), which
 // is the only thing that keeps the two from disagreeing.
@@ -1587,14 +1588,11 @@ export default function getSettings(t) {
           type: 'cron',
           // a recurring schedule needs its cron ; hidden (one time run), it is not checked
           required: true,
-          // in the table : hovering the cron says it in words, in the app's language ; a one-time
-          // run has none, it runs once ; a repository's schedule shows its rrule
+          // in the table : the cron said in words, the cron itself on hover, in the app's language
+          // (as Jobs > System's Schedule column) ; a one-time run has none, it runs once ; a
+          // repository's schedule shows its rrule
           render: (v, row) =>
-            row?.one_time_run
-              ? escapeHtml(t('settings.schedules.oneTimeRun'))
-              : row?.rrule
-                ? rruleCell(row.rrule)
-                : cronCell(v),
+            row?.one_time_run ? escapeHtml(t('settings.schedules.oneTimeRun')) : scheduleCell(row?.rrule || v),
           validator: cronValidator(t),
           // timed by a cron
           showWhen: (item) => item.timing === 'cron',
@@ -1838,6 +1836,76 @@ export default function getSettings(t) {
           label: t('settings.storedJobs.lastUsed'),
           type: 'datetime',
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
+        },
+      ],
+    },
+    system_tasks: {
+      // the app's own maintenance tasks (server/src/lib/systemTasks.js) : read only, a row opens its
+      // page (pages/system-task.vue) ; no Add, no row menu, no Edit or Delete
+      type: 'system/tasks',
+      idKey: 'key',
+      label: t('jobs.menu.system'),
+      labelPlural: t('jobs.menu.system'),
+      // the page's title : the jobs menu's entry, as the scheduled and the stored jobs
+      pageTitle: t('jobs.menu.system'),
+      description: t('jobs.system.description'),
+      icon: 'gears',
+      // their last runs change on their own : read again every minute, as the schedules
+      reloadSeconds: 60,
+      selectable: false,
+      noCreate: true,
+      openPage: (item) => `/jobs/system/${item.key}`,
+      actions: [],
+      // as the scheduled jobs : the name, when it runs, its last run and how it went, its next run
+      fields: [
+        { key: 'key', hidden: true, noInput: true },
+        {
+          // in the user's language, from its key (the server's English for a task it does not know)
+          key: 'name',
+          icon: 'heading',
+          label: t('settings.fields.name'),
+          noInput: true,
+          render: (v, row) => escapeHtml(taskName(t, row)),
+          sortValue: (row) => taskName(t, row),
+        },
+        {
+          // what it does : on its page, not a column (still in Columns)
+          key: 'description',
+          label: t('settings.fields.description'),
+          noInput: true,
+          hidden: true,
+          render: (v, row) => escapeHtml(taskDescription(t, row)),
+        },
+        {
+          // when it runs, in words ; hovering says its cron
+          key: 'cron',
+          label: t('jobs.system.timing'),
+          noInput: true,
+          render: (v, row) => taskTimingCell(t, row),
+        },
+        {
+          key: 'last_run',
+          hideBelow: 1200,
+          label: t('settings.fields.lastRun'),
+          type: 'datetime',
+          noInput: true,
+          render: (v) => (v?.started_at ? escapeHtml(Helpers.formatServerDate(v.started_at)) : '–'),
+          sortValue: (row) => row.last_run?.started_at || '',
+        },
+        {
+          // how the last run went, as a schedule's last launch : success green, failed red, none a dash
+          key: 'status',
+          label: t('settings.fields.status'),
+          noInput: true,
+          render: (v, row) => statusPill(t, row?.last_run?.outcome),
+          sortValue: (row) => row.last_run?.outcome || '',
+        },
+        {
+          key: 'next_run',
+          label: t('settings.schedules.nextRun'),
+          type: 'datetime',
+          noInput: true,
+          render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),
         },
       ],
     },

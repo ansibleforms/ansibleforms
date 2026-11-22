@@ -42,18 +42,18 @@ import {
   queueMinutes, inboundUrl, fingerprint, parseCertBundle, certFingerprint,
 } from "../rte/socket/protocol.js";
 import { DialReport, describeDialFailure, failureLine, safeUrl, scrub, ago } from "../rte/socket/dialReport.js";
+import { startLoops, stopLoops } from "../lib/hubLoops.js";
 
 // how long a lease lasts, renewed every 20 s while the socket is open
 const LEASE_SECONDS = 60;
 const RENEW_MS = 20000;
-// how often the jobs waiting for a socket, and the aborts, are looked for
-const DISPATCH_MS = 2000;
-// how often the inbound runners are looked at (a lease to take, a socket to dial)
-const DIAL_MS = 10000;
+// How often the hub's loops run is each one's setting of seconds (lib/systemTasks.js HUB_LOOPS,
+// their timers in lib/hubLoops.js) : the jobs waiting for a socket and the aborts looked for
+// (runnerDispatch, RUNNER_DISPATCH_SECONDS, every 2 seconds by default), the inbound runners looked
+// at, a lease to take, a socket to dial (runnerDial, RUNNER_DIAL_SECONDS, 10), and what this node
+// keeps of jobs that ended elsewhere let go (runnerPrune, RUNNER_PRUNE_SECONDS, 60).
 // how long an RTE has to say claimed or refused
 const CLAIM_TIMEOUT_MS = 30000;
-// how often what this node keeps of jobs that ended elsewhere is let go (pruneEnded)
-const PRUNE_MS = 60000;
 // a session's answers of itemAllowed (and its refusals said once) kept at most : the oldest go
 const ALLOWED_MAX = 500;
 
@@ -1049,7 +1049,7 @@ const dialing = new Set();
 // the inbound runners whose plain http address was said in the log (once per runner and process)
 const plainWarned = new Set();
 // how often the log says that an inbound RTE could not be dialed : one report per runner, so a
-// runner that stays unreachable warns at most every few minutes, not every round (DIAL_MS)
+// runner that stays unreachable warns at most every few minutes, not every round (runnerDial)
 const dialReports = new Map();
 
 /**
@@ -1352,7 +1352,7 @@ function forgetJob(jobId) {
  * Lets go of what this node keeps of the jobs that ended anywhere : its masks and the job's
  * secrets, its cancel sent, its wait, and the sessions' answers of itemAllowed. A job usually
  * ends on the node holding its socket (its end item, forgetJob), but a node that sent a job and
- * lost the socket, or registered its masks for an item, never sees that end : every PRUNE_MS
+ * lost the socket, or registered its masks for an item, never sees that end : every round of runnerPrune
  * the jobs it keeps something of are looked up, and the ones no longer running are forgotten.
  * The jobs being handed over or written now are left alone.
  *
@@ -1535,7 +1535,7 @@ async function dispatch() {
 
 /**
  * A job launched on this node for a socket-mode runner : sent at once when this node holds the
- * runner's socket (else the holder sends it within DISPATCH_MS).
+ * runner's socket (else the holder sends it at its next round of runnerDispatch).
  *
  * Args:
  *   jobId (number): the job.
@@ -1550,7 +1550,7 @@ export function kick(jobId, runner) {
 
 /**
  * Asks a socket-mode RTE to stop a job now, when this node holds its socket (else the abort
- * flag reaches the holder within DISPATCH_MS).
+ * flag reaches the holder at its next round of runnerDispatch).
  *
  * Args:
  *   jobId (number): the job.
@@ -1765,20 +1765,16 @@ export function startRteHub(httpServer) {
   httpServer.on("upgrade", (req, socket, head) => {
     if (!handleUpgrade(req, socket, head)) socket.destroy();
   });
-  const dispatchTimer = setInterval(() => dispatch().catch((e) => logger.debug(`RTE dispatch: ${e.message}`)), DISPATCH_MS);
-  dispatchTimer.unref?.();
-  const dialTimer = setInterval(() => dialInbound().catch((e) => logger.debug(`RTE inbound dial: ${e.message}`)), DIAL_MS);
-  dialTimer.unref?.();
-  // what this node keeps of the jobs that ended elsewhere, let go now and then
-  const pruneTimer = setInterval(() => pruneEnded().catch((e) => logger.debug(`RTE prune: ${e.message}`)), PRUNE_MS);
-  pruneTimer.unref?.();
+  // the hub's own loops, on their timers at their settings' seconds, armed again when one changes :
+  // each run kept in memory for Jobs > System and summed in a row every hour, a failure warned of
+  // once per distinct error and written as a row once a minute at most ; Run now runs one pass of
+  // the same work, written as its own row (lib/hubLoops.js)
+  startLoops({ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded });
   setTimeout(() => dialInbound().catch(() => {}), 2000).unref?.();
   logger.notice(`Taking RTE sockets on ${appConfig.baseUrl || ""}${APP_SOCKET_PATH}`);
   return {
     stop() {
-      clearInterval(dispatchTimer);
-      clearInterval(dialTimer);
-      clearInterval(pruneTimer);
+      stopLoops();
       for (const e of sessions.values()) e.session.close(CLOSE.GOING_AWAY, "the controller node stops");
     },
   };

@@ -15,6 +15,8 @@ import { MIN_HEADER_SIZE, MAX_HEADER_SIZE } from './httpServerOptions.js';
 import authConfig, { entraEnv } from '../../config/auth.config.js';
 import logConfig, { parseRetentionDays, parseViewLines, validViewLines, knownLogLevel, LOG_LEVEL_DEFAULTS, LOG_LEVELS } from '../../config/log.config.js';
 import ansibleConfig from '../../config/ansible.config.js';
+import { SCHEDULE_SETTINGS, LOOP_SETTINGS, scheduleCronProblem, hubLoop, loopSecondsProblem } from './systemTasks.js';
+import { rearmLoop } from './hubLoops.js';
 
 // Editing environment variables from the settings page.
 //
@@ -78,8 +80,12 @@ export const REFUSED = {
 // YTT_LIB_DATA_<name> is a prefix, not a variable : documented, nothing to show. LOG_COLOR_* are
 // the console's ANSI colour codes : rarely changed, documented. LOG_SYSLOG_* are imported once as a
 // syslog server (Settings > Connections > Syslog), as VAULT_* as a secret store.
+// The system tasks' crons (JOB_CLEANUP_CRON and the like, lib/systemTasks.js) are changed on each
+// task's own page (Jobs > System > the task > Schedule), beside its next runs ; so is the config
+// seed reload's, and its deprecated CONFIG_SEED_RELOAD_SECONDS goes with it (still read, not shown).
+// So are the runner hub's loops' seconds (RUNNER_DISPATCH_SECONDS and the like).
 export const OWNED_ELSEWHERE =
-  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|CONTROLLER_URL|CONTROLLER_TLS_VERIFY|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\})$/;
+  /^(VAULT|MCP|LOG_COLOR|LOG_SYSLOG)_|^RTE_(?!(QUEUE_MINUTES|FILES_MAX_MB)$)|^(ENABLE_(MCP|CHAT)|BASE_URL|AF_ROLE|CONTROLLER_URL|CONTROLLER_TLS_VERIFY|APP_URL|APP_TLS_VERIFY|ANSIBLE_PATH|PROCESS_MAX_BUFFER|LISTEN_HOST|DEFAULT_LANGUAGE|SHOW_DESIGNER|ADMIN_USERNAME|ADMIN_PASSWORD|REINIT_ADMIN|NODE_ENV|ALLOW_ENV_EDIT|YTT_LIB_DATA_\{dynamic\}|(TOKEN|AUDIT|JOB|STORED_JOB)_CLEANUP_CRON|NIGHTLY_BACKUP_CRON|ABANDONED_JOBS_CRON|DEAD_NODES_CRON|SCHEDULE_ENDS_CRON|SCHEDULE_RESYNC_CRON|CONFIG_SEED_RELOAD_(CRON|SECONDS)|RUNNER_(DISPATCH|DIAL|PRUNE)_SECONDS)$/;
 
 // Names whose VALUE must never be sent to the client. A bare 'TOKEN' would be too broad -
 // ACCESS_TOKEN_EXPIRATION and ACCESS_TOKEN_ISSUER are not secrets and are worth seeing -
@@ -280,9 +286,53 @@ function rebuildLoginSoon() {
   loginRebuild.unref?.();
 }
 
+/**
+ * Registers a system task again on its new cron (cron.service rescheduleSystemTask), on
+ * this node : the one whose scheduler runs the tasks does, any other has none to change. Imported
+ * when used, so this module does not load the scheduler and every model behind it.
+ *
+ * Args:
+ *   key (string): the task's key (jobCleanup).
+ */
+function rescheduleSystemTask(key) {
+  import('../services/cron.service.js')
+    .then(({ default: cronService }) => cronService.rescheduleSystemTask(key))
+    .catch((err) => logger.error(`Could not reschedule the system task ${key}: ${err.message || err}`));
+}
+
+// The system tasks' crons (lib/systemTasks.js SCHEDULE_SETTINGS) : appConfig takes the new one,
+// which the API answers at once, then the task is registered again on it. Cleared (applyLive has
+// removed it from process.env and hands over the documented default), appConfig holds none : the
+// task's own cron applies, or the config seed reload's deprecated seconds while they are set.
+const LIVE_SCHEDULES = Object.fromEntries(
+  SCHEDULE_SETTINGS.map((setting) => [
+    setting.env,
+    (v) => {
+      appConfig[setting.config] = process.env[setting.env] === undefined ? '' : String(v ?? '').trim();
+      rescheduleSystemTask(setting.key);
+    },
+  ]),
+);
+
+// The runner hub's loops' seconds (lib/systemTasks.js LOOP_SETTINGS) : appConfig takes the new
+// value, which the API answers at once, then the loop's timer is armed again at it, the old one
+// cleared (lib/hubLoops.js rearmLoop : nothing where the hub does not run). Cleared, appConfig holds
+// none : the loop's own seconds apply.
+const LIVE_LOOP_SECONDS = Object.fromEntries(
+  LOOP_SETTINGS.map((setting) => [
+    setting.env,
+    (v) => {
+      appConfig[setting.config] = process.env[setting.env] === undefined ? '' : String(v ?? '').trim();
+      rearmLoop(setting.key);
+    },
+  ]),
+);
+
 // Live, but needing more than an appConfig field or process.env : a function that
 // reconfigures something already constructed.
 const LIVE_CUSTOM = {
+  ...LIVE_SCHEDULES,
+  ...LIVE_LOOP_SECONDS,
   // jwt.sign() reads these off authConfig at call time (token.controller, login.controller),
   // so updating the object is enough - the next token issued uses the new value
   ACCESS_TOKEN_EXPIRATION: (v) => { authConfig.jwtExpiration = v; },
@@ -335,15 +385,12 @@ const LIVE_CUSTOM = {
   // request, so setting it again on the running app is enough. Reads process.env, which
   // applyLive has already updated. Returns false for a value it refused.
   TRUST_PROXY: () => applyTrustProxy(),
-  // the scheduler registered the seed reload with its interval at startup : it is registered
-  // again with the new one (cron.service, scheduleConfigSeedReload). Imported when used, so this
-  // module does not load the scheduler and every model behind it.
+  // deprecated since 7.8.0, removed in 8.0.0 : the config seed reload's seconds, read as a cron
+  // while CONFIG_SEED_RELOAD_CRON is not set (lib/systemTasks.js deprecatedSchedule). Changed in
+  // the settings file by hand (no page shows it), the task is registered again on what it reads as.
   CONFIG_SEED_RELOAD_SECONDS: (v) => {
-    const seconds = parseInt(v, 10);
-    appConfig.configSeedReloadSeconds = Number.isNaN(seconds) ? 60 : seconds;
-    import('../services/cron.service.js')
-      .then(({ default: cronService }) => cronService.scheduleConfigSeedReload(appConfig))
-      .catch((err) => logger.error(`Could not reschedule the config seed reload: ${err.message || err}`));
+    appConfig.configSeedReloadSeconds = process.env.CONFIG_SEED_RELOAD_SECONDS === undefined ? '' : String(v ?? '').trim();
+    rescheduleSystemTask('configSeedReload');
   },
   // mysql2 fixes connectionLimit at creation, so a new size means a new pool. Safe because a
   // transaction holds its own connection - see MySql.resizePool.
@@ -496,6 +543,19 @@ export function validate(name, value, doc) {
   // the Logs page's lines : a whole number of at least 1, no upper limit (empty : the default)
   if (name === 'LOG_VIEW_LINES' && !validViewLines(v)) {
     return 'LOG_VIEW_LINES must be a whole number of at least 1';
+  }
+  // a system task's cron : 5 fields croner accepts and that run again, refused here
+  // rather than passed over by the scheduler for the default (lib/systemTasks.js taskCron)
+  if (SCHEDULE_SETTINGS.some((s) => s.env === name) && v !== '') {
+    const problem = scheduleCronProblem(v);
+    if (problem) return `${name} ${problem}`;
+  }
+  // a runner hub loop's seconds : a whole number within its bounds, refused here rather than
+  // passed over by the hub for the default (lib/systemTasks.js loopSeconds)
+  const loopSetting = LOOP_SETTINGS.find((s) => s.env === name);
+  if (loopSetting && v !== '') {
+    const problem = loopSecondsProblem(hubLoop(loopSetting.key), v);
+    if (problem) return `${name} ${problem}`;
   }
   if (name === 'LAUNCH_VALIDATION' && v !== '' && !['off', 'log', 'enforce'].includes(v.trim().toLowerCase())) {
     return 'LAUNCH_VALIDATION must be off, log or enforce';

@@ -121,7 +121,7 @@
 /*      by default, BsOffCanvas's sizes) ; a step's dialogSize    */
 /*      widens it while that step is shown                        */
 /*  a cell's [data-af-popover] : its text in a popover on hover   */
-/*      (a cron's meaning in words, lib/cronCell.js)              */
+/*      (a schedule's cron or rule, lib/scheduleCell.js)          */
 /*                                                                */
 /******************************************************************/
 

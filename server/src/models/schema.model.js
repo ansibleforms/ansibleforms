@@ -620,7 +620,8 @@ const SCHEMA_MANIFEST = {
              'settings', 'repositories', 'schedule', 'audit', 'chat_settings', 'secret_stores', 'runners',
              'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
              'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-             'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs'],
+             'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs',
+             'system_task_runs'],
   },
   patches: {
     patchVersion4: { columns: ['ldap.groups_search_base', 'ldap.groups_attribute', 'ldap.group_class',
@@ -660,7 +661,8 @@ const SCHEMA_MANIFEST = {
     // between them, the designer lock, and the node that follows a job
     patchVersion7: { tables: ['secret_stores', 'runners', 'nodes', 'cache_epochs', 'designer_lock', 'user_groups', 'notification_channels', 'syslog_servers', 'login_failures', 'token_revocations', 'schema_migrations',
                               'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
-                              'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs'],
+                              'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs',
+                              'system_task_runs'],
                      columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
@@ -1339,6 +1341,10 @@ async function patchVersion7(messages, success, failed) {
   // a stored job removed once unused for this many days (lib/storedJobExpiry.js) : NULL follows
   // the setting (STORED_JOB_UNUSED_DAYS), also for the stored jobs from before
   await checkPromise(addColumn("stored_jobs", "unused_days", "int(11)", true, "NULL"), messages, success, failed);
+  // the runs of the app's own maintenance tasks (Jobs > System, lib/systemTasks.js) : one row per
+  // run that did something, and each task's latest run
+  const taskRuns = fs.readFileSync(`${__dirname}/../db/create_system_task_runs_table.sql`);
+  await checkPromise(addTable("system_task_runs", taskRuns.toString()), messages, success, failed);
 }
 
 // the schema_migrations row that says the databases were made from the database credentials

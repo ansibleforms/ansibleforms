@@ -1,4 +1,4 @@
-// Re-applying the config seed under a RUNNING process (CONFIG_SEED_RELOAD_SECONDS,
+// Re-applying the config seed under a RUNNING process (CONFIG_SEED_RELOAD_CRON,
 // POST /api/v2/config-seed/apply, SIGHUP).
 //
 // Four properties carry this feature, and every one of them fails silently :

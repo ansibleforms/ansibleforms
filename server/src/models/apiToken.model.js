@@ -108,13 +108,22 @@ ApiToken.touch = function (sid) {
  * Forgets the tokens that expired.
  *
  * Returns:
- *   Promise<void>: settles once done ; a failure is only logged.
+ *   Promise<number>: the tokens forgotten.
+ *
+ * Raises:
+ *   Error: when the database refuses the delete (logged here, recorded by the daily token
+ *     cleanup's run).
  */
 ApiToken.purge = async function () {
-  await (await db()).do("DELETE FROM AnsibleForms.`api_tokens` WHERE expires_at < UTC_TIMESTAMP()").catch((err) =>
-    logger.debug(`Could not purge the expired api tokens: ${err.message || err}`)
-  );
-  touched.clear();
+  try {
+    const res = await (await db()).do("DELETE FROM AnsibleForms.`api_tokens` WHERE expires_at < UTC_TIMESTAMP()");
+    return res?.affectedRows || 0;
+  } catch (err) {
+    logger.debug(`Could not purge the expired api tokens: ${err.message || err}`);
+    throw err;
+  } finally {
+    touched.clear();
+  }
 };
 
 export default ApiToken;

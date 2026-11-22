@@ -136,6 +136,9 @@ export default {
     runnerNotFound: "Runner não encontrado",
     databaseAdded: "Base de dados adicionada",
     databaseNotFound: "Base de dados não encontrada",
+    systemTaskNotFound: "Tarefa do sistema não encontrada",
+    systemTaskScheduleFailed: "Não foi possível guardar o agendamento da tarefa",
+    systemTaskRunFailed: "Não foi possível executar a tarefa",
     runnerAdminOnly:
       "Só um admin pode adicionar, alterar ou eliminar um runner: um runner recebe as credenciais dos trabalhos que executa",
     repositoryAdminOnly:

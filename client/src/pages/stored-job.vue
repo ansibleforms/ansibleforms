@@ -448,6 +448,9 @@ onMounted(async () => {
               <!-- shared with the users who see shared stored jobs : with allowStoredJobsShare, or
                    already shared (then it can be made private again) -->
               <div v-if="canShare || stored.visibility === 'shared'" v-show="fieldShown('shared')" class="mb-3">
+                <label class="form-label fw-bold d-block" for="af-stored-shared">{{
+                  t('settings.storedJobs.visibility')
+                }}</label>
                 <div class="form-check form-switch">
                   <input
                     id="af-stored-shared"

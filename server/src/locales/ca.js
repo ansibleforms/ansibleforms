@@ -139,6 +139,9 @@ export default {
     runnerNotFound: "No s'ha trobat el runner",
     databaseAdded: "Base de dades afegida",
     databaseNotFound: "No s'ha trobat la base de dades",
+    systemTaskNotFound: "No s'ha trobat la tasca del sistema",
+    systemTaskScheduleFailed: "No s'ha pogut desar la programació de la tasca",
+    systemTaskRunFailed: "No s'ha pogut executar la tasca",
     runnerAdminOnly:
       "Només un admin pot afegir, canviar o eliminar un runner: un runner rep les credencials dels treballs que executa",
     repositoryAdminOnly:

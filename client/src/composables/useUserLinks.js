@@ -20,7 +20,7 @@ import { PILL, pill } from '@/lib/tableCells';
 // a job's times as the jobs page shows them (the server sends them in its own zone)
 import Time from '@/lib/Time';
 import { durationSeconds, formatDuration } from '@/lib/jobTime';
-import { cronCell } from '@/lib/cronCell';
+import { scheduleCell } from '@/lib/scheduleCell';
 
 // the latest jobs and audit entries a tab shows
 const JOBS_SHOWN = 100;
@@ -173,7 +173,7 @@ export function useUserLinks(who) {
       key: 'cron',
       label: t('settings.schedules.stepSchedule'),
       class: 'text-nowrap',
-      html: (s) => (s.one_time_run ? oneTimeCell.value : cronCell(s.cron)),
+      html: (s) => (s.one_time_run ? oneTimeCell.value : scheduleCell(s.rrule || s.cron)),
     },
     // when it runs : a one-time run its Run at, a recurring one its cron's next time
     {

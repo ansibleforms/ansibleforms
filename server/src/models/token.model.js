@@ -24,16 +24,26 @@ Token.deleteAllForUser = function (username) {
   return mysql.do("DELETE FROM AnsibleForms.`tokens` WHERE username=?", [username]);
 };
 
-Token.cleanup = function () {
+/**
+ * Deletes the tokens older than a month, and the ones replaced by a refresh longer ago than the
+ * grace (REPLACED_GRACE_SECONDS) : the daily token cleanup (Jobs > System).
+ *
+ * Returns:
+ *   Promise<number>: the tokens deleted.
+ *
+ * Raises:
+ *   Error: when the database refuses the delete (logged here, recorded by the cleanup's run).
+ */
+Token.cleanup = async function () {
   logger.info(`Deleting tokens older than a month, and the ones replaced by a refresh`);
-  mysql
-    .do("DELETE FROM AnsibleForms.`tokens` WHERE timestamp < NOW() - INTERVAL 30 DAY OR replaced_at < UTC_TIMESTAMP() - INTERVAL ? SECOND", [Token.REPLACED_GRACE_SECONDS])
-    .then(() => {
-      logger.notice("Cleanup tokens finished");
-    })
-    .catch((err) => {
-      logger.error("Cleanup tokens failed. " + err);
-    });
+  try {
+    const res = await mysql.do("DELETE FROM AnsibleForms.`tokens` WHERE timestamp < NOW() - INTERVAL 30 DAY OR replaced_at < UTC_TIMESTAMP() - INTERVAL ? SECOND", [Token.REPLACED_GRACE_SECONDS]);
+    logger.notice("Cleanup tokens finished");
+    return res?.affectedRows || 0;
+  } catch (err) {
+    logger.error("Cleanup tokens failed. " + err);
+    throw err;
+  }
 };
 
 // replaced_at is written and compared in UTC : NOW() follows the database's time zone, and a

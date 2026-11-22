@@ -56,6 +56,9 @@ const props = defineProps({
   // stop at it ; none, every run
   end: { type: Object, default: null },
   runCount: { type: [Number, String], default: 0 },
+  // read only : its value shown, every preset, field and the expression greyed out (a system
+  // task whose cron the environment sets)
+  disabled: { type: Boolean, default: false },
 });
 
 // Zone the badges are computed and rendered in: the server's scheduler zone when
@@ -547,168 +550,171 @@ function formatDate(d) {
 </script>
 <template>
   <div class="bs-cron">
-    <!-- Preset buttons -->
-    <div class="cron-presets mb-2">
-      <button
-        v-for="p in PRESETS"
-        :key="p.cron"
-        type="button"
-        class="btn btn-sm me-1 mb-1"
-        :class="isActivePreset(p.cron) ? 'btn-primary' : 'btn-outline-secondary'"
-        @click="applyPreset(p.cron)"
-      >
-        {{ p.label }}
-      </button>
-    </div>
+    <!-- read only : one fieldset disables every button, select and input under it at once -->
+    <fieldset :disabled="disabled">
+      <!-- Preset buttons -->
+      <div class="cron-presets mb-2">
+        <button
+          v-for="p in PRESETS"
+          :key="p.cron"
+          type="button"
+          class="btn btn-sm me-1 mb-1"
+          :class="isActivePreset(p.cron) ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="applyPreset(p.cron)"
+        >
+          {{ p.label }}
+        </button>
+      </div>
 
-    <!-- Segment editors -->
-    <div class="d-flex gap-2 mb-2">
-      <!-- only rendered for 6-field expressions; croner allows them but they
+      <!-- Segment editors -->
+      <div class="d-flex gap-2 mb-2">
+        <!-- only rendered for 6-field expressions; croner allows them but they
                  are advanced, so the value is editable rather than dropped -->
-      <div v-if="segments.hasSeconds" class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.second') }}</label>
-        <input
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.second"
-          @input="editSegment('second', $event.target.value)"
-          @blur="commitSegment('second')"
-        />
+        <div v-if="segments.hasSeconds" class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.second') }}</label>
+          <input
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.second"
+            @input="editSegment('second', $event.target.value)"
+            @blur="commitSegment('second')"
+          />
+        </div>
+        <div class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.minute') }}</label>
+          <select
+            v-if="!segmentIsCustom.minute"
+            class="form-select form-select-sm"
+            :value="segments.minute"
+            @change="updateSegment('minute', $event.target.value)"
+          >
+            <option v-for="o in minuteOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <input
+            v-else
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.minute"
+            @input="editSegment('minute', $event.target.value)"
+            @blur="commitSegment('minute')"
+          />
+        </div>
+        <div class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.hour') }}</label>
+          <select
+            v-if="!segmentIsCustom.hour"
+            class="form-select form-select-sm"
+            :value="segments.hour"
+            @change="updateSegment('hour', $event.target.value)"
+          >
+            <option v-for="o in hourOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <input
+            v-else
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.hour"
+            @input="editSegment('hour', $event.target.value)"
+            @blur="commitSegment('hour')"
+          />
+        </div>
+        <div class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.dayOfMonth') }}</label>
+          <select
+            v-if="!segmentIsCustom.dom"
+            class="form-select form-select-sm"
+            :value="segments.dom"
+            @change="updateSegment('dom', $event.target.value)"
+          >
+            <option v-for="o in domOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <input
+            v-else
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.dom"
+            @input="editSegment('dom', $event.target.value)"
+            @blur="commitSegment('dom')"
+          />
+        </div>
+        <div class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.month') }}</label>
+          <select
+            v-if="!segmentIsCustom.month"
+            class="form-select form-select-sm"
+            :value="segments.month"
+            @change="updateSegment('month', $event.target.value)"
+          >
+            <option v-for="o in monthOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <input
+            v-else
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.month"
+            @input="editSegment('month', $event.target.value)"
+            @blur="commitSegment('month')"
+          />
+        </div>
+        <div class="cron-segment flex-fill">
+          <label class="form-label text-muted small mb-1">{{ t('settings.cron.dayOfWeek') }}</label>
+          <select
+            v-if="!segmentIsCustom.dow"
+            class="form-select form-select-sm"
+            :value="segments.dow"
+            @change="updateSegment('dow', $event.target.value)"
+          >
+            <option v-for="o in dowOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <input
+            v-else
+            type="text"
+            class="form-control form-control-sm text-center font-monospace"
+            :value="segmentValues.dow"
+            @input="editSegment('dow', $event.target.value)"
+            @blur="commitSegment('dow')"
+          />
+        </div>
       </div>
-      <div class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.minute') }}</label>
-        <select
-          v-if="!segmentIsCustom.minute"
-          class="form-select form-select-sm"
-          :value="segments.minute"
-          @change="updateSegment('minute', $event.target.value)"
-        >
-          <option v-for="o in minuteOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <input
-          v-else
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.minute"
-          @input="editSegment('minute', $event.target.value)"
-          @blur="commitSegment('minute')"
-        />
-      </div>
-      <div class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.hour') }}</label>
-        <select
-          v-if="!segmentIsCustom.hour"
-          class="form-select form-select-sm"
-          :value="segments.hour"
-          @change="updateSegment('hour', $event.target.value)"
-        >
-          <option v-for="o in hourOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <input
-          v-else
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.hour"
-          @input="editSegment('hour', $event.target.value)"
-          @blur="commitSegment('hour')"
-        />
-      </div>
-      <div class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.dayOfMonth') }}</label>
-        <select
-          v-if="!segmentIsCustom.dom"
-          class="form-select form-select-sm"
-          :value="segments.dom"
-          @change="updateSegment('dom', $event.target.value)"
-        >
-          <option v-for="o in domOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <input
-          v-else
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.dom"
-          @input="editSegment('dom', $event.target.value)"
-          @blur="commitSegment('dom')"
-        />
-      </div>
-      <div class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.month') }}</label>
-        <select
-          v-if="!segmentIsCustom.month"
-          class="form-select form-select-sm"
-          :value="segments.month"
-          @change="updateSegment('month', $event.target.value)"
-        >
-          <option v-for="o in monthOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <input
-          v-else
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.month"
-          @input="editSegment('month', $event.target.value)"
-          @blur="commitSegment('month')"
-        />
-      </div>
-      <div class="cron-segment flex-fill">
-        <label class="form-label text-muted small mb-1">{{ t('settings.cron.dayOfWeek') }}</label>
-        <select
-          v-if="!segmentIsCustom.dow"
-          class="form-select form-select-sm"
-          :value="segments.dow"
-          @change="updateSegment('dow', $event.target.value)"
-        >
-          <option v-for="o in dowOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <input
-          v-else
-          type="text"
-          class="form-control form-control-sm text-center font-monospace"
-          :value="segmentValues.dow"
-          @input="editSegment('dow', $event.target.value)"
-          @blur="commitSegment('dow')"
-        />
-      </div>
-    </div>
 
-    <!-- Raw expression display -->
-    <div class="d-flex align-items-center gap-2 mb-2">
-      <div class="input-group input-group-sm">
-        <span class="input-group-text"><FaIcon :icon="icon" /></span>
-        <input
-          type="text"
-          class="form-control form-control-sm font-monospace"
-          :class="{ 'is-invalid': hasError || !!expressionError }"
-          :value="modelValue"
-          @input="emit('update:modelValue', $event.target.value)"
-          :placeholder="t('settings.cron.placeholderZone', { zone: Time.zoneLabel(new Date(), timeZone) })"
-        />
+      <!-- Raw expression display -->
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><FaIcon :icon="icon" /></span>
+          <input
+            type="text"
+            class="form-control form-control-sm font-monospace"
+            :class="{ 'is-invalid': hasError || !!expressionError }"
+            :value="modelValue"
+            @input="emit('update:modelValue', $event.target.value)"
+            :placeholder="t('settings.cron.placeholderZone', { zone: Time.zoneLabel(new Date(), timeZone) })"
+          />
+        </div>
       </div>
-    </div>
 
-    <!-- Human description + next runs -->
-    <div v-if="expressionError" class="mb-2">
-      <small class="text-danger"><FaIcon icon="triangle-exclamation" class="me-1" />{{ expressionError }}</small>
-    </div>
-    <div v-else-if="humanDescription" class="mb-2">
-      <small class="text-primary"><FaIcon icon="clock" class="me-1" />{{ humanDescription }}</small>
-    </div>
-    <div v-if="noRunsFound">
-      <small class="text-warning"
-        ><FaIcon icon="triangle-exclamation" class="me-1" />{{
-          t('settings.cron.noRuns', { years: SCAN_YEARS })
-        }}</small
-      >
-    </div>
-    <div v-if="nextRuns.length">
-      <small class="text-muted">{{ nextRunsLabel }}</small>
-      <div class="d-flex flex-wrap gap-2 mt-1">
-        <span v-for="(run, i) in nextRuns" :key="i" class="badge bg-body-secondary text-body-secondary border">
-          {{ formatDate(run) }}
-        </span>
+      <!-- Human description + next runs -->
+      <div v-if="expressionError" class="mb-2">
+        <small class="text-danger"><FaIcon icon="triangle-exclamation" class="me-1" />{{ expressionError }}</small>
       </div>
-    </div>
+      <div v-else-if="humanDescription" class="mb-2">
+        <small class="text-primary"><FaIcon icon="clock" class="me-1" />{{ humanDescription }}</small>
+      </div>
+      <div v-if="noRunsFound">
+        <small class="text-warning"
+          ><FaIcon icon="triangle-exclamation" class="me-1" />{{
+            t('settings.cron.noRuns', { years: SCAN_YEARS })
+          }}</small
+        >
+      </div>
+      <div v-if="nextRuns.length">
+        <small class="text-muted">{{ nextRunsLabel }}</small>
+        <div class="d-flex flex-wrap gap-2 mt-1">
+          <span v-for="(run, i) in nextRuns" :key="i" class="badge bg-body-secondary text-body-secondary border">
+            {{ formatDate(run) }}
+          </span>
+        </div>
+      </div>
+    </fieldset>
   </div>
 </template>
 <style scoped>

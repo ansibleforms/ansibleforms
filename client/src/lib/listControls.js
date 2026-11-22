@@ -41,6 +41,8 @@ const LISTS = {
   backups: { buttons: [144], selectable: false },
   scheduled: { buttons: [158] },
   stored: { buttons: [166] },
+  // the system tasks : read only, nothing to add or tick
+  system: { buttons: [], selectable: false },
   // the lists in a tab of a page : by the page's word and the tab's
   'ssh/known-hosts': { buttons: [178] },
 };

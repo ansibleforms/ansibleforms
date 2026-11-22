@@ -2681,6 +2681,7 @@ onBeforeUnmount(() => {
 
       <!-- shared : the users with allowStoredJobsViewAll can load it too ; it stays yours -->
       <div v-if="canShareStored" class="mb-3">
+        <label class="form-label d-block" for="af-store-shared">{{ t('settings.storedJobs.visibility') }}</label>
         <div class="form-check form-switch">
           <input
             id="af-store-shared"

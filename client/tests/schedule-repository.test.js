@@ -26,7 +26,8 @@ vi.mock('vue-sonner', () => ({
 }));
 
 import getSettings from '../src/config/settings.js';
-import { rruleProblem, rruleValidationMessage, defaultRrule, zoneOf, rruleCell } from '../src/config/rrule.js';
+import { rruleProblem, rruleValidationMessage, defaultRrule, zoneOf } from '../src/config/rrule.js';
+import { scheduleCell } from '../src/lib/scheduleCell.js';
 import { timingKind, scheduleTiming } from '../src/config/settings.js';
 import { intlZone } from '../src/lib/rruleRules.js';
 import { confirmPrompt, answerConfirm } from '../src/lib/confirmPrompt.js';
@@ -86,12 +87,15 @@ describe('where a schedule comes from', () => {
     expect(f.noInput).toBe(true);
   });
 
-  it('the Schedule column shows the rrule of a repository schedule, escaped', () => {
+  it('the Schedule column shows the rrule of a repository schedule, in words or as code, escaped', () => {
     const render = field('schedules', 'cron').render;
-    expect(render('', { rrule: 'DTSTART:20300101T000000Z RRULE:FREQ=DAILY;INTERVAL=1' })).toBe(
-      rruleCell('DTSTART:20300101T000000Z RRULE:FREQ=DAILY;INTERVAL=1'),
+    const rule = 'DTSTART:20300101T000000Z RRULE:FREQ=DAILY;INTERVAL=1';
+    expect(render('', { rrule: rule })).toBe(scheduleCell(rule));
+    expect(render('', { rrule: rule })).toMatch(/>At 12:00 AM, every day<\/span>$/);
+    // one no cron says : the rule itself, as code
+    expect(scheduleCell('RRULE:FREQ=WEEKLY;INTERVAL=2 <x>')).toBe(
+      '<span class="font-monospace small">RRULE:FREQ=WEEKLY;INTERVAL=2 &lt;x&gt;</span>',
     );
-    expect(rruleCell('<x>')).toBe('<span class="font-monospace small">&lt;x&gt;</span>');
   });
 
   it('has the look of the other row badges', () => {
