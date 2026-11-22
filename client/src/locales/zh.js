@@ -1322,7 +1322,7 @@ export default {
       },
       usageHints: {
         forms: '表单文件及其变量文件,由设计器编辑并推送回去',
-        playbooks: '表单运行的 Ansible Playbook（仅一个仓库）',
+        playbooks: '表单运行的 Ansible Playbook，来自第一个仓库，除非表单指定了另一个',
         workflows: '设计器构建的工作流,由设计器编辑并推送回去',
         inventories: '一个清单: 根目录含 inventory.yaml、group_vars 和 host_vars',
         schedules: '调度，其任意 YAML 文件中 controller_schedules: 列表的条目',
@@ -2512,6 +2512,10 @@ export default {
     runnerDefault: '其类型的默认运行器',
     helpIcon: '显示在其磁贴和表单列表中。',
     helpPlaybook: '它运行的 playbook。',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: '仓库',
+    helpPlaybookRepository: '从此仓库的根目录运行 playbook，并使用其 ansible.cfg。',
+    visualFirstPlaybookRepository: '第一个 playbook 仓库',
     formWorkflow: '工作流',
     helpWorkflow: '它运行的工作流，来自 设计器 > 工作流。',
     helpTemplate: '它在运行器上启动的模板：AWX 的作业或工作流模板、Semaphore 的模板。',

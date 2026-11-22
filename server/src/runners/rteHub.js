@@ -1226,7 +1226,9 @@ async function runMessage(jobId, entry) {
   // the playbooks of the repository the controller takes them from (the one added first), the inventories
   // of each by name
   const { default: Repository } = await import("../models/repository.model.js");
-  const playbookRepo = (await Repository.playbooksRepositories())[0]?.name || null;
+  // a form naming its repository (playbookRepository) : that repository, run from its root
+  const playbookRepository = typeof extravars?.__playbookRepository__ === "string" ? extravars.__playbookRepository__ : "";
+  const playbookRepo = playbookRepository || (await Repository.playbooksRepositories())[0]?.name || null;
   const repos = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name");
   const inventoryRepos = (repos || []).map((r) => r.name);
   const msg = {
@@ -1235,11 +1237,11 @@ async function runMessage(jobId, entry) {
     contract: SOCKET_CONTRACT,
     sealed: sealJobSecrets(secrets, entry.runner.token, jobId),
     job: { form: rows[0].form, extravars, lastOrder: await Job.lastOrder(jobId) },
-    paths: { playbookRepo, inventoryRepos },
+    paths: { playbookRepo, inventoryRepos, ...(playbookRepository ? { playbookRoot: true } : {}) },
   };
   // an RTE without files of its own : the folders, packed, by their hashes
   if (filesMode(entry) === "transfer") {
-    msg.files = await jobFileHashes(inventoryRepos);
+    msg.files = await jobFileHashes(inventoryRepos, playbookRepository);
     // the only files this RTE may fetch : the ones of the jobs sent to it
     if (msg.files.playbooks?.hash) entry.hashes.add(msg.files.playbooks.hash);
     for (const inv of msg.files.inventories) entry.hashes.add(inv.hash);
@@ -1249,19 +1251,24 @@ async function runMessage(jobId, entry) {
 
 /**
  * The hashes of a job's files : the playbooks folder and the inventories, as this app sees them.
+ * A job whose form names its repository (playbookRepository) gets that repository's root ; none
+ * when it is not a repository used for playbooks (the RTE then says so).
  *
  * Args:
  *   inventoryRepos (string[]): the repositories used for inventories.
+ *   playbookRepository (string): the form's playbookRepository, if any.
  *
  * Returns:
  *   Promise<object>: { playbooks: { hash }, inventories: [{ repository, hash }] }.
  */
-async function jobFileHashes(inventoryRepos) {
+async function jobFileHashes(inventoryRepos, playbookRepository = "") {
   const { default: Repository } = await import("../models/repository.model.js");
   const { default: Repo } = await import("../models/repo.model.js");
   const { default: ansibleConfig } = await import("../../config/ansible.config.js");
-  const playbooksRoot = (await Repository.getAnsiblePath()) || ansibleConfig.path;
-  const playbooks = await bundleOf(playbooksRoot);
+  const playbooksRoot = playbookRepository
+    ? await Repository.playbookRepositoryRoot(playbookRepository).catch(() => null)
+    : (await Repository.getAnsiblePath()) || ansibleConfig.path;
+  const playbooks = playbooksRoot ? await bundleOf(playbooksRoot) : null;
   const inventories = [];
   const local = await bundleOf(appConfig.inventoryPath);
   if (local) inventories.push({ repository: null, hash: local.hash });

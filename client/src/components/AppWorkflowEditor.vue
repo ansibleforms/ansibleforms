@@ -41,6 +41,7 @@ import {
   editUnlink,
   freeName,
 } from '@/config/workflowFile';
+import { playbookChoices } from '@/lib/playbookChoices';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -87,7 +88,15 @@ function apply(fn) {
 
 // ─── what the instance has : the names a job template, a node may use ─────────
 // null : unknown (the list needs a permission the user lacks) - then nothing is checked
-const refs = ref({ playbooks: null, inventories: null, credentials: null, repositories: null, runners: null });
+const refs = ref({
+  playbooks: null,
+  playbookFiles: null,
+  playbookRepositories: null,
+  inventories: null,
+  credentials: null,
+  repositories: null,
+  runners: null,
+});
 /**
  * Reads a list the panel offers, null when it cannot.
  *
@@ -106,8 +115,12 @@ async function names(url, pick) {
   }
 }
 onMounted(async () => {
-  const [playbooks, inventories, credentials, repositories, runners] = await Promise.all([
-    names('/api/v2/files/playbooks', (d) => (d?.files || []).map((f) => f.path).filter((p) => /\.ya?ml$/i.test(p))),
+  const [playbookList, inventories, credentials, repositories, runners] = await Promise.all([
+    // the playbooks, and the repositories used for them (a node names one with playbook_repository)
+    names('/api/v2/files/playbooks', (d) => ({
+      files: (d?.files || []).map((f) => f.path).filter((p) => /\.ya?ml$/i.test(p)),
+      repositories: d?.repositories || [],
+    })),
     names('/api/v2/files/inventories', (d) => [
       ...new Set(
         (d?.files || [])
@@ -126,7 +139,15 @@ onMounted(async () => {
         .map((r) => ({ name: r.name, type: r.type, flavour: r.flavour || '', is_default: !!r.is_default })),
     ),
   ]);
-  refs.value = { playbooks, inventories, credentials, repositories, runners };
+  refs.value = {
+    playbooks: playbookList ? playbookChoices(playbookList.files, playbookList.repositories) : null,
+    playbookFiles: playbookList,
+    playbookRepositories: playbookList ? playbookList.repositories.map((r) => r.name) : null,
+    inventories,
+    credentials,
+    repositories,
+    runners,
+  };
 });
 const sorted = (list) => [...(list || [])].sort((a, b) => a.localeCompare(b));
 
@@ -210,6 +231,7 @@ const EMPTY_DRAFT = {
   diff_mode: false,
   converge: false,
   runner: '',
+  playbook_repository: '',
   if_extra_var: '',
   extra_vars_key: '',
 };
@@ -304,6 +326,7 @@ function createNode() {
     if (d.type === 'job_template') {
       for (const key of [
         'runner',
+        'playbook_repository',
         'inventory',
         'credentials',
         'limit',
@@ -372,9 +395,12 @@ function addLink() {
  * Returns:
  *   string[]|null: the names.
  */
-function choicesFor(type) {
+function choicesFor(type, playbookRepository = '') {
   const wf = workflows.value[wizard.value ? wizard.value.wi : wfIndex.value];
-  if (type === 'job_template') return refs.value.playbooks ? sorted(refs.value.playbooks) : null;
+  if (type === 'job_template') {
+    const list = refs.value.playbookFiles;
+    return list ? playbookChoices(list.files, list.repositories, playbookRepository) : null;
+  }
   if (type === 'workflow_job_template') return workflows.value.map((w) => w.name).filter((n) => n && n !== wf?.name);
   if (type === 'project') return refs.value.repositories ? sorted(refs.value.repositories) : null;
   return null;

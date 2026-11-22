@@ -1378,7 +1378,7 @@ export default {
       },
       usageHints: {
         forms: 'Formulaires et fichiers vars, modifiés et repoussés par le designer',
-        playbooks: 'Playbooks Ansible exécutés par les formulaires (un seul dépôt)',
+        playbooks: 'Playbooks Ansible des formulaires, du premier dépôt sauf si un formulaire en nomme un autre',
         workflows: 'Workflows que construit le designer, modifiés et repoussés par le designer',
         inventories: 'Un inventaire : inventory.yaml, group_vars et host_vars à sa racine',
         schedules: "Planifications, entrées d'une liste controller_schedules: dans l'un de ses fichiers YAML",
@@ -2649,6 +2649,10 @@ export default {
     runnerDefault: 'Runner par défaut de son type',
     helpIcon: 'Affichée sur sa tuile et dans la liste des formulaires.',
     helpPlaybook: "Le playbook qu'il exécute.",
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Dépôt',
+    helpPlaybookRepository: 'Exécute le playbook depuis la racine de ce dépôt, avec son ansible.cfg.',
+    visualFirstPlaybookRepository: 'Premier dépôt de playbooks',
     formWorkflow: 'Workflow',
     helpWorkflow: "Le workflow qu'il exécute, un de Designer > Workflows.",
     helpTemplate: "Le modèle qu'il lance sur le runner : un modèle de job ou de workflow AWX, un modèle Semaphore.",

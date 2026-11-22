@@ -1377,7 +1377,8 @@ export default {
       },
       usageHints: {
         forms: 'Formularios y sus archivos vars, editados y enviados por el diseñador',
-        playbooks: 'Playbooks de Ansible que ejecutan los formularios (un solo repositorio)',
+        playbooks:
+          'Playbooks de Ansible que ejecutan los formularios, del primer repositorio salvo que un formulario nombre otro',
         workflows: 'Workflows creados, editados y enviados de vuelta por el diseñador',
         inventories: 'Un inventario: inventory.yaml, group_vars y host_vars en su raíz',
         schedules: 'Programaciones, entradas de una lista controller_schedules: en cualquiera de sus archivos YAML',
@@ -2645,6 +2646,10 @@ export default {
     runnerDefault: 'Runner predeterminado de su tipo',
     helpIcon: 'Se muestra en su mosaico y en la lista de formularios.',
     helpPlaybook: 'El playbook que ejecuta.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repositorio',
+    helpPlaybookRepository: 'Ejecuta el playbook desde la raíz de este repositorio, con su ansible.cfg.',
+    visualFirstPlaybookRepository: 'Primer repositorio de playbooks',
     formWorkflow: 'Workflow',
     helpWorkflow: 'El workflow que ejecuta, uno de Diseñador > Workflows.',
     helpTemplate:

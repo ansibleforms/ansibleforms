@@ -1374,7 +1374,8 @@ export default {
       },
       usageHints: {
         forms: 'Formulieren en vars-bestanden, bewerkt en teruggepusht door de designer',
-        playbooks: 'Ansible-playbooks die de formulieren uitvoeren (slechts één repository)',
+        playbooks:
+          'Ansible-playbooks van de formulieren, uit de eerste repository tenzij een formulier een andere noemt',
         workflows: 'Workflows die de designer bouwt, bewerkt en teruggepusht door de designer',
         inventories: 'Een inventaris: inventory.yaml, group_vars en host_vars in de hoofdmap',
         schedules: 'Planners, items van een controller_schedules:-lijst in een van zijn YAML-bestanden',
@@ -2636,6 +2637,10 @@ export default {
     runnerDefault: 'Standaard runner van zijn type',
     helpIcon: 'Getoond op zijn tegel en in de formulierenlijst.',
     helpPlaybook: 'Het playbook dat het uitvoert.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repository',
+    helpPlaybookRepository: 'Voert het playbook uit vanuit de hoofdmap van deze repository, met zijn ansible.cfg.',
+    visualFirstPlaybookRepository: 'Eerste playbook-repository',
     formWorkflow: 'Workflow',
     helpWorkflow: 'De workflow die het uitvoert, een uit Designer > Workflows.',
     helpTemplate: 'Het sjabloon dat het op de runner start: een AWX job- of workflowsjabloon, een Semaphore-sjabloon.',

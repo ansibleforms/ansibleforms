@@ -719,6 +719,27 @@ class Repository extends CrudModel {
     return sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_playbooks ORDER BY id"))
   }
 
+  /**
+   * The root of a repository a form names as its playbook's (playbookRepository) : the folder the
+   * playbook runs from, so the repository's ansible.cfg, roles and collections apply.
+   *
+   * Args:
+   *   name (string): the repository.
+   *
+   * Returns:
+   *   Promise<string>: its folder.
+   *
+   * Raises:
+   *   Error: no repository of that name is used for playbooks.
+   */
+  static async playbookRepositoryRoot(name) {
+    const repositories = await Repository.playbooksRepositories()
+    if (!repositories.some((r) => r.name === name)) {
+      throw new Error(`playbookRepository '${name}' is not a repository used for playbooks`)
+    }
+    return Repo.folderOf(name)
+  }
+
   static async getAnsiblePath() {
   try{
     var repositories = await Repository.playbooksRepositories()
@@ -727,10 +748,8 @@ class Repository extends CrudModel {
       return ""
     }
     
-    if(repositories.length > 1){
-      const repoNames = repositories.map(r => r.name).join(", ")
-      logger.warning(`Multiple repositories are marked as 'use_for_playbooks': ${repoNames}. Only one should be enabled. Playbooks cannot be merged. Using first one: ${repositories[0].name}`)
-    }
+    // several may hold playbooks : a form names its own with playbookRepository ; the others run
+    // the first one's
     
     const repoPath = Repo.folderOf(repositories[0].name)
     const playbooksSubPath = path.join(repoPath, "playbooks")

@@ -324,6 +324,40 @@ describe("the folders a job's run message names", () => {
   });
 });
 
+describe("a job whose form names its playbook's repository (playbookRepository)", () => {
+  test("its run message names that repository, run from its root ; a job without one, as before", async () => {
+    const { default: Credential } = await import("../src/models/credential.model.v2.js");
+    Credential.resolveCredentialMap = async () => ({});
+    const doBefore = mysql.do;
+    const sent = async (jobId, extravars) => {
+      mysql.do = async (sql, params) => {
+        if (sql.startsWith("SELECT form, extravars, credentials")) return [{ form: "f", extravars: JSON.stringify(extravars), credentials: "{}" }];
+        if (sql.includes("WHERE use_for_playbooks")) return [{ id: 3, name: "first" }, { id: 7, name: "infra" }];
+        return doBefore(sql, params);
+      };
+      const entry = entryOf({ ...runners["dmz-1"], rte_files: "local" });
+      const handed = hub.sendJob(jobId, entry);
+      await settle();
+      const run = entry.session.sent.find((m) => m.t === "run");
+      const claim = hub.claims.get(jobId);
+      clearTimeout(claim?.timer);
+      claim?.resolve({ claimed: false, error: "test over" });
+      await handed;
+      return run;
+    };
+    try {
+      const named = await sent(61, { __playbookRepository__: "infra" });
+      assert.equal(named.paths.playbookRepo, "infra");
+      assert.equal(named.paths.playbookRoot, true);
+      const plain = await sent(62, {});
+      assert.equal(plain.paths.playbookRepo, "first");
+      assert.equal("playbookRoot" in plain.paths, false, "nothing new in a job without one");
+    } finally {
+      mysql.do = doBefore;
+    }
+  });
+});
+
 describe("an abort of a socket-mode job", () => {
   // the aborts the database holds (dispatch's second query) : the job, its RTE and its runner
   const withAborts = async (list, fn) => {

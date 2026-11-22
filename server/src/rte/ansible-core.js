@@ -290,16 +290,22 @@ export function runnerIdentity() {
 /**
  * The folder the playbook runs from, as the job's I/O finds it : the playbooks repository,
  * else ANSIBLE_PATH (or the files the controller sent with the job), plus the form's sub path.
+ * A form naming its repository (playbookRepository) runs from that repository's root.
  *
  * Args:
  *   playbookSubPath (string): the form's playbookSubPath.
  *   jobId (number): the job.
+ *   playbookRepository (string): the form's playbookRepository ; none : the first repository used
+ *     for playbooks, from its playbooks folder.
  *
  * Returns:
  *   Promise<string>: the folder.
+ *
+ * Raises:
+ *   Error: the repository named is not one used for playbooks.
  */
-export async function resolvePlaybookDirectory(playbookSubPath = "", jobId = 0) {
-  const directory = await currentIO().playbookDirectory(jobId, playbookSubPath);
+export async function resolvePlaybookDirectory(playbookSubPath = "", jobId = 0, playbookRepository = "") {
+  const directory = await currentIO().playbookDirectory(jobId, playbookSubPath, playbookRepository);
   return directory || (playbookSubPath ? path.join(ansibleConfig.path, playbookSubPath) : ansibleConfig.path);
 }
 
@@ -498,6 +504,7 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
   var ansibleCredentials = extravars?.__ansibleCredentials__ || "";
   var vaultCredentials = extravars?.__vaultCredentials__ || "";
   var playbookSubPath = extravars?.__playbookSubPath__ || "";
+  var playbookRepository = extravars?.__playbookRepository__ || "";
   // merge credentials now
   const merged = { ...extravars, ...credentials };
   // define hiddenExtravars
@@ -584,7 +591,16 @@ async function launchPlaybook(ev, secrets, jobid, counter) {
     const extravarsFileName = `extravars_${jobid}.json`;
     const hiddenExtravarsFileName = `he_${extravarsFileName}`;
     logger.debug(`Extravars File: ${extravarsFileName}`);
-    const directory = await resolvePlaybookDirectory(playbookSubPath, jobid);
+    let directory;
+    try {
+      directory = await resolvePlaybookDirectory(playbookSubPath, jobid, playbookRepository);
+    } catch (err) {
+      // a repository the form names that is none used for playbooks : the job fails, saying so ;
+      // without one, as before
+      if (!playbookRepository) throw err;
+      await currentIO().end(jobid, counter + 1, "stderr", "failed", `[ERROR]: ${err.message}`);
+      return false;
+    }
     // its name (deploy) as its file (deploy.yml) : a form may name it either way
     playbook = playbookFile(directory, playbook);
     extravars.__playbook__ = playbook;

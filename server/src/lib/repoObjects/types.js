@@ -7,9 +7,8 @@
 // A type is one of two kinds :
 //   a content type  (forms, playbooks, workflows, inventories, roles, categories, constants) :
 //                   files the app reads as they are ; several repositories may hold forms,
-//                   workflows and inventories, the app uses the first one of playbooks (its Usage
-//                   step greys the box on the others, the server only warns), and one repository
-//                   at most holds the roles, the categories and the constants, each read from the
+//                   workflows, inventories and playbooks (a form runs the first one's playbooks,
+//                   or names another with playbookRepository), and one repository at most holds the roles, the categories and the constants, each read from the
 //                   file of the repository that gives its top-level key (lib/configKeys.js)
 //   an object type  (schedules, credentials, runners, secret stores, SSO ...) : objects kept in
 //                   step with a table both ways by the engine (lib/repoObjects/engine.js), one

@@ -66,6 +66,9 @@ function pushForminfoToExtravars(formObj, extravars, creds = {}) {
     "instanceGroups",
     "scmBranch",
     "playbookSubPath",
+    // the repository the playbook runs from (its root : its ansible.cfg, roles and collections
+    // apply) ; none : the first repository used for playbooks, from its playbooks folder
+    "playbookRepository",
     // a workflow node's run (models/workflowRun.js) : AWX's skip_tags and verbosity level
     "skipTags",
     "verbosity"

@@ -1391,7 +1391,7 @@ export default {
       },
       usageHints: {
         forms: 'Pliki formularzy i zmiennych, edytowane i wypychane przez projektanta',
-        playbooks: 'Playbooki Ansible uruchamiane przez formularze (tylko jedno repozytorium)',
+        playbooks: 'Playbooki Ansible formularzy, z pierwszego repozytorium, chyba że formularz wskaże inne',
         workflows: 'Workflowy budowane, edytowane i wypychane przez projektanta',
         inventories: 'Inwentarz: inventory.yaml, group_vars i host_vars w katalogu głównym',
         schedules: 'Harmonogramy, wpisy listy controller_schedules: w dowolnym z jego plików YAML',
@@ -2644,6 +2644,10 @@ export default {
     runnerDefault: 'Domyślny runner jego typu',
     helpIcon: 'Pokazywana na jego kafelku i na liście formularzy.',
     helpPlaybook: 'Playbook, który uruchamia.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repozytorium',
+    helpPlaybookRepository: 'Uruchamia playbook z katalogu głównego tego repozytorium, z jego ansible.cfg.',
+    visualFirstPlaybookRepository: 'Pierwsze repozytorium playbooków',
     formWorkflow: 'Workflow',
     helpWorkflow: 'Workflow, który uruchamia, jeden z Projektant > Workflow.',
     helpTemplate: 'Szablon uruchamiany na runnerze: szablon zadania lub workflow AWX, szablon Semaphore.',

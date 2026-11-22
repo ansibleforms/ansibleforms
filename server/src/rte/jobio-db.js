@@ -49,17 +49,23 @@ const dbJobIO = {
 
   /**
    * The folder the playbook runs from : the playbooks repository, else ANSIBLE_PATH, plus the
-   * form's sub path.
+   * form's sub path. A form naming its repository (playbookRepository) runs from its root.
    *
    * Args:
    *   jobId (number): the job.
    *   playbookSubPath (string): the form's playbookSubPath.
+   *   playbookRepository (string): the form's playbookRepository, if any.
    *
    * Returns:
    *   Promise<string>: the folder.
+   *
+   * Raises:
+   *   Error: the repository named is not one used for playbooks.
    */
-  async playbookDirectory(jobId, playbookSubPath = "") {
-    const directory = (await Repository.getAnsiblePath()) || ansibleConfig.path;
+  async playbookDirectory(jobId, playbookSubPath = "", playbookRepository = "") {
+    const directory = playbookRepository
+      ? await Repository.playbookRepositoryRoot(playbookRepository)
+      : (await Repository.getAnsiblePath()) || ansibleConfig.path;
     return playbookSubPath ? path.join(directory, playbookSubPath) : directory;
   },
 

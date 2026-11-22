@@ -72,6 +72,7 @@ import {
   orderFor,
 } from '@/lib/formDoc';
 import { yamlText } from '@/lib/yamlBlock';
+import { playbookChoices } from '@/lib/playbookChoices';
 import BsSwitch from './BsSwitch.vue';
 
 const props = defineProps({
@@ -157,6 +158,7 @@ const form = computed(() => {
     type,
     description: str('description'),
     playbook: str('playbook'),
+    playbookRepository: str('playbookRepository'),
     workflow: str('workflow'),
     template: str('template'),
     icon: str('icon'),
@@ -481,18 +483,27 @@ onMounted(async () => {
 });
 // the playbooks (the designer's Playbooks section : its YAML files), offered as an ansible form's
 // playbook ; none (the list needs the designer's permission) : the name is typed
-const playbookNames = ref([]);
+// the playbooks of each repository used for them (the Playbooks section's files, its other
+// repositories under their name) : { files, repositories ([{ name, prefix, folder }]) }
+const playbookFiles = ref({ files: [], repositories: [] });
 onMounted(async () => {
   try {
     const res = await axios.get('/api/v2/files/playbooks');
-    playbookNames.value = (res.data?.files || [])
-      .map((f) => String(f.path || ''))
-      .filter((p) => /\.ya?ml$/i.test(p))
-      .sort((a, b) => a.localeCompare(b));
+    playbookFiles.value = {
+      files: (res.data?.files || []).map((f) => String(f.path || '')).filter((p) => /\.ya?ml$/i.test(p)),
+      repositories: res.data?.repositories || [],
+    };
   } catch {
-    playbookNames.value = [];
+    playbookFiles.value = { files: [], repositories: [] };
   }
 });
+// the repositories a form may name as its playbook's (playbookRepository)
+const playbookRepositories = computed(() => playbookFiles.value.repositories.map((r) => r.name));
+// the playbooks offered : the first repository's, as it runs them, without a playbookRepository ;
+// the named repository's, from its root, with one
+const playbookNames = computed(() =>
+  playbookChoices(playbookFiles.value.files, playbookFiles.value.repositories, form.value?.playbookRepository),
+);
 // the designer's workflows (Designer > Workflows), offered as a workflow form's workflow : its file
 // (a workflow's name still works) ; none (the list needs the designer's permission) : it is typed
 const workflowNames = ref([]);
@@ -857,6 +868,29 @@ defineExpose({
             </select>
           </div>
           <div class="form-text">{{ t('designer.helpIcon') }}</div>
+        </div>
+        <!-- the repository the playbook runs from, at its root ; none : the first one used for playbooks -->
+        <div v-if="form.type === 'ansible' && (playbookRepositories.length > 1 || form.playbookRepository)">
+          <label class="form-label fw-bold">{{ t('designer.formPlaybookRepository') }}</label>
+          <div class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="code-branch" /></span>
+            <select
+              class="form-select"
+              :value="form.playbookRepository || ''"
+              :disabled="locked"
+              @change="setText('playbookRepository', $event.target.value)"
+            >
+              <option value="">{{ t('designer.visualFirstPlaybookRepository') }}</option>
+              <option
+                v-if="form.playbookRepository && !playbookRepositories.includes(form.playbookRepository)"
+                :value="form.playbookRepository"
+              >
+                {{ form.playbookRepository }}
+              </option>
+              <option v-for="r in playbookRepositories" :key="r" :value="r">{{ r }}</option>
+            </select>
+          </div>
+          <div class="form-text">{{ t('designer.helpPlaybookRepository') }}</div>
         </div>
         <div v-if="form.type === 'ansible'">
           <label class="form-label fw-bold">{{ t('designer.formPlaybook') }}</label>

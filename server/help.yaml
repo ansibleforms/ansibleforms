@@ -3149,6 +3149,29 @@
         short: Subfolder structure for playbooks
         description: |
           If you have a more complex ansible setup, you might want to organize them in subfolders.  Use this property to define a subfolder (or multiple levels) where you want to launch ansible-playbook from.  
+      - name: playbookRepository
+        type: string
+        with_types: ansible
+        version: 7.8.0
+        group: basic
+        allowed: the name of a repository used for playbooks
+        short: The repository the playbook runs from
+        description: |
+          The repository whose playbook the form runs, one with the **Playbooks** usage. The playbook then runs from that
+          repository's root: its `ansible.cfg` applies (and with it its `roles` and `collections` paths), `playbook` is
+          read from the root (`playbooks/site.yml`) and a relative `__inventory__` too (`inventories/prod/hosts.yaml`).
+          `playbookSubPath` still moves the run folder, from that root. Without it, the form runs the playbooks of the
+          repository used for playbooks first, from its `playbooks` folder, else its root, as before. A name that is no
+          repository used for playbooks fails the job, saying so. An `ansible` step of a multistep form names its own.
+          An RTE runner needs 7.8.0 or later to run such a form.
+        examples:
+        - name: A repository in Ansible's own layout
+          code: |
+            - name: Deploy the web servers
+              type: ansible
+              playbookRepository: infra
+              playbook: playbooks/site.yml
+              inventory: inventories/production/hosts.yaml
       - name: vaultCredentials
         type: string
         with_types: ansible
@@ -6808,8 +6831,11 @@
       | Appearance | Defaults (`use_for_defaults`), Logo (`use_for_logo`), Icon (`use_for_icon`), Name (`use_for_name`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
       | System | General (`use_for_general`) |
 
-      Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
-      and inventories).
+      Forms, Playbooks, Workflows and Inventories may be on several repositories. A form runs the playbooks of the
+      repository used for playbooks first (in the order they were added, from its `playbooks` folder, else its
+      root), unless it names another one with `playbookRepository`: it then runs from that repository's root, its
+      `ansible.cfg`, `roles` and `collections` applying, as in the layout Ansible documents (`inventories/`,
+      `playbooks/`, `roles/`, `ansible.cfg`).
 
       **Several forms repositories** are read in the order they were added (as before 7.8), so a form name
       defined in two of them always resolves to the same copy: the one in the repository added first, in the

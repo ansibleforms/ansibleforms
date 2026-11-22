@@ -104,11 +104,10 @@ describe('the usage types', () => {
     ]);
   });
 
-  it('forms, workflows and inventories may be on several repositories ; roles, categories, constants and playbooks one', () => {
+  it('forms, workflows, inventories and playbooks may be on several repositories ; roles, categories and constants one', () => {
     const one = (key) => !!USAGE_TYPES.find((u) => u.key === key).oneOnly;
-    expect(['forms', 'workflows', 'inventories'].map(one)).toEqual([false, false, false]);
-    expect(['roles', 'categories', 'constants', 'playbooks', 'schedules', 'credentials', 'runners'].map(one)).toEqual([
-      true,
+    expect(['forms', 'workflows', 'inventories', 'playbooks'].map(one)).toEqual([false, false, false, false]);
+    expect(['roles', 'categories', 'constants', 'schedules', 'credentials', 'runners'].map(one)).toEqual([
       true,
       true,
       true,
