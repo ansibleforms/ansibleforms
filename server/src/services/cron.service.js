@@ -24,6 +24,8 @@ import { resumeAbandoned } from '../lib/jobResume.js';
 import { nextRunsAsync, limits as rruleLimits, TIMEOUT as RRULE_TIMEOUT } from '../lib/scheduleRrule.js';
 // the stored jobs cleanup's query : expired, or unused for longer than their days
 import { cleanupQuery } from '../lib/storedJobExpiry.js';
+// whether a schedule reached its end (its end date passed, or its runs done)
+import { endReached } from '../lib/scheduleEnd.js';
 
 // the cron registry is re-read from the database this often even without a change notice
 // (lib/epochs.js), in case one was missed
@@ -197,7 +199,9 @@ class CronService {
   /**
    * Queues a schedule whose time came, unless it is turned off or already queued or running (that
    * run is left to finish) : the cron and the rrule tasks alike. The claim in Schedule.launch
-   * makes it launch once, whatever process reads the queue.
+   * makes it launch once, whatever process reads the queue. One at its end (its end date passed,
+   * or its runs done : lib/scheduleEnd.js) never launches : it is ended instead, turned off or
+   * removed as its end_action says (Schedule.endSchedule).
    *
    * Args:
    *   id (number): the schedule.
@@ -209,11 +213,16 @@ class CronService {
   async queueIfIdle(id, name) {
     const schedules = await mysql.do(
       // turned off (enabled 0) : this occurrence is skipped, Run now still runs it
-      "SELECT id FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
+      "SELECT id, name, one_time_run, ends, end_at, end_count, end_action, run_count, repository FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
       [id],
       true
     );
-    if (schedules.length > 0) {
+    // at its end : not launched, ended now (turned off or removed, and no longer registered)
+    const reason = schedules.length > 0 ? endReached(schedules[0]) : null;
+    if (reason) {
+      logger.info(`Schedule ${name} (ID: ${id}) reached its end, it is not launched`);
+      await Schedule.endSchedule(schedules[0], reason);
+    } else if (schedules.length > 0) {
       await Schedule.queue(id);
     } else {
       logger.debug(`Schedule ${name} (ID: ${id}) is off, running or queued, skipping this run`);
@@ -398,15 +407,21 @@ class CronService {
   /**
    * Add or update the task of a schedule as it is stored : every timing it has, its rrule too, so
    * a schedule of a schedules repository is timed by its rrule wherever it is registered from (the
-   * schedule routes, the MCP tools, the resync).
+   * schedule routes, the MCP tools, the resync). One turned off (an end turned it off, or a user)
+   * is not registered : dropped from the registry, as the resync drops it.
    *
    * Args:
-   *   row (object): the schedule's row ({ id, name, cron, one_time_run, rrule }).
+   *   row (object): the schedule's row ({ id, name, cron, one_time_run, rrule, enabled }).
    *
    * Returns:
    *   Promise<void>|undefined: what addSchedule returns (settled once a rrule's task is registered).
    */
   addScheduleRow(row) {
+    // turned off : not registered (it fires no more), registered again once turned on
+    if (row.enabled !== undefined && row.enabled !== null && !Number(row.enabled)) {
+      this.removeSchedule(row.id);
+      return undefined;
+    }
     return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.rrule);
   }
 
@@ -467,7 +482,8 @@ class CronService {
 
     try {
       const schedules = await mysql.do(
-        "SELECT id, name, one_time_run, cron, rrule FROM AnsibleForms.`schedule` WHERE one_time_run IS NOT NULL OR cron<>'' OR rrule<>''",
+        // the ones turned off are not registered : they fire no more until turned on again
+        "SELECT id, name, one_time_run, cron, rrule FROM AnsibleForms.`schedule` WHERE (one_time_run IS NOT NULL OR cron<>'' OR rrule<>'') AND COALESCE(enabled,1)=1",
         undefined,
         true
       );
@@ -564,6 +580,23 @@ class CronService {
     });
     this.jobs.system.set('deadNodes', deadNodesTask);
     logger.info('Initialized the stopped-node sweep (every minute)');
+
+    // 1c. The schedules at their end - every minute. A schedule whose end date passed between two
+    // of its runs is turned off or removed (its end_action) at that minute rather than at its next
+    // run, and so is one whose runs are done that a pull put back on (lib/scheduleEnd.js).
+    const scheduleEndsTask = new Cron('* * * * *', {
+      timezone: this.timezone,
+      protect: true
+    }, async () => {
+      try {
+        const ended = await Schedule.endReachedSchedules();
+        if (ended > 0) logger.info(`Ended ${ended} schedule(s) that reached their end`);
+      } catch (err) {
+        logger.error('Failed to end the schedules that reached their end:', err);
+      }
+    });
+    this.jobs.system.set('scheduleEnds', scheduleEndsTask);
+    logger.info('Initialized the schedule end sweep (every minute)');
 
     // 2. Token cleanup - runs daily at 3:00 AM
     const tokenCleanupTask = new Cron('0 3 * * *', {

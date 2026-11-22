@@ -42,6 +42,8 @@ import { useI18n } from 'vue-i18n';
 import { normalizeParts, cronValidationMessage } from '@/config/cron';
 import { describeCron } from '@/config/cronDescribe';
 import Time from '@/lib/Time';
+// the runs shown stop at the schedule's end (its date, or its runs left)
+import { runsBeforeEnd } from '@/lib/scheduleEnd';
 
 const { t, locale } = useI18n();
 const emit = defineEmits(['update:modelValue']);
@@ -50,6 +52,10 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   hasError: { type: Boolean, default: false },
   icon: { type: String, default: 'stopwatch' },
+  // the schedule's end (lib/scheduleEnd.js endOf) and the jobs it started : the next runs shown
+  // stop at it ; none, every run
+  end: { type: Object, default: null },
+  runCount: { type: [Number, String], default: 0 },
 });
 
 // Zone the badges are computed and rendered in: the server's scheduler zone when
@@ -315,8 +321,8 @@ const DAY_MS = 86400000;
 
 // Returns the next `count` runs as real Dates, and whether the scan was cut short
 // before finding them (in which case an empty result means "unknown", not "never").
-// four : on one line in a dialog
-function getNextRuns(cronStr, count = 4) {
+// three : on one line in a dialog
+function getNextRuns(cronStr, count = 3) {
   if (!cronStr || !cronStr.trim() || expressionError.value) return { runs: [], truncated: false };
   const all = cronStr.trim().split(/\s+/);
   const [minExpr, hrExpr, domExpr, monExpr, dowExpr] = normalizeParts(all);
@@ -478,7 +484,9 @@ let nextRunsTimer = null;
 
 function refreshNextRuns() {
   const { runs, truncated } = getNextRuns(props.modelValue);
-  nextRuns.value = runs;
+  // none after its end : no badge for a run that will not happen (the warning below is the
+  // expression's own, from every run it has)
+  nextRuns.value = runsBeforeEnd(runs, props.end, props.runCount);
   noRunsFound.value = !runs.length && !truncated && !expressionError.value && !!(props.modelValue || '').trim();
 }
 
@@ -492,6 +500,8 @@ watch(
 
 // the scheduler zone arrives asynchronously; recompute once it is known
 watch(timeZone, refreshNextRuns);
+// the end changed : the runs before it
+watch(() => [props.end?.ends, props.end?.end_at, props.end?.end_count, props.runCount], refreshNextRuns);
 
 onMounted(async () => {
   refreshNextRuns();

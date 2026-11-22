@@ -99,7 +99,9 @@ describe('when it is removed : one choice of three', () => {
 
   it('never is offered only without a setting, and a date says the setting still applies', () => {
     const c = read('src/components/AppStoredJobRemoval.vue');
-    expect(c).toMatch(/<div v-if="!max" class="form-check af-removal-row">/);
+    expect(c).toMatch(/:showNever="!max"/);
+    // the choice itself : the shared one of a schedule's end too
+    expect(read('src/components/AppEndChoice.vue')).toMatch(/<div v-if="showNever" class="form-check af-end-row">/);
     expect(c).toMatch(/t\('settings\.storedJobs\.removedAlsoUnused', \{ days: max\.value \}\)/);
   });
 });

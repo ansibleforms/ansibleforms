@@ -46,7 +46,8 @@
 /*  field.nested: a radio group that follows up the one above it  */
 /*      (AWX : which product) - indented, with its label as title */
 /*  field.flush: a switch at the dialog's left edge, its help the */
-/*      full width under it                                       */
+/*      full width under it ; a component the full width, its own */
+/*      title in it (no label column)                             */
 /*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
 /*      its own, instead of field.dependency (the dropdowns'      */
 /*      lists : the credential chosen, its type)                  */
@@ -2045,6 +2046,10 @@ defineExpose({
         <!-- A COMPONENT (type component) : something to see while the record is made (the labels'
              preview), field.component with the props field.props(item, items) gives ; its title in
              the label column, as the other fields -->
+        <!-- flush : the whole width, its own title in it (a schedule's end, AppScheduleEnd) -->
+        <div v-else-if="showField(field) && field.type === 'component' && field.flush" class="mb-3">
+          <component :is="field.component" v-bind="field.props ? field.props($v.item.$model, itemList) : {}" />
+        </div>
         <div v-else-if="showField(field) && field.type === 'component'" class="row mb-3">
           <label class="form-label fw-bold col-form-label col-sm-2">{{ field.label }}</label>
           <div class="col-sm-10">

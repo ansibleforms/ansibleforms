@@ -8,9 +8,10 @@ import logger from "../../lib/logger.js";
 import i18n from "../../lib/i18n.js";
 import ScheduleRepo from "../../models/scheduleRepo.model.js";
 import { validateRruleAsync, nextRunsAsync, zoneOf } from "../../lib/scheduleRrule.js";
+import { runsBeforeEnd, endMoment } from "../../lib/scheduleEnd.js";
 
-// how many runs a rrule's preview shows : four, on one line in a dialog, as a cron's (BsCron)
-const PREVIEW_RUNS = 4;
+// how many runs a rrule's preview shows : three, on one line in a dialog, as a cron's (BsCron)
+const PREVIEW_RUNS = 3;
 
 const scheduleController = {
   async find(req, res) {
@@ -114,26 +115,36 @@ const scheduleController = {
 
   /**
    * A rrule checked, and its next runs (the preview) : its time zone,
-   * the next four runs as UTC ISO strings, or why it is refused.
+   * the next three runs as UTC ISO strings, or why it is refused. Given the schedule's end, the
+   * runs stop at it (lib/scheduleEnd.js) : none after end_at, at most end_count less run_count ;
+   * ended says that its end, not the rule, left fewer runs than asked (or none).
    *
    * Args:
-   *   req (object): the request, ?rrule=<the rrule>.
-   *   res (object): the response, { valid, errors, timezone, next }.
+   *   req (object): the request, ?rrule=<the rrule>, and the end, when it has one : ?end_at=<a
+   *     moment> or ?end_count=<n>&run_count=<the jobs it started>.
+   *   res (object): the response, { valid, errors, timezone, next, ended }.
    */
   async previewRrule(req, res) {
     try {
       const rrule = String(req.query?.rrule ?? "");
       const errors = await validateRruleAsync(rrule);
       let next = [];
+      let ended = false;
+      // the end it has, if any : a date, or a number of runs (less the ones it started)
+      const q = req.query || {};
+      const end = q.end_at ? { ends: "date", end_at: endMoment(q.end_at) } : q.end_count ? { ends: "count", end_count: q.end_count, run_count: q.run_count || 0 } : null;
       // its runs from now, in their thread, awaited : one that cannot be worked out in time says so
       if (!errors.length) {
         try {
-          next = (await nextRunsAsync(rrule, { count: PREVIEW_RUNS })).map((d) => d.toISOString());
+          const runs = await nextRunsAsync(rrule, { count: PREVIEW_RUNS });
+          const kept = end ? runsBeforeEnd(runs, end) : runs;
+          ended = kept.length < runs.length;
+          next = kept.map((d) => d.toISOString());
         } catch (e) {
           errors.push(e.message);
         }
       }
-      return res.json(RestResult.single({ valid: !errors.length, errors, timezone: errors.length ? null : zoneOf(rrule), next }));
+      return res.json(RestResult.single({ valid: !errors.length, errors, timezone: errors.length ? null : zoneOf(rrule), next, ended }));
     } catch (err) {
       Errors.ReturnError(res, err);
     }

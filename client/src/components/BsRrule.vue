@@ -5,13 +5,16 @@
 /*                                                                */
 /*  The iCal rrule a schedule of a schedules repository is timed  */
 /*  by, written on one line (DTSTART;TZID=... RRULE:...)          */
-/*  : a text box, why it would be refused, and its next four runs */
+/*  : a text box, why it would be refused, and its next three runs */
 /*  in its own time zone, as the server works them out            */
 /*  (GET /api/v2/schedule/rrule) - the badges of BsCron.          */
 /*                                                                */
 /*  @props:                                                       */
 /*      modelValue: String - the rrule                            */
 /*      hasError: Boolean - the field is invalid (red border)     */
+/*      end: Object - the schedule's end (lib/scheduleEnd.js      */
+/*           endOf) : the runs shown stop at it                   */
+/*      runCount: Number - the jobs the schedule started          */
 /*                                                                */
 /*  @emits:                                                       */
 /*      update:modelValue: String - the rrule typed               */
@@ -28,6 +31,8 @@ const emit = defineEmits(['update:modelValue']);
 const props = defineProps({
   modelValue: { type: String, default: '' },
   hasError: { type: Boolean, default: false },
+  end: { type: Object, default: null },
+  runCount: { type: [Number, String], default: 0 },
 });
 
 // what the server said : its next runs, its zone, or why it is refused
@@ -35,12 +40,28 @@ const next = ref([]);
 const zone = ref('');
 const serverErrors = ref([]);
 const checked = ref(false);
+// the schedule's end, not the rule, left fewer runs (or none) : no "never fires" then
+const ended = ref(false);
 let timer = null;
 let asked = 0;
 
 // the reason on the text alone, at once ; the server's after it answered
 const textProblem = computed(() => rruleProblem(props.modelValue));
 const problem = computed(() => textProblem.value || serverErrors.value[0] || '');
+
+/**
+ * The schedule's end as the preview takes it : its date, or its runs and the ones started.
+ *
+ * Returns:
+ *   object: { end_at } or { end_count, run_count } ; {} when it never ends.
+ */
+function endParams() {
+  const e = props.end;
+  if (e?.ends === 'date' && e.end_at) return { end_at: new Date(e.end_at).toISOString() };
+  if (e?.ends === 'count' && Number(e.end_count) >= 1)
+    return { end_count: Number(e.end_count), run_count: Number(props.runCount) || 0 };
+  return {};
+}
 
 /**
  * Asks the server for the rrule's check and next runs ; an answer to an older text is dropped.
@@ -55,9 +76,10 @@ async function preview() {
     return;
   }
   try {
-    const res = await axios.get('/api/v2/schedule/rrule', { params: { rrule } });
+    const res = await axios.get('/api/v2/schedule/rrule', { params: { rrule, ...endParams() } });
     if (mine !== asked) return;
     next.value = (res.data?.next || []).map((d) => new Date(d));
+    ended.value = !!res.data?.ended;
     zone.value = res.data?.timezone || '';
     serverErrors.value = res.data?.errors || [];
     checked.value = true;
@@ -70,7 +92,7 @@ async function preview() {
 }
 
 watch(
-  () => props.modelValue,
+  () => [props.modelValue, props.end?.ends, props.end?.end_at, props.end?.end_count, props.runCount],
   () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(preview, 300);
@@ -125,7 +147,7 @@ function formatDate(d) {
     <small v-if="problem" class="text-danger d-block mt-1">{{
       t('settings.schedules.rruleInvalid', { reason: problem })
     }}</small>
-    <small v-else-if="checked && !next.length" class="text-muted d-block mt-1">{{
+    <small v-else-if="checked && !next.length && !ended" class="text-muted d-block mt-1">{{
       t('settings.schedules.rruleNoRuns')
     }}</small>
     <div v-if="!problem && next.length" class="mt-2">

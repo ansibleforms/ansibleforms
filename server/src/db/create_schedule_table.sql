@@ -33,5 +33,15 @@ CREATE TABLE `schedule` (
   `launch_options` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- the stored job a planned job's values came from ; NULL for a schedule
   `stored_job_id` int(11) DEFAULT NULL,
+  -- how it ends (lib/scheduleEnd.js) : never, on a date (end_at) or after a number of runs
+  -- (end_count) ; then turned off or removed (end_action). A one-time run has none
+  `ends` VARCHAR(10) NOT NULL DEFAULT 'never',
+  `end_at` DATETIME DEFAULT NULL,
+  `end_count` INT DEFAULT NULL,
+  `end_action` VARCHAR(10) NOT NULL DEFAULT 'disable',
+  -- the jobs it started (jobs.schedule_id), counted toward end_count
+  `run_count` INT NOT NULL DEFAULT 0,
+  -- a one-time run removed after it started its job ; else turned off and kept
+  `remove_after_run` TINYINT(4) NOT NULL DEFAULT 1,
   UNIQUE KEY `uk_schedule_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

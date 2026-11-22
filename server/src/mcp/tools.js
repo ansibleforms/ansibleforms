@@ -9,6 +9,7 @@ import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
 import { parseMoment, oneTimeRunOf } from '../lib/oneTimeRun.js';
 import yaml from 'yaml';
+import { endOfRow } from '../lib/scheduleEnd.js';
 import { ownerOf as storedJobOwner, seesShared, storedFormDataFor } from '../lib/storedJobScope.js';
 import { settingDays, effectiveUnusedDays, unusedDaysRefusal, unusedDaysValue } from '../lib/storedJobExpiry.js';
 
@@ -186,6 +187,10 @@ export function createHandlers({ user, deps, policy = {} }) {
       status: row.status || null,
       state: row.state || null,
       lastRun: row.last_run ?? null,
+      // when it ends (never, on a date, after a number of runs) and what then, and the jobs it
+      // started so far ; a one-time run : whether it is removed after its run
+      ...endOfRow(row),
+      runCount: Number(row.run_count) || 0,
     };
   }
 
@@ -792,7 +797,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       return { id: row.id, name: row.name, form: ready.formObj.name, ...(await bothClocks(when)), payloadHash: ready.payloadHash, warnings: ready.warnings };
     },
 
-    async createSchedule({ form, name, cron: cronGiven, rrule: rruleGiven, one_time_run: onceGiven, run_at: runAtGiven, extraVars }) {
+    async createSchedule({ form, name, cron: cronGiven, rrule: rruleGiven, one_time_run: onceGiven, run_at: runAtGiven, extraVars, ends, end_at: endAt, end_count: endCount, end_action: endAction, remove_after_run: removeAfterRun }) {
       refuseWhenReadOnly('schedules cannot be created through it');
       // a blank cron or rrule is none : it would store a schedule that never runs
       const cronExpr = String(cronGiven ?? '').trim();
@@ -822,7 +827,11 @@ export function createHandlers({ user, deps, policy = {} }) {
         when = momentOf(runAt, 'one_time_run');
         Object.assign(data, { one_time_run: when.toISOString() });
       }
-      // a value the model refuses (a rrule) : its BadRequestError, said as invalid_request
+      // when it ends and what then (a cron or a rrule), or whether a one-time run is removed after
+      // it : only what is given, the model checks and defaults them (lib/scheduleEnd.js)
+      const end = { ends, end_at: endAt, end_count: endCount, end_action: endAction, remove_after_run: removeAfterRun };
+      for (const [k, v] of Object.entries(end)) if (v !== undefined) data[k] = v;
+      // a value the model refuses (a rrule, an end) : its BadRequestError, said as invalid_request
       const row = await registered(await stored(data.name, () => Schedule.create(data)));
       // its moment on both clocks : one_time_run in UTC, and on the app's clock
       const clocks = when ? await bothClocks(when) : null;
@@ -1267,6 +1276,11 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
       one_time_run: z.string().optional().describe('One run at this moment: ISO 8601 with its offset or Z'),
       run_at: z.string().optional().describe('Deprecated since 7.8.0, removed in 8: the name one_time_run had before'),
       extraVars: z.record(z.string(), z.any()).optional().describe('The extra vars the job gets'),
+      ends: z.enum(['never', 'date', 'count']).optional().describe('When a cron or rrule schedule ends: never (the default), on end_at, or after end_count runs'),
+      end_at: z.string().optional().describe('With ends date: the moment it ends, ISO 8601 with its offset or Z'),
+      end_count: z.number().int().min(1).optional().describe('With ends count: the number of runs after which it ends'),
+      end_action: z.enum(['disable', 'remove']).optional().describe('What happens when it ends: disable (the default) or remove'),
+      remove_after_run: z.boolean().optional().describe('A one_time_run schedule: removed after its run (the default), else disabled and kept'),
     },
     annotations: { readOnlyHint: false, destructiveHint: true },
   }, wrap((a) => handlers.createSchedule(a)));
@@ -1275,8 +1289,8 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
     server.registerTool('list_schedules', {
       title: 'List schedules',
       description: 'The schedules you may see: with allowScheduledJobs all of them, else the runs you planned. '
-        + 'Per schedule its form, when it runs (oneTimeRun, cron or rrule, nextRun), whether it runs as you (planned) and how '
-        + 'its last run went.',
+        + 'Per schedule its form, when it runs (oneTimeRun, cron or rrule, nextRun), whether it runs as you (planned), how '
+        + 'its last run went, when it ends (ends, endAt, endCount, endAction ; removeAfterRun for a one-time run) and its runCount.',
       inputSchema: { form: z.string().optional().describe('Only the schedules of this form') },
       annotations: { readOnlyHint: true },
     }, wrap((a) => handlers.listSchedules(a)));

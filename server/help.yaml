@@ -6544,10 +6544,25 @@
       | `one_time_run` | once, at the moment it gives | an ISO 8601 time with its offset or `Z`; a time without a zone is refused |
 
       Each is stored and run as an app schedule of that timing: a cron stays a cron, a `one_time_run` is a one-time run. A
-      one-time schedule is deleted once it has run, as in the app; its entry stays in git as it is, and the next
+      one-time schedule is turned off once it has run; its entry stays in git as it is, and the next
       pulls do not import it again: an entry whose `one_time_run` is past is skipped, said on a `Not imported` line of
       the pull output, unless the app still waits to run it (its moment passed while the server was down: it runs
-      then, as an app one-time schedule does). Change its `one_time_run` to a moment ahead to run it again.
+      then, as an app one-time schedule does). Change its `one_time_run` to a moment ahead to run it again. An entry
+      with `remove_after_run: false` is kept instead, turned off, with the outcome of its run.
+
+      **Its end.** A schedule timed by a `cron` or a `rrule` may end, as one kept in the app may (its Schedule tab):
+
+      | Key | Says |
+      |---|---|
+      | `ends` | `never` (the default), `date` or `count` |
+      | `end_at` | with `ends: date`, the moment it ends at: an ISO 8601 time with its offset or `Z`; no run after it |
+      | `end_count` | with `ends: count`, the runs it ends after (at least 1): the jobs it started in all, as its Runs tab lists them |
+      | `end_action` | `disable` (the default) or `remove`; a repository's schedule is only ever turned off |
+      | `remove_after_run` | a `one_time_run` only: `false` keeps it, turned off, after its run (`true` when not said) |
+
+      A rrule's own `UNTIL` or `COUNT` still applies; `ends` comes on top of it. A schedule of the repository is managed
+      by its file, so its end turns it off and never removes it, whatever `end_action` says, and a pull keeps it off
+      while its end is reached: change its end, or remove its entry, in git.
 
       **The prompts** become the reserved extra vars the job reads: `limit` (`__limit__`), `job_tags`
       (`__tags__`), `skip_tags` (`__skipTags__`), `verbosity` (`__verbosity__`), `diff_mode` (`__diff__`),

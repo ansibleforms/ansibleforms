@@ -576,6 +576,17 @@ describe("MCP schedules", () => {
     await expect(createHandlers({ user: planner, deps }).createSchedule({ form: "Create volume", name: "x", cron: "0 1 * * *" })).rejects.toMatchObject({ code: "access_denied" });
   });
 
+  test("create_schedule : its end handed to the model as given, and said back", async () => {
+    const client = await connect(manager);
+    const ending = await call(client, "create_schedule", { form: "Create volume", name: "ends after 3", cron: "0 22 * * 1-5", ends: "count", end_count: 3, end_action: "remove" });
+    expect(deps.Schedule.create).toHaveBeenLastCalledWith({ name: "ends after 3", form: "Create volume", extra_vars: "{}\n", cron: "0 22 * * 1-5", ends: "count", end_count: 3, end_action: "remove" });
+    expect(ending.data).toHaveProperty("ends");
+    expect(ending.data).toHaveProperty("runCount");
+    // a value the schema refuses never reaches the model
+    const bad = await client.callTool({ name: "create_schedule", arguments: { form: "Create volume", name: "bad end", cron: "0 1 * * *", ends: "sometime" } });
+    expect(bad.isError).toBe(true);
+  });
+
   test("create_schedule : a cron, a rrule or a one time run, given to the model as it is and registered by its row", async () => {
     const rrule = "DTSTART;TZID=Europe/Madrid:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;BYHOUR=22;BYMINUTE=0";
     const client = await connect(manager);
