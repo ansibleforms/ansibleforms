@@ -792,6 +792,9 @@ export default {
       'Diese Seite läuft noch mit einem älteren Build als der Server. Laden Sie die Seite neu, um die neue Version zu erhalten.',
   },
   common: {
+    // a wizard's buttons : a step back, a step on (the pager's Previous and Next are a page's)
+    previousStep: 'Zurück',
+    nextStep: 'Weiter',
     // the word beside a switch with no text of its own, as it stands
     switchOn: 'An',
     switchOff: 'Aus',
@@ -1035,6 +1038,27 @@ export default {
         '{skipped} ausgewähltes Element kann nicht gelöscht werden und bleibt bestehen. | {skipped} ausgewählte Elemente können nicht gelöscht werden und bleiben bestehen.',
       bulkDeleteNone: 'Keines der ausgewählten Elemente kann gelöscht werden.',
       newItem: 'Neues {item}',
+      // a list's own title for a new record where the template above would not agree with its noun
+      newTitle: {
+        users: 'Neuer Benutzer',
+        groups: 'Neue Gruppe',
+        repositories: 'Neues Repository',
+        sso: 'Neuer SSO-Anbieter',
+        schedules: 'Neuer Zeitplan',
+        storedJobs: 'Neuer gespeicherter Job',
+        knownHosts: 'Neuer bekannter Host',
+        credentials: 'Neue Anmeldedaten',
+        ldap: 'Neues LDAP',
+        runners: 'Neuer Runner',
+        notificationChannels: 'Neuer Benachrichtigungskanal',
+        syslogServers: 'Neuer Syslog-Server',
+        announcements: 'Neue Ankündigung',
+        labels: 'Neues Label',
+        disclaimer: 'Neuer Hinweis',
+        secretStores: 'Neuer Secret Store',
+        ldapDirectories: 'Neues LDAP-Verzeichnis',
+        databases: 'Neue Datenbank',
+      },
       addItem: '{item} hinzufügen',
       edit: 'Bearbeiten',
       save: 'Speichern',

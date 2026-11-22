@@ -708,6 +708,7 @@ export default function getSettings(t) {
       type: 'user',
       route: 'users',
       label: t('settings.users.label'),
+      titleKey: 'users',
       description: t('settings.users.description'),
       icon: 'user',
       selectable: false,
@@ -954,6 +955,7 @@ export default function getSettings(t) {
     groups: {
       type: 'group',
       label: t('settings.groups.label'),
+      titleKey: 'groups',
       description: t('settings.groups.description'),
       icon: 'users',
       selectable: false,
@@ -1118,6 +1120,7 @@ export default function getSettings(t) {
     repositories: {
       type: 'repository',
       label: t('settings.repositories.label'),
+      titleKey: 'repositories',
       labelPlural: t('settings.repositories.labelPlural'),
       description: t('settings.repositories.description'),
       // reloadSeconds: 7,
@@ -1348,6 +1351,7 @@ export default function getSettings(t) {
       type: 'oauth2',
       route: 'oauth2',
       label: t('settings.oauth2.label'),
+      titleKey: 'sso',
       labelPlural: t('settings.oauth2.labelPlural'),
       description: t('settings.oauth2.description'),
       icon: 'right-to-bracket',
@@ -1557,6 +1561,7 @@ export default function getSettings(t) {
     schedules: {
       type: 'schedule',
       label: t('settings.schedules.label'),
+      titleKey: 'schedules',
       labelPlural: t('settings.schedules.labelPlural'),
       // the page's title : the jobs menu's entry (a job state, as the jobs list's titles)
       pageTitle: t('jobs.menu.scheduled'),
@@ -1787,6 +1792,7 @@ export default function getSettings(t) {
     stored_jobs: {
       type: 'stored-jobs',
       label: t('settings.storedJobs.label'),
+      titleKey: 'storedJobs',
       labelPlural: t('settings.storedJobs.labelPlural'),
       // the page's title : the jobs menu's entry (a job state, as the jobs list's titles)
       pageTitle: t('jobs.menu.stored'),
@@ -2008,6 +2014,7 @@ export default function getSettings(t) {
     knownhosts: {
       type: 'knownhosts',
       label: t('settings.knownhosts.label'),
+      titleKey: 'knownHosts',
       description: t('settings.knownhosts.description'),
       removeDoubles: true, // remove double entries
       flat: true, // flat data structure,
@@ -2032,6 +2039,7 @@ export default function getSettings(t) {
     credentials: {
       type: 'credential',
       label: t('settings.credentials.label'),
+      titleKey: 'credentials',
       description: t('settings.credentials.description'),
       icon: 'lock',
       selectable: false,
@@ -2766,6 +2774,7 @@ export default function getSettings(t) {
       // deciding whether to enable it needs to see what it will ask for.
       showDisabledFields: true,
       label: t('settings.ldap.label'),
+      titleKey: 'ldap',
       description: t('settings.ldap.description'),
       icon: 'address-book',
       // Enabled under the name, as an SSO provider's Active
@@ -3113,6 +3122,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.runners'),
       type: 'runner',
       label: t('settings.runners.label'),
+      titleKey: 'runners',
       // Runner is written with its capital, in a sentence too (Add Runner)
       properNoun: true,
       description: t('settings.runners.description'),
@@ -3355,6 +3365,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.notifications'),
       type: 'notificationchannel',
       label: t('settings.notificationChannels.label'),
+      titleKey: 'notificationChannels',
       labelPlural: t('settings.notificationChannels.labelPlural'),
       description: t('settings.notificationChannels.description'),
       icon: 'bell',
@@ -3654,6 +3665,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.syslog'),
       type: 'syslogserver',
       label: t('settings.syslogServers.label'),
+      titleKey: 'syslogServers',
       labelPlural: t('settings.syslogServers.labelPlural'),
       description: t('settings.syslogServers.description'),
       icon: 'tower-broadcast',
@@ -3827,6 +3839,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.announcement'),
       type: 'announcement',
       label: t('settings.interface.announcementLabel'),
+      titleKey: 'announcements',
       labelPlural: t('settings.interface.announcementPlural'),
       description: t('settings.interface.announcementDescription'),
       icon: 'bullhorn',
@@ -3917,6 +3930,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.labels'),
       type: 'label',
       label: t('settings.labels.label'),
+      titleKey: 'labels',
       labelPlural: t('settings.labels.labelPlural'),
       description: t('settings.labels.description'),
       icon: 'tag',
@@ -4001,6 +4015,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.disclaimer'),
       type: 'disclaimerversion',
       label: t('settings.disclaimer.label'),
+      titleKey: 'disclaimer',
       labelPlural: t('settings.disclaimer.labelPlural'),
       description: t('settings.disclaimer.description'),
       icon: 'layer-group',
@@ -4107,6 +4122,7 @@ export default function getSettings(t) {
       pageTitle: t('sidebar.secretStores'),
       type: 'secretstore',
       label: t('settings.secretStores.label'),
+      titleKey: 'secretStores',
       description: t('settings.secretStores.description'),
       icon: 'vault',
       selectable: false,
@@ -5148,6 +5164,7 @@ function ldapDirectories(t, ldap) {
     pageTitle: t('sidebar.ldap'),
     type: 'ldapdirectory',
     label: t('settings.ldap.directory'),
+    titleKey: 'ldapDirectories',
     description: t('settings.ldap.directoriesDescription'),
     icon: 'address-book',
     selectable: false,
@@ -5243,6 +5260,7 @@ function databaseSettings(t) {
     pageTitle: t('sidebar.databases'),
     type: 'database',
     label: t('settings.databases.label'),
+    titleKey: 'databases',
     labelPlural: t('sidebar.databases'),
     description: t('settings.databases.description'),
     icon: 'database',

@@ -785,6 +785,9 @@ export default {
       'このページはサーバーより古いビルドで動作しています。ページを再読み込みして新しいバージョンを取得してください。',
   },
   common: {
+    // a wizard's buttons : a step back, a step on (the pager's Previous and Next are a page's)
+    previousStep: '前へ',
+    nextStep: '次へ',
     // the word beside a switch with no text of its own, as it stands
     switchOn: 'オン',
     switchOff: 'オフ',

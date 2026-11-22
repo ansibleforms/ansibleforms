@@ -1151,7 +1151,7 @@ async function changePassword() {
             </template>
             <template #footer>
               <BsButton v-if="tokenStep === 1" icon="arrow-left" @click="tokenStep = 0">{{
-                t('common.previous')
+                t('common.previousStep')
               }}</BsButton>
               <BsButton
                 v-if="tokenStep === 0"
@@ -1159,7 +1159,7 @@ async function changePassword() {
                 :colorClass="tokenNamed ? 'primary' : 'secondary'"
                 :disabled="!tokenNamed"
                 @click="nextTokenStep"
-                >{{ t('common.next') }}</BsButton
+                >{{ t('common.nextStep') }}</BsButton
               >
               <BsButton
                 v-if="tokenStep === 1"

@@ -160,7 +160,7 @@ import BsSwitch from './BsSwitch.vue';
 const toolsId = `af-tools-${useId()}`;
 // and where its pager goes, under the card (one per instance)
 const pagerId = `af-pager-${useId()}`;
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const router = useRouter();
 const emit = defineEmits([
   'test',
@@ -242,6 +242,25 @@ const objectLabel = computed(() => props.settings.label || '');
 // its capital (settings.properNoun : Runner)
 const objectLabelInSentence = computed(() =>
   props.settings.properNoun ? objectLabel.value : inSentence(objectLabel.value, locale.value),
+);
+/**
+ * A list's own words for a new record's title (newTitle) or its Add button (addLabel), when its
+ * language says them otherwise than the shared template ("New {item}") : a noun's gender (Nouvel
+ * utilisateur, Nueva credencial), its case (Dodaj grupę). Looked up in the language itself, never
+ * from the fallback one, under settings.common.<name>.<titleKey> (settings.titleKey : users).
+ *
+ * Args:
+ *   name (string): newTitle or addLabel.
+ *
+ * Returns:
+ *   string|null: the words ; null when the language has none for this list.
+ */
+function ownWords(name) {
+  const key = props.settings.titleKey && `settings.common.${name}.${props.settings.titleKey}`;
+  return key && te(key, locale.value) ? t(key) : null;
+}
+const addLabel = computed(
+  () => ownWords('addLabel') || t('settings.common.addItem', { item: objectLabelInSentence.value }),
 );
 const objectLabelPlural = computed(() => props.settings.labelPlural || `${objectLabel.value}s`);
 const objectIcon = computed(() => props.settings.icon);
@@ -902,7 +921,7 @@ const title = computed(() => {
     return t('settings.common.changePassword');
   }
   if (action.value == 'new') {
-    return t('settings.common.newItem', { item: objectLabelInSentence.value });
+    return ownWords('newTitle') || t('settings.common.newItem', { item: objectLabelInSentence.value });
   } else if (action.value == 'edit') {
     return `${t('settings.common.edit')} ${objectLabelInSentence.value}`;
   } else {
@@ -1884,9 +1903,7 @@ defineExpose({
         defaultPicker.editLabel
       }}</BsButton>
       <!-- Add : the page's main action, last on the right -->
-      <BsButton v-if="!noCreate" icon="plus" @click="newItem()">{{
-        t('settings.common.addItem', { item: objectLabelInSentence })
-      }}</BsButton>
+      <BsButton v-if="!noCreate" icon="plus" @click="newItem()">{{ addLabel }}</BsButton>
     </template>
   </AppSettings>
   <!-- the defaults (settings.defaultPicker) : a choice per group, Save sets them -->
@@ -1959,10 +1976,10 @@ defineExpose({
       <!-- a wizard : Previous / Next, and Save on the last step (editing : on every step) -->
       <template v-if="wizardActive">
         <BsButton v-if="stepIndex > 0" icon="arrow-left" @click="goToStep(stepIndex - 1)">{{
-          t('common.previous')
+          t('common.previousStep')
         }}</BsButton>
         <BsButton v-if="!isLastStep" icon="arrow-right" @click="goToStep(stepIndex + 1)">{{
-          t('common.next')
+          t('common.nextStep')
         }}</BsButton>
       </template>
       <BsButton v-if="action == 'new' && (!wizardActive || isLastStep)" icon="save" @click="createItem()">{{

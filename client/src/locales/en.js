@@ -782,6 +782,9 @@ export default {
     cacheMismatchMsg: 'This page still runs an older build than the server. Reload the page to get the new version.',
   },
   common: {
+    // a wizard's buttons : a step back, a step on (the pager's Previous and Next are a page's)
+    previousStep: 'Previous',
+    nextStep: 'Next',
     // the word beside a switch with no text of its own, as it stands
     switchOn: 'On',
     switchOff: 'Off',

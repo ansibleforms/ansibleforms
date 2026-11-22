@@ -766,14 +766,14 @@ function startAt(i) {
         </template>
         <template #footer>
           <BsButton v-if="wizard.step > 0" icon="arrow-left" @click="wizard.step--">{{
-            t('common.previous')
+            t('common.previousStep')
           }}</BsButton>
           <BsButton
             v-if="wizard.step < wizardSteps.length - 1"
             icon="arrow-right"
             :disabled="!wizardStepValid"
             @click="wizard.step++"
-            >{{ t('common.next') }}</BsButton
+            >{{ t('common.nextStep') }}</BsButton
           >
           <BsButton v-else icon="check" :disabled="!wizardStepValid" @click="createNode()">{{
             t('workflowEditor.create')
