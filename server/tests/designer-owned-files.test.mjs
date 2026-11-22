@@ -66,7 +66,7 @@ beforeEach(() => {
   write("roles.yaml", ROLES);
   write("config.yaml", YAML.stringify({ constants: { env: "prod" } }));
   write("credentials/git.yaml", YAML.stringify({ controller_credentials: [{ name: "git", password: "${GIT_PASSWORD}" }] }));
-  write("general.yaml", "controller_general:\n  LOG_LEVEL: info\n");
+  write("general.yaml", "controller_general:\n  log_level: info\n");
   write("repositories.yaml", "controller_repositories: []\n");
   // the logo's map names its image relative to its file
   write("branding/logo.yaml", YAML.stringify({ controller_logo: { logo: "../images/logo.png" } }));

@@ -2443,7 +2443,8 @@ async function syncSingle(desc, name, opts = {}) {
   // not kept), said in the pull output
   const keptSecrets = (now) => {
     const secrets = desc.secretsOf ? desc.secretsOf(now) : desc.secrets || [];
-    if (secrets.some((s) => !given(raw[s]) && given(now?.[s]))) summary.secretsKept.push(desc.title);
+    const keyOf = desc.keyOf || ((s) => s);
+    if (secrets.some((s) => !given(raw[keyOf(s)]) && given(now?.[s]))) summary.secretsKept.push(desc.title);
   };
   if (!desc.changed(checked.object, current)) {
     keptSecrets(current);

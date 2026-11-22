@@ -44,8 +44,8 @@ export const sectionOfField = (field) =>
   MCP_ENV.test(String(field)) ? "mcp" : Object.keys(SECTION_FIELDS).find((key) => SECTION_FIELDS[key].includes(field));
 
 /**
- * The key the seed's section names a field it holds by (default_forms_view for forms_view) : what
- * is said of it to the one who wrote the seed.
+ * The key the seed's section names a field it holds by (default_forms_view for forms_view,
+ * mcp_read_only for MCP_READ_ONLY) : what is said of it to the one who wrote the seed.
  *
  * Args:
  *   field (string): the field (an MCP setting's variable).
@@ -55,6 +55,7 @@ export const sectionOfField = (field) =>
  */
 export const seedKeyOf = (field) => {
   const section = sectionOfField(field);
+  if (section === "mcp") return String(field).toLowerCase();
   return KEYS[section] ? KEYS[section].keyOf(field) : field;
 };
 
@@ -70,7 +71,8 @@ export const seedKeyOf = (field) => {
  */
 export const seedFieldsOf = (doc) => [
   ...Object.keys(APPEARANCE_SECTIONS).flatMap((key) => Object.keys(doc?.[key] || {}).map(KEYS[key].fieldOf)),
-  ...Object.keys(doc?.mcp || {}),
+  // an MCP setting by its variable : the seed's key upper case (mcp_read_only : MCP_READ_ONLY)
+  ...Object.keys(doc?.mcp || {}).map((key) => key.toUpperCase()),
 ];
 
 /**

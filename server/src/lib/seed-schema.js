@@ -799,12 +799,13 @@ export const APPEARANCE_SECTIONS = { defaults: defaultsSection, logo: logoSectio
 export const APPEARANCE_KEYS = { defaults: { default_forms_view: "forms_view" } };
 
 // The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
-// their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as a repository's mcp: map holds them.
+// their environment variable names in lower case (enable_mcp, mcp_read_only ...), as a repository's
+// controller_mcp: map holds them.
 // What the seed declares is its own, variable by variable, as the Appearance pages' fields
 // (lib/seedManaged.js) ; each checked as the page's Save checks it when applied.
 export const mcpSection = {
   type: "object",
-  propertyNames: { pattern: "^(ENABLE_MCP|MCP_[A-Z0-9_]+)$" },
+  propertyNames: { pattern: "^(enable_mcp|mcp_[a-z0-9_]+)$" },
   additionalProperties: { type: ["string", "number", "boolean"] },
 };
 

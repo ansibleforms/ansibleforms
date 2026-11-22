@@ -7176,8 +7176,8 @@
         allow_job_status: false
       ```
 
-      **General** (`controller_general:`): Settings > System > General by environment variable names, only those that
-      page changes (never one another page or the deployment owns, a refused one, or one set in the real
+      **General** (`controller_general:`): Settings > System > General by environment variable names in lower case
+      (`job_retention_days` for `JOB_RETENTION_DAYS`; a key in upper case is refused), only those that page changes (never one another page or the deployment owns, a refused one, or one set in the real
       environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
       command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
       `ENABLE_CONFIG_IN_DATABASE`, ytt (`USE_YTT`, `YTT_*`), `EXPRESSION_SANITIZER`, `CONTENT_SECURITY_POLICY`,
@@ -7192,13 +7192,13 @@
       `1`): both are read the same.
       ```yaml
       controller_general:
-        JOB_RETENTION_DAYS: 30
-        LOG_LEVEL: info
-        METRICS_TOKEN: ${METRICS_TOKEN}
+        job_retention_days: 30
+        log_level: info
+        metrics_token: ${METRICS_TOKEN}
       ```
 
-      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
-      changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
+      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names in lower case, every
+      switch that page changes (`enable_mcp`, `mcp_read_only`, `mcp_chat_forms_only`) with its value, its documented default when
       never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
       General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
@@ -7207,9 +7207,9 @@
       server log, the seed's value not applied, and the start goes on.
       ```yaml
       controller_mcp:
-        ENABLE_MCP: true
-        MCP_READ_ONLY: true
-        MCP_CHAT_FORMS_ONLY: false
+        enable_mcp: true
+        mcp_read_only: true
+        mcp_chat_forms_only: false
       ```
 
       **Defaults** (`controller_defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the

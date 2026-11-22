@@ -119,7 +119,7 @@ describe("CONFIG_SEED_PATH unset releases what the seed managed", () => {
     await applyConfigSeed();
     assert.equal(tables.settings[0].seed_managed_fields, null);
     const detail = JSON.parse(audits[0][7]);
-    for (const name of ["name:app_name", "logo:logo", "icon:icon", "defaults:default_theme", "defaults:default_forms_view", "links:header_links", "mcp:MCP_READ_ONLY"]) {
+    for (const name of ["name:app_name", "logo:logo", "icon:icon", "defaults:default_theme", "defaults:default_forms_view", "links:header_links", "mcp:mcp_read_only"]) {
       assert.ok(detail.released.includes(name), `${name} in ${JSON.stringify(detail)}`);
     }
   });
