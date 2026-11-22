@@ -10,7 +10,7 @@
   <div class="container">
     <div class="h-100 d-flex align-items-center justify-content-center mt-5">
       <div>
-        <h1>404 / Automation Overload...</h1>
+        <h1>404 / Automation Overload…</h1>
         <p class="font-monospace">
           <b>PLAY [Searching page] ********************************************</b><br />
           <br />

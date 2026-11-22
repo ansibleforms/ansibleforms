@@ -161,9 +161,9 @@ describe("the schedule's page", () => {
 });
 
 describe('the schedules list', () => {
-  it('shows the last run, then how it ended, then the next run', () => {
+  it('shows the last run, the next run, then how it ended, as every job table puts Status after the times', () => {
     const keys = getSettings(t).schedules.fields.map((f) => f.key);
-    expect(keys.indexOf('status')).toBe(keys.indexOf('last_run') + 1);
-    expect(keys.indexOf('next_run')).toBe(keys.indexOf('status') + 1);
+    expect(keys.indexOf('next_run')).toBe(keys.indexOf('last_run') + 1);
+    expect(keys.indexOf('status')).toBe(keys.indexOf('next_run') + 1);
   });
 });

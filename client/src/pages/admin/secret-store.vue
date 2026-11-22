@@ -107,11 +107,7 @@ const dirty = computed(
   () => !!store.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(store.value)[k] ?? '')),
 );
 // leaving with the store changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the store.
@@ -410,7 +406,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ store?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ store?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ store?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

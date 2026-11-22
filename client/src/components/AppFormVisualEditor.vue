@@ -751,7 +751,7 @@ defineExpose({
         <div class="af-form-span2">
           <label class="form-label fw-bold">{{ t('designer.formName') }}</label>
           <div class="input-group">
-            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
             <input
               class="form-control"
               :class="{ 'is-invalid': !form.name.trim() }"
@@ -778,7 +778,7 @@ defineExpose({
           <label class="form-label fw-bold">{{ t('designer.formDescription') }}</label>
           <!-- a sentence or two : as tall as two lines, as the help below -->
           <div class="input-group">
-            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="circle-info" /></span>
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="info-circle" /></span>
             <textarea
               class="form-control af-text-box"
               rows="3"
@@ -1757,7 +1757,11 @@ defineExpose({
       <template #title> {{ t('designer.visualDeleteField') }} </template>
       <template #default>
         <p class="py-3 fs-6 user-select-none">
-          {{ t('designer.deleteConfirm') }} <strong>{{ rowToDelete.name || '?' }}</strong>?
+          <i18n-t keypath="designer.deleteConfirm" scope="global">
+            <template #name
+              ><strong>{{ rowToDelete.name || '?' }}</strong></template
+            >
+          </i18n-t>
         </p>
       </template>
       <template #footer>

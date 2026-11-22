@@ -55,8 +55,7 @@
 /*      field for this record (an ldap credential's TLS fields    */
 /*      before its bind user) ; null : in its own place           */
 /*  field.flush: a component with its own titles in it (no label */
-/*      above it, a schedule's end) ; a switch takes no notice,   */
-/*      its bold title is above it as every switch's              */
+/*      above it, a schedule's end) ; for a component only        */
 /*  field.showWhen: (item, lists) => Boolean - shown by a rule of */
 /*      its own, instead of field.dependency (the dropdowns'      */
 /*      lists : the credential chosen, its type)                  */
@@ -1632,9 +1631,13 @@ async function bulkDelete() {
     if (skipped) toast.warning(t('settings.common.bulkDeleteNone'));
     return;
   }
-  const question = skipped
-    ? t('settings.common.bulkDeleteConfirmSkip', { count: ids.length, skipped })
-    : t('settings.common.bulkDeleteConfirm', { count: ids.length });
+  // each sentence counted on its own : "Delete 3 items? 1 selected item cannot be deleted"
+  const question = [
+    t('settings.common.bulkDeleteConfirm', { count: ids.length }, ids.length),
+    skipped ? t('settings.common.bulkDeleteSkipped', { skipped }, skipped) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   if (!(await askConfirm(question, { title: t('common.delete'), icon: 'trash' }))) return;
   // each delete on its own : one refused (a 403, a row in use) must not hide that the others
   // went, nor leave the list showing rows that are gone and the selection still ticked
@@ -1758,7 +1761,11 @@ defineExpose({
     <template #title> {{ t('common.delete') }} {{ objectLabelInSentence }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ deleteLabel }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ deleteLabel }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>
@@ -2179,7 +2186,7 @@ defineExpose({
         </div>
 
         <!-- A SWITCH (type checkbox) : its bold title above it, its help under it, as a record page's
-             Enabled ; every switch so, a flush one too (every field has its title) -->
+             Enabled ; every switch so (every field has its title) -->
         <div v-else-if="showField(field) && field.type === 'checkbox'" class="mb-3">
           <label class="form-label fw-bold d-block" :for="'af-switch-' + field.key">{{ field.label }}</label>
           <BsSwitch

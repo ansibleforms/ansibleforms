@@ -54,6 +54,7 @@ import { formPath } from '@/lib/formsPath';
 import { skippedPulls } from '@/lib/pullResults';
 import { EVERYONE_ROLES } from '@/composables/useRoleSupport';
 import { mayOpen } from '@/lib/routePermission';
+import { askToLeave } from '@/lib/unsavedPrompt';
 
 dayjs.extend(relativeTime);
 
@@ -3254,13 +3255,9 @@ function onLockToggle(event) {
 
 async function releaseLock() {
   try {
-    // if dirty, we need to ask for confirmation, it means you are releasing the designer with unsaved changes
+    // with unsaved changes, releasing the designer leaves them : asked first, as leaving the page
     if (isDirty.value) {
-      action.value = 'dirty';
-      nextAction.value = async (proceed) => {
-        resetAction();
-        await deleteLock(proceed);
-      };
+      if (await askToLeaveForms()) await deleteLock();
       return;
     }
     // if not dirty, just release the lock
@@ -3549,36 +3546,26 @@ async function validateForms() {
   }
 }
 
-async function saveForms(close = false) {
+async function saveForms() {
   if (busy.value) return; // a push/load/save is in flight : ignore (e.g. Ctrl+S)
   // the forms without allowFormDesign : read, not saved (Ctrl+S included ; the server refuses too)
-  if (!canDesignForms.value) {
-    if (close) resetAction();
-    return;
-  }
+  if (!canDesignForms.value) return;
   // the buffers are the ytt EXPANSION of the stored template : saving them would
   // replace the template with its output (see loadConfigTemplated)
   if (configTemplated.value) {
     toast.warning(t('settings.settingsPage.configTemplated'));
-    if (close) resetAction();
     return;
   }
   if (!lock.value?.match) {
     toast.error(t('designer.readOnly'));
-    // close the dirty modal like the two sibling early-returns do : without this its
-    // "Save and close" button was dead - a toast appeared and the modal just sat there,
-    // which is what you get when someone force-unlocks while you are editing
-    if (close) resetAction();
     return;
   }
   // if there are warnings, show them and do not save
   if (warnings.value.length > 0) {
     showWarnings.value = true;
     toast.warning(t('designer.fixWarnings'));
-    // 'Save and close' cannot go through : close the dirty modal instead of
-    // leaving it stranded behind the warnings panel with a callback that can
-    // never fire. The user stays in the designer, with the warnings in view.
-    if (close) resetAction();
+    // Save and leave cannot go through : the forms stay unsaved, so the Unsaved changes
+    // dialog keeps the user in the designer, with the warnings in view
     return;
   }
   if (!isDirty.value) {
@@ -3611,18 +3598,6 @@ async function saveForms(close = false) {
     // Restore until the page is reloaded
     if (canRestore.value) await loadBackups();
     if (formsRepos.value.length > 0) await loadFormsRepos(); // saved to a working tree => now unpushed
-    // the save is done : what "Save and close" goes on to (a reload, a release) must not find
-    // the designer still busy with it
-    saving.value = false;
-    if (close && typeof nextAction.value === 'function') {
-      const cb = nextAction.value;
-      nextAction.value = false;
-      try {
-        cb(true);
-      } catch (err) {
-        toast.error(err.message);
-      }
-    }
   } catch (err) {
     toast.error(err.message);
   } finally {
@@ -3690,11 +3665,21 @@ function onBeforeUnload(e) {
   e.preventDefault();
   e.returnValue = '';
 }
-// 2. in-app navigation (navbar, sidebar, browser back) : reuse the dirty modal,
-//    so the user gets the same Save-and-close / Close-without-saving choice as
-//    when releasing the lock. The navigation is replayed once confirmed.
-const leaveConfirmed = ref(false);
-const pendingRoute = ref(null);
+// 2. in-app navigation (navbar, sidebar, browser back) and releasing the lock : the app's
+//    Unsaved changes dialog (AppUnsavedDialog), as every page that saves : Save and leave,
+//    Leave without saving, or Cancel to stay. Save and leave only when the forms can be saved
+//    from here (the lock ours, forms designable, not a ytt template) ; else it says so.
+const canSaveForms = computed(() => canDesignForms.value && !!lock.value?.match && !configTemplated.value);
+
+/**
+ * Asks whether to leave the forms with their unsaved changes, in the app's dialog.
+ *
+ * Returns:
+ *   Promise<boolean>: true to leave (saved, or dropped), false to stay.
+ */
+function askToLeaveForms() {
+  return askToLeave(canSaveForms.value ? () => saveForms() : null, () => isDirty.value);
+}
 
 // ─── the toolbar ──────────────────────────────────────────────────────────────
 // What the section shown offers : the actions of config/designerActions.js (their icons, titles
@@ -3843,18 +3828,9 @@ const toolbarActions = computed(() => {
   ];
 });
 
-onBeforeRouteLeave((to) => {
-  if (!isDirty.value || leaveConfirmed.value) return true;
-  pendingRoute.value = to.fullPath;
-  action.value = 'dirty';
-  nextAction.value = async (proceed) => {
-    resetAction();
-    if (!proceed) return;
-    // skip this guard on the replay, otherwise it would ask again forever
-    leaveConfirmed.value = true;
-    router.push(pendingRoute.value);
-  };
-  return false;
+onBeforeRouteLeave(() => {
+  if (!isDirty.value) return true;
+  return askToLeaveForms();
 });
 
 onMounted(async () => {
@@ -3903,7 +3879,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteForm') }} {{ currentFormName }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteConfirm') }} <strong>{{ currentFormName }}</strong>?
+            <i18n-t keypath="designer.deleteConfirm" scope="global">
+              <template #name
+                ><strong>{{ currentFormName }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
@@ -3924,7 +3904,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteFile') }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteFileConfirm') }} <strong>{{ fileToDelete }}</strong>?
+            <i18n-t keypath="designer.deleteFileConfirm" scope="global">
+              <template #name
+                ><strong>{{ fileToDelete }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
@@ -3945,7 +3929,11 @@ onBeforeUnmount(() => {
         <template #title> {{ t('designer.deleteFolder') }} </template>
         <template #default>
           <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.deleteFolderConfirm') }} <strong>{{ fileToDelete }}</strong>?
+            <i18n-t keypath="designer.deleteFolderConfirm" scope="global">
+              <template #name
+                ><strong>{{ fileToDelete }}</strong></template
+              >
+            </i18n-t>
           </p>
         </template>
         <template #footer>
@@ -4064,32 +4052,6 @@ onBeforeUnmount(() => {
         <template #footer>
           <BsButton icon="check" colorClass="danger" @click="nextAction(true)">{{ t('common.yes') }}</BsButton>
           <BsButton icon="times" @click="resetAction()">{{ t('common.no') }}</BsButton>
-        </template>
-      </BsModal>
-
-      <!-- modal - dirty -->
-      <BsModal
-        v-if="action == 'dirty'"
-        size="md"
-        dialogClass="af-unsaved-dialog"
-        @close="resetAction()"
-        icon="triangle-exclamation"
-        iconClass="text-warning"
-      >
-        <template #title> {{ t('designer.unsavedChanges') }} </template>
-        <template #default>
-          <p class="mb-0 fs-6 user-select-none">
-            {{ t('designer.unsavedConfirm') }}<br />{{ t('designer.unsavedNote') }}
-          </p>
-        </template>
-        <template #footer>
-          <!-- 'proceed' means "go ahead and discard" for both flows this modal
-               serves : release the lock and reload, or leave the page. Passing
-               false here made the button a no-op that only closed the dialog,
-               which since the route guard exists means unsaved changes trapped
-               you on the page - the modal's own @close is the cancel path. -->
-          <BsButton icon="times" @click="nextAction(true)">{{ t('designer.closeWithoutSaving') }}</BsButton>
-          <BsButton icon="save" @click="saveForms(true)">{{ t('designer.saveAndClose') }}</BsButton>
         </template>
       </BsModal>
 
@@ -4242,7 +4204,7 @@ onBeforeUnmount(() => {
               v-model="iconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              :placeholder="t('common.searchPlaceholder')"
+              :placeholder="t('common.search')"
             />
             <div class="icon-grid mt-2">
               <div
@@ -4380,7 +4342,7 @@ onBeforeUnmount(() => {
             :isFloating="false"
             v-model="newCatName"
             :label="t('designer.categoryName')"
-            icon="tag"
+            icon="heading"
             :placeholder="t('designer.categoryNamePlaceholder')"
             class="mb-3"
           />
@@ -4406,7 +4368,7 @@ onBeforeUnmount(() => {
             v-model="catIconSearch"
             :label="t('designer.searchIcons')"
             icon="magnifying-glass"
-            :placeholder="t('common.searchPlaceholder')"
+            :placeholder="t('common.search')"
             class="mb-2"
           />
           <div class="icon-grid">
@@ -4476,7 +4438,7 @@ onBeforeUnmount(() => {
             <div class="flex-grow-1">
               <label v-if="idx === 0" class="form-label fw-bold">{{ t('designer.categoryName') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="tag" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   type="text"
                   class="form-control"
@@ -4565,7 +4527,7 @@ onBeforeUnmount(() => {
               v-model="editCatIconSearch"
               :label="t('designer.searchIcons')"
               icon="magnifying-glass"
-              :placeholder="t('common.searchPlaceholder')"
+              :placeholder="t('common.search')"
               class="mb-2"
             />
             <div class="icon-grid">
@@ -5426,7 +5388,7 @@ onBeforeUnmount(() => {
                         type="text"
                         class="form-control form-control-sm"
                         v-model="treeFilter"
-                        :placeholder="t('designer.search') + '...'"
+                        :placeholder="t('common.search')"
                         ref="treeSearchInput"
                         @keydown.esc="clearTreeSearch()"
                       />

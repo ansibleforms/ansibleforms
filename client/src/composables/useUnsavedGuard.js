@@ -13,16 +13,15 @@ import { askToLeave } from '@/lib/unsavedPrompt';
  *
  * Leaving for another page asks in the app's Unsaved changes dialog (AppUnsavedDialog, one
  * for the whole app) : Save and leave (when the page says how it saves), Leave without
- * saving, or Close to stay. Closing or reloading the tab
+ * saving, or Cancel to stay. Closing or reloading the tab
  * can only ask in the browser's own words. The router guard and the reload guard have to be
  * registered separately - neither covers the other.
  *
  * @param {import('vue').Ref<boolean>} isDirty
- * @param {() => string} message Lazily read, so the locale is resolved at prompt time.
  * @param {() => Promise<boolean|void>} [save] The page's own save (its Save button) : offered
  *   as Save and leave. It returns false (or throws) when the save was refused.
  */
-export function useUnsavedGuard(isDirty, message, save = null) {
+export function useUnsavedGuard(isDirty, save = null) {
   function onBeforeUnload(e) {
     if (!isDirty.value) return;
     // the browser shows its own wording ; assigning returnValue is what triggers it
@@ -35,7 +34,7 @@ export function useUnsavedGuard(isDirty, message, save = null) {
 
   onBeforeRouteLeave(() => {
     if (!isDirty.value) return true;
-    return askToLeave(message(), save, () => isDirty.value);
+    return askToLeave(save, () => isDirty.value);
   });
 }
 

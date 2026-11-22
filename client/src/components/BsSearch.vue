@@ -4,13 +4,12 @@
 /*  Bootstrap Search component                                    */
 /*  A search box : a magnifying glass, the input, and an X that   */
 /*  clears it once something is typed. The placeholder hides as   */
-/*  soon as the box is focused.                                   */
+/*  soon as the box is focused. Every search box of the app says  */
+/*  the same, Search.                                             */
 /*                                                                */
 /*  @model: String - the search text                              */
 /*                                                                */
 /*  @props:                                                       */
-/*      placeholder: String - "Filter" when none : every search   */
-/*                   box in a page filters what the page shows    */
 /*      disabled: Boolean - shown in its place but not usable     */
 /*                   (nothing to filter yet : the designer off)   */
 /*                                                                */
@@ -24,7 +23,6 @@ import { useI18n } from 'vue-i18n';
 const search = defineModel({ type: String, default: '' });
 
 const props = defineProps({
-  placeholder: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
 });
 
@@ -53,7 +51,7 @@ function clear() {
       type="text"
       class="form-control"
       :class="{ 'af-search-has-clear': search }"
-      :placeholder="props.placeholder || t('common.filter')"
+      :placeholder="t('common.search')"
       :disabled="props.disabled"
       @keydown.esc="clear"
     />

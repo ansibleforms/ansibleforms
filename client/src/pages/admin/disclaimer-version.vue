@@ -46,11 +46,7 @@ const wordsDirty = computed(
 );
 const enabledDirty = computed(() => !!record.value && !!edit.value.enabled !== !!Number(record.value.enabled));
 const dirty = computed(() => wordsDirty.value || enabledDirty.value);
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the disclaimer and who accepted it.
@@ -169,11 +165,12 @@ const acceptanceColumns = computed(() => [
  */
 async function askAgain(rows) {
   if (!rows.length) return;
-  const question = t('settings.disclaimer.askAgainConfirm', { count: rows.length });
+  const question = t('settings.disclaimer.askAgainConfirm', { count: rows.length }, rows.length);
   if (!(await askConfirm(question, { title: t('settings.disclaimer.askAgain'), icon: 'rotate' }))) return;
   try {
     const res = await axios.post('/api/v2/disclaimeracceptance/ask-again', { ids: rows.map((r) => r.id) });
-    toast.success(t('settings.disclaimer.askAgainDone', { count: res.data?.count ?? rows.length }));
+    const asked = res.data?.count ?? rows.length;
+    toast.success(t('settings.disclaimer.askAgainDone', { count: asked }, asked));
   } catch (err) {
     toast.error(Helpers.parseAxiosResponseError(err));
   }
@@ -243,7 +240,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ record?.title }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ record?.title }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ record?.title }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>
@@ -254,7 +255,11 @@ onMounted(async () => {
   <BsModal v-if="askAgainOpen" icon="file-signature" size="md" :footerClose="false" @close="askAgainOpen = false">
     <template #title>{{ t('settings.disclaimer.askAgainTitle') }}</template>
     <template #default>
-      <p class="mb-0">{{ t('settings.disclaimer.askAgainTextVersion', { count: record?.acceptances || 0 }) }}</p>
+      <p class="mb-0">
+        {{
+          t('settings.disclaimer.askAgainTextVersion', { count: record?.acceptances || 0 }, record?.acceptances || 0)
+        }}
+      </p>
     </template>
     <template #footer>
       <BsButton icon="pencil" @click="save(false)">{{ t('settings.disclaimer.askAgainNo') }}</BsButton>

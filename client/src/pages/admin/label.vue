@@ -54,11 +54,7 @@ const editable = (rec) => ({
 const dirty = computed(
   () => !!record.value && FIELDS.some((k) => String(edit.value[k] ?? '') !== String(editable(record.value)[k] ?? '')),
 );
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the label, and every label for the preview.
@@ -180,7 +176,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ record?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ record?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ record?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

@@ -401,13 +401,15 @@ export function loopBusy(key) {
  *
  * Args:
  *   key (string): the loop's key.
+ *   launchedBy (string|null): who launched it (lib/systemTasks.js launcherName), written on its
+ *     row ; null for none.
  *
  * Returns:
  *   Promise<object>: { status } : 'done' (with ok, whether the pass succeeded), 'noHub' when the
  *     hub does not run on this node, 'busy' while a pass of it goes, 'unknown' for a key no loop
  *     has.
  */
-export async function runLoopNow(key) {
+export async function runLoopNow(key, launchedBy = null) {
   if (!states.has(key)) return { status: 'unknown' };
   const fn = works.get(key);
   if (!started || !fn) return { status: 'noHub' };
@@ -421,6 +423,7 @@ export async function runLoopNow(key) {
     outcome: done.ok ? 'success' : 'failed',
     result: done.ok ? RUN_NOW_DONE : done.message,
     changed: 0,
+    launchedBy,
   });
   return { status: 'done', ok: done.ok };
 }

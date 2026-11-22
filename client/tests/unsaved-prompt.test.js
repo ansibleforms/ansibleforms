@@ -6,12 +6,12 @@ import { unsavedPrompt, askToLeave, answerUnsaved, saveAndLeave } from '@/lib/un
 
 describe('the Unsaved changes question', () => {
   test('Leave without saving leaves, Close stays', async () => {
-    const leave = askToLeave('Leave?');
+    const leave = askToLeave();
     expect(unsavedPrompt.open).toBe(true);
     expect(unsavedPrompt.save).toBe(null);
     answerUnsaved(true);
     expect(await leave).toBe(true);
-    const stay = askToLeave('Leave?');
+    const stay = askToLeave();
     answerUnsaved(false);
     expect(await stay).toBe(false);
     expect(unsavedPrompt.open).toBe(false);
@@ -20,7 +20,6 @@ describe('the Unsaved changes question', () => {
   test('Save and leave : a save that went through leaves', async () => {
     let dirty = true;
     const asked = askToLeave(
-      'Leave?',
       async () => {
         dirty = false;
       },
@@ -33,14 +32,12 @@ describe('the Unsaved changes question', () => {
 
   test('Save and leave : a refused save stays', async () => {
     const refused = askToLeave(
-      'Leave?',
       async () => false,
       () => true,
     );
     await saveAndLeave();
     expect(await refused).toBe(false);
     const thrown = askToLeave(
-      'Leave?',
       async () => {
         throw new Error('no');
       },
@@ -52,7 +49,6 @@ describe('the Unsaved changes question', () => {
 
   test('Save and leave : changes still there after the save stay', async () => {
     const asked = askToLeave(
-      'Leave?',
       async () => undefined,
       () => true,
     );

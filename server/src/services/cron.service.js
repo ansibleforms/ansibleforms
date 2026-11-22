@@ -27,7 +27,7 @@ import { cleanupQuery } from '../lib/storedJobExpiry.js';
 // whether a schedule reached its end (its end date passed, or its runs done)
 import { endReached } from '../lib/scheduleEnd.js';
 // the maintenance tasks' crons, and the record of their runs (Jobs > System)
-import { taskCron, taskEnabled, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue } from '../lib/systemTasks.js';
+import { taskCron, taskEnabled, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue, launchNext } from '../lib/systemTasks.js';
 
 // the cron registry is re-read from the database even without a change notice (lib/epochs.js),
 // in case one was missed : the system task scheduleResync (SCHEDULE_RESYNC_CRON)
@@ -1000,10 +1000,12 @@ class CronService {
    * the run is the scheduled one's (the worker lock confirmed, then recorded as a run with its
    * outcome and result) and croner counts it busy meanwhile (a tick falling during it is
    * skipped, protect). croner's trigger does not look whether a run is going : a busy job is
-   * refused here, none started on top of it.
+   * refused here, none started on top of it. Its row says who launched it (launchNext, taken by
+   * the run as it starts : the trigger calls it before its first await).
    *
    * Args:
    *   key (string): the task's key.
+   *   launchedBy (string|null): who launched it (lib/systemTasks.js launcherName), null for none.
    *
    * Returns:
    *   object: { status, done } :
@@ -1011,14 +1013,19 @@ class CronService {
    *       here, or the task is off, the config seed reload without CONFIG_SEED_PATH) ;
    *     done: a promise settled when the run ended (null when none started) ; never rejects.
    */
-  runSystemTaskNow(key) {
+  runSystemTaskNow(key, launchedBy = null) {
     const job = this.systemTasksStarted ? this.jobs.system.get(key) : null;
     if (!job) return { status: 'off', done: null };
     if (job.isBusy()) return { status: 'busy', done: null };
-    // croner marks the job busy before its first await : a second call now finds it busy
-    const done = job.trigger().catch((err) => {
-      logger.error(`Run now of the system task ${key} failed:`, err);
-    });
+    // croner marks the job busy before its first await : a second call now finds it busy ; the
+    // run takes its launcher as it starts, one left over (a trigger that never ran it) is cleared
+    launchNext(key, launchedBy);
+    const done = job
+      .trigger()
+      .catch((err) => {
+        logger.error(`Run now of the system task ${key} failed:`, err);
+      })
+      .finally(() => launchNext(key, null));
     return { status: 'started', done };
   }
 

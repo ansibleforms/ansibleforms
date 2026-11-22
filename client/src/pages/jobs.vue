@@ -167,9 +167,6 @@ const columnDefs = computed(() => [
     // a template job : where it ran (jenkins, semaphore, aap ...), its runner's kind
     render: (j) => jobTypeLabel(j),
   },
-  // as wide as its widest pill in the language shown (or its header) : no room kept for a
-  // longer translation
-  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: statusWidth() },
   {
     key: 'start',
     label: t('jobs.startTime'),
@@ -198,9 +195,12 @@ const columnDefs = computed(() => [
     align: 'end',
     sortValue: (j) => durationSeconds(j) ?? -1,
   },
+  // as wide as its widest pill in the language shown (or its header) : no room kept for a
+  // longer translation
+  { key: 'status', label: t('jobs.status'), filterable: true, sortable: true, width: statusWidth() },
   {
     key: 'user',
-    label: t('jobs.user'),
+    label: t('jobs.launchedBy'),
     filterable: true,
     sortable: true,
     render: (j) => `${j.user || ''}${j.user_type ? ' (' + j.user_type + ')' : ''}`,
@@ -1023,7 +1023,7 @@ async function deleteSelected() {
       toast.error(Helpers.parseAxiosResponseError(err) || `Failed to delete job ${id}`);
     }
   }
-  if (done) toast.success(t('jobs.deletedSelected', { count: done }));
+  if (done) toast.success(t('jobs.deletedSelected', { count: done }, done));
   selected.value = new Set();
   await loadJobs();
 }
@@ -1210,7 +1210,11 @@ onMounted(async () => {
       <template #title> {{ t('jobs.deleteJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="py-3 fs-6 user-select-none">
-          {{ t('jobs.deleteConfirm') }} <strong>{{ tempJobId }}</strong>?
+          <i18n-t keypath="jobs.deleteConfirm" scope="global">
+            <template #id
+              ><strong>{{ tempJobId }}</strong></template
+            >
+          </i18n-t>
         </p></template
       >
       <template #footer
@@ -1229,7 +1233,7 @@ onMounted(async () => {
       <template #title> {{ t('jobs.deleteSelected', { count: selected.size }) }} </template>
       <template #default
         ><p class="py-3 fs-6 user-select-none">
-          {{ t('jobs.deleteSelectedConfirm', { count: selected.size }) }}
+          {{ t('jobs.deleteSelectedConfirm', { count: selected.size }, selected.size) }}
         </p></template
       >
       <template #footer
@@ -1241,7 +1245,11 @@ onMounted(async () => {
       <template #title> {{ t('jobs.abortJob') }} {{ tempJobId }} </template>
       <template #default
         ><p class="py-3 fs-6 user-select-none">
-          {{ t('jobs.abortConfirm') }} <strong>{{ tempJobId }}</strong>?
+          <i18n-t keypath="jobs.abortConfirm" scope="global">
+            <template #id
+              ><strong>{{ tempJobId }}</strong></template
+            >
+          </i18n-t>
         </p></template
       >
       <template #footer
@@ -1398,7 +1406,6 @@ onMounted(async () => {
           <BsSearch
             v-if="isJobPage && job"
             v-model="outputSearch"
-            :placeholder="t('jobs.findInOutput')"
             :title="t('jobs.findInOutputHint')"
             @keydown.enter.prevent="nextInOutput()"
           />
@@ -1466,9 +1473,9 @@ onMounted(async () => {
             <!-- the search, as every table's on the title line -->
             <BsSearch v-model="search" class="af-table-search me-2" />
             <!-- the selection, as the other tables' : how many, clear it, or tick every job on all pages -->
-            <span v-if="selected.size" class="text-muted small me-2 text-nowrap"
-              >{{ selected.size }} {{ t('dataTable.selected') }}</span
-            >
+            <span v-if="selected.size" class="text-muted small me-2 text-nowrap">{{
+              t('dataTable.selected', selected.size)
+            }}</span>
             <BsButton v-if="selected.size" icon="xmark" cssClass="me-2 text-nowrap" @click="selected = new Set()">{{
               t('dataTable.clearSelection')
             }}</BsButton>

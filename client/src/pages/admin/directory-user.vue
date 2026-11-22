@@ -62,11 +62,7 @@ const apiPath = computed(
 const signIn = ref(true);
 const dirty = computed(() => !!user.value && signIn.value === !!user.value.blocked);
 // leaving with it turned and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the user's record ; none when it was neither seen nor named by a role.

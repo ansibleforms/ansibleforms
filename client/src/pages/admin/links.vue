@@ -344,11 +344,7 @@ function removeLink(index) {
 
 // ─── saving ───────────────────────────────────────────────────────────────────
 const dirty = computed(() => envDirty.value || ownDirty.value);
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Saves what changed : the switches, then the own links ; the header follows at once.

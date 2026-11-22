@@ -336,11 +336,7 @@ const dirty = computed(
       !!newPassword.value),
 );
 // leaving with the credential changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the credential and the secret stores it can read from.
@@ -865,7 +861,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ credential?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ credential?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ credential?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>
@@ -936,7 +936,7 @@ onMounted(async () => {
                 class="af-credential-field"
                 v-model="edit.name"
                 v-show="fieldShown('name')"
-                icon="lock"
+                icon="heading"
                 :isFloating="false"
                 :required="true"
                 :label="t('settings.fields.name')"

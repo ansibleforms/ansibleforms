@@ -61,7 +61,7 @@ vi.mock("croner", async (importOriginal) => {
 });
 
 const systemTasks = await import("../src/lib/systemTasks.js");
-const { SYSTEM_TASKS, HUB_LOOPS, recorded, recordRun, pruneRuns, resetPruneForTests, RUNS_KEEP_DAYS, RUNS_KEEP_PER_TASK } = systemTasks;
+const { SYSTEM_TASKS, HUB_LOOPS, recorded, recordRun, pruneRuns, resetPruneForTests, RUNS_KEEP_DAYS, RUNS_KEEP_PER_TASK, launcherName, launchNext } = systemTasks;
 const cronService = (await import("../src/services/cron.service.js")).default;
 const SystemTask = (await import("../src/models/systemTask.model.js")).default;
 const Middleware = (await import("../src/lib/middleware.js")).default;
@@ -94,6 +94,30 @@ describe("a run is recorded", () => {
     assert.equal(outcome, "success");
     assert.equal(result, "Removed 3 finished jobs");
     assert.ok(node, "the node that ran it");
+  });
+
+  test("a timed run says no one launched it : launched_by is null", async () => {
+    await recorded("jobCleanup", async () => ({ result: "Removed 0 jobs" }))();
+    const [row] = inserts();
+    assert.match(row.sql, /\(task_key, started_at, ended_at, outcome, result, node, launched_by\) VALUES \(\?, \?, \?, \?, \?, \?, \?\)/);
+    assert.equal(row.params[6], null);
+  });
+
+  test("a Run now's run says who launched it, once : the next timed run says no one", async () => {
+    const run = recorded("jobCleanup", async () => ({ result: "Removed 0 jobs" }));
+    launchNext("jobCleanup", "admin (local)");
+    await run();
+    await run();
+    assert.deepEqual(inserts().map((q) => q.params[6]), ["admin (local)", null]);
+  });
+
+  test("a user is named as the Jobs list names one : the username, then its type", () => {
+    assert.equal(launcherName({ username: "admin", type: "local" }), "admin (local)");
+    assert.equal(launcherName({ username: "jane", type: "ldap" }), "jane (ldap)");
+    assert.equal(launcherName({ username: "bob" }), "bob (local)");
+    assert.equal(launcherName(null), null);
+    assert.equal(launcherName({}), null);
+    assert.equal(launcherName({ username: "x".repeat(300), type: "ldap" }).length, 250);
   });
 
   test("a work that throws is a failed run with its error, and the error goes no further", async () => {
@@ -138,8 +162,9 @@ describe("every run is a row of its own", () => {
   ])("%s : %o", async (key, out) => {
     await recorded(key, async () => out)();
     const [row] = inserts();
-    assert.match(row.sql, /\(task_key, started_at, ended_at, outcome, result, node\) VALUES \(\?, \?, \?, \?, \?, \?\)$/);
+    assert.match(row.sql, /\(task_key, started_at, ended_at, outcome, result, node, launched_by\) VALUES \(\?, \?, \?, \?, \?, \?, \?\)$/);
     assert.equal(row.params[0], key);
+    assert.equal(row.params[6], null, "a timed run");
   });
 });
 
@@ -267,7 +292,7 @@ describe("the tasks as the API answers them", () => {
     assert.equal(job.cron, "30 2 * * *");
     assert.deepEqual(job.last_run, {
       id: 7, started_at: "2026-11-17T02:30:00.000Z", ended_at: "2026-11-17T02:30:01.250Z", duration_ms: 1250,
-      outcome: "success", result: "Removed 120 finished jobs older than 90 days", node: "af-host-8000",
+      outcome: "success", result: "Removed 120 finished jobs older than 90 days", node: "af-host-8000", launched_by: null,
     });
     assert.ok(new Date(job.next_run) > new Date(), "its next run is ahead");
     // set in the process's environment : not changed in the app
@@ -316,11 +341,20 @@ describe("the tasks as the API answers them", () => {
     }
   });
 
+  test("a run answers who launched it", async () => {
+    answer = (sql) => (/^SELECT/.test(sql) ? [{ ...last("jobCleanup"), launched_by: "jane (ldap)" }] : []);
+    const one = await SystemTask.get("jobCleanup");
+    assert.equal(one.runs[0].launched_by, "jane (ldap)");
+    assert.equal(one.last_run.launched_by, "jane (ldap)");
+  });
+
   test("one task with its recent runs, the latest first ; none for an unknown key", async () => {
     answer = (sql) => (/^SELECT/.test(sql) ? [last("jobCleanup"), { ...last("jobCleanup", "failed"), id: 6 }] : []);
     const one = await SystemTask.get("jobCleanup");
     assert.equal(one.runs.length, 2);
     assert.equal(one.runs[1].outcome, "failed");
+    // who launched each : null for a timed run (and a run recorded before the column)
+    assert.equal(one.runs[0].launched_by, null);
     assert.match(queries.at(-1).sql, /WHERE task_key = \? ORDER BY started_at DESC, id DESC LIMIT \?/);
     assert.equal(await SystemTask.get("notATask"), null);
   });
@@ -398,5 +432,19 @@ describe("the table", () => {
     assert.equal((model.match(/'system_task_runs'/g) || []).length, 2, "the base tables and patchVersion7's");
     const own = read("src/db/create_system_task_runs_table.sql");
     assert.doesNotMatch(own, /quiet_of/);
+  });
+
+  test("its launched_by column : the same in both SQL files, added by patchVersion7, in its manifest", () => {
+    const column = "`launched_by` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,";
+    const table = (sql) => sql.slice(sql.indexOf("CREATE TABLE `system_task_runs`"), sql.indexOf("ENGINE=", sql.indexOf("CREATE TABLE `system_task_runs`")));
+    assert.ok(table(read("src/db/create_schema_and_tables.sql")).includes(column), "the fresh install");
+    assert.ok(table(read("src/db/create_system_task_runs_table.sql")).includes(column), "the table's own SQL");
+    const model = read("src/models/schema.model.js");
+    const patch7 = model.slice(model.indexOf("async function patchVersion7"), model.indexOf("\n}\n", model.indexOf("async function patchVersion7")));
+    assert.match(patch7, /addColumn\("system_task_runs", "launched_by", "varchar\(250\) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"\)/);
+    // after the table : an install from before it has the table made, then the column
+    assert.ok(patch7.indexOf('addColumn("system_task_runs"') > patch7.indexOf('addTable("system_task_runs"'));
+    const manifest7 = model.slice(model.indexOf("patchVersion7: {"), model.indexOf("indexes:", model.indexOf("patchVersion7: {")));
+    assert.match(manifest7, /'system_task_runs\.launched_by'/);
   });
 });

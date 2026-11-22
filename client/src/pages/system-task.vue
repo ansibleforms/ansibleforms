@@ -33,12 +33,13 @@ import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
+import Time from '@/lib/Time';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { cronValidationMessage } from '@/config/cron';
 import { tableMatches } from '@/lib/recordSearch';
 import { statusPill } from '@/config/settings';
-import { taskName, taskDescription, taskTiming, runDuration } from '@/lib/systemTasks';
+import { taskName, taskDescription, taskTiming, runDuration, runLauncher } from '@/lib/systemTasks';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -123,11 +124,7 @@ const cronError = computed(() => (dirty.value ? cronProblem.value : ''));
 // Save : a changed cron, or the deprecated variable's cron as it is when it has 5 fields, saved as
 // the new variable
 const canSave = computed(() => dirty.value || (scheduleEditable.value && !!deprecated.value && !cronProblem.value));
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), a runner hub loop's seconds,
@@ -247,15 +244,27 @@ const launchError = computed(() => (lastRun.value?.outcome === 'failed' ? lastRu
 const setting = computed(() => task.value?.setting || null);
 
 // ─── Runs ─────────────────────────────────────────────────────────────────────
-// its recent runs, the latest first (the server keeps a month of them) : when, how long, how it
+// its recent runs, the latest first (the server keeps a month of them) : when it started and ended,
+// how long, how it
 // went, what it did, and the node that ran it ; a row opens nothing
 const runs = computed(() => task.value?.runs || []);
 const runColumns = computed(() => [
+  // who clicked Run now, or Schedule for a timed run (and for a run recorded before this column)
+  { key: 'launched_by', label: t('jobs.launchedBy'), value: (r) => runLauncher(t, r) },
+  // its times as the other Runs tabs' (a schedule's, a stored job's, a runner's) : Time.format, the
+  // server sending ISO strings in UTC ('Z') that it puts in the user's zone
   {
     key: 'started_at',
     label: t('jobs.startTime'),
     keep: true,
-    value: (r) => (r.started_at ? Helpers.formatServerDate(r.started_at) : ''),
+    value: (r) => r.started_at && Time.format(r.started_at),
+  },
+  // when it ended ; empty while it runs
+  {
+    key: 'ended_at',
+    label: t('jobs.endTime'),
+    keep: true,
+    value: (r) => r.ended_at && Time.format(r.ended_at),
   },
   // how long it ran, to the right as a number
   {

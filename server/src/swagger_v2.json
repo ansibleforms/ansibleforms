@@ -3554,6 +3554,11 @@
                               "node": {
                                 "type": "string",
                                 "description": "The node that ran it (the worker)"
+                              },
+                              "launched_by": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Who started it with Run now, as the Jobs list names a user (admin (local)); null for a timed run, a hub loop's timed failure or hourly summary, and a run recorded before it was kept"
                               }
                             },
                             "nullable": true,
@@ -3790,6 +3795,11 @@
                         "node": {
                           "type": "string",
                           "description": "The node that ran it (the worker)"
+                        },
+                        "launched_by": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Who started it with Run now, as the Jobs list names a user (admin (local)); null for a timed run, a hub loop's timed failure or hourly summary, and a run recorded before it was kept"
                         }
                       },
                       "nullable": true,
@@ -3874,6 +3884,11 @@
                           "node": {
                             "type": "string",
                             "description": "The node that ran it (the worker)"
+                          },
+                          "launched_by": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Who started it with Run now, as the Jobs list names a user (admin (local)); null for a timed run, a hub loop's timed failure or hourly summary, and a run recorded before it was kept"
                           }
                         }
                       }

@@ -284,9 +284,9 @@ describe("the runner hub's loops", () => {
     await fail("one");
     await fail("one");
     await fail("two");
-    assert.deepEqual(inserts().map((q) => [q.params[0], q.params[3], q.params[4], q.params[5]]), [
-      ["runnerPrune", "failed", "one", nodeId],
-      ["runnerPrune", "failed", "two", nodeId],
+    assert.deepEqual(inserts().map((q) => [q.params[0], q.params[3], q.params[4], q.params[5], q.params[6]]), [
+      ["runnerPrune", "failed", "one", nodeId, null],
+      ["runnerPrune", "failed", "two", nodeId, null],
     ]);
     vi.setSystemTime(new Date(Date.now() + FAILURE_ROW_EVERY_MS));
     await fail("one");
@@ -303,10 +303,23 @@ describe("the runner hub's loops", () => {
     // its row : its start and end, success, Run now: done, this node
     const rows = inserts();
     assert.equal(rows.length, 1);
-    const [key, startedAt, endedAt, outcome, result, node] = rows[0].params;
+    const [key, startedAt, endedAt, outcome, result, node, launchedBy] = rows[0].params;
     assert.deepEqual([key, outcome, result, node], ["runnerDial", "success", "Run now: done", nodeId]);
+    // no user given : no launcher
+    assert.equal(launchedBy, null);
     assert.equal(RUN_NOW_DONE, "Run now: done");
     assert.ok(startedAt instanceof Date && endedAt instanceof Date && endedAt >= startedAt);
+  });
+
+  test("Run now : its row says who launched it, failed or not", async () => {
+    resetLoopsForTests(true, { runnerDial: async () => {}, runnerPrune: async () => { throw new Error("gone"); } });
+    vi.spyOn(logger, "warning").mockImplementation(() => {});
+    await runLoopNow("runnerDial", "jane (ldap)");
+    await runLoopNow("runnerPrune", "admin (local)");
+    assert.deepEqual(inserts().map((q) => [q.params[0], q.params[3], q.params[6]]), [
+      ["runnerDial", "success", "jane (ldap)"],
+      ["runnerPrune", "failed", "admin (local)"],
+    ]);
   });
 
   test("Run now : a failed pass is warned of as a timed one's, written once, as its own row", async () => {
@@ -393,6 +406,8 @@ describe("the loops' hourly summary", () => {
       { key: "runnerDial", from: "2026-11-17T10:30:00.000Z", to: "2026-11-17T11:00:00.000Z", outcome: "failed", result: "179 passes, 1 failed", node: nodeId },
       { key: "runnerPrune", from: "2026-11-17T10:30:00.000Z", to: "2026-11-17T11:00:00.000Z", outcome: "success", result: "29 passes, 0 failed", node: nodeId },
     ]);
+    // a summary is no one's : launched_by null
+    assert.deepEqual(summaries().map((q) => q.params[6]), [null, null, null]);
     // the next one : a whole hour, its counts from nothing again
     queries.length = 0;
     await vi.advanceTimersByTimeAsync(SUMMARY_EVERY_MS);

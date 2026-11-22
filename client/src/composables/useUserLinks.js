@@ -178,7 +178,7 @@ export function useUserLinks(who) {
     // when it runs : a one-time run its Run at, a recurring one its cron's next time
     {
       key: 'next_run',
-      label: t('settings.schedules.nextRun'),
+      label: t('settings.schedules.nextRunColumn'),
       value: (s) => nextRunOf(s) && Helpers.formatServerDate(nextRunOf(s)),
     },
   ]);

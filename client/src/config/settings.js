@@ -879,9 +879,8 @@ export default function getSettings(t) {
         {
           key: 'role_names',
           step: 'roles',
-          label: '',
+          label: t('settings.settingsPage.roles'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({
@@ -1025,7 +1024,7 @@ export default function getSettings(t) {
           sortable: true,
           required: true,
           filterable: true,
-          icon: 'users',
+          icon: 'heading',
         },
         // where the group comes from : local, or its directory (LDAP, Entra ID, OIDC)
         {
@@ -1050,9 +1049,8 @@ export default function getSettings(t) {
         {
           key: 'user_ids',
           step: 'users',
-          label: '',
+          label: t('settings.settingsPage.users'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({
@@ -1071,9 +1069,8 @@ export default function getSettings(t) {
         {
           key: 'role_names',
           step: 'roles',
-          label: '',
+          label: t('settings.settingsPage.roles'),
           type: 'component',
-          flush: true,
           component: defineAsyncComponent(() => import('@/components/AppPickList.vue')),
           initial: () => [],
           props: (item) => ({
@@ -1306,8 +1303,6 @@ export default function getSettings(t) {
           key: 'pull_scheduled',
           step: 'schedule',
           type: 'checkbox',
-          // at the dialog's left edge, its help on one line
-          flush: true,
           label: t('settings.repositories.scheduledPull'),
           help: t('settings.repositories.helpScheduledPull'),
           hidden: true,
@@ -1332,7 +1327,6 @@ export default function getSettings(t) {
           key: 'rebase_on_start',
           step: 'schedule',
           type: 'checkbox',
-          flush: true,
           label: t('settings.repositories.cloneOnStart'),
           columnLabel: t('settings.repositories.cloneOnStartShort'),
           help: t('settings.repositories.helpCloneOnStart'),
@@ -1708,6 +1702,8 @@ export default function getSettings(t) {
           step: 'when',
           icon: 'calendar',
           label: t('settings.schedules.oneTimeRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.oneTimeRunColumn'),
           type: 'datetime',
           convertToUtc: true,
           help: t('settings.schedules.runAtHelp'),
@@ -1747,6 +1743,20 @@ export default function getSettings(t) {
           // more ; the Columns menu still shows it)
           hideBelow: 1200,
           label: t('settings.fields.lastRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.lastRunColumn'),
+          type: 'datetime',
+          noInput: true,
+          render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
+        },
+        // when it runs next : its cron's next occurrence, or its one time run while ahead (the
+        // server computes it, schedule.model.js)
+        {
+          key: 'next_run',
+          // a date with its time and zone, in full
+          label: t('settings.schedules.nextRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.nextRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
@@ -1760,21 +1770,13 @@ export default function getSettings(t) {
           // the last launch's outcome as a pill, as a job's status ; Starting... while it launches
           render: (v, row) => schedulePill(t, row),
         },
-        // when it runs next : its cron's next occurrence, or its one time run while ahead (the
-        // server computes it, schedule.model.js)
-        {
-          key: 'next_run',
-          // a date with its time and zone, in full
-          label: t('settings.schedules.nextRun'),
-          type: 'datetime',
-          noInput: true,
-          render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
-        },
         {
           key: 'extra_vars',
           step: 'extra-vars',
           type: 'editor',
           label: t('settings.fields.extraVars'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.extraVarsColumn'),
           hidden: true,
           lang: 'yaml',
           style: editorStyle('40vh'),
@@ -1869,7 +1871,7 @@ export default function getSettings(t) {
           step: 'values',
           type: 'editor',
           lang: 'yaml',
-          label: t('settings.storedJobs.tabValues'),
+          label: t('settings.storedJobs.valuesLabel'),
           help: t('settings.storedJobs.valuesHelpNew'),
           style: editorStyle('30vh'),
           hidden: true,
@@ -1896,7 +1898,6 @@ export default function getSettings(t) {
           key: 'never_expires',
           step: 'details',
           type: 'checkbox',
-          flush: true,
           label: t('settings.storedJobs.neverExpires'),
           initial: (r) => !r?.expires_at,
           hidden: true,
@@ -1978,10 +1979,21 @@ export default function getSettings(t) {
           key: 'last_run',
           hideBelow: 1200,
           label: t('settings.fields.lastRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.fields.lastRunColumn'),
           type: 'datetime',
           noInput: true,
           render: (v) => (v?.started_at ? escapeHtml(Helpers.formatServerDate(v.started_at)) : '–'),
           sortValue: (row) => row.last_run?.started_at || '',
+        },
+        {
+          key: 'next_run',
+          label: t('settings.schedules.nextRun'),
+          // its column's header, in Title Case in English
+          columnLabel: t('settings.schedules.nextRunColumn'),
+          type: 'datetime',
+          noInput: true,
+          render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),
         },
         {
           // how the last run went, as a schedule's last launch : success green, failed red, none a dash
@@ -1990,13 +2002,6 @@ export default function getSettings(t) {
           noInput: true,
           render: (v, row) => statusPill(t, row?.last_run?.outcome),
           sortValue: (row) => row.last_run?.outcome || '',
-        },
-        {
-          key: 'next_run',
-          label: t('settings.schedules.nextRun'),
-          type: 'datetime',
-          noInput: true,
-          render: (v) => (v ? escapeHtml(Helpers.formatServerDate(v)) : '–'),
         },
       ],
     },
@@ -2142,7 +2147,7 @@ export default function getSettings(t) {
           sortable: true,
           required: true,
           filterable: true,
-          icon: 'lock',
+          icon: 'heading',
           isKey: true,
         },
         {
@@ -2533,7 +2538,6 @@ export default function getSettings(t) {
           key: 'with_host',
           step: 'login',
           type: 'checkbox',
-          flush: true,
           label: t('settings.credentials.addHostPort'),
           help: t('settings.credentials.addHostPortHelp'),
           initial: (r) => !!String(r?.host ?? '').trim(),
@@ -3613,7 +3617,6 @@ export default function getSettings(t) {
           key: 'verify_tls',
           step: 'connection',
           type: 'checkbox',
-          flush: true,
           label: t('settings.notificationChannels.verifyTls'),
           help: t('settings.notificationChannels.verifyTlsHelp'),
           initial: (r) => (r?.id ? !!r.verify_tls : true),
@@ -4195,7 +4198,6 @@ export default function getSettings(t) {
           key: 'vault_enterprise',
           step: 'type',
           type: 'checkbox',
-          flush: true,
           label: t('settings.secretStores.enterprise'),
           help: t('settings.secretStores.enterpriseHelp'),
           initial: (r) => !!String(r?.namespace || '').trim(),
@@ -4310,7 +4312,6 @@ export default function getSettings(t) {
           key: 'write_enabled',
           step: 'options',
           type: 'checkbox',
-          flush: true,
           label: t('settings.secretStores.writeEnabled'),
           // a Vault below its prefix, a CyberArk to its safes through its PVWA
           help: (r) =>
@@ -5290,7 +5291,7 @@ function databaseSettings(t) {
         sortable: true,
         required: true,
         filterable: true,
-        icon: 'database',
+        icon: 'heading',
         isKey: true,
       },
       {

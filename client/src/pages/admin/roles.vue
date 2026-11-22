@@ -37,11 +37,7 @@ const { sortedLocalGroups, sortedLocalUsers, loadLocalNames, usersThroughGroups,
   useRoleSupport(roles, save);
 
 // a role removed here is only gone once saved : leaving with it unsaved asks first
-useUnsavedGuard(
-  isRolesDirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveRoles(),
-);
+useUnsavedGuard(isRolesDirty, () => saveRoles());
 
 // Read-only when the config can't be loaded, can't be parsed or is a ytt template.
 const readOnly = computed(() => parseError.value || isTemplated.value || !!loadError.value);
@@ -263,9 +259,13 @@ async function bulkDelete() {
     if (skipped) toast.warning(t('settings.common.bulkDeleteNone'));
     return;
   }
-  const question = skipped
-    ? t('settings.common.bulkDeleteConfirmSkip', { count: ids.length, skipped })
-    : t('settings.common.bulkDeleteConfirm', { count: ids.length });
+  // each sentence counted on its own : "Delete 3 items? 1 selected item cannot be deleted"
+  const question = [
+    t('settings.common.bulkDeleteConfirm', { count: ids.length }, ids.length),
+    skipped ? t('settings.common.bulkDeleteSkipped', { skipped }, skipped) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   if (!(await askConfirm(question, { title: t('common.delete'), icon: 'trash' }))) return;
   await deleteRoles(ids);
 }
@@ -279,7 +279,7 @@ async function bulkDelete() {
 async function deleteOne(item) {
   if (item.required) return;
   if (
-    !(await askConfirm(`${t('settings.common.deleteConfirm')} ${item.name}?`, {
+    !(await askConfirm(t('settings.common.deleteConfirm', { name: item.name }), {
       title: t('common.delete'),
       icon: 'trash',
     }))

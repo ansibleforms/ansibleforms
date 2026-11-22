@@ -104,11 +104,7 @@ const dirty = computed(
   () => !!server.value && EDITED.some((k) => String(edit.value[k] ?? '') !== String(editable(server.value)[k] ?? '')),
 );
 // leaving with the server changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads the server.
@@ -293,7 +289,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ server?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ server?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ server?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

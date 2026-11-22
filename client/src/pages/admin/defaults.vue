@@ -138,11 +138,7 @@ const languageEnv = computed(() => envItems.value.map((e) => ({ ...e, hint: t('s
 
 // leaving with a change unsaved asks first
 const dirty = computed(() => themeDirty.value || envDirty.value);
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Loads what the page edits of the settings row.

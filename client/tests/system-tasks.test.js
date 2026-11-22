@@ -14,7 +14,7 @@ import { withoutComments } from './vueSource.js';
 import { routePermission, mayOpen } from '@/lib/routePermission';
 import getSettings from '@/config/settings';
 import i18n from '@/plugins/i18n';
-import { taskName, taskDescription, taskTiming, taskTimingCell, runDuration } from '@/lib/systemTasks';
+import { taskName, taskDescription, taskTiming, taskTimingCell, runDuration, runLauncher } from '@/lib/systemTasks';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(path.join(here, '..', p), 'utf8');
@@ -99,9 +99,9 @@ describe('the list', () => {
     expect(list.selectable).toBe(false);
   });
 
-  it("has the scheduled jobs' columns : name, when it runs, last run, status, next run", () => {
+  it("has the scheduled jobs' columns : name, when it runs, last run, next run, status", () => {
     const shown = list.fields.filter((f) => !f.hidden).map((f) => f.key);
-    expect(shown).toEqual(['name', 'cron', 'last_run', 'status', 'next_run']);
+    expect(shown).toEqual(['name', 'cron', 'last_run', 'next_run', 'status']);
   });
 
   it('says when a task runs in words, its cron on hover', () => {
@@ -188,8 +188,43 @@ describe("a task's page", () => {
     const tab = page.slice(page.indexOf('v-if="tabShown(\'runs\')"'), page.indexOf('searchNone'));
     expect(tab).not.toMatch(/isLoop/);
     const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
-    expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual(['started_at', 'duration', 'outcome', 'result', 'node']);
+    // who launched it first, as the other Runs tabs put who ran a job before its times
+    expect([...cols.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual([
+      'launched_by',
+      'started_at',
+      'ended_at',
+      'duration',
+      'outcome',
+      'result',
+      'node',
+    ]);
+    // its times as the other Runs tabs' (Time.format), the end before the duration, empty while it runs
+    expect(cols).toMatch(
+      /key: 'started_at',\s*label: t\('jobs\.startTime'\),\s*keep: true,\s*value: \(r\) => r\.started_at && Time\.format\(r\.started_at\)/,
+    );
+    expect(cols).toMatch(
+      /key: 'ended_at',\s*label: t\('jobs\.endTime'\),\s*keep: true,\s*value: \(r\) => r\.ended_at && Time\.format\(r\.ended_at\)/,
+    );
+    expect(cols).not.toContain('formatServerDate');
+    for (const other of ['pages/schedule.vue', 'pages/stored-job.vue', 'pages/admin/runner.vue']) {
+      expect(read(`src/${other}`), other).toContain('value: (j) => j.start && Time.format(j.start)');
+    }
     expect(runDuration(60 * 60 * 1000)).toBe('1h 00m 00s');
+  });
+
+  it('says who launched each run after its Status : the user of a Run now, else Schedule', async () => {
+    const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
+    expect(cols).toMatch(/key: 'launched_by', label: t\('jobs\.launchedBy'\), value: \(r\) => runLauncher\(t, r\)/);
+    expect(runLauncher(t, { launched_by: 'admin (local)' })).toBe('admin (local)');
+    // a timed run, and a run recorded before the column was there
+    expect(runLauncher(t, { launched_by: null })).toBe('jobs.system.timing');
+    expect(runLauncher(t, {})).toBe('jobs.system.timing');
+    // Schedule, one word in every language
+    for (const lang of LANGUAGES) {
+      const word = (await import(`../src/locales/${lang}.js`)).default.jobs.system.timing;
+      expect(word, lang).toBeTruthy();
+      expect(word.trim().split(/\s+/), lang).toHaveLength(1);
+    }
   });
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
@@ -200,9 +235,9 @@ describe("a task's page", () => {
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
   });
 
-  it("has the Scheduled list's columns in its order : Last run, Status, Next run", () => {
+  it("has the Scheduled list's columns in its order : Last run, Next run, Status", () => {
     const list = getSettings(t).system_tasks.fields.map((f) => f.key);
-    expect(list.slice(list.indexOf('last_run'))).toEqual(['last_run', 'status', 'next_run']);
+    expect(list.slice(list.indexOf('last_run'))).toEqual(['last_run', 'next_run', 'status']);
   });
 
   it('says where its setting is changed, or that the environment sets it', () => {
@@ -273,7 +308,7 @@ describe("a task's Schedule tab", () => {
     expect(page).toMatch(/n >= secondsMin\.value && n <= secondsMax\.value/);
     // its bounds in words : From 1 to 60 seconds.
     expect(i18n.global.t('jobs.system.intervalBounds', { min: 1, max: 60 })).toBe('From 1 to 60 seconds.');
-    expect(i18n.global.t('jobs.system.intervalLabel')).toBe('Every');
+    expect(i18n.global.t('jobs.system.intervalLabel')).toBe('Interval');
     expect(i18n.global.t('jobs.system.intervalUnit')).toBe('seconds');
   });
 

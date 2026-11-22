@@ -715,7 +715,7 @@ export async function confirmUsageDelete(t, repo) {
   if (!off.length) return null;
   const pv = await preview(repo.name, off);
   const changes = { on: [], off };
-  return askConfirm(`${t('settings.common.deleteConfirm')} ${repo.name}?`, {
+  return askConfirm(t('settings.common.deleteConfirm', { name: repo.name }), {
     title: t('common.delete'),
     ok: t('common.delete'),
     icon: 'trash',

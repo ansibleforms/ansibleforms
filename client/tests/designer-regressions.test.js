@@ -194,15 +194,15 @@ describe('the lock poll is not armed on a dead component', () => {
   });
 });
 
-describe('read-only still closes the dirty modal', () => {
-  it('the branch resets the action like its siblings', () => {
-    // without this "Save and close" was dead: a toast appeared and the modal just sat
-    // there - what you get when someone force-unlocks while you are editing
-    // bounded by the block's own end, not a character count : the explanatory comment
-    // inside it is long enough that a fixed window stopped short of the code
-    const at = designer.indexOf('if (!lock.value?.match) {');
-    const fn = designer.slice(at, designer.indexOf('\n  }', at));
-    expect(fn).toMatch(/if \(close\) resetAction\(\);/);
+describe('read-only offers no Save and leave', () => {
+  it('the leave question saves only with the lock held', () => {
+    // a force-unlock while editing made "Save and close" dead in the designer's own modal : a
+    // toast, and the modal sat there. The app's dialog now asks, and offers Save and leave
+    // only when the forms can be saved from here, the lock held among them
+    const at = designer.indexOf('const canSaveForms');
+    const line = designer.slice(at, designer.indexOf('\n', at));
+    expect(line).toMatch(/lock\.value\?\.match/);
+    expect(designer).toMatch(/askToLeave\(canSaveForms\.value \? \(\) => saveForms\(\) : null/);
   });
 });
 

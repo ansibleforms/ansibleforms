@@ -664,7 +664,7 @@ function startAt(i) {
           <div class="col-lg-8">
             <label class="form-label fw-bold">{{ t('workflowEditor.name') }}</label>
             <div class="input-group">
-              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="diagram-project" /></span>
+              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
               <input
                 class="form-control"
                 :class="{ 'is-invalid': !w.name }"
@@ -687,13 +687,16 @@ function startAt(i) {
           <div class="w-100"></div>
           <div class="col-lg-8">
             <label class="form-label fw-bold">{{ t('workflowEditor.description') }}</label>
-            <textarea
-              class="form-control"
-              rows="3"
-              :value="w.description"
-              :disabled="readOnly"
-              @change="setWorkflowAt(wi, 'description', $event.target.value)"
-            ></textarea>
+            <div class="input-group">
+              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="info-circle" /></span>
+              <textarea
+                class="form-control"
+                rows="3"
+                :value="w.description"
+                :disabled="readOnly"
+                @change="setWorkflowAt(wi, 'description', $event.target.value)"
+              ></textarea>
+            </div>
           </div>
         </div>
       </div>

@@ -92,11 +92,7 @@ const dirty = computed(
     EDITED.some((k) => JSON.stringify(edit.value[k] ?? '') !== JSON.stringify(editable(stored.value)[k] ?? '')),
 );
 // leaving with the stored job changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 // the values typed are YAML : a mistake is said under the editor, and nothing is saved
 const valuesError = computed(() => {
@@ -135,7 +131,6 @@ const runColumns = computed(() => [
   { key: 'id', label: t('settings.linked.job'), keep: true, class: 'text-end', value: (j) => `#${j.id}` },
   // who launched it : a shared stored job is launched by other users too
   { key: 'user', label: t('jobs.launchedBy') },
-  { key: 'status', label: t('settings.linked.status'), keep: true },
   // its times as the jobs page shows them (the server sends them in its own zone)
   { key: 'start', label: t('jobs.startTime'), keep: true, value: (j) => j.start && Time.format(j.start) },
   { key: 'end', label: t('jobs.endTime'), keep: true, value: (j) => j.end && Time.format(j.end) },
@@ -148,6 +143,7 @@ const runColumns = computed(() => [
     class: 'text-end',
     value: (j) => formatDuration(durationSeconds(j)),
   },
+  { key: 'status', label: t('settings.linked.status'), keep: true },
 ]);
 
 /**
@@ -228,7 +224,7 @@ const tabFields = computed(() => ({
       t('settings.storedJobs.removedWhenUnused'),
     ],
   ],
-  values: [['values', t('settings.storedJobs.tabValues'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
+  values: [['values', t('settings.storedJobs.valuesLabel'), t('settings.storedJobs.valuesHelp'), edit.value?.values]],
   // the table : its name, or a row with the word in a cell it shows (runsMatch)
   runs: [['runs', t('settings.storedJobs.tabRuns')]],
 }));
@@ -339,7 +335,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ stored?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ stored?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ stored?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>
@@ -500,7 +500,7 @@ onMounted(async () => {
                 :style="editorStyle('40vh')"
                 :isFloating="false"
                 :help="t('settings.storedJobs.valuesHelp')"
-                :label="t('settings.storedJobs.tabValues')"
+                :label="t('settings.storedJobs.valuesLabel')"
               />
               <div v-if="valuesError" class="invalid-feedback d-block mt-n2">{{ valuesError }}</div>
             </template>

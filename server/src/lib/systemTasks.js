@@ -404,6 +404,54 @@ const RESULT_MAX = 1000;
 
 // when this process last pruned the table (0 : not yet, the first recorded run does)
 let lastPrune = 0;
+// the most a run's launched_by holds (its column is varchar(250))
+const LAUNCHED_BY_MAX = 250;
+// who asked the next run of a task with Run now, by its key (launchNext) : taken by that run
+const launchers = new Map();
+
+/**
+ * Who launched a run, as the Jobs list names a job's user (its User column) : the username, then
+ * its type in brackets ("admin (local)", "jane (ldap)").
+ *
+ * Args:
+ *   user (object|null): the user who asked, as the request carries it ({ username, type }).
+ *
+ * Returns:
+ *   string|null: the name, null for no user (a timed run).
+ */
+export function launcherName(user) {
+  if (!user?.username) return null;
+  return `${user.username} (${user.type || 'local'})`.slice(0, LAUNCHED_BY_MAX);
+}
+
+/**
+ * Says who launched the next run of a task (Run now, services/cron.service.js runSystemTaskNow),
+ * just before its croner job is triggered : that run takes it (recorded), a timed one never
+ * finds one.
+ *
+ * Args:
+ *   key (string): the task's key.
+ *   launchedBy (string|null): who launched it (launcherName), null for none.
+ */
+export function launchNext(key, launchedBy) {
+  if (launchedBy) launchers.set(key, launchedBy);
+  else launchers.delete(key);
+}
+
+/**
+ * Takes who launched a task's run (launchNext), once : null when none did (a timed run).
+ *
+ * Args:
+ *   key (string): the task's key.
+ *
+ * Returns:
+ *   string|null: who launched it.
+ */
+export function takeLauncher(key) {
+  const launchedBy = launchers.get(key) ?? null;
+  launchers.delete(key);
+  return launchedBy;
+}
 
 /**
  * A count with its noun, singular or plural : "1 job", "120 jobs".
@@ -480,7 +528,8 @@ export async function pruneRuns() {
  *   task (object): the task's entry of SYSTEM_TASKS (or a loop's of HUB_LOOPS : its hourly
  *     summary, a Run now pass or a timed failure).
  *   run (object): { startedAt (Date), endedAt (Date), outcome (success, failed), result (string),
- *     changed (number : what the run changed, 0 for nothing) }.
+ *     changed (number : what the run changed, 0 for nothing), launchedBy (string|null : who
+ *     started it with Run now, launcherName ; null or left out for a timed run) }.
  *   options (object): { onError (function|null) : a row that cannot be written is handed to it,
  *     (err) => ..., instead of logged here : the caller logs it (lib/hubLoops.js, once an hour) }.
  *
@@ -489,12 +538,13 @@ export async function pruneRuns() {
  */
 export async function recordRun(task, run, { onError = null } = {}) {
   const result = String(run.result ?? '').slice(0, RESULT_MAX);
+  const launchedBy = run.launchedBy ? String(run.launchedBy).slice(0, LAUNCHED_BY_MAX) : null;
   try {
     // step 1 : its row
     await mysql.do(
-      'INSERT INTO AnsibleForms.`system_task_runs` (task_key, started_at, ended_at, outcome, result, node) ' +
-        'VALUES (?, ?, ?, ?, ?, ?)',
-      [task.key, run.startedAt, run.endedAt, run.outcome, result, nodeId],
+      'INSERT INTO AnsibleForms.`system_task_runs` (task_key, started_at, ended_at, outcome, result, node, launched_by) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [task.key, run.startedAt, run.endedAt, run.outcome, result, nodeId, launchedBy],
       true,
     );
   } catch (err) {
@@ -533,7 +583,8 @@ export function recorded(key, fn) {
   const task = systemTask(key);
   if (!task) throw new Error(`No system task is named ${key}`);
   return async (...args) => {
-    // step 1 : the work
+    // step 1 : the work, and who launched it (Run now : launchNext ; a timed run has none)
+    const launchedBy = takeLauncher(key);
     const startedAt = new Date();
     let run;
     try {
@@ -548,14 +599,15 @@ export function recorded(key, fn) {
       run = { outcome: 'failed', result: err?.message || String(err), changed: 0 };
     }
     // step 2 : its row
-    await recordRun(task, { ...run, startedAt, endedAt: new Date() });
+    await recordRun(task, { ...run, startedAt, endedAt: new Date(), launchedBy });
     return run;
   };
 }
 
-// tests only : the next recorded run prunes again
+// tests only : the next recorded run prunes again, and no run has a launcher waiting
 export function resetPruneForTests() {
   lastPrune = 0;
+  launchers.clear();
 }
 
-export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, LOOP_SETTINGS, systemTask, hubLoop, loopSeconds, loopSecondsProblem, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded };
+export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, LOOP_SETTINGS, systemTask, hubLoop, loopSeconds, loopSecondsProblem, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded, launcherName, launchNext, takeLauncher };

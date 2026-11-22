@@ -621,11 +621,11 @@ async function savePreferences() {
   savedPrefs.value = currentPreferences();
   toast.success(t('profilePage.preferencesSaved'));
 }
-useUnsavedGuard(prefsDirty, () => t('settings.common.unsavedChanges'), savePreferences);
+useUnsavedGuard(prefsDirty, savePreferences);
 // another view of the profile (its menu) is the same page to the router : asked there too
 onBeforeRouteUpdate((to, from) => {
   if (from.params.view !== 'preferences' || to.params.view === 'preferences' || !prefsDirty.value) return true;
-  return askToLeave(t('settings.common.unsavedChanges'), savePreferences, () => prefsDirty.value);
+  return askToLeave(savePreferences, () => prefsDirty.value);
 });
 
 // ─── account and permissions : searched ───────────────────────────────────────
@@ -1105,14 +1105,13 @@ async function changePassword() {
                 <pre class="af-token-example mb-4"><code>{{ tokenExample }}</code></pre>
               </div>
               <!-- the request : a lifetime and the password -->
-              <!-- its fields as every dialog's : the name at the left, the field and its help at the right -->
+              <!-- its fields as every dialog's : the name above the field, bold, the help under it -->
               <div v-else-if="tokenStep === 0">
                 <BsInput
                   v-model="tokenForm.name"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="text"
-                  icon="tag"
+                  icon="heading"
                   :required="true"
                   :label="t('profilePage.token.name')"
                   :help="t('profilePage.token.nameHint')"
@@ -1120,7 +1119,6 @@ async function changePassword() {
                 />
                 <BsInput
                   v-model="tokenForm.days"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="select"
                   icon="hourglass-half"
@@ -1141,7 +1139,6 @@ async function changePassword() {
                 <BsInput
                   v-else
                   v-model="tokenForm.password"
-                  :isHorizontal="true"
                   :isFloating="false"
                   type="password"
                   icon="lock"

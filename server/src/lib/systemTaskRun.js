@@ -14,6 +14,12 @@
 // Nothing ever runs a task's work outside its croner job on the worker : two nodes never run a
 // task at once, and a run is never started on top of another.
 //
+// Its row says who launched it (launched_by). On the node that runs the tasks, the run takes it as
+// it starts (services/cron.service.js runSystemTaskNow). A change notice carries nothing but its
+// name, so a run handed to the worker is recorded without it, and the node that handed it writes
+// it on the run's row once that row is there (stampLauncher) : the first row of the task after the
+// notice, the one the request already waits for (a timed tick during the run is skipped).
+//
 // The nightly backup is not waited for (LONG_TASKS) : a backup of a large database takes
 // minutes, longer than a proxy keeps a request open. It is answered at once (202), the page
 // follows it.
@@ -33,9 +39,15 @@ export const LONG_TASKS = new Set(['nightlyBackup']);
 export const FORWARD_WAIT_MS = 20000;
 // how often it looks for the run's row meanwhile
 export const FORWARD_POLL_MS = 500;
+// a run handed to the worker that was not waited for (a backup, or one longer than the wait) : how
+// long its row is looked for after, to write who launched it, and how often
+export const FOLLOW_MS = 2 * 60 * 60 * 1000;
+export const FOLLOW_POLL_MS = 10000;
 
 // the tasks this node handed to the worker and still waits for : a second Run now is refused
 const forwarding = new Set();
+// the follows going (followRun), bumped to end them all (tests)
+let followGeneration = 0;
 
 /**
  * The name of the change notice that asks the worker to run a task now (lib/epochs.js).
@@ -109,22 +121,72 @@ async function latestRunId(key) {
 }
 
 /**
- * Waits for a task's new row (one after `after`), FORWARD_WAIT_MS at most.
+ * Waits for a task's new row (one after `after`), a while at most.
  *
  * Args:
  *   key (string): the task's key.
  *   after (number): the id of its latest row before the run.
+ *   waitMs (number): the most to wait (FORWARD_WAIT_MS by default).
+ *   pollMs (number): how often to look (FORWARD_POLL_MS by default).
+ *   unref (boolean): whether its timers keep the process up (false : a follow in the background).
  *
  * Returns:
- *   Promise<boolean>: true when the run was recorded, false when the wait is over first.
+ *   Promise<number>: the new row's id once the run was recorded, 0 when the wait is over first.
  */
-async function waitForRun(key, after) {
-  const until = Date.now() + FORWARD_WAIT_MS;
-  while (Date.now() < until) {
-    await new Promise((resolve) => setTimeout(resolve, FORWARD_POLL_MS));
-    if ((await latestRunId(key)) > after) return true;
+async function waitForRun(key, after, waitMs = FORWARD_WAIT_MS, pollMs = FORWARD_POLL_MS, unref = false) {
+  const generation = followGeneration;
+  const until = Date.now() + waitMs;
+  while (Date.now() < until && generation === followGeneration) {
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, pollMs);
+      if (unref) timer.unref?.();
+    });
+    const latest = await latestRunId(key);
+    if (latest > after) return latest;
   }
-  return false;
+  return 0;
+}
+
+/**
+ * Writes who launched a run on its row, handed to the worker and recorded there without it (a
+ * change notice carries nothing). A row that already names someone is left as it is. Never
+ * throws : a launcher that cannot be written is logged, the run itself is recorded.
+ *
+ * Args:
+ *   id (number): the run's row.
+ *   launchedBy (string|null): who launched it (lib/systemTasks.js launcherName) ; null writes nothing.
+ *
+ * Returns:
+ *   Promise<void>: once written.
+ */
+export async function stampLauncher(id, launchedBy) {
+  if (!id || !launchedBy) return;
+  try {
+    await mysql.do(
+      'UPDATE AnsibleForms.`system_task_runs` SET launched_by = ? WHERE id = ? AND launched_by IS NULL',
+      [launchedBy, id],
+      true,
+    );
+  } catch (err) {
+    logger.warning(`Could not write who launched the system task run ${id}: ${err.message || err}`);
+  }
+}
+
+/**
+ * Follows a run handed to the worker that the request does not wait for (a backup, or one that
+ * outlasted the wait), in the background : its row is looked for FOLLOW_MS at most, then who
+ * launched it written on it. Never throws, never keeps the process up.
+ *
+ * Args:
+ *   key (string): the task's key.
+ *   after (number): the id of its latest row before the run.
+ *   launchedBy (string|null): who launched it ; null follows nothing.
+ */
+function followRun(key, after, launchedBy) {
+  if (!launchedBy) return;
+  waitForRun(key, after, FOLLOW_MS, FOLLOW_POLL_MS, true)
+    .then((id) => stampLauncher(id, launchedBy))
+    .catch(() => {});
 }
 
 /**
@@ -133,6 +195,8 @@ async function waitForRun(key, after) {
  *
  * Args:
  *   key (string): the task's key.
+ *   launchedBy (string|null): who launched it (lib/systemTasks.js launcherName), written on its
+ *     row ; null for none.
  *
  * Returns:
  *   Promise<object>: { status, node } :
@@ -141,10 +205,10 @@ async function waitForRun(key, after) {
  *       'off' (the scheduler has no job for it) or 'noWorker' (no process runs the tasks) ;
  *     node: where it runs ('this node' or the worker's name).
  */
-export async function runNow(key) {
-  // step 1 : the tasks run here, its croner job triggered
+export async function runNow(key, launchedBy = null) {
+  // step 1 : the tasks run here, its croner job triggered, the run taking who launched it
   if (await runsHere()) {
-    const started = cronService.runSystemTaskNow(key);
+    const started = cronService.runSystemTaskNow(key, launchedBy);
     if (started.status !== 'started') return { status: started.status, node: 'this node' };
     if (LONG_TASKS.has(key)) return { status: 'started', node: 'this node' };
     await started.done;
@@ -159,8 +223,19 @@ export async function runNow(key) {
     const after = await latestRunId(key);
     await bump(runNotice(key));
     logger.info(`Asked the worker ${worker.id} to run the system task ${key} now`);
-    if (LONG_TASKS.has(key)) return { status: 'started', node: worker.id };
-    return { status: (await waitForRun(key, after)) ? 'done' : 'started', node: worker.id };
+    // step 3 : its row, who launched it written on it once there (followed after the answer when
+    // it is not waited for)
+    if (LONG_TASKS.has(key)) {
+      followRun(key, after, launchedBy);
+      return { status: 'started', node: worker.id };
+    }
+    const id = await waitForRun(key, after);
+    if (!id) {
+      followRun(key, after, launchedBy);
+      return { status: 'started', node: worker.id };
+    }
+    await stampLauncher(id, launchedBy);
+    return { status: 'done', node: worker.id };
   } finally {
     forwarding.delete(key);
   }
@@ -190,9 +265,10 @@ export function runNoticed(key) {
   return started.status;
 }
 
-// tests only : nothing handed to the worker
+// tests only : nothing handed to the worker, no run followed
 export function resetRunsForTests() {
   forwarding.clear();
+  followGeneration++;
 }
 
-export default { LONG_TASKS, runNotice, runsHere, busyTasks, runNow, runNoticed };
+export default { LONG_TASKS, runNotice, runsHere, busyTasks, runNow, runNoticed, stampLauncher };

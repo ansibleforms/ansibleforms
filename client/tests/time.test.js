@@ -225,3 +225,20 @@ describe('Time.wallText', () => {
     expect(Time.wallText('nope', 'UTC')).toBe('');
   });
 });
+
+describe("a system task's Runs tab and the other Runs tabs", () => {
+  beforeEach(() => localStorage.removeItem('af_timezone'));
+
+  // a system run's times are ISO strings in UTC (server systemTask.model.js toISOString), as a
+  // job's : Time.format (the other Runs tabs) shows them as formatServerDate did, in every zone
+  test('show an ISO UTC time the same, with Time.format or formatServerDate', () => {
+    const iso = '2026-11-20T09:15:30.000Z';
+    expect(Time.format(iso)).toBe('2026-11-20 09:15:30 UTC');
+    prefer('Europe/Madrid');
+    expect(Time.format(iso)).toBe('2026-11-20 10:15:30 CET');
+    for (const zone of ['UTC', 'Europe/Madrid', 'America/New_York', 'Asia/Tokyo']) {
+      prefer(zone);
+      expect(Time.format(iso), zone).toBe(Helpers.formatServerDate(iso));
+    }
+  });
+});

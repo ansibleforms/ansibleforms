@@ -1,4 +1,4 @@
-// A Refresh button says Refreshing... while it reads again (composables/useRefreshing.js).
+// A Refresh button says Refreshing… while it reads again (composables/useRefreshing.js).
 //
 // A refresh that comes back in 50 ms changed nothing the eye could see, so a click looked
 // lost. The words stay at least a second, its two arrows turn meanwhile, and every page's
@@ -69,10 +69,10 @@ describe('the pages', () => {
     expect(offenders.map((p) => p.slice(src.length + 1))).toEqual(['components/AppRefreshButton.vue']);
   });
 
-  it('say Refreshing... in every language', async () => {
+  it('say Refreshing… in every language', async () => {
     for (const lang of ['en', 'es', 'ca', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh']) {
       const text = (await import(`../src/locales/${lang}.js`)).default.common.refreshing;
-      expect(text, lang).toMatch(/\.\.\.$/);
+      expect(text, lang).toMatch(/…$/);
     }
   });
 });

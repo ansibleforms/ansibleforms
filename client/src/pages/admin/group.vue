@@ -53,11 +53,7 @@ const dirty = computed(
     ['name', 'description'].some((k) => (edit.value[k] || '') !== (group.value[k] || '')),
 );
 // leaving with the details changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveDetails(),
-);
+useUnsavedGuard(dirty, () => saveDetails());
 
 // the users in the group (as their first group or another one), and the others
 const members = computed(() => users.value.filter((u) => (u.group_ids || []).includes(groupIdNumber.value)));
@@ -300,7 +296,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ group?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ group?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ group?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>
@@ -382,7 +382,7 @@ onMounted(async () => {
             class="af-group-field"
             v-model="edit.name"
             v-show="fieldShown('name')"
-            icon="users"
+            icon="heading"
             :isFloating="false"
             :required="true"
             :disabled="isAdmins"

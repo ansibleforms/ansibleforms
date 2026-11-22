@@ -292,9 +292,9 @@ function text(col, row) {
     >
       <BsSearch v-if="search === null" v-model="filter" class="af-table-search" />
       <!-- the selection : how many, Clear selection, Select all, and what the page does with them -->
-      <span v-if="selectable && selected.size" class="text-muted small"
-        >{{ selected.size }} {{ t('dataTable.selected') }}</span
-      >
+      <span v-if="selectable && selected.size" class="text-muted small">{{
+        t('dataTable.selected', selected.size)
+      }}</span>
       <button v-if="selectable && selected.size" class="btn btn-outline-primary" @click="selected = new Set()">
         <FaIcon icon="xmark" class="me-1" />{{ t('dataTable.clearSelection') }}
       </button>

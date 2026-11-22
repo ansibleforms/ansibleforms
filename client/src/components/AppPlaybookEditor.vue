@@ -188,7 +188,7 @@ function pickSection(pi) {
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   class="form-control"
                   :value="play.name"
@@ -353,7 +353,7 @@ function pickSection(pi) {
             <div class="input-group af-pbe-section-select">
               <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="layer-group" /></span>
               <select v-model="sectionToAdd[pi]" class="form-select" @change="pickSection(pi)">
-                <option :value="undefined">{{ t('playbookEditor.addSection') }}...</option>
+                <option :value="undefined">{{ t('playbookEditor.addSection') }}…</option>
                 <option v-for="k in missing(play)" :key="k" :value="k">{{ t(`playbookOutline.sections.${k}`) }}</option>
               </select>
             </div>
@@ -372,7 +372,7 @@ function pickSection(pi) {
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
               <div class="input-group">
-                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
                 <input
                   class="form-control"
                   :value="task.name"

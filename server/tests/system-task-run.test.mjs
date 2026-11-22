@@ -34,9 +34,14 @@ const db = vi.hoisted(() => ({ runs: [], nodes: [], nextId: 1 }));
 vi.mock("../src/models/db.model.js", () => {
   const run = async (sql, values) => {
     if (/INSERT INTO AnsibleForms\.`system_task_runs`/.test(sql)) {
-      const [task_key, started_at, ended_at, outcome, result, node] = values;
-      db.runs.push({ id: db.nextId++, task_key, started_at, ended_at, outcome, result, node });
+      const [task_key, started_at, ended_at, outcome, result, node, launched_by] = values;
+      db.runs.push({ id: db.nextId++, task_key, started_at, ended_at, outcome, result, node, launched_by });
       return { affectedRows: 1 };
+    }
+    if (/^UPDATE AnsibleForms\.`system_task_runs` SET launched_by = \? WHERE id = \? AND launched_by IS NULL$/.test(sql)) {
+      const row = db.runs.find((r) => r.id === values[1] && r.launched_by == null);
+      if (row) row.launched_by = values[0];
+      return { affectedRows: row ? 1 : 0 };
     }
     if (/SELECT MAX\(id\) AS id FROM AnsibleForms\.`system_task_runs`/.test(sql)) {
       const ids = db.runs.filter((r) => r.task_key === values[0]).map((r) => r.id);
@@ -156,6 +161,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await cronService.stopAll(0);
 });
 
@@ -179,6 +185,22 @@ describe("Run now on the node that runs the tasks", () => {
     assert.equal(res.body.runs.length, 1);
     // nothing handed to another node
     assert.deepEqual(notices.sent, []);
+  });
+
+  test("its row says who launched it, as the Jobs list names a user ; the run answers it", async () => {
+    await startTasks();
+    const res = await runNow("abandonedJobs");
+    assert.equal(db.runs[0].launched_by, "admin (local)");
+    assert.equal(res.body.runs[0].launched_by, "admin (local)");
+    assert.equal(res.body.last_run.launched_by, "admin (local)");
+  });
+
+  test("a timed run says no one launched it, a Run now just before included", async () => {
+    await startTasks();
+    await runNow("abandonedJobs");
+    // the croner job's own run (a tick) : no launcher left over
+    await cronService.jobs.system.get("abandonedJobs").trigger();
+    assert.deepEqual(db.runs.map((r) => r.launched_by), ["admin (local)", null]);
   });
 
   test("a work that throws is a failed run, recorded with its error", async () => {
@@ -292,10 +314,10 @@ describe("Run now of a runner hub loop", () => {
       assert.equal(res.body.last_run.outcome, "success");
       assert.equal(res.body.last_run.node, nodeId);
     }
-    // each pass its own row, Run now: done ; nothing handed to another node
+    // each pass its own row, Run now: done, who launched it ; nothing handed to another node
     assert.deepEqual(
-      db.runs.map((r) => [r.task_key, r.outcome, r.result, r.node]),
-      Object.keys(passes).map((key) => [key, "success", "Run now: done", nodeId]),
+      db.runs.map((r) => [r.task_key, r.outcome, r.result, r.node, r.launched_by]),
+      Object.keys(passes).map((key) => [key, "success", "Run now: done", nodeId, "admin (local)"]),
     );
     assert.deepEqual(notices.sent, []);
   });
@@ -390,7 +412,28 @@ describe("Run now from a node that does not run the tasks", () => {
     assert.equal(res.status, 200);
     assert.deepEqual(notices.sent, ["systemtask-run:jobCleanup"]);
     assert.equal(res.body.last_run.result, "Removed 2 jobs");
+    // the worker recorded it without a launcher (a notice carries none) : this node wrote it
+    assert.equal(db.runs[0].launched_by, "admin (local)");
+    assert.equal(res.body.last_run.launched_by, "admin (local)");
     assert.equal(audits.find((a) => a.action === "system.task.run").detail.node, "worker-host-8443");
+  });
+
+  test("a run not waited for (a backup) has who launched it written once its row is there", async () => {
+    lock.held = false;
+    db.nodes.push(worker());
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    assert.deepEqual(await TaskRun.runNow("nightlyBackup", "jane (ldap)"), { status: "started", node: "worker-host-8443" });
+    // the worker's row, minutes later, without a launcher
+    db.runs.push({ id: db.nextId++, task_key: "nightlyBackup", started_at: new Date(), ended_at: new Date(), outcome: "success", result: "Backed up", node: "worker-host-8443", launched_by: null });
+    await vi.advanceTimersByTimeAsync(TaskRun.FOLLOW_POLL_MS);
+    assert.equal(db.runs[0].launched_by, "jane (ldap)");
+  });
+
+  test("the worker's run on a notice is recorded without a launcher, the asking node writes it", async () => {
+    await startTasks();
+    assert.equal(TaskRun.runNoticed("abandonedJobs"), "started");
+    await vi.waitFor(() => assert.equal(db.runs.length, 1));
+    assert.equal(db.runs[0].launched_by, null);
   });
 
   test("refused while the worker says it runs (409), no notice sent", async () => {

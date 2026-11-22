@@ -2032,7 +2032,6 @@ onBeforeUnmount(() => {
             <div class="af-title-controls af-form-controls">
               <BsSearch
                 v-model="fieldSearch"
-                :placeholder="t('form.findField')"
                 :title="t('form.findFieldHint')"
                 @keydown.enter.prevent="nextFieldMatch()"
               />
@@ -2591,7 +2590,7 @@ onBeforeUnmount(() => {
   >
     <template #default>
       <div class="mb-3">
-        <label class="form-label">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
+        <label class="form-label fw-bold">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
         <div class="input-group">
           <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
           <input
@@ -2610,13 +2609,13 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="mb-3" v-if="scheduleAction === 'schedule'">
-        <label class="form-label">{{ t('form.cronExpression') }} <span class="text-danger">*</span></label>
+        <label class="form-label fw-bold">{{ t('form.cronExpression') }} <span class="text-danger">*</span></label>
         <!-- the same editor as a schedule's : presets, the next runs, and the scheduler's zone -->
         <BsCron v-model="scheduleForm.cron" icon="stopwatch" />
       </div>
 
       <div class="mb-3" v-if="scheduleAction === 'run-later'">
-        <label class="form-label">{{ t('form.runAt') }} <span class="text-danger">*</span></label>
+        <label class="form-label fw-bold">{{ t('form.runAt') }} <span class="text-danger">*</span></label>
         <!-- the same picker as a schedule's and an announcement's (its time in the user's zone, sent
              as UTC) -->
         <BsDateTime
@@ -2653,7 +2652,7 @@ onBeforeUnmount(() => {
   >
     <template #default>
       <div class="mb-3">
-        <label class="form-label">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
+        <label class="form-label fw-bold">{{ t('form.scheduleName') }} <span class="text-danger">*</span></label>
         <div class="input-group">
           <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
           <input
@@ -2667,7 +2666,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="mb-3">
-        <label class="form-label">{{ t('form.description') }}</label>
+        <label class="form-label fw-bold">{{ t('form.description') }}</label>
         <div class="input-group">
           <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="info-circle" /></span>
           <textarea
@@ -2684,13 +2683,16 @@ onBeforeUnmount(() => {
       <AppStoredJobRemoval
         v-model="storeForm.removal"
         class="mb-3"
+        labelClass="form-label fw-bold"
         :setting="store.storedJobUnusedDays"
         :disabled="storeSubmitting"
       />
 
       <!-- shared : the users with allowStoredJobsViewAll can load it too ; it stays yours -->
       <div v-if="canShareStored" class="mb-3">
-        <label class="form-label d-block" for="af-store-shared">{{ t('settings.storedJobs.visibility') }}</label>
+        <label class="form-label fw-bold d-block" for="af-store-shared">{{
+          t('settings.storedJobs.visibility')
+        }}</label>
         <div class="form-check form-switch">
           <input
             id="af-store-shared"

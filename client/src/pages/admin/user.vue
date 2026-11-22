@@ -71,11 +71,7 @@ const detailsDirty = computed(
 const signInDirty = computed(() => !!user.value && !!edit.value && edit.value.signIn === !!user.value.blocked);
 const dirty = computed(() => detailsDirty.value || signInDirty.value);
 // leaving with the details changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveDetails(),
-);
+useUnsavedGuard(dirty, () => saveDetails());
 
 // the groups the user belongs to : its first (group_id) and the others (group_ids)
 const userGroups = computed(() => {
@@ -509,7 +505,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ user?.username }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ user?.username }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ user?.username }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

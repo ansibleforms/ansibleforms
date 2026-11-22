@@ -64,7 +64,7 @@ const details = computed(() => {
   return [
     { key: 'folder', icon: 'folder', label: t('admin.backups.folder'), value: b.folder },
     { key: 'date', icon: 'calendar', label: t('admin.backups.date'), value: Helpers.formatServerDate(b.date) },
-    { key: 'description', icon: 'comment', label: t('admin.backups.description'), value: b.description || '' },
+    { key: 'description', icon: 'info-circle', label: t('admin.backups.description'), value: b.description || '' },
     {
       key: 'backupFile',
       icon: 'database',
@@ -168,7 +168,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ folder }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ folder }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ folder }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

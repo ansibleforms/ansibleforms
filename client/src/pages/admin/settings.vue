@@ -477,11 +477,7 @@ async function saveEnvironmentVariables() {
 
 const anyDirty = computed(() => settingsDirty.value || envDirty.value);
 // leaving with settings changed and unsaved asks first
-useUnsavedGuard(
-  anyDirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveActiveTab(),
-);
+useUnsavedGuard(anyDirty, () => saveActiveTab());
 
 async function saveActiveTab() {
   // A refused settings half must stop the whole save, not let the environment half

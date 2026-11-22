@@ -57,11 +57,7 @@ function comparable(key, value) {
 const dirty = computed(
   () => !!record.value && FIELDS.some((k) => comparable(k, edit.value[k]) !== comparable(k, record.value[k])),
 );
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 /**
  * Reads the announcement.
@@ -141,7 +137,7 @@ const name = computed(() => {
 // the title's step : the first 12 characters of its message, then ... (a whole message is long)
 const shortName = computed(() => {
   const text = String(record.value?.message || '');
-  return text.length > 12 ? `${text.slice(0, 12)}...` : text;
+  return text.length > 12 ? `${text.slice(0, 12)}…` : text;
 });
 const pageCrumbs = computed(() => [
   { title: t('sidebar.announcement'), icon: 'bullhorn', to: '/settings/announcements' },
@@ -188,7 +184,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

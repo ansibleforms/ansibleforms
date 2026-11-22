@@ -227,7 +227,7 @@ defineExpose({ add: addCategory, locked });
   <BsModal v-if="newCategory" size="lg" @close="newCategory = null" icon="folder-tree">
     <template #title> {{ t('settings.settingsPage.newCategory') }} </template>
     <template #default>
-      <BsInput :isFloating="false" v-model="newCategory.name" :label="t('settings.settingsPage.name')" icon="tag" />
+      <BsInput :isFloating="false" v-model="newCategory.name" :label="t('settings.settingsPage.name')" icon="heading" />
       <label class="form-label fw-bold">{{ t('settings.settingsPage.icon') }}</label>
       <div class="input-group">
         <span class="input-group-text"><FaIcon :icon="newCategory.icon || 'question'" class="fa-fw" /></span>
@@ -294,7 +294,7 @@ defineExpose({ add: addCategory, locked });
           </div>
         </div>
         <div class="input-group">
-          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="heading" /></span>
           <input
             class="form-control"
             v-model="row.cat.name"

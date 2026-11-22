@@ -52,7 +52,7 @@ import { join } from 'node:path';
 describe('designAllForms : every form in the designer, or only those of the roles', () => {
   const LANGS = ['en', 'es', 'ca', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh'];
 
-  it('in the Designer group after Edit Forms, on by default, needing the designer', () => {
+  it('in the Designer group after Edit forms, on by default, needing the designer', () => {
     const designer = roleOptionGroups.find((g) => g.name === 'designer').keys;
     expect(designer.indexOf('designAllForms')).toBe(designer.indexOf('allowFormDesign') + 1);
     expect(roleOptionDefaults('ops').designAllForms).toBe(true);
@@ -78,7 +78,7 @@ describe('designAllForms : every form in the designer, or only those of the role
   });
 });
 
-describe('designAllPlaybooks and designAllWorkflows : right after Edit Playbooks and Edit Workflows', () => {
+describe('designAllPlaybooks and designAllWorkflows : right after Edit playbooks and Edit workflows', () => {
   const LANGS = ['en', 'es', 'ca', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh'];
 
   it('in the Designer group, each after its Edit option, on by default, needing the designer', () => {
@@ -110,8 +110,8 @@ describe('designAllPlaybooks and designAllWorkflows : right after Edit Playbooks
     }
     const en = (await import('../src/locales/en.js')).default.settings.settingsPage;
     expect([en.roleOptionDesignAllPlaybooks, en.roleOptionDesignAllWorkflows]).toEqual([
-      'Edit All Playbooks',
-      'Edit All Workflows',
+      'Edit all playbooks',
+      'Edit all workflows',
     ]);
   });
 });

@@ -606,12 +606,12 @@ function exportCsv() {
           type="search"
           class="form-control form-control-sm"
           style="max-width: 220px"
-          :placeholder="t('common.filter')"
+          :placeholder="t('common.search')"
         />
 
         <!-- Selection info + bulk helpers -->
         <span v-if="selectable && selectedIds.size" class="text-muted small">
-          {{ selectedIds.size }} {{ t('dataTable.selected') }}
+          {{ t('dataTable.selected', selectedIds.size) }}
         </span>
         <!-- the selection's buttons in the style of the toolbar's others (Columns, Export CSV) -->
         <button v-if="selectable && selectedIds.size" class="btn" :class="toolButton" @click="clearSelection">

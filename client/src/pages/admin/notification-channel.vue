@@ -126,11 +126,7 @@ const dirty = computed(
     edited.value.some((k) => String(edit.value[k] ?? '') !== String(editable(channel.value)[k] ?? '')),
 );
 // leaving with the channel changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 // the credentials its logins and tokens are : smtp and entraid ones for mail, api ones for a token ;
 // none first
@@ -502,7 +498,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ channel?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ channel?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ channel?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

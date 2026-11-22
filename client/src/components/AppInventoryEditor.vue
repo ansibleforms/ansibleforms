@@ -356,7 +356,7 @@ function leaveVar(event) {
           />
         </div>
         <div v-if="!vars.length && !newVar" class="text-muted small mb-2">
-          {{ t('inventoryEditor.noVar', { name: openName }) }}
+          {{ t('inventoryEditor.noVar') }}
         </div>
         <!-- the new variable's row, once Add variable is clicked -->
         <div v-if="newVar && !readOnly" ref="newVarRow" class="d-flex gap-2 mb-2" @focusout="leaveVar">

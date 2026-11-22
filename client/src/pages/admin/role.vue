@@ -54,11 +54,7 @@ const {
 } = useRoleSupport(roles, save);
 
 // leaving with the role changed and unsaved asks first
-useUnsavedGuard(
-  isRolesDirty,
-  () => t('settings.common.unsavedChanges'),
-  () => saveRoles(),
-);
+useUnsavedGuard(isRolesDirty, () => saveRoles());
 
 // read only when the config can't be loaded, can't be parsed or is a ytt template
 const readOnly = computed(() => parseError.value || isTemplated.value || !!loadError.value);
@@ -325,7 +321,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ role?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ role?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ role?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
     </template>
     <template #footer>

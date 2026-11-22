@@ -119,11 +119,7 @@ const dirty = computed(
   () => !!schedule.value && EDITED.some((k) => compared(edit.value[k]) !== compared(editable(schedule.value)[k])),
 );
 // leaving with the schedule changed and unsaved asks first
-useUnsavedGuard(
-  dirty,
-  () => t('settings.common.unsavedChanges'),
-  () => save(),
-);
+useUnsavedGuard(dirty, () => save());
 
 const running = computed(() => ['running', 'queued'].includes(schedule.value?.state));
 // kept in the schedules repository : saved into its file
@@ -264,7 +260,6 @@ const runColumns = computed(() => [
   { key: 'id', label: t('settings.linked.job'), keep: true, class: 'text-end', value: (j) => `#${j.id}` },
   // who it ran as : the Schedule Service, or the user who planned it
   { key: 'user', label: t('jobs.launchedBy') },
-  { key: 'status', label: t('settings.linked.status'), keep: true },
   // its times as the jobs page shows them (the server sends them in its own zone)
   { key: 'start', label: t('jobs.startTime'), keep: true, value: (j) => j.start && Time.format(j.start) },
   { key: 'end', label: t('jobs.endTime'), keep: true, value: (j) => j.end && Time.format(j.end) },
@@ -277,6 +272,7 @@ const runColumns = computed(() => [
     class: 'text-end',
     value: (j) => formatDuration(durationSeconds(j)),
   },
+  { key: 'status', label: t('settings.linked.status'), keep: true },
 ]);
 
 /**
@@ -522,7 +518,11 @@ onMounted(async () => {
     <template #title> {{ t('common.delete') }} {{ schedule?.name }} </template>
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
-        {{ t('settings.common.deleteConfirm') }} <strong>{{ schedule?.name }}</strong>?
+        <i18n-t keypath="settings.common.deleteConfirm" scope="global">
+          <template #name
+            ><strong>{{ schedule?.name }}</strong></template
+          >
+        </i18n-t>
       </p>
       <!-- a repository's : its file goes too, for the repository's Push -->
       <p v-if="inRepository" class="mt-2 mb-0 small text-body-secondary user-select-none">
