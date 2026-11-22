@@ -139,7 +139,10 @@ function iconOf(text, at) {
  */
 function inputsLabelled(labels) {
   const found = [];
-  const pattern = new RegExp(`t\\('(${labels.map((l) => l.replace(/\./g, '\\.')).join('|')})'\\)`, 'g');
+  const pattern = new RegExp(
+    `t\\('(${labels.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})'\\)`,
+    'g',
+  );
   for (const file of sourceFiles(src)) {
     const text = withoutComments(readFileSync(file, 'utf8'));
     for (const m of text.matchAll(pattern)) {
