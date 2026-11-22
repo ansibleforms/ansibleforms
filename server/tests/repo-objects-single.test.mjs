@@ -344,8 +344,8 @@ describe("the chat assistant's switch (ENABLE_CHAT), enable_chat in its map as t
 
   test("the config seed's chat section stays as it is : no switch in it, the file's schema has one", async () => {
     const { seedSchema, chatFileItem } = await import("../src/lib/seed-schema.js");
-    assert.equal(seedSchema.properties.chat.properties.enable_chat, undefined);
-    assert.ok(!seedSchema.properties.chat.required.includes("enable_chat"));
+    assert.equal(seedSchema.properties.chat_assistant.properties.enable_chat, undefined);
+    assert.ok(!seedSchema.properties.chat_assistant.required.includes("enable_chat"));
     assert.equal(Object.keys(chatFileItem.properties)[0], "enable_chat");
     assert.equal(chatFileItem.required, undefined);
   });

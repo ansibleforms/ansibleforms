@@ -342,7 +342,7 @@ export function seedHasMailSettings(doc) {
  * mail_password, mail_from) as a mail channel and its smtp credential : deprecated since 7.6,
  * removed in 8. The settings row has no mail columns any more, the mail goes through the mail
  * channels (Connections > Notifications), so a seed written before keeps working : its mail keys
- * leave the settings section, and with a mail server set the notification_channels section gets
+ * leave the settings section, and with a mail server set the notifications section gets
  * a mail channel, 'default', sending from mail_from, as the upgrade's move of the mail settings
  * makes it :
  *   - with a mail_username : the credentials section gets an smtp credential, 'mail-login',
@@ -391,7 +391,7 @@ export function foldMailSettingsIntoChannel(doc, reserved = {}, own = {}) {
   // step 3 : free names, never one the seed declares nor one reserved
   const credentials = doc.credentials ? { ...doc.credentials } : { items: [] };
   credentials.items = [...(credentials.items || [])];
-  const channels = doc.notification_channels ? { ...doc.notification_channels } : { items: [] };
+  const channels = doc.notifications ? { ...doc.notifications } : { items: [] };
   channels.items = [...(channels.items || [])];
   // the seed's own record's name when free, else the base or the first free one after it
   const free = (base, taken, ownName) => {
@@ -429,7 +429,7 @@ export function foldMailSettingsIntoChannel(doc, reserved = {}, own = {}) {
   }
   // step 5 : the mail channel
   channels.items.push(item);
-  return { doc: { ...doc, settings, credentials, notification_channels: channels }, folded: true, channel, credential };
+  return { doc: { ...doc, settings, credentials, notifications: channels }, folded: true, channel, credential };
 }
 
 const oauth2Item = {
@@ -538,7 +538,7 @@ export function storedValuesOf(obj, values = {}) {
 export const deprecatedValueNotice = (d) => `${d.field}: ${d.value} is deprecated since ${d.since} and removed in 8: read as ${d.field}: ${d.use}, declare that instead`;
 
 /**
- * The config seed's oauth2 items with their values as stored (storedValuesOf, OAUTH2_VALUES) :
+ * The config seed's sso items with their values as stored (storedValuesOf, OAUTH2_VALUES) :
  * provider: entraid applied as azuread, provider: azuread still read, listed as deprecated (warned
  * by the caller). Returns a new document.
  *
@@ -550,14 +550,14 @@ export const deprecatedValueNotice = (d) => `${d.field}: ${d.value} is deprecate
  *     with what it says.
  */
 export function foldOauth2Values(doc) {
-  if (!Array.isArray(doc?.oauth2?.items)) return { doc, deprecated: [] };
+  if (!Array.isArray(doc?.sso?.items)) return { doc, deprecated: [] };
   const deprecated = [];
-  const items = doc.oauth2.items.map((item) => {
+  const items = doc.sso.items.map((item) => {
     const stored = storedValuesOf(item, OAUTH2_VALUES);
     deprecated.push(...stored.deprecated.map((d) => ({ name: item?.name, notice: deprecatedValueNotice(d) })));
     return stored.object;
   });
-  return { doc: { ...doc, oauth2: { ...doc.oauth2, items } }, deprecated };
+  return { doc: { ...doc, sso: { ...doc.sso, items } }, deprecated };
 }
 
 const repositoryItem = {
@@ -949,14 +949,14 @@ export const seedSchema = {
     // the repository types' descriptors (lib/repoObjects/groups.js, users.js), made or changed
     groups: listSection(groupItem),
     users: listSection(userItem),
-    oauth2: listSection(oauth2Item),
+    sso: listSection(oauth2Item),
     repositories: listSection(repositoryItem),
-    syslog_servers: listSection(syslogServerItem),
-    notification_channels: listSection(notificationChannelItem),
+    syslog: listSection(syslogServerItem),
+    notifications: listSection(notificationChannelItem),
     labels: listSection(labelItem),
     ldap: ldapSection,
     settings: settingsSection,
-    chat: chatSection,
+    chat_assistant: chatSection,
     defaults: defaultsSection,
     logo: logoSection,
     icon: iconSection,
@@ -975,7 +975,7 @@ const validator = ajv.compile(seedSchema);
 // typo here : the second entry silently wins the upsert while the first is counted
 // as declared, so a prune would spare a record nobody can see in the file.
 function assertUniqueNames(doc) {
-  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels", "announcements"]) {
+  for (const key of ["runners", "secret_stores", "credentials", "databases", "sso", "repositories", "syslog", "notifications", "labels", "announcements"]) {
     const items = doc[key]?.items;
     if (!Array.isArray(items)) continue;
     const seen = new Set();
@@ -1011,14 +1011,14 @@ function assertSingletonFlags(doc) {
   }
   const byProvider = {};
   // by the provider's type as stored (entraid and azuread are one), named as a file says it
-  for (const item of doc.oauth2?.items || []) {
+  for (const item of doc.sso?.items || []) {
     if (!item.enable) continue;
     const provider = fileValuesOf(storedValuesOf(item, OAUTH2_VALUES).object, OAUTH2_VALUES).provider;
     (byProvider[provider] = byProvider[provider] || []).push(item.name);
   }
   for (const [provider, names] of Object.entries(byProvider)) {
     if (names.length > 1) {
-      throw new Error(`Seed file enables more than one '${provider}' oauth2 provider: ${names.sort().join(", ")}`);
+      throw new Error(`Seed file enables more than one '${provider}' SSO provider: ${names.sort().join(", ")}`);
     }
   }
   // one repository per object type (the schedules, the credentials ...) : the objects are written
@@ -1086,7 +1086,41 @@ export function itemValidator(section) {
 // opts : { held, inDatabase } - the repositories holding the configuration's keys in the database
 // now and whether it is kept there, as the apply folds use_for_config with them (foldConfigFlag) :
 // a seed is refused only for what the apply would really give ; none (a fresh database) as before
+// The seed's sections named as the repository's keys since 7.8.0 (controller_sso:, controller_syslog:,
+// controller_notifications:, controller_chat_assistant:) : their names before, still read,
+// deprecated and removed in 8. { old name: section }
+export const SECTION_ALIASES = { oauth2: "sso", syslog_servers: "syslog", notification_channels: "notifications", chat: "chat_assistant" };
+
+/**
+ * The seed with its sections under their names : a section given by its name before
+ * (SECTION_ALIASES) read as its section.
+ *
+ * Args:
+ *   doc (object): the seed.
+ *
+ * Returns:
+ *   object: { doc (the seed, its sections renamed), renamed ([old, section] pairs, to be said) }.
+ *
+ * Raises:
+ *   Error: a section given by both names.
+ */
+export function foldSectionAliases(doc) {
+  if (!doc || typeof doc !== "object") return { doc, renamed: [] };
+  const renamed = Object.entries(SECTION_ALIASES).filter(([old]) => Object.hasOwn(doc, old));
+  if (!renamed.length) return { doc, renamed };
+  const both = renamed.filter(([, section]) => Object.hasOwn(doc, section));
+  if (both.length) throw new Error(`Seed file validation failed: ${both.map(([old, section]) => `${section}: and ${old}: are the same section, give it once as ${section}:`).join("; ")}`);
+  const out = { ...doc };
+  for (const [old, section] of renamed) {
+    out[section] = out[old];
+    delete out[old];
+  }
+  return { doc: out, renamed };
+}
+
 export function validateSeed(doc, opts = {}) {
+  // a section by its name before : checked as its section (said when the seed is applied)
+  doc = foldSectionAliases(doc).doc;
   if (!validator(doc)) {
     const details = schemaErrors(validator.errors);
     throw new Error(`Seed file validation failed: ${details}`);

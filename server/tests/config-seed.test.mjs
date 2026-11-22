@@ -32,7 +32,7 @@ vi.mock("../src/models/db.model.js", () => ({
   },
 }));
 
-const { validateSeed, interpolateEnv, foldRunnerSecretsIntoCredentials, foldOauth2Values } = await import("../src/lib/seed-schema.js");
+const { validateSeed, interpolateEnv, foldRunnerSecretsIntoCredentials, foldOauth2Values, foldSectionAliases } = await import("../src/lib/seed-schema.js");
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 appConfig.encryptionSecret ||= "0123456789abcdef0123456789abcdef";
 const { buildRecord, listSections, canonicalJson, applyChat, differs } = await import("../src/lib/seed.js");
@@ -203,42 +203,57 @@ describe("the seed schema refuses anything it does not understand", () => {
 
   test("two enabled oauth2 providers of the SAME type are rejected", () => {
     assert.throws(
-      () => validateSeed({ oauth2: { items: [
+      () => validateSeed({ sso: { items: [
         { name: "a", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
         { name: "b", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
       ] } }),
-      /enables more than one 'oidc' oauth2 provider: a, b/
+      /enables more than one 'oidc' SSO provider: a, b/
     );
   });
 
   // entraid is Microsoft Entra ID, stored azuread : azuread (deprecated) is the same type
   test("an entraid and an azuread provider both enabled are the SAME type, rejected", () => {
     assert.throws(
-      () => validateSeed({ oauth2: { items: [
+      () => validateSeed({ sso: { items: [
         { name: "a", provider: "entraid", client_id: "c", client_secret: "s", enable: true },
         { name: "b", provider: "azuread", client_id: "c", client_secret: "s", enable: true },
       ] } }),
-      /enables more than one 'entraid' oauth2 provider: a, b/
+      /enables more than one 'entraid' SSO provider: a, b/
     );
   });
 
   // different provider types are independent, so this must stay allowed
+  test("the sections' names before 7.8.0 are still read as the repository's keys name them", () => {
+    const old = {
+      oauth2: { items: [{ name: "corp", provider: "oidc", enable: true, credential: "corp-client" }] },
+      syslog_servers: { items: [{ name: "siem", host: "siem.example.com" }] },
+      notification_channels: { items: [{ name: "ops", type: "slack", webhook_url: "https://hooks.example.com/x" }] },
+      chat: { provider: "anthropic", api_key: "x", base_url: "", model: "claude-opus-5-5", max_turns: 20, max_tool_rounds: 6, timeout_seconds: 60, allow_job_status: true },
+    };
+    const { doc, renamed } = foldSectionAliases(old);
+    assert.deepEqual(Object.keys(doc).sort(), ["chat_assistant", "notifications", "sso", "syslog"]);
+    assert.deepEqual(renamed.map(([o, n]) => `${o}>${n}`), ["oauth2>sso", "syslog_servers>syslog", "notification_channels>notifications", "chat>chat_assistant"]);
+    assert.equal(validateSeed(old), true);
+    assert.deepEqual(foldSectionAliases({ sso: { items: [] } }).renamed, [], "the new names as they are");
+    assert.throws(() => validateSeed({ sso: { items: [] }, oauth2: { items: [] } }), /sso: and oauth2: are the same section, give it once as sso:/);
+  });
+
   test("two enabled oauth2 providers of DIFFERENT types are fine", () => {
-    assert.equal(validateSeed({ oauth2: { items: [
+    assert.equal(validateSeed({ sso: { items: [
       { name: "a", provider: "entraid", client_id: "c", client_secret: "s", enable: true },
       { name: "b", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
     ] } }), true);
   });
 
   test("provider: entraid is applied as azuread, the type stored ; azuread still read, said deprecated", () => {
-    const seed = { oauth2: { items: [
+    const seed = { sso: { items: [
       { name: "a", provider: "entraid", client_id: "c", client_secret: "s" },
       { name: "b", provider: "azuread", client_id: "c", client_secret: "s" },
       { name: "c", provider: "oidc", client_id: "c", client_secret: "s" },
     ] } };
     assert.equal(validateSeed(seed), true);
     const { doc, deprecated } = foldOauth2Values(seed);
-    assert.deepEqual(doc.oauth2.items.map((i) => i.provider), ["azuread", "azuread", "oidc"]);
+    assert.deepEqual(doc.sso.items.map((i) => i.provider), ["azuread", "azuread", "oidc"]);
     assert.deepEqual(deprecated, [{ name: "b", notice: "provider: azuread is deprecated since 7.8.0 and removed in 8: read as provider: entraid, declare that instead" }]);
     assert.deepEqual(foldOauth2Values({}).doc, {}, "a seed without oauth2 as it is");
   });
@@ -566,15 +581,15 @@ describe("the chat assistant's provider is seedable (a single-row section)", () 
   const summary = () => ({ created: [], updated: [], unchanged: 0, adopted: [], released: [], deleted: [] });
 
   test("a fully declared chat section validates, its key from the environment", () => {
-    assert.equal(validateSeed({ chat: FULL_CHAT }), true);
-    assert.equal(interpolateEnv({ chat: FULL_CHAT }, { CHAT_API_KEY: "sk-live" }).chat.api_key, "sk-live");
-    assert.throws(() => interpolateEnv({ chat: FULL_CHAT }, {}), /undefined environment variables: CHAT_API_KEY/);
+    assert.equal(validateSeed({ chat_assistant: FULL_CHAT }), true);
+    assert.equal(interpolateEnv({ chat_assistant: FULL_CHAT }, { CHAT_API_KEY: "sk-live" }).chat_assistant.api_key, "sk-live");
+    assert.throws(() => interpolateEnv({ chat_assistant: FULL_CHAT }, {}), /undefined environment variables: CHAT_API_KEY/);
   });
 
   test("every field is required, and the provider is one we have", () => {
     const { model, ...partial } = FULL_CHAT; // eslint-disable-line no-unused-vars
-    assert.throws(() => validateSeed({ chat: partial }), /required property 'model'/);
-    assert.throws(() => validateSeed({ chat: { ...FULL_CHAT, provider: "watson" } }), /validation failed/);
+    assert.throws(() => validateSeed({ chat_assistant: partial }), /required property 'model'/);
+    assert.throws(() => validateSeed({ chat_assistant: { ...FULL_CHAT, provider: "watson" } }), /validation failed/);
   });
 
   test("applied: adopted, the key encrypted, the row managed", async () => {
@@ -585,8 +600,8 @@ describe("the chat assistant's provider is seedable (a single-row section)", () 
     };
     const s = summary();
     await applyChat({ ...FULL_CHAT, api_key: "sk-live" }, s);
-    assert.deepEqual(s.adopted, ["chat"]);
-    assert.deepEqual(s.updated, ["chat"]);
+    assert.deepEqual(s.adopted, ["chat_assistant"]);
+    assert.deepEqual(s.updated, ["chat_assistant"]);
     assert.equal(writes[0].managed, 1);
     assert.equal(writes[0].provider, "anthropic");
     assert.notEqual(writes[0].api_key, "sk-live");
@@ -594,8 +609,8 @@ describe("the chat assistant's provider is seedable (a single-row section)", () 
   });
 
   test("the proxy settings are optional, and extra headers may be a yaml mapping", async () => {
-    assert.equal(validateSeed({ chat: { ...FULL_CHAT, auth_type: "api-key", api_version: "2024-10-21", request_user: "af-chat", ignore_certs: true, extra_headers: { "X-Org": "ops" } } }), true);
-    assert.throws(() => validateSeed({ chat: { ...FULL_CHAT, auth_type: "basic" } }), /validation failed/);
+    assert.equal(validateSeed({ chat_assistant: { ...FULL_CHAT, auth_type: "api-key", api_version: "2024-10-21", request_user: "af-chat", ignore_certs: true, extra_headers: { "X-Org": "ops" } } }), true);
+    assert.throws(() => validateSeed({ chat_assistant: { ...FULL_CHAT, auth_type: "basic" } }), /validation failed/);
     const writes = [];
     dbHandler = async (sql, rec) => {
       if (/^UPDATE/.test(sql)) { writes.push(rec); return { affectedRows: 1 }; }

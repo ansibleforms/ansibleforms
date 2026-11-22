@@ -7051,10 +7051,15 @@
       | --- | --- | --- | --- | --- |
       | Secret stores | `controller_secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
       | Databases | `controller_databases:` | an item of `databases:` | `credential` (of type database) | |
-      | Notifications | `controller_notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
-      | SSO | `controller_sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | Notifications | `controller_notifications:` | an item of `notifications:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `controller_sso:` | an item of `sso:` (by its name) | `credential` | `client_secret` |
       | LDAP | `controller_ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
-      | Syslog | `controller_syslog:` | an item of `syslog_servers:` | | |
+      | Syslog | `controller_syslog:` | an item of `syslog:` | | |
+
+      Every seed section is named as the repository's key without `controller_` (`sso:` for `controller_sso:`). The
+      seed's names before 7.8.0 are still read, deprecated and removed in 8.0, said in the server log: `oauth2:` for
+      `sso:`, `syslog_servers:` for `syslog:`, `notification_channels:` for `notifications:` and `chat:` for
+      `chat_assistant:`. A seed giving a section by both names is refused.
       | Labels | `controller_labels:` | an item of `labels:` | | |
 
       ```yaml
@@ -7071,7 +7076,7 @@
           enable: true
       ```
 
-      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `oauth2:`
+      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `sso:`
       items. `azuread`, its name before, is still read the same (deprecated, removed in 8.0, said in the pull output).
 
       An entry may leave a secret out: the one in the database stays (an object of the app is written to git without
@@ -7161,11 +7166,11 @@
 
       **Chat assistant** (`controller_chat_assistant:`): what Settings > Connections > Chat assistant saves, every field
       optional: its switch `enable_chat` (the `ENABLE_CHAT` environment setting, named as its variable in lower case,
-      as Defaults' `default_language`), then the settings in the config seed's `chat:` format. The switch is checked
+      as Defaults' `default_language`), then the settings in the config seed's `chat_assistant:` format. The switch is checked
       and saved as the page's Save (the chat turns on or off at once, no restart, audited), and a save of the switch on
       the page rewrites it in the map; the app writes it on or off. When the real environment sets `ENABLE_CHAT`
       the app never writes it, and a map giving it is refused, nothing applied, as General refuses such a variable.
-      General never holds it. The config seed's `chat:` section has no switch. `api_key` only as `${ENV}`, or left
+      General never holds it. The config seed's `chat_assistant:` section has no switch. `api_key` only as `${ENV}`, or left
       out (the one in the database stays); `credential` names an api credential, and the map waits while it is missing.
       ```yaml
       controller_chat_assistant:

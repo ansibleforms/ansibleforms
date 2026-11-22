@@ -10,7 +10,7 @@ import { seedType } from "./seedType.js";
 
 export default seedType({
   key: "notifications",
-  section: "notification_channels",
+  section: "notifications",
   model: "notificationchannel",
   Model: NotificationChannel,
   title: "Notifications",

@@ -1,13 +1,13 @@
 'use strict';
 // The Syslog type of the repository-backed objects (lib/repoObjects/engine.js) : the syslog servers
 // of the syslog: lists of a repository's files, in the config seed's format (an item of its
-// syslog_servers section) : where the server log and the audit entries are sent.
+// syslog section) : where the server log and the audit entries are sent.
 import SyslogServer from "../../models/syslogServer.model.js";
 import { seedType } from "./seedType.js";
 
 export default seedType({
   key: "syslog",
-  section: "syslog_servers",
+  section: "syslog",
   model: "syslogserver",
   Model: SyslogServer,
   title: "Syslog servers",

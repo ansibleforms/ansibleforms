@@ -146,7 +146,7 @@ describe("CONFIG_SEED_PATH unset releases what the seed managed", () => {
     assert.equal(targetType, "seed");
     assert.equal(outcome, "success");
     assert.deepEqual(JSON.parse(detail).released.sort(), [
-      "chat", "credential:rte", "label:prod", "ldap", "runner:rte",
+      "chat_assistant", "credential:rte", "label:prod", "ldap", "runner:rte",
     ]);
   });
 

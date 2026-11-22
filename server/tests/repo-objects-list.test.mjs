@@ -350,7 +350,7 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.equal(notifications.key, "notifications");
     assert.equal(notifications.single, undefined);
     const { itemValidator, chatFileItem } = await import("../src/lib/seed-schema.js");
-    assert.deepEqual(notifications.keyOrder, itemValidator("notification_channels").keys);
+    assert.deepEqual(notifications.keyOrder, itemValidator("notifications").keys);
     assert.deepEqual(chat.keyOrder, itemValidator(chatFileItem).keys);
   });
 });
