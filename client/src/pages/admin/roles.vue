@@ -319,10 +319,10 @@ onMounted(async () => {
     <!-- Previous / Next, and Save on the last step -->
     <template #footer>
       <BsButton v-if="roleStep > 0" icon="arrow-left" @click="goToRoleStep(roleStep - 1)">{{
-        t('common.previous')
+        t('common.previousStep')
       }}</BsButton>
       <BsButton v-if="!roleLastStep" icon="arrow-right" @click="goToRoleStep(roleStep + 1)">{{
-        t('common.next')
+        t('common.nextStep')
       }}</BsButton>
       <BsButton v-if="roleLastStep" icon="save" @click="createRole()">{{ t('settings.common.save') }}</BsButton>
     </template>
