@@ -136,29 +136,53 @@ const NUMBER_PARTS = {
  *   object: { errors (string[]), text (the rrule trimmed) }.
  */
 /**
- * How many DTSTART properties a rule's text gives : DTSTART, its parameters if any (;TZID=...), a
- * colon and a date-time (20261020T020000, Z or not). Counted by a scan, never by a regex that could
- * backtrack over the whole text from every DTSTART.
+ * Where a date-time (20261020T020000) written at a place of a text ends : digits, a T, digits.
+ *
+ * Args:
+ *   text (string): the text.
+ *   at (number): where it would start.
+ *
+ * Returns:
+ *   number: the index after it ; -1 when no date-time starts there.
+ */
+function momentEnd(text, at) {
+  const digit = (k) => text.charCodeAt(k) >= 48 && text.charCodeAt(k) <= 57;
+  let k = at;
+  while (digit(k)) k++;
+  if (k === at || text[k] !== "T") return -1;
+  let end = k + 1;
+  while (digit(end)) end++;
+  return end === k + 1 ? -1 : end;
+}
+
+/**
+ * The DTSTART properties a rule's text gives : DTSTART, its parameters if any (;TZID=...), a colon
+ * and a date-time (20261020T020000, Z or not). Read by a scan, character by character, never by a
+ * regex that could backtrack over the text.
  *
  * Args:
  *   text (string): the rule's text.
  *
  * Returns:
- *   number: the DTSTART properties found.
+ *   object: { count (the DTSTART properties), naive (one without parameters whose date-time has no
+ *     zone : a space right after it) }.
  */
-function countDtstarts(text) {
-  const moment = /[0-9]+T[0-9]+/y;
+function dtstartsOf(text) {
   let count = 0;
+  let naive = false;
   for (let i = text.indexOf("DTSTART"); i !== -1; i = text.indexOf("DTSTART", i + 7)) {
     let colon = i + 7;
+    const plain = text[colon] === ":";
     // its parameters : up to the next colon, at least one character
     if (text[colon] === ";") colon = text.indexOf(":", colon + 2);
     if (colon === -1) break;
     if (text[colon] !== ":") continue;
-    moment.lastIndex = colon + 1;
-    if (moment.test(text)) count++;
+    const end = momentEnd(text, colon + 1);
+    if (end === -1) continue;
+    count++;
+    if (plain && text[end] === " ") naive = true;
   }
-  return count;
+  return { count, naive };
 }
 
 function readErrors(value) {
@@ -167,10 +191,10 @@ function readErrors(value) {
   // step 1 : what is checked on the text ; EXDATE and RDATE end the check at once, said on
   // their own
   const errors = [];
-  const dtstarts = countDtstarts(text);
-  if (!dtstarts) errors.push("Valid DTSTART required in rrule. Value should start with: DTSTART:YYYYMMDDTHHMMSSZ");
-  if (/DTSTART:[0-9]+T[0-9]+ /.test(text)) errors.push("DTSTART cannot be a naive datetime.  Specify ;TZINFO= or YYYYMMDDTHHMMSSZZ.");
-  if (dtstarts > 1) errors.push("Multiple DTSTART is not supported.");
+  const dtstarts = dtstartsOf(text);
+  if (!dtstarts.count) errors.push("Valid DTSTART required in rrule. Value should start with: DTSTART:YYYYMMDDTHHMMSSZ");
+  if (dtstarts.naive) errors.push("DTSTART cannot be a naive datetime.  Specify ;TZINFO= or YYYYMMDDTHHMMSSZZ.");
+  if (dtstarts.count > 1) errors.push("Multiple DTSTART is not supported.");
   if (!/rrule:/i.test(text)) errors.push("One or more rule required in rrule.");
   if (/exdate:/i.test(text)) return { errors: ["EXDATE not allowed in rrule."], text };
   if (/rdate:/i.test(text)) return { errors: ["RDATE not allowed in rrule."], text };
