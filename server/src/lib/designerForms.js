@@ -39,8 +39,7 @@
 //
 // The git outputs a limited designer reads (a push, a repository's pull and push output) leave out
 // the lines naming files, and the form names defined twice they are not told of ; the load's warning
-// of a form name defined twice (the forms list, the designer, a repository's page) is left out unless
-// both copies are theirs.
+// of a form name defined twice (the forms list, the designer) is left out unless both copies are theirs.
 //
 // A designer some forms, playbooks or workflows are hidden from adds no expression nor query the
 // server runs to a form (assertServerCodeKept), and runs no raw expression either
@@ -216,16 +215,15 @@ export async function designerConfig(config, user, unloaded = []) {
     ...config,
     forms,
     // a duplicate naming a hidden form : its warning left out
-    warnings: await designerWarnings(config.warnings, user),
+    warnings: (await designerWarnings(config.warnings, user)) || [],
     errors: (config.errors || []).filter((e) => !hiddenErrors.some((start) => String(e).startsWith(start))),
   };
 }
 
 /**
  * A load's warnings as a user reads them : without the "defined twice" warnings naming a form
- * hidden from them (duplicateShown). The forms list (GET /api/v2/config/formlist) is filtered
- * by the user's roles already, but the loader warns of every name defined twice, whoever it
- * belongs to.
+ * hidden from them (duplicateShown). The forms list (GET /api/v2/config/formlist) is filtered by
+ * the user's roles already, but the loader warns of every name defined twice, whoever it belongs to.
  *
  * Args:
  *   warnings (string[]): the load's warnings.
@@ -668,8 +666,7 @@ export function designerGitOutput(output, user) {
  */
 export async function designerRepositories(rows, user) {
   if (designsEverything(user)) return rows;
-  // the duplicate lines they may read : those of now, naming no form hidden from them (a line
-  // stored by an earlier pull too : one no longer true is left out)
+  // the duplicate lines they may read : those of now, naming no form hidden from them
   const shownLines = designsAllForms(user)
     ? null
     : new Set((await Form.duplicates().catch(() => [])).filter((d) => duplicateShown(d, user)).map((d) => `Warning: ${d.notice}`));

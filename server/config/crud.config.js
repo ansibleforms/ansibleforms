@@ -25,7 +25,11 @@ const crudConfigs = {
       { name: 'token_url' },
       { name: 'userinfo_url' },
       { name: 'extra' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },
@@ -70,7 +74,12 @@ const crudConfigs = {
       { name: 'vault_path' },
       { name: 'secret_store' },
       { name: 'secret_ref' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the credentials repository and the file (credentials/<file>.yaml) it comes from : written
+      // by lib/repoObjects alone (isRepoLink : never from a request body), NULL for one kept in the
+      // app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -120,7 +129,11 @@ const crudConfigs = {
       { name: 'rte_max_jobs' },
       { name: 'rte_cache_mb' },
       { name: 'rte_files' },
-      { name: 'rte_drain_seconds' }
+      { name: 'rte_drain_seconds' },
+      // the runners repository and the file (runners/<file>.yaml) it comes from : written by
+      // lib/repoObjects alone (isRepoLink : never from a request body)
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -137,7 +150,11 @@ const crudConfigs = {
       { name: 'description' },
       // a credential of Connections > Credentials, of type database
       { name: 'credential', required: true },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the databases repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -169,7 +186,11 @@ const crudConfigs = {
       { name: 'headers' },
       { name: 'verify_tls', isBoolean: true },
       { name: 'payload' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -185,7 +206,11 @@ const crudConfigs = {
       { name: 'color' },
       { name: 'enabled', isBoolean: true },
       { name: 'position' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -206,7 +231,11 @@ const crudConfigs = {
       { name: 'source' },
       { name: 'receives' },
       { name: 'enabled', isBoolean: true },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -245,7 +274,11 @@ const crudConfigs = {
       { name: 'pvwa_credential' },
       { name: 'pvwa_auth' },
       { name: 'platform_id' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -256,7 +289,11 @@ const crudConfigs = {
       { name: 'id', isKey: true },
       { name: 'name', isNaturalKey: true, required: true },
       // what the group is for, or who owns it
-      { name: 'description' }
+      { name: 'description' },
+      // the groups repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -276,7 +313,11 @@ const crudConfigs = {
       { name: 'blocked' },
       // its latest sign-in : read with the user, written by User.recordSignIn alone (at each
       // sign-in, lib/signInGate.js), never by a create or an update
-      { name: 'last_login', isDatetime: true }
+      { name: 'last_login', isDatetime: true },
+      // the users repository and the file it comes from : written by lib/repoObjects alone
+      // (isRepoLink : never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },
@@ -290,11 +331,41 @@ const crudConfigs = {
       { name: 'user' },
       { name: 'password', isEncrypted: true, setDefault: true },
       { name: 'description' },
-      { name: 'use_for_config', isBoolean: true },
+      // the roles, the categories and the constants, each from its own file (lib/configKeys.js) ;
+      // the Config usage of before (use_for_config) is split into them
+      { name: 'use_for_roles', isBoolean: true },
+      { name: 'use_for_categories', isBoolean: true },
+      { name: 'use_for_constants', isBoolean: true },
       { name: 'use_for_forms', isBoolean: true },
       { name: 'use_for_playbooks', isBoolean: true },
       { name: 'use_for_workflows', isBoolean: true },
       { name: 'use_for_inventories', isBoolean: true },
+      // the schedules in its schedules folder, one YAML file each (models/scheduleRepo.model.js)
+      { name: 'use_for_schedules', isBoolean: true },
+      // the objects it holds, one YAML file each in the type's folder (lib/repoObjects) : one
+      // repository at most per type ; those of a later version are refused when turned on
+      { name: 'use_for_repositories', isBoolean: true },
+      { name: 'use_for_credentials', isBoolean: true },
+      { name: 'use_for_secret_stores', isBoolean: true },
+      { name: 'use_for_databases', isBoolean: true },
+      { name: 'use_for_groups', isBoolean: true },
+      { name: 'use_for_users', isBoolean: true },
+      { name: 'use_for_runners', isBoolean: true },
+      { name: 'use_for_notifications', isBoolean: true },
+      { name: 'use_for_sso', isBoolean: true },
+      { name: 'use_for_ldap', isBoolean: true },
+      { name: 'use_for_syslog', isBoolean: true },
+      { name: 'use_for_chat_assistant', isBoolean: true },
+      { name: 'use_for_mcp', isBoolean: true },
+      { name: 'use_for_disclaimer', isBoolean: true },
+      { name: 'use_for_defaults', isBoolean: true },
+      { name: 'use_for_logo', isBoolean: true },
+      { name: 'use_for_icon', isBoolean: true },
+      { name: 'use_for_name', isBoolean: true },
+      { name: 'use_for_links', isBoolean: true },
+      { name: 'use_for_labels', isBoolean: true },
+      { name: 'use_for_announcements', isBoolean: true },
+      { name: 'use_for_general', isBoolean: true },
       // a credential of Connections > Credentials : the user and password git uses
       { name: 'credential' },
       { name: 'rebase_on_start', isBoolean: true },
@@ -311,7 +382,11 @@ const crudConfigs = {
       { name: 'pull_status' },
       { name: 'push_status' },
       { name: 'head' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repositories repository and its repositories.yaml it comes from : written by
+      // lib/repoObjects alone (isRepoLink : never from a request body)
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: true,
     cacheTTL: 3600
@@ -345,7 +420,11 @@ const crudConfigs = {
       { name: 'group_member_attribute' },
       { name: 'group_member_user_attribute' },
       { name: 'mail_attribute' },
-      { name: 'managed', isBoolean: true }
+      { name: 'managed', isBoolean: true },
+      // the repository and the file it comes from : written by lib/repoObjects alone (isRepoLink :
+      // never from a request body), NULL for one kept in the app only
+      { name: 'repository', isRepoLink: true },
+      { name: 'repo_file', isRepoLink: true }
     ],
     allowCache: false
   },
@@ -354,9 +433,9 @@ const crudConfigs = {
     fields: [
       { name: 'id', isKey: true },
       { name: 'name', isNaturalKey: true, required: true },
-      { name: 'one_time_run', isBoolean: true },
+      // its timing, one of three : the moment of its one run, a cron, or an iCal rrule (below)
+      { name: 'one_time_run', isDatetime: true },
       { name: 'cron' },
-      { name: 'run_at', isDatetime: true },
       { name: 'extra_vars' },
       { name: 'form' },
       { name: 'output' },
@@ -373,6 +452,17 @@ const crudConfigs = {
       // fires. Missing here, it was dropped on insert and never read back, and a planned run
       // of a form under 'enforce' failed with "no rawFormData was sent" (#1063)
       { name: 'raw_form_data' },
+      // what it is for, in a few words
+      { name: 'description' },
+      // timed by an iCal rrule, instead of a cron or a one time run
+      { name: 'rrule' },
+      // the schedules repository and the file it comes from : set by models/scheduleRepo.model.js
+      // alone, never from a request body (Schedule.create and update drop them)
+      { name: 'repository' },
+      { name: 'repo_file' },
+      // its file's prompts as the reserved extra vars a job reads (JSON) : the file's, never a
+      // request body's
+      { name: 'launch_options' },
       // the stored job a planned run's values came from (Schedule.plan, checked by
       // lib/storedJobUse.js) : its last use is written when the run fires. Set ONLY by
       // Schedule.plan, never by a schedule's create or update (a schedule keeps its own copy)

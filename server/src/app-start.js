@@ -1,6 +1,7 @@
 // The app : the web interface, the API and everything around it. Started by index.js with
-// AF_ROLE unset (the app and the worker in one process, as AnsibleForms always ran) or
-// AF_ROLE=app (the web app only, next to a worker - several may run behind a load balancer).
+// AF_ROLE unset (the controller and the worker in one process, as AnsibleForms always ran) or
+// AF_ROLE=controller (the web interface and the API only, next to a worker - several may run
+// behind a load balancer ; AF_ROLE=app, its name before 7.8, is read the same).
 // A worker or an RTE never loads this module.
 import express from 'express';
 import ansibleforms from './app.js';
@@ -19,6 +20,7 @@ import httpsConfig from '../config/https.config.js';
 import { registerHttpsServer } from './lib/httpsContext.js';
 import { httpServerOptions } from './lib/httpServerOptions.js';
 import authConfig, { entraEnvWarnings } from '../config/auth.config.js';
+import { controllerEnvWarnings } from './lib/controllerEnv.js';
 import logger from './lib/logger.js';
 import { reloadConfigSeed } from './lib/seed.js';
 import { getExpressionMode } from './lib/expressionMode.js';
@@ -87,10 +89,10 @@ export async function startApp(){
   // left open across an upgrade learns it runs an older one (src/lib/appBuild.js, issue #660)
   app.use(appBuildHeader(build.gitSha));
 
-  // Several app nodes must sign and accept the same tokens : a secret generated per process
+  // Several controller nodes must sign and accept the same tokens : a secret generated per process
   // makes every node refuse what another one signed - a login that works one request in two
-  if (ROLE === 'app' && authConfig.secretIsGenerated) {
-    await die('AF_ROLE=app needs ACCESS_TOKEN_SECRET, the same on every app node: refusing to start');
+  if (ROLE === 'controller' && authConfig.secretIsGenerated) {
+    await die('AF_ROLE=controller needs ACCESS_TOKEN_SECRET, the same on every controller node: refusing to start');
   }
 
   await waitForDatabase();
@@ -149,6 +151,8 @@ export async function startApp(){
 
   // the Entra ID variables of before 7.3 (AZURE_*) : still read, said once
   for (const warning of entraEnvWarnings()) logger.warning(warning);
+  // the names of before 7.8 still set : AF_ROLE=app (lib/controllerEnv.js)
+  for (const warning of controllerEnvWarnings()) logger.warning(warning);
 
   if (authConfig.secretIsGenerated) {
     logger.warning('[SECURITY] JWT signing secret was auto-generated. All tokens will be invalidated on restart. Set the ACCESS_TOKEN_SECRET environment variable for persistent token signing.');

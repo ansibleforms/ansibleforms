@@ -644,7 +644,8 @@ const SCHEMA_MANIFEST = {
                               'audit', 'chat_settings'],
                      columns: ['oauth2_providers.tenant_id', 'jobs.raw_form_data', 'repositories.use_for_config',
                                'jobs.pid', 'jobs.host', 'schedule.one_time_run',
-                               'schedule.run_at', 'credentials.vault_path', 'jobs.awx_workflow', 'settings.logo',
+                               // not schedule.run_at : 7.8.0 drops it, one_time_run holds the moment
+                               'credentials.vault_path', 'jobs.awx_workflow', 'settings.logo',
                                'settings.config_source', 'settings.default_language',
                                'settings.default_theme', 'settings.default_theme_color',
                                'credentials.managed', 'oauth2_providers.managed',
@@ -681,7 +682,19 @@ const SCHEMA_MANIFEST = {
                                'credentials.ignore_certs', 'credentials.ca_bundle', 'credentials.rte_cert_sha256', 'oauth2_providers.auto_login',
                                'runners.credential', 'ldap.description', 'settings.disclaimer_version', 'announcements.enabled',
                                'credentials.url', 'settings.encryption_check', 'credentials.key_passphrase',
-                               'stored_jobs.last_used_at', 'schedule.stored_job_id', 'jobs.stored_job_id', 'stored_jobs.unused_days'],
+                               'repositories.use_for_schedules', 'schedule.description', 'schedule.rrule',
+                               'schedule.repository', 'schedule.repo_file', 'schedule.launch_options',
+                               'repositories.use_for_credentials', 'repositories.use_for_secret_stores', 'repositories.use_for_databases', 'repositories.use_for_runners', 'repositories.use_for_notifications', 'repositories.use_for_sso', 'repositories.use_for_ldap', 'repositories.use_for_syslog', 'repositories.use_for_chat_assistant', 'repositories.use_for_disclaimer', 'repositories.use_for_defaults', 'repositories.use_for_logo', 'repositories.use_for_icon', 'repositories.use_for_name', 'repositories.use_for_links', 'repositories.use_for_roles', 'repositories.use_for_categories', 'repositories.use_for_constants', 'repositories.use_for_repositories', 'repositories.repository', 'repositories.repo_file', 'repositories.use_for_labels', 'repositories.use_for_announcements', 'repositories.use_for_general', 'repositories.use_for_mcp', 'repositories.use_for_groups', 'repositories.use_for_users',
+                               'credentials.repository', 'credentials.repo_file', 'runners.repository', 'runners.repo_file',
+                               'announcements.name', 'announcements.repository', 'announcements.repo_file', 'settings.seed_managed_fields',
+                               'disclaimer_versions.repository', 'disclaimer_versions.repo_file',
+                               'secret_stores.repository', 'secret_stores.repo_file', 'notification_channels.repository', 'notification_channels.repo_file', 'oauth2_providers.repository', 'oauth2_providers.repo_file', 'ldap.repository', 'ldap.repo_file', 'syslog_servers.repository', 'syslog_servers.repo_file', 'labels.repository', 'labels.repo_file', 'databases.repository', 'databases.repo_file',
+                               'groups.repository', 'groups.repo_file', 'users.repository', 'users.repo_file',
+                               'directory_users.repository', 'directory_users.repo_file', 'directory_users.description',
+                               'stored_jobs.last_used_at',
+                               'schedule.stored_job_id',
+                               'jobs.stored_job_id',
+                               'stored_jobs.unused_days'],
                      indexes: ['jobs.idx_jobs_stored_job'] },
   },
 };
@@ -860,11 +873,14 @@ async function patchVersion6(messages, success, failed) {
   
   // Add one_time_run column to schedule table (6.2.0)
   // This allows schedules to be either recurring (false) or one-time (true)
-  await checkPromise(addColumn("schedule", "one_time_run", "tinyint(4)", true, "0"), messages, success, failed);
-  
   // Add run_at column to schedule table (6.2.0)
   // This stores the datetime for one-time scheduled jobs
-  await checkPromise(addColumn("schedule", "run_at", "datetime", true, "NULL"), messages, success, failed);
+  // 7.8.0 turns them into one column, one_time_run holding the moment (oneTimeRunMoment, patch 7) :
+  // added as 6.2.0 had them only on a database that has neither yet, never again after that
+  if (!(await oneTimeRunIsMoment())) {
+    await checkPromise(addColumn("schedule", "one_time_run", "tinyint(4)", true, "0"), messages, success, failed);
+    await checkPromise(addColumn("schedule", "run_at", "datetime", true, "NULL"), messages, success, failed);
+  }
   
   // Create stored_jobs table (6.2.0)
   // This allows users to save and load form data
@@ -1241,6 +1257,38 @@ async function patchVersion7(messages, success, failed) {
   const databases = fs.readFileSync(`${__dirname}/../db/create_databases_table.sql`);
   await checkPromise(addTable("databases", databases.toString()), messages, success, failed);
   await checkPromise(addDatabasesForCredentials(), messages, success, failed);
+  // schedules kept in a git repository (use_for_schedules), the entries of the schedules: lists of
+  // its YAML files, timed by their iCal rrule (models/scheduleRepo.model.js).
+  // A schedule says where it comes from (repository, repo_file) ; its entry's prompts are kept as
+  // the reserved extra vars a job reads (launch_options) ; any schedule may have a description
+  await checkPromise(addColumn("repositories", "use_for_schedules", "tinyint(4)", true, "0"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "description", "text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "rrule", "text", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "repository", "varchar(250)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("schedule", "launch_options", "longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", true, "NULL"), messages, success, failed);
+  // a schedule is timed by one of cron, rrule or one_time_run : one_time_run holds the moment of
+  // its one run, instead of a flag and run_at beside it
+  await checkPromise(oneTimeRunMoment(), messages, success, failed);
+  // the objects a repository may hold, one usage flag per type (lib/repoObjects/types.js), one
+  // YAML file per object in the type's folder ; the objects of the types built say where they come
+  // from (repository, repo_file), the other types' tables will in the version that brings them
+  for (const type of ["credentials", "secret_stores", "databases", "runners", "notifications", "sso", "ldap", "syslog", "chat_assistant", "disclaimer", "defaults", "logo", "icon", "name", "links", "labels", "announcements", "general", "roles", "categories", "constants", "repositories", "mcp", "groups", "users"]) {
+    await checkPromise(addColumn("repositories", `use_for_${type}`, "tinyint(4)", true, "0"), messages, success, failed);
+  }
+  // the Config usage split into Roles, Categories and Constants (the three columns added just above)
+  await checkPromise(splitConfigUsage(), messages, success, failed);
+  // an announcement is found by its name (a seed's, a repository's)
+  await checkPromise(addColumn("announcements", "name", "varchar(100)", true, "NULL"), messages, success, failed);
+  // the fields the config seed manages per field (its defaults, logo, icon, name, links and mcp
+  // sections), read only in the app (lib/seedManaged.js)
+  await checkPromise(addColumn("settings", "seed_managed_fields", "text", true, "NULL"), messages, success, failed);
+  for (const table of ["credentials", "runners", "secret_stores", "databases", "notification_channels", "oauth2_providers", "ldap", "syslog_servers", "labels", "announcements", "disclaimer_versions", "repositories", "groups", "users", "directory_users"]) {
+    await checkPromise(addColumn(table, "repository", "varchar(250)", true, "NULL"), messages, success, failed);
+    await checkPromise(addColumn(table, "repo_file", "varchar(500)", true, "NULL"), messages, success, failed);
+  }
+  // what an LDAP or SSO user is, as an admin or its repository entry says (a contractor, until ...)
+  await checkPromise(addColumn("directory_users", "description", "varchar(250)", true, "NULL"), messages, success, failed);
   // a secret store a credential's secret may be written to (secrets/providers write) : off, and
   // only below its write prefix
   await checkPromise(addColumn("secret_stores", "write_enabled", "tinyint(4)", true, "0"), messages, success, failed);
@@ -1317,6 +1365,89 @@ export async function addDatabasesForCredentials() {
   if (!made.length) return null;
   const message = `Made a database of Connections > Databases for each database credential (${made.join(", ")})`;
   logger.notice(message);
+  return message;
+}
+
+/**
+ * Whether a schedule's one_time_run already holds the moment of its run (7.8.0 : a datetime column,
+ * no run_at beside it) rather than the flag 6.2.0 added.
+ *
+ * Args:
+ *   query (function): (sql, params) => rows ; the database by default.
+ *
+ * Returns:
+ *   Promise<boolean>: true once the schedule table has its one_time_run as a moment.
+ */
+export async function oneTimeRunIsMoment(query = (sql, params) => mysql.do(sql, params)) {
+  const columns = (await query("SHOW COLUMNS FROM AnsibleForms.`schedule`")) || [];
+  const flag = columns.find((c) => c.Field === "one_time_run");
+  return !!flag && /^(datetime|timestamp)/i.test(String(flag.Type)) && !columns.some((c) => c.Field === "run_at");
+}
+
+/**
+ * Turns a schedule's one-time run into one column holding its moment (7.8.0) : a schedule is
+ * timed by exactly one of cron, rrule and one_time_run. Each step checks what is there first, so a
+ * start that stopped halfway finishes it, and a second run does nothing :
+ *   1. a column one_time_moment (datetime) is added ;
+ *   2. while the 6.2.0 flag is there : a one-time row (flag 1 with its run_at) gets its run_at as
+ *      its moment, its cron and rrule cleared ; a recurring one (flag 0) no moment (its stale run_at
+ *      dropped) ; a row flagged one-time without a run_at is kept as it is, without a moment, and
+ *      logged ;
+ *   3. the flag and run_at are dropped ;
+ *   4. one_time_moment is renamed one_time_run.
+ * The jobs users planned ("Run later") are one-time rows : they keep their moment and their owner.
+ *
+ * Args:
+ *   query (function): (sql, params) => rows ; the database by default.
+ *
+ * Returns:
+ *   Promise<string>: what was done, for the patch's messages.
+ */
+export async function oneTimeRunMoment(query = (sql, params) => mysql.do(sql, params)) {
+  const columnsNow = async () => new Map(((await query("SHOW COLUMNS FROM AnsibleForms.`schedule`")) || []).map((c) => [c.Field, String(c.Type)]));
+  let columns = await columnsNow();
+  const isMoment = (type) => /^(datetime|timestamp)/i.test(type || "");
+  if (isMoment(columns.get("one_time_run")) && !columns.has("run_at") && !columns.has("one_time_moment")) {
+    return "The one-time runs of the schedules hold their moment already";
+  }
+  const done = [];
+  // step 1 : the new column, unless the old flag is gone and it was renamed already
+  if (!columns.has("one_time_moment") && !isMoment(columns.get("one_time_run"))) {
+    await query("ALTER TABLE AnsibleForms.`schedule` ADD COLUMN `one_time_moment` datetime NULL DEFAULT NULL");
+    done.push("added one_time_moment");
+  }
+  columns = await columnsNow();
+  // step 2 : the moments, while the flag and run_at are both there to read them from
+  const flag = columns.has("one_time_run") && !isMoment(columns.get("one_time_run"));
+  if (flag && columns.has("run_at") && columns.has("one_time_moment")) {
+    const once = await query(
+      "UPDATE AnsibleForms.`schedule` SET one_time_moment = run_at, cron = NULL, rrule = NULL WHERE COALESCE(one_time_run,0) = 1 AND run_at IS NOT NULL",
+    );
+    const recurring = await query("UPDATE AnsibleForms.`schedule` SET one_time_moment = NULL WHERE COALESCE(one_time_run,0) <> 1");
+    const odd = (await query("SELECT id, name FROM AnsibleForms.`schedule` WHERE COALESCE(one_time_run,0) = 1 AND run_at IS NULL")) || [];
+    for (const r of odd) {
+      logger.warning(`Schedule '${r.name}' (${r.id}) was a one-time run without its time: kept as it is, without a one-time run (give it one, or a cron or a rrule)`);
+    }
+    done.push(`${once?.affectedRows || 0} one-time and ${recurring?.affectedRows || 0} recurring schedules given their timing`);
+  }
+  // step 3 : the flag and run_at go
+  if (flag) {
+    await query("ALTER TABLE AnsibleForms.`schedule` DROP COLUMN `one_time_run`");
+    done.push("dropped the one_time_run flag");
+  }
+  columns = await columnsNow();
+  if (columns.has("run_at") && columns.has("one_time_moment")) {
+    await query("ALTER TABLE AnsibleForms.`schedule` DROP COLUMN `run_at`");
+    done.push("dropped run_at");
+  }
+  // step 4 : the moment under its name
+  columns = await columnsNow();
+  if (columns.has("one_time_moment") && !columns.has("one_time_run")) {
+    await query("ALTER TABLE AnsibleForms.`schedule` CHANGE COLUMN `one_time_moment` `one_time_run` datetime NULL DEFAULT NULL");
+    done.push("renamed one_time_moment to one_time_run");
+  }
+  const message = `The one-time runs of the schedules now hold their moment in one_time_run: ${done.join(", ") || "nothing left to do"}`;
+  logger.warning(message);
   return message;
 }
 
@@ -2153,6 +2284,47 @@ export async function dedupeLdapNames() {
   if (!renamed.length) return null;
   const message = `LDAP directories shared a name: renamed ${renamed.join(", ")} so the name can be unique`;
   logger.warning(message);
+  return message;
+}
+
+/**
+ * Splits the Config usage of the repositories into its three keys' (lib/configKeys.js) : the
+ * repository 7.3 read its configuration from gets use_for_roles, use_for_categories and
+ * use_for_constants, so it serves the same configuration as before. 7.3 took the first row of
+ * `WHERE use_for_config` with no order : a scan of the table, in the order of its primary key -
+ * the lowest id. Any other repository that had it (7.3 only warned about them) gets none : one
+ * repository holds each key now. 7.3 read none of them when the configuration was kept in the
+ * database (Settings > Config source, ENABLE_CONFIG_IN_DATABASE) and the database held one : the
+ * database copy was served whole, so none gets the flags then, or its keys would be laid over the
+ * database copy (said, so they can be turned on). use_for_config goes back to 0 everywhere - the
+ * column kept, no longer read, so a second start changes nothing.
+ *
+ * Returns:
+ *   Promise<string|null>: what it did, null when no repository had it.
+ */
+export async function splitConfigUsage() {
+  const rows = await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_config = 1 ORDER BY id");
+  if (!rows?.length) return null;
+  // the configuration served from the database : no repository was read (models/form.model.js
+  // getBaseConfig reads the database copy first, Settings.resolveConfigInDatabase)
+  const [settings] = await mysql.do("SELECT config_source, config_yaml FROM AnsibleForms.`settings` limit 1");
+  const { default: Settings } = await import("./settings.model.js");
+  if (settings && Settings.resolveConfigInDatabase(settings) && String(settings.config_yaml ?? "").trim()) {
+    await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");
+    const message =
+      `The configuration is kept in the database: the Config usage of ${rows.map((r) => `'${r.name}'`).join(", ")} was not read ` +
+      "and is not given (turn on Roles, Categories or Constants on a repository to read them from it)";
+    logger.warning(message);
+    return message;
+  }
+  const [first, ...others] = rows;
+  await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_roles = 1, use_for_categories = 1, use_for_constants = 1, use_for_config = 0 WHERE id = ?", [first.id]);
+  if (others.length) await mysql.do("UPDATE AnsibleForms.`repositories` SET use_for_config = 0 WHERE use_for_config = 1");
+  const message =
+    `The Config usage of repository '${first.name}' is now Roles, Categories and Constants` +
+    (others.length ? ` ; ${others.map((r) => `'${r.name}'`).join(", ")} had it too, unused since 7.3 read the first one : not given` : "");
+  logger.notice(message);
+  if (others.length) logger.warning(message);
   return message;
 }
 

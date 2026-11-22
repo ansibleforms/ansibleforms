@@ -61,6 +61,30 @@ Ldap.isUnreachable = isUnreachable;
 Ldap.urls = urls;
 
 /**
+ * The fields a declaration gives (the config seed's ldap section, a repository's directory file),
+ * converted as a save from the app converts them (the constructor : the yes or no flags, the bind
+ * password encrypted) - only those it declares : the constructor materialises every field it
+ * knows (an absent flag as 0, the group fields as ""), and writing that whole would blank what the
+ * declaration never mentioned.
+ *
+ * Args:
+ *   cfg (object): the declared fields.
+ *
+ * Returns:
+ *   object: the fields to write.
+ */
+Ldap.declared = function (cfg) {
+  const converted = { ...new Ldap(cfg) };
+  const record = {};
+  for (const key of Object.keys(converted)) {
+    if (key === "testuser" || key === "testpassword") continue;
+    if (cfg[key] === undefined || converted[key] === undefined) continue;
+    record[key] = converted[key];
+  }
+  return record;
+};
+
+/**
  * A directory as stored, its bind password decrypted (an undecryptable one emptied).
  *
  * Args:
@@ -189,10 +213,11 @@ Ldap.find = async function () {
  *
  * Args:
  *   record (object): the fields to write, converted (new Ldap).
+ *   opts (object): as updateById's ({ fromSeed : the config seed's }).
  */
-Ldap.update = async function (record) {
+Ldap.update = async function (record, opts = {}) {
   const current = await Ldap.find();
-  return Ldap.updateById(current.id, record);
+  return Ldap.updateById(current.id, record, opts);
 };
 
 /**
@@ -201,14 +226,25 @@ Ldap.update = async function (record) {
  * Args:
  *   id (number|string): the directory.
  *   record (object): the fields to write, converted (new Ldap).
+ *   opts (object): { fromRepo (its repository's pull), fromSeed (the config seed's) } ; none : an
+ *     edit in the app, refused when git would undo it (lib/repoObjects/engine.js assertAppEdit).
  *
  * Raises:
  *   Errors.NotFoundError: no such directory.
  *   Errors.BadRequestError: its new name or its credential is not valid.
+ *   Errors.ConflictError: an edit in the app git would undo (its bind password taken from an
+ *     environment variable, its entry gone or renamed in git).
  */
-Ldap.updateById = async function (id, record) {
+Ldap.updateById = async function (id, record, opts = {}) {
   const current = await Ldap.findById(id);
   if (!current) throw new Errors.NotFoundError(`No ldap directory ${id}`);
+  // an edit in the app of a repository's directory that git would undo : refused before anything is
+  // written, its bind password compared as the rows hold it (decrypted)
+  if (!opts.fromRepo && !opts.fromSeed) {
+    const { assertAppEdit } = await import("../lib/repoObjects/engine.js");
+    const plain = record.bind_user_pw ? { ...record, bind_user_pw: crypto.decrypt(record.bind_user_pw) } : record;
+    await assertAppEdit("ldap", id, plain);
+  }
   // the test fields and the id are never columns to write
   delete record.testuser;
   delete record.testpassword;
@@ -222,10 +258,12 @@ Ldap.updateById = async function (id, record) {
 };
 
 /**
- * Adds a directory, last in the lookup order unless it says its own.
+ * Adds a directory, last in the lookup order unless it says its own (one a repository's file
+ * makes : its place is the one its file says, else its column's).
  *
  * Args:
  *   record (object): the fields, converted (new Ldap).
+ *   opts (object): { fromRepo (true : a repository's file makes it, lib/repoObjects) }.
  *
  * Returns:
  *   number: its id.
@@ -234,7 +272,7 @@ Ldap.updateById = async function (id, record) {
  *   Errors.BadRequestError: its name is not valid or taken, its credential is not an ldap one, or
  *     it has no servers.
  */
-Ldap.create = async function (record) {
+Ldap.create = async function (record, opts = {}) {
   delete record.testuser;
   delete record.testpassword;
   delete record.id;
@@ -245,7 +283,7 @@ Ldap.create = async function (record) {
   if (!String(record.server || "").trim() && !(await Ldap.connectionOf(record.credential))) {
     throw new Errors.BadRequestError("An LDAP directory needs an ldap credential with its servers (host)");
   }
-  if (!record.position) {
+  if (!record.position && !opts.fromRepo) {
     const last = await mysql.do("SELECT COALESCE(MAX(position), 0) AS p FROM AnsibleForms.`ldap`");
     record.position = (last[0]?.p || 0) + 1;
   }

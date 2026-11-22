@@ -18,6 +18,8 @@ import Errors from '../lib/errors.js';
 export const ANNOUNCEMENT_LEVELS = ['info', 'warning', 'danger'];
 // the longest message kept (the column's size)
 export const MAX_MESSAGE = 500;
+// the longest name kept (the column's size)
+export const MAX_NAME = 100;
 
 /**
  * A moment as the database keeps it : UTC, YYYY-MM-DD HH:MM:SS.
@@ -43,7 +45,8 @@ export function toDbMoment(value) {
  * start.
  *
  * Args:
- *   data (object): what the page sent - message, level, enabled, start_at, end_at.
+ *   data (object): what the page sent - message, level, enabled, start_at, end_at ; name (a seed's
+ *     or a repository's announcement).
  *   partial (boolean): an update, where a field left out stays as it is.
  *
  * Returns:
@@ -55,6 +58,9 @@ export function toDbMoment(value) {
  */
 export function announcementFields(data, partial = false) {
   const out = {};
+  // step 0 : its name, when it has one (a seed's or a repository's announcement is named, so it
+  // is found again ; one made in the app has none until a repository writes it)
+  if (data.name !== undefined) out.name = String(data.name ?? '').trim().slice(0, MAX_NAME) || null;
   // step 1 : the message, trimmed and cut to its column
   if (!partial || data.message !== undefined) {
     const message = String(data.message ?? '').trim();
@@ -122,7 +128,8 @@ export function isRunning(a, now = Date.now()) {
 
 // ─── the table ──────────────────────────────────────────────────────────────
 
-const COLUMNS = 'id, message, level, enabled, start_at, end_at, created_by, created_at';
+// its name, and the announcements repository and file it comes from (lib/repoObjects), with the rest
+const COLUMNS = 'id, name, message, level, enabled, start_at, end_at, created_by, created_at, repository, repo_file';
 
 const Announcement = {
   /**

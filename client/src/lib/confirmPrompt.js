@@ -17,6 +17,8 @@ export const confirmPrompt = reactive({
   message: '',
   ok: '',
   icon: 'circle-question',
+  // paragraphs under the question (what a repository's usages will do), a heading as { heading }
+  details: [],
   resolve: null,
 });
 
@@ -42,16 +44,17 @@ function onEscape(event) {
  * Args:
  *   message (string): the question ; what follows its question mark shows on a line of its own.
  *   options (object): title (the modal's title), ok (its button's label, the title when not
- *     given) and icon (of the title and the button).
+ *     given), icon (of the title and the button) and details (paragraphs under the question,
+ *     each a string, or { heading } for the title of a section).
  *
  * Returns:
  *   Promise<boolean>: true when its button is clicked, false when it is closed.
  */
-export function askConfirm(message, { title = '', ok = '', icon = 'circle-question' } = {}) {
+export function askConfirm(message, { title = '', ok = '', icon = 'circle-question', details = [] } = {}) {
   // a question still open (asked again before it was answered) : it is turned down
   confirmPrompt.resolve?.(false);
   return new Promise((resolve) => {
-    Object.assign(confirmPrompt, { open: true, title, message, ok: ok || title, icon, resolve });
+    Object.assign(confirmPrompt, { open: true, title, message, ok: ok || title, icon, details, resolve });
     // Escape turns it down while it is open (once : adding the same listener again is a no-op)
     window.addEventListener('keydown', onEscape, true);
   });
@@ -67,7 +70,15 @@ export function answerConfirm(yes) {
   // answered : Escape is no longer the question's
   window.removeEventListener('keydown', onEscape, true);
   const resolve = confirmPrompt.resolve;
-  Object.assign(confirmPrompt, { open: false, title: '', message: '', ok: '', icon: 'circle-question', resolve: null });
+  Object.assign(confirmPrompt, {
+    open: false,
+    title: '',
+    message: '',
+    ok: '',
+    icon: 'circle-question',
+    details: [],
+    resolve: null,
+  });
   resolve?.(yes);
 }
 

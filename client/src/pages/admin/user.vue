@@ -40,6 +40,7 @@ import { useRoleMembership } from '@/composables/useRoleMembership';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { reloadKeepingEdits } from '@/lib/keepEdits';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -272,6 +273,8 @@ const { search, searching, matches, matchingKeys, shownTabs, tabShown, searchHea
 });
 const shownFields = computed(() =>
   matchingKeys([
+    // where it comes from : the users repository's entry
+    ...repositorySourceFields(t, user.value || {}),
     ['username', t('settings.fields.username')],
     ['description', t('settings.fields.description')],
     ['email', t('settings.fields.email')],
@@ -583,6 +586,8 @@ onMounted(async () => {
           <!-- Details : the username, its description and email, its latest sign-in (read only), then
                whether it may sign in -->
           <div v-if="tab.key === 'details'" class="af-user-details">
+            <!-- where it comes from : the users repository's entry ; nothing for one it does not hold -->
+            <AppRepositorySource v-show="fieldShown('source')" :record="user" />
             <BsInput
               class="af-user-field"
               v-model="edit.username"

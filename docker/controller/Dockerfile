@@ -1,4 +1,4 @@
-# The app runs on plain node: it spawns git, ssh, ssh-keyscan, ssh-keygen, mariadb-dump,
+# The controller runs on plain node: it spawns git, ssh, ssh-keyscan, ssh-keygen, mariadb-dump,
 # mariadb, ytt, ps and sh, never ansible or python (playbooks run on an RTE, docker/runner/rte-*).
 # Both node images are pinned by DIGEST, not by tag : a new node build moves the tag, and
 # without the pin that would silently change what every application build starts from - with
@@ -123,18 +123,18 @@ LABEL org.opencontainers.image.source="https://github.com/ansibleforms/ansiblefo
       org.opencontainers.image.licenses="GPL-3.0" \
       org.opencontainers.image.version="${VERSION}"
 
-# for now we still run the app under dist..
+# for now we still run the controller under dist..
 WORKDIR /app/dist
 
 # copy the server code, no more compiling needed sing ESM. Owned by `node` (uid 1000), the
-# user the app runs as : it writes persistent/ (forms, repositories, uploads, backups) and
+# user the controller runs as : it writes persistent/ (forms, repositories, uploads, backups) and
 # its ssh key and known_hosts in /home/node/.ssh
 COPY --chown=node:node --from=tmp_builder /app/server/. ./
 RUN mkdir -p /app/dist/persistent /home/node/.ssh \
  && chown node:node /app/dist /app/dist/persistent /home/node/.ssh \
  && chmod 700 /home/node/.ssh
 
-# never root : a hole in the app or a dependency gets a user that owns only the app's files
+# never root : a hole in the controller or a dependency gets a user that owns only the controller's files
 USER node
 ENV HOME=/home/node
 
@@ -146,5 +146,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["nod
 
 # Use js files to run the application
 # tini as PID 1 : it hands SIGTERM to node (which stops cleanly, src/lib/shutdown.js) and reaps
-# the git and ssh processes the app leaves behind, which node as PID 1 never does
+# the git and ssh processes the controller leaves behind, which node as PID 1 never does
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "./index.js"]

@@ -7,9 +7,11 @@ import Helpers from '../../lib/common.js';
 import i18n from '../../lib/i18n.js';
 import { sniffImageMime } from '../../lib/imagetype.js';
 import { DEFAULT_LOGO } from '../../lib/defaultlogo.js';
+import { BRAND_IMAGES } from '../../lib/brandImages.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
-// a logo is small ; cap the upload well below anything that would bloat the settings table
-const MAX_LOGO_BYTES = 900 * 1024;
+// a logo is small : the upload capped as a Logo repository's logo is (lib/brandImages.js)
+const MAX_LOGO_BYTES = BRAND_IMAGES.logo.maxBytes;
 
 // keep the upload in memory, it is validated and stored in the database as a data url,
 // nothing is ever written to disk
@@ -43,22 +45,31 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), i18n.t(req, 'resources.logoInvalidImage')));
     }
     try {
-      await Settings.setLogo(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+      // the Logo repository's logo: map, before : its logo written into it after
+      await RepoObjects.holding('logo', async () => {
+        const before = await RepoObjects.snapshot('logo');
+        await BRAND_IMAGES.logo.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+        await RepoObjects.appUpdated('logo', before);
+      });
       logger.notice(`Custom logo updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
     } catch (e) {
-      res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), Helpers.getError(e)));
+      res.status(e.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), Helpers.getError(e)));
     }
   });
 };
 
 const remove = async function (req, res) {
   try {
-    await Settings.setLogo(DEFAULT_LOGO);
+    await RepoObjects.holding('logo', async () => {
+      const before = await RepoObjects.snapshot('logo');
+      await BRAND_IMAGES.logo.set(null);
+      await RepoObjects.appUpdated('logo', before);
+    });
     logger.notice(`Custom logo removed, default logo restored`)
     res.json(RestResult.single(null));
   } catch (err) {
-    res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), Helpers.getError(err)));
+    res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateLogo'), Helpers.getError(err)));
   }
 };
 

@@ -41,7 +41,7 @@ import {
   explorerWidthAfterDrag,
   explorerFolded,
   explorerColumns,
-  firstExplorerFile,
+  openFirstExplorerItem,
 } from '@/config/fileExplorer';
 import { inventoryOf, inventoryFileRole } from '@/config/inventoryTree';
 
@@ -543,12 +543,12 @@ function discardAndGo() {
  */
 async function loadAndOpen() {
   await loadList();
-  if (selected.value) return;
-  const first = firstExplorerFile(
-    listing.value.files.map((f) => f.path),
-    isInventories.value ? (p) => inventoryFileRole(p).role === 'inventory' : undefined,
-  );
-  if (first) await open(first, true);
+  await openFirstExplorerItem({
+    isOpen: () => !!selected.value,
+    paths: listing.value.files.map((f) => f.path),
+    accept: isInventories.value ? (p) => inventoryFileRole(p).role === 'inventory' : undefined,
+    open: (path) => open(path, true),
+  });
 }
 
 watch(

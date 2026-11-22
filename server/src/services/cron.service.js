@@ -21,6 +21,7 @@ import { nodeId } from '../lib/role.js';
 import { purgeRevocations } from '../lib/tokenRevocation.js';
 import ApiToken from '../models/apiToken.model.js';
 import { resumeAbandoned } from '../lib/jobResume.js';
+import { nextRunsAsync, limits as rruleLimits, TIMEOUT as RRULE_TIMEOUT } from '../lib/scheduleRrule.js';
 // the stored jobs cleanup's query : expired, or unused for longer than their days
 import { cleanupQuery } from '../lib/storedJobExpiry.js';
 
@@ -61,8 +62,8 @@ class Cron extends Croner {
   }
 }
 
-const scheduleSignature = (oneTimeRun, cron, runAt) =>
-  `${oneTimeRun}|${cron || ''}|${runAt ? new Date(runAt).getTime() : ''}`;
+const scheduleSignature = (oneTimeRun, cron, rrule) =>
+  `${oneTimeRun ? new Date(oneTimeRun).getTime() : ''}|${cron || ''}|${rrule || ''}`;
 
 /**
  * Centralized Cron Service
@@ -86,6 +87,8 @@ class CronService {
       repositories: new Map(),
       schedules: new Map(),
     };
+    // the registration of each rrule schedule under way : one made or removed meanwhile ends it
+    this.rruleTurns = new Map();
     this.active = false;
     // the system tasks (initializeSystemTasks) run on this node : what scheduleConfigSeedReload
     // checks before rescheduling
@@ -192,15 +195,140 @@ class CronService {
   }
 
   /**
-   * Add or update a schedule cron job
+   * Queues a schedule whose time came, unless it is turned off or already queued or running (that
+   * run is left to finish) : the cron and the rrule tasks alike. The claim in Schedule.launch
+   * makes it launch once, whatever process reads the queue.
+   *
+   * Args:
+   *   id (number): the schedule.
+   *   name (string): its name, for the log.
+   *
+   * Returns:
+   *   Promise<void>
    */
-  addSchedule(id, name, cronExpression, oneTimeRun, runAt) {
+  async queueIfIdle(id, name) {
+    const schedules = await mysql.do(
+      // turned off (enabled 0) : this occurrence is skipped, Run now still runs it
+      "SELECT id FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
+      [id],
+      true
+    );
+    if (schedules.length > 0) {
+      await Schedule.queue(id);
+    } else {
+      logger.debug(`Schedule ${name} (ID: ${id}) is off, running or queued, skipping this run`);
+    }
+  }
+
+  /**
+   * Registers a repository schedule's next run, worked out from its iCal rrule in the rrule's own
+   * zone (lib/scheduleRrule.js, awaited : the process goes on meanwhile) : a one-shot task at that
+   * moment that queues it, as a cron task does, then registers the run after it. The queueing is
+   * the worker's only (whileWorker) ; the next run is registered either way, so a process that
+   * holds the worker lock again later still has the schedule. A rule with no run ahead (its COUNT
+   * or UNTIL passed) registers nothing. A rule whose runs took too long to work out is not dropped
+   * : a task tries again once the rule is no longer given up. One that failed otherwise (its thread
+   * did not start or stopped) is forgotten, so the next resync registers it again.
+   *
+   * Args:
+   *   id (number): the schedule.
+   *   name (string): its name.
+   *   rrule (string): its rrule.
+   *   after (Date): the moment its next run is after (now by default).
+   *
+   * Returns:
+   *   Promise<void>: settled once it is registered (never rejected).
+   */
+  addRruleSchedule(id, name, rrule, after = new Date()) {
+    // this registration's turn, and its rrule taken now : a resync meanwhile leaves it to it
+    const turn = {};
+    this.rruleTurns.set(id, turn);
+    this.signatures.schedules.set(id, scheduleSignature(null, null, rrule));
+    const current = () => this.rruleTurns.get(id) === turn && this.active;
+    // a task in the registry : the one a removeSchedule stops
+    const register = (task) => {
+      task.resume();
+      this.jobs.schedules.set(id, task);
+    };
+    return nextRunsAsync(rrule, { after, count: 1 }).then(
+      ([next]) => {
+        if (!current()) return;
+        if (!next) {
+          logger.info(`Schedule ${name} (ID: ${id}) has no run ahead in its rrule, nothing to register`);
+          return;
+        }
+        const queue = whileWorker(async () => {
+          logger.info(`Rrule triggered for schedule: ${name} (ID: ${id})`);
+          try {
+            await this.queueIfIdle(id, name);
+          } catch (err) {
+            logger.error(`Error in schedule rrule job for ${name} (ID: ${id}):`, err);
+          }
+        });
+        // a run that passed while it was worked out (its thread busy with other rules) : run at
+        // once, a task for a moment gone would never fire
+        const at = next.getTime() > Date.now() ? next : new Date(Date.now() + 1000);
+        // croner's own class : the run is guarded above, and the next one registered whatever it did
+        const task = new Croner(at, { paused: true, protect: true }, async () => {
+          await queue();
+          // still the task registered for it (not removed or replaced meanwhile) : the next run
+          // (after this one, even if the timer fired a little early : never the same run twice,
+          // and a run a second later still taken)
+          if (this.jobs.schedules.get(id) === task && this.active) {
+            task.stop();
+            this.jobs.schedules.delete(id);
+            await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), next.getTime())));
+          }
+        });
+        register(task);
+        logger.info(`Added rrule job for schedule: ${name} (ID: ${id}), next run at ${at.toISOString()}`);
+      },
+      (err) => {
+        if (!current()) return;
+        if (err?.code !== RRULE_TIMEOUT) {
+          // not registered : its signature dropped, or no resync or change notice would try again
+          this.signatures.schedules.delete(id);
+          logger.error(`Failed to add rrule job for schedule ${name} (ID: ${id}), tried again at the next resync: ${err?.message || err}`);
+          return;
+        }
+        // given up a while : tried again once it is walked again, from then
+        const at = new Date(Date.now() + rruleLimits.givenUpMs + 1000);
+        logger.warning(`The next run of schedule ${name} (ID: ${id}) could not be worked out in time, tried again at ${at.toISOString()}`);
+        const retry = new Croner(at, { paused: true }, async () => {
+          if (this.jobs.schedules.get(id) !== retry || !this.active) return;
+          retry.stop();
+          this.jobs.schedules.delete(id);
+          await this.addRruleSchedule(id, name, rrule, new Date(Math.max(Date.now(), after.getTime())));
+        });
+        register(retry);
+      },
+    );
+  }
+
+  /**
+   * Add or update a schedule's task, by its one timing : the moment of its one run, its iCal rrule
+   * or its cron.
+   *
+   * Args:
+   *   id (number): the schedule.
+   *   name (string): its name, for the log.
+   *   cronExpression (string|null): its cron.
+   *   oneTimeRun (Date|string|null): the moment of its one run.
+   *   rrule (string|null): its iCal rrule.
+   *
+   * Returns:
+   *   Promise<void>|undefined: what addRruleSchedule returns for a rrule.
+   */
+  addSchedule(id, name, cronExpression, oneTimeRun, rrule = null) {
     if (!this.active) return;
     try {
       // Remove existing job if any
       this.removeSchedule(id);
 
-      if (oneTimeRun === 1 && runAt) {
+      if (!oneTimeRun && rrule && String(rrule).trim() !== '') {
+        // timed by its rrule, registered once its next run is known
+        return this.addRruleSchedule(id, name, rrule);
+      } else if (oneTimeRun) {
         // One-time schedule: check every minute if it's time to run
         const task = new Cron('* * * * *', {
           timezone: this.timezone,
@@ -211,14 +339,14 @@ class CronService {
           try {
             const schedules = await mysql.do(
               // turned off (enabled 0) : it waits, Run now still runs it
-              "SELECT id, run_at FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
+              "SELECT id, one_time_run FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
               [id],
               true
             );
             
             if (schedules.length > 0) {
               const schedule = schedules[0];
-              const runAtTime = dayjs(schedule.run_at);
+              const runAtTime = dayjs(schedule.one_time_run);
               const now = dayjs();
               
               if (runAtTime.isBefore(now) || runAtTime.isSame(now, 'minute')) {
@@ -233,9 +361,9 @@ class CronService {
 
         task.resume();
         this.jobs.schedules.set(id, task);
-        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, runAt));
-        logger.info(`Added one-time schedule job for: ${name} (ID: ${id}) to run at: ${runAt}`);
-      } else if (oneTimeRun === 0 && cronExpression && cronExpression.trim() !== '') {
+        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, rrule));
+        logger.info(`Added one-time schedule job for: ${name} (ID: ${id}) to run at: ${oneTimeRun instanceof Date ? oneTimeRun.toISOString() : oneTimeRun}`);
+      } else if (cronExpression && cronExpression.trim() !== '') {
         // Recurring cron schedule
         // Validate cron expression
         if (!this.validateCronExpression(cronExpression)) {
@@ -250,19 +378,8 @@ class CronService {
         }, async () => {
           logger.info(`Cron triggered for schedule: ${name} (ID: ${id})`);
           try {
-            // Check if schedule is already running or queued
-            const schedules = await mysql.do(
-              // turned off (enabled 0) : this occurrence is skipped, Run now still runs it
-              "SELECT id FROM AnsibleForms.`schedule` WHERE id=? AND COALESCE(enabled,1)=1 AND COALESCE(state,'')<>'running' AND COALESCE(state,'')<>'queued'",
-              [id],
-              true
-            );
-            
-            if (schedules.length > 0) {
-              await Schedule.queue(id);
-            } else {
-              logger.debug(`Schedule ${name} (ID: ${id}) is already running or queued, skipping cron execution`);
-            }
+            // queued unless turned off, already running or queued
+            await this.queueIfIdle(id, name);
           } catch (err) {
             logger.error(`Error in schedule cron job for ${name} (ID: ${id}):`, err);
           }
@@ -270,7 +387,7 @@ class CronService {
 
         task.resume();
         this.jobs.schedules.set(id, task);
-        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, runAt));
+        this.signatures.schedules.set(id, scheduleSignature(oneTimeRun, cronExpression, rrule));
         logger.info(`Added cron job for schedule: ${name} (ID: ${id}) with schedule: ${cronExpression}`);
       }
     } catch (err) {
@@ -279,10 +396,26 @@ class CronService {
   }
 
   /**
+   * Add or update the task of a schedule as it is stored : every timing it has, its rrule too, so
+   * a schedule of a schedules repository is timed by its rrule wherever it is registered from (the
+   * schedule routes, the MCP tools, the resync).
+   *
+   * Args:
+   *   row (object): the schedule's row ({ id, name, cron, one_time_run, rrule }).
+   *
+   * Returns:
+   *   Promise<void>|undefined: what addSchedule returns (settled once a rrule's task is registered).
+   */
+  addScheduleRow(row) {
+    return this.addSchedule(row.id, row.name, row.cron, row.one_time_run, row.rrule);
+  }
+
+  /**
    * Remove a schedule cron job
    */
   removeSchedule(id) {
     this.signatures.schedules.delete(id);
+    this.rruleTurns.delete(id);
     const task = this.jobs.schedules.get(id);
     if (task) {
       task.stop();
@@ -334,7 +467,7 @@ class CronService {
 
     try {
       const schedules = await mysql.do(
-        "SELECT id, name, one_time_run, cron, run_at FROM AnsibleForms.`schedule` WHERE (one_time_run=0 AND cron<>'') OR (one_time_run=1 AND run_at IS NOT NULL)",
+        "SELECT id, name, one_time_run, cron, rrule FROM AnsibleForms.`schedule` WHERE one_time_run IS NOT NULL OR cron<>'' OR rrule<>''",
         undefined,
         true
       );
@@ -342,11 +475,14 @@ class CronService {
       for (const id of [...this.jobs.schedules.keys()]) {
         if (!wanted.has(id)) this.removeSchedule(id);
       }
+      // a rrule schedule is registered once its next run is worked out : awaited, all together
+      const registering = [];
       for (const [id, r] of wanted) {
-        if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.run_at)) {
-          this.addSchedule(r.id, r.name, r.cron, r.one_time_run, r.run_at);
+        if (this.signatures.schedules.get(id) !== scheduleSignature(r.one_time_run, r.cron, r.rrule)) {
+          registering.push(this.addScheduleRow(r));
         }
       }
+      await Promise.all(registering);
       logger.debug(`Schedule cron jobs in sync: ${this.jobs.schedules.size}`);
     } catch (err) {
       logger.error('Failed to sync the schedule cron jobs:', err);
@@ -694,6 +830,7 @@ class CronService {
       logger.debug(`Stopped schedule cron job: ${id}`);
     });
     this.jobs.schedules.clear();
+    this.rruleTurns.clear();
 
     this.jobs.system.forEach((task, name) => {
       task.stop();

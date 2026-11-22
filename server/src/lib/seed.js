@@ -22,11 +22,13 @@
 // supposed to describe it, and nothing says so out loud. A RELOAD of an already running
 // instance is the opposite : see reloadConfigSeed.
 import fs from "fs";
+import path from "path";
 import { createHash } from "node:crypto";
 import yaml from "yaml";
 import logger from "./logger.js";
 import appConfig from "../../config/app.config.js";
 import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
+import { foldConfigFlag, APPEARANCE_SECTIONS, foldOauth2Values } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -39,10 +41,16 @@ import Label from "../models/label.model.js";
 import NotificationChannel from "../models/notificationChannel.model.js";
 import Ldap from "../models/ldap.model.js";
 import Settings from "../models/settings.model.js";
-import ChatSettings, { normaliseExtraHeaders } from "../models/chatSettings.model.js";
+import ChatSettings from "../models/chatSettings.model.js";
 import Audit from "../models/audit.model.js";
 import mysql from "../models/db.model.js";
 import { repoFolder } from "../models/repo.model.js";
+import { canonicalJson, differs } from "./seedCompare.js";
+import { sectionOfField, seedKeyOf, seedFieldsOf, setSeedManagedFields } from "./seedManaged.js";
+
+// a field the seed held per field, as a release names it : by its section and the key the seed
+// names it by (defaults:default_theme, defaults:default_forms_view, mcp:MCP_READ_ONLY)
+const heldName = (field) => `${sectionOfField(field)}:${seedKeyOf(field)}`;
 
 // The one thing that distinguishes the seed from an API caller. Everything the seed
 // writes goes through the normal models, so encryption, the is_default handling and
@@ -116,7 +124,16 @@ const listSections = [
     // repository's user/password/cron reported "1 updated" on every boot for ever while
     // never actually clearing it - the old credential kept being injected into the clone
     // URL. Going through CrudModel writes the empty value, which is what was declared.
-    update: (d, row) => CrudModel.update("repositories", d, row.id, seedOpts),
+    // ... yet the rules of its usages as the app's save : one repository at most per object type
+    // (refused, naming the one in use), and a usage turned on or off followed (its objects taken,
+    // or unlinked and kept in the app)
+    update: async (d, row) => {
+      const RepoObjects = (await import("./repoObjects/index.js")).default;
+      await RepoObjects.assertUsageAllowed(d, row.name, row);
+      const res = await CrudModel.update("repositories", d, row.id, seedOpts);
+      await Repository.afterUsageChange(row, d.name ?? row.name, seedOpts);
+      return res;
+    },
     remove: (row) => Repository.delete(row.name, seedOpts),
   },
   {
@@ -161,69 +178,9 @@ const listSections = [
   },
 ];
 
-// JSON with object keys in a stable (sorted) order, recursively, so two structurally
-// equal documents always produce the same string. Array order is meaningful and is kept.
-// Exported for the test that pins the MySQL key-sorting behaviour this exists for.
-export function canonicalJson(value) {
-  const walk = (v) => {
-    if (Array.isArray(v)) return v.map(walk);
-    if (v !== null && typeof v === "object") {
-      const out = {};
-      for (const k of Object.keys(v).sort()) out[k] = walk(v[k]);
-      return out;
-    }
-    return v;
-  };
-  return JSON.stringify(walk(value));
-}
-
-// Whether any declared field differs from what is stored.
-//
-// Without this the seed would rewrite every row on every boot, because encryption
-// uses a random IV : the same password produces different ciphertext each time, so
-// "did it change?" cannot be answered by comparing what is about to be written. That
-// would make the audit trail claim a change on every restart and make the applied
-// counts meaningless. Comparison is loose (String()) because a port declared as 389
-// comes back from MySQL as "389" in a varchar column.
-// Exported for the tests of the JSON comparisons.
-export function differs(declared, stored) {
-  for (const [key, value] of Object.entries(declared)) {
-    if (key === "managed") continue;
-    const before = stored[key];
-    if (typeof value === "boolean") {
-      if ((before ? 1 : 0) !== (value ? 1 : 0)) return true;
-      continue;
-    }
-    if (value === null || value === undefined) continue;
-    // A JSON column (oauth2_providers.extra) is returned PARSED by mysql2, so String()
-    // gives "[object Object]" and every comparison against the declared string differed
-    // - rewriting the row on every boot, and with it re-running the "only one enabled
-    // provider per type" side effect that disables a sibling somebody enabled by hand.
-    //
-    // Comparing must be CANONICAL, not just structural: MySQL sorts an object's keys when
-    // it stores JSON (verified - '{"b":2,"a":1}' comes back as '{"a":1,"b":2}'), while
-    // JSON.parse preserves the declared order. A plain JSON.stringify of each side
-    // therefore still differs for any declared object whose keys are not already sorted.
-    if (before !== null && typeof before === "object") {
-      let parsed = value;
-      if (typeof value === "string") {
-        try { parsed = JSON.parse(value); } catch { parsed = value; }
-      }
-      if (canonicalJson(before) !== canonicalJson(parsed)) return true;
-      continue;
-    }
-    // the other way round : an object declared for a TEXT column holding JSON
-    // (secret_stores.extra), which String() would turn into "[object Object]"
-    if (typeof value === "object") {
-      let parsed;
-      try { parsed = JSON.parse(before ?? "null"); } catch { parsed = before; }
-      if (canonicalJson(parsed) !== canonicalJson(value)) return true;
-      continue;
-    }
-    if (String(before ?? "") !== String(value)) return true;
-  }
-  return false;
-}
+// canonicalJson and differs : the comparison of a declared item with its stored row, shared
+// with the repository-backed objects (lib/repoObjects), in lib/seedCompare.js
+export { canonicalJson, differs };
 
 /**
  * The record to write for a declared item.
@@ -240,12 +197,35 @@ export function buildRecord(section, item, isCreate) {
     : { ...item, managed: true };
 }
 
+/**
+ * Says that the config seed declares an object a repository holds : not applied, the
+ * repository's version kept (the same words as RepoObjects.applyDeclared's).
+ *
+ * Args:
+ *   label (string): what it is (credential, runner, ldap).
+ *   name (string): its name.
+ *   row (object): the row as stored ({ repository, repo_file }).
+ *
+ * Returns:
+ *   void
+ */
+function warnHeldByRepository(label, name, row) {
+  logger.warning(`The config seed declares the ${label} '${name}', which repository '${row.repository}' holds (${row.repo_file}): not applied, the repository's version is kept`);
+}
+
 async function applyListSection(section, cfg, summary) {
   const items = cfg.items || [];
   const declared = new Set(items.map((i) => i.name));
 
   for (const item of items) {
     const existing = await CrudModel.findByName(section.modelName, item.name);
+    // one a repository holds : git's, never the seed's too (each would undo the other, the seed at
+    // every start, git at every pull, refusing a row the seed made managed) - left as it is, said,
+    // as the sections read through the repository types are (RepoObjects.applyDeclared)
+    if (existing?.repository) {
+      warnHeldByRepository(section.label, item.name, existing);
+      continue;
+    }
     if (existing) {
       const data = buildRecord(section, item, false);
       // already managed and unchanged : leave the row alone entirely. Compared without the fields
@@ -306,7 +286,7 @@ async function applyListSection(section, cfg, summary) {
  * does. So if that first clone failed - bad credentials, DNS, or the pod killed mid-clone by
  * a readiness probe - every later boot took the `unchanged` fast path, because status/head/
  * output are runtime state and deliberately not declarable, so differs() never looks at
- * them. A repository marked use_for_config then made the instance serve NO forms, for ever,
+ * them. A repository marked use_for_roles then made the instance serve NO forms, for ever,
  * while the seed reported itself applied.
  *
  * Checking the directory rather than `status` on purpose: status can read 'success' from an
@@ -337,14 +317,12 @@ async function applyLdap(cfg, summary) {
   // hand-configured LDAP set enable=0 and destroyed the group mapping - it stopped
   // directory logins. So take only the keys the seed actually declared, with the
   // constructor's conversion applied. Same rule as applySettings, and as buildRecord.
-  const converted = { ...new Ldap(cfg) };
-  const record = {};
-  for (const key of Object.keys(converted)) {
-    if (key === 'testuser' || key === 'testpassword') continue;
-    if (cfg[key] === undefined) continue;          // not declared : leave it alone
-    if (converted[key] === undefined) continue;
-    record[key] = converted[key];
+  // a directory a repository holds : git's, never the seed's too (applyListSection)
+  if (stored?.repository) {
+    warnHeldByRepository("ldap", stored.name, stored);
+    return;
   }
+  const record = Ldap.declared(cfg);
   // compare against what was declared, not against the freshly encrypted record
   if (stored?.managed && !differs(cfg, stored)) {
     summary.unchanged++;
@@ -357,7 +335,7 @@ async function applyLdap(cfg, summary) {
     summary.adopted.push("ldap");
   }
   record.managed = 1;
-  await Ldap.update(record);
+  await Ldap.update(record, seedOpts);
   summary.updated.push("ldap");
 }
 
@@ -397,14 +375,8 @@ async function applySettings(cfg, summary) {
 export async function applyChat(declared, summary) {
   // extra headers may be written as a yaml mapping : compared and stored as the model keeps
   // them (normalised JSON text), or every start would see a difference
-  const cfg = declared.extra_headers === undefined ? declared : { ...declared, extra_headers: normaliseExtraHeaders(declared.extra_headers) };
+  const { cfg, record } = ChatSettings.declared(declared);
   const stored = await ChatSettings.find();
-  const converted = { ...new ChatSettings(cfg) };
-  const record = {};
-  for (const key of Object.keys(converted)) {
-    if (cfg[key] === undefined || converted[key] === undefined) continue;
-    record[key] = converted[key];
-  }
   if (stored?.managed && !differs(cfg, stored)) {
     summary.unchanged++;
     return;
@@ -434,6 +406,18 @@ function oneAtATime(fn) {
 
 export function applyConfigSeed(opts) {
   return oneAtATime(() => applySeedNow(opts));
+}
+
+/**
+ * Whether the configuration is kept in the database and the database holds one : what 7.3 served
+ * then, whatever repository had use_for_config (models/form.model.js getBaseConfig).
+ *
+ * Returns:
+ *   Promise<boolean>: true when it is.
+ */
+async function configKeptInDatabase() {
+  const [settings] = (await mysql.do("SELECT config_source, forms_yaml FROM AnsibleForms.`settings` limit 1")) || [];
+  return !!settings && Settings.resolveConfigInDatabase(settings) && !!String(settings.forms_yaml ?? "").trim();
 }
 
 export function reloadConfigSeed(opts) {
@@ -582,10 +566,35 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     throw new Error("Seed file must contain a yaml mapping at the top level");
   }
   doc = interpolateEnv(doc);
-  validateSeed(doc);
+  // a repository's use_for_config : deprecated since 7.8.0, removed in 8 - the roles, the categories
+  // and the constants, each a flag of its own now
+  // the repository holding them already (the one the schema patch gave them to) keeps them ; the
+  // configuration kept in the database : 7.3 read none of them, none gets the flags. Read before the
+  // validation : it checks the flags as the apply gives them (foldConfigFlag), never stricter
+  const declaresConfig = Array.isArray(doc.repositories?.items) && doc.repositories.items.some((r) => r?.use_for_config !== undefined);
+  const held = declaresConfig
+    ? (await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY id")).map((r) => r.name)
+    : [];
+  const inDatabase = declaresConfig && (await configKeptInDatabase());
+  validateSeed(doc, { held, inDatabase });
   if (doc.awx) {
     logger.warning("The config seed's awx: section is deprecated since 7 and removed in 8: declare those connections under runners: with type: awx");
     doc = foldAwxIntoRunners(doc);
+  }
+  // use_for_config folded as the validation checked it
+  const configFlag = foldConfigFlag(doc, held, { inDatabase });
+  doc = configFlag.doc;
+  if (inDatabase) {
+    for (const name of configFlag.dropped) {
+      logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.8.0 and removed in 8: the configuration is kept in the database, which was served instead of it, so it is not applied (declare use_for_roles, use_for_categories or use_for_constants to read them from it)`);
+    }
+    configFlag.dropped = [];
+  }
+  for (const name of configFlag.folded) {
+    logger.warning(`The config seed's repository '${name}' uses use_for_config, deprecated since 7.8.0 and removed in 8: declare use_for_roles, use_for_categories and use_for_constants (applied now as those three)`);
+  }
+  for (const name of configFlag.dropped) {
+    logger.warning(`The config seed's repository '${name}' uses use_for_config too, deprecated since 7.8.0 and removed in 8: only one repository holds the roles, the categories and the constants, '${configFlag.holder}' has them ; its use_for_config is not applied`);
   }
   // a runner's own token, or user and password : deprecated since 7.3 in favour of a credential
   // of its kind (credential:), removed in 8. Applied as such a credential, named after the runner
@@ -604,6 +613,11 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     const credential = doc.runners.items.find((r) => r.name === name).credential;
     logger.warning(`The config seed's runner '${name}' carries its own token or user and password, deprecated since 7.3 and removed in 8: declare a credential of its kind with its url and name it with credential: (applied now as the credential '${credential}')`);
   }
+  // an oauth2 provider's type as a file says it (provider: entraid) : applied as it is stored
+  // (azuread) ; provider: azuread still read, deprecated since 7.8.0 (lib/seed-schema.js OAUTH2_VALUES)
+  const oauth2Values = foldOauth2Values(doc);
+  doc = oauth2Values.doc;
+  for (const d of oauth2Values.deprecated) logger.warning(`The config seed's oauth2 provider '${d.name}' says ${d.notice}`);
 
   // the settings' mail keys : deprecated since 7.6 (the settings row has no mail columns), removed
   // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). Every
@@ -629,7 +643,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   // written would otherwise carry a `managed` flag with nothing in the trail explaining
   // who set it - so record what got as far as being applied, then re-throw.
   try {
-    await applySections(doc, summary);
+    await applySections(doc, summary, { dir: path.dirname(seedPath) });
   } catch (e) {
     await logApply(seedPath, summary, 'failure');
     throw e;
@@ -713,6 +727,15 @@ async function releaseWhenOff() {
       released.push(section.key);
       groups.push(section.key);
     }
+  }
+
+  // Step 2b : the fields its Appearance and mcp sections declared (kept per field in the settings
+  // row, lib/seedManaged.js), said by their section
+  const heldFields = await setSeedManagedFields([]);
+  released.push(...heldFields.map(heldName));
+  for (const label of [...Object.keys(APPEARANCE_SECTIONS), "mcp"]) {
+    const fields = heldFields.filter((f) => sectionOfField(f) === label);
+    if (fields.length) groups.push(`${label}: ${fields.map(seedKeyOf).join(", ")}`);
   }
 
   // Step 3 : say so, once. Nothing released (every start after the first) is silent.
@@ -833,7 +856,15 @@ async function reloadSeedNow({ force = false, trigger = "poll" } = {}) {
   }
 }
 
-async function applySections(doc, summary) {
+/**
+ * Applies the sections of a validated seed document.
+ *
+ * Args:
+ *   doc (object): the document.
+ *   summary (object): what was applied, filled in.
+ *   opts (object): { dir (the seed file's folder : the files a section names beside it) }.
+ */
+async function applySections(doc, summary, opts = {}) {
   for (const section of listSections) {
     // an absent section behaves like an empty one, so deleting a block from the file
     // releases its records rather than freezing them for ever
@@ -861,6 +892,40 @@ async function applySections(doc, summary) {
   } else {
     const res = await mysql.do("UPDATE AnsibleForms.`chat_settings` SET managed=0 WHERE managed=1");
     if (res.affectedRows > 0) summary.released.push("chat");
+  }
+
+  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements,
+  // the disclaimer versions, the local groups and the users : read through the descriptors a
+  // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted ;
+  // the groups before the users, whose new local ones take the groups listing them
+  const sections = [
+    ...Object.keys(APPEARANCE_SECTIONS).map((key) => [key, key, key]),
+    ["mcp", "mcp", "MCP"],
+    ["announcements", "announcements", "announcement"],
+    ["disclaimer", "disclaimer", "disclaimer version"],
+    ["groups", "groups", "group"],
+    ["users", "users", "user"],
+  ];
+  // the fields its Appearance and mcp sections declare are its own from now on (read only in the
+  // app) ; one it no longer declares, or a section gone, released (lib/seedManaged.js)
+  const heldReleased = await setSeedManagedFields(seedFieldsOf(doc));
+  summary.released.push(...heldReleased.map(heldName));
+  if (sections.some(([key]) => doc[key])) {
+    const { default: RepoObjects } = await import("./repoObjects/index.js");
+    const { declareSeedGroups } = await import("./repoObjects/groups.js");
+    // the seed's groups' members : a new local user of its users takes the groups listing it
+    declareSeedGroups(doc.groups?.items || []);
+    try {
+      for (const [key, type, label] of sections) {
+        if (!doc[key]) continue;
+        const done = await RepoObjects.applyDeclared(await RepoObjects.descriptorOf(type), doc[key].items || doc[key], opts);
+        summary.created.push(...done.created.map((n) => `${label}:${n}`));
+        summary.updated.push(...done.updated.map((n) => (n === type ? label : `${label}:${n}`)));
+        summary.unchanged += done.unchanged;
+      }
+    } finally {
+      declareSeedGroups([]);
+    }
   }
 
 }
@@ -905,5 +970,5 @@ async function logApply(seedPath, summary, outcome) {
   }
 }
 
-export { listSections, applyListSection };
+export { listSections, applyListSection, applyLdap };
 export default { applyConfigSeed, reloadConfigSeed, getSeedState };

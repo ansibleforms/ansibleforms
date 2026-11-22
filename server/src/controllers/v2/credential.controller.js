@@ -12,6 +12,7 @@ import { formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import { SECRET_MASK, masked, isMasked } from '../../lib/secretMask.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 import Audit from '../../models/audit.model.js';
 import { writeSecret } from '../../secrets/providers/index.js';
 
@@ -378,8 +379,17 @@ const credentialController = {
       // the secret it reads from a secret store : an admin's to choose
       assertSecretRefUnchanged(req, null);
       // typed here and written to its secret store : the save's checks first (nothing is written
-      // for a save that would be refused), then the store, then the reference saved
-      const credential = await saveWithTypedSecret(req, null, null, () => CredentialModel.create(req.body));
+      // for a save that would be refused), then the store, then the reference saved, under the
+      // credentials repository's write claim (RepoObjects.holding)
+      const credential = await saveWithTypedSecret(req, null, null, () =>
+        RepoObjects.holding('credentials', async () => {
+          const credential = await CredentialModel.create(req.body);
+          // the credentials repository, when there is one : written to it as a new file, without its
+          // secrets (lib/repoObjects)
+          await RepoObjects.appCreated('credentials', credential);
+          return credential;
+        }),
+      );
       res.json(RestResult.single({ message: i18n.t(req, 'success.created', { resource: 'Credential' }), id: credential }));
     } catch (err) {
       Errors.ReturnError(res, publicError(req, err));
@@ -412,8 +422,14 @@ const credentialController = {
       if (before && req.body?.name !== undefined && req.body.name !== before.name) await assertUnused(req, before.name);
       // typed here and written to its secret store (a new one, or a new password for the one it
       // reads) : the save's checks first (nothing is written for a save that would be refused),
-      // then the store, then the reference saved
-      await saveWithTypedSecret(req, before, req.params.id, () => CredentialModel.update(req.body, req.params.id));
+      // then the store, then the reference saved, under its repository's write claim
+      await saveWithTypedSecret(req, before, req.params.id, () =>
+        RepoObjects.holding([], async () => {
+          await CredentialModel.update(req.body, req.params.id);
+          // one of the credentials repository : its changed fields written to its file
+          if (before?.repository) await RepoObjects.appUpdated('credentials', before, req.params.id);
+        }, before),
+      );
       if ([before?.credential_type, req.body?.credential_type].some((t) => SSO_TYPES.includes(t))) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.updated', { resource: 'Credential' }) }));
     } catch (err) {
@@ -426,7 +442,11 @@ const credentialController = {
       const before = await CredentialModel.findById(req.params.id).catch(() => null);
       await assertMayChange(req, before);
       if (before) await assertUnused(req, before.name);
-      await CredentialModel.delete(req.params.id);
+      await RepoObjects.holding([], async () => {
+        await CredentialModel.delete(req.params.id);
+        // one of the credentials repository : its file goes too, for the repository's Push
+        if (before?.repository) await RepoObjects.appDeleted('credentials', before);
+      }, before);
       if (SSO_TYPES.includes(before?.credential_type)) await reloadSso();
       res.json(RestResult.single({ message: i18n.t(req, 'success.deleted', { resource: 'Credential' }) }));
     } catch (err) {

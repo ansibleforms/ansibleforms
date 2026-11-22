@@ -214,6 +214,6 @@ describe("a repository", () => {
   test("an admin's move keeps both", async () => {
     await call(repoController.update, admin, { body: { uri: "https://new/x.git", credential: "git-bot" }, params: { name: "infra" } });
     expect(repoWrites[0][1].credential).toBe("git-bot");
-    expect(repoWrites[0][3]).toEqual({ dropPassword: false });
+    expect(repoWrites[0][3]).toMatchObject({ dropPassword: false });
   });
 });

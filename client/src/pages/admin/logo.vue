@@ -7,6 +7,7 @@ import Profile from '@/lib/Profile';
 import { useAppStore } from '@/stores/app';
 import { useI18n } from 'vue-i18n';
 import { useSingleTab } from '@/composables/useSingleTab';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 
@@ -114,9 +115,13 @@ async function removeLogo() {
   }
 }
 
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   await measureHeaderLogo();
+  await loadSeedManaged();
 });
 </script>
 <template>
@@ -147,15 +152,22 @@ onMounted(async () => {
         <BsButton
           icon="upload"
           :colorClass="!selectedFile || busy ? 'secondary' : 'primary'"
-          :disabled="!selectedFile || busy"
+          :disabled="!selectedFile || busy || seeded('logo')"
           @click="upload()"
           >{{ t('logo.uploadButton') }}</BsButton
         >
-        <BsButton v-if="store.customLogo && !store.logoIsDefault" icon="trash" :disabled="busy" @click="removeLogo()">{{
-          t('logo.remove')
-        }}</BsButton>
+        <BsButton
+          v-if="store.customLogo && !store.logoIsDefault"
+          icon="trash"
+          :disabled="busy || seeded('logo')"
+          @click="removeLogo()"
+          >{{ t('logo.remove') }}</BsButton
+        >
       </template>
       <template #default>
+        <AppSeedNotice v-if="seeded('logo')" />
+        <!-- kept under logo: in a repository's file, the image it names : which one, and the file -->
+        <AppRepositorySource type="logo" />
         <div class="row">
           <div class="col-md-6">
             <label class="form-label fw-bold mb-2">{{ t('logo.current') }}</label>
@@ -181,6 +193,7 @@ onMounted(async () => {
         <div>
           <input
             ref="fileInput"
+            :disabled="seeded('logo')"
             class="form-control"
             style="max-width: 40rem"
             type="file"

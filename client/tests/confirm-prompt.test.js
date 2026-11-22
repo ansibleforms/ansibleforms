@@ -138,3 +138,37 @@ describe('the client', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the dialog above every other', () => {
+  // AppConfirmDialog is mounted before the pages (App.vue), so at the same z-index a dialog open on
+  // the page (a repository's New dialog asking about its usages) is drawn over the question. Its
+  // modal and its backdrop must be above every modal and backdrop the client styles, nested ones too.
+  const src = join(import.meta.dirname, '../src');
+  const files = (dir) =>
+    readdirSync(dir).flatMap((f) => {
+      const p = join(dir, f);
+      return statSync(p).isDirectory() ? files(p) : /\.(vue|scss)$/.test(f) ? [p] : [];
+    });
+  // every rule naming a modal or a backdrop with a z-index : [file, selector, z-index]
+  const rules = (text) =>
+    [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map((m) => [m[1].trim(), Number(m[2].match(/z-index:\s*(\d+)/)?.[1])])
+      .filter(([sel, z]) => /modal|backdrop/.test(sel) && z);
+  const confirmFile = join(src, 'components/AppConfirmDialog.vue');
+  const own = rules(readFileSync(confirmFile, 'utf8'));
+  const zOf = (re) => own.find(([sel]) => re.test(sel))?.[1];
+
+  it('wraps its modal in its layer', () => {
+    expect(readFileSync(confirmFile, 'utf8')).toMatch(/<div class="af-confirm-layer">\s*<BsModal/);
+  });
+
+  it("puts its backdrop above every other modal (Bootstrap's 1055 too), its modal above its backdrop", () => {
+    const others = files(src)
+      .filter((p) => p !== confirmFile)
+      .flatMap((p) => rules(readFileSync(p, 'utf8')).map(([sel, z]) => ({ p, sel, z })));
+    expect(others.length).toBeGreaterThan(2);
+    const highest = Math.max(1055, ...others.map((o) => o.z));
+    expect(zOf(/\.modal\)/)).toBeGreaterThan(zOf(/\.modal-backdrop\)/));
+    expect(zOf(/\.modal-backdrop\)/)).toBeGreaterThan(highest);
+  });
+});

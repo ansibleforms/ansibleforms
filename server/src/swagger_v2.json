@@ -35,7 +35,7 @@
     { "name": "directory", "description": "LDAP and SSO users and groups seen at sign-in or named by a role" },
     { "name": "designer", "description": "Designer lock, forms repositories and the designer's playbooks, vars files, inventories and workflows" },
     { "name": "announcement", "description": "The announcements under the header (Settings > Appearance > Announcements)" },
-    { "name": "schedule", "description": "Scheduled and planned (Run later) jobs" },
+    { "name": "schedule", "description": "Scheduled and planned (Run later) jobs: kept in the app or in a schedules repository (controller_schedules: entries of its YAML files), each timed by exactly one of a cron, an iCal rrule or one_time_run (the moment of its one run): its kind is the field that is set" },
     { "name": "storedjob", "description": "Stored jobs: saved form values per user" }
   ],
   "servers": [
@@ -353,7 +353,8 @@
                   "properties": {
                     "config_yaml": { "type": "string", "description": "The active config.yaml content (empty string when there is none yet)" },
                     "forms_yaml": { "type": "string", "deprecated": true, "description": "The same content as config_yaml, under its name before 7.6 (deprecated, removed in 8)" },
-                    "baseHash": { "type": "string", "description": "sha256 fingerprint of config_yaml, for optimistic concurrency on save" }
+                    "baseHash": { "type": "string", "description": "sha256 fingerprint of config_yaml, for optimistic concurrency on save" },
+                    "templated": { "type": "boolean", "description": "The base config or a file a repository holds the roles, categories or constants in is a ytt template: the editors are read only" }
                   }
                 }
               }
@@ -743,11 +744,34 @@
                           "user": { "type": "string" },
                           "password": { "type": "string", "example": "**********" },
                           "description": { "type": "string" },
-                          "use_for_config": { "type": "boolean" },
+                          "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
+                          "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
+                          "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
                           "use_for_forms": { "type": "boolean" },
                           "use_for_playbooks": { "type": "boolean" },
                           "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "The controller_schedules: entries of its YAML files (any name, any folder) hold the schedules, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as an entry), turning it off keeps them in the app, unlinked" },
+                  "use_for_repositories": { "type": "boolean", "description": "The controller_repositories: entries of its YAML files (any name, any folder) hold the other repositories, in the config seed format (never itself, never one holding repositories). One repository at most" },
+                  "use_for_credentials": { "type": "boolean", "description": "The controller_credentials: entries of its YAML files (any name, any folder) hold the credentials, in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "The controller_secret_stores: entries of its YAML files (any name, any folder) hold the secret stores, in the config seed format, naming their credential, secrets as ${ENV} references only. One repository at most" },
+                  "use_for_databases": { "type": "boolean", "description": "The controller_databases: entries of its YAML files (any name, any folder) hold the databases forms query, in the config seed format, each naming its credential of type database. One repository at most : turning it on takes the app's databases, turning it off keeps them in the app, unlinked" },
+                  "use_for_runners": { "type": "boolean", "description": "The controller_runners: entries of its YAML files (any name, any folder) hold the runners, in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notifications": { "type": "boolean", "description": "The controller_notifications: entries of its YAML files (any name, any folder) hold the notification channels, in the config seed format, naming their credentials, a webhook address as an ${ENV} reference only. One repository at most" },
+                  "use_for_sso": { "type": "boolean", "description": "The controller_sso: entries of its YAML files (any name, any folder) hold the SSO providers, in the config seed format (oauth2 items), naming their credential, a client secret as an ${ENV} reference only. One repository at most" },
+                  "use_for_ldap": { "type": "boolean", "description": "The controller_ldap: entries of its YAML files (any name, any folder) hold the LDAP directories (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's entry cannot be removed while linked. One repository at most" },
+                  "use_for_syslog": { "type": "boolean", "description": "The controller_syslog: entries of its YAML files (any name, any folder) hold the syslog servers, in the config seed format. One repository at most" },
+                  "use_for_chat_assistant": { "type": "boolean", "description": "The controller_chat_assistant: map of one of its YAML files holds the chat assistant's switch (enable_chat, the ENABLE_CHAT environment setting) and its settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "The controller_mcp: map of one of its YAML files holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "The controller_disclaimer: entries of its YAML files (any name, any folder) hold the disclaimer versions (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
+                  "use_for_defaults": { "type": "boolean", "description": "The controller_defaults: map of one of its YAML files holds what Settings > Appearance > Defaults saves: the theme and its colour, the forms view, the time zone, the date format and the language. One repository at most" },
+                  "use_for_logo": { "type": "boolean", "description": "The controller_logo: map of one of its YAML files names the logo (Settings > Appearance > Logo), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_icon": { "type": "boolean", "description": "The controller_icon: map of one of its YAML files names the website icon (Settings > Appearance > Icon), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_name": { "type": "boolean", "description": "The controller_name: map of one of its YAML files holds the app name (Settings > Appearance > Name). One repository at most" },
+                  "use_for_links": { "type": "boolean", "description": "The controller_links: map of one of its YAML files holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
+                  "use_for_labels": { "type": "boolean", "description": "The controller_labels: entries of its YAML files (any name, any folder) hold the labels beside the logo, in the config seed format, with their position. One repository at most" },
+                  "use_for_announcements": { "type": "boolean", "description": "The controller_announcements: entries of its YAML files (any name, any folder) hold the announcements, named, with their schedule and switch. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "The controller_general: map of one of its YAML files holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                           "rebase_on_start": { "type": "boolean" },
                           "cron": { "type": "string" },
                           "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -788,11 +812,35 @@
                   "user": { "type": "string" },
                   "password": { "type": "string" },
                   "description": { "type": "string" },
-                  "use_for_config": { "type": "boolean" },
+                  "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.8.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
                   "use_for_forms": { "type": "boolean" },
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "The controller_schedules: entries of its YAML files (any name, any folder) hold the schedules, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as an entry), turning it off keeps them in the app, unlinked" },
+                  "use_for_repositories": { "type": "boolean", "description": "The controller_repositories: entries of its YAML files (any name, any folder) hold the other repositories, in the config seed format (never itself, never one holding repositories). One repository at most" },
+                  "use_for_credentials": { "type": "boolean", "description": "The controller_credentials: entries of its YAML files (any name, any folder) hold the credentials, in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "The controller_secret_stores: entries of its YAML files (any name, any folder) hold the secret stores, in the config seed format, naming their credential, secrets as ${ENV} references only. One repository at most" },
+                  "use_for_databases": { "type": "boolean", "description": "The controller_databases: entries of its YAML files (any name, any folder) hold the databases forms query, in the config seed format, each naming its credential of type database. One repository at most : turning it on takes the app's databases, turning it off keeps them in the app, unlinked" },
+                  "use_for_runners": { "type": "boolean", "description": "The controller_runners: entries of its YAML files (any name, any folder) hold the runners, in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notifications": { "type": "boolean", "description": "The controller_notifications: entries of its YAML files (any name, any folder) hold the notification channels, in the config seed format, naming their credentials, a webhook address as an ${ENV} reference only. One repository at most" },
+                  "use_for_sso": { "type": "boolean", "description": "The controller_sso: entries of its YAML files (any name, any folder) hold the SSO providers, in the config seed format (oauth2 items), naming their credential, a client secret as an ${ENV} reference only. One repository at most" },
+                  "use_for_ldap": { "type": "boolean", "description": "The controller_ldap: entries of its YAML files (any name, any folder) hold the LDAP directories (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's entry cannot be removed while linked. One repository at most" },
+                  "use_for_syslog": { "type": "boolean", "description": "The controller_syslog: entries of its YAML files (any name, any folder) hold the syslog servers, in the config seed format. One repository at most" },
+                  "use_for_chat_assistant": { "type": "boolean", "description": "The controller_chat_assistant: map of one of its YAML files holds the chat assistant's switch (enable_chat, the ENABLE_CHAT environment setting) and its settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "The controller_mcp: map of one of its YAML files holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "The controller_disclaimer: entries of its YAML files (any name, any folder) hold the disclaimer versions (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
+                  "use_for_defaults": { "type": "boolean", "description": "The controller_defaults: map of one of its YAML files holds what Settings > Appearance > Defaults saves: the theme and its colour, the forms view, the time zone, the date format and the language. One repository at most" },
+                  "use_for_logo": { "type": "boolean", "description": "The controller_logo: map of one of its YAML files names the logo (Settings > Appearance > Logo), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_icon": { "type": "boolean", "description": "The controller_icon: map of one of its YAML files names the website icon (Settings > Appearance > Icon), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_name": { "type": "boolean", "description": "The controller_name: map of one of its YAML files holds the app name (Settings > Appearance > Name). One repository at most" },
+                  "use_for_links": { "type": "boolean", "description": "The controller_links: map of one of its YAML files holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
+                  "use_for_labels": { "type": "boolean", "description": "The controller_labels: entries of its YAML files (any name, any folder) hold the labels beside the logo, in the config seed format, with their position. One repository at most" },
+                  "use_for_announcements": { "type": "boolean", "description": "The controller_announcements: entries of its YAML files (any name, any folder) hold the announcements, named, with their schedule and switch. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "The controller_general: map of one of its YAML files holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -816,6 +864,55 @@
           },
           "400": { "description": "Missing required fields" },
           "500": { "description": "Failed to create repository" }
+        }
+      }
+    },
+    "/repository/{name}/usage-preview": {
+      "get": {
+        "tags": ["repository"],
+        "summary": "Preview turning its object usages on or off",
+        "description": "What turning the repository's object usages on (or off) would do, changing nothing, for each type asked : the app's objects it would write as entries of the first file giving the type's key, else of <key>.yaml (and those written without their secrets, which stay in the database), those that stay in the app and why, the entries whose name an app object has (the entry wins), the objects it holds now ; and whether it has changes not pushed yet.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "types", "in": "query", "required": true, "description": "The object types, comma separated", "schema": { "type": "string", "example": "credentials,runners" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unpushed": { "type": "boolean", "description": "It has changes not pushed yet" },
+                    "types": {
+                      "type": "object",
+                      "description": "By type (schedules, credentials, runners)",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "repository": { "type": "string" },
+                          "active": { "type": "string", "nullable": true, "description": "The type's repository now" },
+                          "written": { "type": "array", "items": { "type": "string" } },
+                          "withoutSecret": { "type": "array", "items": { "type": "string" }, "description": "Written without their secrets, kept in the database" },
+                          "kept": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "reason": { "type": "string" }, "code": { "type": "string", "description": "Why, as a code the client translates: seed, registered, pending, holder, noSchedule, cron, notWritten" }, "error": { "type": "string", "description": "With notWritten: the error" }, "whole": { "type": "boolean", "description": "The type's one object stays whole (the chat assistant's settings the config seed manages)" }, "cron": { "type": "string" } } } },
+                          "clashes": { "type": "array", "items": { "type": "string" } },
+                          "files": { "type": "integer", "description": "The entries there are (1 or 0 for a type the app has one of)" },
+                          "readIn": { "type": "array", "description": "A list type : the objects its files give, by file, read in by the turn-on", "items": { "type": "object", "properties": { "file": { "type": "string" }, "names": { "type": "array", "items": { "type": "string" } } } } },
+                          "file": { "type": "string", "description": "The file the app's objects would be written to : the first giving the type's key, else <key>.yaml" },
+                          "linked": { "type": "integer" },
+                          "recurring": { "type": "integer", "description": "Schedules : the app's recurring schedules" },
+                          "planned": { "type": "integer", "description": "Schedules : the jobs users planned (Run later), which stay in the app" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
         }
       }
     },
@@ -848,11 +945,34 @@
                     "user": { "type": "string" },
                     "password": { "type": "string", "example": "**********" },
                     "description": { "type": "string" },
-                    "use_for_config": { "type": "boolean" },
+                    "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
+                    "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
+                    "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
                     "use_for_forms": { "type": "boolean" },
                     "use_for_playbooks": { "type": "boolean" },
                     "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "The controller_schedules: entries of its YAML files (any name, any folder) hold the schedules, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as an entry), turning it off keeps them in the app, unlinked" },
+                  "use_for_repositories": { "type": "boolean", "description": "The controller_repositories: entries of its YAML files (any name, any folder) hold the other repositories, in the config seed format (never itself, never one holding repositories). One repository at most" },
+                  "use_for_credentials": { "type": "boolean", "description": "The controller_credentials: entries of its YAML files (any name, any folder) hold the credentials, in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "The controller_secret_stores: entries of its YAML files (any name, any folder) hold the secret stores, in the config seed format, naming their credential, secrets as ${ENV} references only. One repository at most" },
+                  "use_for_databases": { "type": "boolean", "description": "The controller_databases: entries of its YAML files (any name, any folder) hold the databases forms query, in the config seed format, each naming its credential of type database. One repository at most : turning it on takes the app's databases, turning it off keeps them in the app, unlinked" },
+                  "use_for_runners": { "type": "boolean", "description": "The controller_runners: entries of its YAML files (any name, any folder) hold the runners, in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notifications": { "type": "boolean", "description": "The controller_notifications: entries of its YAML files (any name, any folder) hold the notification channels, in the config seed format, naming their credentials, a webhook address as an ${ENV} reference only. One repository at most" },
+                  "use_for_sso": { "type": "boolean", "description": "The controller_sso: entries of its YAML files (any name, any folder) hold the SSO providers, in the config seed format (oauth2 items), naming their credential, a client secret as an ${ENV} reference only. One repository at most" },
+                  "use_for_ldap": { "type": "boolean", "description": "The controller_ldap: entries of its YAML files (any name, any folder) hold the LDAP directories (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's entry cannot be removed while linked. One repository at most" },
+                  "use_for_syslog": { "type": "boolean", "description": "The controller_syslog: entries of its YAML files (any name, any folder) hold the syslog servers, in the config seed format. One repository at most" },
+                  "use_for_chat_assistant": { "type": "boolean", "description": "The controller_chat_assistant: map of one of its YAML files holds the chat assistant's switch (enable_chat, the ENABLE_CHAT environment setting) and its settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "The controller_mcp: map of one of its YAML files holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "The controller_disclaimer: entries of its YAML files (any name, any folder) hold the disclaimer versions (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
+                  "use_for_defaults": { "type": "boolean", "description": "The controller_defaults: map of one of its YAML files holds what Settings > Appearance > Defaults saves: the theme and its colour, the forms view, the time zone, the date format and the language. One repository at most" },
+                  "use_for_logo": { "type": "boolean", "description": "The controller_logo: map of one of its YAML files names the logo (Settings > Appearance > Logo), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_icon": { "type": "boolean", "description": "The controller_icon: map of one of its YAML files names the website icon (Settings > Appearance > Icon), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_name": { "type": "boolean", "description": "The controller_name: map of one of its YAML files holds the app name (Settings > Appearance > Name). One repository at most" },
+                  "use_for_links": { "type": "boolean", "description": "The controller_links: map of one of its YAML files holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
+                  "use_for_labels": { "type": "boolean", "description": "The controller_labels: entries of its YAML files (any name, any folder) hold the labels beside the logo, in the config seed format, with their position. One repository at most" },
+                  "use_for_announcements": { "type": "boolean", "description": "The controller_announcements: entries of its YAML files (any name, any folder) hold the announcements, named, with their schedule and switch. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "The controller_general: map of one of its YAML files holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                     "rebase_on_start": { "type": "boolean" },
                     "cron": { "type": "string" },
                     "status": { "type": "string", "description": "The lock of the repository: running while any git operation (pull, push, reset) or a designer save holds it, else how the last pull ended." },
@@ -896,11 +1016,35 @@
                   "user": { "type": "string" },
                   "password": { "type": "string" },
                   "description": { "type": "string" },
-                  "use_for_config": { "type": "boolean" },
+                  "use_for_roles": { "type": "boolean", "description": "The file of it giving controller_roles: (any name, any folder) holds the roles (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_categories": { "type": "boolean", "description": "The file of it giving controller_categories: (any name, any folder) holds the categories (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_constants": { "type": "boolean", "description": "The file of it giving controller_constants: (any name, any folder) holds the constants (config.yaml still read, deprecated). One repository at most" },
+                  "use_for_config": { "type": "boolean", "deprecated": true, "description": "Deprecated since 7.8.0, removed in 8: applied as use_for_roles, use_for_categories and use_for_constants" },
                   "use_for_forms": { "type": "boolean" },
                   "use_for_playbooks": { "type": "boolean" },
                   "use_for_workflows": { "type": "boolean" },
                   "use_for_inventories": { "type": "boolean" },
+                  "use_for_schedules": { "type": "boolean", "description": "The controller_schedules: entries of its YAML files (any name, any folder) hold the schedules, read in after each pull. One repository at most : turning it on takes the app's recurring schedules (each written as an entry), turning it off keeps them in the app, unlinked" },
+                  "use_for_repositories": { "type": "boolean", "description": "The controller_repositories: entries of its YAML files (any name, any folder) hold the other repositories, in the config seed format (never itself, never one holding repositories). One repository at most" },
+                  "use_for_credentials": { "type": "boolean", "description": "The controller_credentials: entries of its YAML files (any name, any folder) hold the credentials, in the config seed format, secrets as ${ENV} references only. One repository at most : turning it on takes the app's credentials (written without their secrets), turning it off keeps them in the app, unlinked" },
+                  "use_for_secret_stores": { "type": "boolean", "description": "The controller_secret_stores: entries of its YAML files (any name, any folder) hold the secret stores, in the config seed format, naming their credential, secrets as ${ENV} references only. One repository at most" },
+                  "use_for_databases": { "type": "boolean", "description": "The controller_databases: entries of its YAML files (any name, any folder) hold the databases forms query, in the config seed format, each naming its credential of type database. One repository at most : turning it on takes the app's databases, turning it off keeps them in the app, unlinked" },
+                  "use_for_runners": { "type": "boolean", "description": "The controller_runners: entries of its YAML files (any name, any folder) hold the runners, in the config seed format, naming their credential. One repository at most : turning it on takes the app's runners, turning it off keeps them in the app, unlinked" },
+                  "use_for_notifications": { "type": "boolean", "description": "The controller_notifications: entries of its YAML files (any name, any folder) hold the notification channels, in the config seed format, naming their credentials, a webhook address as an ${ENV} reference only. One repository at most" },
+                  "use_for_sso": { "type": "boolean", "description": "The controller_sso: entries of its YAML files (any name, any folder) hold the SSO providers, in the config seed format (oauth2 items), naming their credential, a client secret as an ${ENV} reference only. One repository at most" },
+                  "use_for_ldap": { "type": "boolean", "description": "The controller_ldap: entries of its YAML files (any name, any folder) hold the LDAP directories (the seed's ldap section with the directory's name, position and domains), naming their credential. The main directory's entry cannot be removed while linked. One repository at most" },
+                  "use_for_syslog": { "type": "boolean", "description": "The controller_syslog: entries of its YAML files (any name, any folder) hold the syslog servers, in the config seed format. One repository at most" },
+                  "use_for_chat_assistant": { "type": "boolean", "description": "The controller_chat_assistant: map of one of its YAML files holds the chat assistant's switch (enable_chat, the ENABLE_CHAT environment setting) and its settings in the config seed format (its chat section), the api key as an ${ENV} reference only, naming its credential. One repository at most" },
+                  "use_for_mcp": { "type": "boolean", "description": "The controller_mcp: map of one of its YAML files holds the MCP settings (Settings > Connections > MCP), keyed by their environment variable names. One repository at most" },
+                  "use_for_disclaimer": { "type": "boolean", "description": "The controller_disclaimer: entries of its YAML files (any name, any folder) hold the disclaimer versions (version, title, text, checkbox_label, enabled, ask_again). Acceptances are never in git. One repository at most" },
+                  "use_for_defaults": { "type": "boolean", "description": "The controller_defaults: map of one of its YAML files holds what Settings > Appearance > Defaults saves: the theme and its colour, the forms view, the time zone, the date format and the language. One repository at most" },
+                  "use_for_logo": { "type": "boolean", "description": "The controller_logo: map of one of its YAML files names the logo (Settings > Appearance > Logo), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_icon": { "type": "boolean", "description": "The controller_icon: map of one of its YAML files names the website icon (Settings > Appearance > Icon), an image file of the repository relative to that file, read and written as binary. One repository at most" },
+                  "use_for_name": { "type": "boolean", "description": "The controller_name: map of one of its YAML files holds the app name (Settings > Appearance > Name). One repository at most" },
+                  "use_for_links": { "type": "boolean", "description": "The controller_links: map of one of its YAML files holds the header links and the Designer link (Settings > Appearance > Links). One repository at most" },
+                  "use_for_labels": { "type": "boolean", "description": "The controller_labels: entries of its YAML files (any name, any folder) hold the labels beside the logo, in the config seed format, with their position. One repository at most" },
+                  "use_for_announcements": { "type": "boolean", "description": "The controller_announcements: entries of its YAML files (any name, any folder) hold the announcements, named, with their schedule and switch. One repository at most" },
+                  "use_for_general": { "type": "boolean", "description": "The controller_general: map of one of its YAML files holds the System > General settings by their environment variable names (those that page changes), secrets as ${ENV} references only, applied as that page saves them. One repository at most" },
                   "rebase_on_start": { "type": "boolean" },
                   "cron": { "type": "string" }
                 }
@@ -1216,7 +1360,7 @@
           "authentication"
         ],
         "summary": "Sign in with Microsoft Entra ID : redirects to Microsoft's sign-in page",
-        "description": "The enabled Entra ID provider's client (its credential's client id, secret, tenant and redirect URL). The paths of before 7.3, /auth/azureadoauth2..., answer the same (deprecated, removed in 8.0); 'azuread' stays the provider's name in the database and the config seed.",
+        "description": "The enabled Entra ID provider's client (its credential's client id, secret, tenant and redirect URL). The paths of before 7.3, /auth/azureadoauth2..., answer the same (deprecated, removed in 8.0); 'azuread' stays the provider's name in the database and this API; the config seed and a repository's controller_sso: entries say provider: entraid ('azuread' still read there, deprecated, removed in 8.0).",
         "responses": {
           "302": {
             "description": "To Microsoft's sign-in page"
@@ -2832,6 +2976,7 @@
           "disclaimer"
         ],
         "summary": "One version of the disclaimer",
+        "description": "Its number, title, text and checkbox label, whether it is the one in force, how many accepted it, and the disclaimer repository and file it comes from (repository, repo_file : the file its entry is in), empty for one kept in the app only.",
         "parameters": [
           {
             "name": "id",
@@ -3696,6 +3841,10 @@
                       "relocates": {
                         "type": "boolean"
                       },
+                      "ownedElsewhere": {
+                        "type": "boolean",
+                        "description": "Another page's or the deployment's : not shown on Settings > System > General, never in a General repository's general: map"
+                      },
                       "short": {
                         "type": "string",
                         "nullable": true
@@ -4114,6 +4263,3472 @@
           },
           "404": {
             "description": "No such token of this user"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        }
+      }
+    },
+    "/user": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "List local users, or find one by username",
+        "description": "Without username: all local users (passwords masked) with role and job counts; with directory=1 the LDAP and SSO users are listed beside them. With username: that one user. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Return only the local user with this username"
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Any value: add the LDAP and SSO users (seen at sign-in or named by a role)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users, or a single user when username is given"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Create a local user",
+        "description": "The password must satisfy the password policy. Creating a user that would get the admin role (its group or the admin role names it) is an admin's only. Needs the settings permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalUserCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created user"
+          },
+          "400": {
+            "description": "Empty body, or the password policy refuses the password"
+          },
+          "403": {
+            "description": "Granting admin needs an admin"
+          }
+        }
+      }
+    },
+    "/user/{id}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Get a local user by ID",
+        "description": "The password is masked. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User object"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Update a local user",
+        "description": "Fields sent are updated; username cannot be changed. A new password must satisfy the password policy, lifts a lockout and ends the user's sessions (a masked password keeps the stored one). An admin account, or moving a user into a group that grants admin, is an admin's only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalUserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated"
+          },
+          "400": {
+            "description": "Empty body, or the password policy refuses the password"
+          },
+          "403": {
+            "description": "Changing an admin account or granting admin needs an admin"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Delete a local user",
+        "description": "Its sessions end. An admin account is deleted by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted"
+          },
+          "403": {
+            "description": "Deleting an admin account needs an admin"
+          }
+        }
+      }
+    },
+    "/user/{id}/groups": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Add a group to a local user",
+        "description": "Adds a group besides the user's existing ones. Adding a group that grants admin, or changing an admin account, is an admin's only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "group_id"
+                ],
+                "properties": {
+                  "group_id": {
+                    "type": "integer",
+                    "description": "The group to add"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Group added"
+          },
+          "400": {
+            "description": "group_id missing, or the user is in that group already"
+          },
+          "403": {
+            "description": "Needs an admin"
+          },
+          "404": {
+            "description": "User or group not found"
+          }
+        }
+      }
+    },
+    "/user/{id}/groups/{groupId}": {
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Remove a group from a local user",
+        "description": "A user keeps at least one group. Changing an admin account is an admin's only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          },
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The group to remove"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group removed"
+          },
+          "400": {
+            "description": "The user is not in that group, or it is its only group"
+          },
+          "403": {
+            "description": "Needs an admin"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/user/{id}/block": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Block or allow a local user's sign-in",
+        "description": "Blocked, the user's sessions end at once and every sign-in is refused. The admin user and the requesting user cannot be blocked; an admin account is changed by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockedState"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ blocked }"
+          },
+          "400": {
+            "description": "Cannot block the admin user or yourself"
+          },
+          "403": {
+            "description": "Changing an admin account needs an admin"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/user/{id}/tokens": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "List a local user's API tokens",
+        "description": "Its tokens that have not expired or been revoked. For an admin account, an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tokens (sid, name, created_at, expires_at, last_used_at)"
+          },
+          "403": {
+            "description": "An admin account needs an admin"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/user/{id}/tokens/{sid}": {
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "user"
+        ],
+        "summary": "Revoke a local user's API token",
+        "description": "Its session ends at once. For an admin account, an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The local user's id"
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The token's session id (sid, from the token list)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ revoked: true }"
+          },
+          "403": {
+            "description": "An admin account needs an admin"
+          },
+          "404": {
+            "description": "User or token not found"
+          }
+        }
+      }
+    },
+    "/directory/users/{type}/{name}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "Get an LDAP or SSO user",
+        "description": "Its row of the user list (seen at sign-in or named by a role), plus groups and roles_at_login from its last sign-in. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Directory user"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "Forget an LDAP or SSO user's record",
+        "description": "The record comes back at its next sign-in. A blocked user is kept. A user that maps to the admin role is forgotten by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ forgotten }"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          },
+          "403": {
+            "description": "An admin user needs an admin"
+          },
+          "409": {
+            "description": "The user is blocked and is kept"
+          }
+        }
+      }
+    },
+    "/directory/users/{type}/{name}/block": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "Block or allow an LDAP or SSO user's sign-in",
+        "description": "Blocked, its sessions end at once. The requesting user cannot block itself; a user that maps to the admin role is changed by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockedState"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ blocked }"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name, or blocking yourself"
+          },
+          "403": {
+            "description": "An admin user needs an admin"
+          }
+        }
+      }
+    },
+    "/directory/users/{type}/{name}/end-sessions": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "End an LDAP or SSO user's sessions",
+        "description": "Its tokens issued before now (API tokens too) are refused and its refresh tokens removed; it signs in again. A user that maps to the admin role is changed by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ ended: true }"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          },
+          "403": {
+            "description": "An admin user needs an admin"
+          }
+        }
+      }
+    },
+    "/directory/users/{type}/{name}/tokens": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "List an LDAP or SSO user's API tokens",
+        "description": "Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tokens (sid, name, created_at, expires_at, last_used_at)"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          }
+        }
+      }
+    },
+    "/directory/users/{type}/{name}/tokens/{sid}": {
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "Revoke an LDAP or SSO user's API token",
+        "description": "Its session ends at once. A user that maps to the admin role is changed by an admin only. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The user's name, url-encoded"
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The token's session id (sid, from the token list)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ revoked: true }"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          },
+          "403": {
+            "description": "An admin user needs an admin"
+          },
+          "404": {
+            "description": "Token not found"
+          }
+        }
+      }
+    },
+    "/directory/groups/{type}/{name}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "directory"
+        ],
+        "summary": "Get an LDAP or SSO group",
+        "description": "A group seen at a sign-in or named by a role, with the members seen. Needs the settings permission.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "azuread",
+                "oidc"
+              ]
+            },
+            "description": "The directory type"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The group's name, url-encoded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Directory group"
+          },
+          "400": {
+            "description": "Unknown directory type or empty name"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/ldap": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "ldapdirectory"
+        ],
+        "summary": "Get the default LDAP directory",
+        "description": "The default LDAP directory (the one named 'default', else the first); the same handler as /ldapdirectory/{id}. The bind password is masked. Needs the settings permission.",
+        "responses": {
+          "200": {
+            "description": "LdapDirectory object"
+          },
+          "404": {
+            "description": "No LDAP directory"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "ldapdirectory"
+        ],
+        "summary": "Update the default LDAP directory",
+        "description": "The default LDAP directory (the one named 'default', else the first); the same handler as /ldapdirectory/{id}. Fields not sent are kept; the masked password keeps the stored one. Needs the settings permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LdapDirectory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "LDAP directory updated"
+          },
+          "400": {
+            "description": "No data sent"
+          },
+          "403": {
+            "description": "The directory comes from the config seed and is read only"
+          },
+          "404": {
+            "description": "No LDAP directory"
+          }
+        }
+      }
+    },
+    "/ldap/check": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "ldapdirectory"
+        ],
+        "summary": "Test the default LDAP directory",
+        "description": "The default LDAP directory (the one named 'default', else the first); the same handler as /ldapdirectory/{id}. Signs testuser/testpassword in with the fields sent over the stored ones; the stored bind password is used only for the stored servers. Needs the settings permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LdapDirectory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The test user's entry; empty when the directory does not know the user"
+          },
+          "400": {
+            "description": "No data sent, or the masked password sent for other servers"
+          },
+          "404": {
+            "description": "No LDAP directory"
+          },
+          "500": {
+            "description": "Why the directory could not be used"
+          }
+        }
+      }
+    },
+    "/lock": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Get designer lock status",
+        "description": "Tells whether the designer lock is free, held by the caller (match) or by someone else. Only username, type, displayName and created of the holder are returned.",
+        "responses": {
+          "200": {
+            "description": "RestResult with data { free, lock?, match?, released? }"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Take the designer lock",
+        "description": "Takes the designer lock when it is free or already the caller's.",
+        "responses": {
+          "201": {
+            "description": "Lock taken"
+          },
+          "403": {
+            "description": "Designer is disabled"
+          },
+          "423": {
+            "description": "The designer is locked by another user"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Release the designer lock",
+        "description": "Releases the caller's lock. With force=true an admin releases somebody else's lock; that holder's unsaved changes are lost.",
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "description": "Set to 'true' to force-release another user's lock (admin only).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lock released"
+          },
+          "403": {
+            "description": "force=true by a non-admin, or the designer is disabled"
+          },
+          "423": {
+            "description": "The lock is held by another user"
+          }
+        }
+      }
+    },
+    "/backup/{folder}/restore": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "backup"
+        ],
+        "summary": "Restore a database backup",
+        "description": "Replaces the entire database with the dump of the backup folder. Requires the allowBackupOps role option. The environment file is not restored (see /backup/{folder}/restore-env).",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The backup folder name (14 digits, a timestamp)."
+          },
+          {
+            "name": "backupFirst",
+            "in": "query",
+            "required": false,
+            "description": "Set to 'true' to take a backup before restoring; a failing pre-restore backup aborts the restore.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { message, restoreFolder, ... }"
+          },
+          "400": {
+            "description": "Invalid folder name, or the backup has no usable database dump"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "404": {
+            "description": "Backup folder not found"
+          }
+        }
+      }
+    },
+    "/repository/{name}/sync": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "repository"
+        ],
+        "summary": "Commit and push repository",
+        "description": "Commits the working tree of a forms, config, playbooks, workflows or inventories repository and pushes it to the remote (cloning it first when missing). Requires the settings or connections settings permission. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The repository name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { output } (the git output, credentials masked)"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "500": {
+            "description": "Failed to sync repository"
+          }
+        }
+      }
+    },
+    "/forms-repos": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "List forms repositories",
+        "description": "Lists the repositories the designer can push, without credentials, each with a dirty flag. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "responses": {
+          "200": {
+            "description": "RestResult with data { count, repositories, configRepo, staged }"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/forms-repos/sync": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Commit and push all forms repositories",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
+        "responses": {
+          "200": {
+            "description": "RestResult with data { results: [{ name, status, output }] }"
+          },
+          "400": {
+            "description": "No forms repositories"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "500": {
+            "description": "One or more repositories failed to sync"
+          }
+        }
+      }
+    },
+    "/forms-repos/sync/{name}": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Commit and push one forms repository",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. For a user whose role option designAllForms, designAllPlaybooks or designAllWorkflows is off, the git output leaves out the lines naming files.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The repository name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { output }"
+          },
+          "400": {
+            "description": "Not a pushable forms repository"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "500": {
+            "description": "Failed to sync repository"
+          }
+        }
+      }
+    },
+    "/forms-repos/pull": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Pull all forms repositories",
+        "description": "Pulls every pushable repository from its remote; a repository with unpushed changes is skipped. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option.",
+        "responses": {
+          "200": {
+            "description": "RestResult with data { results: [{ name, status, output? }], skipped }"
+          },
+          "400": {
+            "description": "No forms repositories"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "500": {
+            "description": "One or more repositories failed to pull"
+          }
+        }
+      }
+    },
+    "/forms-repos/pull/{name}": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Pull one forms repository",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The repository name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Repository pulled"
+          },
+          "400": {
+            "description": "Not a pushable forms repository"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "409": {
+            "description": "The repository has changes not pushed yet"
+          },
+          "500": {
+            "description": "Failed to pull repository"
+          }
+        }
+      }
+    },
+    "/files/workflows/names": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "List workflow names",
+        "description": "The designer's workflows by name, each with its file: what a workflow form may run. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed.",
+        "responses": {
+          "200": {
+            "description": "RestResult list of { name, file }"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/files/{kind}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "List designer files",
+        "description": "Lists the playbooks, vars files, inventories or workflows of the designer. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the logo's and the icon's images) is never listed, read, written nor deleted here (403).",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { repository, repositories, exists, truncated, dirty, roots, files: [{ path, size, modified }] }"
+          },
+          "400": {
+            "description": "Unknown kind"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/files/{kind}/file": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Read a designer file",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file answers 404. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the logo's and the icon's images) is never listed, read, written nor deleted here (403).",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "description": "File path relative to the kind's folder.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { path, content }"
+          },
+          "400": {
+            "description": "Unknown kind, invalid path, file too big or not text"
+          },
+          "403": {
+            "description": "No access (missing role option), or a file a usage type of its repository owns"
+          },
+          "404": {
+            "description": "File not found, or hidden from the user"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Save a designer file",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file's name answers 409, as a file there already. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the logo's and the icon's images) is never listed, read, written nor deleted here (403). A workflow file whose nodes run a playbook or a workflow hidden from the user answers 409, without naming it. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectFileWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RestResult with data { path, repository } (workflows also sharedNames)"
+          },
+          "400": {
+            "description": "Unknown kind, invalid path, content not text or too big"
+          },
+          "403": {
+            "description": "No access (missing role option), a form file, or a file a usage type of its repository owns"
+          },
+          "409": {
+            "description": "The name is already taken (a hidden file), or a workflow running a playbook or a workflow hidden from the user"
+          },
+          "423": {
+            "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Create a designer file",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file's name answers 409, as a file there already. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the logo's and the icon's images) is never listed, read, written nor deleted here (403). A workflow file whose nodes run a playbook or a workflow hidden from the user answers 409, without naming it. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectFileWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "RestResult with data { path, repository }"
+          },
+          "400": {
+            "description": "Unknown kind, invalid path, content not text or too big"
+          },
+          "403": {
+            "description": "No access (missing role option), a form file, or a file a usage type of its repository owns"
+          },
+          "409": {
+            "description": "File exists already (a hidden file too), or a workflow running a playbook or a workflow hidden from the user"
+          },
+          "423": {
+            "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Delete a designer file",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock. Without the role option designAllPlaybooks (playbooks) or designAllWorkflows (workflows), both on by default and always for admins, only the files used by the forms the user can see in the designer, and the files no form uses yet, are shown; a hidden file is refused without being revealed. Without designAllForms, the form files are left out too. A hidden file answers 404. A form file (a forms folder's, or a yaml file of a forms repository serving its forms from its root) is never written nor deleted here (403): the designer's forms write it. A file a usage type of its repository owns (roles.yaml, categories.yaml, constants.yaml, config.yaml, an object type's folder or file such as credentials/ or general.yaml, and the logo's and the icon's images) is never listed, read, written nor deleted here (403).",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "description": "File path relative to the kind's folder.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { path, repository }"
+          },
+          "400": {
+            "description": "Unknown kind or invalid path"
+          },
+          "403": {
+            "description": "No access (missing role option), a form file, or a file a usage type of its repository owns"
+          },
+          "404": {
+            "description": "File not found, or hidden from the user"
+          },
+          "423": {
+            "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
+          }
+        }
+      }
+    },
+    "/files/{kind}/push": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Commit and push designer files",
+        "description": "Commits and pushes the repository (or repositories) of the kind. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Writing also requires the role option of the kind (allowPlaybookDesign, allowVarsFileDesign, allowInventoryDesign or allowWorkflowDesign) and the caller must hold the designer lock.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "playbooks",
+                "vars",
+                "inventories",
+                "workflows"
+              ]
+            },
+            "description": "The kind of files."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with data { repository, output } ; without designAllForms, designAllPlaybooks or designAllWorkflows the output leaves out the lines naming files"
+          },
+          "400": {
+            "description": "The files are in a local folder, no repository to push to"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "423": {
+            "description": "The designer lock is held by another user (or, for file changes, not held by the caller)"
+          }
+        }
+      }
+    },
+    "/config": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Save the forms configuration",
+        "description": "Writes the forms (each to its file), the categories and the constants. Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not change the roles. With the role option designAllForms off, the forms the user does not see are kept as they are (a file holding several forms keeps its hidden ones), a read-only subform must come back unchanged (403), a form named as a hidden one (one that does not load included), a subform a hidden form uses, or a form put in the file of a hidden form that does not load is refused with the name said to be taken (409), and every form saved (a subform aside) must keep one of the user's roles (400). Without designAllPlaybooks or designAllWorkflows, a form naming a playbook or a workflow hidden from the user is refused (409). Without any of the three, a form may not gain an expression or a query the server runs that it does not have already (403). A form saved to a file a usage type of its repository owns (roles.yaml, config.yaml, general.yaml, an object type's folder ...), in a repository serving its forms from its root, is refused (409).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormsConfigDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved (data null)"
+          },
+          "400": {
+            "description": "Empty body, invalid configuration, or a form saved without one of the user's roles (designAllForms off)"
+          },
+          "403": {
+            "description": "No access, a non-admin changed the roles, a read-only subform changed, or a new or changed expression or query the server runs (designAllForms, designAllPlaybooks or designAllWorkflows off)"
+          },
+          "409": {
+            "description": "Duplicate form name, a form name or file already taken, or a playbook or a workflow not available to the user (designAllForms, designAllPlaybooks or designAllWorkflows off)"
+          },
+          "423": {
+            "description": "The designer is locked by another user"
+          },
+          "500": {
+            "description": "Failed to save"
+          }
+        }
+      },
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Get the forms configuration",
+        "description": "Returns the categories, the roles, the constants and the forms, as the designer edits them, with the load's errors and warnings. With the role option designAllForms off (it is on by default, and always for admins) only the forms whose roles hold one of the user's roles are returned, with the subforms no hidden form uses; a subform a hidden form uses as well as one of theirs is added with readOnly: true, and the warnings and errors naming a hidden form are left out. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "responses": {
+          "200": {
+            "description": "RestResult with the configuration"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          },
+          "500": {
+            "description": "Failed to read the forms config"
+          }
+        }
+      }
+    },
+    "/config/check": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Validate a forms configuration",
+        "description": "Parses and validates the configuration against the schema without saving it. Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormsConfigDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Valid (data null)"
+          },
+          "400": {
+            "description": "An empty body, or an invalid configuration (the validation message in details)"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/config/restore/{backupName}": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Restore a forms configuration backup",
+        "description": "Restores a configuration backup file (see /config/backups). Requires designer access (SHOW_DESIGNER on and the showDesigner role option). Also requires the allowFormDesign role option. Takes the designer lock for the write when it is free and releases it afterwards. A non-admin may not restore a backup with different roles. Refused (403) for a user whose role option designAllForms is off: a backup replaces every form.",
+        "parameters": [
+          {
+            "name": "backupName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The backup file name (ending in .bak.<timestamp>)."
+          },
+          {
+            "name": "backupBeforeRestore",
+            "in": "query",
+            "required": false,
+            "description": "Set to 'true' to back up the current configuration first.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restored (data null)"
+          },
+          "400": {
+            "description": "Missing or invalid backup name"
+          },
+          "403": {
+            "description": "No access, designAllForms off, or a non-admin restores different roles"
+          },
+          "423": {
+            "description": "The designer is locked by another user"
+          },
+          "500": {
+            "description": "Failed to restore"
+          }
+        }
+      }
+    },
+    "/config/backups": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "List forms configuration backups",
+        "description": "Requires designer access (SHOW_DESIGNER on and the showDesigner role option).",
+        "responses": {
+          "200": {
+            "description": "RestResult with data [{ file, date }], newest first"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/config/formlist": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Get the forms of the caller",
+        "description": "Returns the categories and the forms the caller's roles may open, without roles and constants. Any authenticated user. With the role option designAllForms off, the warning of a form name defined twice is left out unless the caller's roles reach both copies.",
+        "responses": {
+          "200": {
+            "description": "RestResult with the filtered configuration"
+          }
+        }
+      }
+    },
+    "/config/formslinked": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "List forms with their roles and runners",
+        "description": "Every form with the roles that open it and where its jobs run. Requires any settings permission (settings, appearance or connections). Without the settings permission itself and with the role option designAllForms off, only the forms the caller's designer shows are returned.",
+        "responses": {
+          "200": {
+            "description": "RestResult list"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/config/formscredentials": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "List credentials used by forms",
+        "description": "The credentials each form names, for a credential's Used by tab. Requires the settings or connections settings permission. Without the settings permission itself and with the role option designAllForms off, only the forms the caller's designer shows are returned.",
+        "responses": {
+          "200": {
+            "description": "RestResult list"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/config/workflowscredentials": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "List credentials used by workflows",
+        "description": "The credentials each designer workflow names, for a credential's Used by tab. Requires the settings or connections settings permission. Without the settings permission itself and with the role option designAllWorkflows off, only the workflow files the caller's designer shows are returned.",
+        "responses": {
+          "200": {
+            "description": "RestResult list of { name, description, file, credentials: [{ name, where }] }"
+          },
+          "403": {
+            "description": "No access (missing role option)"
+          }
+        }
+      }
+    },
+    "/config/form": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "config"
+        ],
+        "summary": "Get one form",
+        "description": "Returns the configuration of one form the caller's roles may open (without roles and categories). Any authenticated user.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "description": "The form name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RestResult with the form configuration"
+          },
+          "400": {
+            "description": "Form name not provided"
+          },
+          "403": {
+            "description": "The caller's roles do not grant the form"
+          },
+          "404": {
+            "description": "Form not found"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "get": {
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Sign out",
+        "description": "Ends the session of the bearer token sent (access, refresh and api token of that login); without a valid token nothing is revoked and the call still succeeds. Returns the identity provider's logout URL when OIDC is set up.",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { logoutUrl } }"
+          },
+          "500": {
+            "description": "The logout failed"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Sign out, removing the refresh token too",
+        "description": "Ends the session of the bearer token sent (access, refresh and api token of that login); without a valid token nothing is revoked and the call still succeeds. Returns the identity provider's logout URL when OIDC is set up. The refresh token in the body is deleted as well.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshtoken": {
+                    "type": "string",
+                    "description": "the refresh token of this login, deleted"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { logoutUrl } }"
+          },
+          "500": {
+            "description": "The logout failed"
+          }
+        }
+      }
+    },
+    "/auth/settings": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "The sign-in options of the login page",
+        "description": "Public. Which single sign-on providers are enabled, whether the login page goes straight to one, and the longest api token lifetime offered. The azure* fields are the names of before 7.3 (deprecated, removed in 8.0).",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { entraIdEnabled, entraGroupfilter, entraGraphUrl, azureAdEnabled, azureGroupfilter, azureGraphUrl, oidcEnabled, oidcIssuer, oidcGroupfilter, ssoAutoLogin, ssoAutoLoginProvider, apiTokenMaxDays } }"
+          },
+          "500": {
+            "description": "The settings could not be read"
+          }
+        }
+      }
+    },
+    "/auth/azureadoauth2": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Sign in with Microsoft Entra ID (deprecated path)",
+        "description": "Deprecated path of before 7.3, the same handler as GET /auth/entraid (removed in 8.0).",
+        "parameters": [
+          {
+            "name": "reauth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "1 asks the provider for the credentials again (prompt=login), for an api token"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To Microsoft's sign-in page, or back to /login?error=... on a failure"
+          }
+        }
+      }
+    },
+    "/auth/azureadoauth2/callback": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Microsoft Entra ID callback (deprecated path)",
+        "description": "Deprecated path of before 7.3, the same handler as GET /auth/entraid/callback (removed in 8.0). Called by Microsoft for a provider saved with the old redirect URI.",
+        "responses": {
+          "302": {
+            "description": "Into the app with a one-time handoff token in the fragment (/#token=...), or back to /login?error=..."
+          }
+        }
+      }
+    },
+    "/auth/azureadoauth2/login": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Trade the Entra ID handoff token for the app's tokens (deprecated path)",
+        "description": "Deprecated path of before 7.3, the same handler as POST /auth/entraid/login (removed in 8.0).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "the one-time handoff token of the callback"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ token, refreshtoken }"
+          },
+          "401": {
+            "description": "An unknown, used or expired handoff token, Entra ID not enabled, another tenant, or the user may not sign in"
+          }
+        }
+      }
+    },
+    "/auth/oidc": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Sign in with OpenID Connect : redirects to the provider's sign-in page",
+        "description": "Public. Uses the enabled OIDC provider.",
+        "parameters": [
+          {
+            "name": "reauth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "1 asks the provider for the credentials again (prompt=login), for an api token"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To the OIDC provider's sign-in page, or back to /login?error=... on a failure"
+          }
+        }
+      }
+    },
+    "/auth/oidc/callback": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "OpenID Connect callback",
+        "description": "Public. Called by the OIDC provider after the user signed in there.",
+        "responses": {
+          "302": {
+            "description": "Into the app with a one-time handoff token in the fragment (/#token=...), or back to /login?error=..."
+          }
+        }
+      }
+    },
+    "/auth/oidc/login": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Trade the OIDC handoff token for the app's tokens",
+        "description": "Public. The groups come from the token's claim, filtered with the provider's group filter.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "the one-time handoff token of the callback"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ token, refreshtoken }"
+          },
+          "401": {
+            "description": "An unknown, used or expired handoff token, OIDC not enabled, or the user may not sign in"
+          }
+        }
+      }
+    },
+    "/announcement": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "announcement"
+        ],
+        "summary": "List the announcements",
+        "description": "Needs the appearance settings permission (showSettings or showAppearanceSettings).",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { count, records } } - those not ended yet (ended ones are deleted first), each with a title"
+          },
+          "403": {
+            "description": "No appearance settings permission"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "announcement"
+        ],
+        "summary": "Add an announcement",
+        "description": "Needs the appearance settings permission (showSettings or showAppearanceSettings). Shows at once in every open tab.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Announcement"
+                  }
+                ],
+                "required": [
+                  "message"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "{ status, message, data: { message, id } }"
+          },
+          "400": {
+            "description": "Empty body, no message, an unknown level, a value that is no date, or an end not after the start or already past"
+          },
+          "403": {
+            "description": "No appearance settings permission"
+          }
+        }
+      }
+    },
+    "/announcement/{id}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "announcement"
+        ],
+        "summary": "Get an announcement by ID",
+        "description": "Needs the appearance settings permission (showSettings or showAppearanceSettings).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: announcement }"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "announcement"
+        ],
+        "summary": "Update an announcement by ID",
+        "description": "Needs the appearance settings permission (showSettings or showAppearanceSettings). Only the fields given change.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Announcement updated"
+          },
+          "400": {
+            "description": "Empty body, an empty message, an unknown level, a value that is no date, or an end not after the start or already past"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "announcement"
+        ],
+        "summary": "Delete an announcement by ID",
+        "description": "Needs the appearance settings permission (showSettings or showAppearanceSettings).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Announcement deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/disclaimer": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "The disclaimer to show, and whether this user still has to accept it",
+        "description": "Any signed-in user.",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { enabled, version, title, text, checkbox_label, required } } - version 0 when there is none yet"
+          }
+        }
+      }
+    },
+    "/disclaimer/accept": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Accept the disclaimer",
+        "description": "Any signed-in user. Recorded with the user, the version, the time, the IP and the user agent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "description": "the version accepted : the current one"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "No disclaimer is on, or the version is not the current one (it changed while read)"
+          }
+        }
+      }
+    },
+    "/disclaimer/decline": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Decline the disclaimer",
+        "description": "Any signed-in user. Nothing is recorded but a log entry; the client signs the user out.",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: null }"
+          }
+        }
+      }
+    },
+    "/disclaimersettings": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "The disclaimer's settings : on or off, and its current text",
+        "description": "Needs the settings permission (showSettings).",
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { enabled, version, title, text, checkbox_label } }"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Save the disclaimer : on or off, and its text",
+        "description": "Needs the settings permission (showSettings). A changed text rewrites the current version, or makes a new one when askAgain is set (and always the first time), so everyone accepts again.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "checkbox_label": {
+                    "type": "string"
+                  },
+                  "askAgain": {
+                    "type": "boolean",
+                    "description": "a changed text becomes a new version, which every user accepts again"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { enabled, version, title, text, checkbox_label } } - as it now stands"
+          },
+          "400": {
+            "description": "Empty body, or switched on without a title, a text or a checkbox label"
+          }
+        }
+      }
+    },
+    "/disclaimeracceptance": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Who accepted which version of the disclaimer",
+        "description": "Needs the settings permission (showSettings).",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "only the acceptances of this version"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { count, records } } - each { id, username, user_type, version, accepted_at, ip, user_agent }, the latest first"
+          }
+        }
+      }
+    },
+    "/disclaimeracceptance/ask-again": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Ask users to accept the disclaimer again",
+        "description": "Needs the settings permission (showSettings). The acceptances given are cleared; their users see the disclaimer again at their next request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "the acceptance ids"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { count } } - how many acceptances were cleared"
+          },
+          "400": {
+            "description": "No acceptance id given"
+          }
+        }
+      }
+    },
+    "/disclaimeracceptance/{id}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "disclaimer"
+        ],
+        "summary": "Get a disclaimer acceptance by ID",
+        "description": "Needs the settings permission (showSettings).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ status, message, data: { id, username, user_type, version, accepted_at, ip, user_agent } }"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/schedule": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List schedules, or one by name",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). Each listed schedule carries a computed next_run and where it comes from (repository, repo_file).",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Return the single schedule with this name (data is null when none)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule list or single schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "form": {
+                            "type": "string",
+                            "description": "The form it runs"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "one_time_run": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true,
+                            "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                          },
+                          "cron": {
+                            "type": "string",
+                            "description": "Its cron, in the scheduler's time zone"
+                          },
+                          "rrule": {
+                            "type": "string",
+                            "description": "Its iCal rrule, on one line",
+                            "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                          },
+                          "extra_vars": {
+                            "type": "string",
+                            "description": "The extra vars it sends the form (YAML)"
+                          },
+                          "repository": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The schedules repository it comes from ; null for one kept in the app"
+                          },
+                          "repo_file": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "schedules.yaml"
+                          },
+                          "launch_options": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "last_run": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "next_run": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Computed : its cron's, rrule's or one time run's next run"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No allowScheduledJobs"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Create a schedule, or plan a one-time run",
+        "description": "With allowScheduledJobs and no planned flag an admin-level schedule is created. While a schedules repository is used, it is saved and written to it as a new entry (waiting for the repository's Push), with its own timing: a cron, a rrule or a one-time run (one_time_run, the moment: an ISO 8601 time with its offset or Z); otherwise it is kept in the app, timed the same ways. Exactly one timing is kept. Otherwise (allowPlannedJobs, or planned: true) it plans a one-time run of a form the caller may run, as the caller, and needs name, form and one_time_run, with no cron nor rrule. Deprecated since 7.8.0 (removed in 8, a warning in the server log): one_time_run true with run_at, or run_at alone, is read as one_time_run at run_at; one_time_run false is no one-time run.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Schedule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Schedule created; data is the new schedule"
+          },
+          "400": {
+            "description": "Missing name or moment (one_time_run), invalid cron, a refused rrule or moment (or a rrule with a one-time run), or extra_vars / raw_form_data not a dictionary"
+          },
+          "403": {
+            "description": "No allowScheduledJobs or allowPlannedJobs, a recurring plan, a form the caller may not run, or verbose mode without allowVerboseMode"
+          },
+          "409": {
+            "description": "Another schedule has that name"
+          },
+          "422": {
+            "description": "Launch validation refuses the field values of a planned run"
+          }
+        }
+      }
+    },
+    "/schedule/repositories": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List the schedules repositories",
+        "description": "The schedules repository (use_for_schedules), when there is one : new schedules are written to it, whatever their timing.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedules repositories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/rrule": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Check a rrule and preview its next runs",
+        "description": "Checks an iCal rrule and gives its next four runs, in UTC, worked out in the rrule's own time zone. A rule that never fires (no run in the 50 years after its DTSTART) is refused ; runs that cannot be worked out within a second are said in errors.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rrule",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The check and the next runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "next": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/{id}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Get a schedule by ID",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "form": {
+                      "type": "string",
+                      "description": "The form it runs"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "one_time_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                    },
+                    "cron": {
+                      "type": "string",
+                      "description": "Its cron, in the scheduler's time zone"
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "description": "Its iCal rrule, on one line",
+                      "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                    },
+                    "extra_vars": {
+                      "type": "string",
+                      "description": "The extra vars it sends the form (YAML)"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The schedules repository it comes from ; null for one kept in the app"
+                    },
+                    "repo_file": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "schedules.yaml"
+                    },
+                    "launch_options": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "last_run": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "next_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Computed : its cron's, rrule's or one time run's next run"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No allowScheduledJobs"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Update a schedule by ID",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). owner, raw_form_data, state, output, last_run and queue_id cannot be changed, nor where it comes from (repository, repo_file). A repository's schedule is saved into its entry, where it is (only the fields changed; the rest of the file kept) for the repository's Push; it may be timed by a cron, a rrule or a one-time run, and a change of kind rewrites the entry's timing key (cron:, rrule: or one_time_run:, the other two removed). A pull that removed it meanwhile answers 404, one that changed it 409. Either way, a cron or a one-time run sent without a rrule drops the rrule it had, a rrule wins over a cron sent with it, and a rrule with a one-time run is refused (400).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Schedule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Schedule updated; data is the updated schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "form": {
+                      "type": "string",
+                      "description": "The form it runs"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "one_time_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "The moment of its one run (a one-time schedule, deleted after its run); null for one timed by its cron or rrule"
+                    },
+                    "cron": {
+                      "type": "string",
+                      "description": "Its cron, in the scheduler's time zone"
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "description": "Its iCal rrule, on one line",
+                      "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+                    },
+                    "extra_vars": {
+                      "type": "string",
+                      "description": "The extra vars it sends the form (YAML)"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The schedules repository it comes from ; null for one kept in the app"
+                    },
+                    "repo_file": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "schedules.yaml"
+                    },
+                    "launch_options": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Its entry's prompts as the reserved extra vars a job reads (JSON, read only)"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "last_run": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "next_run": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Computed : its cron's, rrule's or one time run's next run"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cron expression, a refused rrule or moment, a rrule with a one-time run, or a one-time run taken off with no cron or rrule in its place"
+          },
+          "403": {
+            "description": "No allowScheduledJobs"
+          },
+          "404": {
+            "description": "Not found, or removed by a pull meanwhile"
+          },
+          "409": {
+            "description": "Another schedule has that name, or a pull changed it meanwhile"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Delete a schedule by ID",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). A repository's schedule loses its file too (pushed with the repository's Push). Its past jobs stay.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule deleted"
+          },
+          "403": {
+            "description": "No allowScheduledJobs"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/schedule/{id}/launch": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Run a schedule now",
+        "description": "Needs the allowScheduledJobs role option (403 otherwise). Queues the schedule (unless already queued or running) and launches it. It runs as the Schedule Service (or, for a planned job, as the user who planned it).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule launched; data is the id"
+          },
+          "403": {
+            "description": "No allowScheduledJobs"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/stored-jobs": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "storedjob"
+        ],
+        "summary": "List stored jobs, filter by form, or get one by name",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). By name only the caller's own are searched; by form_name the caller's own and, with the allowStoredJobsViewAll role option, the ones other users shared (visibility shared) of a form the caller may open that does not set allowStoredJobSharing: false; another user's comes without the values of its password fields, in list and yaml rows too. The full list shows everyone's to a user with the settings permission, otherwise only the caller's own.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Return the caller's stored job with this name (data is null when none)"
+          },
+          {
+            "name": "form_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only the stored jobs of this form: the caller's own, and the ones shared with them"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored job list or single stored job"
+          },
+          "403": {
+            "description": "No allowStoredJobs"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "storedjob"
+        ],
+        "summary": "Create a stored job",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). The owner is the calling user. A shared one (visibility shared) needs the allowStoredJobsShare role option and a form that does not set allowStoredJobSharing: false.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoredJob"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored job created; data is { id }"
+          },
+          "400": {
+            "description": "Missing required field, a value too long, or a visibility other than private or shared"
+          },
+          "403": {
+            "description": "No allowStoredJobs, or sharing without allowStoredJobsShare or on a form that does not allow it"
+          },
+          "409": {
+            "description": "The caller already has a stored job with this name for this form"
+          }
+        }
+      }
+    },
+    "/stored-jobs/{id}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "storedjob"
+        ],
+        "summary": "Get a stored job by ID",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs, and the ones shared with them (see the list by form_name). One shared by another user comes without the values of its password fields, in list and yaml rows too.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored job"
+          },
+          "403": {
+            "description": "No allowStoredJobs, or another user's stored job"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "storedjob"
+        ],
+        "summary": "Update a stored job by ID",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs ; one shared with them is not theirs to change. A body without writable fields changes nothing. Sharing it (visibility shared) needs the allowStoredJobsShare role option and a form that allows it.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoredJob"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored job updated"
+          },
+          "403": {
+            "description": "No allowStoredJobs, or another user's stored job"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Name already used for this form"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "storedjob"
+        ],
+        "summary": "Delete a stored job by ID",
+        "description": "Needs the allowStoredJobs role option (403 otherwise). A user without the settings permission only reaches their own stored jobs.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored job deleted"
+          },
+          "403": {
+            "description": "No allowStoredJobs, or another user's stored job"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/rte/register": {
+      "post": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "Register an RTE",
+        "description": "An RTE's one registration call, before an inbound RTE listens (so the app knows the address to dial); an outbound RTE registers when it dials. No user signs in: the RTE's own token, or a join token, is the proof. Limited per address, as the sign-in is.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bearer and the RTE's token (RTE_TOKEN), at least 16 characters"
+          },
+          {
+            "name": "X-AF-RTE-Name",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The RTE's runner name (RTE_NAME)"
+          },
+          {
+            "name": "X-AF-RTE-Join",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "A join token, for an RTE the app does not know yet"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "inbound",
+                      "outbound"
+                    ],
+                    "description": "Inbound: the app dials the RTE ; outbound: the RTE dials the app"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "An inbound RTE's address, which the app dials (RTE_URL)"
+                  },
+                  "cert": {
+                    "type": "string",
+                    "description": "An inbound RTE's certificate (PEM), only with an https address"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runner": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "uri": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pending": {
+                      "type": "boolean",
+                      "description": "Waits for an admin's approval under Connections > Runners"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A name, address or certificate that is missing or not valid"
+          },
+          "401": {
+            "description": "The token is missing, too short or not the runner's, or the join token is unknown, revoked, expired or used up"
+          },
+          "409": {
+            "description": "The name is another type of runner, the runner is managed by the config seed, or it waits for approval"
+          },
+          "429": {
+            "description": "Too many attempts from this address"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Basic authentication for login."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token. Authenticate via /auth/login, then use 'Authorize' here."
+      },
+      "metricsToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The value of the METRICS_TOKEN environment variable, for /metrics only."
+      }
+    },
+    "schemas": {
+      "Runner": {
+        "type": "object",
+        "description": "Where a job runs. type rte : a runtime environment container (AF_ROLE=rte) for playbooks. type awx : AWX / Ansible Automation Platform / Ascender for templates. type semaphore : Semaphore UI for templates, in one project. type rundeck : Rundeck jobs, in one project. type jenkins : Jenkins jobs, signed in with a user and its API token, in a folder if any.",
+        "required": ["name", "type", "uri"],
+        "properties": {
+          "name": { "type": "string", "example": "rte-vmware" },
+          "type": { "type": "string", "enum": ["rte", "awx", "semaphore", "rundeck", "jenkins"] },
+          "description": { "type": "string" },
+          "uri": { "type": "string", "example": "https://rte-vmware:8000" },
+          "token": { "type": "string", "description": "rte : its RTE_TOKEN. awx : an API token (or use_credentials). semaphore : an API token of a Semaphore user. rundeck : a user's API token. jenkins : the API token of the user in username" },
+          "use_credentials": { "type": "boolean", "description": "awx : sign in with username and password instead of a token" },
+          "username": { "type": "string" },
+          "password": { "type": "string", "description": "Stored encrypted ; shown masked" },
+          "ignore_certs": { "type": "boolean" },
+          "ca_bundle": { "type": "string" },
+          "is_default": { "type": "boolean", "description": "Used by playbook forms that name no runner" },
+          "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
+          "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
+          "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : runners.yaml)" },
+          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
+        }
+      },
+      "SyslogServer": {
+        "type": "object",
+        "description": "A syslog server the server log and the audit entries are sent to.",
+        "required": ["name"],
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : syslog.yaml)" },
+          "name": { "type": "string", "example": "siem" },
+          "description": { "type": "string" },
+          "host": { "type": "string", "example": "syslog.example.com", "description": "Required unless the protocol is unix or unix-connect" },
+          "port": { "type": "integer", "default": 514 },
+          "protocol": { "type": "string", "enum": ["udp4", "udp6", "tcp4", "tcp6", "tls4", "tls6", "unix", "unix-connect"], "default": "udp4" },
+          "path": { "type": "string", "example": "/dev/log", "description": "The socket, for unix and unix-connect" },
+          "level": { "type": "string", "enum": ["emerg", "alert", "crit", "error", "warning", "notice", "info", "debug"], "default": "info", "description": "The lowest level of the server log it gets; audit entries are always sent" },
+          "type": { "type": "string", "enum": ["BSD", "5424"], "default": "BSD" },
+          "app_name": { "type": "string", "default": "AnsibleForms" },
+          "source": { "type": "string", "default": "localhost", "description": "The host the lines say they come from" },
+          "receives": { "type": "string", "enum": ["log", "audit", "both"], "default": "both" },
+          "enabled": { "type": "boolean", "default": true }
+        }
+      },
+      "NotificationChannel": {
+        "type": "object",
+        "description": "A notification channel. Which fields are used depends on the type.",
+        "required": ["name", "type"],
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : notifications.yaml)" },
+          "name": { "type": "string", "example": "ops-slack" },
+          "description": { "type": "string" },
+          "type": { "type": "string", "enum": ["mail", "slack", "teams", "telegram", "webhook"], "description": "Set on create; it stays" },
+          "enabled": { "type": "boolean", "default": true },
+          "is_active": { "type": "boolean", "description": "mail: the one the app sends its mail with" },
+          "server": { "type": "string", "example": "smtp.example.com", "description": "mail: read, the server of its smtp credential. Written, deprecated since 7.3 : used only while the credential has no host" },
+          "port": { "type": "integer", "example": 587, "description": "mail: as server, the credential's port" },
+          "secure": { "type": "boolean", "description": "mail: as server, the credential's TLS" },
+          "from_address": { "type": "string", "description": "mail" },
+          "credential": { "type": "string", "description": "mail: an smtp credential, the login" },
+          "webhook_url": { "type": "string", "description": "slack, teams: the webhook address, a secret (masked when read)" },
+          "chat_id": { "type": "string", "description": "telegram: the chat" },
+          "api_url": { "type": "string", "description": "telegram: the Bot API address, empty for api.telegram.org" },
+          "token_credential": { "type": "string", "description": "telegram: an api credential whose password is the bot token; webhook: an api credential whose password is the bearer token" },
+          "url": { "type": "string", "description": "webhook: the address" },
+          "method": { "type": "string", "enum": ["POST", "PUT"], "default": "POST", "description": "webhook" },
+          "headers": { "type": "string", "description": "webhook: extra headers, a JSON object" },
+          "verify_tls": { "type": "boolean", "default": true, "description": "webhook" },
+          "payload": { "type": "string", "description": "webhook: the JSON body, with {{title}} {{text}} {{status}} {{event}} {{jobId}} {{form}} {{user}} {{link}}" }
+        }
+      },
+      "LdapDirectory": {
+        "type": "object",
+        "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : ldap.yaml)" },
+          "name": {
+            "type": "string",
+            "description": "letters, digits, - and _ ; 'default' keeps its members' short names (ldap/<group>, the bare username), any other's are ldap/<name>/<group> and <name>/<user>"
+          },
+          "position": {
+            "type": "integer",
+            "description": "the order a bare username is looked up in, the lowest first"
+          },
+          "domains": {
+            "type": "string",
+            "description": "sign-in domains, comma separated : user@domain goes straight to this directory"
+          },
+          "enable": {
+            "type": "boolean"
+          },
+          "server": {
+            "type": "string",
+            "description": "one or more servers, comma separated, each host, host:port or ldap(s)://host:port ; the next one is tried when one cannot be reached. Read : its ldap credential's servers (host). Written : deprecated since 7.3, used only while the credential has none ; port, enable_tls, ignore_certs, cert and ca_bundle the same"
           },
           "429": {
             "description": "Too many requests"
@@ -7163,6 +10778,8 @@
           "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
           "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
           "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : runners.yaml)" },
           "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
         }
       },
@@ -7171,6 +10788,8 @@
         "description": "A syslog server the server log and the audit entries are sent to.",
         "required": ["name"],
         "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : syslog.yaml)" },
           "name": { "type": "string", "example": "siem" },
           "description": { "type": "string" },
           "host": { "type": "string", "example": "syslog.example.com", "description": "Required unless the protocol is unix or unix-connect" },
@@ -7190,6 +10809,8 @@
         "description": "A notification channel. Which fields are used depends on the type.",
         "required": ["name", "type"],
         "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : notifications.yaml)" },
           "name": { "type": "string", "example": "ops-slack" },
           "description": { "type": "string" },
           "type": { "type": "string", "enum": ["mail", "slack", "teams", "telegram", "webhook"], "description": "Set on create; it stays" },
@@ -7215,6 +10836,8 @@
       "LdapDirectory": {
         "type": "object",
         "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : ldap.yaml)" },
           "name": {
             "type": "string",
             "description": "letters, digits, - and _ ; 'default' keeps its members' short names (ldap/<group>, the bare username), any other's are ldap/<name>/<group> and <name>/<user>"
@@ -7302,6 +10925,8 @@
         "description": "A secret store. Which fields are used depends on the type.",
         "required": ["name", "type", "url"],
         "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : secret_stores.yaml)" },
           "name": { "type": "string", "example": "vault" },
           "type": { "type": "string", "enum": ["vault", "cyberark_ccp"] },
           "description": { "type": "string" },
@@ -7324,6 +10949,8 @@
         "required": ["name", "credential"],
         "properties": {
           "id": { "type": "integer", "readOnly": true },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The databases repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : databases.yaml)" },
           "name": { "type": "string", "description": "The name a field's dbConfig gives", "example": "cmdb" },
           "description": { "type": "string", "example": "The CMDB" },
           "credential": { "type": "string", "description": "The credential of type database it connects with: its engine, server, database and login", "example": "cmdb-login" },
@@ -7362,6 +10989,8 @@
           "db_type": { "type": "string", "description": "Type of database (mysql, postgres, etc).", "example": "mysql" },
           "secret_store": { "type": "string", "description": "Name of the secret store user and password are read from.", "example": "vault" },
           "secret_ref": { "type": "string", "description": "Where the secret lives in the store, e.g. a Vault path.", "example": "secret/myapp/prod" },
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The credentials repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : credentials.yaml)" },
           "vault_path": { "type": "string", "deprecated": true, "description": "Deprecated since 7, removed in 8 : the same as secret_store 'vault' with this secret_ref.", "example": "secret/data/myapp/prod" }
         },
         "required": ["name"]
@@ -7396,6 +11025,8 @@
         "type": "object",
         "description": "OAuth2 provider configuration object (Azure AD, OIDC, etc.).",
         "properties": {
+          "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The repository it comes from (Settings > Connections > Repositories) ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
+          "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : sso.yaml)" },
           "id": { "type": "integer", "description": "Unique identifier for the OAuth2 provider.", "example": 1 },
           "provider": { "type": "string", "description": "Provider type (e.g., 'azuread', 'oidc', 'google', 'github').", "example": "oidc" },
           "name": { "type": "string", "description": "Unique name for the provider.", "example": "my-oidc-provider" },
@@ -7560,22 +11191,35 @@
             "type": "string",
             "description": "Unique schedule name"
           },
+          "description": {
+            "type": "string",
+            "description": "What it is for, in a few words"
+          },
           "form": {
             "type": "string",
             "description": "Form to launch"
           },
           "one_time_run": {
-            "type": "boolean",
-            "description": "Run once at run_at instead of on the cron"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Run once, at this moment, instead of on a cron or a rrule: ISO 8601 with its offset or Z (a schedules repository's refuses one without a zone, 400); null takes it off. Exactly one of one_time_run, cron and rrule is kept",
+            "example": "2026-11-15T22:00:00+01:00"
           },
           "cron": {
             "type": "string",
             "description": "Cron expression (validated, 400 if invalid)"
           },
+          "rrule": {
+            "type": "string",
+            "description": "An iCal rrule, on one line, instead of a cron (validated, 400 if refused)",
+            "example": "DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1"
+          },
           "run_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When a one-time run fires"
+            "deprecated": true,
+            "description": "Deprecated since 7.8.0, removed in 8: the moment before one_time_run held it (with one_time_run true, or alone). Read as one_time_run"
           },
           "extra_vars": {
             "type": "string",

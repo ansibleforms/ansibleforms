@@ -21,5 +21,9 @@ CREATE TABLE `oauth2_providers` (
   `userinfo_url` TEXT DEFAULT NULL,
   `extra` JSON DEFAULT NULL, -- for any additional provider-specific config
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (sso/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   UNIQUE KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

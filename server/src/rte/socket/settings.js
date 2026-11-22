@@ -9,7 +9,7 @@
 /*  same variables set on the RTE, which are its fallback when a  */
 /*  field of the runner page is empty.                            */
 /*                                                                */
-/*  Shared by the app (runners/rteHub.js, models/runner.model.js) */
+/*  Shared by the controller (runners/rteHub.js, models/runner.model.js) */
 /*  and the RTE (rte/socket/rte-socket.js).                       */
 /*                                                                */
 /******************************************************************/
@@ -19,7 +19,7 @@
  * them on the RTE, and their default.
  *   - maxJobs : the playbooks it runs at once, 0 no limit
  *   - cacheMb : the size of its job files cache, in MB ; 0 keeps none
- *   - files : transfer (the app sends the job's files) or local (its own folders)
+ *   - files : transfer (the controller sends the job's files) or local (its own folders)
  *   - drainSeconds : how long a stop waits for the running playbooks
  */
 export const RTE_SETTINGS = [
@@ -133,7 +133,7 @@ export function settingsOfEnv(env = process.env) {
  *
  * Args:
  *   fromEnv (object): settingsOfEnv.
- *   fromRunner (object): what the app sent (settingsOfRunner).
+ *   fromRunner (object): what the controller sent (settingsOfRunner).
  *
  * Returns:
  *   object: { maxJobs, cacheMb, files, drainSeconds }.

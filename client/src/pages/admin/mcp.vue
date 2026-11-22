@@ -8,12 +8,15 @@ import BaseUrl from '@/lib/BaseUrl';
 import { useEnvVars } from '@/composables/useEnvVars';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 /******************************************************************/
 /*                                                                */
 /*  Settings > Connections > MCP : the MCP server for AI agents   */
 /*  (its switch and its two options, environment variables that   */
-/*  apply without a restart), and how a client connects to it     */
+/*  apply without a restart), and how a client connects to it.    */
+/*  An MCP repository keeps the switches under mcp: in a file ;  */
+/*  config seed's mcp section holds them per variable (read only) */
 /*                                                                */
 /******************************************************************/
 
@@ -44,6 +47,9 @@ const titleCrumbs = computed(() => {
 // the variables of the page : the switch first, then what it decides while on
 const { envItems, envEdits, envDirty, envRestartPending, loadEnvironmentVariables, saveEnvironmentVariables } =
   useEnvVars(['ENABLE_MCP', 'MCP_READ_ONLY', 'MCP_CHAT_FORMS_ONLY']);
+
+// the switches the config seed's mcp section manages : read only here (the server refuses them)
+const { seeded, loadSeedManaged } = useSeedManaged();
 
 // the MCP server switched on, as the page shows it (before Save too) : its options follow
 const mcpOn = computed(() => String(envEdits.value.ENABLE_MCP ?? '0') === '1');
@@ -145,7 +151,7 @@ async function copy(text) {
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
   if (!authenticated.value) return;
-  await loadEnvironmentVariables();
+  await Promise.all([loadEnvironmentVariables(), loadSeedManaged()]);
   try {
     publicUrl.value = (await axios.get('/api/v2/settings/')).data?.url || '';
   } catch {
@@ -204,6 +210,9 @@ onMounted(async () => {
             >
               <FaIcon :icon="searchHead('general').tab.icon" class="me-1" />{{ searchHead('general').tab.label }}
             </h6>
+            <!-- the MCP repository keeping the switches, and the ones the config seed manages -->
+            <AppRepositorySource v-show="!searching" type="mcp" />
+            <AppSeedNotice v-if="seeded(...shownEnvItems.map((e) => e.name))" />
             <div v-if="envRestartPending.length" class="alert alert-warning py-2">
               <FaIcon icon="triangle-exclamation" class="me-2" />
               {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
@@ -214,7 +223,7 @@ onMounted(async () => {
                 v-model="envEdits[e.name]"
                 :e="e"
                 :asSwitch="true"
-                :disabled="e.name !== 'ENABLE_MCP' && !mcpOn"
+                :disabled="seeded(e.name) || (e.name !== 'ENABLE_MCP' && !mcpOn)"
               />
             </template>
           </div>

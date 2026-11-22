@@ -1,6 +1,6 @@
 // The job's I/O in database mode (RTE_MODE=database, deprecated) : the RTE reads the job and
-// writes its output, log, events and end status in the app's database itself, as every RTE
-// did up to 7.2. The socket modes do the same through the app (socketJobIO in rte/socket/rte-socket.js).
+// writes its output, log, events and end status in the controller's database itself, as every RTE
+// did up to 7.2. The socket modes do the same through the controller (socketJobIO in rte/socket/rte-socket.js).
 //
 // Loaded only in database mode : the database modules it imports need DB_* at import, which a
 // socket-mode RTE does not have (rte/ansible-core.js imports none of them).

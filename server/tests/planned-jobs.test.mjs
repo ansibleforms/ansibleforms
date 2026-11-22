@@ -52,7 +52,7 @@ vi.mock("../src/models/db.model.js", () => ({
 }));
 
 vi.mock("../src/services/cron.service.js", () => ({
-  default: { removeSchedule: () => {}, addSchedule: () => {} },
+  default: { removeSchedule: () => {}, addSchedule: () => {}, addScheduleRow: () => {} },
 }));
 
 // the forms each role may run : 'Demo Form' for 'users', 'Admin Form' for admins only
@@ -83,9 +83,11 @@ const planner = {
 const scheduler = { ...planner, options: { allowPlannedJobs: true, allowScheduledJobs: true } };
 const nobody = { ...planner, options: { allowPlannedJobs: false, allowScheduledJobs: false } };
 
-const runAt = "2030-01-01 10:00:00";
+// the moment of the run, as a request sends it, and as the schedule table keeps it (UTC)
+const runAt = "2030-01-01T10:00:00Z";
+const stored = "2030-01-01 10:00:00";
 const planBody = (extra = {}) => ({
-  name: "bob later", one_time_run: true, form: "Demo Form", extra_vars: "username: x\n", run_at: runAt, ...extra,
+  name: "bob later", one_time_run: runAt, form: "Demo Form", extra_vars: "username: x\n", ...extra,
 });
 
 // ─── the route guard ───────────────────────────────────────────────
@@ -140,8 +142,9 @@ describe("Schedule.plan", () => {
     const id = await Schedule.plan(planner, planBody());
     assert.equal(id, 7);
     assert.equal(created.form, "Demo Form");
-    assert.equal(created.one_time_run, true);
-    assert.equal(created.run_at, runAt);
+    // one_time_run holds the moment, no run_at beside it
+    assert.equal(created.one_time_run, stored);
+    assert.equal("run_at" in created, false);
     const owner = JSON.parse(created.owner);
     assert.equal(owner.username, "bob");
     assert.deepEqual(owner.roles, ["users", "default"]);
@@ -178,9 +181,18 @@ describe("Schedule.plan", () => {
     await assert.rejects(Schedule.plan(planner, planBody({ extra_vars: "__verbose__: true\n" })), { name: "AccessDeniedError" });
   });
 
-  test("extra_vars must be a dictionary, and a run_at is required", async () => {
+  test("extra_vars must be a dictionary, and the moment of its run is required", async () => {
     await assert.rejects(Schedule.plan(planner, planBody({ extra_vars: "- a\n- b\n" })), { name: "BadRequestError" });
-    await assert.rejects(Schedule.plan(planner, planBody({ run_at: null })), { name: "BadRequestError" });
+    await assert.rejects(Schedule.plan(planner, planBody({ one_time_run: true })), { name: "BadRequestError" });
+    await assert.rejects(Schedule.plan(planner, planBody({ one_time_run: "not a time" })), { name: "BadRequestError" });
+  });
+
+  test("the pair before 7.8.0 (one_time_run true with run_at) still plans, at run_at (deprecated)", async () => {
+    await Schedule.plan(planner, planBody({ one_time_run: true, run_at: "2030-01-01 10:00:00" }));
+    assert.equal(created.one_time_run, stored);
+    await Schedule.plan(planner, planBody({ one_time_run: undefined, run_at: runAt }));
+    assert.equal(created.one_time_run, stored);
+    assert.equal("run_at" in created, false);
   });
 
   test("the owner is the whole token user, so ansibleforms_user matches a browser launch", async () => {
@@ -225,6 +237,69 @@ describe("Schedule.plan", () => {
     assert.equal(created.raw_form_data, undefined);
   });
 
+  test("while a schedules repository is used, every new schedule goes to it, whatever its timing ; a planned job stays in the app", async () => {
+    const { default: ScheduleRepo } = await import("../src/models/scheduleRepo.model.js");
+    const original = { active: ScheduleRepo.activeRepository, create: ScheduleRepo.create };
+    const sent = [];
+    ScheduleRepo.activeRepository = async () => "ops";
+    ScheduleRepo.create = async (repo, data) => { sent.push([repo, data.name]); return 99; };
+    try {
+      assert.equal(await Schedule.create({ name: "nightly", form: "Demo Form", cron: "0 2 * * *" }), 99);
+      await Schedule.create({ name: "once", form: "Demo Form", one_time_run: "2030-01-01T00:00:00Z" });
+      await Schedule.create({ name: "weekly", form: "Demo Form", rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=WEEKLY;INTERVAL=1" });
+      assert.deepEqual(sent, [["ops", "nightly"], ["ops", "once"], ["ops", "weekly"]]);
+      // a "Run later" job a user planned : that user's job, kept in the app
+      await Schedule.plan(planner, planBody());
+      assert.equal(sent.length, 3);
+      assert.ok(created.owner);
+    } finally {
+      Object.assign(ScheduleRepo, { activeRepository: original.active, create: original.create });
+    }
+  });
+
+  test("a schedule kept in the app may run on a rrule (one a repository left it), checked", async () => {
+    let updated = null;
+    const original = CrudModel.update;
+    CrudModel.update = async (_m, data) => { updated = { ...data }; return {}; };
+    try {
+      await Schedule.update({ rrule: "DTSTART;TZID=UTC:20300101T000000  RRULE:FREQ=DAILY;INTERVAL=1", cron: "0 1 * * *" }, 7);
+      assert.equal(updated.rrule, "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1");
+      assert.equal(updated.cron, null);
+      await assert.rejects(Schedule.update({ rrule: "DTSTART:20300101T000000Z RRULE:FREQ=SECONDLY;INTERVAL=1" }, 7), { name: "BadRequestError" });
+    } finally {
+      CrudModel.update = original;
+    }
+  });
+
+  test("the timing given replaces the one it had, exactly one kept ; a rrule with a one time run is refused", async () => {
+    let updated = null;
+    const original = CrudModel.update;
+    CrudModel.update = async (_m, data) => { updated = { ...data }; return {}; };
+    try {
+      // it runs on the cron it is given, not on the rrule it had
+      await Schedule.update({ one_time_run: null, cron: "0 1 * * *" }, 7);
+      assert.deepEqual([updated.rrule, updated.cron, updated.one_time_run], [null, "0 1 * * *", null]);
+      // once, at its moment : the cron and the rrule cleared
+      await Schedule.update({ one_time_run: "2030-01-01T00:00:00Z" }, 7);
+      assert.deepEqual([updated.rrule, updated.cron, updated.one_time_run], [null, null, "2030-01-01 00:00:00"]);
+      // the pair before 7.8.0 : read as that moment ; the flag off with a cron : the cron
+      await Schedule.update({ one_time_run: 1, run_at: "2030-01-01T00:00:00.000Z" }, 7);
+      assert.deepEqual([updated.one_time_run, "run_at" in updated], ["2030-01-01 00:00:00", false]);
+      await Schedule.update({ one_time_run: 0, cron: "0 1 * * *", run_at: "2030-01-01T00:00:00Z" }, 7);
+      assert.deepEqual([updated.rrule, updated.cron, updated.one_time_run, "run_at" in updated], [null, "0 1 * * *", null, false]);
+      // neither : the rrule stays
+      await Schedule.update({ enabled: 0 }, 7);
+      assert.equal("rrule" in updated, false);
+      // a one time run has no rrule
+      const rrule = "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1";
+      await assert.rejects(Schedule.update({ one_time_run: "2030-01-01T00:00:00Z", rrule }, 7), { name: "BadRequestError" });
+      await assert.rejects(Schedule.create({ name: "once", form: "Demo Form", one_time_run: "2030-01-01T00:00:00Z", rrule }), { name: "BadRequestError" });
+      assert.equal(created, null);
+    } finally {
+      CrudModel.update = original;
+    }
+  });
+
   test("an update changes neither the owner nor the values a run was planned with", async () => {
     let updated = null;
     const original = CrudModel.update;
@@ -243,7 +318,7 @@ describe("Schedule.plan", () => {
 describe("Schedule.launch", () => {
   let row;
   beforeEach(() => {
-    row = { id: 1, name: "n", form: "Demo Form", extra_vars: "a: 1", one_time_run: 1 };
+    row = { id: 1, name: "n", form: "Demo Form", extra_vars: "a: 1", one_time_run: new Date("2030-01-01T10:00:00Z") };
     CrudModel.findById = async () => ({ ...row });
     CrudModel.update = async (_m, data) => { Object.assign(row, data); return { changedRows: 1 }; };
     CrudModel.delete = async () => ({ affectedRows: 1 });
@@ -257,6 +332,20 @@ describe("Schedule.launch", () => {
     assert.equal(launched.fromClient, true, "its extra_vars came from a request body");
     assert.equal(launched.serverExtravars.schedule.owner, undefined);
     assert.equal(launched.extravars.schedule, undefined, "the schedule's record is not form output");
+  });
+
+  test("the schedule extra var keeps run_at, a copy of one_time_run's moment as before 7.8.0 (deprecated)", async () => {
+    await Schedule.launch(1);
+    const { schedule } = launched.serverExtravars;
+    // the moment as the table gives it, a Date : sent as before
+    assert.ok(schedule.one_time_run instanceof Date);
+    assert.equal(schedule.run_at, schedule.one_time_run);
+    assert.equal(JSON.parse(JSON.stringify(schedule)).run_at, "2030-01-01T10:00:00.000Z");
+    // a recurring one : none, as before
+    row.one_time_run = null;
+    row.cron = "0 1 * * *";
+    await Schedule.launch(1);
+    assert.equal(launched.serverExtravars.schedule.run_at, null);
   });
 
   test("a planned job fires with the raw field values it was planned with", async () => {
@@ -274,10 +363,26 @@ describe("Schedule.launch", () => {
     assert.equal(launched.fromClient, false);
   });
 
+  test("a repository schedule runs as the Schedule Service, its file's prompts as the job's reserved extra vars", async () => {
+    Object.assign(row, {
+      one_time_run: null,
+      rrule: "DTSTART;TZID=UTC:20300101T000000 RRULE:FREQ=DAILY;INTERVAL=1",
+      repository: "ops",
+      repo_file: "schedules/n.yaml",
+      launch_options: JSON.stringify({ __limit__: "web", __tags__: "rotate" }),
+    });
+    await Schedule.launch(1);
+    assert.equal(launched.user.username, "Schedule Service");
+    assert.deepEqual(launched.extravars, { a: 1, __limit__: "web", __tags__: "rotate" });
+    assert.equal(launched.serverExtravars.schedule.repository, "ops");
+    assert.equal(launched.serverExtravars.schedule.launch_options, undefined);
+    assert.equal(launched.serverExtravars.schedule.rrule, undefined);
+  });
+
   test("an unreadable owner fails the run instead of falling back to admin", async () => {
     row.owner = "not json";
     // a recurring one : a one-time schedule is deleted after its run, its outcome with it
-    row.one_time_run = 0;
+    row.one_time_run = null;
     await Schedule.launch(1);
     assert.equal(launched, null, "nothing may run");
     assert.equal(row.status, "failed");
@@ -334,5 +439,11 @@ describe("the schedule record", () => {
     assert.deepEqual(CrudModel.getFieldValues("schedule", { ...row }), row);
     assert.match(CrudModel.getSelectFields("schedule"), /\braw_form_data\b/);
     assert.match(CrudModel.getSelectFields("schedule"), /\bstored_job_id\b/);
+  });
+
+  test("its one-time run is one column holding the moment : no run_at, no flag", () => {
+    assert.match(CrudModel.getSelectFields("schedule"), /\bone_time_run\b/);
+    assert.doesNotMatch(CrudModel.getSelectFields("schedule"), /\brun_at\b/);
+    assert.deepEqual(CrudModel.getFieldValues("schedule", { one_time_run: "2030-01-01T10:00:00.000Z" }), { one_time_run: "2030-01-01 10:00:00" });
   });
 });

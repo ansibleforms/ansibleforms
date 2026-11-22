@@ -7,6 +7,7 @@ import { sha256 } from '../lib/formEngine/node/hash.js';
 import { createFormServices } from '../lib/formServices.js';
 import { describeRowErrors, resolveWizard } from '../lib/launchValidation.js';
 import { cronError } from '../lib/cronValidate.js';
+import { parseMoment, oneTimeRunOf } from '../lib/oneTimeRun.js';
 import yaml from 'yaml';
 import { ownerOf as storedJobOwner, seesShared, storedFormDataFor } from '../lib/storedJobScope.js';
 import { settingDays, effectiveUnusedDays, unusedDaysRefusal, unusedDaysValue } from '../lib/storedJobExpiry.js';
@@ -177,9 +178,10 @@ export function createHandlers({ user, deps, policy = {} }) {
       // a run planned by a user runs as them ; any other schedule as the Schedule Service
       planned: !!owner,
       runsAs: owner ? owner.username : 'Schedule Service',
-      oneTimeRun: !!row.one_time_run,
-      runAt: row.run_at ?? null,
+      // its one timing : the moment of its one run, a cron or a rrule
+      oneTimeRun: row.one_time_run ? new Date(row.one_time_run).toISOString() : null,
       cron: row.cron || null,
+      rrule: row.rrule || null,
       nextRun: nextRunOf(row),
       status: row.status || null,
       state: row.state || null,
@@ -193,19 +195,9 @@ export function createHandlers({ user, deps, policy = {} }) {
    */
   function momentOf(runAt, what = 'run_at') {
     const text = String(runAt ?? '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
-      throw new ToolError(`${what} must be an ISO 8601 time with its offset or Z, such as 2026-10-15T22:00:00+02:00 or `
-        + `2026-10-15T20:00:00Z, not '${text}': a time without a zone is ambiguous`, 'invalid_request');
-    }
-    const when = new Date(text);
-    // a date that does not exist (30 February, 24:00) is moved by the parser without a word :
-    // refused instead, the run would happen on another day than the one asked
-    const [, y, mo, d, h, mi] = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/).map(Number);
-    const day = new Date(Date.UTC(y, mo - 1, d));
-    if (Number.isNaN(when.getTime()) || h > 23 || mi > 59
-      || day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) {
-      throw new ToolError(`${what} '${text}' is not a valid time`, 'invalid_request');
-    }
+    // the one reading of a moment the app has (lib/oneTimeRun.js) : its zone given, a day that exists
+    const { when, error } = parseMoment(text, what);
+    if (error) throw new ToolError(error, 'invalid_request');
     if (when.getTime() < Date.now() - 60 * 1000) {
       throw new ToolError(`${what} '${text}' is in the past`, 'invalid_request', { now: new Date().toISOString() });
     }
@@ -401,10 +393,10 @@ export function createHandlers({ user, deps, policy = {} }) {
     return { drafts, skipped: skips, stale };
   }
 
-  /** The cron service runs it from now on (the schedule routes do the same). */
+  /** The cron service runs it from now on, by its rrule when it has one (as the schedule routes do). */
   async function registered(id) {
     const row = await Schedule.findById(id);
-    cron?.addSchedule?.(row.id, row.name, row.cron, row.one_time_run, row.run_at);
+    cron?.addScheduleRow?.(row);
     return row;
   }
 
@@ -789,8 +781,7 @@ export function createHandlers({ user, deps, policy = {} }) {
       const id = await stored(String(name).trim(), () => Schedule.plan(user, {
         name: String(name).trim(),
         form: ready.formObj.name,
-        one_time_run: true,
-        run_at: when.toISOString(),
+        one_time_run: when.toISOString(),
         extra_vars: yaml.stringify(ready.extravars),
         raw_form_data: ready.rawFormData,
         // started from a stored job : its last use is recorded when the run fires
@@ -801,13 +792,21 @@ export function createHandlers({ user, deps, policy = {} }) {
       return { id: row.id, name: row.name, form: ready.formObj.name, ...(await bothClocks(when)), payloadHash: ready.payloadHash, warnings: ready.warnings };
     },
 
-    async createSchedule({ form, name, cron: cronGiven, run_at: runAt, extraVars }) {
+    async createSchedule({ form, name, cron: cronGiven, rrule: rruleGiven, one_time_run: onceGiven, run_at: runAtGiven, extraVars }) {
       refuseWhenReadOnly('schedules cannot be created through it');
-      // a blank cron is none : it would store a schedule that never runs
+      // a blank cron or rrule is none : it would store a schedule that never runs
       const cronExpr = String(cronGiven ?? '').trim();
+      const rruleText = String(rruleGiven ?? '').trim();
       if (!mayManage) throw new ToolError('You do not have permission to create schedules (the allowScheduledJobs role option)', 'access_denied');
       if (!String(name ?? '').trim()) throw new ToolError('A schedule needs a name', 'invalid_request');
-      if (!!cronExpr === !!runAt) throw new ToolError('Give one of cron (a recurring schedule) or run_at (one run), not both and not neither', 'invalid_request');
+      // its one run's moment : one_time_run, or run_at as before 7.8.0 (deprecated, said once)
+      const runAt = runAtGiven !== undefined && !onceGiven
+        ? oneTimeRunOf({ run_at: runAtGiven }, 'mcp').one_time_run
+        : onceGiven;
+      // exactly one timing, as a schedule of the app or of a schedules repository has
+      if ([cronExpr, rruleText, runAt].filter(Boolean).length !== 1) {
+        throw new ToolError('Give one of cron or rrule (a recurring schedule) or one_time_run (one run, at that moment), not several and not none', 'invalid_request');
+      }
       const { formObj } = await loadForm(form);
       if (formObj.type === 'subform') throw new ToolError(`'${formObj.name}' is a subform and cannot be scheduled on its own`, 'unsupported');
       const data = { name: String(name).trim(), form: formObj.name, extra_vars: yaml.stringify(extraVars || {}) };
@@ -815,13 +814,19 @@ export function createHandlers({ user, deps, policy = {} }) {
       if (cronExpr) {
         const problem = cronError(cronExpr);
         if (problem) throw new ToolError(`Not a cron schedule: ${problem}`, 'invalid_request');
-        Object.assign(data, { cron: cronExpr, one_time_run: false });
+        Object.assign(data, { cron: cronExpr });
+      } else if (rruleText) {
+        // checked by the model, as a rrule sent to the schedule routes is (invalid_request)
+        Object.assign(data, { rrule: rruleText });
       } else {
-        when = momentOf(runAt);
-        Object.assign(data, { one_time_run: true, run_at: when.toISOString() });
+        when = momentOf(runAt, 'one_time_run');
+        Object.assign(data, { one_time_run: when.toISOString() });
       }
+      // a value the model refuses (a rrule) : its BadRequestError, said as invalid_request
       const row = await registered(await stored(data.name, () => Schedule.create(data)));
-      return { ...scheduleSummary(row), ...(when ? await bothClocks(when) : {}) };
+      // its moment on both clocks : one_time_run in UTC, and on the app's clock
+      const clocks = when ? await bothClocks(when) : null;
+      return { ...scheduleSummary(row), ...(clocks ? { oneTimeRun: clocks.runAt, oneTimeRunLocal: clocks.runAtLocal, timezone: clocks.timezone } : {}) };
     },
 
     async listSchedules({ form } = {}) {
@@ -1249,14 +1254,18 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
   if (!policy.readOnly && options.allowScheduledJobs) server.registerTool('create_schedule', {
     title: 'Create schedule',
     description: 'A schedule of a form, as in Settings > Schedules: recurring with `cron` (five fields, such as '
-      + '"0 22 * * 1-5"), or one run with `run_at` (ISO 8601 with its offset or Z). It runs as the Schedule '
+      + '"0 22 * * 1-5") or `rrule` (an iCal rrule on one line, its DTSTART with a TZID or Z), or one run with '
+      + '`one_time_run` (its moment: ISO 8601 with its offset or Z) - exactly one of them. While a schedules repository is used it '
+      + 'is written there with that timing. It runs as the Schedule '
       + 'Service with the given extra vars, NOT as you and without the form\'s validation - to run a form '
       + 'once as yourself, use plan_job.',
     inputSchema: {
       form: z.string().describe('Form name'),
       name: z.string().min(1).max(255).describe('A name for the schedule ; names are unique'),
       cron: z.string().optional().describe('A cron expression, for a recurring schedule'),
-      run_at: z.string().optional().describe('One run at this time: ISO 8601 with its offset or Z'),
+      rrule: z.string().optional().describe('An iCal rrule, for a recurring schedule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1'),
+      one_time_run: z.string().optional().describe('One run at this moment: ISO 8601 with its offset or Z'),
+      run_at: z.string().optional().describe('Deprecated since 7.8.0, removed in 8: the name one_time_run had before'),
       extraVars: z.record(z.string(), z.any()).optional().describe('The extra vars the job gets'),
     },
     annotations: { readOnlyHint: false, destructiveHint: true },
@@ -1266,7 +1275,7 @@ export function registerTools(server, handlers, policy = {}, user = {}) {
     server.registerTool('list_schedules', {
       title: 'List schedules',
       description: 'The schedules you may see: with allowScheduledJobs all of them, else the runs you planned. '
-        + 'Per schedule its form, when it runs (runAt or cron, nextRun), whether it runs as you (planned) and how '
+        + 'Per schedule its form, when it runs (oneTimeRun, cron or rrule, nextRun), whether it runs as you (planned) and how '
         + 'its last run went.',
       inputSchema: { form: z.string().optional().describe('Only the schedules of this form') },
       annotations: { readOnlyHint: true },

@@ -34,7 +34,7 @@ On a Linux server, run the installer and answer its questions:
 curl -fsSL https://ansibleforms.com/install | sh
 ```
 
-It installs a controller (the app, its database and an RTE) or a Runner, on Docker, Podman or Kubernetes.
+It installs a controller (the web interface and API, its database and an RTE) or a Runner, on Docker, Podman or Kubernetes.
 
 Run again, it finds an AnsibleForms already installed and upgrades it.
 
@@ -70,7 +70,7 @@ One container is enough: with `AF_ROLE` unset it serves the web app and runs the
 (schema, seed, schedules, backups, repository syncs, cleanups). Playbooks run on any number of RTEs;
 templates and jobs run on the AWX, Semaphore, Rundeck and Jenkins servers set up as runners.
 
-To scale out or for high availability, split it: app nodes (`AF_ROLE=app`) behind a load balancer and a
+To scale out or for high availability, split it: controller nodes (`AF_ROLE=controller`) behind a load balancer and a
 worker (`AF_ROLE=worker`), all from the same image, on one database and one shared volume. A second worker
 waits and takes over when the first stops; [examples/scale](examples/scale) has a compose file.
 

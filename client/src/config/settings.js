@@ -6,6 +6,8 @@ import axios from 'axios';
 import Helpers from '@/lib/Helpers';
 import { cronCell } from '@/lib/cronCell';
 import { cronValidationMessage } from './cron';
+import { rruleValidationMessage, defaultRrule, rruleCell } from './rrule';
+import { USAGE_FLAGS, confirmUsageChange, confirmUsageDelete, usageToast } from '@/lib/repositoryUsage';
 import { PILL, pill, esc } from '@/lib/tableCells';
 import { defineAsyncComponent, h } from 'vue';
 import { formPath } from '@/lib/formsPath';
@@ -24,6 +26,10 @@ import { ssoCallbackUrl, SSO_EXAMPLE_BASE } from '@/lib/ssoCallback';
 // The server refuses a bad expression too (lib/cronValidate.js, called from CrudModel), so
 // this is the early, explanatory answer rather than the only line of defence.
 const cronValidator = (t) => (value) => cronValidationMessage(t, value);
+
+// a repository schedule's rrule, checked on its text (config/rrule.js) ; the server
+// parses it and works out its runs
+const rruleValidator = (t) => (value) => rruleValidationMessage(t, value);
 
 // a runner's or a secret store's credential with its server : its TLS is asked for
 const credentialServer = (r) => SERVER_CREDENTIAL_TYPES.includes(r?.credential_type) && !!String(r?.url || '').trim();
@@ -218,6 +224,45 @@ export function schedulePill(t, state) {
   const known = { running: PILL.blue, queued: PILL.amber, idle: PILL.grey };
   const label = known[state] ? t(`settings.schedules.state_${state}`) : state;
   return pill(known[state], label);
+}
+
+/**
+ * How a schedule is timed, as its dialog and its page offer the choice : once (a one time run), on
+ * an iCal rrule, or on a cron (a new schedule's, as before) - the same three for a schedule of the
+ * app and one of a schedules repository.
+ *
+ * Args:
+ *   item (object): the schedule ({ one_time_run (the moment of its one run), rrule }), or none
+ *     for a new one.
+ *
+ * Returns:
+ *   string: cron, rrule or once.
+ */
+export function timingKind(item) {
+  if (String(item?.one_time_run ?? '').trim()) return 'once';
+  if (String(item?.rrule ?? '').trim()) return 'rrule';
+  return 'cron';
+}
+
+/**
+ * The timing fields a schedule is saved with, from the kind chosen : that kind's own value, the
+ * other two emptied (the server keeps the one given, for the app's schedule and in a repository's
+ * entry alike).
+ *
+ * Args:
+ *   kind (string): cron, rrule or once (timingKind).
+ *   item (object): the schedule's values ({ cron, rrule, one_time_run (its moment), ... }).
+ *
+ * Returns:
+ *   object: the values, with one_time_run, cron and rrule set for that kind.
+ */
+export function scheduleTiming(kind, item) {
+  return {
+    ...item,
+    one_time_run: kind === 'once' ? item.one_time_run || null : null,
+    cron: kind === 'cron' ? item.cron || '' : '',
+    rrule: kind === 'rrule' ? String(item.rrule || '').trim() : '',
+  };
 }
 
 // ─── SSO providers (Access > SSO) ────────────────────────────────────────────
@@ -993,14 +1038,21 @@ export default function getSettings(t) {
       selectable: false,
       // a row opens the repository's page
       openPage: (item) => `/settings/repositories/${item.id}`,
-      // Scheduled pull off : no schedule ; the switch itself is not stored
-      beforeSave: ({ pull_scheduled, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
+      // Scheduled pull off : no schedule ; the switch itself is not stored, nor the Usage column
+      beforeSave: ({ pull_scheduled, usage: _usage, ...item }) => (pull_scheduled ? item : { ...item, cron: '' }),
+      // its object usages (schedules, credentials, runners ...) turned on or off ask first, one
+      // question for all of them (what each will take, or let go), and say after what they did ;
+      // deleting a repository that holds objects asks the same
+      confirmSave: (body, original) => confirmUsageChange(t, body.name, original, body),
+      afterSave: (answer) => usageToast(t, answer),
+      confirmDelete: (item) => confirmUsageDelete(t, item),
       // the dialog in steps : what the repository is, the credentials to reach it, what it is used
       // for, when it syncs
       steps: [
         { key: 'repository', label: t('settings.repositories.stepRepository') },
         { key: 'credentials', label: t('settings.repositories.stepCredentials') },
-        { key: 'usage', label: t('settings.repositories.stepUsage') },
+        // wider : its categories, each type with its description on one line
+        { key: 'usage', label: t('settings.repositories.stepUsage'), dialogSize: 'xl' },
         { key: 'schedule', label: t('settings.repositories.stepSchedule') },
       ],
       actions: [
@@ -1015,20 +1067,14 @@ export default function getSettings(t) {
           dividerBefore: true,
         },
         {
-          // only a repository the designer writes to (forms, settings, playbooks, workflows) is pushed
-          // back, and only when it has changes not pushed yet
+          // only a repository the app writes to (forms, config, playbooks, workflows, inventories,
+          // the objects it holds) is pushed back, and only when it has changes not pushed yet
           name: 'sync',
           enabledWhen: (r) => !!r.unpushed,
           icon: 'upload',
           title: t('settings.repositories.push'),
           color: 'test',
-          dependency: [
-            'use_for_forms',
-            'use_for_config',
-            'use_for_playbooks',
-            'use_for_workflows',
-            'use_for_inventories',
-          ],
+          dependency: USAGE_FLAGS,
         },
         { name: 'reset', icon: 'redo', title: t('settings.repositories.reset'), color: 'refresh' },
         {
@@ -1202,75 +1248,12 @@ export default function getSettings(t) {
           hidden: true,
         },
         {
-          key: 'use_for_config',
+          // what the app reads from it : its usage types under their five headings, ticked one by one
+          // or a heading at once (AppRepositoryUsage) ; no column in the list, its page says it
+          key: 'usage',
           step: 'usage',
-          // the app uses one repository for it
-          oneOnly: true,
-          shortLabel: t('settings.repositories.useConfigShort'),
-          shortHint: t('settings.repositories.useConfigHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForConfig'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useConfigShort'),
-          help: t('settings.repositories.helpUseForConfig'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_forms',
-          step: 'usage',
-          shortLabel: t('settings.repositories.useFormsShort'),
-          shortHint: t('settings.repositories.useFormsHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForForms'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useFormsShort'),
-          help: t('settings.repositories.helpUseForForms'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_playbooks',
-          step: 'usage',
-          // the app uses one repository for it
-          oneOnly: true,
-          shortLabel: t('settings.repositories.usePlaybooksShort'),
-          shortHint: t('settings.repositories.usePlaybooksHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForPlaybooks'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.usePlaybooksShort'),
-          help: t('settings.repositories.helpUseForPlaybooks'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_inventories',
-          step: 'usage',
-          // several repositories may hold inventories, each its own
-          shortLabel: t('settings.repositories.useInventoriesShort'),
-          shortHint: t('settings.repositories.useInventoriesHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForInventories'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useInventoriesShort'),
-          help: t('settings.repositories.helpUseForInventories'),
-          hidden: true,
-        },
-        {
-          key: 'use_for_workflows',
-          step: 'usage',
-          // several repositories may hold workflows, as forms
-          shortLabel: t('settings.repositories.useWorkflowsShort'),
-          shortHint: t('settings.repositories.useWorkflowsHint'),
-          isSwitch: false,
-          type: 'checkbox',
-          label: t('settings.repositories.useForWorkflows'),
-          // the column : its short name, as on the Usage step
-          columnLabel: t('settings.repositories.useWorkflowsShort'),
-          help: t('settings.repositories.helpUseForWorkflows'),
-          hidden: true,
+          type: 'usage',
+          noTable: true,
         },
       ],
     },
@@ -1499,6 +1482,9 @@ export default function getSettings(t) {
       // a schedule has its own page (pages/schedule.vue) : its row and Edit open it, New the
       // wizard
       openPage: (item) => `/jobs/scheduled/${item.id}`,
+      // the timing chosen sent, the other two emptied : a cron, a rrule, or a one time run - for a
+      // schedule of the app and one the server writes to the schedules repository alike
+      beforeSave: ({ timing, ...item }) => scheduleTiming(timing, item),
       // the dialog in steps : what runs (its name, the form), when (once at a time, or on a cron
       // schedule), the extra vars it sends to the form
       steps: [
@@ -1544,6 +1530,13 @@ export default function getSettings(t) {
           help: t('settings.repositories.helpName'),
         },
         {
+          // what it is for, in a few words : on its page, not a column (still in Columns)
+          key: 'description',
+          icon: 'info-circle',
+          label: t('settings.fields.description'),
+          hidden: true,
+        },
+        {
           // the form it runs
           key: 'form',
           icon: 'pen-to-square',
@@ -1557,13 +1550,28 @@ export default function getSettings(t) {
           required: true,
         },
         {
-          key: 'one_time_run',
+          // where it comes from (set by the server, never chosen) : no column in the list, the
+          // schedule's page says it for one kept in the schedules repository
+          key: 'repository',
+          label: t('settings.repositories.source'),
+          noInput: true,
+          noTable: true,
+        },
+        {
+          // how it is timed (the dialog only : beforeSave sends it as its fields) : a cron, the
+          // default as before, an iCal rrule, or one run ; the same three wherever it is kept
+          key: 'timing',
           step: 'when',
-          label: t('settings.schedules.oneTimeRun'),
-          type: 'checkbox',
-          placeholder: t('settings.schedules.oneTimeRunPlaceholder'),
-          required: false,
+          label: t('settings.schedules.timing'),
+          type: 'radio',
+          options: [
+            { value: 'cron', label: t('settings.schedules.timingCron'), hint: t('settings.schedules.timingCronHint') },
+            { value: 'rrule', label: t('settings.schedules.rrule'), hint: t('settings.schedules.timingRruleHint') },
+            { value: 'once', label: t('settings.schedules.oneTimeRun'), hint: t('settings.schedules.timingOnceHint') },
+          ],
+          initial: (item) => timingKind(item),
           hidden: true,
+          noTable: true,
         },
         {
           key: 'cron',
@@ -1576,17 +1584,37 @@ export default function getSettings(t) {
           // a recurring schedule needs its cron ; hidden (one time run), it is not checked
           required: true,
           // in the table : hovering the cron says it in words, in the app's language ; a one-time
-          // run has none, it runs once
-          render: (v, row) => (row?.one_time_run ? escapeHtml(t('settings.schedules.oneTimeRun')) : cronCell(v)),
+          // run has none, it runs once ; a repository's schedule shows its rrule
+          render: (v, row) =>
+            row?.one_time_run
+              ? escapeHtml(t('settings.schedules.oneTimeRun'))
+              : row?.rrule
+                ? rruleCell(row.rrule)
+                : cronCell(v),
           validator: cronValidator(t),
-          negateDependency: true,
-          dependency: 'one_time_run',
+          // timed by a cron
+          showWhen: (item) => item.timing === 'cron',
         },
         {
-          key: 'run_at',
+          // timed by its iCal rrule, its next runs under it
+          key: 'rrule',
+          step: 'when',
+          label: t('settings.schedules.rrule'),
+          type: 'rrule',
+          help: t('settings.schedules.rruleHelp'),
+          hidden: true,
+          noTable: true,
+          required: true,
+          initial: (item) => item?.rrule || defaultRrule(Intl.DateTimeFormat().resolvedOptions().timeZone),
+          validator: rruleValidator(t),
+          showWhen: (item) => item.timing === 'rrule',
+        },
+        {
+          // its one run : the moment it runs at
+          key: 'one_time_run',
           step: 'when',
           icon: 'calendar',
-          label: t('settings.schedules.runAt'),
+          label: t('settings.schedules.oneTimeRun'),
           type: 'datetime',
           convertToUtc: true,
           help: t('settings.schedules.runAtHelp'),
@@ -1594,9 +1622,9 @@ export default function getSettings(t) {
           // there to pick in Columns
           hidden: true,
           render: (v) => (v ? Helpers.formatServerDate(v) : '–'),
-          // a one time run needs its time ; hidden (a cron schedule), it is not checked
+          // a one time run needs its time ; hidden (a recurring schedule), it is not checked
           required: true,
-          dependency: 'one_time_run',
+          showWhen: (item) => item.timing === 'once',
         },
         // when it last ran, then when it runs next
         {

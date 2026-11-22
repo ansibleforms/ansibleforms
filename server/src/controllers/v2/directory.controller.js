@@ -15,6 +15,8 @@ import { configRoles } from '../../lib/roleCounts.js';
 import { directoryUserRows, directoryGroupRows, effectiveRolesOfDirectoryUser } from '../../lib/directoryViews.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
 import Errors from '../../lib/errors.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+import { userBefore, userSaved } from '../../lib/repoObjects/access.js';
 
 /**
  * Refuses to a user who is not an admin a change of a directory user who is one : blocking its
@@ -55,6 +57,8 @@ export async function assertMayTouchDirectoryAdmin(req, id) {
  */
 function failed(req, res, err) {
   if (err instanceof Errors.AccessDeniedError) return res.status(403).json(RestResult.error(err.message));
+  // its repository cannot follow the change now (busy, a file that cannot be read : lib/repoObjects)
+  if (err instanceof Errors.ConflictError) return res.status(409).json(RestResult.error(err.message));
   res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedDirectoryUser'), helpers.getError(publicError(req, err))));
 }
 
@@ -120,7 +124,13 @@ const setBlocked = async function (req, res) {
     if (blocked && me?.type === id.type && String(me.username).toLowerCase() === id.name.toLowerCase()) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.cantBlockYourself')));
     }
-    await DirectoryUser.setBlocked(id.type, id.name, blocked);
+    // the users repository, when there is one : blocked written to its entry, or a new entry for
+    // a user it did not hold yet (blocked before its first sign-in)
+    const before = await userBefore({ type: id.type, username: id.name });
+    await RepoObjects.holding(before ? [] : ["users"], async () => {
+      await DirectoryUser.setBlocked(id.type, id.name, blocked);
+      await userSaved(before, await userBefore({ type: id.type, username: id.name }));
+    }, before);
     if (blocked) await endSessions(id);
     res.json(RestResult.single({ blocked }));
   } catch (err) {
@@ -149,7 +159,13 @@ const forgetUser = async function (req, res) {
   try {
     // an admin directory user is the admin role's own to change
     await assertMayTouchDirectoryAdmin(req, id);
-    const forgotten = await DirectoryUser.forget(id.type, id.name);
+    // one of the users repository : its entry goes too, for the repository's Push
+    const before = await userBefore({ type: id.type, username: id.name });
+    const forgotten = await RepoObjects.holding([], async () => {
+      const gone = await DirectoryUser.forget(id.type, id.name);
+      if (gone && before?.repository) await userSaved(before, null);
+      return gone;
+    }, before);
     if (!forgotten) return res.status(409).json(RestResult.error(i18n.t(req, 'resources.directoryUserKept')));
     res.json(RestResult.single({ forgotten }));
   } catch (err) {

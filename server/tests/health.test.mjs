@@ -60,6 +60,7 @@ vi.mock("../src/models/settings.model.js", () => ({
     findConfigYaml: async () => ({ config_yaml: "categories: []", config_source: null }),
     resolveConfigInDatabase: () => false,
     getActiveConfig: async () => "categories: []\n",
+    isTemplated: async () => false,
   },
 }));
 // the scheduler lives in-process, so in a test there are no registered tasks and
@@ -319,14 +320,15 @@ describe("health reports problems, not just ok", () => {
 
   test("a ytt templated config is reported so the read-only editors make sense", async () => {
     const settings = (await import("../src/models/settings.model.js")).default;
-    const original = settings.getActiveConfig;
-    settings.getActiveConfig = async () => "#@ load('x')\ncategories: []\n";
+    // the base, or a file a repository holds a key in (Settings.isTemplated)
+    const original = settings.isTemplated;
+    settings.isTemplated = async () => true;
     try {
       const r = await Health.check();
       assert.equal(infoOf(r, "configSource").detail.templated, true);
       assert.equal(checkOf(r, "configSource"), undefined, "config source is a fact, not a check");
     } finally {
-      settings.getActiveConfig = original;
+      settings.isTemplated = original;
     }
   });
 

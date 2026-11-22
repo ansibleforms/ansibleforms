@@ -8,6 +8,7 @@ import RunnerJoinToken from "../../models/runnerJoinToken.model.js";
 import { socketState, isSocketRunner, dropSocket, pushSettings } from "../../runners/rteHub.js";
 import { publish } from "../../lib/liveEvents.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 // the token and password are stored encrypted and decrypted on read, so they never leave
 // here unmasked
@@ -90,7 +91,10 @@ const create = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const created = await Runner.create(req.body);
+    // the runners repository follows (lib/repoObjects) : the new runner a new file, and the
+    // others' files where they changed - the default of a type is one runner, so making this one
+    // the default clears it on the others
+    const created = await RepoObjects.following("runners", () => Runner.create(req.body));
     // { message, id }, as the other records answer a create
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "resources.runnerAdded"), id: created }));
   } catch (err) {
@@ -114,7 +118,9 @@ const update = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
-    const updated = await Runner.update(req.body, req.params.id);
+    // the runners repository follows : this runner's changed fields written to its file, and the
+    // others' where it changed them (made the default, it is no longer theirs)
+    const updated = await RepoObjects.following("runners", () => Runner.update(req.body, req.params.id));
     if (!updated) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
     // its RTE gets its settings now when this node holds its socket, else at the next renewal
     const saved = await Runner.findById(req.params.id).catch(() => null);
@@ -131,9 +137,14 @@ const deleteRunner = async (req, res) => {
     // its name first : an RTE's socket on this node is closed at once (another node's closes at
     // its next lease renewal, the runner gone)
     const before = await Runner.findStoredById(req.params.id);
-    const deleted = await Runner.delete(req.params.id);
-    if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
-    if (before?.name) dropSocket(before.name, "deleted under Connections > Runners");
+    const deleted = await RepoObjects.holding([], async () => {
+      const deleted = await Runner.delete(req.params.id);
+      if (!deleted) throw new Errors.NotFoundError(i18n.t(req, "resources.runnerNotFound"));
+      if (before?.name) dropSocket(before.name, "deleted under Connections > Runners");
+      // one of the runners repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("runners", before);
+      return deleted;
+    }, before);
     return res.json(RestResult.single(deleted));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -154,7 +165,8 @@ const pendingCount = async (req, res) => {
 const approve = async (req, res) => {
   try {
     assertAdmin(req);
-    const runner = await Runner.approve(req.params.id);
+    // approved, it may become the default of its type : the runners repository follows
+    const runner = await RepoObjects.following("runners", () => Runner.approve(req.params.id));
     publish("runners");
     return res.json(RestResult.single(maskSecrets(runner)));
   } catch (err) {

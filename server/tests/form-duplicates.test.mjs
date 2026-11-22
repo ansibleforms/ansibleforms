@@ -1,8 +1,9 @@
 // A form name defined in two forms repositories : the forms repositories read in one fixed order
-// (the order they were added, whatever order the database returns them in), so the same copy wins
-// every time - in the list, a single form and the designer alike. The warning names both copies
-// (the one used, the one skipped), and each repository involved says so in its pull output and on
-// its page. A new form whose name another forms repository already defines is refused by the save.
+// (the order they were added, as 7.3 read them, whatever order the database returns them in), so
+// the same copy wins every time - in
+// the list, a single form and the designer alike. The warning names both copies (the one used,
+// the one skipped), and each repository involved says so in its pull output and on its page. A
+// new form whose name another forms repository already defines is refused by the save.
 import { test, describe, beforeEach, vi } from "vitest";
 import assert from "node:assert/strict";
 import fs from "fs";
@@ -45,7 +46,7 @@ vi.mock("../src/lib/logger.js", async () => await import("./__mocks__/logger.js"
 
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 const { default: Form } = await import("../src/models/form.model.js");
-const { default: Repository, sortedById } = await import("../src/models/repository.model.js");
+const { default: Repository, sortedByName, sortedById } = await import("../src/models/repository.model.js");
 
 const BASE = path.join(ROOT, "config.yaml");
 const ROLES = [{ name: "admin", groups: ["local/admins"] }, { name: "default", groups: [] }];
@@ -75,12 +76,13 @@ describe("the forms repositories in one fixed order", () => {
       formsRepos = order;
       assert.deepEqual((await Repository.getFormsFolders()).map((f) => f.name), ["forms-ops", "forms-team"]);
       assert.deepEqual((await Repository.findFormsRepositories()).map((r) => r.name), ["forms-ops", "forms-team"]);
-      // not by name : the one added first
+      // not by name : the one added first, the one 7.3 read first
       ids = { "forms-team": 1, "forms-ops": 2 };
       assert.deepEqual((await Repository.getFormsFolders()).map((f) => f.name), ["forms-team", "forms-ops"]);
       ids = { "forms-ops": 1, "forms-team": 2 };
     }
     assert.deepEqual(sortedById([{ id: 3, name: "a" }, { id: 1, name: "c" }, { id: 2, name: "b" }]).map((r) => r.name), ["c", "b", "a"]);
+    assert.deepEqual(sortedByName([{ name: "b" }, { name: "A" }, { name: "a" }]).map((r) => r.name), ["A", "a", "b"]);
   });
 
   test("the one added first wins, in the list, a single form and the designer alike", async () => {
@@ -99,7 +101,7 @@ describe("the forms repositories in one fixed order", () => {
 });
 
 describe("where the first one wins, the one added first", () => {
-  test("the playbooks and the config.yaml of a forms repository : the one added first, not the first by name", async () => {
+  test("the playbooks and the config.yaml of a forms repository : the one 7.3 read, not the first by name", async () => {
     ids = { "forms-team": 1, "forms-ops": 2 };
     formsRepos = ["forms-ops", "forms-team"];
     fs.writeFileSync(path.join(ROOT, "forms-ops", "config.yaml"), "roles: []\n");
@@ -177,6 +179,21 @@ describe("a save that would define a form name twice", () => {
     ]).then(() => null, (e) => e);
     assert.doesNotMatch(String(outcome?.message || ""), /unique|defined twice/i);
     assert.equal(YAML.parse(fs.readFileSync(path.join(ROOT, "forms-team", "forms", "deploy.yaml"), "utf8")).description, "team");
+  });
+
+  test("a skipped copy in a file with other forms : kept in its place when that file is saved", async () => {
+    formsRepos = ["forms-team", "forms-ops"];
+    writeForm("forms-team", "deploy.yaml", [form("Deploy", "team"), form("Team Only", "team")]);
+    await save([
+      { ...form("Deploy", "ops"), source: "deploy.yaml", repository: "forms-ops" },
+      { ...form("Other", "ops"), source: "other.yaml", repository: "forms-ops" },
+      { ...form("Team Only", "team, edited"), source: "deploy.yaml", repository: "forms-team" },
+    ]);
+    const team = YAML.parse(fs.readFileSync(path.join(ROOT, "forms-team", "forms", "deploy.yaml"), "utf8"));
+    assert.deepEqual(team.map((f) => [f.name, f.description]), [["Deploy", "team"], ["Team Only", "team, edited"]]);
+    // the copy used is still forms-ops', the other still skipped and said
+    const { forms } = await Form.load(undefined, undefined, true);
+    assert.equal(forms.find((f) => f.name === "Deploy").description, "ops");
   });
 });
 

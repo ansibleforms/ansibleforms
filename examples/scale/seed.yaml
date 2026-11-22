@@ -1,6 +1,6 @@
 # Config seed, applied by the worker at every start (CONFIG_SEED_PATH in .env). It declares the
 # rte container of compose.yaml as the default runner, so playbook forms run there, signing in
-# with the credential below. The app dials the RTE (RTE_MODE=inbound) over one WebSocket : the RTE
+# with the credential below. The controller dials the RTE (RTE_MODE=inbound) over one WebSocket : the RTE
 # holds no database credentials. Objects declared here are read-only in the interface ; see
 # https://ansibleforms.com/seed/ and https://ansibleforms.com/rte/modes.html
 version: 1

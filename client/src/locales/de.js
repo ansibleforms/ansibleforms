@@ -1118,6 +1118,8 @@ export default {
       forgetConfirm:
         '{name} vergessen? Der Eintrag wird entfernt und kommt bei der nächsten Anmeldung zurück. Jobs, gespeicherte Jobs und Zeitpläne bleiben.',
       blockedNote: 'Ein Administrator hat diesen Benutzer gesperrt: Sitzungen beendet, Anmeldungen abgelehnt.',
+      repoNeverNote:
+        'Der Eintrag seines Repositorys deklariert diesen Benutzer, aber er hat sich nie angemeldet: Seine Gruppen sind ab der ersten Anmeldung bekannt.',
       neverNote: 'In Rollen genannt, nie angemeldet: seine Gruppen sind ab der ersten Anmeldung bekannt.',
       readOnlyNote: 'Aus {source}: Identität und Gruppen, bei jeder Anmeldung gelesen, Stand: letzte Anmeldung.',
       groupReadOnlyNote: 'Gruppe aus {source}: ihre Benutzer sind die, die bei ihrer letzten Anmeldung darin waren.',
@@ -1298,15 +1300,6 @@ export default {
       helpName: 'Alphanumerisch mit Bindestrich und Unterstrich',
       helpUri: 'Nur SSH- oder HTTPS-URIs sind erlaubt',
       placeholderPassword: 'Passwort oder Token',
-      useForConfig: 'Fuer Konfiguration verwenden?',
-      useForForms: 'Fuer Formulare verwenden?',
-      useForPlaybooks: 'Fuer Playbooks verwenden?',
-      useForWorkflows: 'Für Workflows verwenden?',
-      helpUseForConfig: 'Kategorien und Konstanten aus seiner config.yaml gelesen (nur in einem Repository).',
-      helpUseForForms: 'Lädt und speichert Formulare in forms/ oder der Wurzel; Push im Designer veröffentlicht.',
-      helpUseForPlaybooks: 'Playbooks laufen aus seinem Ordner playbooks oder der Wurzel (nur in einem Repository).',
-      helpUseForWorkflows:
-        'Die Workflows des Designers werden aus diesem Repository gelesen und dorthin zurückgepusht.',
       helpCloneOnStart: 'Das Repository wird bei jedem Start der Anwendung gepullt (beim ersten Mal geklont).',
       cloneOnStartShort: 'Beim Start pullen',
       cloneOnStart: 'Beim Start der App pullen',
@@ -1319,20 +1312,147 @@ export default {
       stepRepository: 'Repository',
       stepSchedule: 'Pull-Zeitplan',
       stepUsage: 'Verwendung',
-      useConfigHint: 'config.yaml mit den Kategorien und Konstanten (nur ein Repository)',
-      useConfigShort: 'Einstellungen',
-      useFormsHint: 'Formulare und Variablendateien, vom Designer bearbeitet und gepusht',
-      useFormsShort: 'Formulare',
-      usePlaybooksHint: 'Ansible-Playbooks, die die Formulare ausführen (nur ein Repository)',
-      usePlaybooksShort: 'Playbooks',
-      useWorkflowsHint: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
-      useWorkflowsShort: 'Workflows',
+      usageCategories: {
+        designer: 'Designer',
+        jobs: 'Jobs',
+        access: 'Zugriff',
+        connections: 'Verbindungen',
+        appearance: 'Erscheinungsbild',
+        system: 'System',
+      },
+      usageHeldBy: 'Bereits vom Repository „{name}“ verwaltet',
+      usageCategoryAll: '{category}: alle Typen, die angehakt werden können',
+      usageTypes: {
+        forms: 'Formulare',
+        playbooks: 'Playbooks',
+        workflows: 'Workflows',
+        inventories: 'Inventare',
+        schedules: 'Zeitpläne',
+        sso: 'SSO',
+        ldap: 'LDAP',
+        disclaimer: 'Haftungsausschluss',
+        credentials: 'Anmeldedaten',
+        secret_stores: 'Secret Stores',
+        runners: 'Runner',
+        syslog: 'Syslog',
+        labels: 'Labels',
+        announcements: 'Ankündigungen',
+      },
+      usageHints: {
+        forms: 'Formulare und Variablendateien, vom Designer bearbeitet und gepusht',
+        playbooks: 'Ansible-Playbooks, die die Formulare ausführen (nur ein Repository)',
+        workflows: 'Workflows, die der Designer erstellt, bearbeitet und zurückpusht',
+        inventories: 'Ein Inventar: inventory.yaml, group_vars und host_vars in seiner Wurzel',
+        schedules: 'Zeitpläne, Einträge einer Liste controller_schedules: in einer seiner YAML-Dateien',
+        sso: 'SSO-Anbieter, Einträge einer Liste controller_sso: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        ldap: 'LDAP-Verzeichnisse, Einträge einer Liste controller_ldap: in einer seiner YAML-Dateien, in ihrer Suchreihenfolge',
+        disclaimer:
+          'Versionen des Haftungsausschlusses, Einträge einer Liste controller_disclaimer: in einer seiner YAML-Dateien',
+        users:
+          'Benutzer, lokal und aus einem Verzeichnis, Einträge einer Liste controller_users: in einer seiner YAML-Dateien, Passwörter nur als Umgebungsverweise',
+        groups:
+          'Lokale Gruppen und ihre Mitglieder, Einträge einer Liste controller_groups: in einer seiner YAML-Dateien',
+        credentials:
+          'Anmeldedaten, Einträge einer Liste controller_credentials: in einer seiner YAML-Dateien, Geheimnisse nur als Umgebungsverweise',
+        secret_stores:
+          'Secret Stores, Einträge einer Liste controller_secret_stores: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        databases:
+          'Datenbanken, die die Formulare abfragen, Einträge einer Liste controller_databases: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        runners:
+          'Runner, Einträge einer Liste controller_runners: in einer seiner YAML-Dateien, die ihre Anmeldedaten benennen',
+        notifications:
+          'Benachrichtigungen, Einträge einer Liste controller_notifications: in einer seiner YAML-Dateien',
+        syslog: 'Syslog-Server, Einträge einer Liste controller_syslog: in einer seiner YAML-Dateien',
+        chat_assistant:
+          'Der Schalter und die Einstellungen des Chat-Assistenten, unter controller_chat_assistant: in einer seiner YAML-Dateien, der Schlüssel nur als Umgebungsverweis',
+        mcp: 'Die MCP-Einstellungen nach ihrem Umgebungsnamen, unter controller_mcp: in einer seiner YAML-Dateien',
+        defaults:
+          'Design, Farbe, Formularansicht, Zeitzone, Datumsformat und Sprache, unter controller_defaults: in einer seiner YAML-Dateien',
+        logo: 'Das Logo, unter controller_logo: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        icon: 'Das Website-Symbol, unter controller_icon: in einer seiner YAML-Dateien, das Bild relativ zu dieser Datei benannt',
+        name: 'Der Name der App, unter controller_name: in einer seiner YAML-Dateien',
+        links:
+          'Die Links der Kopfzeile und der Link zum Designer, unter controller_links: in einer seiner YAML-Dateien',
+        labels:
+          'Die Labels neben dem Logo, Einträge einer Liste controller_labels: in einer seiner YAML-Dateien, in ihrer Reihenfolge',
+        announcements: 'Ankündigungen, Einträge einer Liste controller_announcements: in einer seiner YAML-Dateien',
+        general:
+          'Die Einstellungen unter Allgemein nach ihrem Umgebungsnamen, unter controller_general: in einer seiner YAML-Dateien',
+        roles:
+          'Die Rollen, unter controller_roles: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        categories:
+          'Die Kategorien, unter controller_categories: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        constants:
+          'Die Konstanten, unter controller_constants: in einer seiner YAML-Dateien (config.yaml wird noch gelesen, veraltet)',
+        repositories:
+          'Die anderen Repositories, Einträge einer Liste controller_repositories: in einer seiner YAML-Dateien',
+      },
+      usageOnTitle: '{type} einschalten',
+      usageOnQuestion: '{name} für {type} verwenden?',
+      usageOnButton: 'Einschalten',
+      usageOffTitle: '{type} ausschalten',
+      usageOffQuestion: '{name} nicht mehr für {type} verwenden?',
+      usageOffButton: 'Ausschalten',
+      usageChangeTitle: 'Verwendung ändern',
+      usageChangeQuestion: 'Ändern, wofür {name} verwendet wird?',
+      usageChangeButton: 'Verwendung speichern',
+      usageOnHeading: '{type}: eingeschaltet',
+      usageOffHeading: '{type}: ausgeschaltet',
+      usageOnWrittenFile: '{type} dieser App nach {name} in {file} geschrieben, wartet auf Push.',
+      usageOnWrittenList: '{type} dieser App nach {name} geschrieben, in {file}: {count}.',
+      usageOnReadIn: 'Was seine Dateien enthalten, beim Einschalten gelesen: {files}.',
+      usageOnReadFile: '{name} hat bereits {file}: die Version in git gewinnt und ersetzt {type} dieser App.',
+      usageOnGitWins:
+        'Steht derselbe Name in git und in dieser App, gewinnt die Version in git und ersetzt die der App.',
+      usageOnClashes: 'Gleicher Name in git und in dieser App, die Version in git ersetzt die der App: {names}.',
+      usageOnKept: 'Diese bleiben in dieser App: {names}.',
+      usageOnWithoutSecret:
+        'Ohne ihre Geheimnisse geschrieben, die in der Datenbank bleiben (git enthält nie ein Geheimnis im Klartext): {names}.',
+      usageOnAppOnly: 'Nur in der App behalten, kein Feld des Zeitplaneintrags gibt sie wieder: {names}.',
+      usageOnSkipped: 'In git bereits beendet, nicht importiert: {count}.',
+      formDuplicate:
+        "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} wird übersprungen (Formularnamen müssen über alle Formular-Repositories eindeutig sein)",
+      configDeprecated:
+        '{key} aus config.yaml gelesen: veraltet, verschieben Sie sie in eine eigene Datei, zum Beispiel {file} (config.yaml wird ab 8.0.0 nicht mehr gelesen)',
+      configNotRead:
+        '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen {key}, sonst die der Basiskonfiguration, werden verwendet, bis die Datei in git korrigiert ist',
+      rolesNotice: 'Rollen: {line}',
+      configRolesNotRead:
+        '{file} wird nicht gelesen ({reason}): Die zuletzt daraus gelesenen Rollen werden verwendet, bis die Datei in git korrigiert ist, sonst nur die Admin-Rolle von local/admins, nie die der Basiskonfiguration',
+      usagePreviewFailed:
+        'Was diese Änderung bewirkt, konnte nicht vom Server gelesen werden: Sie wird trotzdem angewendet, wenn Sie fortfahren.',
+      usageOnNewRepository:
+        '{name} ist noch nicht geklont: Hat das Remote diese Dateien bereits, gewinnt die Version in git und ersetzt die dieser App. Seine Pull-Ausgabe sagt nach dem Klonen, was übernommen wurde.',
+      usageOnAfter:
+        'Ab dann bringt ein Pull die Änderungen aus git, und die hier gemachten Änderungen gehen mit dem Push des Repositorys nach git.',
+      usageOnDone:
+        '{type}: {created} aus seinen Dateien gelesen, {written} ins Repository geschrieben (warten auf Push), {matched} durch git ersetzt, {kept} in dieser App behalten.',
+      usageOffKept: '{type}: {count} bleiben unverändert in dieser App, nicht mehr mit git verknüpft.',
+      usageOffPull:
+        'Es wird zuerst noch einmal gepullt, damit sie seinen neuesten Dateien entsprechen. Die Dateien in git bleiben, wie sie sind.',
+      usageOffUnpushed: 'Achtung: Es hat Änderungen, die noch nicht gepusht sind. Sie werden nicht an git gesendet.',
+      usageOffDone: '{type}: {count} von git gelöst, sie bleiben in dieser App.',
+      usageNotPulled: 'Das Repository wurde nicht gepullt ({reason}).',
+      usageRefused: 'Abgelehnte Dateien: {files}.',
+      usageNotReadIn:
+        'Die neuesten Dateien wurden vorher nicht eingelesen ({error}): die Objekte bleiben, wie der letzte Pull sie hinterlassen hat.',
+      usageFailed: '{type} konnte der Änderung nicht folgen: {error}',
+      usageKeptWhy: {
+        seed: 'vom Konfigurations-Seed verwaltet',
+        registered: 'von seinem RTE registriert',
+        pending: 'wartet auf Genehmigung',
+        holder: 'es enthält die Repositories, nie in seiner eigenen Datei',
+        uriSecret: 'seine URI enthält einen Benutzer oder ein Token: geben Sie ihm stattdessen eine Anmeldeinformation',
+        noSchedule: 'es hat weder gültigen Cron noch Rrule noch Ausführungszeit',
+        notWritten: 'nicht geschrieben: {error}',
+      },
+      source: 'Quelle',
+      sourceRepository: 'Repository: {name}',
+      sourceRepositoryHelp:
+        'In einer Datei des Repositorys {name} gespeichert: Speichern schreibt die Datei, der Push des Repositorys sendet sie an git.',
+      schedulesOnPlanned: 'Einmalige Jobs von „Später ausführen“ bleiben in dieser App.',
       notPushed: 'Ausstehende Änderungen',
       notPushedHint: 'Änderungen noch nicht zum Remote gepusht: pushe sie im Designer oder mit Push.',
-      useForInventories: 'Für Inventare verwenden?',
-      helpUseForInventories: 'Inventar: Formulare nennen es mit inventory: <Repository-Name>; der Designer ändert es.',
-      useInventoriesHint: 'Ein Inventar: inventory.yaml, group_vars und host_vars in seiner Wurzel',
-      useInventoriesShort: 'Inventare',
       fieldsRequired: 'Name, Branch, URI und Beschreibung sind erforderlich.',
       noOutput: 'Noch keine Ausgabe: Repository pullen, um die Meldungen von git zu sehen.',
       noPushOutput: 'Dieses Repository wurde noch nie gepusht.',
@@ -1343,7 +1463,6 @@ export default {
       showPullOutput: 'Ausgabe des letzten Pulls anzeigen',
       showPushOutput: 'Ausgabe des letzten Pushs anzeigen',
       notFound: "Es gibt kein Repository mit der ID '{id}'.",
-      formDuplicate: "Das Formular '{name}' ist zweimal definiert: {used} wird verwendet, {skipped} übersprungen",
       ownUser: 'Es hat noch einen eigenen Benutzer ({user}): wählen Sie Anmeldedaten, um ihn zu ersetzen.',
       pull: 'Pull',
       pullAll: 'Alle pullen',
@@ -1410,7 +1529,6 @@ export default {
       oneTimeRanRemoved: 'Der einmalige Zeitplan wurde ausgeführt und entfernt: sein Job steht auf der Seite Jobs.',
       placeholderName: 'Name des Zeitplans',
       oneTimeRun: 'Einmaliger Lauf',
-      oneTimeRunPlaceholder: 'Einmal statt wiederkehrend ausfuehren',
       runAt: 'Ausfuehren um',
       runAtHelp: 'Datum und Uhrzeit fuer die einmalige Ausfuehrung dieses Jobs',
       extraVarsHelp: 'Es gibt keine Formularfelder für die Extra-Variablen, Sie müssen sie hier hinzufügen.',
@@ -1427,6 +1545,21 @@ export default {
       startedJobTitle: 'Gestarteter Job',
       startedJob: 'Job #{id}',
       startedJobHelp: 'Der Job, den der letzte Lauf gestartet hat: öffnen Sie ihn, um zu sehen, wie er endete.',
+      rrule: 'Wiederholungsregel (rrule)',
+      rruleHelp: 'DTSTART mit TZID, dann RRULE, EXRULE lässt Läufe aus. Läuft in dieser Zone.',
+      rruleInvalid: 'Diese rrule wird abgelehnt: {reason}',
+      rruleNoRuns: 'Diese rrule hat keinen kommenden Lauf.',
+      timing: 'Zeitsteuerung',
+      timingCron: 'Cron',
+      timingCronHint: 'wiederkehrend, in der Zeitzone des Servers',
+      timingRruleHint: 'wiederkehrend, eine iCal-Regel in ihrer eigenen Zeitzone',
+      timingOnceHint: 'einmal, zu einem Datum und einer Uhrzeit, danach entfernt',
+      enabledHelp: 'Ausgeschaltet läuft er nicht nach seinem Zeitplan (Jetzt ausführen startet ihn trotzdem).',
+      launchOptions: 'Aus der Datei',
+      launchOptionsHelp:
+        'Die Prompts der Datei (limit, job_tags, inventory ...), als diese Extra-Vars an den Job gesendet. Sie werden in der Datei bearbeitet.',
+      deleteFileHint:
+        'Seine Datei {file} wird auch aus dem Repository {name} gelöscht: pushen Sie das Repository, um sie aus git zu entfernen.',
     },
     runners: {
       pending: 'Wartet auf Freigabe',
@@ -1480,13 +1613,13 @@ export default {
       ownToken: 'Meldet sich mit dem eigenen Token von vor den Anmeldedaten an, bis ein Eintrag gewählt wird.',
       ownTokenRte: 'Meldet sich mit dem Token an, mit dem sich sein RTE registriert hat, bis ein Eintrag gewählt wird.',
       rteMode: 'Modus',
-      rteModeHelp: 'Wie die RTE mit der App spricht: RTE_MODE auf der RTE.',
+      rteModeHelp: 'Wie die RTE mit dem Controller spricht: RTE_MODE auf der RTE.',
       rteMode_outbound: 'Ausgehend',
-      rteMode_outboundHint: 'Die RTE verbindet sich mit der App: von außen erreicht sie nichts',
+      rteMode_outboundHint: 'Die RTE verbindet sich mit dem Controller: von außen erreicht sie nichts',
       rteMode_inbound: 'Eingehend',
-      rteMode_inboundHint: 'Die App verbindet sich mit der RTE unter der Adresse der Anmeldedaten',
+      rteMode_inboundHint: 'Der Controller verbindet sich mit der RTE unter der Adresse der Anmeldedaten',
       rteMode_database: 'Datenbank (veraltet)',
-      rteMode_databaseHint: 'Die RTE nutzt die Datenbank der App selbst: entfällt in 8.0.0',
+      rteMode_databaseHint: 'Die RTE nutzt die Datenbank des Controllers selbst: entfällt in 8.0.0',
       socket: 'Verbindung',
       tabRte: 'RTE',
       rteSettingsSocketOnly:
@@ -1496,10 +1629,10 @@ export default {
         'Wie viele Playbooks dieses RTE gleichzeitig ausführt; 0 bedeutet kein Limit. Leer: die eigene {env} des RTE, sonst {default}.',
       cacheMb: 'Cache für Jobdateien',
       cacheMbHelp:
-        'Wie viel der von der App gesendeten Jobdateien dieses RTE behält, in MB; 0 behält keine. Leer: die eigene {env} des RTE, sonst {default}.',
+        'Wie viel der vom Controller gesendeten Jobdateien dieses RTE behält, in MB; 0 behält keine. Leer: die eigene {env} des RTE, sonst {default}.',
       filesMode: 'Jobdateien',
       filesModeHelp:
-        'Übertragung: Die App sendet die Dateien mit dem Job. Lokal: Das RTE arbeitet mit seinen eigenen eingebundenen Ordnern.',
+        'Übertragung: Der Controller sendet die Dateien mit dem Job. Lokal: Das RTE arbeitet mit seinen eigenen eingebundenen Ordnern.',
       files_defaultValue: 'Standard ({value})',
       files_transfer: 'Übertragung',
       files_local: 'Lokal',
@@ -1511,8 +1644,9 @@ export default {
       overridesRte: 'Überschreibt {env} auf dem RTE ({value}).',
       socketConnected: 'Verbunden',
       socketDisconnected: 'Nicht verbunden',
-      socketDisconnectedHint: 'Kein Socket zu dieser RTE: prüfen Sie, ob sie läuft, Adresse oder APP_URL und Token.',
-      socketHint: 'App-Knoten {node}, RTE {version}, {running} von {max} Jobs laufen',
+      socketDisconnectedHint:
+        'Kein Socket zu dieser RTE: prüfen Sie, ob sie läuft, Adresse oder CONTROLLER_URL und Token.',
+      socketHint: 'Controller-Knoten {node}, RTE {version}, {running} von {max} Jobs laufen',
       joinTokenValid_1: '1 Stunde',
       joinTokenValid_24: '1 Tag',
       joinTokenValid_168: '7 Tage',
@@ -1824,7 +1958,7 @@ export default {
     },
     knownhosts: {
       label: 'Bekannter Host',
-      description: 'Server, denen die App per SSH vertraut; ein Repository-Host kommt beim ersten Klonen.',
+      description: 'Server, denen der Controller per SSH vertraut; ein Repository-Host kommt beim ersten Klonen.',
       showEntry: 'Host in die Zwischenablage kopieren',
       hostEntry: 'Host-Eintrag',
     },
@@ -2906,7 +3040,7 @@ export default {
       aborted: 'Jobs, die vor ihrem Ende abgebrochen wurden.',
       rejected: 'Jobs, die ein Genehmiger abgelehnt hat: Sie wurden nie ausgeführt.',
       abandoned:
-        'Jobs, die verloren haben, was sie ausführte (ein neu gestartetes oder gestopptes RTE oder App-Knoten), und nicht mehr enden können. Starte einen neu, um ihn erneut auszuführen.',
+        'Jobs, die verloren haben, was sie ausführte (ein neu gestartetes oder gestopptes RTE oder Controller-Knoten), und nicht mehr enden können. Starte einen neu, um ihn erneut auszuführen.',
     },
     title: 'Jobs',
     refresh: 'Aktualisieren',

@@ -8,9 +8,11 @@ import logger from '../../lib/logger.js';
 import Helpers from '../../lib/common.js';
 import i18n from '../../lib/i18n.js';
 import { sniffImageMime } from '../../lib/imagetype.js';
+import { BRAND_IMAGES } from '../../lib/brandImages.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
-// an icon is tiny ; the cap keeps a photo from being stored as one
-const MAX_ICON_BYTES = 256 * 1024;
+// an icon is tiny ; the cap keeps a photo from being stored as one (lib/brandImages.js)
+const MAX_ICON_BYTES = BRAND_IMAGES.icon.maxBytes;
 
 // kept in memory : validated and stored in the database as a data url, never written to disk
 const uploadMulter = multer({
@@ -56,11 +58,16 @@ const update = function (req, res) {
       return res.status(400).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), i18n.t(req, 'resources.faviconInvalidImage')));
     }
     try {
-      await Settings.setFavicon(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+      // the Icon repository's icon: map, before : its icon written into it after
+      await RepoObjects.holding('icon', async () => {
+        const before = await RepoObjects.snapshot('icon');
+        await BRAND_IMAGES.icon.set(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+        await RepoObjects.appUpdated('icon', before);
+      });
       logger.notice(`Website icon updated (${mime}, ${req.file.buffer.length} bytes)`)
       res.json(RestResult.single(null));
     } catch (e) {
-      res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(e)));
+      res.status(e.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(e)));
     }
   });
 };
@@ -74,11 +81,15 @@ const update = function (req, res) {
  */
 const remove = async function (req, res) {
   try {
-    await Settings.setFavicon(null);
+    await RepoObjects.holding('icon', async () => {
+      const before = await RepoObjects.snapshot('icon');
+      await BRAND_IMAGES.icon.set(null);
+      await RepoObjects.appUpdated('icon', before);
+    });
     logger.notice(`Website icon removed, the default one restored`)
     res.json(RestResult.single(null));
   } catch (err) {
-    res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(err)));
+    res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateFavicon'), Helpers.getError(err)));
   }
 };
 

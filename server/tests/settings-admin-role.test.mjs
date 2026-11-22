@@ -19,6 +19,7 @@ let importFileRoles = [];
 vi.mock("../src/models/settings.model.js", () => ({
   default: {
     getActiveConfig: async () => active,
+    isTemplated: async () => false,
     saveActiveConfig: async (text) => { written.push(text); },
     // the model's own part (reading and validating the file) is not under test : it hands the
     // roles of the file to the caller's check, then writes

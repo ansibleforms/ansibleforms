@@ -1,6 +1,6 @@
 'use strict';
-import { forgetAppDefaults } from "../../routes/v2/app.routes.js";
-import { publish } from "../../lib/liveEvents.js";
+import { saveSettingsFields } from "../../lib/appearance.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 import Settings from '../../models/settings.model.js';
 import Form from '../../models/form.model.js';
 import Lock from '../../models/lock.model.js';
@@ -44,6 +44,12 @@ const refuseWhileDesignerLocked = async function(req, res) {
 // a latent bug waiting for someone to "improve" one of them
 const configHash = auditConfigHash;
 
+// the types kept in one file of a repository, whose page says which (source_<type> in the settings)
+const SINGLE_FILE_TYPES = ['general', 'defaults', 'logo', 'icon', 'name', 'links', 'mcp', 'chat_assistant'];
+// the types holding fields of the settings row this endpoint saves, one per Appearance page : a
+// save writes the file of the page whose fields it changed, never another's
+const ROW_TYPES = ['defaults', 'name', 'links'];
+
 const find = async function(req, res) {
     try {
       const settings = await Settings.find();
@@ -51,6 +57,10 @@ const find = async function(req, res) {
       // knows whether the active config lives in the database.
       if (settings) {
         settings.enableConfigInDatabase = appConfig.enableConfigInDatabase;
+        // where each type kept in one file is (source_defaults : { repository, repo_file }, or
+        // null) : the Repository line of its page, read by whoever reads that page's settings
+        const sources = await Promise.all(SINGLE_FILE_TYPES.map((key) => RepoObjects.singleSource(key)));
+        SINGLE_FILE_TYPES.forEach((key, i) => (settings[`source_${key}`] = sources[i]));
       }
       // a part of the settings on its own (lib/settingsSections.js) : only its fields
       const readable = readableSettingsFields(req);
@@ -219,20 +229,24 @@ const update = async function(req, res) {
                 `${i18n.t(req, 'resources.seedManagedSettings')} (${blocked.join(', ')})`));
             }
           }
-          const record = new Settings(body);
-          // Guard against an effectively-empty record (no recognized fields),
-          // which would produce invalid `UPDATE t set ?` SQL.
-          if (Object.keys(record).length === 0) {
+          // the Defaults, Name and Links repositories' files, before : the changed fields written
+          // after into their page's file, under their repositories' write claims, taken first
+          // (RepoObjects.holding)
+          const saved = await RepoObjects.holding(ROW_TYPES, async () => {
+            const before = await RepoObjects.snapshots(ROW_TYPES);
+            // converted, saved and shown at once in every open tab (lib/appearance.js) ; a record
+            // with no field the model knows is refused
+            if (!(await saveSettingsFields(body))) return false;
+            await RepoObjects.appUpdatedAll(before);
+            return true;
+          });
+          if (!saved) {
             return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
           }
-          await Settings.update(record);
-          // the theme, the name, the label, the announcement : shown at once, in every open tab
-          // (the 'appearance' live event : the header re-reads /api/v2/app/config)
-          forgetAppDefaults();
-          publish("appearance");
           res.json(RestResult.single(null));
         } catch(err) {
-          res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
+          // an appearance field the config seed manages : 403, as every seeded object
+          res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
         }
     }
 };
@@ -278,10 +292,11 @@ const exportConfig = async function(req, res) {
 const getConfig = async function(req, res) {
     try {
       const yaml = await Settings.getActiveConfig();
-      // baseHash lets the client detect a concurrent change on save (see saveConfig)
+      // baseHash lets the client detect a concurrent change on save (see saveConfig) ; templated :
+      // the base or a file a repository holds a key in is a ytt template, the editors read only ;
       // config_yaml, and forms_yaml as before 7.6 (deprecated, removed in 8) for the clients
       // that still read it
-      res.json(RestResult.single({ config_yaml: yaml, forms_yaml: yaml, baseHash: configHash(yaml) }));
+      res.json(RestResult.single({ config_yaml: yaml, forms_yaml: yaml, baseHash: configHash(yaml), templated: await Settings.isTemplated() }));
     } catch(err) {
       res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedFindSettings'), Helpers.getError(err)));
     }
@@ -375,7 +390,8 @@ const saveConfig = async function(req, res) {
       });
       res.json(RestResult.single(null));
     } catch(err) {
-      res.status(500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
+      // a refusal (a key that cannot be written : lib/configKeys.js) keeps its status
+      res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateSettings'), Helpers.getError(err)));
     }
 };
 

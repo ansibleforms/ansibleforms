@@ -10,6 +10,7 @@ import Helpers from "../../lib/common.js";
 import i18n from "../../lib/i18n.js";
 import CredentialModel from "../../models/credential.model.v2.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
+import RepoObjects from "../../lib/repoObjects/index.js";
 
 // the fields that say where a channel sends the credential it names, by type : a mail channel's
 // own server (used while its credential has none), a webhook's url and a telegram bot's API
@@ -124,7 +125,10 @@ const create = async (req, res) => {
       throw new Errors.BadRequestError(i18n.t(req, "errors.requiredFields"));
     }
     await guardChannelCredentials(req, null);
-    const id = await NotificationChannel.create(req.body);
+    // the notification channels repository follows (lib/repoObjects) : the new channel a new file,
+    // and the others' files where they changed - the active mail channel is one, so making this
+    // one active clears it on the others
+    const id = await RepoObjects.following("notifications", () => NotificationChannel.create(req.body));
     return res.status(201).json(RestResult.single({ message: i18n.t(req, "success.created", { resource: "Notification channel" }), id }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -150,7 +154,9 @@ const update = async (req, res) => {
     const existing = await NotificationChannel.findById(req.params.id);
     if (!existing) throw new Errors.NotFoundError(`No notification channel with id ${req.params.id}`);
     await guardChannelCredentials(req, existing);
-    await NotificationChannel.update(req.body, req.params.id);
+    // the notification channels repository follows : this channel's changed fields written to its
+    // file, and the others' where it changed them (made the active one, it is no longer theirs)
+    await RepoObjects.following("notifications", () => NotificationChannel.update(req.body, req.params.id));
     return res.json(RestResult.single({ message: i18n.t(req, "success.updated", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -159,7 +165,12 @@ const update = async (req, res) => {
 
 const deleteChannel = async (req, res) => {
   try {
-    await NotificationChannel.delete(req.params.id);
+    const before = await NotificationChannel.findById(req.params.id).catch(() => null);
+    await RepoObjects.holding([], async () => {
+      await NotificationChannel.delete(req.params.id);
+      // one of the notification channels repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted("notifications", before);
+    }, before);
     return res.json(RestResult.single({ message: i18n.t(req, "success.deleted", { resource: "Notification channel" }) }));
   } catch (err) {
     Errors.ReturnError(res, err);

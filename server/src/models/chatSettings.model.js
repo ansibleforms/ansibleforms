@@ -2,6 +2,7 @@
 import logger from "../lib/logger.js";
 import mysql from "./db.model.js";
 import crypto from "../lib/crypto.js";
+import { stripTrailingSlashes } from "../lib/url.js";
 import { CHAT_VENDORS, CHAT_PROVIDERS, effectiveSettings } from "../chat/vendors.js";
 
 export { CHAT_VENDORS, CHAT_PROVIDERS, effectiveSettings };
@@ -65,6 +66,52 @@ function clampInt(v, min, max, dflt) {
   if (isNaN(n)) return dflt;
   return Math.min(max, Math.max(min, n));
 }
+
+/**
+ * The fields a declaration gives (the config seed's chat section, a repository's chat_assistant: map),
+ * converted as a save from the app converts them (the constructor : the key encrypted, the numbers
+ * clamped) - only those it declares : the constructor materialises every field it knows.
+ *
+ * Args:
+ *   declared (object): the declared fields ; extra headers may be a yaml mapping.
+ *
+ * Returns:
+ *   object: { cfg (the declaration, its extra headers as the model keeps them : compared with the
+ *     stored row), record (the fields to write) }.
+ *
+ * Raises:
+ *   Error: extra headers that cannot be sent as they are.
+ */
+ChatSettings.declared = function (declared) {
+  const cfg = declared.extra_headers === undefined ? declared : { ...declared, extra_headers: normaliseExtraHeaders(declared.extra_headers) };
+  const converted = { ...new ChatSettings(cfg) };
+  const record = {};
+  for (const key of Object.keys(converted)) {
+    if (cfg[key] === undefined || converted[key] === undefined) continue;
+    record[key] = converted[key];
+  }
+  return { cfg, record };
+};
+
+/**
+ * Whether settings send their key to the same place as the saved ones : the same provider, base
+ * url and certificate check. A stored key (the row's own, or its credential's) only goes there,
+ * as the settings page's mail check keeps the stored mail password for the stored server.
+ *
+ * Args:
+ *   saved (object): the row as it is stored.
+ *   wanted (object): the settings as they would be used.
+ *
+ * Returns:
+ *   boolean: true when the key would go to the saved target.
+ */
+ChatSettings.sameTarget = function (saved, wanted) {
+  const text = (v) => stripTrailingSlashes(v === null || v === undefined ? '' : String(v).trim());
+  const flag = (v) => v === true || Number(v) === 1;
+  return text(saved?.provider) === text(wanted?.provider)
+    && text(saved?.base_url) === text(wanted?.base_url)
+    && flag(saved?.ignore_certs) === flag(wanted?.ignore_certs);
+};
 
 ChatSettings.update = async function (record) {
   logger.info(`Updating chat settings (provider ${record.provider || 'none'})`);

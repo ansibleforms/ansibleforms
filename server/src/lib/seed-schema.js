@@ -9,6 +9,7 @@
 // file live in git next to the rest of the deployment.
 import Ajv from "ajv";
 import { CHAT_PROVIDERS } from "../chat/vendors.js";
+import { USAGE_TYPES, ONE_ONLY_FLAGS } from "./repoObjects/types.js";
 
 const str = { type: "string" };
 const bool = { type: "boolean" };
@@ -176,6 +177,75 @@ export function foldAwxIntoRunners(doc) {
   runners.items = [...(runners.items || []), ...(awx.items || []).map((item) => ({ ...item, type: "awx" }))];
   if (awx.prune && runners.prune === undefined) runners.prune = awx.prune;
   return { ...rest, runners };
+}
+
+/**
+ * A repository's use_for_config (deprecated since 7.8.0, removed in 8) as the three flags it is
+ * now : use_for_roles, use_for_categories and use_for_constants, each the item's own when it
+ * declares it. The one rule for the config seed's repositories (foldConfigFlag) and a
+ * repositories: entries of a repository (lib/repoObjects/repositories.js).
+ *
+ * Args:
+ *   item (object): the repository as declared.
+ *   give (boolean): false : the item's use_for_config is on, but another repository has the three
+ *     flags already (one repository holds each) - dropped, no flag given.
+ *
+ * Returns:
+ *   object: the item, without use_for_config ; as it is when it does not declare it.
+ */
+export function foldConfigItem(item, give = true) {
+  if (item?.use_for_config === undefined) return item;
+  const { use_for_config: on, ...rest } = item;
+  if (on && !give) return rest;
+  return { use_for_roles: on, use_for_categories: on, use_for_constants: on, ...rest };
+}
+
+/**
+ * The config seed's repositories' use_for_config folded (foldConfigItem). 7.3 read its configuration
+ * from the first use_for_config repository and only warned about the others. The repository that
+ * holds the three flags in the database already (the one the schema patch gave them to : the one
+ * 7.3 read) keeps them when the seed declares use_for_config on it ; while it holds them, the
+ * others declaring it get none. With none holding them, the first one that declares it (in the
+ * file's order, the order a fresh database made them in) gets them. The others are listed as such,
+ * warned by the caller, never a refusal of the seed. With the configuration kept in the database,
+ * 7.3 read none of them (the database copy was served whole) : every use_for_config is dropped,
+ * none gets the flags, as the schema patch gives none then (models/schema.model.js
+ * splitConfigUsage). Returns a new document ; the warnings are the caller's.
+ *
+ * Args:
+ *   doc (object): the seed document.
+ *   held (string[]): the repositories holding use_for_roles, use_for_categories or
+ *     use_for_constants in the database now ; none for a fresh one (and the schema check).
+ *   opts (object): { inDatabase (true : the configuration is kept in the database, and it holds
+ *     one) }.
+ *
+ * Returns:
+ *   { doc: object, folded: string[], dropped: string[], holder: string|null }: the document, the
+ *     repositories whose flag moved, those whose use_for_config was dropped, and the one that has the
+ *     three flags from it.
+ */
+export function foldConfigFlag(doc, held = [], opts = {}) {
+  const items = doc?.repositories?.items || [];
+  if (!items.some((r) => r.use_for_config !== undefined)) return { doc, folded: [], dropped: [], holder: null };
+  if (opts.inDatabase) {
+    const dropped = items.filter((r) => r.use_for_config !== undefined).map((r) => r.name);
+    const repositoryItems = items.map(({ use_for_config: _dropped, ...rest }) => rest);
+    return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded: [], dropped, holder: null };
+  }
+  // the one holding them now, unless this seed takes them off it (use_for_config: false)
+  const turnedOff = new Set(items.filter((r) => r.use_for_config !== undefined && !r.use_for_config).map((r) => r.name));
+  const current = held.filter((name) => !turnedOff.has(name));
+  const declaring = items.filter((r) => r.use_for_config).map((r) => r.name);
+  const holder = current.length ? (declaring.find((name) => current.includes(name)) ?? current[0]) : (declaring[0] ?? null);
+  const folded = [];
+  const dropped = [];
+  const repositoryItems = items.map((r) => {
+    if (r.use_for_config === undefined) return r;
+    const give = !r.use_for_config || r.name === holder;
+    (give ? folded : dropped).push(r.name);
+    return foldConfigItem(r, give);
+  });
+  return { doc: { ...doc, repositories: { ...doc.repositories, items: repositoryItems } }, folded, dropped, holder };
 }
 
 /**
@@ -390,6 +460,106 @@ const oauth2Item = {
   },
 };
 
+// One SSO provider as a repository holds it (lib/repoObjects/sso.js) : an item of the oauth2
+// section, without its rule that the client secret or a credential be given - a provider of the
+// app is written to git without its secret, which stays in the database (the model still checks
+// a new provider has its client : OAuth2.assertClient)
+export const ssoProviderItem = (({ anyOf: _client, ...item }) => item)(oauth2Item);
+
+// ---------------------------------------------------------------------------------
+// Values a file says otherwise than they are stored.
+//
+// A field's value as the config seed and a repository's files say it, when the database stores
+// it under another (older) name : { field: { stored: { file, deprecated } } } - file the value a
+// file says (and the app writes), deprecated the version since which the stored value said in a
+// file is deprecated (still read, the same meaning ; said where it is read). The one map for the
+// seed (lib/seed.js) and a repository's entries (lib/repoObjects/fields.js values).
+// ---------------------------------------------------------------------------------
+
+// an SSO provider's type : Microsoft Entra ID is entraid in a file ; the database, the sign-in and
+// the API keep azuread, its name of before (a role's members say entraid/ the same way)
+export const OAUTH2_VALUES = { provider: { azuread: { file: "entraid", deprecated: "7.8.0" } } };
+
+/**
+ * An object's values as a file says them : each stored value of a field the map names given its
+ * file value (the app writes it so).
+ *
+ * Args:
+ *   obj (object): the object, its values as stored.
+ *   values (object): the map ({ field: { stored: { file } } }) ; none : the object as it is.
+ *
+ * Returns:
+ *   object: a copy with the file values ; the object itself when the map changes nothing.
+ */
+export function fileValuesOf(obj, values = {}) {
+  let out = obj;
+  for (const [field, map] of Object.entries(values)) {
+    const to = map[obj?.[field]]?.file;
+    if (to !== undefined) out = { ...out, [field]: to };
+  }
+  return out;
+}
+
+/**
+ * An object's values as they are stored : each file value of a field the map names given its
+ * stored value ; a stored value a file still says (deprecated) kept, said once per field and value.
+ *
+ * Args:
+ *   obj (object): the object, as a file (or the seed) gives it.
+ *   values (object): the map ({ field: { stored: { file, deprecated } } }) ; none : the object as it
+ *     is.
+ *
+ * Returns:
+ *   object: { object (a copy with the stored values ; the object itself when the map changes
+ *     nothing), deprecated ([{ field, value, use, since }] : the deprecated values it says) }.
+ */
+export function storedValuesOf(obj, values = {}) {
+  let object = obj;
+  const deprecated = [];
+  for (const [field, map] of Object.entries(values)) {
+    const value = obj?.[field];
+    for (const [stored, { file, deprecated: since }] of Object.entries(map)) {
+      if (value === file) object = { ...object, [field]: stored };
+      else if (value === stored && since) deprecated.push({ field, value, use: file, since });
+    }
+  }
+  return { object, deprecated };
+}
+
+/**
+ * What a deprecated value says (storedValuesOf), the pull output's and the server log's words.
+ *
+ * Args:
+ *   d (object): { field, value, use, since }.
+ *
+ * Returns:
+ *   string: the notice.
+ */
+export const deprecatedValueNotice = (d) => `${d.field}: ${d.value} is deprecated since ${d.since} and removed in 8: read as ${d.field}: ${d.use}, declare that instead`;
+
+/**
+ * The config seed's oauth2 items with their values as stored (storedValuesOf, OAUTH2_VALUES) :
+ * provider: entraid applied as azuread, provider: azuread still read, listed as deprecated (warned
+ * by the caller). Returns a new document.
+ *
+ * Args:
+ *   doc (object): the seed document.
+ *
+ * Returns:
+ *   { doc: object, deprecated: { name, notice }[] }: the document, and each item's deprecated value
+ *     with what it says.
+ */
+export function foldOauth2Values(doc) {
+  if (!Array.isArray(doc?.oauth2?.items)) return { doc, deprecated: [] };
+  const deprecated = [];
+  const items = doc.oauth2.items.map((item) => {
+    const stored = storedValuesOf(item, OAUTH2_VALUES);
+    deprecated.push(...stored.deprecated.map((d) => ({ name: item?.name, notice: deprecatedValueNotice(d) })));
+    return stored.object;
+  });
+  return { doc: { ...doc, oauth2: { ...doc.oauth2, items } }, deprecated };
+}
+
 const repositoryItem = {
   type: "object",
   additionalProperties: false,
@@ -403,11 +573,11 @@ const repositoryItem = {
     password: str,
     // a credential of the credentials section (or the app), used instead of user/password
     credential: str,
+    // what the app reads from it : every usage type's flag (lib/repoObjects/types.js)
+    ...Object.fromEntries(USAGE_TYPES.map((t) => [t.flag, bool])),
+    // deprecated since 7.8.0, removed in 8 : the roles, the categories and the constants at once
+    // (foldConfigFlag)
     use_for_config: bool,
-    use_for_forms: bool,
-    use_for_playbooks: bool,
-    use_for_workflows: bool,
-    use_for_inventories: bool,
     rebase_on_start: bool,
     cron: str,
     // status, pull_status, push_status, pull_output, push_output, pulled_at, pushed_at and head
@@ -500,6 +670,9 @@ const chatSection = {
   properties: {
     provider: { type: "string", enum: ["", ...CHAT_PROVIDERS] },
     api_key: str,
+    // an api credential of the credentials section whose password is the key, instead of api_key
+    // (optional : omitted leaves the column alone)
+    credential: str,
     base_url: str,
     model: str,
     max_turns: strOrInt,
@@ -555,6 +728,129 @@ const ldapSection = {
   },
 };
 
+// One LDAP directory as a repository holds it (lib/repoObjects/ldap.js, one file per directory) :
+// the fields of the ldap section above, and the directory's own - its name (main is the one the
+// ldap section is), its place in the lookup order, its sign-in domains. Only the name is required :
+// a file declares what it owns, as the list sections' items do, so the main directory's file is the
+// ldap section with `name: main`.
+export const ldapDirectoryItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$" },
+    position: strOrInt,
+    domains: str,
+    ...ldapSection.properties,
+  },
+};
+
+// The chat assistant's settings as a repository holds them (lib/repoObjects/chatAssistant.js, its chat_assistant: map) :
+// what the Chat assistant page saves - its switch (enable_chat : the ENABLE_CHAT environment
+// setting, named as its variable in lower case, as the Defaults page's default_language) first, then
+// the chat section's fields - none required : a file declares what it owns, its api key left out
+// when the app's stays in the database. The config seed's chat section stays as it is : the switch
+// is an environment setting, never the seed's (lib/seed.js applies the provider row only).
+export const chatFileItem = (({ required: _all, properties, ...section }) => ({ ...section, properties: { enable_chat: bool, ...properties } }))(chatSection);
+
+// The Settings > Appearance pages a repository holds one file each of (lib/repoObjects/defaults.js,
+// logo.js, icon.js, name.js) and the config seed one section each of : what each page saves, and
+// nothing else. Every field optional : what is not declared is left alone. What the seed declares
+// is its own, field by field : read only in the app (lib/seedManaged.js), released when it is no
+// longer declared or the seed is turned off.
+const appearanceSection = (properties) => ({ type: "object", additionalProperties: false, properties });
+
+// Settings > Appearance > Defaults : the theme and its colour, the forms view, the time zone, the
+// date format, the language (a repository's defaults: map, the seed's defaults section)
+export const defaultsSection = appearanceSection({
+  default_theme: { type: "string", enum: ["system", "light", "dark"] },
+  default_theme_color: str,
+  default_forms_view: str,
+  default_timezone: str,
+  default_date_format: str,
+  default_language: str,
+});
+
+// Settings > Appearance > Logo and Icon : an image file's path, relative to the seed file (or the
+// repository's logo: and icon: maps), read as binary and checked as an upload is ; empty : the
+// bundled one
+export const logoSection = appearanceSection({ logo: str });
+export const iconSection = appearanceSection({ icon: str });
+
+// Settings > Appearance > Name : the app's name (a repository's name: map, the seed's name section)
+export const nameSection = appearanceSection({ app_name: str });
+
+// The header's links (Settings > Appearance > Links) : its own links and whether the Designer's
+// shows. Every field optional ; what the seed declares is its own, field by field, as the other
+// Appearance pages' (lib/seedManaged.js).
+export const linksSection = appearanceSection({
+  // { label, url, icon, newTab, id, parent } each, as Settings > Appearance > Links keeps them
+  header_links: { type: ["array", "string"] },
+  show_designer: bool,
+});
+
+// the seed's sections held field by field, one per Settings > Appearance page, in the menu's
+// order (lib/seedManaged.js) : the seed key of each, its schema
+export const APPEARANCE_SECTIONS = { defaults: defaultsSection, logo: logoSection, icon: iconSection, name: nameSection, links: linksSection };
+
+// the keys of those sections named otherwise than the field they set (lib/repoObjects/yamlKeys.js),
+// { key: field } per section : the forms view is default_forms_view in a file, as its siblings,
+// and forms_view in the settings row, the API and the page (the fields the seed holds by that name)
+export const APPEARANCE_KEYS = { defaults: { default_forms_view: "forms_view" } };
+
+// The MCP server's settings (Settings > Connections > MCP) : its switch and its options, keyed by
+// their environment variable names (ENABLE_MCP, MCP_READ_ONLY ...), as a repository's mcp: map holds them.
+// What the seed declares is its own, variable by variable, as the Appearance pages' fields
+// (lib/seedManaged.js) ; each checked as the page's Save checks it when applied.
+export const mcpSection = {
+  type: "object",
+  propertyNames: { pattern: "^(ENABLE_MCP|MCP_[A-Z0-9_]+)$" },
+  additionalProperties: { type: ["string", "number", "boolean"] },
+};
+
+// An announcement under the header (Settings > Appearance > Announcements) : named, so a seed or a
+// repository finds it again ; its message, type, switch, and when it starts and ends showing (ISO
+// moments, UTC when they carry no zone)
+const announcementItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "message"],
+  properties: {
+    name: { type: "string", minLength: 1, maxLength: 100 },
+    message: str,
+    level: { type: "string", enum: ["info", "warning", "danger"] },
+    enabled: bool,
+    start_at: str,
+    end_at: str,
+  },
+};
+
+// A version of the disclaimer users accept (Settings > Access > Disclaimer) : its number, title,
+// text and checkbox label, and whether it is the one in force (enabled : the disclaimer on, this
+// version asked). A changed text is a correction of that version ; with ask_again: true, everyone
+// who accepted it is asked again - as the app's save offers both. Acceptances are never declared.
+export const disclaimerItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["version"],
+  properties: {
+    version: { type: "integer", minimum: 1 },
+    title: str,
+    text: str,
+    checkbox_label: str,
+    enabled: bool,
+    ask_again: bool,
+  },
+};
+
+// a section of named items the seed makes or changes (never deletes : they are not managed)
+const itemsSection = (item) => ({
+  type: "object",
+  additionalProperties: false,
+  required: ["items"],
+  properties: { items: { type: "array", items: item } },
+});
+
 // The public url, and the mail fields of before 7.6 (deprecated, removed in 8 : the settings row
 // has no mail columns any more, foldMailSettingsIntoChannel makes them a mail channel and its
 // smtp credential). The settings row also holds config_yaml, the logo and the theme defaults -
@@ -591,6 +887,37 @@ const labelItem = {
   },
 };
 
+// a local group of Settings > Access > Groups : its name, what it is for, and the local users in
+// it (their usernames) - a group holds its members, the users' entries say nothing of their groups
+export const groupItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    description: str,
+    users: { type: "array", items: { type: "string", minLength: 1 } },
+  },
+};
+
+// a user of Settings > Access > Users : a local one (type local, the default) with its email, what
+// it is, its password as an ${ENV} reference (hashed when read ; none : set in the app) and its
+// sign-in blocked or not ; or one of a directory (ldap, entraid, oidc), of which only what the app
+// owns is said - what it is and whether it is blocked : the rest comes from its directory
+export const userItem = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username"],
+  properties: {
+    username: { type: "string", minLength: 1 },
+    type: { type: "string", enum: ["local", "ldap", "entraid", "oidc"] },
+    email: str,
+    description: str,
+    password: str,
+    blocked: bool,
+  },
+};
+
 const settingsSection = {
   type: "object",
   additionalProperties: false,
@@ -617,6 +944,10 @@ export const seedSchema = {
     runners: listSection(runnerItem),
     credentials: listSection(credentialItem),
     databases: listSection(databaseItem),
+    // the local groups (their members) and the users, local and of a directory : applied through
+    // the repository types' descriptors (lib/repoObjects/groups.js, users.js), made or changed
+    groups: listSection(groupItem),
+    users: listSection(userItem),
     oauth2: listSection(oauth2Item),
     repositories: listSection(repositoryItem),
     syslog_servers: listSection(syslogServerItem),
@@ -625,6 +956,14 @@ export const seedSchema = {
     ldap: ldapSection,
     settings: settingsSection,
     chat: chatSection,
+    defaults: defaultsSection,
+    logo: logoSection,
+    icon: iconSection,
+    name: nameSection,
+    links: linksSection,
+    mcp: mcpSection,
+    announcements: itemsSection(announcementItem),
+    disclaimer: itemsSection(disclaimerItem),
   },
 };
 
@@ -635,7 +974,7 @@ const validator = ajv.compile(seedSchema);
 // typo here : the second entry silently wins the upsert while the first is counted
 // as declared, so a prune would spare a record nobody can see in the file.
 function assertUniqueNames(doc) {
-  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels"]) {
+  for (const key of ["runners", "secret_stores", "credentials", "databases", "oauth2", "repositories", "syslog_servers", "notification_channels", "labels", "announcements"]) {
     const items = doc[key]?.items;
     if (!Array.isArray(items)) continue;
     const seen = new Set();
@@ -670,37 +1009,94 @@ function assertSingletonFlags(doc) {
     }
   }
   const byProvider = {};
+  // by the provider's type as stored (entraid and azuread are one), named as a file says it
   for (const item of doc.oauth2?.items || []) {
     if (!item.enable) continue;
-    (byProvider[item.provider] = byProvider[item.provider] || []).push(item.name);
+    const provider = fileValuesOf(storedValuesOf(item, OAUTH2_VALUES).object, OAUTH2_VALUES).provider;
+    (byProvider[provider] = byProvider[provider] || []).push(item.name);
   }
   for (const [provider, names] of Object.entries(byProvider)) {
     if (names.length > 1) {
       throw new Error(`Seed file enables more than one '${provider}' oauth2 provider: ${names.sort().join(", ")}`);
     }
   }
+  // one repository per object type (the schedules, the credentials ...) : the objects are written
+  // back to it, they cannot go to two
+  for (const flag of ONE_ONLY_FLAGS) {
+    const names = (doc.repositories?.items || []).filter((item) => item[flag]).map((item) => item.name);
+    if (names.length > 1) {
+      throw new Error(`Seed file declares ${flag} on more than one repository: ${names.sort().join(", ")}`);
+    }
+  }
+  // one disclaimer version of each number, one at most in force
+  const versions = (doc.disclaimer?.items || []).map((item) => item.version);
+  const twice = versions.filter((v, i) => versions.indexOf(v) !== i);
+  if (twice.length) throw new Error(`Seed file declares disclaimer version ${[...new Set(twice)].join(", ")} more than once`);
+  const enabled = (doc.disclaimer?.items || []).filter((item) => item.enabled).map((item) => item.version);
+  if (enabled.length > 1) throw new Error(`Seed file enables more than one disclaimer version: ${enabled.join(", ")}`);
+}
+
+/**
+ * The messages of a schema validation, one string : each error's path and message, the key an
+ * additionalProperties error is about named (ajv's own message does not say which one).
+ *
+ * Args:
+ *   errors (object[]): ajv's errors.
+ *
+ * Returns:
+ *   string: the messages, apart by ' ; '.
+ */
+export function schemaErrors(errors) {
+  return (errors || [])
+    .map((e) => {
+      // ajv's own message for additionalProperties is 'must NOT have additional
+      // properties', which does not say WHICH one - useless when the whole point of
+      // rejecting unknown keys is to point at the typo. The name is in params.
+      const extra = e.params?.additionalProperty ? ` '${e.params.additionalProperty}'` : "";
+      return `${e.instancePath || "/"} ${e.message}${extra}`;
+    })
+    .join(" ; ");
+}
+
+/**
+ * A validator of one item of a list section (credentials, runners ...), as the seed checks it :
+ * what the repository-backed objects check their files with (lib/repoObjects).
+ *
+ * Args:
+ *   section (string|object): the section (credentials), or an item's own schema (an LDAP
+ *     directory's, ldapDirectoryItem).
+ *
+ * Returns:
+ *   object: { validate (function : item => string[] of errors), keys (the item's fields, in
+ *     the schema's order), schema (its JSON schema) }.
+ */
+export function itemValidator(section) {
+  const schema = typeof section === "string" ? seedSchema.properties[section].properties.items.items : section;
+  const check = ajv.compile(schema);
+  return {
+    schema,
+    keys: Object.keys(schema.properties),
+    validate: (item) => (check(item) ? [] : [schemaErrors(check.errors)]),
+  };
 }
 
 // Validates the parsed seed document. Throws with every message combined, so one
 // restart tells the operator everything that is wrong instead of the first thing.
-export function validateSeed(doc) {
+// opts : { held, inDatabase } - the repositories holding the configuration's keys in the database
+// now and whether it is kept there, as the apply folds use_for_config with them (foldConfigFlag) :
+// a seed is refused only for what the apply would really give ; none (a fresh database) as before
+export function validateSeed(doc, opts = {}) {
   if (!validator(doc)) {
-    const details = (validator.errors || [])
-      .map((e) => {
-        // ajv's own message for additionalProperties is 'must NOT have additional
-        // properties', which does not say WHICH one - useless when the whole point of
-        // rejecting unknown keys is to point at the typo. The name is in params.
-        const extra = e.params?.additionalProperty ? ` '${e.params.additionalProperty}'` : "";
-        return `${e.instancePath || "/"} ${e.message}${extra}`;
-      })
-      .join(" ; ");
+    const details = schemaErrors(validator.errors);
     throw new Error(`Seed file validation failed: ${details}`);
   }
   // the deprecated awx: items count as runners for the cross-item rules, and the deprecated mail
   // keys of the settings as the channel and credential they become
   const folded = foldMailSettingsIntoChannel(foldAwxIntoRunners(doc)).doc;
-  assertUniqueNames(folded);
-  assertSingletonFlags(folded);
+  // a repository's use_for_config counts as the three flags it is now
+  const flags = foldConfigFlag(folded, opts.held || [], { inDatabase: !!opts.inDatabase }).doc;
+  assertUniqueNames(flags);
+  assertSingletonFlags(flags);
   return true;
 }
 

@@ -26,6 +26,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { reloadKeepingEdits } from '@/lib/keepEdits';
 import { askConfirm } from '@/lib/confirmPrompt';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -213,6 +214,8 @@ const { search, searching, matchingKeys, tableMatches, shownTabs, tabShown, sear
 });
 const shownFields = computed(() =>
   matchingKeys([
+    // one kept in a repository : where it comes from
+    ...repositorySourceFields(t, record.value),
     ['title', t('settings.disclaimer.title'), t('settings.disclaimer.titleHelp')],
     ['text', t('settings.disclaimer.text'), t('settings.disclaimer.textHelp')],
     ['checkbox', t('settings.disclaimer.checkbox'), t('settings.disclaimer.checkboxHelp')],
@@ -305,6 +308,8 @@ onMounted(async () => {
           >
             <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
           </h6>
+          <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+          <AppRepositorySource v-show="fieldShown('source')" :record="record" />
           <BsInput
             class="af-disclaimer-field"
             v-model="edit.title"

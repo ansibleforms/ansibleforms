@@ -551,11 +551,11 @@ const launchStoredJobId = ref(null);
 // Schedule off-canvas state
 const showScheduleOffcanvas = ref(false);
 const scheduleAction = ref('schedule'); // 'schedule' or 'run-later'
+// a schedule's cron, or a run later's moment (one_time_run)
 const scheduleForm = ref({
   name: '',
-  one_time_run: false,
   cron: '',
-  run_at: null,
+  one_time_run: null,
 });
 const scheduleSubmitting = ref(false);
 
@@ -1366,17 +1366,15 @@ function openScheduleOffcanvas(action = 'schedule') {
   if (action === 'schedule') {
     scheduleForm.value = {
       name: '',
-      one_time_run: false,
       cron: '0 0 * * *', // Default: daily at midnight
-      run_at: null,
+      one_time_run: null,
     };
   } else {
     // run-later
     scheduleForm.value = {
       name: '',
-      one_time_run: true,
       cron: '',
-      run_at: null,
+      one_time_run: null,
     };
   }
 
@@ -1397,15 +1395,15 @@ async function createSchedule() {
     return;
   }
 
-  // Ensure type is set based on action
-  scheduleForm.value.one_time_run = scheduleAction.value === 'run-later';
+  // run later : once, at its moment ; schedule : on its cron
+  const once = scheduleAction.value === 'run-later';
 
-  if (!scheduleForm.value.one_time_run && !scheduleForm.value.cron) {
+  if (!once && !scheduleForm.value.cron) {
     toast.warning(t('form.cronRequired'));
     return;
   }
 
-  if (scheduleForm.value.one_time_run && !scheduleForm.value.run_at) {
+  if (once && !scheduleForm.value.one_time_run) {
     toast.warning(t('form.runAtRequired'));
     return;
   }
@@ -1418,7 +1416,6 @@ async function createSchedule() {
 
     const scheduleData = {
       name: scheduleForm.value.name,
-      one_time_run: scheduleForm.value.one_time_run,
       form: currentForm.value.name,
       extra_vars: YAML.stringify(formdata.value),
       // the raw field values : a planned run is checked by the launch validation when it is
@@ -1429,11 +1426,11 @@ async function createSchedule() {
       planned: scheduleAction.value === 'run-later',
     };
 
-    // Add type-specific fields
-    if (!scheduleForm.value.one_time_run) {
+    // its timing : a cron, or the moment of its one run
+    if (!once) {
       scheduleData.cron = scheduleForm.value.cron;
     } else {
-      scheduleData.run_at = scheduleForm.value.run_at;
+      scheduleData.one_time_run = scheduleForm.value.one_time_run;
     }
 
     // Run later from a stored job : named, its last use is recorded when the run fires ; a
@@ -2620,7 +2617,7 @@ onBeforeUnmount(() => {
         <!-- the same picker as a schedule's and an announcement's (its time in the user's zone, sent
              as UTC) -->
         <BsDateTime
-          v-model="scheduleForm.run_at"
+          v-model="scheduleForm.one_time_run"
           icon="calendar"
           dateType="datetime"
           :convertToUtc="true"

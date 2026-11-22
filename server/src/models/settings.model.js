@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import yaml from "yaml";
 import Announcement from './announcement.model.js';
+import { keySources, composeConfig, writeConfigKeys, mergeIntoBase, withoutHeldKeys, isTemplate } from '../lib/configKeys.js';
 
 //mail object create
 var Settings=function(settings){
@@ -404,6 +405,31 @@ Settings.exportConfig = async function(){
   return "config.yaml exported successfully"
 }
 Settings.getActiveConfig = async function() {
+  // the roles, the categories and the constants a repository holds laid over the base
+  // configuration (lib/configKeys.js)
+  return composeConfig(await activeBaseText(), await keySources(), (file) => fs.readFileSync(file, 'utf8'))
+}
+/**
+ * Whether the configuration is a ytt template : its base (the database copy or the config file) or
+ * the file a repository holds a key in. Each is tested as it is written - the configuration shown
+ * is the base with each key as its file has it, a directive above a file's key not among them -
+ * so the designer and the editors go read only, and a save never writes the expansion over it.
+ *
+ * Returns:
+ *   Promise<boolean>: true when one of them is.
+ */
+Settings.isTemplated = async function() {
+  if (isTemplate(await activeBaseText())) return true
+  return (await keySources()).some((s) => s.exists && isTemplate(fs.readFileSync(s.path, 'utf8')))
+}
+/**
+ * The base configuration's text : the database copy when it serves the config, else the config
+ * file (a forms repository's config.yaml of before, or the local CONFIG_PATH).
+ *
+ * Returns:
+ *   Promise<string>: the text, '' when there is none.
+ */
+async function activeBaseText() {
   const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
 
@@ -423,6 +449,32 @@ Settings.saveActiveConfig = async function(yamlStr, options = {}) {
   if (!options.ignoreDesignerLock) await Settings.assertDesignerNotLocked()
   const settings = await Settings.findConfigYaml()
   const useDatabase = Settings.resolveConfigInDatabase(settings)
+
+  // the keys a repository holds : each written back to the file it was read from, as the text has
+  // it (its comments with it), the rest into the base configuration as the text has them too, a key
+  // the text no longer gives taken out of it ; only what changed is written (lib/configKeys.js). A
+  // ytt template is written as it is
+  const sources = await keySources()
+  if (sources.length && !isTemplate(yamlStr)) {
+    const doc = yaml.parse(yamlStr) || {}
+    // the configuration served now (its text : what the editor showed) ; one that cannot be read :
+    // every key is a change
+    let served
+    let servedText
+    try {
+      servedText = (await Settings.getActiveConfig()) || ''
+      served = yaml.parse(servedText) || {}
+    } catch {
+      served = undefined
+      servedText = undefined
+    }
+    // the base's text first : a change it refuses (a ytt template) refused before a file is written
+    const base = mergeIntoBase(await activeBaseText(), withoutHeldKeys(doc, sources), served, { text: yamlStr, servedText, held: sources.map((s) => s.key) })
+    await writeConfigKeys(doc, sources, { claim: true, served, text: yamlStr })
+    // none of the base's keys changed : nothing more to write
+    if (base === null) return
+    yamlStr = base
+  }
 
   if (useDatabase) {
     logger.info("Saving config to database")

@@ -13,7 +13,14 @@ import Errors from '../lib/errors.js';
 import { SECRET_MASK } from '../lib/secretMask.js';
 import { bump } from '../lib/epochs.js';
 import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
+import { USAGE_FLAGS, objectTypesOf, typeOf, USAGE_TYPES, normalizeUsageFlags } from '../lib/repoObjects/types.js';
+import { deprecationLines, CONFIG_KEYS } from '../lib/configKeys.js';
+import { uriCarriesSecret } from '../lib/repoObjects/secrets.js';
 import { releasedOperationsSql } from '../lib/repositoryClaims.js';
+
+// the flags of the object types : a repository's that turn on or off make it take the app's
+// objects, or let them go (lib/repoObjects/engine.js)
+const OBJECT_FLAGS = USAGE_TYPES.filter((t) => t.objects).map((t) => t.flag);
 
 // a repository claim older than this is released whatever its node says : no clone, pull or
 // sync runs for that long, so it is the remains of one that hung
@@ -113,6 +120,39 @@ function removeEmptyFolders(dir, keepSelf = false) {
 }
 
 /**
+ * The repository-backed objects (lib/repoObjects : the schedules, the credentials, the runners
+ * ... kept in a repository used for them), loaded when first needed : they import this model, so a
+ * static import would be a cycle.
+ *
+ * Returns:
+ *   Promise<object>: the RepoObjects engine.
+ */
+async function repoObjects() {
+  return (await import("../lib/repoObjects/index.js")).default
+}
+
+/**
+ * Reads a repository's object types into their tables once a clone made its working tree where
+ * there was none, under the claim the caller holds (lib/repoObjects/engine.js afterGit) : what
+ * every clone into a missing tree does, whichever operation made it (a clone, a Pull, a Push).
+ * An object whose file is not in the repository as cloned (deleted in git, or never pushed) is
+ * unlinked and kept in the app, never deleted nor written back ; a first clone takes the app's
+ * other objects of each type (activate).
+ *
+ * Args:
+ *   name (string): the repository.
+ *   repo (object): its record (its use_for_* flags).
+ *   activate (boolean): whether the clone takes the app's objects (its first clone).
+ *
+ * Returns:
+ *   Promise<string>: the lines for its output, '' when it holds no object type.
+ */
+async function objectsAfterFreshClone(name, repo, activate) {
+  if (!objectTypesOf(repo).length) return ""
+  return (await repoObjects()).afterGit(name, repo, { activate, reset: true })
+}
+
+/**
  * The forms model, loaded when first needed : it imports this model, so a static import would be
  * a cycle.
  *
@@ -124,9 +164,31 @@ async function formModel() {
 }
 
 /**
- * Repositories in the order they were added : by id, whatever order the rows come in - where
- * several of one usage are read in turn and the first one wins (the playbooks, the forms folders
- * - and with them a form name defined twice - and the first config.yaml of a forms repository).
+ * Repositories in one fixed order : by name, as the database's ORDER BY name compares them (case
+ * left aside), then exactly. Where several repositories of one usage are all read (the inventories,
+ * the workflows) the order is fixed here too : whatever order the rows come in, the same every
+ * time. Where the first one wins, sortedById.
+ *
+ * Args:
+ *   rows (object[]): the repositories ({ name, ... }).
+ *
+ * Returns:
+ *   object[]: a sorted copy.
+ */
+export function sortedByName(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    const x = String(a?.name ?? "")
+    const y = String(b?.name ?? "")
+    return x.localeCompare(y, "en", { sensitivity: "base" }) || (x < y ? -1 : x > y ? 1 : 0)
+  })
+}
+
+/**
+ * Repositories in the order they were added : by id, as 7.3 read them where several of one usage
+ * are read in turn and the first one wins (the forms folders - and with them a form name defined
+ * twice, the vars folder - the first config file, the playbooks). Its queries had no order, the
+ * database scanned the table by its primary key : the same repository keeps winning after an
+ * upgrade, and whatever order the rows come in, every time.
  *
  * Args:
  *   rows (object[]): the repositories ({ id, name, ... }).
@@ -182,11 +244,17 @@ class Repository extends CrudModel {
     if (!Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
-    // the branch it pulls and pushes is required, as its name ; the seed's own may leave it out
-    // (the remote's default)
-    if (!opts.fromSeed && !String(data.branch ?? "").trim()) {
+    // the branch it pulls and pushes is required, as its name ; the seed's own, and a
+    // repositories: entry (in the seed's format), may leave it out (the remote's default)
+    if (!opts.fromSeed && !opts.fromRepo && !String(data.branch ?? "").trim()) {
       throw new Errors.BadRequestError("Missing required field: branch");
     }
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories: entry)
+    normalizeUsageFlags(data);
+    // one repository at most per object type (the schedules, the credentials ...), and no usage of
+    // a later version
+    const objects = await repoObjects()
+    await objects.assertUsageAllowed(data, data.name, null);
     const insertId = await super.create(this.modelName, data, opts);
     // Don't await - clone happens in background (it can take minutes and the API has to
     // answer the create now). But the rejection must not escape: clone() throws before it
@@ -194,14 +262,32 @@ class Repository extends CrudModel {
     // output at all, the process-level handler in app.js only logged it, and the
     // repositories page showed a repository stuck blank with the reason nowhere the user
     // could reach. Record it where they are already looking.
-    Repository.clone(data.name).catch(async (e) => {
+    // the activation below takes the app's objects and says what it did : the clone only reads.
+    // Tracked until it is done : a pull whose repositories: entries made it waits for it (a while)
+    // before reading what names its content (lib/repoObjects/engine.js afterClones)
+    const done = Repository.clone(data.name, false, { activate: false }).catch(async (e) => {
       logger.error(`Background clone of '${data.name}' failed: ${helpers.getError(e)}`)
       try {
         await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [helpers.getError(e), data.name], { name: data.name })
       } catch (e2) {
         logger.error(`...and the failure could not be recorded on the repository either: ${helpers.getError(e2)}`)
       }
+    }).then(async () => {
+      // made the repository of object types (the schedules, the credentials ...) : once cloned, it
+      // takes the app's objects of each (activate), the clone just made read as it is
+      if (!objectTypesOf(data).length) return
+      try {
+        const report = await objects.afterUsageChange(null, data.name, data, { pull: false })
+        // a usage its activation turned off again (the repository busy) : the record read fresh
+        if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name: data.name })
+        // what it took, said after the clone's own lines : the create answered long ago, so the
+        // repository's page is where its admin reads it
+        await Repository.appendUsageReport(data.name, report)
+      } catch (e) {
+        logger.error(`Repository '${data.name}' could not take the objects of its usages: ${helpers.getError(e)}`)
+      }
     });
+    objects.trackClone(data.name, done);
     return insertId;
   }
 
@@ -218,14 +304,29 @@ class Repository extends CrudModel {
     if (data.name !== undefined && data.name !== name && !Repo.isValidName(data.name)) {
       throw new Errors.BadRequestError(`Invalid repository name: ${data.name}. Only letters, digits, dots, dashes and underscores, not starting with a dot.`);
     }
+    // its flags as they are stored (1 or 0), whoever writes it (the API, the seed, a repositories: entry)
+    normalizeUsageFlags(data);
+    // one repository at most per object type : turned on here while another one has it, refused ;
+    // a usage of a later version too
+    await (await repoObjects()).assertUsageAllowed(data, name, repo);
+    // one a repositories: entry holds : its uri goes to git, so it never carries a user or a token
+    if (repo.repository && !opts.fromRepo && uriCarriesSecret(data.uri)) {
+      throw new Errors.BadRequestError(`Repository '${name}' is kept in ${repo.repository}/${repo.repo_file}: its uri must not carry a user or a token, give it a credential instead`);
+    }
 
     // Remove empty fields - but a field the dialog can clear, sent empty, is cleared : its
     // schedule (Scheduled pull off) or its credential. Removed with the others, an empty
     // value left the old one in place, so a repository could never stop being pulled on
     // a schedule nor drop its credential.
-    const cleared = Repository.CLEARABLE.filter((key) => key in data && (data[key] === "" || data[key] === null));
+    // A repository's repositories: entry (opts.fromRepo) clears whatever its entry no longer declares,
+    // each to the value it gives (a description emptied, a column back to null).
+    const cleared = Object.fromEntries(
+      Object.keys(data)
+        .filter((key) => (opts.fromRepo || Repository.CLEARABLE.includes(key)) && (data[key] === "" || data[key] === null))
+        .map((key) => [key, opts.fromRepo ? data[key] : null]),
+    );
     helpers.removeEmptyFields(data);
-    for (const key of cleared) data[key] = null;
+    Object.assign(data, cleared);
     // moved to another address without its password typed again (controllers/v2/repository
     // guardRepositoryCredential) : the stored password stays behind, written empty
     if (opts.dropPassword) data.password = "";
@@ -257,6 +358,9 @@ class Repository extends CrudModel {
         const res = await super.update(this.modelName, data, repo.id, opts);
         // release the claim under the NEW name - the row carries it now
         await Repository.writeState("update AnsibleForms.`repositories` set status = ? where name = ?", [repo.status ?? null, newName])
+        // its objects (schedules, credentials ...) say they come from it under its new name
+        await (await repoObjects()).renameRepository(name, newName).catch((e) => logger.error(`The objects of repository '${name}' still name it so: ${helpers.getError(e)}`))
+        await Repository.afterUsageChange(repo, newName, opts)
         return res;
       } catch (e) {
         // Put the tree back. The row keeps the old name from here on, so a tree left at
@@ -275,7 +379,62 @@ class Repository extends CrudModel {
       }
     }
 
-    return super.update(this.modelName, data, repo.id, opts);
+    const res = await super.update(this.modelName, data, repo.id, opts);
+    await Repository.afterUsageChange(repo, name, opts);
+    return res;
+  }
+
+  /**
+   * Follows a repository made, or no longer, the repository of object types (the schedules, the
+   * credentials, the runners ...) : made one, it takes the app's objects of each ; no longer one,
+   * its objects are unlinked and stay in the app (lib/repoObjects/engine.js afterUsageChange, the
+   * repository pulled once). What it did is put in opts.report, by type, for the answer. A failure
+   * is logged, never thrown : the repository itself was saved. A usage whose activation the
+   * repository was too busy for is turned off again (said in the report) : its record read fresh.
+   *
+   * Args:
+   *   before (object): the repository as it was.
+   *   name (string): its name now.
+   *   opts (object): { report (an object the result is written to, by type) }.
+   *
+   * Returns:
+   *   Promise<object>: what it did, by type ({} when no flag changed).
+   */
+  static async afterUsageChange(before, name, opts = {}) {
+    try {
+      const flags = OBJECT_FLAGS.join(", ")
+      const rows = await mysql.do(`SELECT ${flags} FROM AnsibleForms.\`repositories\` WHERE name = ?`, [name])
+      const report = await (await repoObjects()).afterUsageChange(before, name, rows?.[0] || {}, { report: opts.report })
+      if (Object.values(report).some((r) => r.turnedOff)) Repository.evictCache({ name })
+      // what it did after the lines of the pull it ran : its page's last pull output tells it all
+      await Repository.appendUsageReport(name, report)
+      return report
+    } catch (e) {
+      logger.error(`The objects of repository '${name}' could not follow its usage: ${helpers.getError(e)}`)
+      return {}
+    }
+  }
+
+  /**
+   * Adds what turning a repository's usages on or off did (lib/repoObjects/engine.js
+   * usageReportText : the objects written, read in, kept, unlinked) to its last pull output, after
+   * the lines of the pull or clone it ran : its page shows the files the activation wrote, never
+   * only a pull saying they are not there. A failure is logged, never thrown.
+   *
+   * Args:
+   *   name (string): the repository.
+   *   report (object): what it did, by type (afterUsageChange's).
+   *
+   * Returns:
+   *   Promise<void>
+   */
+  static async appendUsageReport(name, report) {
+    try {
+      const text = await (await repoObjects()).usageReportText(report)
+      if (text) await Repository.writeState("update AnsibleForms.`repositories` set pull_output = CONCAT(COALESCE(pull_output, ''), ?) where name = ?", [text, name], { name })
+    } catch (e) {
+      logger.error(`What the usages of repository '${name}' did could not be added to its pull output: ${helpers.getError(e)}`)
+    }
   }
 
   // Override delete to cleanup disk
@@ -288,6 +447,20 @@ class Repository extends CrudModel {
     // managed guard has to be asked for explicitly - otherwise a seeded repository
     // would be refused an edit but still be deletable, which is worse than either.
     if (!opts.fromSeed) await CrudModel.assertNotManaged(this.modelName, repo.id);
+
+    // the repository of object types (the schedules, the credentials ...) : pulled once more, its
+    // files read in by the pull itself - before the claim below, which the pull takes too
+    const holds = objectTypesOf(repo).length > 0
+    let pulled = "not cloned"
+    if (holds && Repo.isValidName(name) && fs.existsSync(Repo.folderOf(name))) {
+      try {
+        await Repository.pull(name)
+        pulled = "pulled"
+      } catch (e) {
+        pulled = `not pulled: ${helpers.getError(e)}`
+        logger.warning(`Repository '${name}' could not be pulled before it is deleted, its working copy is read as it is: ${helpers.getError(e)}`)
+      }
+    }
 
     // Claim the repo BEFORE deleting the tree, exactly as reset() does and for the same
     // reason: this rm -rf's the working tree, which must not race a pull or a sync
@@ -303,6 +476,14 @@ class Repository extends CrudModel {
       throw new Error(`Repository '${name}' not found or already running, try again later`)
     }
     try {
+      // its objects unlinked - they stay in the app (the files in git are not touched) - only now
+      // the delete holds the claim : one refused (busy) never leaves them unlinked while the
+      // repository still holds them. Read in once more under that claim, never waiting for it
+      if (holds) {
+        const objects = await repoObjects()
+        const report = await objects.asHolding(name, () => objects.afterUsageChange(repo, name, {}, { report: opts.report, pull: false }))
+        for (const r of Object.values(report)) if (r.deactivated && !r.deactivated.pull) r.deactivated.pull = pulled
+      }
       // awaited : it was fire-and-forget, so a validateRepoName throw became an unhandled
       // rejection while the record was removed anyway
       await Repo.delete(name);
@@ -315,7 +496,8 @@ class Repository extends CrudModel {
     // findByName above populated `name:<name>` in the shared cache, and without the
     // eviction GET /api/v2/repository/<name> kept answering 200 with a deleted
     // repository.
-    return await Repository.writeState("DELETE FROM AnsibleForms.`repositories` WHERE name = ?", [name], { name, id: repo?.id });
+    const deleted = await Repository.writeState("DELETE FROM AnsibleForms.`repositories` WHERE name = ?", [name], { name, id: repo?.id });
+    return deleted;
   }
 
   static async findById(id) {
@@ -354,7 +536,9 @@ class Repository extends CrudModel {
     }
     try {
       await Repo.delete(name); // delete the repo on disk
-      await Repository.clone(name, true); // recreate it ; clone writes the final status
+      // recreate it ; clone writes the final status. The objects whose file is not in the
+      // remote (written by the app, never pushed) are unlinked and kept, never deleted
+      await Repository.clone(name, true, { reset: true });
     } catch (e) {
       // release the claim so a delete failure doesn't wedge the repo at 'running'
       await Repository.writeState("update AnsibleForms.`repositories` set pull_output = ?, pulled_at = NOW(), status = 'failed', pull_status = 'failed' where name = ?", [e.message, name], { name })
@@ -434,65 +618,45 @@ class Repository extends CrudModel {
   }
 
   static async getConfigPath() {
-  // No catch that answers "" - same reasoning as getFormsFolders above. "" means "use the
-  // local config file", so a database blip made every config write land in
-  // persistent/config.yaml while the repository copy kept being served, discarding the
-  // edit silently. Let it throw; the caller reports the real cause.
-  {
-    // First check for repositories with use_for_config enabled (new way since 6.1.0)
-    var configRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_config")
-    
-    if(configRepositories.length > 0){
-      // Found config repository/repositories
-      if(configRepositories.length > 1){
-        const repoNames = configRepositories.map(r => r.name).join(", ")
-        logger.warning(`Multiple repositories are marked as 'use_for_config': ${repoNames}. Only one should be enabled. Using first one: ${configRepositories[0].name}`)
-      }
-      
-      const repoPath = Repo.folderOf(configRepositories[0].name)
-      
-      const configPath = path.join(repoPath, "config.yaml")
-      if(fs.existsSync(configPath)){
-        logger.debug(`Found config.yaml in use_for_config repository: ${configRepositories[0].name}`)
-        return configPath
-      }
-
-      // Config repo exists but no config file found
-      logger.warning(`Repository '${configRepositories[0].name}' is marked as use_for_config but has no config.yaml`)
+    // No catch that answers "" - same reasoning as getFormsFolders above. "" means "use the
+    // local config file", so a database blip made every config write land in
+    // persistent/config.yaml while the repository copy kept being served, discarding the
+    // edit silently. Let it throw; the caller reports the real cause.
+    const foundConfigs = (await Repository.getConfigCandidates()).filter((c) => fs.existsSync(c.path))
+    if (foundConfigs.length === 0) {
       return ""
     }
-    
-    // Fall back to old behavior: check use_for_forms repositories (backwards compatibility) ;
-    // in the order they were added : the first one holding a config.yaml wins, the same one every time
-    var repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
-  }
-  
-  if(repositories.length === 0){
-    return ""
-  }
-  
-  var foundConfigs = []
-  
-  // Loop through all form repositories to find config files
-  for(const repo of repositories){
-    var repoPath = Repo.folderOf(repo.name)
-    
-    const configPath = path.join(repoPath, "config.yaml")
-    if(fs.existsSync(configPath)){
-      foundConfigs.push({ repo: repo.name, path: configPath })
+    if (foundConfigs.length > 1) {
+      const configList = foundConfigs.map(c => `${c.repo}/${path.basename(c.path)}`).join(", ")
+      logger.warning(`Multiple config files found in repositories: ${configList}. Using first one: ${foundConfigs[0].repo}/${path.basename(foundConfigs[0].path)}`)
     }
-  }
-  
-  if(foundConfigs.length === 0){
-    return ""
-  }
-  
-  if(foundConfigs.length > 1){
-    const configList = foundConfigs.map(c => `${c.repo}/${path.basename(c.path)}`).join(", ")
-    logger.warning(`Multiple config files found in repositories: ${configList}. Using first one: ${foundConfigs[0].repo}/${path.basename(foundConfigs[0].path)}`)
-  }
-  
     return foundConfigs[0].path
+  }
+
+  /**
+   * The files the base configuration may be served from (getConfigPath), in the order they are
+   * tried : the config.yaml of every forms repository, in the order they were added (the 7.3
+   * layout, kept for backwards compatibility) ; none when a repository holds the roles, the
+   * categories or the constants, then the base is the local CONFIG_PATH (or the database copy).
+   * One not there yet is a candidate too : made, it would be served. The designer's explorers and
+   * its forms save never write one (lib/repoObjects/ownedPaths.js).
+   *
+   * Returns:
+   *   Promise<object[]>: [{ repo (its repository), path (absolute) }].
+   *
+   * Raises:
+   *   Error: the repositories could not be read (never answered as "none", see getConfigPath).
+   */
+  static async getConfigCandidates() {
+    // The roles, the categories and the constants : each from its own repository (use_for_roles,
+    // use_for_categories, use_for_constants, lib/configKeys.js), laid over the base configuration -
+    // which then is the local CONFIG_PATH (or the database copy), never a repository's file
+    const keyRepositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_roles OR use_for_categories OR use_for_constants ORDER BY name")
+    if (keyRepositories.length > 0) return []
+    // Fall back to old behavior: the use_for_forms repositories (backwards compatibility), in the
+    // order they were added : the first one holding a config.yaml wins, the same one every time
+    const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
+    return repositories.map((repo) => ({ repo: repo.name, path: path.join(Repo.folderOf(repo.name), "config.yaml") }))
   }
 
   // Return the forms folder of every forms repository, with the repository
@@ -512,9 +676,8 @@ class Repository extends CrudModel {
     //
     // Failing loudly is the only honest answer, and it is the rule this codebase already
     // applies to health.model's authenticationFacts.
-    //
-    // In the order they were added (sortedById) : a form name defined in two of them resolves to
-    // the first one's copy, every time - the query had no ORDER BY, so it was the database's.
+    // in the order they were added : a form name defined in two of them resolves to the first one's,
+    // every time
     const repositories = sortedById(await mysql.do("SELECT id, name FROM AnsibleForms.`repositories` WHERE use_for_forms ORDER BY id"))
 
     return repositories.map(repo => {
@@ -614,7 +777,7 @@ class Repository extends CrudModel {
   static async getInventoryRoots() {
     const local = { repository: null, root: appConfig.inventoryPath }
     try {
-      const repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name")
+      const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_inventories ORDER BY name"))
       return [local, ...repositories.filter((repo) => Repo.isValidName(repo.name)).map((repo) => ({ repository: repo.name, root: Repo.folderOf(repo.name) }))]
     } catch (e) {
       logger.error("Failed to get the inventories repositories: ", e)
@@ -628,7 +791,7 @@ class Repository extends CrudModel {
   static async getWorkflowsRoots() {
     const local = { repository: null, root: appConfig.workflowsPath }
     try {
-      const repositories = await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_workflows ORDER BY name")
+      const repositories = sortedByName(await mysql.do("SELECT name FROM AnsibleForms.`repositories` WHERE use_for_workflows ORDER BY name"))
       return [local, ...repositories.filter((repo) => Repo.isValidName(repo.name)).map((repo) => ({ repository: repo.name, root: Repo.folderOf(repo.name) }))]
     } catch (e) {
       logger.error("Failed to get the workflows repositories: ", e)
@@ -666,8 +829,18 @@ class Repository extends CrudModel {
   // when claimed=true the caller already holds the atomic status='running' lock
   // (e.g. reset, which must claim before it deletes the tree) ; this avoids a
   // double-claim that would otherwise fail its own guard (issue #414)
-  static async clone(name, claimed = false) {
+  //
+  // opts.activate (default true) : its first clone - no working tree before it - takes the app's
+  // objects of the types it holds (lib/repoObjects/engine.js afterGit), so a repository that was
+  // not cloned when its usage was turned on takes them once it is ; false when the caller
+  // activates it itself. opts.reset : cloned again by a reset. A reset, as any clone where there
+  // was no working tree (one that was gone, a reset whose clone failed), reads the files as cloned
+  // again : an object whose file is not there may never have been pushed, it is unlinked and kept
+  // in the app, never deleted
+  static async clone(name, claimed = false, opts = {}) {
     var output, status, head, repo
+    const fresh = Repo.isValidName(name) && !fs.existsSync(Repo.folderOf(name))
+    const first = !claimed && opts.activate !== false && fresh
     if (!claimed) {
       // the settings' Pull runs a clone, which pulls a repository already cloned
       // (Repo.clone) : the same rule as a pull (assertNoLocalChanges). A reset deletes
@@ -686,9 +859,16 @@ class Repository extends CrudModel {
       output = await Repo.clone(repo.uri, name, branch, Repository.gitAuth(repo))
       if (repo.use_for_forms) {
         output += await Repository.seedFormsRepo(name)
-        // a form name it shares with another forms repository : which copy is used, which skipped
-        output += await (await formModel()).duplicateLines(name)
       }
+      // its object types read into their tables, still under the claim ; its first clone takes
+      // the app's objects of each, a clone into a missing tree (or a reset) reads them as cloned
+      // again (objectsAfterFreshClone)
+      if (fresh || opts.reset) output += await objectsAfterFreshClone(name, repo, first)
+      else if (objectTypesOf(repo).length) output += await (await repoObjects()).afterGit(name, repo, { activate: false, reset: false })
+      // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
+      output += await deprecationLines(name)
+      // a form name it shares with another forms repository : which copy is used, which skipped
+      output += await (await formModel()).duplicateLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -755,8 +935,15 @@ class Repository extends CrudModel {
       // its credential : what the pull signs in with, and the password masked in the output
       if (pullRepo) pullRepo = await Repository.withCredential(pullRepo).catch(() => pullRepo)
       output = await Repo.pull(name, Repository.gitAuth(pullRepo), pullRepo?.uri)
+      // its schedules: entries read into the schedule table, still under the claim : what changed
+      // is said under git's output
+      if (objectTypesOf(pullRepo).length) {
+        output += await (await repoObjects()).afterGit(name, pullRepo)
+      }
+      // its configuration keys read from config.yaml : deprecated, said (lib/configKeys.js)
+      output += await deprecationLines(name)
       // a form name it shares with another forms repository : which copy is used, which skipped
-      if (pullRepo?.use_for_forms) output += await (await formModel()).duplicateLines(name)
+      output += await (await formModel()).duplicateLines(name)
       status = "success"
     } catch (e) {
       output = e.message
@@ -806,25 +993,53 @@ class Repository extends CrudModel {
 
   // the repository that holds config.yaml (categories/roles/constants) ; config
   // is written to and pushed from there. Returns null when config is local.
+  // With the roles, the categories and the constants each in a repository of their own
+  // (lib/configKeys.js), the first of them the designer writes : the categories', the
+  // constants', then the roles'.
   static async getConfigRepoName() {
     const configPath = await Repository.getConfigPath()
-    return configRepoFromPath(configPath, appConfig.repoPath)
+    return configRepoFromPath(configPath, appConfig.repoPath) || (await Repository.findKeyRepositories())[0]?.name || null
+  }
+
+  /**
+   * The repositories holding the roles, the categories or the constants (lib/configKeys.js) : a
+   * designer save writes those keys into them, so they are pushed from the designer as the forms
+   * repositories are.
+   *
+   * Returns:
+   *   Promise<object[]>: [{ name, status, head }], the categories' first, then the constants',
+   *     then the roles' ; none when no repository holds them (or they cannot be read).
+   */
+  static async findKeyRepositories() {
+    try {
+      // the roles last : the admin's, the designer saves them unchanged
+      const flags = [...CONFIG_KEYS.filter((k) => k.key !== "roles"), ...CONFIG_KEYS.filter((k) => k.key === "roles")].map((k) => k.flag)
+      const rows = sortedByName(await mysql.do(`SELECT name,status,head,${flags.join(",")} FROM AnsibleForms.\`repositories\` WHERE ${flags.join(" OR ")} ORDER BY name`))
+      // by the key, then by name : the one the designer writes the most first
+      return flags.flatMap((flag) => rows.filter((r) => Number(r[flag]))).filter((r, i, all) => all.findIndex((x) => x.name === r.name) === i).map(({ name, status, head }) => ({ name, status, head }))
+    } catch (e) {
+      logger.error("Failed to get the repositories of the roles, the categories and the constants: ", e)
+      return []
+    }
   }
 
   // the repositories the designer can push to : the forms repos plus the
-  // config-origin repo when config lives in a separate use_for_config repo, so
-  // config edits made in the designer can be committed and flagged as unpushed
+  // config-origin repo when config lives in a separate use_for_config repo, and the
+  // repositories holding the roles, the categories or the constants, so config edits
+  // made in the designer can be committed and flagged as unpushed
   static async findPushableRepositories() {
     const repos = await Repository.findFormsRepositories()
-    const configRepo = await Repository.getConfigRepoName()
-    if (configRepo && !repos.some(r => r.name === configRepo)) {
+    const add = (r) => { if (r && !repos.some(x => x.name === r.name)) repos.push(r) }
+    const configRepo = configRepoFromPath(await Repository.getConfigPath(), appConfig.repoPath)
+    if (configRepo) {
       try {
         const cfg = await mysql.do("SELECT name,status,head FROM AnsibleForms.`repositories` WHERE name = ?", [configRepo])
-        if (cfg.length) repos.push(cfg[0])
+        add(cfg[0])
       } catch (e) {
         logger.error("Failed to add config repository to the pushable set: ", e)
       }
     }
+    for (const r of await Repository.findKeyRepositories()) add(r)
     return repos
   }
 
@@ -1023,18 +1238,29 @@ class Repository extends CrudModel {
       syncRepo = await Repository.withCredential(await Repository.findByName(name))
       // a forms repo (read+write forms) or the config-origin repo (so config
       // edits can be committed even when config lives in a separate repo)
-      if (!syncRepo.use_for_forms && !syncRepo.use_for_config && !syncRepo.use_for_playbooks && !syncRepo.use_for_workflows && !syncRepo.use_for_inventories) {
-        throw new Error(`Repository '${name}' is not a forms, config, playbooks, workflows or inventories repository`)
+      if (!USAGE_FLAGS.some((flag) => !!Number(syncRepo[flag] ?? 0))) {
+        throw new Error(`Repository '${name}' is used for nothing the app writes to (forms, config, playbooks, workflows, inventories, or objects such as schedules)`)
       }
       const repoDir = Repo.folderOf(name)
+      let cloned = ""
       if (!fs.existsSync(repoDir)) {
-        // first sync : clone it (an empty remote repository is fine)
-        await Repo.clone(syncRepo.uri, name, syncRepo.branch || undefined, Repository.gitAuth(syncRepo))
+        // first sync : clone it (an empty remote repository is fine), its objects read as every
+        // clone into a missing tree reads them (objectsAfterFreshClone) before anything is
+        // committed : a file deleted in git is never pushed back, the app's other objects go too
+        cloned = await Repo.clone(syncRepo.uri, name, syncRepo.branch || undefined, Repository.gitAuth(syncRepo))
+        cloned = `${cloned || ""}${await objectsAfterFreshClone(name, syncRepo, true)}`
       }
       // bind the new staged forms to this repository before committing (only a
       // forms repo receives staged forms ; a config-only repo just pushes config)
       if (syncRepo.use_for_forms) Repository.flushStagingInto(name)
-      output = await Repo.sync(name, message || `Forms sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
+      // a repository that only holds objects (schedules, credentials ...) says which in its commit
+      const objects = objectTypesOf(syncRepo).map((key) => typeOf(key).label)
+      const what = !syncRepo.use_for_forms && objects.length ? objects.join(", ").replace(/^./, (c) => c.toUpperCase()) : "Forms"
+      output = (cloned ? `${cloned}\n` : "") + await Repo.sync(name, message || `${what} sync by ${triggeredBy || "AnsibleForms"}`, Repository.gitAuth(syncRepo), syncRepo.uri)
+      // its rebase on the remote brings git's edits and deletes of its object files : read in
+      // still under the claim, as a pull reads them - left unread, the next app edit would write a
+      // file deleted in git back, and the next Push resurrect it (a fresh clone was read already)
+      if (!cloned && objectTypesOf(syncRepo).length) output += await (await repoObjects()).afterGit(name, syncRepo)
       status = "success"
     } catch (e) {
       output = e.message

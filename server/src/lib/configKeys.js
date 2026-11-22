@@ -1,0 +1,853 @@
+'use strict';
+// The base configuration's keys a repository may hold, one usage type each (lib/repoObjects/types.js)
+// : the roles (use_for_roles, Access), the categories and the constants (use_for_categories,
+// use_for_constants, Designer), one repository at most each. Each key is read on its own from its
+// type's repository : from the file that gives it at its top level (controller_roles:,
+// controller_categories:, controller_constants:), any name, any folder
+// (lib/repoObjects/repoFiles.js) - two files giving it are not
+// read, both named ; its own file at the root (roles.yaml) without the key is read and refused,
+// never the base's served in its place - else from the config.yaml of before at its root, which
+// may leave it out, its keys plain there (roles:, categories:, constants:)
+// (deprecated since 7.8.0, no longer read in 8.0.0 : said in the server log once per load, in the
+// repository's pull output and on its page), and written back to the file it was read from -
+// config.yaml stays config.yaml until it is moved - or a new one of its own (roles.yaml ...).
+//
+// A key no repository holds comes from where the base configuration comes from (the database copy,
+// the CONFIG_PATH file : models/form.model.js getBaseConfig, models/settings.model.js) : the keys of
+// the repositories are laid over it.
+import fs from "fs";
+import path from "path";
+import YAML from "yaml";
+import logger from "./logger.js";
+import Errors from "./errors.js";
+import mysql from "../models/db.model.js";
+import Repo from "../models/repo.model.js";
+import _ from "lodash";
+import { updateMapFile, newMapFile, editedText, parseDocument, keptAsParsed, writtenText, editListEntry, appendListEntries, removeListEntry } from "./repoObjects/yamlFile.js";
+import { servedRoles, missingReferences } from "./configRoles.js";
+import { scanRepository } from "./repoObjects/repoFiles.js";
+import { fileKeyOf, typeKeyOf } from "./repoObjects/types.js";
+
+// ===========================================================================
+// THE KEYS
+// ===========================================================================
+
+// each key : its usage type, its flag, the file a repository giving it nowhere gets on the first write
+// ... and what its value is : a list (roles, categories) or a dictionary (constants)
+// ... and, for the roles, what is served when its file is not read (broken, or its repository not
+// cloned) and was never read on this node (closed) : the local admins' admin role only - never the base configuration's roles, which the
+// repository's replaced and may grant more than they do (composeConfig). The default role every
+// user has goes with it, without groups and without options (nothing more than the app's defaults) :
+// the base schema (schema/base_schema.json) requires it, a set without it fails the validation of
+// the whole configuration (every forms list and configuration load refused, the admins' included)
+export const CLOSED_ROLES = Object.freeze([
+  Object.freeze({ name: "admin", groups: Object.freeze(["local/admins"]) }),
+  Object.freeze({ name: "default", groups: Object.freeze([]) }),
+]);
+export const CONFIG_KEYS = [
+  // the roles : each checked on its own, and spread over as many files as the repository likes
+  // (multi : lib/configRoles.js) ; the categories and the constants : one file each
+  { key: "roles", flag: "use_for_roles", file: "roles.yaml", list: true, closed: CLOSED_ROLES, multi: true },
+  { key: "categories", flag: "use_for_categories", file: "categories.yaml", list: true },
+  { key: "constants", flag: "use_for_constants", file: "constants.yaml", list: false },
+];
+
+// the one file the three keys were in before (use_for_config) : still read, deprecated
+export const LEGACY_FILE = "config.yaml";
+
+/**
+ * The top-level key a key's file gives it by : controller_ and the key (controller_roles), the
+ * plain key in config.yaml of before (roles).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string: the key, as its file writes it.
+ */
+export const fileKeyIn = (source) => (source.deprecated ? source.key : fileKeyOf(source.key));
+
+// a ytt template : a line starting (after spaces) with #@, the test the settings pages, the
+// designer and the health page use
+const YTT_DIRECTIVE = /^\s*#@/m;
+
+/**
+ * Whether a configuration's text is a ytt template.
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   boolean: true when a line of it is a ytt directive.
+ */
+export const isTemplate = (text) => YTT_DIRECTIVE.test(String(text ?? ""));
+
+/**
+ * Where each key held by a repository is : its repository, the file it is read from (the one giving
+ * it at its top level, any name, any folder ; else its own file at the root - roles.yaml - when it
+ * is there without the key, read and refused, never the base's in its place ; else config.yaml at
+ * its root, which may leave it out),
+ * whether that file is config.yaml (deprecated), whether it exists yet (a repository with neither
+ * gets a file of its own on the first write : roles.yaml ...), and the files when several give it
+ * (not read : keyFileProblem). A key no repository holds is not listed : the base configuration
+ * gives it. A key whose repository is not cloned (a clone that failed, or is under way) is listed as
+ * missing : not read (its value last read on this node is served meanwhile, else the base's, the
+ * roles closed : composeConfig), and a save of it refused (assertKeysWritable), never written to
+ * the base in its place.
+ *
+ * Returns:
+ *   Promise<object[]>: [{ key, flag, file (relative to the repository), repository, path,
+ *     deprecated, exists, missing, several (the files giving it, when more than one), notGiving
+ *     (its own file there, giving no key : refused) }].
+ */
+export async function keySources() {
+  const rows = await mysql.do(`SELECT name, ${CONFIG_KEYS.map((k) => k.flag).join(", ")} FROM AnsibleForms.\`repositories\` ORDER BY name`);
+  const out = [];
+  const scans = new Map();
+  for (const k of CONFIG_KEYS) {
+    const repo = (rows || []).find((r) => Number(r[k.flag]) && Repo.isValidName(r.name));
+    if (!repo) continue;
+    const dir = Repo.folderOf(repo.name);
+    if (!fs.existsSync(dir)) {
+      out.push({ ...k, repository: repo.name, path: path.join(dir, k.file), deprecated: false, exists: false, missing: true });
+      continue;
+    }
+    // the repository's files, read once for its keys
+    if (!scans.has(repo.name)) scans.set(repo.name, scanRepository(dir));
+    const scan = scans.get(repo.name);
+    // the files giving it (or one that cannot be read, its lines seeming to give it), config.yaml
+    // of before (its plain keys) only when none does
+    // ... or one giving it with a value of another shape (refused when read : keyDocument)
+    const own = [...scan.holding(k.key).map((f) => f.file), ...scan.hinted(k.key).map((u) => u.file), ...scan.misfit(k.key)].sort();
+    const named = path.join(dir, k.file);
+    const legacy = path.join(dir, LEGACY_FILE);
+    if (own.length) {
+      // the roles from each file giving them (files) ; another key from one file at most
+      const spread = own.length > 1 ? (k.multi ? { files: own } : { several: own }) : {};
+      out.push({ ...k, file: own[0], repository: repo.name, path: path.join(dir, own[0]), deprecated: false, exists: true, ...spread });
+    } else if (fs.existsSync(named)) {
+      // no file gives it, but its own file is there (a typo in its key, a plain map) : read, and
+      // not taken (keyDocument) - never the base's in its place, the roles closed
+      out.push({ ...k, repository: repo.name, path: named, deprecated: false, exists: true, notGiving: true });
+    } else if (fs.existsSync(legacy)) out.push({ ...k, file: LEGACY_FILE, repository: repo.name, path: legacy, deprecated: true, exists: true });
+    else out.push({ ...k, repository: repo.name, path: named, deprecated: false, exists: false });
+  }
+  return out;
+}
+
+/**
+ * The deprecation notice of a key read from config.yaml.
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string: the notice.
+ */
+export const deprecationNotice = (source) =>
+  `${source.key} read from ${LEGACY_FILE}: deprecated, move them to a file of their own (${fileKeyOf(source.key)}: in any file, ${CONFIG_KEYS.find((k) => k.key === source.key)?.file || `${source.key}.yaml`} for instance ; ${LEGACY_FILE} is no longer read in 8.0.0)`;
+
+/**
+ * The keys of a repository read from config.yaml, for its pull output and its page.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<object[]>: [{ key, file, notice }] ; none when it reads none from config.yaml.
+ */
+export async function repositoryDeprecations(name) {
+  // file : the file of its own it may move to (roles.yaml ...)
+  return (await keySources()).filter((s) => s.repository === name && s.deprecated).map((s) => ({ key: s.key, file: CONFIG_KEYS.find((k) => k.key === s.key).file, notice: deprecationNotice(s) }));
+}
+
+/**
+ * The lines a repository's pull output says of its keys read from config.yaml, and of its key files
+ * that are not read (repositoryKeyProblems).
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<string>: the lines, starting with a newline ; '' for none.
+ */
+export async function deprecationLines(name) {
+  try {
+    const problems = (await repositoryKeyProblems(name)).map((p) => `\nNot read: ${p.file}: ${p.reason} - the ${p.key} last read from it (else ${meanwhile(p.key)}) are used until it is fixed`);
+    const notices = (await repositoryKeyNotices(name)).map((line) => `\nRoles: ${line}`);
+    return (await repositoryDeprecations(name)).map((d) => `\nDeprecated: ${d.notice}`).join("") + problems.join("") + notices.join("");
+  } catch (e) {
+    logger.debug(`Could not read the configuration keys of repository '${name}': ${e.message}`);
+    return "";
+  }
+}
+
+// ===========================================================================
+// ONE KEY OF A FILE, AS IT IS WRITTEN
+// ===========================================================================
+
+// the plain key of a map's pair
+const keyOf = (pair) => (YAML.isScalar(pair.key) ? pair.key.value : pair.key);
+
+/**
+ * A YAML document's text, parsed as a map : an empty text (or one of comments only) is an empty
+ * map.
+ *
+ * Args:
+ *   text (string): the text.
+ *
+ * Returns:
+ *   YAML.Document: the document, its contents a map.
+ *
+ * Raises:
+ *   Error: not valid YAML, or not a map.
+ */
+function mapDocument(text) {
+  const doc = parseDocument(text);
+  if (doc.errors.length) throw new Error(`not valid YAML: ${doc.errors[0].message}`);
+  if (doc.contents === null || doc.contents === undefined) doc.contents = doc.createNode({});
+  if (!YAML.isMap(doc.contents)) throw new Error("not a YAML dictionary");
+  return doc;
+}
+
+/**
+ * A text with one key as another text has it, as written there : its value with its comments, the
+ * comment above it ; the rest of the text kept line for line (yamlFile.js editedText). The
+ * configuration shown is the base with each repository's key as its file writes it, and a key
+ * saved from that text is written to its file with the comments it was given.
+ *
+ * The text written always reads as the text with that key's value : a value naming an anchor
+ * outside it (constants: &admins ... roles: groups: *admins), or an anchor of the text that goes
+ * with its old value, is laid as the value it reads as instead (its comments lost) ; the whole
+ * text so read, its keys in their order, when its own aliases still name the value it loses.
+ *
+ * Args:
+ *   text (string): the text to change.
+ *   key (string): the key, as the text writes it (roles in the configuration, controller_roles in
+ *     a key's file).
+ *   from (YAML.Document): the document that gives it (mapDocument).
+ *   fromKey (string): the key as `from` writes it ; the same when not given.
+ *   written (boolean): true (a key saved into a file) : its lists and maps written in block style
+ *     ("- " items, one key a line), whatever style `from` gives them ; false (the configuration
+ *     shown) : as `from` writes them.
+ *
+ * Returns:
+ *   string: the text, as it is when `from` has no such key.
+ *
+ * Raises:
+ *   Error: the text is not valid YAML, or not a map.
+ */
+function withKeyOf(text, key, from, fromKey = key, written = true) {
+  const pair = from.contents.items.find((p) => keyOf(p) === fromKey);
+  if (!pair) return text;
+  const original = String(text ?? "");
+  // what the text must read as : its keys, that one's value the one `from` reads as
+  const wanted = { ...(mapDocument(original).toJS() || {}), [key]: (from.toJS() || {})[fromKey] };
+  const laid = (valueOf) => {
+    const doc = mapDocument(original);
+    const value = valueOf(doc);
+    const there = doc.contents.items.find((p) => keyOf(p) === key);
+    if (there) {
+      there.value = value;
+      // the comment above the key : the one of the text it comes from, when it has one
+      if (YAML.isNode(pair.key) && pair.key.commentBefore) {
+        if (!YAML.isNode(there.key)) there.key = doc.createNode(there.key);
+        there.key.commentBefore = pair.key.commentBefore;
+      }
+    } else {
+      // the key as the text writes it, the comment above it kept
+      const newKey = YAML.isNode(pair.key) ? pair.key.clone() : doc.createNode(key);
+      if (YAML.isScalar(newKey)) newKey.value = key;
+      doc.contents.items.push(doc.createPair(newKey, value));
+    }
+    // shown : its flow lists and maps as `from` writes them ; saved : in block style (editedText)
+    if (!written) keptAsParsed(doc, value);
+    return original.trim() ? editedText(doc, original) : writtenText(doc);
+  };
+  const readsAsWanted = (out) => {
+    const doc = YAML.parseDocument(out);
+    return !doc.errors.length && _.isEqual(doc.toJS(), wanted);
+  };
+  // its node as written, then the value it reads as
+  const values = [() => (YAML.isNode(pair.value) ? pair.value.clone() : pair.value), (doc) => doc.createNode(wanted[key])];
+  for (const valueOf of values) {
+    try {
+      const out = laid(valueOf);
+      if (readsAsWanted(out)) return out;
+    } catch {
+      // an alias left without its anchor : the next way
+    }
+  }
+  return YAML.stringify(wanted, { lineWidth: 0 });
+}
+
+/**
+ * Whether a key's value is the one served now : such a key is not written (a file is never
+ * rewritten for nothing, a ytt template never turned into its expansion), nor refused.
+ *
+ * Args:
+ *   doc (object): the configuration saved.
+ *   key (string): the key.
+ *   served (object|undefined): the configuration served now ; none : every key is a change.
+ *
+ * Returns:
+ *   boolean: true when it is unchanged.
+ */
+const unchanged = (doc, key, served) => served !== undefined && served !== null && _.isEqual(doc?.[key], served?.[key]);
+
+/**
+ * A key as a text writes it : the comment above it, the key and its value with their comments ;
+ * what tells a key left as it was served in the editor from one whose comments were changed.
+ *
+ * Args:
+ *   doc (YAML.Document): the text's document (mapDocument).
+ *   text (string): the text.
+ *   key (string): the key.
+ *
+ * Returns:
+ *   string|null: its text ; null when the text has no such key, or its place is not known.
+ */
+function keyText(doc, text, key) {
+  const pair = doc.contents.items.find((p) => keyOf(p) === key);
+  if (!pair || !YAML.isNode(pair.key) || !pair.key.range) return null;
+  const end = YAML.isNode(pair.value) && pair.value.range ? pair.value.range[2] : pair.key.range[2];
+  return `${pair.key.commentBefore ?? ""}\n${String(text).slice(pair.key.range[0], end)}`;
+}
+
+// ===========================================================================
+// READ : THE KEYS LAID OVER THE BASE CONFIGURATION
+// ===========================================================================
+
+// the document of each key file last read whole ({ doc, key : the key as it writes it }), by its
+// path and its key (a config.yaml of before gives several keys, each read and checked on its own) : a file broken in git afterwards keeps its
+// keys as they were (composeConfig) ; and what was last said of a file that is not read
+const lastRead = new Map();
+const reported = new Map();
+const readKey = (source) => `${source.path}\n${source.key}`;
+// ... and the document each key was last read as from its repository, whichever of its files gave
+// it : a key whose file is gone afterwards (deleted or renamed in git), or whose repository is no
+// longer cloned (a reset re-cloning it, a clone failing), keeps it as it was (composeConfig)
+const lastHeld = new Map();
+const heldKey = (source) => `${source.repository}\n${source.key}`;
+
+/**
+ * Forgets every key file read on this node and what was said of them, as a node just started : for
+ * the tests, each of which starts from repositories of its own.
+ */
+export function resetKeyReadsForTests() {
+  lastRead.clear();
+  lastHeld.clear();
+  lastRoles.clear();
+  reported.clear();
+}
+
+/**
+ * Why a key a repository holds is not there to read : its repository not cloned (a clone failed,
+ * or one under way, a reset re-cloning it), or no file giving it any more after it was read on this
+ * node (deleted, or its key taken out, in git). A repository that never gave its file on
+ * this node has none : its key is served from the base configuration until a save writes the file
+ * (the base's value is the one in force when the flag is set ; a node cannot tell a file deleted
+ * before it started from one never written).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string|null: why, null when its file is there, or never was on this node.
+ */
+const absentProblem = (source) => {
+  if (source.missing) return "its repository is not cloned";
+  if (!source.exists && lastHeld.has(heldKey(source))) return `no file of its repository gives ${fileKeyOf(source.key)}: any more`;
+  return null;
+};
+
+/**
+ * What a key whose file is not read, and was never read on this node, is served as : the roles
+ * closed (the local admins' admin role only), the others the base configuration's.
+ *
+ * Args:
+ *   key (string): the key.
+ *
+ * Returns:
+ *   string: said in the server log and the pull output.
+ */
+const meanwhile = (key) => (CONFIG_KEYS.find((k) => k.key === key)?.closed ? "only the admin role of local/admins" : "those of the base configuration");
+
+/**
+ * The base configuration with the keys of the repositories laid over it.
+ *
+ * Args:
+ *   baseText (string): the base configuration's text (the database copy, the CONFIG_PATH file).
+ *   sources (object[]): the keys' sources (keySources).
+ *   render (function): (file) => its text (the file read, or rendered with ytt).
+ *
+ * Returns:
+ *   string: the configuration's text : the base's, each key a repository holds as its file writes
+ *     it (its comments, a ytt directive among them, kept), the base's other lines as they are ; the
+ *     base as it is when no key comes from a repository. A key file that is not read (not valid
+ *     YAML, not a dictionary, its key not a list or a dictionary as it should be), or that is not
+ *     there to read (its repository not cloned, its file gone after it was read : absentProblem),
+ *     gives its key as it was last read on this node (from that file, else from its repository),
+ *     else the base's - the roles closed instead (the local admins' admin role only : a node
+ *     started while the file is broken or the repository not cloned never grants the base's roles
+ *     the repository replaced, which the base keeps since a save never takes a held key out of it)
+ *     : said, never a failure of the whole configuration. The categories and the constants, which
+ *     grant nothing, follow the same rule with the base's as their last resort.
+ */
+export function composeConfig(baseText, sources, render) {
+  // the files there, and the keys whose file is not there to read although it should be (absentProblem)
+  const laid = sources.filter((s) => s.exists || absentProblem(s));
+  if (!laid.length) return baseText;
+  let text = String(baseText ?? "");
+  for (const s of laid) {
+    let from;
+    try {
+      const absent = absentProblem(s);
+      if (absent) throw new Error(absent);
+      from = s.multi ? rolesDocument(s, render) : { doc: keyDocument(s, render(s.path)), key: fileKeyIn(s) };
+      lastRead.set(readKey(s), from);
+      lastHeld.set(heldKey(s), from);
+      reported.delete(readKey(s));
+    } catch (e) {
+      // a file that cannot be read, or is not there to read : its key as it was last read (from
+      // that file, else from its repository), else the base's (the roles closed) - never the whole
+      // configuration lost with it (said once in the server log, in its pull output and on its page)
+      from = (s.exists && lastRead.get(readKey(s))) || lastHeld.get(heldKey(s));
+      const closed = CONFIG_KEYS.find((k) => k.key === s.key)?.closed;
+      const line = `${s.repository}/${s.file} is not read: ${e.message} - ${from ? `the ${s.key} last read from it are` : `${meanwhile(s.key)} ${closed ? "is" : "are"}`} used until it is fixed`;
+      if (reported.get(readKey(s)) !== line) logger.error(line);
+      reported.set(readKey(s), line);
+      if (!from && closed) from = { doc: mapDocument(YAML.stringify({ [s.key]: closed })), key: s.key };
+      if (!from) continue;
+    }
+    // the key as its file writes it : the configuration shown, never written from here
+    text = withKeyOf(text, s.key, from.doc, from.key, false);
+  }
+  return text;
+}
+
+// each role as last served from a repository on this node, by the repository and its name : what a
+// role refused now is served as meanwhile (lib/configRoles.js servedRoles)
+const lastRoles = new Map();
+const rolesOf = (source) => {
+  if (!lastRoles.has(heldKey(source))) lastRoles.set(heldKey(source), new Map());
+  return lastRoles.get(heldKey(source));
+};
+
+/**
+ * The files a key is read from : every file of its repository giving it (the roles), else its one
+ * file - each relative to the repository, with its path.
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   object[]: [{ file, path }].
+ */
+const filesOf = (source) =>
+  source.files ? source.files.map((file) => ({ file, path: path.join(Repo.folderOf(source.repository), file) })) : [{ file: source.file || path.basename(source.path), path: source.path }];
+
+/**
+ * The roles of a repository read from each of its files, each role checked on its own
+ * (lib/configRoles.js servedRoles) : the document they are served as, and what was refused.
+ *
+ * Args:
+ *   source (object): the roles' source (keySources).
+ *   render (function): (file) => its text (the file read, or rendered with ytt).
+ *   last (Map): the roles last served (rolesOf) ; a copy is given to only look (keyFileProblem).
+ *
+ * Returns:
+ *   object: { doc (the document : the file's own when one file gives them as served, its comments
+ *     kept ; else the roles served, as YAML writes them), key (as the document writes it), problems }.
+ *
+ * Raises:
+ *   Error: no file gives them in a way that can be read (one file only, not read) : the caller
+ *     serves them as last read.
+ */
+function rolesDocument(source, render, last = rolesOf(source)) {
+  const key = fileKeyIn(source);
+  const files = filesOf(source).map((f) => {
+    try {
+      const doc = keyDocument(source, render(f.path));
+      const value = (doc.toJS() || {})[key];
+      return { file: f.file, roles: Array.isArray(value) ? value : [], doc };
+    } catch (e) {
+      return { file: f.file, roles: null, problem: e.message };
+    }
+  });
+  // its one file not read : as a key whose file is not read (composeConfig)
+  if (files.length === 1 && files[0].roles === null) throw new Error(files[0].problem);
+  const served = servedRoles(files, last, CLOSED_ROLES);
+  for (const line of served.problems) {
+    const said = `${source.repository}: ${line}`;
+    if (!reported.has(said)) logger.warning(said);
+    reported.set(said, said);
+  }
+  const said = { key, problems: served.problems, blocking: served.blocking };
+  if (!served.changed && files.length === 1) return { doc: files[0].doc, ...said };
+  // one file : its own document, each role served as it is there keeping its node (its comments),
+  // a role refused replaced by its last version or left out, a required one added at the end
+  if (files.length === 1 && files[0].doc) {
+    const doc = files[0].doc;
+    const seq = doc.contents.get(key, true);
+    if (YAML.isSeq(seq)) {
+      const byName = new Map(served.roles.map((r) => [r.name, r]));
+      const placed = new Set();
+      const items = [];
+      for (const item of seq.items) {
+        const role = YAML.isNode(item) ? item.toJS(doc) : item;
+        const want = role && typeof role === "object" ? byName.get(role.name) : undefined;
+        if (!want || placed.has(want.name)) continue;
+        placed.add(want.name);
+        items.push(_.isEqual(role, want) ? item : doc.createNode(want));
+      }
+      for (const role of served.roles) if (!placed.has(role.name)) items.push(doc.createNode(role));
+      seq.items = items;
+      return { doc, ...said };
+    }
+  }
+  return { doc: mapDocument(YAML.stringify({ [key]: served.roles })), ...said };
+}
+
+/**
+ * A key file's text as the document it gives, checked : valid YAML, a dictionary, every alias
+ * resolvable, the key given by its own file (config.yaml of before may leave it out), and the key,
+ * when it gives it, of its kind (a list of roles or categories, a dictionary of constants).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *   text (string): the file's text (read, or rendered with ytt).
+ *
+ * Returns:
+ *   YAML.Document: the document (mapDocument).
+ *
+ * Raises:
+ *   Error: why it is not read.
+ */
+function keyDocument(source, text) {
+  // several files giving it : none of them read, each named
+  if (source.several) throw new Error(`${source.several.length} files give its ${source.key} (${source.several.join(", ")}): one file at most gives them`);
+  const doc = mapDocument(text);
+  // its own file giving no key (a typo, a plain map, a form saved under its name) : never read
+  if (source.notGiving) throw new Error(`it does not give its ${source.key} (a top-level '${fileKeyIn(source)}:' key)`);
+  const value = (doc.toJS() || {})[fileKeyIn(source)];
+  // a key's own file without its key (a plain map, a typo in the key) : not read - taken as it is,
+  // it would serve the base's value without a word ; config.yaml of before may give some keys only
+  if (value === undefined && !source.deprecated) throw new Error(`it does not give its ${source.key} (a top-level '${fileKeyIn(source)}:' key)`);
+  const list = CONFIG_KEYS.find((k) => k.key === source.key)?.list;
+  if (value === undefined || value === null || list === undefined) return doc;
+  if (list && !Array.isArray(value)) throw new Error(`its ${source.key} must be a list`);
+  if (!list && (typeof value !== "object" || Array.isArray(value))) throw new Error(`its ${source.key} must be a dictionary`);
+  return doc;
+}
+
+/**
+ * Why a key file of a repository is not read, as it is now in its working tree : the file as it is
+ * written (a ytt template is not checked here, its expansion is when it is loaded).
+ *
+ * Args:
+ *   source (object): the key's source (keySources).
+ *
+ * Returns:
+ *   string|null: why, null when it is read (or not there).
+ */
+export function keyFileProblem(source) {
+  if (!source.exists) return null;
+  // the roles over several files : the files not read (a role refused is no file's problem :
+  // repositoryKeyNotices)
+  if (source.files) {
+    const unread = [];
+    for (const f of filesOf(source)) {
+      try {
+        const text = fs.readFileSync(f.path, "utf8");
+        if (!isTemplate(text)) keyDocument(source, text);
+      } catch (e) {
+        unread.push(`${f.file}: ${e.message || e}`);
+      }
+    }
+    return unread.length ? unread.join("; ") : null;
+  }
+  try {
+    const text = fs.readFileSync(source.path, "utf8");
+    if (isTemplate(text)) return null;
+    keyDocument(source, text);
+    return null;
+  } catch (e) {
+    return e.message || String(e);
+  }
+}
+
+/**
+ * The key files of a repository that are not read (keyFileProblem), or not there to read although
+ * its key is served as last read or closed (absentProblem), for its pull output and its page.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<object[]>: [{ key, file, reason }] ; none when each is read.
+ */
+export async function repositoryKeyProblems(name) {
+  const out = [];
+  for (const s of (await keySources()).filter((x) => x.repository === name)) {
+    const reason = absentProblem(s) || keyFileProblem(s);
+    if (reason) out.push({ key: s.key, file: s.file, reason });
+  }
+  return out;
+}
+
+/**
+ * What is said of the roles a repository holds, role by role, for its pull output and its page :
+ * each role refused (its last version served, else left out), each required role kept, and what
+ * the roles name that is not there. None of them stops the roles being served.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   Promise<string[]>: the lines ; none when there is nothing to say (or its files are not read :
+ *     repositoryKeyProblems says it).
+ */
+export async function repositoryKeyNotices(name) {
+  const s = (await keySources()).find((x) => x.multi && x.repository === name);
+  if (!s || !s.exists || absentProblem(s) || keyFileProblem(s)) return [];
+  try {
+    const read = rolesDocument(s, (p) => fs.readFileSync(p, "utf8"), new Map(rolesOf(s)));
+    const roles = read.doc.toJS()?.[fileKeyIn(s)] || [];
+    return [...read.problems, ...(await missingReferences(roles))];
+  } catch {
+    // its files not read : repositoryKeyProblems says it
+    return [];
+  }
+}
+
+// ===========================================================================
+// WRITE : EACH KEY BACK TO ITS FILE
+// ===========================================================================
+
+/**
+ * Refuses a save that changes a key it cannot write : one whose repository has the flag but no
+ * working copy (not cloned yet, or its clone failed) - written to the base configuration instead,
+ * the save would be lost without a word once the repository is cloned and its file read again -
+ * or one whose file is a ytt template (written, the template would become its expansion). A key
+ * the save gives as it is served now is never refused : the designer sends every key with each
+ * save of a form.
+ *
+ * Args:
+ *   doc (object): the configuration saved (categories, roles, constants ...).
+ *   sources (object[]): the keys' sources (keySources).
+ *   served (object): the configuration served now ; none : every key the save gives is a change.
+ *
+ * Raises:
+ *   Errors.ConflictError: a key the save changes cannot be written, named with why.
+ */
+export function assertKeysWritable(doc, sources, served) {
+  const changed = (sources || []).filter((s) => doc?.[s.key] !== undefined && !unchanged(doc, s.key, served));
+  const refused = [];
+  for (const s of changed) {
+    if (s.missing) refused.push(`The ${s.key} are held by repository '${s.repository}', which is not cloned: pull it (or fix its clone) before saving them`);
+    else if (s.exists && isTemplate(fs.readFileSync(s.path, "utf8"))) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, a ytt template: change them in git`);
+    else if (keyFileProblem(s)) refused.push(`The ${s.key} are in ${s.repository}/${s.file}, which is not read (${keyFileProblem(s)}): fix it in git`);
+    else if (s.multi && s.exists) {
+      // a role refused in git : a save would overwrite it with what the app serves meanwhile
+      let blocking;
+      try {
+        blocking = rolesDocument(s, (p) => fs.readFileSync(p, "utf8"), new Map(rolesOf(s))).blocking;
+      } catch {
+        blocking = [];
+      }
+      if (blocking.length) refused.push(`The roles of repository '${s.repository}' cannot be saved while git has a role it refuses (${blocking.join("; ")}): fix it in git first`);
+    }
+  }
+  if (refused.length) throw new Errors.ConflictError(refused.join("; "));
+}
+
+/**
+ * A configuration without the keys the repositories hold : what goes to the base configuration.
+ *
+ * Args:
+ *   doc (object): the configuration.
+ *   sources (object[]): the keys' sources (keySources).
+ *
+ * Returns:
+ *   object: a copy, without those keys.
+ */
+export const withoutHeldKeys = (doc, sources) => _.omit(doc, sources.map((s) => s.key));
+
+/**
+ * Writes the keys a repository holds back to the file each was read from (config.yaml stays
+ * config.yaml : only its key changes, the rest of the file kept) or to a new file of its own. A key
+ * as it is served now is not written.
+ *
+ * Args:
+ *   doc (object): the configuration (categories, roles, constants ...).
+ *   sources (object[]): the keys' sources (keySources).
+ *   opts (object): { claim (true : each repository's write claim taken here ; false : the caller
+ *     holds them, as a designer save does), served (the configuration served now : a key the same
+ *     is not written ; none : every key given is), text (the text the configuration was saved as :
+ *     each key written as it has it, its comments with it ; none : as YAML writes its value) }.
+ *
+ * Returns:
+ *   Promise<object>: { rest (the configuration without the keys the repositories hold : the
+ *     base's), repositories (the names written to) }.
+ *
+ * Raises:
+ *   Errors.ConflictError: a key that cannot be written (assertKeysWritable).
+ */
+export async function writeConfigKeys(doc, sources, opts = {}) {
+  assertKeysWritable(doc, sources, opts.served);
+  const saved = opts.text !== undefined ? mapDocument(opts.text) : null;
+  const byRepo = new Map();
+  for (const s of sources) {
+    if (doc[s.key] === undefined) continue;
+    if (unchanged(doc, s.key, opts.served)) continue;
+    if (!byRepo.has(s.repository)) byRepo.set(s.repository, []);
+    byRepo.get(s.repository).push(s);
+  }
+  const { default: Repository } = opts.claim ? await import("../models/repository.model.js") : { default: null };
+  for (const [repository, list] of byRepo) {
+    const prior = opts.claim ? await Repository.claimForWrite(repository) : undefined;
+    try {
+      for (const s of list) {
+        // the roles spread over several files : each role written where it is, only those changed
+        if (s.files) {
+          writeRolesAcross(s, doc[s.key]);
+          continue;
+        }
+        const text = fs.existsSync(s.path) ? fs.readFileSync(s.path, "utf8") : "";
+        let next;
+        // the key as its file writes it (controller_roles ; roles in config.yaml of before)
+        const key = fileKeyIn(s);
+        if (saved) next = withKeyOf(text, key, saved, s.key);
+        else next = text.trim() ? updateMapFile(text, { [key]: doc[s.key] }) : newMapFile({ [key]: doc[s.key] });
+        if (next !== text) fs.writeFileSync(s.path, next, "utf8");
+        logger.info(`Saved the ${s.key} into ${repository}/${s.file}`);
+      }
+    } finally {
+      if (opts.claim && prior !== undefined) await Repository.releaseWrite(repository, prior).catch((e) => logger.error(`Failed to release write-lock on '${repository}': ${e.message}`));
+    }
+  }
+  return { rest: withoutHeldKeys(doc, sources), repositories: [...byRepo.keys()] };
+}
+
+/**
+ * Writes the roles a repository spreads over several files, each where it is : a role changed is
+ * rewritten in its entry (the file's other entries, its comments, kept), a role gone is taken out of
+ * its file, a new one goes at the end of the first file. A role as it is in its file is not touched.
+ *
+ * Args:
+ *   source (object): the roles' source (keySources, with its files).
+ *   roles (object[]): the roles saved.
+ *
+ * Returns:
+ *   void
+ */
+function writeRolesAcross(source, roles) {
+  const key = fileKeyIn(source);
+  const files = filesOf(source).map((f) => ({ ...f, text: fs.readFileSync(f.path, "utf8") }));
+  // where each role is now, and as it is there
+  const where = new Map();
+  for (const f of files) {
+    const list = (YAML.parse(f.text) || {})[key];
+    for (const role of Array.isArray(list) ? list : []) if (role?.name && !where.has(role.name)) where.set(role.name, { f, role });
+  }
+  const saved = new Map((roles || []).map((r) => [r.name, r]));
+  // gone : out of its file
+  for (const [name, at] of where) {
+    if (saved.has(name)) continue;
+    at.f.text = removeListEntry(at.f.text, key, name).text;
+  }
+  // changed : its entry rewritten whole ; new : at the end of the first file
+  const added = [];
+  for (const role of roles || []) {
+    const at = where.get(role.name);
+    if (!at) {
+      added.push(role);
+      continue;
+    }
+    if (_.isEqual(at.role, role)) continue;
+    at.f.text = editListEntry(at.f.text, key, role.name, (d, map) => {
+      map.items = d.createNode(role).items;
+    });
+  }
+  if (added.length) files[0].text = appendListEntries(files[0].text, key, added);
+  for (const f of files) {
+    if (f.text !== fs.readFileSync(f.path, "utf8")) {
+      fs.writeFileSync(f.path, f.text, "utf8");
+      logger.info(`Saved the roles into ${source.repository}/${f.file}`);
+    }
+  }
+}
+
+/**
+ * The base configuration with the keys a save gives that no repository holds : the base's other
+ * keys, its comments and the ones the repositories hold kept as they are. Saved from a text (the
+ * configuration's editor, a backup restored), each key is written as that text has it, its comments
+ * with it, and a key of the base the text no longer gives is taken out of it.
+ *
+ * Args:
+ *   baseText (string): the base configuration's text.
+ *   rest (object): the keys to write (writeConfigKeys' rest).
+ *   served (object): the configuration served now : only a key that differs is written ; none :
+ *     each one is.
+ *   opts (object): { text (the text the configuration was saved as : each key written as it has
+ *     it ; none : as YAML writes its value), servedText (the text served now, the one the editor
+ *     showed : a key the text gives as it is there, value and text, is left as it is in the base ;
+ *     none : each key is written as the text has it), held (string[] : the keys the repositories
+ *     hold - a key served now that the save no longer gives, none of these, is taken out of the
+ *     base ; none : no key taken out) }.
+ *
+ * Returns:
+ *   string|null: the base configuration's new text ; null when no key changed (nothing to write).
+ *
+ * Raises:
+ *   Errors.ConflictError: a key changed while the base configuration is a ytt template.
+ *   Errors.AccessDeniedError: a key of a usage type (controller_credentials ...) the save gives :
+ *     written to a repository's base configuration, it would be read in as that type's objects.
+ */
+export function mergeIntoBase(baseText, rest, served, opts = {}) {
+  // the app's repository objects are never written by a configuration save (the designer's)
+  const typeKey = Object.keys(rest || {}).find((key) => typeKeyOf(key));
+  if (typeKey) throw new Errors.AccessDeniedError(`The configuration gives ${typeKey}:, a key of the objects the app keeps in a repository: it is not written from the configuration`);
+  const base = String(baseText ?? "");
+  // the keys taken out : served now, no longer given, none a repository holds
+  const known = served !== undefined && served !== null && Array.isArray(opts.held);
+  const removed = known ? Object.keys(served).filter((key) => rest[key] === undefined && !opts.held.includes(key)) : [];
+  const gone = Object.fromEntries(removed.map((key) => [key, undefined]));
+  let saved;
+  try {
+    saved = opts.text !== undefined && base.trim() && !isTemplate(base) ? mapDocument(opts.text) : null;
+  } catch {
+    // a text that is not a map of valid YAML : its values, as before
+    saved = null;
+  }
+  if (saved) {
+    // the text served (the configuration shown in the editor) : a key the save gives as it is
+    // there, value and text, was not touched - its text in the base left as it is, never replaced
+    // by the one shown (the values a key file's anchors read as, when its aliases could not be laid
+    // as written, lose the base's comments and aliases)
+    let shown = null;
+    try {
+      shown = opts.servedText !== undefined ? mapDocument(opts.servedText) : null;
+    } catch {
+      shown = null;
+    }
+    const untouched = (key) => shown !== null && unchanged(rest, key, served) && keyText(saved, opts.text, key) === keyText(shown, opts.servedText, key);
+    // each key as the text has it : a text the same as the base's is not written
+    let next = base;
+    for (const key of Object.keys(rest)) if (!untouched(key)) next = withKeyOf(next, key, saved);
+    if (removed.length) next = updateMapFile(next, gone);
+    return next === base ? null : next;
+  }
+  const edits = { ...Object.fromEntries(Object.entries(rest).filter(([key]) => !unchanged(rest, key, served))), ...gone };
+  if (served !== undefined && served !== null && !Object.keys(edits).length) return null;
+  if (isTemplate(baseText)) {
+    throw new Errors.ConflictError(`The base configuration is a ytt template: change ${Object.keys(edits).join(", ")} where it is kept`);
+  }
+  try {
+    return base.trim() ? updateMapFile(baseText, edits) : newMapFile(edits);
+  } catch {
+    // a base that is not a map of valid YAML : the keys alone, as before
+    return YAML.stringify(rest);
+  }
+}

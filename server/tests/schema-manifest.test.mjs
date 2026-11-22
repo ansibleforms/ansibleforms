@@ -57,6 +57,12 @@ function manifest() {
 const patchColumns = new Set(
   [...model.matchAll(/addColumn\("(\w+)",\s*"(\w+)"/g)].map((m) => `${m[1]}.${m[2]}`)
 );
+// the columns a later patch drops again (a column 7 no longer uses, schedule.run_at once
+// one_time_run holds the moment) : a fresh install never has them
+const droppedColumns = new Set([
+  ...[...model.matchAll(/dropColumn\("(\w+)",\s*"(\w+)"\)/g)].map((m) => `${m[1]}.${m[2]}`),
+  ...[...model.matchAll(/ALTER TABLE AnsibleForms\.`(\w+)` DROP COLUMN `(\w+)`/g)].map((m) => `${m[1]}.${m[2]}`),
+]);
 // the managed columns are added by a loop over a table list, not literal calls
 const managedLoop = /for \(const table of \[([^\]]+)\]\)[\s\S]{0,200}?addColumn\(table, "managed"/.exec(model);
 if (managedLoop) {
@@ -146,7 +152,7 @@ describe("the schema manifest describes what the code actually builds", () => {
       const table = c.split(".")[0];
       // only for tables the fresh install actually builds - patchVersion5 still adds columns
       // to legacy azuread/oidc tables that a fresh install deliberately never creates
-      return sqlTables.has(table) && !sqlColumns.has(c);
+      return sqlTables.has(table) && !sqlColumns.has(c) && !droppedColumns.has(c);
     }).sort();
     assert.deepEqual(missing, [], "a patch adds these but a fresh install would not have them");
   });

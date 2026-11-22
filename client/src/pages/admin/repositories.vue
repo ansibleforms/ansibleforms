@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n';
 import Helpers from '@/lib/Helpers';
 import { sortPulls } from '@/lib/pullResults';
 import { useAppStore } from '@/stores/app';
-import { toPush } from '@/lib/repositoryUsage';
+import { pullOrder, toPush } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const settings = computed(() => getSettings(t));
@@ -67,9 +67,11 @@ async function runGit(repo, action, title) {
 async function triggerClone(repo) {
   await runGit(repo, 'clone', t('settings.repositories.pull'));
 }
-// Pull all : every repository pulled (cloned when it is not there yet) at once, as its own Pull
-// does ; the ones that fail are named, and so are the ones skipped because their changes are
-// not pushed yet (the server refuses their pull with a 409, the others still go)
+// Pull all : every repository pulled (cloned when it is not there yet), as its own Pull does ; the
+// ones holding objects one after the other in the objects' order (the credentials before what signs
+// in with them : lib/repositoryUsage.js pullOrder), the others at once ; the ones that fail are named,
+// and so are the ones skipped because their changes are not pushed yet (the server refuses their pull
+// with a 409, the others still go)
 const pullingAll = ref(false);
 async function pullAll() {
   pullingAll.value = true;
@@ -77,10 +79,20 @@ async function pullAll() {
     const result = await axios.get('/api/v2/repository/');
     const repos = Array.isArray(result.data.records) ? result.data.records : [];
     for (const repo of repos) showRunning(repo.name, 'clone');
-    const pulls = await Promise.allSettled(
-      repos.map((repo) => axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/clone`, {})),
-    );
-    const { pulled, skipped, failed } = sortPulls(repos, pulls);
+    const pull = (repo) => axios.post(`/api/v2/repository/${encodeURIComponent(repo.name)}/clone`, {});
+    const [ordered, rest] = pullOrder(repos);
+    // each outcome as Promise.allSettled gives it, in the order the repositories were pulled
+    const settled = [];
+    for (const repo of ordered) {
+      settled.push(
+        await pull(repo).then(
+          (value) => ({ status: 'fulfilled', value }),
+          (reason) => ({ status: 'rejected', reason }),
+        ),
+      );
+    }
+    settled.push(...(await Promise.allSettled(rest.map(pull))));
+    const { pulled, skipped, failed } = sortPulls([...ordered, ...rest], settled);
     if (failed.length) toast.error(t('settings.repositories.pullAllFailed', { names: failed.join(', ') }));
     if (skipped.length) toast.warning(t('settings.repositories.pullAllSkipped', { names: skipped.join(', ') }));
     if (!failed.length && pulled.length) toast.success(t('settings.repositories.pullAllDone', pulled.length));
@@ -100,7 +112,7 @@ async function pushAll() {
   pushingAll.value = true;
   try {
     const repos = pushable.value;
-    for (const repo of repos) adminMulti.value.setItemProperty({ id: repo.name, key: 'status', value: 'running' });
+    for (const repo of repos) showRunning(repo.name, 'sync');
     // one after the other, as the designer's Push all (each a commit and a push of its own)
     const failed = [];
     for (const repo of repos) {

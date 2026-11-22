@@ -16,8 +16,6 @@ import { getStore, checkStore, listMounts, VAULT_STORE_NAME } from "../../secret
 import appConfig from "../../../config/app.config.js";
 
 import { fileURLToPath } from 'url';
-import { bump } from '../../lib/epochs.js';
-import { publish } from '../../lib/liveEvents.js';
 import Errors from '../../lib/errors.js';
 import { formLinks, formCredentials } from '../../lib/formLinks.js';
 import { workflowCredentials } from '../../models/workflowRun.js';
@@ -25,6 +23,8 @@ import yaml from 'yaml';
 import { isAdminRequest, assertKeepsOwnAdmin } from '../../lib/adminGrants.js';
 import { canonicalJson } from '../../lib/formEngine/output.js';
 import { mayEnvVar } from '../../lib/settingsSections.js';
+import { saveEnvValues, EnvSaveError, ENV_MASK } from '../../lib/envSave.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 import { designsAllForms, designsEverything, designerConfig, designerWarnings, designerForms, designerWorkflowFiles, designerSave, assertFilesShown, assertServerCodeKept } from '../../lib/designerForms.js';
 
 /**
@@ -136,91 +136,31 @@ const saveEnv = async function(req,res){
     if(outside.length){
       return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${i18n.t(req, 'errors.noSettingsAccess')} (${outside.join(', ')})`))
     }
-    // 403 and not 401 : App.vue's axios interceptor treats any 401 as a dead session
-    // and signs the user out. Refused at the endpoint, not merely greyed out in the UI.
-    if(!appConfig.allowEnvEdit){
-      return res.status(403).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), EnvSettings.ENV_EDIT_DISABLED_REASON))
-    }
-    const help = await Help.get()
-    const envSection = help.filter(x => x.name=='Environment Variables')[0]
-    const docs = new Map((envSection?.items || []).map(x => [x.name, x]))
-    const managed = await EnvSettings.readManaged()
-
-    // validate everything BEFORE writing anything : a partial write of a bad set would
-    // leave the file describing a state nobody asked for
-    for(const name of names){
-      if(!docs.has(name)){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} is not a known environment variable`))
-      }
-      if(EnvSettings.REFUSED[name]){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), EnvSettings.REFUSED[name]))
-      }
-      if(EnvSettings.isOverridden(name, managed)){
-        return res.status(409).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} is set in the environment and cannot be changed from here`))
-      }
-      // the client sends nothing for an unchanged secret, but never trust that : storing
-      // the mask would replace a working credential with the literal placeholder
-      if(String(updates[name] ?? '').trim() === MASK){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), `${name} was not changed`))
-      }
-      const problem = EnvSettings.validate(name, updates[name], docs.get(name))
-      if(problem){
-        return res.status(400).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), problem))
-      }
-    }
-
-    // PERSIST FIRST, then apply. applyLive mutates the running process - the log level,
-    // the paths, VAULT_TOKEN, the db pool size, the TLS context - and writeManaged can
-    // still fail after that (a read-only persistent volume, ENOSPC). Applying first meant
-    // the caller got a 500 saying the save had failed while every one of those changes was
-    // already in force, and stayed in force until a restart, with nothing on disk to
-    // explain it. A write that fails now changes nothing at all.
-    for(const name of names){
-      const value = updates[name] === null || updates[name] === undefined ? '' : String(updates[name])
-      if(value === ''){ managed.delete(name) } else { managed.set(name, value) }
-    }
-    await EnvSettings.writeManaged(managed)
-    // the other nodes read the file again and apply what changed (init/cluster.js)
-    bump('env')
-
-    const restart = []
-    for(const name of names){
-      const value = updates[name] === null || updates[name] === undefined ? '' : String(updates[name])
-      // hand the documented default over : clearing a field means "back to the default", and
-      // applyLive cannot know what that is
-      // an RTE's own variable : the app has nothing to apply, and its restart would change nothing
-      if(EnvSettings.classify(name) === 'rte'){ EnvSettings.applyLive(name, value, docs.get(name)?.default); continue }
-      if(!EnvSettings.applyLive(name, value, docs.get(name)?.default)) restart.push(name)
-    }
-
-    // the NAMES only : these values include credentials
-    Audit.log({
-      user: req.user?.user,
-      ip: req.ip,
-      action: 'settings.env.update',
-      outcome: 'success',
-      targetType: 'env',
-      target: names.slice(0, 5).join(','),
-      detail: { changed: names, restartRequired: restart },
+    // the general, defaults, links, MCP and chat assistant repositories' files, before (the
+    // language is the defaults', the Designer's link the links', the MCP switches the MCP's, the
+    // chat's switch the chat assistant's) : their changed variables written into them after, each
+    // into its own page's file only, under their repositories' write claims, taken first
+    // (RepoObjects.holding)
+    const restart = await RepoObjects.holding(['general', 'defaults', 'links', 'mcp', 'chat_assistant'], async () => {
+      const before = await RepoObjects.snapshots(['general', 'defaults', 'links', 'mcp', 'chat_assistant'])
+      // checked, written, applied, audited : as a General repository's pull (lib/envSave.js)
+      const { restartRequired } = await saveEnvValues(updates, { user: req.user?.user, ip: req.ip })
+      await RepoObjects.appUpdatedAll(before)
+      return restartRequired
     })
-    logger.notice(`Environment settings updated: ${names.join(', ')}`)
-    // a variable the header shows (the Designer's link) : every open tab re-reads it at once
-    publish('appearance')
     return res.json(RestResult.single({ message: i18n.t(req, 'config.envVarsSaved'), changed: names, restartRequired: restart }))
   }catch(err){
+    if(err instanceof EnvSaveError){
+      return res.status(err.status).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), err.message))
+    }
     logger.error(helpers.getError(err))
-    return res.status(500).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), helpers.getError(err)))
+    return res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'config.failedSaveEnvVars'), helpers.getError(err)))
   }
 }
 
-// Names whose VALUE must never be sent to the client. A bare 'TOKEN' would be too broad -
-// ACCESS_TOKEN_EXPIRATION and ACCESS_TOKEN_ISSUER are not secrets and are worth seeing -
-// so this matches a trailing _TOKEN instead, which is what VAULT_TOKEN and any future
-// <service>_TOKEN look like. HTTPS_KEY is deliberately NOT matched: it is a path to a key
-// file, not the key itself, and the path is useful to see. PASSWORD and SECRET are trailing
-// too, for the same reason : PASSWORD_MIN_LENGTH is a number, and it was hidden as a secret.
-const SECRET_ENV_NAME = /_PASSWORD$|_SECRET$|_TOKEN$|_SECRET_PREVIOUS$/;
-const MASK = "*** NOT REVEALED ***";
+// the secrets' names : their values never leave the server (lib/envSettings.js)
+const SECRET_ENV_NAME = EnvSettings.SECRET_ENV_NAME;
+const MASK = ENV_MASK;
 // the state an unset secret is in : the page says it instead of the mask
 const SECRET_STATES = { ENCRYPTION_SECRET: 'default', ACCESS_TOKEN_SECRET: 'random' };
 
@@ -333,6 +273,8 @@ const env = async function(req,res){
       }
       // a restart applies a new path but does not move what is already at the old one
       item.relocates = EnvSettings.RELOCATES.has(x.name)
+      // another page's or the deployment's : not shown on this page (lib/envSettings.js)
+      item.ownedElsewhere = EnvSettings.OWNED_ELSEWHERE.test(x.name)
       item.description = x.description || null
       item.type = x.type || null
       item.allowed = x.allowed || null
@@ -482,8 +424,7 @@ const save = async function(req,res){
       // the designer writes the whole document, so the previous one has to be read
       // before the save to get a role delta out of it
       var previousConfig = await Settings.getActiveConfig().catch(() => '')
-      // a name another forms repository holds said taken without where, to a designer limited to
-      // some forms (a copy may be one hidden from them)
+      // a name taken said without where, to a designer limited to some forms
       var forms = await Form.save(newConfig, { conceal: !designsAllForms(user) })
       if(forms) {
         // read back what was actually written rather than re-serializing req.body :
@@ -644,9 +585,8 @@ const configMode = async function(req,res){
 // they could not already get from the designer's own load.
 const configTemplated = async function(req,res){
   try{
-    const raw = await Settings.getActiveConfig()
-    // the same test the settings pages and useFormsConfig use
-    res.json(RestResult.single({ templated: /^\s*#@/m.test(raw || '') }))
+    // its base and each file a repository holds a key in, as they are written (Settings.isTemplated)
+    res.json(RestResult.single({ templated: await Settings.isTemplated() }))
   }catch(err){
     res.status(500).json(RestResult.error(i18n.t(req, 'config.failedGetFormsConfig'), helpers.getError(err)))
   }

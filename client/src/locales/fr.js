@@ -1117,6 +1117,8 @@ export default {
       forgetConfirm:
         'Oublier {name} ? Son enregistrement disparaît et revient à sa prochaine connexion. Ses jobs, jobs enregistrés et planifications restent.',
       blockedNote: 'Un administrateur a bloqué cet utilisateur : sessions terminées, connexions refusées.',
+      repoNeverNote:
+        "L'entrée de son dépôt déclare cet utilisateur, mais il ne s'est jamais connecté : ses groupes sont connus à sa première connexion.",
       neverNote: 'Nommé dans les rôles mais jamais connecté : ses groupes seront connus à la 1re connexion.',
       readOnlyNote: 'De {source} : qui il est et ses groupes, lus à chaque connexion, selon la dernière.',
       groupReadOnlyNote: 'Groupe de {source} : ses membres sont ceux qui y figuraient à leur dernière connexion.',
@@ -1297,14 +1299,6 @@ export default {
       helpName: 'Alphanumerique avec tiret et underscore',
       helpUri: 'Seules les URI SSH ou HTTPS sont autorisees',
       placeholderPassword: 'Mot de passe ou jeton',
-      useForConfig: 'Utiliser pour la configuration ?',
-      useForForms: 'Utiliser pour les formulaires ?',
-      useForPlaybooks: 'Utiliser pour les playbooks ?',
-      useForWorkflows: 'Utiliser pour les workflows ?',
-      helpUseForConfig: 'Catégories et constantes lues depuis son config.yaml (sur un seul dépôt).',
-      helpUseForForms: 'Formulaires lus et enregistrés dans son dossier forms ou racine ; Push les publie.',
-      helpUseForPlaybooks: "Les playbooks s'exécutent depuis son dossier playbooks ou racine (sur un seul dépôt).",
-      helpUseForWorkflows: 'Les workflows du designer sont lus depuis ce dépôt et y sont repoussés.',
       helpCloneOnStart: "Le dépôt est mis à jour (cloné la première fois) à chaque démarrage de l'application.",
       cloneOnStartShort: 'Pull au démarrage',
       cloneOnStart: "Pull au démarrage de l'application",
@@ -1317,20 +1311,145 @@ export default {
       stepRepository: 'Dépôt',
       stepSchedule: 'Planification du pull',
       stepUsage: 'Utilisation',
-      useConfigHint: 'config.yaml avec les catégories et les constantes (un seul dépôt)',
-      useConfigShort: 'Paramètres',
-      useFormsHint: 'Formulaires et fichiers vars, modifiés et repoussés par le designer',
-      useFormsShort: 'Formulaires',
-      usePlaybooksHint: 'Playbooks Ansible exécutés par les formulaires (un seul dépôt)',
-      usePlaybooksShort: 'Playbooks',
-      useWorkflowsHint: 'Workflows que construit le designer, modifiés et repoussés par le designer',
-      useWorkflowsShort: 'Workflows',
+      usageCategories: {
+        designer: 'Designer',
+        jobs: 'Jobs',
+        access: 'Accès',
+        connections: 'Connexions',
+        appearance: 'Apparence',
+        system: 'Système',
+      },
+      usageHeldBy: 'Déjà géré par le dépôt « {name} »',
+      usageCategoryAll: '{category} : tous les types qui peuvent être cochés',
+      usageTypes: {
+        forms: 'Formulaires',
+        playbooks: 'Playbooks',
+        workflows: 'Workflows',
+        inventories: 'Inventaires',
+        schedules: 'Planifications',
+        sso: 'SSO',
+        ldap: 'LDAP',
+        disclaimer: 'Avertissement',
+        credentials: 'Identifiants',
+        secret_stores: 'Coffres de secrets',
+        runners: 'Runners',
+        syslog: 'Syslog',
+        labels: 'Étiquettes',
+        announcements: 'Annonces',
+      },
+      usageHints: {
+        forms: 'Formulaires et fichiers vars, modifiés et repoussés par le designer',
+        playbooks: 'Playbooks Ansible exécutés par les formulaires (un seul dépôt)',
+        workflows: 'Workflows que construit le designer, modifiés et repoussés par le designer',
+        inventories: 'Un inventaire : inventory.yaml, group_vars et host_vars à sa racine',
+        schedules: "Planifications, entrées d'une liste controller_schedules: dans l'un de ses fichiers YAML",
+        sso: "Fournisseurs SSO, entrées d'une liste controller_sso: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
+        ldap: "Annuaires LDAP, entrées d'une liste controller_ldap: dans l'un de ses fichiers YAML, dans leur ordre de recherche",
+        disclaimer:
+          "Versions de l'avertissement, entrées d'une liste controller_disclaimer: dans l'un de ses fichiers YAML",
+        users:
+          "Utilisateurs, locaux et d'un annuaire, entrées d'une liste controller_users: dans l'un de ses fichiers YAML, mots de passe uniquement en références d'environnement",
+        groups:
+          "Groupes locaux et leurs membres, entrées d'une liste controller_groups: dans l'un de ses fichiers YAML",
+        credentials:
+          "Identifiants, entrées d'une liste controller_credentials: dans l'un de ses fichiers YAML, secrets uniquement en références d'environnement",
+        secret_stores:
+          "Coffres de secrets, entrées d'une liste controller_secret_stores: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
+        databases:
+          "Bases de données que les formulaires interrogent, entrées d'une liste controller_databases: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
+        runners:
+          "Runners, entrées d'une liste controller_runners: dans l'un de ses fichiers YAML, qui nomment leur identifiant",
+        notifications: "Notifications, entrées d'une liste controller_notifications: dans l'un de ses fichiers YAML",
+        syslog: "Serveurs syslog, entrées d'une liste controller_syslog: dans l'un de ses fichiers YAML",
+        chat_assistant:
+          "L'interrupteur et les réglages de l'assistant de chat, sous controller_chat_assistant: dans l'un de ses fichiers YAML, la clé uniquement en référence d'environnement",
+        mcp: "Les paramètres MCP par leur nom d'environnement, sous controller_mcp: dans l'un de ses fichiers YAML",
+        defaults:
+          "Le thème, la couleur, la vue des formulaires, le fuseau horaire, le format de date et la langue, sous controller_defaults: dans l'un de ses fichiers YAML",
+        logo: "Le logo, sous controller_logo: dans l'un de ses fichiers YAML, l'image nommée par rapport à ce fichier",
+        icon: "L'icône du site web, sous controller_icon: dans l'un de ses fichiers YAML, l'image nommée par rapport à ce fichier",
+        name: "Le nom de l'application, sous controller_name: dans l'un de ses fichiers YAML",
+        links: "Les liens de l'en-tête et celui du designer, sous controller_links: dans l'un de ses fichiers YAML",
+        labels:
+          "Les étiquettes à côté du logo, entrées d'une liste controller_labels: dans l'un de ses fichiers YAML, dans leur ordre",
+        announcements: "Annonces, entrées d'une liste controller_announcements: dans l'un de ses fichiers YAML",
+        general:
+          "Les paramètres Général par leur nom d'environnement, sous controller_general: dans l'un de ses fichiers YAML",
+        roles: "Les rôles, sous controller_roles: dans l'un de ses fichiers YAML (config.yaml encore lu, obsolète)",
+        categories:
+          "Les catégories, sous controller_categories: dans l'un de ses fichiers YAML (config.yaml encore lu, obsolète)",
+        constants:
+          "Les constantes, sous controller_constants: dans l'un de ses fichiers YAML (config.yaml encore lu, obsolète)",
+        repositories: "Les autres dépôts, entrées d'une liste controller_repositories: dans l'un de ses fichiers YAML",
+      },
+      usageOnTitle: 'Activer {type}',
+      usageOnQuestion: 'Utiliser {name} pour {type} ?',
+      usageOnButton: 'Activer',
+      usageOffTitle: 'Désactiver {type}',
+      usageOffQuestion: 'Ne plus utiliser {name} pour {type} ?',
+      usageOffButton: 'Désactiver',
+      usageChangeTitle: "Modifier l'usage",
+      usageChangeQuestion: 'Modifier ce à quoi sert {name} ?',
+      usageChangeButton: "Enregistrer l'usage",
+      usageOnHeading: '{type} : activé',
+      usageOffHeading: '{type} : désactivé',
+      usageOnWrittenFile: '{type} de cette application écrits dans {name}, dans {file}, en attente du Push.',
+      usageOnWrittenList: '{type} de cette application écrits dans {name}, dans {file} : {count}.',
+      usageOnReadIn: 'Ce que ses fichiers contiennent, lu à l’activation : {files}.',
+      usageOnReadFile: "{name} a déjà {file} : la version de git l'emporte et remplace {type} de cette application.",
+      usageOnGitWins:
+        "Quand le même nom est dans git et dans cette application, la version de git l'emporte et remplace celle de l'application.",
+      usageOnClashes:
+        "Même nom dans git et dans cette application, la version de git remplace celle de l'application : {names}.",
+      usageOnKept: 'Ceux-ci restent dans cette application : {names}.',
+      usageOnWithoutSecret:
+        'Écrits sans leurs secrets, qui restent dans la base de données (git ne contient jamais un secret en clair) : {names}.',
+      usageOnAppOnly:
+        "Gardées dans l'application seulement, aucun champ de l'entrée de la planification ne les donne : {names}.",
+      usageOnSkipped: 'Déjà terminés dans git, non importés : {count}.',
+      formDuplicate:
+        "Le formulaire '{name}' est défini deux fois : {used} est utilisé, {skipped} est ignoré (les noms de formulaire doivent être uniques entre les dépôts de formulaires)",
+      configDeprecated:
+        "{key} lus depuis config.yaml : obsolète, déplacez-les dans un fichier à eux, {file} par exemple (config.yaml n'est plus lu en 8.0.0)",
+      configNotRead:
+        "{file} n'est pas lu ({reason}) : les {key} lus en dernier depuis ce fichier, sinon ceux de la configuration de base, sont utilisés jusqu'à sa correction dans git",
+      rolesNotice: 'Rôles : {line}',
+      configRolesNotRead:
+        "{file} n'est pas lu ({reason}) : les rôles lus en dernier depuis ce fichier sont utilisés jusqu'à sa correction dans git, sinon seulement le rôle admin de local/admins, jamais ceux de la configuration de base",
+      usagePreviewFailed:
+        "Ce que fera ce changement n'a pas pu être lu sur le serveur : il est tout de même appliqué si vous continuez.",
+      usageOnNewRepository:
+        "{name} n'est pas encore cloné : si le dépôt distant a déjà ces fichiers, la version de git l'emporte et remplace celle de cette application. Sa sortie de pull dit ce qu'il a pris une fois cloné.",
+      usageOnAfter:
+        'Dès lors, un pull apporte les changements faits dans git, et les changements faits ici vont dans git avec le Push du dépôt.',
+      usageOnDone:
+        '{type} : {created} lus depuis ses fichiers, {written} écrits dans le dépôt (en attente du Push), {matched} remplacés par git, {kept} gardés dans cette application.',
+      usageOffKept: '{type} : {count} restent dans cette application tels quels, plus liés à git.',
+      usageOffPull:
+        "Il est d'abord tiré une dernière fois, pour qu'elles correspondent à ses derniers fichiers. Les fichiers dans git restent tels quels.",
+      usageOffUnpushed: 'Attention : il a des changements pas encore poussés. Ils ne sont pas envoyés à git.',
+      usageOffDone: '{type} : {count} déliés de git, ils restent dans cette application.',
+      usageNotPulled: "Le dépôt n'a pas été tiré ({reason}).",
+      usageRefused: 'Fichiers refusés : {files}.',
+      usageNotReadIn:
+        "Ses derniers fichiers n'ont pas été lus avant ({error}) : les objets restent tels que le dernier pull les a laissés.",
+      usageFailed: "{type} n'a pas pu suivre le changement : {error}",
+      usageKeptWhy: {
+        seed: 'géré par le seed de configuration',
+        registered: 'enregistré par son RTE',
+        pending: "en attente d'approbation",
+        holder: 'il contient les dépôts, jamais dans son propre fichier',
+        uriSecret: 'son uri contient un utilisateur ou un jeton : donnez-lui plutôt un identifiant',
+        noSchedule: "il n'a ni cron, ni rrule, ni heure d'exécution valide",
+        notWritten: 'non écrit : {error}',
+      },
+      source: 'Source',
+      sourceRepository: 'Dépôt : {name}',
+      sourceRepositoryHelp:
+        "Gardée dans un fichier du dépôt {name} : un enregistrement écrit le fichier, le Push du dépôt l'envoie à git.",
+      schedulesOnPlanned: 'Les jobs ponctuels « Exécuter plus tard » restent dans cette application.',
       notPushed: 'Modifications en attente',
       notPushedHint: 'Changements pas encore poussés : poussez-les depuis le designer, ou avec Push.',
-      useForInventories: 'Utiliser pour les inventaires ?',
-      helpUseForInventories: 'Un inventaire : les formulaires le nomment par inventory: <nom du dépôt>.',
-      useInventoriesHint: 'Un inventaire : inventory.yaml, group_vars et host_vars à sa racine',
-      useInventoriesShort: 'Inventaires',
       fieldsRequired: "Le nom, la branche, l'URI et la description sont obligatoires.",
       noOutput: 'Pas encore de sortie : faites un pull du dépôt pour voir ce que dit git.',
       noPushOutput: "Ce dépôt n'a jamais été poussé (push).",
@@ -1341,7 +1460,6 @@ export default {
       showPullOutput: 'Afficher la sortie du dernier pull',
       showPushOutput: 'Afficher la sortie du dernier push',
       notFound: "Aucun dépôt avec l'id '{id}'.",
-      formDuplicate: "Le formulaire '{name}' est défini deux fois : {used} est utilisé, {skipped} ignoré",
       ownUser: 'Il a encore son propre utilisateur ({user}) : choisissez un identifiant pour le remplacer.',
       pull: 'Pull',
       pullAll: 'Tout puller',
@@ -1407,7 +1525,6 @@ export default {
       oneTimeRanRemoved: "La planification unique s'est exécutée et a été supprimée : sa tâche est sur la page Tâches.",
       placeholderName: 'Nom de la planification',
       oneTimeRun: 'Execution unique',
-      oneTimeRunPlaceholder: 'Executer une seule fois au lieu de recurremment',
       runAt: 'Executer a',
       runAtHelp: 'Date et heure pour executer ce job une seule fois',
       extraVarsHelp: 'Aucun champ ne fournit les variables supplémentaires, ajoutez-les ici.',
@@ -1424,6 +1541,22 @@ export default {
       startedJobTitle: 'Job lancé',
       startedJob: 'Job #{id}',
       startedJobHelp: "Le job lancé par la dernière exécution : ouvrez-le pour voir comment il s'est terminé.",
+      rrule: 'Règle de récurrence (rrule)',
+      rruleHelp: 'DTSTART avec son TZID, puis RRULE, et EXRULE pour en retirer. Dans ce fuseau.',
+      rruleInvalid: 'Cette rrule est refusée : {reason}',
+      rruleNoRuns: "Cette rrule n'a plus d'exécution à venir.",
+      timing: 'Planification',
+      timingCron: 'Cron',
+      timingCronHint: 'récurrent, dans le fuseau horaire du serveur',
+      timingRruleHint: 'récurrent, une règle iCal dans son propre fuseau horaire',
+      timingOnceHint: 'une fois, à une date et une heure, puis supprimé',
+      enabledHelp:
+        "Désactivée, elle ne s'exécute pas selon sa planification (Exécuter maintenant la lance quand même).",
+      launchOptions: 'Depuis le fichier',
+      launchOptionsHelp:
+        'Les prompts du fichier (limit, job_tags, inventory ...), envoyés au job comme ces extra vars. Ils se modifient dans le fichier.',
+      deleteFileHint:
+        'Son fichier {file} est aussi supprimé du dépôt {name} : poussez le dépôt pour le retirer de git.',
     },
     runners: {
       pending: "En attente d'approbation",
@@ -1480,13 +1613,13 @@ export default {
       ownToken: "Il se connecte avec son propre jeton, d'avant les identifiants, jusqu'au choix d'un identifiant.",
       ownTokenRte: "Il se connecte avec le jeton d'enregistrement de son RTE, jusqu'au choix d'un identifiant.",
       rteMode: 'Mode',
-      rteModeHelp: "Comment le RTE parle à l'application : RTE_MODE sur le RTE.",
+      rteModeHelp: 'Comment le RTE parle au contrôleur : RTE_MODE sur le RTE.',
       rteMode_outbound: 'Sortant',
-      rteMode_outboundHint: "Le RTE appelle l'application : rien ne l'atteint de l'extérieur",
+      rteMode_outboundHint: "Le RTE appelle le contrôleur : rien ne l'atteint de l'extérieur",
       rteMode_inbound: 'Entrant',
-      rteMode_inboundHint: "L'application appelle le RTE à l'adresse de son identifiant",
+      rteMode_inboundHint: "Le contrôleur appelle le RTE à l'adresse de son identifiant",
       rteMode_database: 'Base de données (obsolète)',
-      rteMode_databaseHint: "Le RTE utilise lui-même la base de l'application : supprimé en 8.0.0",
+      rteMode_databaseHint: 'Le RTE utilise lui-même la base du contrôleur : supprimé en 8.0.0',
       socket: 'Connexion',
       tabRte: 'RTE',
       rteSettingsSocketOnly:
@@ -1496,10 +1629,10 @@ export default {
         'Combien de playbooks ce RTE exécute à la fois ; 0 signifie sans limite. Vide : la variable {env} du RTE, sinon {default}.',
       cacheMb: 'Cache des fichiers',
       cacheMbHelp:
-        "Quelle part des fichiers de job envoyés par l'app ce RTE conserve, en Mo ; 0 n'en garde aucun. Vide : la variable {env} du RTE, sinon {default}.",
+        "Quelle part des fichiers de job envoyés par le contrôleur ce RTE conserve, en Mo ; 0 n'en garde aucun. Vide : la variable {env} du RTE, sinon {default}.",
       filesMode: 'Fichiers de job',
       filesModeHelp:
-        "Transfert : l'app envoie les fichiers avec le job. Local : le RTE s'exécute depuis ses propres dossiers montés.",
+        "Transfert : le contrôleur envoie les fichiers avec le job. Local : le RTE s'exécute depuis ses propres dossiers montés.",
       files_defaultValue: 'Par défaut ({value})',
       files_transfer: 'Transfert',
       files_local: 'Local',
@@ -1511,8 +1644,9 @@ export default {
       overridesRte: 'Remplace {env} défini sur le RTE ({value}).',
       socketConnected: 'Connecté',
       socketDisconnected: 'Non connecté',
-      socketDisconnectedHint: "Aucun socket vers ce RTE : vérifiez qu'il tourne, son adresse ou APP_URL, et son jeton.",
-      socketHint: 'Nœud {node}, RTE {version}, {running} sur {max} jobs en cours',
+      socketDisconnectedHint:
+        "Aucun socket vers ce RTE : vérifiez qu'il tourne, son adresse ou CONTROLLER_URL, et son jeton.",
+      socketHint: 'Nœud du contrôleur {node}, RTE {version}, {running} sur {max} jobs en cours',
       joinTokenValid_1: '1 heure',
       joinTokenValid_24: '1 jour',
       joinTokenValid_168: '7 jours',
@@ -1826,7 +1960,8 @@ export default {
     },
     knownhosts: {
       label: 'Hôte connu',
-      description: "Serveurs de confiance en SSH ; l'hôte d'un dépôt est ajouté à son premier clonage.",
+      description:
+        "Serveurs auxquels le contrôleur fait confiance en SSH ; l'hôte d'un dépôt est ajouté à son premier clonage.",
       showEntry: "Copier l'hôte dans le presse-papiers",
       hostEntry: "Entree d'hote",
     },
@@ -2898,7 +3033,7 @@ export default {
       aborted: 'Les jobs arrêtés avant la fin.',
       rejected: "Tâches qu'un approbateur a rejetées : elles n'ont jamais été exécutées.",
       abandoned:
-        "Tâches qui ont perdu ce qui les exécutait (un RTE ou un nœud redémarré ou arrêté) et ne peuvent plus se terminer. Relancez-en une pour l'exécuter à nouveau.",
+        "Tâches qui ont perdu ce qui les exécutait (un RTE ou un nœud du contrôleur redémarré ou arrêté) et ne peuvent plus se terminer. Relancez-en une pour l'exécuter à nouveau.",
     },
     title: 'Jobs',
     refresh: 'Actualiser',

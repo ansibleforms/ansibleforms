@@ -14,10 +14,11 @@
 /*      preview: Object                                           */
 /*      trigger: Object                                           */
 /*                                                                */
-/*  settings.steps: [{ key, label, when }] - the record dialog in */
-/*      steps (a wizard) : a field names its step (field.step,    */
-/*      the first one when it names none) ; when(item) keeps a    */
-/*      step to the records it applies to. Creating walks the     */
+/*  settings.steps: [{ key, label, when, dialogSize }] - the      */
+/*      record dialog in steps (a wizard) : a field names its     */
+/*      step (field.step, the first one when it names none) ;     */
+/*      when(item) keeps a step to the records it applies to ;    */
+/*      dialogSize widens the dialog on it. Creating walks the    */
 /*      steps with Previous / Next and saves on the last ;        */
 /*      editing may jump to any step and save from any            */
 /*      ; notes(item) gives a step its help, shown above its      */
@@ -78,6 +79,19 @@
 /*      gets `created` with its name                              */
 /*  canCreateChoices (prop): a dialogOnly dialog that keeps its   */
 /*      dropdowns' New buttons (a page opens it, not a dialog)    */
+/*  field.emptyLabel: the label of a clearable dropdown's empty   */
+/*      choice, '' when not given                                 */
+/*  settings.confirmSave: async (body, original) => Boolean - a   */
+/*      question before a create (original null) or an update ;   */
+/*      false saves nothing (a repository's object usages)        */
+/*  settings.afterSave: (answer) => void - after a create, an     */
+/*      update or a delete, with the server's answer              */
+/*  settings.confirmDelete: async (item) => Boolean|null - a      */
+/*      question of its own before a delete ; null asks the usual */
+/*  field.type 'usage': a repository's usage types under their    */
+/*      headings (AppRepositoryUsage), its use_for_* flags        */
+/*  field.type 'rrule': an iCal rrule, its next runs under it      */
+/*      (BsRrule : a schedule kept in a schedules repository)     */
 /*  field.emptyText: what a dropdown with nothing to choose says, */
 /*      disabled, over its New button, or (item) => that ('' :    */
 /*      its New button only)                                      */
@@ -102,6 +116,9 @@
 /*  settings.openPage: (item) => path - a record has its own page */
 /*      (a user's) : its row and its Edit open that page instead  */
 /*      of the record dialog ; New still opens the dialog         */
+/*  settings.dialogSize: 'xl' - the record dialog's width (lg     */
+/*      by default, BsOffCanvas's sizes) ; a step's dialogSize    */
+/*      widens it while that step is shown                        */
 /*  a cell's [data-af-popover] : its text in a popover on hover   */
 /*      (a cron's meaning in words, lib/cronCell.js)              */
 /*                                                                */
@@ -388,7 +405,7 @@ async function loadItems(force = true) {
       // an optional reference (a credential's secret store) must be clearable : a
       // select has no way back to "nothing" without an empty option
       parentLists.value[field.parent] = field.clearable
-        ? [{ [field.valueKey]: '', [field.labelKey]: '' }, ...list]
+        ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }, ...list]
         : list;
     }
     if (field.parent && field.values && Array.isArray(field.values)) {
@@ -569,6 +586,17 @@ async function changePasswordItem(value) {
   removeUnwantedProperties();
 }
 async function deleteItem(value) {
+  // a question of its own (a schedules repository's : its schedules stay in the app) : asked
+  // instead of the usual one, Cancel deletes nothing
+  if (typeof props.settings.confirmDelete === 'function') {
+    const answer = await props.settings.confirmDelete(value);
+    if (answer === false) return;
+    if (answer === true) {
+      itemId.value = value[idKey];
+      await loadItem();
+      return removeItem();
+    }
+  }
   itemId.value = value[idKey];
   await loadItem();
   action.value = 'delete';
@@ -632,9 +660,13 @@ function newItem(defaults = {}) {
 async function createItem() {
   var invalid = isInvalid.value;
   if (!invalid) {
+    const body = savePayload();
+    // a question before it is saved (a new schedules repository : what it will take)
+    if (typeof props.settings.confirmSave === 'function' && !(await props.settings.confirmSave(body, null))) return;
     try {
-      await axios.post(`/api/v${props.apiVersion}/${objectType}/`, savePayload());
+      const res = await axios.post(`/api/v${props.apiVersion}/${objectType}/`, body);
       toast.success(t('settings.common.nameCreated', { name: objectTitle('') }));
+      props.settings.afterSave?.(res.data);
       // the dialog that asked for it (a dropdown's New button) selects what was created
       emit('created', item.value.name ?? item.value[idKey]);
       if (props.dialogOnly) unselectItem();
@@ -654,12 +686,20 @@ async function updateItem(passwordOnly = false) {
     invalid = isInvalid.value;
   }
   if (!invalid) {
+    const body = passwordOnly ? item.value : savePayload();
+    // a question before it is saved, the record as it was beside it
+    const original = itemList.value.find((r) => String(r[idKey]) === String(itemId.value)) || null;
+    if (
+      !passwordOnly &&
+      typeof props.settings.confirmSave === 'function' &&
+      !(await props.settings.confirmSave(body, original))
+    ) {
+      return;
+    }
     try {
-      await axios.put(
-        `/api/v${props.apiVersion}/${objectType}/${itemId.value}`,
-        passwordOnly ? item.value : savePayload(),
-      );
+      const res = await axios.put(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`, body);
       toast.success(t('settings.common.nameUpdated', { name: objectTitle('') }));
+      props.settings.afterSave?.(res.data);
       loadItems();
     } catch (err) {
       toast.error(Helpers.parseAxiosResponseError(err, 'Failed to update item'));
@@ -670,12 +710,14 @@ async function updateItem(passwordOnly = false) {
 }
 async function removeItem() {
   try {
+    let res;
     if (isFlat) {
-      await axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`);
+      res = await axios.delete(`/api/v${props.apiVersion}/${objectType}?name=${encodeURIComponent(item.value.name)}`);
     } else {
-      await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
+      res = await axios.delete(`/api/v${props.apiVersion}/${objectType}/${itemId.value}`);
     }
     toast.success(t('settings.common.nameDeleted', { name: objectTitle('') }));
+    props.settings.afterSave?.(res?.data);
     unselectItem();
     loadItems();
   } catch (err) {
@@ -929,7 +971,9 @@ function emptyTextOf(field) {
  */
 async function onCreated(field, name) {
   const list = await loadList(field.values, false, field.valuesApiVersion);
-  parentLists.value[field.parent] = field.clearable ? [{ [field.valueKey]: '', [field.labelKey]: '' }, ...list] : list;
+  parentLists.value[field.parent] = field.clearable
+    ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }, ...list]
+    : list;
   if (name !== undefined && name !== null) item.value[field.key] = name;
 }
 
@@ -970,6 +1014,11 @@ function savePasswordFromDialog(secret) {
   updateItem(true);
 }
 const isLastStep = computed(() => stepIndex.value === steps.value.length - 1);
+// the record dialog's width : the shown step's own (a wide step, as the repositories' usages),
+// else the object's, else lg
+const dialogSize = computed(
+  () => (wizardActive.value && steps.value[stepIndex.value]?.dialogSize) || props.settings.dialogSize || 'lg',
+);
 // the help of the step shown (a step's notes(item)) : what to know before filling it in, as
 // the permissions a provider needs
 const stepNotes = computed(() => {
@@ -1086,10 +1135,16 @@ const isInvalidPassword = computed(() => {
 // BsDataTable mode (always on — BsDataTable is the only table renderer)
 // the list's delete action : with one, the rows get checkboxes, to delete several at once
 const deleteAction = computed(() => actions.value.find((a) => a.name === 'delete') || null);
-// checkboxes : a list that is selectable (the default), one whose rows can be deleted, or one that
-// asks for them (checkboxes : a read-only list, the rows ticked exported)
+// deleting several at once : not for a list whose delete asks a question of its own per record
+// (settings.confirmDelete : a repository holding objects says what stays in the app, and its
+// answer is said after) - each is deleted from its row, its question asked
+const bulkDeleteAction = computed(() =>
+  typeof props.settings.confirmDelete === 'function' ? null : deleteAction.value,
+);
+// checkboxes : a list that is selectable (the default), one whose rows can be deleted several at
+// once, or one that asks for them (checkboxes : a read-only list, the rows ticked exported)
 const dataTableSelectable = computed(
-  () => props.settings.selectable !== false || !!deleteAction.value || !!props.settings.checkboxes,
+  () => props.settings.selectable !== false || !!bulkDeleteAction.value || !!props.settings.checkboxes,
 );
 // the table's controls on the title line (BsDataTable's toolbar), their widths in pixels as their
 // labels make them : the search, Select all on a list whose rows can be ticked, the columns, the
@@ -1460,6 +1515,8 @@ function onDataTableRowClick(item) {
 }
 
 async function bulkDelete() {
+  // a delete that asks per record (settings.confirmDelete) is never done several at once
+  if (!bulkDeleteAction.value) return;
   // only what is still on screen : a selected row that has since disappeared must not
   // be guessed at, and the count in the confirmation has to be the count acted on
   const present = new Map(itemList.value.map((r) => [r[idKey], r]));
@@ -1652,7 +1709,7 @@ defineExpose({
               >{{ action.title }} ({{ bulkRows(action).length }})</BsButton
             >
           </template>
-          <BsButton v-if="count && deleteAction" icon="trash" @click="bulkDelete">
+          <BsButton v-if="count && bulkDeleteAction" icon="trash" @click="bulkDelete">
             {{ t('common.delete') }} ({{ count }})
           </BsButton>
         </template>
@@ -1785,6 +1842,7 @@ defineExpose({
     :show="['select', 'edit', 'new', 'change_password'].includes(action) && !usesPasswordDialog"
     :icon="objectIcon"
     :title="title"
+    :size="dialogSize"
     @close="unselectItem"
   >
     <template #actions>
@@ -1880,6 +1938,41 @@ defineExpose({
             </div>
           </div>
         </div>
+
+        <!-- RRULE FIELD : the iCal rrule of a repository schedule, its next runs under it -->
+        <div v-if="showField(field) && field.type === 'rrule'" class="row mb-3">
+          <label class="col-sm-2 col-form-label fw-bold">
+            {{ field.label }}
+            <span v-if="field.required" class="text-danger">*</span>
+          </label>
+          <div class="col-sm-10">
+            <BsRrule
+              v-model="$v.item[field.key].$model"
+              :hasError="$v.item[field.key].$invalid && $v.item[field.key].$dirty"
+            />
+            <small v-if="field.help" class="form-text text-muted d-block mt-1">{{ textOf(field.help) }}</small>
+            <!-- why it is refused, BsRrule says under its box : here only the other errors (required),
+                 not the validator's same reason a second time -->
+            <div v-if="$v.item[field.key].$invalid && $v.item[field.key].$dirty" class="invalid-feedback d-block">
+              <div
+                v-for="error in $v.item[field.key].$errors.filter((e) => e.$validator !== 'custom')"
+                :key="error.$uid"
+              >
+                {{ error.$message }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- USAGE FIELD : a repository's usage types under their headings (AppRepositoryUsage), its
+             flags on the record ; a one-only type another record has greyed with its name -->
+        <AppRepositoryUsage
+          v-if="showField(field) && field.type === 'usage'"
+          v-model="item"
+          class="mb-3"
+          :others="itemList"
+          :readonly="!!field.readonly"
+        />
 
         <!-- A SHORT CHECKBOX (shortLabel) : at the left edge, its label and a few grey words
              (shortHint) on one line ; one only (oneOnly) and already ticked on another record :
@@ -2039,7 +2132,14 @@ defineExpose({
 
         <!-- ALL OTHER FIELD TYPES -->
         <BsInput
-          v-else-if="showField(field) && field.type !== 'datetime' && field.type !== 'cron' && !field.listWhen?.(item)"
+          v-else-if="
+            showField(field) &&
+            field.type !== 'datetime' &&
+            field.type !== 'cron' &&
+            field.type !== 'rrule' &&
+            field.type !== 'usage' &&
+            !field.listWhen?.(item)
+          "
           :isHorizontal="true"
           :type="field.type"
           :placeholder="action == 'edit' && field.onEdit ? '********' : textOf(field.placeholder)"
@@ -2191,21 +2291,7 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* a one-only checkbox another record already has : the whole line greyed */
-.af-taken .form-check-label,
-.af-taken .form-check-label span {
-  color: var(--bs-secondary-color) !important;
-  opacity: 0.6;
-}
-/* a radio of a group, or a short checkbox : at the left edge, the list tight */
-.af-short-check {
-  margin-bottom: 0.6rem;
-}
-/* the labels one width, so their grey hints line up in a column */
-.af-short-label {
-  display: inline-block;
-  min-width: 12rem;
-}
+/* .af-taken, .af-short-check and .af-short-label : global (styles/bootstrap-override.scss) */
 /* a follow-up radio group : indented to the labels of the group above, its title small and
    bold, a line at its left joining it to the option it follows */
 .af-radio-nested {

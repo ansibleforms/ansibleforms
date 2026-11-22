@@ -19,6 +19,7 @@ import { LABEL_COLORS } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -139,6 +140,8 @@ const previewLabels = computed(() => {
 const { search, searching, matchingKeys } = useRecordSearch();
 const shownFields = computed(() =>
   matchingKeys([
+    // one kept in a repository : where it comes from
+    ...repositorySourceFields(t, record.value),
     ['name', t('settings.labels.label'), t('settings.labels.nameHelp')],
     ['color', t('settings.labels.color'), t('settings.labels.colorHelp')],
     ['position', t('settings.labels.position'), t('settings.labels.positionHelp')],
@@ -228,6 +231,8 @@ onMounted(async () => {
           <h6 v-if="searching && shownFields.length" class="fw-bold text-body-secondary af-search-tab af-search-first">
             <FaIcon :icon="tabs[0].icon" class="me-1" />{{ tabs[0].label }}
           </h6>
+          <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+          <AppRepositorySource v-show="fieldShown('source')" :record="record" />
           <BsInput
             v-show="fieldShown('name')"
             class="af-label-field"

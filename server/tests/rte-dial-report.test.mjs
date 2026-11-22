@@ -1,4 +1,4 @@
-// Why a socket between the app and an RTE could not be opened (server/src/rte/socket/dialReport.js) :
+// Why a socket between the controller and an RTE could not be opened (server/src/rte/socket/dialReport.js) :
 // the cause in plain words with a hint, the address without its credentials, never the token,
 // and the log said once per cause, again at most every few minutes while it lasts, and once
 // when the socket opens again.
@@ -56,19 +56,19 @@ describe("what a failed dial says", () => {
     assert.equal(scrub(`proxy http://joe:pw@proxy:3128 said ${TOKEN}`, [TOKEN]), "proxy http://***@proxy:3128 said ***");
   });
 
-  test("a refusal of the handshake : its status, the app's reason and a hint", () => {
+  test("a refusal of the handshake : its status, the controller's reason and a hint", () => {
     const r401 = describeDialFailure({ status: 401, body: JSON.stringify({ error: "the token of RTE 'x' is not the one stored for its runner: check its RTE_TOKEN" }) }, { url: APP });
     assert.equal(r401.cause, "http-401");
     assert.match(r401.text, /HTTP 401: the token of RTE 'x'/);
     assert.match(r401.text, /RTE_TOKEN/);
     const r404 = describeDialFailure({ status: 404, body: "<html><body><h1>Not Found</h1></body></html>" }, { url: APP });
     assert.match(r404.text, /HTTP 404: Not Found/);
-    assert.match(r404.text, /APP_URL/);
+    assert.match(r404.text, /CONTROLLER_URL/);
     assert.match(r404.text, /BASE_URL/);
     assert.match(describeDialFailure({ status: 407 }, { url: APP, proxy: true }).text, /HTTPS_PROXY/);
     assert.match(describeDialFailure({ status: 409, body: "{\"error\":\"runner 'x' waits for approval\"}" }, { url: APP }).text, /waits for approval/);
     assert.match(describeDialFailure({ status: 502 }, { url: APP }).text, /proxy or load balancer/);
-    // the app dialing an inbound RTE : the hints are its own
+    // the controller dialing an inbound RTE : the hints are its own
     assert.match(describeDialFailure({ status: 401 }, { side: "rte", url: "wss://rte:8443/rte/v1/socket" }).text, /runner's credential/);
     assert.match(describeDialFailure({ status: 404 }, { side: "rte", url: "wss://rte:8443/rte/v1/socket" }).text, /RTE_URL/);
   });
@@ -79,12 +79,12 @@ describe("what a failed dial says", () => {
     assert.equal(out.cause, "tls-DEPTH_ZERO_SELF_SIGNED_CERT");
     assert.match(out.text, /not trusted/);
     assert.match(out.text, /NODE_EXTRA_CA_CERTS/);
-    assert.match(out.text, /APP_TLS_VERIFY=0/);
+    assert.match(out.text, /CONTROLLER_TLS_VERIFY=0/);
     assert.match(describeDialFailure({ error: self }, { side: "rte", url: "wss://rte:8443/" }).text, /registered with/);
     const name = Object.assign(new Error("Hostname/IP does not match certificate's altnames"), { code: "ERR_TLS_CERT_ALTNAME_INVALID" });
-    assert.match(describeDialFailure({ error: name }, { url: APP }).text, /not for forms\.example\.com.*APP_URL/);
+    assert.match(describeDialFailure({ error: name }, { url: APP }).text, /not for forms\.example\.com.*CONTROLLER_URL/);
     const dns = Object.assign(new Error("getaddrinfo ENOTFOUND forms.example.com"), { code: "ENOTFOUND", hostname: "forms.example.com" });
-    assert.match(describeDialFailure({ error: dns }, { url: APP }).text, /forms\.example\.com does not resolve.*APP_URL/);
+    assert.match(describeDialFailure({ error: dns }, { url: APP }).text, /forms\.example\.com does not resolve.*CONTROLLER_URL/);
     assert.match(describeDialFailure({ error: dns }, { url: APP, proxy: true }).text, /through the proxy/);
     const refused = Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:443"), { code: "ECONNREFUSED", address: "10.0.0.5", port: 443 });
     assert.match(describeDialFailure({ error: refused }, { url: APP }).text, /nothing listens at 10\.0\.0\.5:443/);
@@ -118,7 +118,7 @@ describe("what a failed dial says", () => {
         const url = `wss://127.0.0.1:${tlsServer.address().port}/api/v2/rte/socket`;
         const why = describeDialFailure(await dialOnce(url, { rejectUnauthorized: true }), { url });
         assert.match(why.cause, /^tls-/);
-        assert.match(why.text, /NODE_EXTRA_CA_CERTS|APP_TLS_VERIFY/);
+        assert.match(why.text, /NODE_EXTRA_CA_CERTS|CONTROLLER_TLS_VERIFY/);
       } finally {
         tlsServer.close();
       }
@@ -182,7 +182,7 @@ describe("how often the log says it", () => {
     let now = 0;
     const report = new DialReport({ now: () => now });
     const why = { cause: "dns", text: "the name x does not resolve" };
-    assert.equal(failureLine(report, why, "RTE 'r1': cannot reach the app at wss://x/"), "RTE 'r1': cannot reach the app at wss://x/: the name x does not resolve");
+    assert.equal(failureLine(report, why, "RTE 'r1': cannot reach the controller at wss://x/"), "RTE 'r1': cannot reach the controller at wss://x/: the name x does not resolve");
     now += 1000;
     assert.equal(failureLine(report, why, "p"), null);
     now = DIAL_REPEAT_MS + 1000;

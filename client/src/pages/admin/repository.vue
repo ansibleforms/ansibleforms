@@ -25,6 +25,16 @@ import Profile from '@/lib/Profile';
 import TokenStorage from '@/lib/TokenStorage';
 import { repositoryPullPill, repositoryPushPill } from '@/config/settings';
 import { cronValidationMessage } from '@/config/cron';
+import {
+  USAGE_FLAGS,
+  confirmUsageChange,
+  confirmUsageDelete,
+  usageToast,
+  usageSearchFields,
+  usedFor,
+  usageLabel,
+  repositorySourceFields,
+} from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -61,47 +71,11 @@ const EDITED = [
   'uri',
   'description',
   'credential',
-  'use_for_config',
-  'use_for_forms',
-  'use_for_playbooks',
-  'use_for_workflows',
-  'use_for_inventories',
+  // what the app reads from it : every usage type's flag
+  ...USAGE_FLAGS,
   'cron',
   'rebase_on_start',
 ];
-// what the app reads from it, each its short label and a few grey words, as in the dialog
-const USAGES = computed(() =>
-  [
-    {
-      key: 'use_for_config',
-      label: t('settings.repositories.useConfigShort'),
-      hint: t('settings.repositories.useConfigHint'),
-      oneOnly: true,
-    },
-    {
-      key: 'use_for_forms',
-      label: t('settings.repositories.useFormsShort'),
-      hint: t('settings.repositories.useFormsHint'),
-    },
-    {
-      key: 'use_for_playbooks',
-      label: t('settings.repositories.usePlaybooksShort'),
-      hint: t('settings.repositories.usePlaybooksHint'),
-      oneOnly: true,
-    },
-    {
-      key: 'use_for_inventories',
-      label: t('settings.repositories.useInventoriesShort'),
-      hint: t('settings.repositories.useInventoriesHint'),
-    },
-    {
-      key: 'use_for_workflows',
-      label: t('settings.repositories.useWorkflowsShort'),
-      hint: t('settings.repositories.useWorkflowsHint'),
-    },
-  ].sort((a, b) => a.label.localeCompare(b.label)),
-);
-
 /**
  * The fields of a record as this page edits them : the checkboxes booleans, the schedule's
  * switch read from the schedule.
@@ -114,14 +88,7 @@ const USAGES = computed(() =>
  */
 function editable(record) {
   const out = Object.fromEntries(EDITED.map((k) => [k, record[k] ?? '']));
-  for (const u of [
-    'use_for_config',
-    'use_for_forms',
-    'use_for_playbooks',
-    'use_for_workflows',
-    'use_for_inventories',
-    'rebase_on_start',
-  ]) {
+  for (const u of [...USAGE_FLAGS, 'rebase_on_start']) {
     out[u] = !!record[u];
   }
   out.pull_scheduled = !!(record.cron && String(record.cron).trim());
@@ -205,34 +172,12 @@ function emptyOutput(key) {
   if (key !== 'push-output') return t('settings.repositories.noOutput');
   return t(canPush.value ? 'settings.repositories.noPushOutput' : 'settings.repositories.noPushTarget');
 }
-// pushed back : only what the designer writes to it, its forms, settings, playbooks, workflows or inventories
-// (and, on the button, only when it has changes not pushed yet)
-const canPush = computed(
-  () =>
-    !!(
-      repo.value?.use_for_forms ||
-      repo.value?.use_for_config ||
-      repo.value?.use_for_playbooks ||
-      repo.value?.use_for_workflows ||
-      repo.value?.use_for_inventories
-    ),
-);
+// pushed back : only what the app writes to it, its forms, config, playbooks, workflows,
+// inventories or the objects it holds (and, on the button, only when it has changes not pushed yet)
+const canPush = computed(() => usedFor(repo.value).length > 0);
+// the other repositories, as saved : who already has a one-only usage
+const otherRepos = computed(() => others.value.filter((r) => r.name !== repo.value?.name));
 const cronError = computed(() => (edit.value?.pull_scheduled ? cronValidationMessage(t, edit.value.cron) : null));
-
-/**
- * The other repository that already has a one-only usage, so this one cannot take it too.
- *
- * Args:
- *   usage (object): one of USAGES.
- *
- * Returns:
- *   string|null: that repository's name.
- */
-function takenBy(usage) {
-  if (!usage.oneOnly || edit.value[usage.key]) return null;
-  const other = others.value.find((r) => r[usage.key] && r.name !== repo.value.name);
-  return other ? other.name : null;
-}
 
 /**
  * Reads the name of the repository the address numbers, from the repositories list.
@@ -348,6 +293,8 @@ const { search, searching, matches, matchingKeys, shownTabs, tabShown, searchHea
 // each tab's fields : [key, label, help], only those it shows (as the template's v-if)
 const tabFields = computed(() => ({
   details: [
+    // one listed in a repositories repository's repositories: entries : where it comes from
+    ...repositorySourceFields(t, repo.value),
     ['pull', t('settings.fields.pull')],
     ['push', t('settings.fields.push')],
     ['head', t('settings.fields.head'), repo.value?.head],
@@ -361,7 +308,7 @@ const tabFields = computed(() => ({
     repo.value?.user &&
       !edit.value?.credential && ['own_user', t('settings.repositories.ownUser', { user: repo.value.user })],
   ].filter(Boolean),
-  usage: USAGES.value.map((usage) => [usage.key, usage.label, usage.hint]),
+  usage: usageSearchFields(t),
   schedule: [
     ['pull_scheduled', t('settings.repositories.scheduledPull'), t('settings.repositories.helpScheduledPull')],
     ['rebase_on_start', t('settings.repositories.cloneOnStart'), t('settings.repositories.helpCloneOnStart')],
@@ -398,9 +345,14 @@ async function save() {
     toast.warning(cronError.value);
     return;
   }
+  // its object usages turned on or off : one question first, a section per type (Cancel saves
+  // nothing)
+  if (!(await confirmUsageChange(t, repoName.value, repo.value, data))) return;
   try {
-    await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
+    const res = await axios.put(`/api/v2/repository/${encodeURIComponent(repoName.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
+    // and what it did to the objects of each usage
+    usageToast(t, res.data);
     // renamed : the api knows it by its new name from now on ; its address, its number, stays
     if (data.name !== repoName.value) repoName.value = data.name;
     await load();
@@ -429,8 +381,18 @@ async function run(what) {
   if (running.value) watchRun();
 }
 
-// Delete asks first
+// Delete asks first ; a repository holding objects says they stay in the app
 const confirmDelete = ref(false);
+
+/**
+ * Asks before the delete : the question of a repository holding objects (they stay in the app),
+ * or the usual one.
+ */
+async function askDelete() {
+  const answer = await confirmUsageDelete(t, repo.value);
+  if (answer === null) confirmDelete.value = true;
+  else if (answer) await deleteRepo();
+}
 
 /**
  * Deletes the repository, then goes back to the repositories.
@@ -439,10 +401,11 @@ async function deleteRepo() {
   confirmDelete.value = false;
   try {
     const name = repoName.value;
-    await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`);
+    const res = await axios.delete(`/api/v2/repository/${encodeURIComponent(repoName.value)}`);
     edit.value = null;
     repo.value = null;
     toast.success(t('settings.common.nameDeleted', { name }));
+    usageToast(t, res.data);
     router.push('/settings/repositories');
   } catch (err) {
     fail(err);
@@ -520,8 +483,42 @@ onMounted(async () => {
                 <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
               </h6>
             </template>
-            <!-- a form name it shares with another forms repository : the copy used, the one skipped -->
-            <div v-for="d in repo.formDuplicates || []" :key="d.skipped.place" class="alert alert-warning py-2">
+            <!-- listed in a repositories repository's repositories: entries : which one -->
+            <AppRepositorySource v-show="fieldShown('source')" :record="repo" />
+            <!-- its roles, categories or constants read from config.yaml : deprecated, a line each -->
+            <div v-for="d in repo.deprecations || []" :key="d.key" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{
+                t('settings.repositories.configDeprecated', { key: usageLabel(t, d.key), file: d.file })
+              }}
+            </div>
+            <!-- its roles, role by role : one refused (its last version served), a required one kept,
+                 a group, user or runner one names that is not there -->
+            <div v-for="(line, i) in repo.keyNotices || []" :key="'n' + i" class="alert alert-warning py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{ t('settings.repositories.rolesNotice', { line }) }}
+            </div>
+            <!-- a roles, categories or constants file it holds that is not read : why, what is used meanwhile
+                 (the roles never the base configuration's) -->
+            <div v-for="d in repo.keyProblems || []" :key="'k' + d.key" class="alert alert-danger py-2">
+              <FaIcon icon="triangle-exclamation" class="me-2" />{{
+                t(
+                  d.key === 'roles'
+                    ? 'settings.repositories.configRolesNotRead'
+                    : 'settings.repositories.configNotRead',
+                  {
+                    key: usageLabel(t, d.key),
+                    file: d.file,
+                    reason: d.reason,
+                  },
+                )
+              }}
+            </div>
+            <!-- a form name it shares with another forms repository : the copy used, the one skipped
+                 (keyed on both : one file may hold two of them) -->
+            <div
+              v-for="d in repo.formDuplicates || []"
+              :key="`${d.name}|${d.skipped.place}`"
+              class="alert alert-warning py-2"
+            >
               <FaIcon icon="triangle-exclamation" class="me-2" />{{
                 t('settings.repositories.formDuplicate', { name: d.name, used: d.used.place, skipped: d.skipped.place })
               }}
@@ -616,8 +613,8 @@ onMounted(async () => {
               {{ t('settings.repositories.ownUser', { user: repo.user }) }}
             </p>
           </template>
-          <!-- Usage : what the app reads from it ; a one-only usage another repository has is
-             greyed, who has it in the tooltip -->
+          <!-- Usage : what the app reads from it, under five headings ; a one-only usage another
+             repository has is greyed with its name, one of a later version with a short note -->
           <template v-if="tabShown('usage')">
             <template v-if="searching && searchHead('usage')">
               <hr v-if="!searchHead('usage').first" class="mt-4 mb-0 af-search-line" />
@@ -628,26 +625,7 @@ onMounted(async () => {
                 <FaIcon :icon="searchHead('usage').tab.icon" class="me-1" />{{ searchHead('usage').tab.label }}
               </h6>
             </template>
-            <div
-              v-for="usage in USAGES"
-              v-show="fieldShown(usage.key)"
-              :key="usage.key"
-              class="form-check af-short-check"
-              :class="{ 'af-taken': takenBy(usage) }"
-              :title="takenBy(usage) ? t('settings.common.takenBy', { name: takenBy(usage) }) : null"
-            >
-              <input
-                :id="'af-usage-' + usage.key"
-                v-model="edit[usage.key]"
-                class="form-check-input"
-                type="checkbox"
-                :disabled="sourceLocked || !!takenBy(usage)"
-              />
-              <label class="form-check-label" :for="'af-usage-' + usage.key">
-                <span class="af-short-label">{{ usage.label }}</span>
-                <span class="text-body-secondary small">{{ usage.hint }}</span>
-              </label>
-            </div>
+            <AppRepositoryUsage v-model="edit" :others="otherRepos" :readonly="sourceLocked" :shown="fieldShown" />
           </template>
           <!-- Schedule : the scheduled pull and its schedule, the clone on app start -->
           <template v-if="tabShown('schedule')">
@@ -740,7 +718,7 @@ onMounted(async () => {
         <BsButton icon="redo" cssClass="text-nowrap" :disabled="running" @click="run('reset')">{{
           t('settings.repositories.reset')
         }}</BsButton>
-        <BsButton v-if="appStore.isAdmin" icon="trash" @click="confirmDelete = true">{{ t('common.delete') }}</BsButton>
+        <BsButton v-if="appStore.isAdmin" icon="trash" @click="askDelete()">{{ t('common.delete') }}</BsButton>
         <BsButton icon="save" :disabled="!dirty" @click="save()">{{ t('settings.common.save') }}</BsButton>
       </template>
       <!-- the record loading : its buttons as grey placeholders, so the title line keeps its
@@ -763,19 +741,6 @@ onMounted(async () => {
 }
 .af-repo-head {
   font-size: 0.85em;
-}
-/* the short checkboxes : their labels one width, so the grey hints line up, as in the dialog */
-.af-short-check {
-  margin-bottom: 0.6rem;
-}
-.af-short-label {
-  display: inline-block;
-  min-width: 12rem;
-}
-.af-taken .form-check-label,
-.af-taken .form-check-label span {
-  color: var(--bs-secondary-color) !important;
-  opacity: 0.6;
 }
 /* git's output, as the server log : a bordered box that scrolls within the card, each line
    numbered in a grey column, git's own spacing kept */

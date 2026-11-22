@@ -8,6 +8,7 @@ import Schema, { importSsoEnvOnce } from '../models/schema.model.js';
 import mysql from "../models/db.model.js";
 import Repository from '../models/repository.model.js';
 import Schedule from '../models/schedule.model.js';
+import RepoObjects from '../lib/repoObjects/index.js';
 import BackupModel from '../models/backup.model.js';
 import cronService from '../services/cron.service.js';
 import appConfig from "../../config/app.config.js";
@@ -368,6 +369,12 @@ const initOnce = async function({ boot = false } = {}){
     await cronService.resync()
     return schemaIsReady
   }
+
+  // the repositories' objects read in first, in their fixed order (credentials, secret stores,
+  // what signs in with them, then the others) : what changed in git while no worker ran is what
+  // the app starts with, and the schedules what the cron service registers
+  logger.info("Synchronizing the objects of the repositories (credentials, runners, schedules ...)")
+  await RepoObjects.syncAll()
 
   logger.info("Initializing cron service for scheduled tasks")
   // Initialize all cron jobs from database (repositories, schedules)

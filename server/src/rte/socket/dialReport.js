@@ -1,8 +1,8 @@
 /******************************************************************/
 /*                                                                */
-/*  Why a socket between the app and an RTE could not be opened,  */
+/*  Why a socket between the controller and an RTE could not be opened,  */
 /*  in plain words, and how often the log says it. An outbound    */
-/*  RTE dials the app (rte/socket/rte-socket.js), the app dials   */
+/*  RTE dials the controller (rte/socket/rte-socket.js), the controller dials   */
 /*  an inbound RTE (runners/rteHub.js) : a name that does not     */
 /*  resolve, nothing listening, a certificate not trusted, a      */
 /*  proxy or the other side refusing the handshake each get a     */
@@ -106,7 +106,7 @@ function refusalText(body) {
  *   failure (object): { error : the socket's error (with its code), or status : the HTTP
  *     status the handshake was refused with and body : its body ; neither : it closed before
  *     it opened, with code : the close code }.
- *   opts (object): { side : "app" when an RTE dials the app (outbound), "rte" when the app
+ *   opts (object): { side : "app" when an RTE dials the controller (outbound), "rte" when the controller
  *     dials an inbound RTE ; url : the address dialed ; proxy : true when it went through
  *     HTTPS_PROXY ; secrets : the values never to show }.
  *
@@ -130,17 +130,17 @@ export function describeDialFailure(failure = {}, { side = "app", url = "", prox
     const said = `HTTP ${status}${why ? `: ${why}` : ""}`;
     if (status === 401) {
       return say(`http-${status}`, outbound
-        ? `the app refused this RTE's token (${said}): check RTE_TOKEN against its runner's token, or RTE_JOIN_TOKEN for a first join`
-        : `the RTE refused the app's token (${said}): its RTE_TOKEN is not the token of its runner's credential`);
+        ? `the controller refused this RTE's token (${said}): check RTE_TOKEN against its runner's token, or RTE_JOIN_TOKEN for a first join`
+        : `the RTE refused the controller's token (${said}): its RTE_TOKEN is not the token of its runner's credential`);
     }
     if (status === 403) {
       return say(`http-${status}`, outbound
-        ? `the app refused this RTE (${said}): its runner may be rejected or removed under Connections > Runners`
+        ? `the controller refused this RTE (${said}): its runner may be rejected or removed under Connections > Runners`
         : `the RTE refused the socket (${said})`);
     }
     if (status === 404) {
       return say(`http-${status}`, outbound
-        ? `no RTE socket at this address (${said}): APP_URL must be the app's address as people open it, with its BASE_URL path if any, and a proxy in front must pass it on`
+        ? `no RTE socket at this address (${said}): CONTROLLER_URL must be the controller's address as people open it, with its BASE_URL path if any, and a proxy in front must pass it on`
         : `no RTE socket at this address (${said}): the runner's address (RTE_URL) must be the RTE itself, and a proxy in front must pass /rte/v1/socket on`);
     }
     if (status === 407) {
@@ -148,7 +148,7 @@ export function describeDialFailure(failure = {}, { side = "app", url = "", prox
     }
     if (status === 409) {
       return say(`http-${status}`, outbound
-        ? `the app refused this RTE (${said}): a runner of that name (RTE_NAME) exists already or waits for approval`
+        ? `the controller refused this RTE (${said}): a runner of that name (RTE_NAME) exists already or waits for approval`
         : `the RTE refused the socket (${said})`);
     }
     if (status === 400 || status === 426) {
@@ -169,12 +169,12 @@ export function describeDialFailure(failure = {}, { side = "app", url = "", prox
   // ─── the certificate ───
   if (UNTRUSTED_CODES.includes(code)) {
     return say(`tls-${code}`, outbound
-      ? `the app's certificate is not trusted (${code}: ${message}): name its CA with NODE_EXTRA_CA_CERTS (a PEM file), or set APP_TLS_VERIFY=0 inside one trusted network`
+      ? `the controller's certificate is not trusted (${code}: ${message}): name its CA with NODE_EXTRA_CA_CERTS (a PEM file), or set CONTROLLER_TLS_VERIFY=0 inside one trusted network`
       : `the RTE's certificate is not trusted (${code}: ${message}): it is not the one the RTE registered with (restart the RTE so it registers again), or put its CA in the runner's credential`);
   }
   if (code === "ERR_TLS_CERT_ALTNAME_INVALID") {
     return say(`tls-${code}`, outbound
-      ? `the app's certificate is not for ${host} (${message}): APP_URL must use a name the certificate holds, or set APP_TLS_VERIFY=0 inside one trusted network`
+      ? `the controller's certificate is not for ${host} (${message}): CONTROLLER_URL must use a name the certificate holds, or set CONTROLLER_TLS_VERIFY=0 inside one trusted network`
       : `the RTE's certificate is not for ${host} (${message}): the runner's address (RTE_URL) must use a name the certificate holds`);
   }
   if (EXPIRED_CODES.includes(code)) {
@@ -186,7 +186,7 @@ export function describeDialFailure(failure = {}, { side = "app", url = "", prox
 
   // ─── the network ───
   if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
-    return say(`dns-${code}`, `the name ${err.hostname || host} does not resolve${via} (${code}): check the ${outbound ? "APP_URL" : "runner's address (RTE_URL)"} host and this container's DNS`);
+    return say(`dns-${code}`, `the name ${err.hostname || host} does not resolve${via} (${code}): check the ${outbound ? "CONTROLLER_URL" : "runner's address (RTE_URL)"} host and this container's DNS`);
   }
   if (code === "ECONNREFUSED") {
     return say(`net-${code}`, `nothing listens at ${err.address ? `${err.address}:${err.port}` : host}${via} (${code}): is the ${proxy ? "proxy" : outbound ? "app" : "RTE"} running, on that port?`);
@@ -204,7 +204,7 @@ export function describeDialFailure(failure = {}, { side = "app", url = "", prox
  * How often the log says that a socket could not be opened : the first failure and every
  * change of cause at once, the same cause again at most once every repeatMs while it lasts,
  * and the socket opening after failures once. One per dialed address (an outbound RTE has one,
- * the app one per inbound runner).
+ * the controller one per inbound runner).
  */
 export class DialReport {
   /**
@@ -289,7 +289,7 @@ export function ago(ms) {
  * Args:
  *   report (DialReport): the dialed address's report.
  *   why (object): describeDialFailure()'s { cause, text }.
- *   prefix (string): who dials what ("RTE 'x': cannot reach the app at wss://...").
+ *   prefix (string): who dials what ("RTE 'x': cannot reach the controller at wss://...").
  *
  * Returns:
  *   string|null

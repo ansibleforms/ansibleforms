@@ -4,7 +4,7 @@
 /*  callback plugin writes one JSON line per play, task and host  */
 /*  result to a file ; this reads the file as it grows, every     */
 /*  half second, and hands the new events on in order - to the    */
-/*  database (database mode) or the app (socket modes).           */
+/*  database (database mode) or the controller (socket modes).           */
 /*                                                                */
 /******************************************************************/
 import fs from "fs";

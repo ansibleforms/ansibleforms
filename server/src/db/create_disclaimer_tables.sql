@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS `disclaimer_versions` (
   `checkbox_label` varchar(200) NOT NULL,
   `created_by` varchar(250) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  -- the repository and the file (disclaimer/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS `disclaimer_acceptances` (

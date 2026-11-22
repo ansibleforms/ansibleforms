@@ -246,7 +246,7 @@
     type: string
     allowed: a valid file path
     short: Config seed file
-    hint: A file declaring runners, credentials, databases, SSO, repositories and settings, instead of clicking them together.
+    hint: A file declaring runners, credentials, databases, users, groups, SSO, repositories and settings, instead of clicking them together.
     default: ""
     description: |
       Path to a declarative config seed. When set, the yaml file it points to is applied at
@@ -286,7 +286,9 @@
       deployment (kubernetes, docker-compose, ArgoCD): there the file is either ephemeral, so a
       save is silently lost at the next restart, or durable, so it drifts away from the manifest
       that is meant to be authoritative. With 0 every variable is shown with its value in force
-      but cannot be changed, and the save endpoint refuses.
+      but cannot be changed, and the save endpoint refuses. The config seed's own `mcp:` section and the
+      language and Designer link of its `defaults:` and `links:` sections are still applied: the seed is the
+      declaration this setting stands for.
   - name: FORMS_FOLDER_PATH
     version: 6.1.0
     type: string
@@ -357,100 +359,124 @@
   - name: AF_ROLE
     version: 7.0.0
     type: string
-    allowed: all, app, worker, rte
+    allowed: all, controller, worker, rte
     short: What this process runs
     default: all
     description: |
-      `all` (the default, or unset) is AnsibleForms as it always ran: the web app and the
-      worker in one process. To run several app nodes behind a load balancer, split them:
-      `app` serves the web interface and the API only (as many as you like, each with the same
-      `ACCESS_TOKEN_SECRET`), and `worker` runs the background work only - the database
-      bootstrap and seed, the schedules, the nightly backup, the repository syncs and the
-      cleanups. One worker works at a time ; a second one waits and takes over when the first
-      stops. App nodes and the worker share the database and the persistent volume.
+      `all` (the default, or unset) is AnsibleForms as it always ran: the controller's web
+      interface, its API and the worker in one process. To run several controller nodes behind a
+      load balancer, split them: `controller` serves the web interface and the API only (as many
+      as you like, each with the same `ACCESS_TOKEN_SECRET`), and `worker` runs the background
+      work only - the database bootstrap and seed, the schedules, the nightly backup, the
+      repository syncs and the cleanups. One worker works at a time ; a second one waits and takes
+      over when the first stops. Controller nodes and the worker share the database and the
+      persistent volume. `app`, the name of `controller` before 7.8, is still read the same
+      (deprecated, removed in 8.0, said in the log at start) ; a node started with it keeps its
+      `app-` name, so it finds its own jobs again after the upgrade.
 
-      `rte` starts the same image as a runtime environment that runs playbooks for an app, with
-      no web interface, scheduler or seed. How it talks to the app is `RTE_MODE`: over one
-      WebSocket (`outbound`, it dials the app at `APP_URL` ; `inbound`, the app dials it at
-      `RTE_URL`), holding no database credentials ; or, deprecated, reading and writing the app's
-      database itself (`database`, with `DB_*` and the same `ENCRYPTION_SECRET`). Either way it
-      needs `RTE_TOKEN`.
+      `rte` starts the same image as a runtime environment that runs playbooks for a controller,
+      with no web interface, scheduler or seed. How it talks to the controller is `RTE_MODE`: over
+      one WebSocket (`outbound`, it dials the controller at `CONTROLLER_URL` ; `inbound`, the
+      controller dials it at `RTE_URL`), holding no database credentials ; or, deprecated, reading
+      and writing the controller's database itself (`database`, with `DB_*` and the same
+      `ENCRYPTION_SECRET`). Either way it needs `RTE_TOKEN`.
   - name: RTE_MODE
     version: 7.3.0
     type: string
     allowed: outbound, inbound or database
     default: database
-    short: How an RTE talks to the app
-    hint: "Read by an RTE: outbound dials the app, inbound is dialed by it; database is deprecated."
+    short: How an RTE talks to the controller
+    hint: "Read by an RTE: outbound dials the controller, inbound is dialed by it; database is deprecated."
     description: |
       Read by an RTE (`AF_ROLE=rte`).
 
-      `outbound`: the RTE dials the app (`APP_URL`) and keeps one WebSocket open, redialing when
-      it drops. Nothing reaches the RTE from outside: only its zone to the app on the app's port,
-      through a proxy if `HTTPS_PROXY` says so. The first time it joins with `RTE_JOIN_TOKEN`.
+      `outbound`: the RTE dials the controller (`CONTROLLER_URL`) and keeps one WebSocket open,
+      redialing when it drops. Nothing reaches the RTE from outside: only its zone to the
+      controller on the controller's port, through a proxy if `HTTPS_PROXY` says so. The first
+      time it joins with `RTE_JOIN_TOKEN`.
 
       `HTTPS_PROXY` and `NO_PROXY` (lower case read too) are the system's own proxy variables,
       set on the RTE's container rather than here, and a playbook keeps them: the socket to the
-      app and an inbound RTE's registration call go through `HTTPS_PROXY`, unless the app's host
-      is in `NO_PROXY` (host names, `.domain` suffixes, or `*` for every host).
+      controller and an inbound RTE's registration call go through `HTTPS_PROXY`, unless the
+      controller's host is in `NO_PROXY` (host names, `.domain` suffixes, or `*` for every host).
 
       A dial that fails is logged at warning with its cause and a hint: a name that does not
       resolve, nothing listening, a certificate not trusted or not for that name, a proxy, or
-      the app refusing the socket (401 the token, 404 the `APP_URL` path or `BASE_URL`). The
-      first failure and every change of cause are logged at once, the same cause again at most
-      every 5 minutes while it lasts, and reaching the app again at notice. The app does the
-      same for an inbound RTE it cannot dial. The token is never logged.
+      the controller refusing the socket (401 the token, 404 the `CONTROLLER_URL` path or
+      `BASE_URL`). The first failure and every change of cause are logged at once, the same cause
+      again at most every 5 minutes while it lasts, and reaching the controller again at notice.
+      The controller does the same for an inbound RTE it cannot dial. The token is never logged.
 
-      `inbound`: the RTE listens and the app dials it at its runner's address (`RTE_URL`), one
-      app node at a time. With `APP_URL` (and `RTE_JOIN_TOKEN` the first time) it registers
-      itself with one call ; without, add its runner under Connections > Runners (type RTE, mode
-      inbound, its address and `RTE_TOKEN`).
+      `inbound`: the RTE listens and the controller dials it at its runner's address (`RTE_URL`),
+      one controller node at a time. With `CONTROLLER_URL` (and `RTE_JOIN_TOKEN` the first time)
+      it registers itself with one call ; without, add its runner under Connections > Runners
+      (type RTE, mode inbound, its address and `RTE_TOKEN`).
 
-      In both socket modes the RTE holds no database credentials: the app sends it each job and
-      stores what comes back - the output, the events, the end - exactly once, and sends the end
-      notifications. The job's files come with it unless `RTE_FILES=local`.
+      In both socket modes the RTE holds no database credentials: the controller sends it each job
+      and stores what comes back - the output, the events, the end - exactly once, and sends the
+      end notifications. The job's files come with it unless `RTE_FILES=local`.
 
-      `database` (deprecated, removed in 8.0.0): the RTE reads and writes the app's database
+      `database` (deprecated, removed in 8.0.0): the RTE reads and writes the controller's database
       itself, with `DB_*` and the same `ENCRYPTION_SECRET` - the only mode before 7.3, and the one
       of an RTE without `RTE_MODE` throughout 7.x. It logs a deprecation warning at its start.
-  - name: APP_URL
-    version: 7.3.0
+  - name: CONTROLLER_URL
+    version: 7.8.0
     type: string
     allowed: an http:// or https:// address
-    short: The app's address an RTE dials
-    hint: "On an outbound RTE (and an inbound one that registers itself): the app's address."
+    short: The controller's address an RTE dials
+    hint: "On an outbound RTE (and an inbound one that registers itself): the controller's address."
     description: |
-      On an RTE in `outbound` mode: the app's address as people open it -
+      On an RTE in `outbound` mode: the controller's address as people open it -
       `https://forms.example.com`, with its `BASE_URL` if any. The RTE adds the socket's path
       (`/api/v2/rte/socket`) and dials it over `wss://` (`ws://` for an http address).
 
       On an RTE in `inbound` mode: the address of its one registration call (with `RTE_URL` and,
-      the first time, `RTE_JOIN_TOKEN`) ; the app dials it from then on.
+      the first time, `RTE_JOIN_TOKEN`) ; the controller dials it from then on.
 
       The certificate is checked: name a private CA with `NODE_EXTRA_CA_CERTS`, or turn the check
-      off inside one trusted network with `APP_TLS_VERIFY=0`.
+      off inside one trusted network with `CONTROLLER_TLS_VERIFY=0`. Replaces `APP_URL`, still
+      read when this one is not set.
+  - name: CONTROLLER_TLS_VERIFY
+    version: 7.8.0
+    type: number
+    allowed: 0 or 1
+    default: 1
+    short: Whether an RTE checks the controller's certificate
+    hint: "On an RTE: 0 accepts the controller's self-signed certificate, inside one trusted network only."
+    description: |
+      On an RTE that dials the controller (`CONTROLLER_URL`). 1: the controller's certificate must
+      be valid for its name (a private CA through `NODE_EXTRA_CA_CERTS`). 0: any certificate is
+      accepted - only inside one trusted network, such as a compose project or a pod, where the
+      controller's certificate is self-signed. Replaces `APP_TLS_VERIFY`, still read when this one
+      is not set.
+  - name: APP_URL
+    version: 7.3.0
+    type: string
+    allowed: an http:// or https:// address
+    short: The controller's address an RTE dials (deprecated)
+    description: |
+      **Deprecated: use `CONTROLLER_URL` ; removed in 8.0.** Still read when `CONTROLLER_URL` is not
+      set, with a warning in the log at start ; when both are set, `CONTROLLER_URL` wins.
   - name: APP_TLS_VERIFY
     version: 7.3.0
     type: number
     allowed: 0 or 1
     default: 1
-    short: Whether an RTE checks the app's certificate
-    hint: "On an RTE: 0 accepts the app's self-signed certificate, inside one trusted network only."
+    short: Whether an RTE checks the controller's certificate (deprecated)
     description: |
-      On an RTE that dials the app (`APP_URL`). 1: the app's certificate must be valid for its
-      name (a private CA through `NODE_EXTRA_CA_CERTS`). 0: any certificate is accepted - only
-      inside one trusted network, such as a compose project or a pod, where the app's certificate
-      is self-signed.
+      **Deprecated: use `CONTROLLER_TLS_VERIFY` ; removed in 8.0.** Still read when
+      `CONTROLLER_TLS_VERIFY` is not set, with a warning in the log at start ; when both are set,
+      `CONTROLLER_TLS_VERIFY` wins.
   - name: RTE_JOIN_TOKEN
     version: 7.3.0
     type: string
     allowed: a join token of Connections > Runners (afj_...)
-    short: The token an RTE joins the app with, once
+    short: The token an RTE joins the controller with, once
     hint: "On an RTE: a join token that approves it at once, for unattended installs."
     description: |
-      On an RTE in a socket mode, the first time, optional. Without it an RTE the app does not
+      On an RTE in a socket mode, the first time, optional. Without it an RTE the controller does not
       know asks to join and waits for an admin's approval under Connections > Runners. With it
-      the RTE is approved at once - for unattended installs - and the app adds it as a runner
+      the RTE is approved at once - for unattended installs - and the controller adds it as a runner
       (or gives a runner of that name still waiting for approval the new token ; an approved
       runner keeps its token, which only an admin changes). Join tokens are made through the
       API (`POST /api/v2/runner/jointoken`, an admin). From then on the RTE signs in with its own
@@ -471,9 +497,9 @@
     allowed: transfer or local
     default: transfer
     short: Where a socket-mode RTE gets a job's files
-    hint: "On an RTE in a socket mode: transfer gets them from the app, local uses its own folders."
+    hint: "On an RTE in a socket mode: transfer gets them from the controller, local uses its own folders."
     description: |
-      On an RTE in a socket mode. `transfer`: the app sends the playbooks folder and the
+      On an RTE in a socket mode. `transfer`: the controller sends the playbooks folder and the
       inventories with the job, packed and named by a hash of their content ; the RTE keeps them
       packed (`RTE_CACHE_PATH`) and an unchanged folder is never sent twice. Each job unpacks
       them in a private folder of its own, removed when it ends. It needs no shared disk and
@@ -486,29 +512,29 @@
     type: number
     allowed: a positive integer
     default: 512
-    short: The largest folder the app sends an RTE
-    hint: "Read by the app: a bigger playbooks or inventory folder must be mounted on the RTE."
+    short: The largest folder the controller sends an RTE
+    hint: "Read by the controller: a bigger playbooks or inventory folder must be mounted on the RTE."
     description: |
-      Read by the app: a playbooks or inventory folder bigger than this is not sent to an RTE
+      Read by the controller: a playbooks or inventory folder bigger than this is not sent to an RTE
       with `RTE_FILES=transfer` ; the job fails and says to mount the folder on the RTE instead.
   - name: RTE_SPOOL_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-spool"
-    short: Where a socket-mode RTE keeps what the app has not stored yet
+    short: Where a socket-mode RTE keeps what the controller has not stored yet
     hint: "On an RTE in a socket mode: keep it on a volume so a restart resends what is left."
     description: |
-      On an RTE in a socket mode: each job's output, events and end wait here until the app acks
-      them, and are sent again after a reconnect - to the same app node or another. On a volume,
+      On an RTE in a socket mode: each job's output, events and end wait here until the controller acks
+      them, and are sent again after a reconnect - to the same controller node or another. On a volume,
       an RTE that restarts sends what it had not delivered.
   - name: RTE_CACHE_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-files"
-    short: Where a socket-mode RTE keeps the job files the app sent
+    short: Where a socket-mode RTE keeps the job files the controller sent
     hint: "On an RTE with RTE_FILES=transfer: the packed folders it got, up to RTE_CACHE_MB."
     description: |
-      On an RTE with `RTE_FILES=transfer`: the playbooks and inventory folders the app sent,
+      On an RTE with `RTE_FILES=transfer`: the playbooks and inventory folders the controller sent,
       packed, each under its hash ; those used most recently are kept, up to `RTE_CACHE_MB`. Each
       running job unpacks them under `jobs/` in a private folder, removed when the job ends.
   - name: RTE_CACHE_MB
@@ -520,17 +546,17 @@
     hint: "On an RTE with RTE_FILES=transfer, in MB; 0 keeps none. Also on its runner page."
     description: |
       On an RTE with `RTE_FILES=transfer`: how much the job files it keeps (`RTE_CACHE_PATH`)
-      may take, in MB. The ones used longest ago go first ; 0 keeps none, so the app sends a
+      may take, in MB. The ones used longest ago go first ; 0 keeps none, so the controller sends a
       job's files with every job. It can be set on the runner page (Connections >
       Runners > the runner > RTE) ; a value there wins over this variable.
   - name: RTE_TOKEN
     version: 7.0.0
     type: string
     allowed: at least 16 characters
-    short: The token between an app and its RTE
+    short: The token between a controller and its RTE
     description: |
       On an RTE (`AF_ROLE=rte`): the bearer token every call must carry ; the RTE refuses to
-      start without one. The app stores the same token on the runner (Connections > Runners) ;
+      start without one. The controller stores the same token on the runner (Connections > Runners) ;
       a socket-mode RTE that joins (`RTE_JOIN_TOKEN` or an admin's approval) puts it there. A
       database-mode RTE that registers itself (`RTE_REGISTER`) does too, and keeps it in step.
   - name: RTE_REGISTER
@@ -590,7 +616,7 @@
     allowed: 0 or a positive integer
     default: 60
     short: Wait for a busy or disconnected RTE (minutes)
-    hint: Read by the app nodes and the worker.
+    hint: Read by the controller nodes and the worker.
     description: |
       A job handed to an RTE that is full (RTE_MAX_JOBS) or stopping waits for it, asking again
       every 10 seconds, for this many minutes ; then it fails and says why. An abort ends the
@@ -606,19 +632,19 @@
     hint: "On an RTE: 127.0.0.1 keeps it on its own host (a native outbound RTE)."
     description: |
       On an RTE (`AF_ROLE=rte`): the address its listener binds (its probes, its metrics and,
-      inbound, the socket the app dials). Not set: every interface, as before. `127.0.0.1` keeps
-      a native outbound RTE, which takes no call from the app, reachable from its own host only.
-      An inbound RTE must listen where the app reaches it (`RTE_URL`).
+      inbound, the socket the controller dials). Not set: every interface, as before. `127.0.0.1` keeps
+      a native outbound RTE, which takes no call from the controller, reachable from its own host only.
+      An inbound RTE must listen where the controller reaches it (`RTE_URL`).
   - name: RTE_URL
     version: 7.0.0
     type: string
     allowed: an http:// or https:// address, without a slash on the end
-    short: The address the app reaches an RTE on
-    hint: "On an inbound RTE: the address the app dials it on, usually its service name."
+    short: The address the controller reaches an RTE on
+    hint: "On an inbound RTE: the address the controller dials it on, usually its service name."
     description: |
-      On an RTE in `inbound` mode: the address the app dials it on, usually the service name -
+      On an RTE in `inbound` mode: the address the controller dials it on, usually the service name -
       `http://rte:8000` in docker compose, the service in kubernetes. It is required when the RTE
-      registers itself with `APP_URL` (it refuses to start without it), and becomes its runner's
+      registers itself with `CONTROLLER_URL` (it refuses to start without it), and becomes its runner's
       address. On an `outbound` RTE it is optional: it is only recorded as the runner's address.
 
       On a deprecated database-mode RTE that registers itself (`RTE_REGISTER`): the address it
@@ -626,11 +652,11 @@
       `PORT`, named after the node (`rte-<hostname>-<port>`), which change when it is recreated.
 
       An inbound RTE (`RTE_MODE=inbound`) over TLS: set `HTTPS=1` with its own `HTTPS_CERT` and
-      `HTTPS_KEY`, and an `https://` address here. When it registers (`APP_URL`) it sends its
-      certificate, the app keeps it as the ca_bundle of the runner's credential and dials the
+      `HTTPS_KEY`, and an `https://` address here. When it registers (`CONTROLLER_URL`) it sends its
+      certificate, the controller keeps it as the ca_bundle of the runner's credential and dials the
       RTE pinned to it, whatever name the certificate was made for. A runner waiting for
       approval shows the certificate's fingerprint, which the RTE logs at its start. Over plain
-      `http://` to another host the app sends `RTE_TOKEN` in clear, and says so in its log.
+      `http://` to another host the controller sends `RTE_TOKEN` in clear, and says so in its log.
   - name: JOB_RETENTION_DAYS
     version: 6.3.0
     type: number
@@ -731,10 +757,10 @@
     description: | 
       With 1, the worker creates the schema (all AnsibleForms tables) itself at startup when it finds an empty database.
       It only does so on a database without a single AnsibleForms table, so an existing installation is never recreated.
-      App nodes wait until the worker has created and patched the schema before they serve.
+      Controller nodes wait until the worker has created and patched the schema before they serve.
 
       With 0, nothing creates the schema: the worker skips it at startup, the schema endpoint refuses to create it,
-      and app nodes start without waiting for it. Set 0 to rule out any schema creation, for example on a production database.
+      and controller nodes start without waiting for it. Set 0 to rule out any schema creation, for example on a production database.
 
       The docker-compose MySQL only creates the empty `AnsibleForms` database and its user on its first start:
       the tables come from AnsibleForms, so keep 1 for a fresh install.
@@ -993,7 +1019,8 @@
       config seed), forms with `enableForChat: true`, and users whose roles allow `allowChat`
       (the default). Form definitions and the values being filled in are sent to that
       provider ; passwords, credentials and job output never are. Takes effect at once,
-      without a restart. See the Chat assistant page of the documentation.
+      without a restart. A Chat assistant repository keeps it as `enable_chat` in its
+      `controller_chat_assistant:` map, never General's. See the Chat assistant page of the documentation.
   - name: API_TOKEN_MAX_DAYS
     version: 7.0.0
     type: number
@@ -1055,7 +1082,7 @@
     hint: "0 turns it off."
     description: |
       A ceiling on the authentication endpoints - the login, the logout, the token refresh and the
-      single sign-on callbacks - per client address and per app node: above it they answer 429
+      single sign-on callbacks - per client address and per controller node: above it they answer 429
       before any password or token is looked at. Generous, so that a person or a script never
       reaches it ; LOGIN_MAX_FAILURES is what stops a password from being guessed. Behind a
       reverse proxy, set TRUST_PROXY so the address is the client's. Applied without a restart.
@@ -1070,7 +1097,7 @@
       After this many failed logins in a row, an account (local or LDAP) is locked for
       LOGIN_LOCKOUT_MINUTES: every attempt is refused with status 429 before any password is
       checked, whether the account exists or not. A successful login clears the count, and so
-      does an admin setting the user's password. Counted in the database, so every app node
+      does an admin setting the user's password. Counted in the database, so every controller node
       sees the same attempts. 0 turns the lockout off. Applied without a restart.
   - name: LOGIN_MAX_FAILURES_PER_IP
     version: 7.0.0
@@ -1298,7 +1325,7 @@
     short: Prometheus metrics token
     hint: Unset, /api/v2/metrics answers 404; applied without a restart.
     description: |
-      Set, an app node (`AF_ROLE` `all` or `app`) serves Prometheus metrics at `/api/v2/metrics`
+      Set, a controller node (`AF_ROLE` `all` or `controller`) serves Prometheus metrics at `/api/v2/metrics`
       and an RTE at `/metrics`, to a scraper that sends `Authorization: Bearer <METRICS_TOKEN>`.
       Unset, they answer 404. A worker (`AF_ROLE=worker`) serves no metrics: it answers only
       `/api/v2/version` and `/health`, for its container healthcheck.
@@ -1562,7 +1589,7 @@
       To keep the communication between client and server safe, we strongly recommend you to set this secret.
 
       Not set: each start generates a random secret, so a restart ends every session and everyone logs in again.
-      An app node (`AF_ROLE=app`) refuses to start without it: set the same value on every app node.
+      A controller node (`AF_ROLE=controller`) refuses to start without it: set the same value on every controller node.
   - name: ACCESS_TOKEN_EXPIRATION
     type: string
     allowed: a valid time indication
@@ -1660,7 +1687,7 @@
       The secret must be 32 characters long ; a shorter one is extended and a longer one cut.
       Setting it, or changing it, re-encrypts every stored secret with it on the next start, in one
       transaction, so none is lost : from the default key the first time, from
-      ENCRYPTION_SECRET_PREVIOUS after that. Set the same value on every app node, the worker and
+      ENCRYPTION_SECRET_PREVIOUS after that. Set the same value on every controller node, the worker and
       every RTE that registers itself.
   - name: ENCRYPTION_SECRET_PREVIOUS
     type: string
@@ -1683,7 +1710,7 @@
     default: "%PERSISTENT_FOLDER%/playbooks"
     description: |
       Read by an RTE (`AF_ROLE=rte`): the folder its playbooks run from when no repository is
-      marked for playbooks. Since 7 the app runs no playbook itself, so set this in the RTE
+      marked for playbooks. Since 7 the controller runs no playbook itself, so set this in the RTE
       container's environment ; it is not editable on the Settings page.
   - name: REGEX_FILTER_JOB_OUTPUT
     type: string
@@ -1747,7 +1774,7 @@
     allowed: a positive number
     default: 5
     short: AWX silence before a job is given up (minutes)
-    hint: Read by the app node or worker following the job.
+    hint: Read by the controller node or worker following the job.
     description: |
       While an AWX job runs, the app asks AWX for its status and output every second. When AWX
       does not answer (a network blip, a restart, a busy controller) it tries again with a
@@ -1843,7 +1870,7 @@
       - allowFormDesign: The user can edit the forms config in the designer (categories, constants, forms: save, restore, pull and push the forms repositories). Without it the designer shows them read-only. Default true. (Added in 7.3.0)
       - designAllForms: The designer shows and edits every form. Without it, only the forms whose `roles` hold one of the user's roles: the others are left out (never named, a name taken by one is only said to be taken, a form of theirs naming one as a subform shows nothing of it). The subforms no hidden form uses (new ones included) are theirs to edit, a subform a hidden form uses as well as one of theirs is shown read only, and a form saved (a subform aside) must keep one of their roles. A file holding several forms keeps the hidden ones as they are, restoring a backup needs this option, and the form files are left out of the designer's other explorers (a repository's whole tree, as the workflows show it). The forms list leaves out the warning of a form name defined twice unless both copies are theirs, and the settings pages' Forms tabs and a credential's Used by tab, reached with a part of the settings only (not showSettings), list only the forms their designer shows. Limits the forms only (playbooks and workflows have designAllPlaybooks and designAllWorkflows); inventories, vars files, categories and constants stay visible to every designer. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowPlaybookDesign: The user can edit the playbooks in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.0.0)
-      - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the app or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
+      - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the controller or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowWorkflowDesign: The user can edit the workflows in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
       - designAllWorkflows: Show and edit every workflow in the designer; without it, only the workflows used by the forms the user can see, and the ones no form uses yet. A form uses the workflow file it runs (`workflow`) and the nested workflows that one runs (every workflow a reference may mean, when several have its name); the forms it can see follow designAllForms. A hidden workflow file is never listed nor read (nor named in a credential's Used by tab, without showSettings): it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Workflows still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
       - allowInventoryDesign: The user can edit the inventories in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
@@ -2070,7 +2097,7 @@
           - allowFormDesign: The user can edit the forms config in the designer (categories, constants, forms: save, restore, pull and push the forms repositories). Without it the designer shows them read-only. Default true. (Added in 7.3.0)
           - designAllForms: The designer shows and edits every form. Without it, only the forms whose `roles` hold one of the user's roles: the others are left out (never named, a name taken by one is only said to be taken, a form of theirs naming one as a subform shows nothing of it). The subforms no hidden form uses (new ones included) are theirs to edit, a subform a hidden form uses as well as one of theirs is shown read only, and a form saved (a subform aside) must keep one of their roles. A file holding several forms keeps the hidden ones as they are, restoring a backup needs this option, and the form files are left out of the designer's other explorers (a repository's whole tree, as the workflows show it). The forms list leaves out the warning of a form name defined twice unless both copies are theirs, and the settings pages' Forms tabs and a credential's Used by tab, reached with a part of the settings only (not showSettings), list only the forms their designer shows. Limits the forms only (playbooks and workflows have designAllPlaybooks and designAllWorkflows); inventories, vars files, categories and constants stay visible to every designer. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowPlaybookDesign: The user can edit the playbooks in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.0.0)
-          - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the app or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
+          - designAllPlaybooks: Show and edit every playbook in the designer; without it, only the playbooks used by the forms the user can see, and the ones no form uses yet. A form uses a playbook by its `playbook` (with `playbookSubPath`), its ansible steps and the job template nodes of the workflows it runs (on the controller or an rte runner); the forms it can see follow designAllForms. A hidden playbook is never listed nor read: it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Playbooks still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowWorkflowDesign: The user can edit the workflows in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
           - designAllWorkflows: Show and edit every workflow in the designer; without it, only the workflows used by the forms the user can see, and the ones no form uses yet. A form uses the workflow file it runs (`workflow`) and the nested workflows that one runs (every workflow a reference may mean, when several have its name); the forms it can see follow designAllForms. A hidden workflow file is never listed nor read (nor named in a credential's Used by tab, without showSettings): it answers as a missing file, or as a file there already, and a form of theirs naming one, or a workflow file whose nodes run one, is refused. Edit Workflows still decides whether the shown ones can be changed. Off, the user may not run a raw expression either (POST /api/v2/expression with an `expression` of its own, as the designer previews a form not saved yet): it could read the files hidden from them. The expressions of the saved forms still run, and showSettings still allows a raw one. A form saved may not gain an expression or a query the server runs that it does not have already (403). Default true, always true for admins. (Added in 7.5.0)
           - allowInventoryDesign: The user can edit the inventories in the designer (save, new, remove, push). Without it the designer shows them read-only. Default true. (Added in 7.1.0)
@@ -6472,6 +6499,706 @@
       ```
       
       All forms appear together in the UI, automatically merged!
+  - name: Schedules kept in a git repository
+    short: Schedules in YAML, entries of a schedules list in any file
+    version: v7.8.0
+    description: |
+      The scheduler always runs from the database; a git repository is an optional source kept in step with it.
+      One repository at most has the **Schedules** usage (`use_for_schedules`, Settings > Connections >
+      Repositories); a second one is refused, by the API and by the config seed. Its schedules are the entries of
+      a top-level `controller_schedules:` list, in any YAML file of the repository, any name, any folder, at any depth (see
+      *Repository usage types*, where a repository keeps them). A schedule is found by its name, never by its
+      file. Without a schedules repository, schedules live in the database only. Either way a schedule is timed the
+      same three ways: a cron, an iCal rrule, or one run at a moment (`one_time_run`, its value the moment).
+
+      **An entry** is a single schedule: its name, the form it runs (`form`, the form's name), its timing, its
+      values and its prompts (inventory and credentials by name or by natural key):
+      ```yaml
+      controller_schedules:
+        - name: Nightly log rotation
+          description: ''
+          rrule: DTSTART;TZID=Europe/Brussels:20261020T020000 RRULE:FREQ=DAILY;INTERVAL=1
+          enabled: true
+          form: Nightly Workflow            # the AnsibleForms form it runs
+          extra_data:                       # the form's values (its extra vars)
+            retention_days: 14
+          limit: webservers                 # a prompt, see below
+        - name: Weekly report
+          form: Weekly Report
+          rrule: DTSTART:20261019T060000Z RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO
+        - name: Workday backup
+          form: Backup
+          cron: '30 22 * * 1-5'                 # a cron, quoted (a value starting with * is no YAML text)
+        - name: Migrate the database
+          form: Migration
+          one_time_run: '2026-11-14T21:00:00+01:00'   # one run, at that moment
+      ```
+
+      **Its timing** is exactly one of three keys; none, or more than one, refuses the entry (the pull output says
+      why):
+
+      | Key | Runs | Checked as |
+      |---|---|---|
+      | `rrule` | on an iCal rrule, in its own time zone | below |
+      | `cron` | on a cron, in the scheduler's time zone (`LOG_TZ`) | an app schedule's cron: 5 or 6 fields, croner itself |
+      | `one_time_run` | once, at the moment it gives | an ISO 8601 time with its offset or `Z`; a time without a zone is refused |
+
+      Each is stored and run as an app schedule of that timing: a cron stays a cron, a `one_time_run` is a one-time run. A
+      one-time schedule is deleted once it has run, as in the app; its entry stays in git as it is, and the next
+      pulls do not import it again: an entry whose `one_time_run` is past is skipped, said on a `Not imported` line of
+      the pull output, unless the app still waits to run it (its moment passed while the server was down: it runs
+      then, as an app one-time schedule does). Change its `one_time_run` to a moment ahead to run it again.
+
+      **The prompts** become the reserved extra vars the job reads: `limit` (`__limit__`), `job_tags`
+      (`__tags__`), `skip_tags` (`__skipTags__`), `verbosity` (`__verbosity__`), `diff_mode` (`__diff__`),
+      `job_type: check` (`__check__`), `inventory` (`__inventory__`), `scm_branch` (`__scmBranch__`),
+      `execution_environment` (`__executionEnvironment__`), `instance_groups` (`__instanceGroups__`) and
+      `credentials` (each by its own name in `__credentials__`). `forks`, `timeout`, `job_slice_count` and `labels`
+      are checked and kept in the entry, AnsibleForms has nothing to give them to. Any other key, your own
+      included, is kept as it is when the app writes the entry, and never read.
+
+      **The rrule** times the schedule, in its own time zone: `DTSTART` with a `TZID` (an IANA zone such as
+      `Europe/Brussels`, or a fixed offset from `UTC-12` to `UTC+14` written `UTC+5` or `GMT-3`) or a UTC time
+      ending in `Z`, one or more `RRULE`, and `EXRULE`. Refused: no or several `DTSTART`, a
+      naive one, `EXDATE`, `RDATE`, a rule without `INTERVAL` or with one under 1, `SECONDLY`, `BYDAY` with a number
+      (`5MO`), `COUNT` with `UNTIL`, `COUNT` above 999 (in any case, `count=5000` too), a `BYxxx` number out of its
+      range (`BYHOUR` 0 to 23, `BYSETPOS` 1 to 366 or -366 to -1, `BYEASTER` -80 to 250 ...), a `WKST` that is no
+      weekday, a `DTSTART` or `UNTIL` that is no real day and time (`20300230`), a part given twice in a rule
+      (`FREQ=FOO;INTERVAL=1;FREQ=DAILY`, `BYDAY` and `BYWEEKDAY` being one part), and a rule that never fires: no run in the 50 years after its `DTSTART` (`FREQ=HOURLY;INTERVAL=2;BYHOUR=1`
+      from midnight only meets even hours). A rule whose runs take longer than a second to work out is refused, saying so (one saved
+      before is tried again a minute later). A time a DST change skips runs when the clock reaches it (02:30 runs at 03:30 the night
+      the clock goes from 02:00 to 03:00), as a cron does; a time the clock shows twice runs once, at the first.
+      A schedule sent a cron or a one time run without a rrule drops the rrule it had, and a rrule with a one time
+      run is refused, wherever it is kept.
+
+      **In the app and its API** a schedule has the same three fields, exactly one of them set: `cron`, `rrule`
+      or `one_time_run`, the moment of its one run (`2026-11-15T22:00:00+01:00`); its kind is the one that is
+      set. A "Run later" job a user plans is a one-time run too. The pair the API took before 7.8.0,
+      `one_time_run: true` with `run_at`, is still read as `one_time_run` at that moment (deprecated, removed in 8,
+      a warning in the server log), and `one_time_run: false` with a cron as that cron.
+
+      **Turning it on.** Before it is saved, the app shows what it will do. Then the repository is pulled and its
+      entries are read in; an entry named as a schedule of the app replaces that schedule's definition (git wins,
+      its runs and history stay). Every other schedule of the app is written to the repository as a new entry, at
+      the end of the first file holding `controller_schedules:` (else of `schedules.yaml` at its root, made), waiting
+      for the repository's Push, with its own timing as it is: `cron:`, `rrule:` or `one_time_run:`, nothing converted.
+      The "Run later" jobs users planned stay in the app: they are those users' jobs, run as them. Its launch
+      options are written as the prompts a pull reads them from (`__limit__` as `limit`, `__check__` as
+      `job_type: check`, its credentials by name ...); an option no prompt gives (a credential mapped under
+      another name) is kept in the app only, and the question says so. The result is shown and logged.
+
+      **Pull: git to the app.** After each pull (or clone, reset) of the schedules repository and at the start of
+      the worker, its entries are read into Jobs > Scheduled: a new name makes a schedule, a changed entry changes
+      it, a removed one removes it (its past jobs stay), an entry moved to another file keeps its schedule. An entry
+      with no name, no timing, two timings or a refused one, no `form`, a form that does not exist, or a name
+      another schedule has (or another entry gives too), is refused alone: the repository's pull output and the
+      server log name it (`schedules.yaml#Nightly log rotation`) and say why, a schedule it made before stays as it
+      was, and the other entries still sync. When and how a schedule ran stays in the database, never in the file.
+
+      **The app: back to git.** While the repository is used, every new schedule is saved and written to it as a new
+      entry (the first file holding `controller_schedules:`, else `schedules.yaml`), with the
+      timing chosen in its dialog (a cron, a rrule or a one time run); editing a repository schedule (its name,
+      description, form, enabled, timing, extra vars) writes its entry where it is, only the fields changed: a
+      timing of another kind is written under its own key (`cron:`, `rrule:` or `one_time_run:`), the other two removed.
+      Deleting one removes its entry (the file with it when it holds nothing more). "Run later" jobs users planned
+      stay in the database. As for the
+      designer's forms, the change waits in the repository's working tree (its Push column says so) until the
+      repository is pushed.
+
+      **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and its
+      entries read in (skipped, and said, when it cannot be reached), then its schedules are unlinked. They stay in
+      the app with their name, form, timing, values, enabled and job options, and keep running on their timing; the
+      files in git are left as they are. Turning it on again goes through the same steps as the first time.
+      Repository schedules run as the Schedule Service, as every schedule of the app.
+
+      **The `schedule` extra var.** Every job a schedule launches gets the schedule as the extra var `schedule`:
+      its `id`, `name`, `description`, `form`, `enabled`, `queue_id`, `repository`, `repo_file` and
+      `one_time_run` (the moment of its one run, null for a recurring one). `schedule.run_at` is the same moment
+      under the name it had before 7.8.0, kept for the playbooks that read it: deprecated, removed in 8.
+  - name: Repository usage types
+    short: What a repository is used for, in five groups
+    version: v7.8.0
+    description: |
+      A repository's **Usage** step (Settings > Connections > Repositories, its dialog and its page) lists what the
+      app reads from it, one box per type, in five groups. A box on a group's heading ticks or unticks every type of
+      the group that can be ticked; a type another repository uses is greyed with that repository's name. The
+      repositories list shows one **Usage** column: a badge per type the repository is used for.
+
+      | Group | Types (flag) |
+      | --- | --- |
+      | Designer | Categories (`use_for_categories`), Constants (`use_for_constants`), Forms (`use_for_forms`), Inventories (`use_for_inventories`), Playbooks (`use_for_playbooks`), Workflows (`use_for_workflows`), Schedules (`use_for_schedules`) |
+      | Access | Disclaimer (`use_for_disclaimer`), Users (`use_for_users`), Groups (`use_for_groups`), Roles (`use_for_roles`), LDAP (`use_for_ldap`), SSO (`use_for_sso`) |
+      | Connections | Repositories (`use_for_repositories`), Credentials (`use_for_credentials`), Secret stores (`use_for_secret_stores`), Databases (`use_for_databases`), Runners (`use_for_runners`), Notifications (`use_for_notifications`), Chat assistant (`use_for_chat_assistant`), MCP (`use_for_mcp`), Syslog (`use_for_syslog`) |
+      | Appearance | Defaults (`use_for_defaults`), Logo (`use_for_logo`), Icon (`use_for_icon`), Name (`use_for_name`), Links (`use_for_links`), Labels (`use_for_labels`), Announcements (`use_for_announcements`) |
+      | System | General (`use_for_general`) |
+
+      Forms, Playbooks, Workflows and Inventories work as before (several repositories may hold forms, workflows
+      and inventories).
+
+      **Several forms repositories** are read in the order they were added (as before 7.8), so a form name
+      defined in two of them always resolves to the same copy: the one in the repository added first, in the
+      forms list, a form opened and the designer alike. The other copy is skipped, and the warning names both, for example `Form 'Deploy' is
+      defined twice: forms-ops/forms/deploy.yaml is used, forms-team/forms/deploy.yaml is skipped (form names must
+      be unique across forms repositories)`. It shows with the forms' other load warnings, in the pull output of
+      each repository involved, and as a warning line on each one's page. The designer saves the copy used, where it
+      is; a new form whose name another forms repository already defines is refused, saying where it is.
+
+      **Roles, Categories and Constants** (the Config usage of before, split) each read only their own key of the
+      base configuration, one repository at most each: `controller_roles:`, `controller_categories:` and
+      `controller_constants:` from the file of the repository that gives that key at its top level, any name, any
+      folder (one file may give all three). The roles may be spread over several files (see *Users, groups and
+      roles kept in a git repository*); two files giving the categories, or the constants, are not read, both
+      named on the repository's page and in its pull output. When no
+      file gives it, its own file at the root (`roles.yaml`, `categories.yaml`, `constants.yaml`) is read when it is
+      there, and refused when it does not give the key (a typo, `role:`): its key is never served from the base
+      configuration in its place. Else the key is read from the repository's `config.yaml` (its plain `roles:`,
+      `categories:` and `constants:`, as the base configuration writes them), still working but deprecated: the server log says it once per load, the repository's pull output and its page say it too, for
+      example `roles read from config.yaml: deprecated, move them to a file of their own (controller_roles: in any
+      file, roles.yaml for instance ; config.yaml is no longer read in 8.0.0)`. Any other file giving the key is preferred
+      to `config.yaml`. A key no repository holds comes from where the base configuration comes from (the database copy, or
+      the `CONFIG_PATH` file), as before; the keys of the repositories are laid over it. The designer saving the
+      categories or the constants, and a save of the roles, writes each key back into the file it was read from
+      (`config.yaml` stays `config.yaml` until it is moved), or into a new file of its own (`roles.yaml` ...) when
+      no file gives it; the repository's Push sends it as before. A key is written only when the save changes it, with
+      the comments it was given in the config editor, which shows each key as its file writes it. While the
+      repository holding a key is not cloned (its clone failed, or is under way, a Reset cloning it again), or no
+      file gives it any more after the server read it (deleted, or its key taken out, in git), the key is served as
+      the server last read
+      it, else the roles as the admin role of `local/admins` only (never the base configuration's roles, which the
+      repository replaced) and the categories or constants from the base configuration; the repository's page and
+      its pull output say so. A repository that never had the file serves the base configuration's key until a
+      save writes the file. A save changing a key whose repository is not cloned is refused, never written to the
+      base in its place. A file holding a key that
+      is a ytt template makes the configuration read only, as a templated base does, and a change to that key is
+      refused. A designer backup restored puts each key back into the file of the repository holding it. An install upgraded from before gets the three flags on the repository it
+      read its configuration from (the first one with `use_for_config`); another one that had it gets none, said in
+      the server log. None gets them when the configuration was kept in the database (Config source), which was
+      then served whole: the log says so, and Roles, Categories or Constants can be turned on by hand. The config
+      seed, a repository's `controller_repositories:` entries and the API still take `use_for_config` as a deprecated alias of the three, with
+      a warning; a seed declaring it on several repositories leaves the three on the one holding them already (the
+      one the upgrade gave them to), else gives them to the first one.
+
+      Every other type is an object type, one repository at most per type.
+
+      **Where a repository keeps them: by their content.** Any `.yaml` or `.yml` file of the repository, any name,
+      any folder, at any depth (its `.git` folder and every hidden folder or file left out; a link followed only
+      while it stays in the repository, one leading outside refused and said once in the pull output), holds the
+      types whose key it gives at its top level. One key per type, always `controller_` and the type's key; a plain
+      key (`credentials:`, a Galaxy requirements file's `roles:`, a vars file's `labels:`) is no type's, never read
+      nor written by the app:
+
+      | Key | Holds | Example entry |
+      | --- | --- | --- |
+      | `controller_schedules:` | a list of schedules | `- name: Nightly` |
+      | `controller_credentials:`, `controller_secret_stores:`, `controller_databases:`, `controller_runners:`, `controller_notifications:`, `controller_sso:`, `controller_ldap:`, `controller_syslog:`, `controller_labels:`, `controller_announcements:`, `controller_repositories:` | a list of objects, each found by its `name` | `- name: git-bot` |
+      | `controller_groups:` | a list of local groups, each found by its `name`, listing its members | `- name: ops` |
+      | `controller_users:` | a list of users, each found by its `type` (local when not said) and `username` | `- username: alice` |
+      | `controller_disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
+      | `controller_general:`, `controller_mcp:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
+      | `controller_roles:`, `controller_categories:`, `controller_constants:` | the base configuration's key, as before | |
+
+      A file may hold several types, and a type may be spread over many files. A file whose keys are no type's
+      (a form, a playbook, an inventory, a vars file) is none of theirs, and its keys are never read; a file mixing
+      a type's key with keys of its own: the type's key is read, the others left alone. A form (a map with a
+      `type`, as every form has) is never a type's file, whatever keys it has, and a key with a text, a number or a
+      yes or no under it (a vars file's `name: web`) is no type's either, nor is one whose value has not the type's
+      shape (a list of names under `controller_labels:`, a list under the key of a map): that file is never read nor
+      written to, refused in the pull output, and the objects linked to it are kept; for a type the app has one of,
+      an edit or a turn-on of it is refused meanwhile, as for a file that cannot be read. Only the usages the repository holds are
+      read: a key of another type is left alone, its pull output says so once as a hint (`Not read, the repository
+      is not used for them: controller_labels: (team/look.yaml) - turn the usage on to read them`).
+
+      **An object is its name within its type, never its file.** Each linked object knows the file its entry is in
+      (its page shows it); an entry moved to another file only changes that. Two entries of a type giving the same
+      name, in one file or two, are both refused, naming both places (`the name 'git-bot' is given twice: here
+      (a.yaml, entry 1) and in team/b.yaml (entry 2)`), and the object of that name stays as it was; two files
+      giving the same map (two `controller_defaults:`) are refused the same way, nothing applied. A name changed in git is a
+      delete and a new object, except when, in one pull, exactly one object of the type is gone from a file and
+      exactly one new name of that type appears in that same file, what tells the object apart besides its name
+      unchanged (a credential's `credential_type`, `host` and `user`; a runner's `type`, `uri` and `username`; a
+      notification channel's `type`; a secret store's `type` and `url`): that is its rename, said in the pull
+      output (`Renamed prod-db to main-db (its secrets kept)`), and the object keeps its secrets kept in the
+      database, its id and what uses it (a rename is refused while something uses the object by its old name,
+      unless each user names the new one in the same commit; a disclaimer version never changes its number). One
+      of those fields changed too is another object: the one gone is deleted and a new one made. An entry that is refused or waits keeps the object of its name as it was, and an entry refused
+      without a name keeps the objects its file held whose entries are gone; the objects of a file that cannot be
+      read (not valid YAML) stay as they are, the file refused when its lines seem to give the type's key, and
+      while such a file cannot be read no object whose entry is gone is deleted (it may have moved into it): each
+      one is kept, said in the pull output, until the file is read again.
+
+      **The app writes back where the object is**: an edit rewrites only the fields it changed in that entry, the
+      file's comments, its other keys and entries kept; a new object of the app goes at the end of the first file
+      (by path) giving the type's key, else into `<key>.yaml` at the repository's root, made (`credentials.yaml`
+      holding `controller_credentials:`; one of that name there that gives no such key, a form or a playbook, is never written to: `credentials-2.yaml`
+      then); a delete removes its entry, the key when its list is left empty, and the file when it holds nothing
+      more. Turning a usage on writes the app's objects the same way. Images (the logo's, the icon's) are named
+      relative to the file naming them, inside the repository. Every list and map the app writes is in block style
+      (`- ` items, one key per line), a value you wrote as a flow list (`[a, b]`) too once the app changes it; the
+      flow lists and maps it does not change stay as you wrote them, and flow style is always read.
+
+      **The designer** never lists, reads, writes nor deletes a file giving the key of a type its repository holds
+      (nor the images such a file names), and refuses to write a file whose content would give the key of any type,
+      whether its repository holds that type or not (turned on later, it would read the file in); its forms load
+      never reads a file giving a type's key as forms.
+
+      A repository holding the credentials, the runners and its look, for example (any names would do):
+      ```yaml
+      # platform/access.yaml
+      controller_credentials:
+        - name: git-bot
+          credential_type: git
+          user: bot
+          password: ${GIT_BOT_TOKEN}
+        - name: rte-main
+          credential_type: rte
+          password: ${RTE_MAIN_TOKEN}
+      controller_runners:
+        - name: rte-main
+          type: rte
+          rte_mode: outbound
+          credential: rte-main
+          is_default: true
+      ```
+      ```yaml
+      # look.yml, the logo images/logo.png beside it
+      controller_name:
+        app_name: ACME Automation
+      controller_logo:
+        logo: images/logo.png
+      controller_defaults:
+        default_theme: dark
+      ```
+
+      **Saving several changes at once** asks one question: a section per type turned on or off, with what it will
+      do, one Cancel and one confirm. A single change shows only its own section.
+
+      **A new repository** cannot be read before its first clone, so its question also says that when the remote
+      already has these entries, the version in git wins and replaces the app's. Once the clone is done, in the
+      background, its pull output says what each type took, for example `Now holds the schedules: 0 read from its
+      files, 0 replaced by an entry of the same name, 2 written to schedules.yaml (waiting for Push), 1 kept in the
+      app`, or why
+      one could not follow. A repository that could not be cloned then (or when its usage was turned on) says it is
+      not cloned, and takes the app's objects on its first clone. When what a change will do cannot be read from the server, the question says so in
+      one line instead of each type's section, and the change is still applied if confirmed.
+  - name: Credentials and runners kept in a git repository
+    short: Credentials and runners in YAML, in the seed's format
+    version: v7.8.0
+    description: |
+      A repository with the **Credentials** usage holds its credentials as the entries of a `controller_credentials:` list, one
+      with the **Runners** usage its runners as the entries of a `controller_runners:` list, in any YAML file of it, any name,
+      any folder (see *Repository usage types*). One repository at most per type (the same repository, and the same
+      file, may hold both). An entry is one item of the config seed's `credentials:` or `runners:` section, so seed
+      items and repository entries are interchangeable:
+      ```yaml
+      # connections.yaml
+      controller_credentials:
+        - name: rte-main
+          credential_type: rte
+          password: ${RTE_MAIN_TOKEN}
+      controller_runners:
+        - name: rte-main
+          type: rte
+          rte_mode: outbound
+          credential: rte-main
+          rte_max_jobs: 4
+          is_default: true
+          enabled: true
+      ```
+
+      **Secrets are never plain in git.** A credential's `password` (its token or client secret) and `client_key`,
+      and a runner's own `token` or `password`, are written as `${ENV}` references only, resolved from the
+      environment as the config seed resolves them. Only the secret fields are resolved: in any other field a
+      `${NAME}` stays plain text. An entry holding a plain secret, or naming a variable that is not set, is refused and
+      named in the pull output; so is one naming a variable of the server itself (`DB_*`, `ACCESS_TOKEN_*`,
+      `ENCRYPTION_*`, `ADMIN_*`, `METRICS_TOKEN`, `RTE_JOIN_TOKEN` and the variables Settings > System > General
+      refuses), which the object would send wherever the entry says. `RTE_TOKEN` and `VAULT_TOKEN` stay readable. A file or a folder that is a link leading outside the repository is never read nor
+      written through. An app object written to git (turning the usage on, a new object,
+      an edit) is written without its secrets, which stay in the database; the pull output lists the objects whose
+      secrets come from the database. A secret typed in the app for an object whose entry gives that secret as an
+      `${ENV}` reference is refused (409), nothing saved: the next pull would put the variable's value back, so
+      change the variable, or the entry in git. An object whose entry is no longer in git (removed, or renamed there
+      while the rename is refused) is never written back as a second entry: an edit of a field its entry would
+      hold is refused the same way, until it is fixed in git.
+
+      **Pull: git to the app.** After each pull (or clone, reset) and at the start of the worker, the entries are read
+      in, each found by its name: a new name makes an object, a changed entry changes it, a removed one removes it.
+      After a **Reset**, or any clone where the working tree was gone (a Pull or a Push included), an object whose
+      entry is not in the remote (deleted in git, or written by the app and never pushed) is unlinked and kept in the
+      app with its secrets, never deleted, and never written back by the usage that clone turns on. A key taken out
+      of an entry is taken out of the app too: the field gets the value a new object made from that entry gets (a
+      secret excepted, kept in the database). An entry moved to another file keeps its object, which follows it. An
+      entry the seed's schema or the app's rules refuse (a credential type without its required fields, a runner of
+      another type than its credential) is refused alone, said in the pull output with its place
+      (`connections.yaml#rte-main`). A runner whose credential does not exist yet **waits**, said in the pull output,
+      and is read again when the credentials are next pulled. Removing a credential's entry while a runner, a
+      repository, a secret store, a database, a channel or a sign-in still uses it is refused: the credential stays, the pull
+      output says what uses it; renaming it in its file (the one name gone from that file, the one new name in it)
+      while something uses it is refused the same way, unless every one of them is a repository object whose own
+      entry names the new name in the same commit (the credential renamed, the runner following it). At the worker's start the types are read in a fixed order:
+      credentials, secret stores, what signs in or connects with them (databases, runners ...), then the others.
+
+      **Turning it on** shows what it will do first: the app's objects written to the repository, and the file they
+      go to (those whose secrets stay in the database said), the entries whose name an app object has (git's
+      version wins, the secret in the database kept when the entry gives none), and what stays in the app: objects
+      the config seed manages, runners an RTE registered itself or waiting for approval, and an object named as an
+      entry of the repository that is refused or waits (it follows that entry once it is read in, never a second
+      entry of its name). It also lists what the repository's files hold, each file with the names of its objects,
+      all read in when the usage is turned on; the result then says how many were read in from its files.
+      What the pull before it took is said in its report too. A repository a pull or a push holds for the whole
+      wait is not turned on: the usage is turned off again, nothing written, said in its report - save it again in
+      a moment. **The app: back to git.** Editing a linked object
+      rewrites only the fields that changed in its entry (its `${ENV}` references, comments, other keys and the
+      file's other entries kept), a new object is written as a new entry (the first file holding the type's key,
+      else `credentials.yaml` or `runners.yaml`), deleting one removes its entry; all wait for the repository's Push.
+      A save while the repository is pulled or pushed waits for it a few seconds; still busy, it is refused (409)
+      with nothing changed, never saved in the app without its file. So is a new object, or an edit of a type the
+      app has one of, while a file of the repository that seems to give the type's key cannot be read (not valid
+      YAML): written beside it, the type would be given twice once that file is fixed. An edit or a delete of an
+      object of that type is refused the same way, as the next pull would undo it. Fix the file in git, pull,
+      then save again; turning the usage on keeps the app's objects in the app meanwhile, said in its report.
+      The credential's and the runner's page show **Repository: <name>** and the file of its entry for a linked
+      object.
+
+      **Turning it off**, or deleting the repository, after a question: the repository is pulled once more and read
+      in, then its objects are unlinked; they stay in the app as they are, the files in git untouched.
+  - name: Secret stores, databases, notification channels, SSO, LDAP, syslog servers and labels kept in a git repository
+    short: Lists of objects under their key, in the seed's format
+    version: v7.8.0
+    description: |
+      Seven more object types work exactly as the credentials and the runners (see *Credentials and runners kept in a
+      git repository*): the entries of a list under the type's key, in any YAML file of the repository, one
+      repository at most per type, two ways, the same question before turning a type on or off, the same pull
+      output, and **Repository: <name>** on the object's page. Each entry is in the config seed's format, so a seed
+      item and a repository entry are interchangeable.
+
+      | Usage | Key | An entry is | Names (waits when missing) | Secrets (`${ENV}` only) |
+      | --- | --- | --- | --- | --- |
+      | Secret stores | `controller_secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
+      | Databases | `controller_databases:` | an item of `databases:` | `credential` (of type database) | |
+      | Notifications | `controller_notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `controller_sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | LDAP | `controller_ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
+      | Syslog | `controller_syslog:` | an item of `syslog_servers:` | | |
+      | Labels | `controller_labels:` | an item of `labels:` | | |
+
+      ```yaml
+      # access/directories.yaml
+      controller_ldap:
+        - name: main
+          server: ldap.example.com
+          credential: ldap-bind
+          position: 1
+      controller_sso:
+        - name: corp
+          provider: entraid
+          credential: corp-client
+          enable: true
+      ```
+
+      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `oauth2:`
+      items. `azuread`, its name before, is still read the same (deprecated, removed in 8.0, said in the pull output).
+
+      An entry may leave a secret out: the one in the database stays (an object of the app is written to git without
+      its secrets, and the pull output says so). An SSO provider's entry may therefore give neither its client
+      secret nor a credential when the provider already has its secret in the app.
+
+      **LDAP.** One entry per directory; the main directory's entry is the seed's `ldap:` section with `name: main`,
+      and an entry named `main` takes the main directory over. The main directory keeps its rules: it is never
+      renamed nor deleted, so removing its entry while it is linked is refused, said in the pull output, and the
+      directory stays linked. The directories keep their lookup order: `position` is written to each entry, and
+      moving a directory up or down in the app rewrites the positions of the entries that changed.
+
+      **Labels** keep their order the same way: `position` is in each entry, a label moved in the app rewrites the
+      positions in the entries, and a label without a position goes after the others.
+
+      **Databases** name the credential they connect with, one of type database (Connections > Credentials);
+      an entry naming a credential of another type is refused, one whose credential is not there yet waits:
+      ```yaml
+      controller_databases:
+        - name: cmdb
+          description: The CMDB
+          credential: cmdb-login
+      ```
+      A database holds no secret and no address: its engine, server, database and login are its credential's.
+
+      **Credentials they use** cannot lose their entry: removing a credential's entry while a secret store, a
+      database, a notification channel, an SSO provider, an LDAP directory, a runner, a repository or the chat
+      assistant uses it is refused, said in the pull output. At the worker's start and in one pull the credentials are read first,
+      then what names them; Pull all pulls the repositories in the same order.
+  - name: Repositories kept in a git repository
+    short: The other repositories, entries of a repositories list
+    version: v7.8.0
+    description: |
+      A repository with the **Repositories** usage (`use_for_repositories`, one repository at most) holds the other
+      repositories as the entries of a `controller_repositories:` list, in any YAML file of it, each item in the config seed's format for
+      its `repositories:` section (name, uri, branch, description, `credential` by name, the `use_for_*` flags, the
+      pull schedule `cron`, `rebase_on_start`). As in the seed, an entry may leave out its `branch`: the
+      remote's default branch is used.
+      ```yaml
+      controller_repositories:
+        - name: forms
+          uri: https://git.example.com/forms.git
+          branch: main
+          credential: git-bot
+          use_for_forms: true
+          cron: "*/15 * * * *"
+      ```
+      It works as the other usage types (the same question before turning it on or off, the same pull output, a
+      linked repository's page shows **Repository: <name>**), with these guard rails:
+
+      - **The holder is never in its own files**: an entry named as the repository holding it is not imported
+        (said in the pull output), and turning the usage on never writes the holder to it.
+      - **No chains**: an entry never sets `use_for_repositories` on another repository: refused, said, the
+        entry's other fields applied.
+      - **Credentials and order**: a repository names its credential by name and waits while it is missing. At
+        the worker's start and in one pull the credentials are read first, then the repositories, then every
+        other type (a repository made from an entry may hold any of them).
+      - **A repository made from an entry** is cloned as one made in the app, and its usage types take their
+        objects as if they were ticked (git wins, no question: the entry is the decision). A usage another
+        repository holds already is refused for it, said; its other usages apply.
+      - **An entry removed** deletes its repository as the app's delete does: its objects unlinked, they stay in
+        the app; its working copy removed. Never the holder, and never a repository with changes not pushed
+        yet: refused, kept, said in the pull output.
+      - **The config seed's** repositories stay the seed's, listed as staying in the app.
+      - **Secrets**: a credential by name only. An entry with a `user` or a `password`, or a user and token in
+        its `uri` (`https://user:token@...`), is refused.
+
+      A `controller_repositories:` that is not a list changes nothing in the app (its file refused, said). No file giving
+      `controller_repositories:` at all deletes nothing either: the repositories it listed stay in the app, no longer linked to
+      it (said in the pull output), so an entry the app writes next makes a file that never deletes the others.
+
+  - name: Settings, chat, appearance, announcements and the disclaimer kept in a git repository
+    short: The last usage types, eight of them one map under their key
+    version: v7.8.0
+    description: |
+      The last ten usage types work as the others (two ways, the same question before turning them on or off,
+      the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
+      Eight are things the app has one of (chat, general settings, MCP, and the Appearance pages Defaults, Logo,
+      Icon, Name and Links): each is **one map** under its key (`controller_chat_assistant:`, `controller_general:`, `controller_mcp:`,
+      `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:`) in any YAML file of the repository, one file at most
+      giving it (two are refused, both named, nothing applied), holding what its menu item's page saves and
+      nothing else, so a save on a page writes its own map only. Several of them may share a file. Turning the
+      type on writes the app's values when no file gives it (to `<key>.yaml` at the root, made), or applies the
+      map when one does (git wins); a pull applies it; a save in the app rewrites only the fields it changed, in
+      the file that gives it; turning it off reads it once more and the app keeps its values. A map removed from
+      git changes nothing in the app.
+
+      **Chat assistant** (`controller_chat_assistant:`): what Settings > Connections > Chat assistant saves, every field
+      optional: its switch `enable_chat` (the `ENABLE_CHAT` environment setting, named as its variable in lower case,
+      as Defaults' `default_language`), then the settings in the config seed's `chat:` format. The switch is checked
+      and saved as the page's Save (the chat turns on or off at once, no restart, audited), and a save of the switch on
+      the page rewrites it in the map; the app writes it on or off. When the real environment sets `ENABLE_CHAT`
+      the app never writes it, and a map giving it is refused, nothing applied, as General refuses such a variable.
+      General never holds it. The config seed's `chat:` section has no switch. `api_key` only as `${ENV}`, or left
+      out (the one in the database stays); `credential` names an api credential, and the map waits while it is missing.
+      ```yaml
+      controller_chat_assistant:
+        enable_chat: true
+        provider: openai
+        model: gpt-5
+        api_key: ${CHAT_API_KEY}
+        allow_job_status: false
+      ```
+
+      **General** (`controller_general:`): Settings > System > General by environment variable names, only those that
+      page changes (never one another page or the deployment owns, a refused one, or one set in the real
+      environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
+      command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
+      `ENABLE_CONFIG_IN_DATABASE`, ytt (`USE_YTT`, `YTT_*`), `EXPRESSION_SANITIZER`, `CONTENT_SECURITY_POLICY`,
+      `REST_ALLOWED_HOSTS`, `REST_DENIED_HOSTS`, `REST_IGNORE_CERTS`, the Microsoft sign-in addresses
+      (`ENTRA_*_URI`, `AZURE_*_URI`), `TRUST_PROXY`, `PORT`, `HTTPS`, `HTTPS_KEY` and `HTTPS_CERT`: a map setting one
+      is refused, said with why in the pull output, and the app never writes them to it. A variable whose name ends
+      in `_PASSWORD`, `_SECRET`, `_TOKEN` or `_SECRET_PREVIOUS` only as `${ENV}`. A pull applies the map exactly as the page's Save: every value checked first (a map with one bad
+      value changes nothing), the managed file written, the other nodes told, each variable applied at once or
+      said to need a restart (in the pull output), and the change audited. The app writes the variables saved from
+      the page, each in its documented type: a number as a number, a yes or no as `true` or `false`, a text as
+      text (quoted when it looks like a number). A map may give a value either way (`30` or `"30"`, `true` or
+      `1`): both are read the same.
+      ```yaml
+      controller_general:
+        JOB_RETENTION_DAYS: 30
+        LOG_LEVEL: info
+        METRICS_TOKEN: ${METRICS_TOKEN}
+      ```
+
+      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
+      changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
+      never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
+      General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
+      General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
+      section in the same format, and it locks what it declares, variable by variable, as its `defaults:` does.
+      A variable it declares that is set in the real environment keeps the environment's value: said in the
+      server log, the seed's value not applied, and the start goes on.
+      ```yaml
+      controller_mcp:
+        ENABLE_MCP: true
+        MCP_READ_ONLY: true
+        MCP_CHAT_FORMS_ONLY: false
+      ```
+
+      **Defaults** (`controller_defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the
+      forms view, the time zone, the date format and the language (`default_theme`, `default_theme_color`,
+      `default_forms_view`, `default_timezone`, `default_date_format`, `default_language`). The config seed
+      has a `defaults:` section in the same format.
+      ```yaml
+      controller_defaults:
+        default_theme: dark
+        default_theme_color: "#198754"
+        default_forms_view: tiles
+        default_timezone: Europe/Brussels
+        default_date_format: DD/MM/YYYY
+        default_language: fr
+      ```
+
+      **Logo** (`controller_logo:` and its image) and **Icon** (`controller_icon:` and its image): the logo and the website icon, each an
+      image file of the repository its map names by its path, relative to the file naming it (`../images/logo.png`
+      reaches a folder beside that file's), never outside the repository. The images are read and written as
+      binary and checked as an upload is (an image type sniffed from its bytes; the logo at most 900 KB, the icon
+      256 KB); an empty value restores the bundled one. An image changed in the app is written to the file its map
+      names (beside it with the new extension when its type changed), or as `logo.<ext>` / `icon.<ext>` beside the
+      file when it names none; a file of that name already there that the map does not name is never overwritten:
+      the write is refused, said in the server log. The config seed has `logo:` and `icon:` sections in the same
+      format, the images relative to the seed file.
+      ```yaml
+      # branding.yaml, the images in its assets folder
+      controller_logo:
+        logo: assets/logo.png
+      controller_icon:
+        icon: assets/icon.svg
+      ```
+
+      **Name** (`controller_name:`): the app's name, as Settings > Appearance > Name saves it. The config seed has a
+      `name:` section in the same format.
+      ```yaml
+      controller_name:
+        app_name: ACME Automation
+      ```
+
+      **Links** (`controller_links:`): Settings > Appearance > Links, its own usage type: the header's links
+      (`header_links`, each `id`, `label`, `url`, `icon`, `newTab` and `parent`) and whether the Designer's link
+      shows (`show_designer`). The config seed has a `links:` section in the same format.
+      ```yaml
+      controller_links:
+        show_designer: true
+        header_links:
+          - id: docs
+            label: Docs
+            url: https://docs.example.com
+            icon: book
+            newTab: true
+      ```
+
+      As every seed section, the seed's `defaults:`, `logo:`, `icon:`, `name:` and `links:` lock what they declare,
+      field by field: those fields are read only on the Appearance pages (a notice says so, a seeded logo or icon
+      cannot be uploaded nor removed) and the API refuses their change (403); a field no longer declared is
+      released, and all are when the seed is turned off. The seed's `mcp:` does the same on the MCP page, variable
+      by variable. A Defaults, Logo, Icon, Name, Links or MCP repository and the seed never own the same field: the
+      seed keeps the fields it declares (listed as staying in the app when the repository is made the type's, never written to its
+      map, and not applied from it, said in the pull output); the repository holds the others.
+
+      **Announcements** (`controller_announcements:`, a list): named (what a pull finds them by), with their
+      `message`, `level` (info, warning, danger), `enabled` and their schedule (`start_at`, `end_at`, ISO moments,
+      compared in UTC). One made in the app is written with the start of its message as its name and keeps it. An
+      entry whose end is already past is not imported: no refusal, an information line in the pull output (`Not
+      imported, already ended: Maintenance (announcements.yaml#Maintenance)`), and the announcement of it, if the
+      app has it, is removed from the app. The entry stays in git as it is; the app's own removal of an ended
+      announcement never deletes nor rewrites its entry. Turning the usage on skips them too, and its question
+      says how many. The seed's `announcements:` section takes the same items, an ended one left out.
+      ```yaml
+      controller_announcements:
+        - name: Maintenance
+          message: The app is down on Sunday from 8 to 10.
+          level: warning
+          start_at: 2030-01-06T08:00:00Z
+          end_at: 2030-01-06T10:00:00Z
+      ```
+
+      **Disclaimer** (`controller_disclaimer:`, a list of versions): `version` (its number, what a pull finds it by),
+      `title`, `text`, `checkbox_label` and `enabled` (the version in force, the disclaimer on; one at most). A
+      changed title, text or label arriving from git is a **correction** of that version, as the app's save makes
+      one; with `ask_again: true` in the entry, everyone who accepted it is asked again (a key of the entry only:
+      never written back, and nothing happens while the text does not change). A version keeps its number: an
+      entry whose `version` changes is refused, a new version is a new entry. Who accepted what is never in git.
+      The seed's `disclaimer:` section takes the same items.
+      ```yaml
+      controller_disclaimer:
+        - version: 2
+          title: Terms of use
+          text: Use this tool for your own team's systems only.
+          checkbox_label: I agree
+          enabled: true
+          ask_again: true
+      ```
+  - name: Users, groups and roles kept in a git repository
+    short: Who is in what and may do what, reviewed in git
+    version: v7.8.0
+    description: |
+      Settings > Access can live in git: the **Users** (`use_for_users`), the **Groups** (`use_for_groups`) and the
+      **Roles** (`use_for_roles`), one repository at most each (one repository may hold all three). Users and groups
+      work as the other object types (see *Credentials and runners kept in a git repository*): entries of a list
+      under their key, in any YAML file, both ways, and **Repository: <name>** on their pages.
+
+      **A group holds its members.** A `controller_groups:` entry gives the group's `name`, its `description` and
+      the usernames of the local users in it (`users:`); a user's entry says nothing of its groups, so who is in a
+      group is read and reviewed in one place. A user left out of a group's list leaves the group, never its only
+      one (a user keeps at least one group, said in the server log). Adding a user to a group in the app, or
+      removing it, rewrites that group's entry.
+      ```yaml
+      controller_groups:
+        - name: admins
+          description: Platform administrators
+          users:
+            - alice
+        - name: operators
+          users:
+            - alice
+            - bob
+      ```
+
+      **Users, local and of a directory, in one list.** A user is found by its `type` and its `username`, so a
+      local `jdoe` and an LDAP `jdoe` are two users:
+
+      | Type | What its entry gives |
+      | --- | --- |
+      | `local` (the default, not written) | `email`, `description`, `blocked`, and `password` as an `${ENV}` reference only (hashed when read, never written back). Without a password, set one in the app: the user signs in once it is set. |
+      | `ldap`, `entraid`, `oidc` | only what the app owns of it: `description` and `blocked`. Its email, name, groups and roles come from its directory at each sign-in; an email or a password in its entry is refused. |
+
+      A new local user takes the groups whose entries list it, the first of them by name its first group; one
+      no group lists is refused until a group does. A directory user's entry makes its record before it ever
+      signs in, so a leaver is blocked before they try (its page says its repository entry declares it); its
+      entry removed, its record goes, made again (unblocked) at its next sign-in. Turning the usage on writes
+      the app's local users without their password, and a directory user only when the app holds something of it
+      (blocked, a description), never one merely seen at a sign-in.
+      ```yaml
+      controller_users:
+        - username: alice
+          email: alice@example.com
+        - username: bob
+          email: bob@example.com
+          password: ${BOB_PASSWORD}
+        - username: jdoe
+          type: ldap
+          blocked: true
+          description: Left on 2026-10-31
+      ```
+
+      **The built-in admin** is never read from nor written to git, and its groups never change from git: it
+      stays the way back in. An entry for it is refused. The `admins` group is never renamed nor deleted.
+
+      **Roles, each read on its own.** `controller_roles:` keeps its format (see *Roles*), and each role is
+      checked on its own: a role that is not valid, or whose name is given twice, is refused alone (said on
+      the repository's page and in its pull output), its last version served meanwhile, else it is left out;
+      the others are served, never the whole configuration lost with it. The `admin` and the `default` role are
+      always there: one a pull no longer gives keeps the version last read, else the closed one. The roles may
+      be spread over several files of the repository, served as one list in the order of their files; a save
+      of the roles writes each role where it is (only those that changed, a new one at the end of the first
+      file). What a role names that is not there - a local group or user, a runner, a secret store - is said
+      too: it grants nothing until there is one. A save of the roles is refused while git has a role the app
+      refuses: fix it in git first.
+
+      The config seed takes `groups:` and `users:` sections with the same items (the password resolved from the
+      environment as every secret of the seed); a new local user of the seed takes the groups whose seed items
+      list it. They are made or changed, never managed nor deleted.
   - name: Job Relaunch with Pre-filled Data
     short: Relaunch jobs with form data
     version: v6.0.3
@@ -6715,7 +7442,7 @@
         # note: in the expression you can use placeholders to make them dynamic
   - name: Mail through Microsoft 365
     short: Send mail with OAuth2 instead of an SMTP password
-    version: v7.6.0
+    version: v7.8.0
     description: |
       Exchange Online turns off SMTP AUTH with a user and a password (basic authentication) by default at the end of December 2026.
       A mail channel (Connections > Notifications) can send through Microsoft 365 with OAuth2 instead: give it a **Microsoft Entra ID**

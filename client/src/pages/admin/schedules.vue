@@ -34,9 +34,6 @@ async function triggerLaunch(schedule) {
 
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
-  if (!authenticated.value) {
-    return;
-  }
 });
 </script>
 

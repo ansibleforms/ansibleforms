@@ -13,27 +13,39 @@ import { nodeId, NODE_DEAD_SECONDS, uptimeSeconds } from '../lib/role.js';
 const LAUNCH_MAX_MINUTES = 10;
 import Form from './form.model.js';
 import Errors from '../lib/errors.js';
+import ScheduleRepo from './scheduleRepo.model.js';
+import { nextRun as rruleNextRun, nextRunAsync as rruleNextRunAsync, validateRruleAsync, normalizeRrule } from '../lib/scheduleRrule.js';
+import { oneTimeRunOf, tableMoment } from '../lib/oneTimeRun.js';
+
+// where a schedule comes from and what its file says : the schedules repository's to write
+// (models/scheduleRepo.model.js), never a request body's
+const REPOSITORY_FIELDS = ['repository', 'repo_file', 'launch_options'];
 import Audit from './audit.model.js';
 import { storedJobOfLaunch } from '../lib/storedJobUse.js';
 
 /**
  * Adds when a schedule runs next (next_run, an ISO string or null) : its cron's next occurrence,
- * in the scheduler's timezone, or its one time run while that is still ahead. Computed, never
- * stored - the schedules table shows it.
+ * in the scheduler's timezone, a repository schedule's next rrule occurrence, in the rrule's own
+ * zone, or its one time run while that is still ahead. Computed, never stored - the schedules
+ * table shows it.
  *
  * Args:
  *   row (object): a schedule as read from the table.
+ *   rruleNext (Date|null): its rrule's next run, when it was worked out already (withNextRunAsync).
  *
  * Returns:
  *   object: the schedule with next_run.
  */
-function withNextRun(row) {
+function withNextRun(row, rruleNext = undefined) {
   let next = null;
   // turned off : it does not run next
   if (row.enabled !== undefined && row.enabled !== null && !Number(row.enabled)) return { ...row, next_run: null };
   try {
     if (row.one_time_run) {
-      if (row.run_at && new Date(row.run_at) > new Date()) next = new Date(row.run_at);
+      // its one run, while it is ahead
+      if (new Date(row.one_time_run) > new Date()) next = new Date(row.one_time_run);
+    } else if (row.rrule) {
+      next = rruleNext === undefined ? rruleNextRun(row.rrule) : rruleNext;
     } else if (row.cron) {
       const cron = new Cron(row.cron, { paused: true, timezone: cronService.timezone });
       next = cron.nextRun();
@@ -80,6 +92,72 @@ function isLaunchRefusal(err) {
   return err?.name === 'AccessDeniedError' || err?.name === 'ForbiddenError';
 }
 
+/**
+ * withNextRun, a rrule's next run awaited (lib/scheduleRrule.js nextRunAsync) : the process goes
+ * on while the schedules list is worked out.
+ *
+ * Args:
+ *   row (object): a schedule as read from the table.
+ *
+ * Returns:
+ *   Promise<object>: the schedule with next_run.
+ */
+async function withNextRunAsync(row) {
+  const on = row.enabled === undefined || row.enabled === null || !!Number(row.enabled);
+  if (on && !row.one_time_run && row.rrule) return withNextRun(row, await rruleNextRunAsync(row.rrule));
+  return withNextRun(row);
+}
+
+/**
+ * Checks the timing a schedule kept in the app is given and leaves it exactly one : a one time run
+ * (one_time_run, its moment), a rrule (checked) or a cron. A rrule sent with a one time run is
+ * refused ; a rrule wins over a cron sent with it ; the timing given replaces the one it had (the
+ * other two cleared). None of them given, nothing changes ; a one time run taken off without a
+ * cron or a rrule in its place is refused. The pair before 7.8.0 (one_time_run true with run_at)
+ * is read as a one time run at run_at (lib/oneTimeRun.js, deprecated).
+ *
+ * Args:
+ *   data (object): the request body (changed in place).
+ *   current (object|null): the schedule as it is (an update), null for a new one.
+ *
+ * Returns:
+ *   Promise<void>
+ *
+ * Raises:
+ *   Errors.BadRequestError: the rrule or the moment is refused, a rrule sent with a one time run,
+ *     or a one time run taken off with nothing in its place.
+ */
+async function checkAppTiming(data, current = null) {
+  oneTimeRunOf(data, 'api');
+  const given = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  const rrule = data.rrule !== undefined ? normalizeRrule(data.rrule) : undefined;
+  if (given(data.one_time_run)) {
+    if (rrule) throw new Errors.BadRequestError("A one time run has no rrule: send either, not both.");
+    data.one_time_run = tableMoment(data.one_time_run);
+    data.cron = null;
+    data.rrule = null;
+    return;
+  }
+  if (rrule) {
+    const errors = await validateRruleAsync(rrule);
+    if (errors.length) throw new Errors.BadRequestError(`The rrule is refused: ${errors.join(" ")}`);
+    data.rrule = rrule;
+    data.cron = null;
+    data.one_time_run = null;
+    return;
+  }
+  if (data.rrule !== undefined) data.rrule = null;
+  if (given(data.cron)) {
+    data.rrule = null;
+    data.one_time_run = null;
+    return;
+  }
+  // a one time run taken off, nothing in its place
+  if (data.one_time_run !== undefined && current?.one_time_run && !current?.cron && !current?.rrule) {
+    throw new Errors.BadRequestError("A schedule needs a cron, a rrule or a one time run.");
+  }
+  if (data.one_time_run !== undefined) data.one_time_run = null;
+}
 
 /**
  * Writes a scheduled launch to the audit log. No request launches it, so the audit middleware
@@ -125,6 +203,17 @@ class Schedule extends CrudModel {
 
   static async create(data) {
     logger.info(`Creating schedule ${data.name}`);
+    // where it comes from is never a request body's
+    for (const key of REPOSITORY_FIELDS) delete data[key];
+    // the pair before 7.8.0 (one_time_run true with run_at) read as a one time run at run_at
+    oneTimeRunOf(data, 'api');
+    // a schedule while a schedules repository is used : saved, and written there as a new entry
+    // waiting for its Push, with its own timing (a cron, a rrule or a one time run). A job a user
+    // plans ("Run later") is plan()'s, never written there
+    const active = await ScheduleRepo.activeRepository();
+    if (active) return ScheduleRepo.create(active, data);
+    // kept in the app : a cron, a rrule (checked) or a one time run
+    await checkAppTiming(data);
     // `owner` is written by plan() alone. A request body that carries one is somebody
     // choosing which user a schedule runs as - drop it, like the internal fields below.
     delete data.owner
@@ -151,7 +240,7 @@ class Schedule extends CrudModel {
    * strip and the `ansibleforms_user` a playbook asserts on would all be bypassed by
    * waiting a minute. So a planned job is held to what launching the form right now
    * would allow :
-   *   - one-time only, with a run_at ; no cron, nothing recurring ;
+   *   - one-time only, with its moment (one_time_run) ; no cron, no rrule, nothing recurring ;
    *   - only a form the user may run (Form.load with the user's roles), checked here ;
    *   - verbose only with allowVerboseMode, as the launch controller checks it ;
    *   - only the fields below are taken from the request - not status, state, output,
@@ -166,7 +255,7 @@ class Schedule extends CrudModel {
    * @param {object} user the authenticated user (req.user.user)
    * @param {object} data the request body
    * @returns {Promise<number>} the id of the new schedule
-   * @throws {Errors.BadRequestError} no name or run_at, extra_vars or raw_form_data not a
+   * @throws {Errors.BadRequestError} no name or moment, extra_vars or raw_form_data not a
    *   dictionary
    * @throws {Errors.ValidationError} launch validation 'enforce' refuses the field values
    * @throws {Errors.AccessDeniedError} no allowPlannedJobs, not one-time, a form the user may
@@ -176,10 +265,16 @@ class Schedule extends CrudModel {
     if (!user?.options?.allowPlannedJobs) {
       throw new Errors.AccessDeniedError("You do not have permission to plan jobs.");
     }
-    if (!data.one_time_run || data.cron) {
+    // recurring (a cron, a rrule, or the old flag saying not once) : not a plan
+    const notOnce = [false, 0, '0', 'false'].includes(data.one_time_run) || (data.one_time_run === undefined && !data.run_at);
+    if (notOnce || data.cron || data.rrule) {
       throw new Errors.AccessDeniedError("You can only plan a one-time run. Recurring schedules need the 'allowScheduledJobs' role option.");
     }
-    if (!data.run_at) throw new Errors.BadRequestError("A planned job needs a run_at.");
+    // its moment : one_time_run, or the pair before 7.8.0 (one_time_run true with run_at)
+    if ([true, 1, '1', 'true'].includes(data.one_time_run) && !data.run_at) throw new Errors.BadRequestError("A planned job needs the moment of its run (one_time_run).");
+    oneTimeRunOf(data, 'api');
+    if (!data.one_time_run) throw new Errors.BadRequestError("A planned job needs the moment of its run (one_time_run).");
+    const moment = tableMoment(data.one_time_run);
     if (!data.name) throw new Errors.BadRequestError("A planned job needs a name.");
     const formName = data.form || '';
     // the same role filter the launch applies. Form.load throws its own AccessDeniedError
@@ -234,12 +329,11 @@ class Schedule extends CrudModel {
     // token (#1036) : the jwt strategy put them back on it (lib/userGroups.js), and the
     // planned run keeps them here, as they are now.
     const owner = { ...user, groups: user.groups || [], roles: user.roles || [], options: user.options || {} };
-    logger.info(`Planning a one-time run of form '${formName}' for ${user.username} at ${data.run_at}`);
+    logger.info(`Planning a one-time run of form '${formName}' for ${user.username} at ${moment} UTC`);
     return super.create(this.modelName, {
       name: data.name,
       form: formName,
-      one_time_run: true,
-      run_at: data.run_at,
+      one_time_run: moment,
       extra_vars: data.extra_vars || '',
       // filtered on the server as a job's are : no password, even one in a list row, and
       // nothing the form does not declare
@@ -266,16 +360,33 @@ class Schedule extends CrudModel {
     // nor the stored job it was planned from : set by plan() alone (a schedule never has one)
     delete data.stored_job_id
     logger.info(`Updating schedule ${(data.name) ? data.name : id}`);
+    // where it comes from is never changed by an edit
+    for (const key of REPOSITORY_FIELDS) delete data[key];
+    // the pair before 7.8.0 (one_time_run true with run_at) read as a one time run at run_at
+    oneTimeRunOf(data, 'api');
+    // (an id that is not there is answered by the update below)
+    const current = await super.findById(this.modelName, id).catch(() => null);
+    // a repository's : its file is written (only what changed), then its row
+    if (current?.repository) {
+      return ScheduleRepo.update(current, data);
+    }
+    // an app's : timed by a cron, a rrule or once (checked), exactly one
+    await checkAppTiming(data, current);
     return super.update(this.modelName, data, id);
   }
   static async delete(id) {
     logger.info(`Deleting schedule ${id}`);
+    const current = await super.findById(this.modelName, id).catch(() => null);
+    // a repository's : its file goes too (the repository's Push sends the removal to git)
+    if (current?.repository) {
+      return ScheduleRepo.delete(current);
+    }
     return super.delete(this.modelName, id);
   }
   static async findAll() {
     logger.info("Finding all schedules");
     const rows = await super.findAll(this.modelName);
-    return Array.isArray(rows) ? rows.map(withNextRun) : rows;
+    return Array.isArray(rows) ? Promise.all(rows.map(withNextRunAsync)) : rows;
   }
   static async findById(id) {
     logger.info(`Finding schedule ${id}`);
@@ -364,6 +475,18 @@ class Schedule extends CrudModel {
       if (typeof extravars !== 'object' || extravars === null || Array.isArray(extravars)) {
         throw new Error("Extra vars is not a valid dictionary.");
       }
+      // a repository schedule's prompts (its file's limit, job_tags, inventory ...) as the
+      // reserved extra vars the job reads ; over the extra data, as the prompts are apart
+      // from its extra vars
+      if (schedule.launch_options) {
+        let options;
+        try {
+          options = JSON.parse(schedule.launch_options);
+        } catch (e) {
+          throw new Error(`The launch options of this schedule cannot be read: ${e.message}`, { cause: e });
+        }
+        if (options && typeof options === 'object' && !Array.isArray(options)) extravars = { ...extravars, ...options };
+      }
       // A planned job (Schedule.plan) runs as the user who planned it ; anything else is
       // an admin-level schedule and runs as the Schedule Service. A planned job whose
       // owner cannot be read FAILS - falling back to the admin user would hand it exactly
@@ -390,8 +513,13 @@ class Schedule extends CrudModel {
       delete scheduleInfo.state;
       delete scheduleInfo.last_run;
       delete scheduleInfo.cron;
+      delete scheduleInfo.rrule;
+      delete scheduleInfo.launch_options;
       delete scheduleInfo.extra_vars;
       delete scheduleInfo.raw_form_data;
+      // run_at : the moment of its one run as a playbook read it before 7.8.0 (one_time_run holds
+      // it now) - a copy kept for those playbooks, deprecated, removed in 8
+      scheduleInfo.run_at = schedule.one_time_run ?? null;
       delete scheduleInfo.stored_job_id;
       // a planned job's raw field values, for the launch validation (Schedule.plan)
       let rawFormData = {};
@@ -436,9 +564,9 @@ class Schedule extends CrudModel {
       await auditScheduledLaunch(schedule, schedule.form, plannedOwnerOf(schedule), !!schedule.owner, isLaunchRefusal(err) ? 'denied' : 'failure', undefined, err.message || String(err));
     }
     // A one-time schedule is deleted after its run, BEFORE anything sets it idle : idle, its
-    // run_at passed and still enabled, it is exactly what the cron's every-minute check queues,
+    // moment passed and still enabled, it is exactly what the cron's every-minute check queues,
     // so a delete that failed after the idle write launched it again, every minute, for ever.
-    if(schedule.one_time_run === 1){
+    if(schedule.one_time_run){
       await this.endOneTime(schedule, { output, status, last_run: currentDate });
       return;
     }

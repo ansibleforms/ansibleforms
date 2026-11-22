@@ -5,10 +5,18 @@
 /*  schedules' list : the steps of its dialog as tabs, and what   */
 /*  it said the last time, the tab kept in the url -              */
 /*    Details      where it stands (last launch, the job it       */
-/*                 started, state, last and next run), its name   */
-/*                 and the form it runs                           */
-/*    Schedule     once at a time, or on a cron schedule          */
-/*    Extra vars   what it sends the form (YAML)                  */
+/*                 started, state, last and next run), where it   */
+/*                 comes from (this app, or a schedules           */
+/*                 repository's file), its name, description,     */
+/*                 the form it runs and whether it is on          */
+/*    Schedule     how it is timed, the same three choices for a  */
+/*                 schedule of the app and one of a schedules     */
+/*                 repository : on a cron, on an iCal rrule (its  */
+/*                 next runs under it), or once at a time         */
+/*    Extra vars   what it sends the form (YAML), and a           */
+/*                 repository schedule's prompts from its file    */
+/*  A repository's schedule is saved into its file (the           */
+/*  repository's Push sends it to git), deleted with it.          */
 /*  Under Last launch : the job it started (a link), or why it    */
 /*  could not start one.                                          */
 /*  Run now and Delete top right, beside Save. While it runs, its */
@@ -16,16 +24,18 @@
 /*  the title line narrows every tab at once.                     */
 /*                                                                */
 /******************************************************************/
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
-import { statusPill, schedulePill } from '@/config/settings';
+import { statusPill, schedulePill, timingKind, scheduleTiming } from '@/config/settings';
 import { editorStyle } from '@/config/editorStyle';
 import { cronValidationMessage } from '@/config/cron';
+import { rruleValidationMessage, defaultRrule } from '@/config/rrule';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
@@ -41,7 +51,9 @@ const scheduleId = computed(() => String(route.params.id || ''));
 const schedule = ref(null); // as saved
 const edit = ref(null); // as edited
 const formNames = ref([]); // the forms it can run
-const EDITED = ['name', 'form', 'one_time_run', 'cron', 'run_at', 'extra_vars'];
+const EDITED = ['name', 'description', 'form', 'enabled', 'timing', 'cron', 'one_time_run', 'rrule', 'extra_vars'];
+// how a schedule may be timed, wherever it is kept : the choice of its Schedule tab
+const TIMINGS = ['cron', 'rrule', 'once'];
 
 /**
  * The fields of a schedule as this page edits them.
@@ -55,10 +67,16 @@ const EDITED = ['name', 'form', 'one_time_run', 'cron', 'run_at', 'extra_vars'];
 function editable(record) {
   return {
     name: record.name ?? '',
+    description: record.description ?? '',
     form: record.form ?? '',
-    one_time_run: !!record.one_time_run,
+    // on unless turned off
+    enabled: record.enabled === undefined || record.enabled === null ? true : !!Number(record.enabled),
+    // cron, rrule or once
+    timing: timingKind(record),
     cron: record.cron ?? '',
-    run_at: record.run_at ?? '',
+    // the moment of its one run
+    one_time_run: record.one_time_run ?? '',
+    rrule: record.rrule ?? '',
     extra_vars: record.extra_vars ?? '',
   };
 }
@@ -75,8 +93,63 @@ useUnsavedGuard(
 );
 
 const running = computed(() => ['running', 'queued'].includes(schedule.value?.state));
-const cronError = computed(() =>
-  edit.value && !edit.value.one_time_run ? cronValidationMessage(t, edit.value.cron) : null,
+// kept in the schedules repository : saved into its file
+const inRepository = computed(() => !!schedule.value?.repository);
+/**
+ * A timing's choice as its Schedule tab and the New schedule dialog say it.
+ *
+ * Args:
+ *   kind (string): cron, rrule or once.
+ *
+ * Returns:
+ *   string: its label.
+ */
+const timingLabel = (kind) =>
+  ({
+    cron: t('settings.schedules.timingCron'),
+    rrule: t('settings.schedules.rrule'),
+    once: t('settings.schedules.oneTimeRun'),
+  })[kind];
+
+/**
+ * The few grey words after a timing's choice.
+ *
+ * Args:
+ *   kind (string): cron, rrule or once.
+ *
+ * Returns:
+ *   string: its hint.
+ */
+const timingHint = (kind) =>
+  ({
+    cron: t('settings.schedules.timingCronHint'),
+    rrule: t('settings.schedules.timingRruleHint'),
+    once: t('settings.schedules.timingOnceHint'),
+  })[kind];
+
+// the timing chosen : each checked when it is the one
+const cronError = computed(() => (edit.value?.timing === 'cron' ? cronValidationMessage(t, edit.value.cron) : null));
+const rruleError = computed(() =>
+  edit.value?.timing === 'rrule'
+    ? edit.value.rrule.trim()
+      ? rruleValidationMessage(t, edit.value.rrule)
+      : t('settings.common.fieldRequired', { field: t('settings.schedules.rrule') })
+    : null,
+);
+// a repository schedule's prompts from its file (limit, job_tags ...), as the extra vars the job
+// gets : shown, edited in the file
+const launchOptions = computed(() => {
+  try {
+    const options = JSON.parse(schedule.value?.launch_options || '{}');
+    return options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+  } catch {
+    return {};
+  }
+});
+const launchOptionsText = computed(() =>
+  Object.entries(launchOptions.value)
+    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .join('\n'),
 );
 // what its last run said : the job it started (schedule.model writes "The schedule started
 // job <id>."), or, when it started none, why
@@ -202,25 +275,47 @@ const tabFields = computed(() => {
       ['state', t('settings.schedules.scheduleState'), t('settings.schedules.scheduleStateHelp')],
       ['lastRun', t('settings.fields.lastRun'), s.last_run ? Helpers.formatServerDate(s.last_run) : ''],
       ['nextRun', t('settings.schedules.nextRun'), s.next_run ? Helpers.formatServerDate(s.next_run) : ''],
+      // only a schedule from a repository has a source to find
+      ...repositorySourceFields(t, s),
       ['name', t('settings.fields.name'), t('settings.repositories.helpName')],
+      ['description', t('settings.fields.description'), edit.value?.description],
       ['form', t('settings.fields.form'), edit.value?.form],
+      ['enabled', t('settings.schedules.enabled'), t('settings.schedules.enabledHelp')],
     ],
     schedule: [
-      ['one_time_run', t('settings.schedules.oneTimeRun')],
-      edit.value?.one_time_run
-        ? ['run_at', t('settings.schedules.runAt'), t('settings.schedules.runAtHelp')]
-        : [
-            'cron',
-            t('settings.cron.minute'),
-            t('settings.cron.hour'),
-            t('settings.cron.dayOfMonth'),
-            t('settings.cron.month'),
-            t('settings.cron.dayOfWeek'),
-            edit.value?.cron,
-          ],
+      [
+        'timing',
+        t('settings.schedules.timing'),
+        t('settings.schedules.timingCron'),
+        t('settings.schedules.rrule'),
+        t('settings.schedules.oneTimeRun'),
+      ],
+      edit.value?.timing === 'rrule'
+        ? ['rrule', t('settings.schedules.rrule'), t('settings.schedules.rruleHelp'), edit.value?.rrule]
+        : edit.value?.timing === 'once'
+          ? ['one_time_run', t('settings.schedules.oneTimeRun'), t('settings.schedules.runAtHelp')]
+          : [
+              'cron',
+              t('settings.cron.minute'),
+              t('settings.cron.hour'),
+              t('settings.cron.dayOfMonth'),
+              t('settings.cron.month'),
+              t('settings.cron.dayOfWeek'),
+              edit.value?.cron,
+            ],
     ],
     'extra-vars': [
       ['extra_vars', t('settings.fields.extraVars'), t('settings.schedules.extraVarsHelp'), edit.value?.extra_vars],
+      ...(launchOptionsText.value
+        ? [
+            [
+              'launch_options',
+              t('settings.schedules.launchOptions'),
+              t('settings.schedules.launchOptionsHelp'),
+              launchOptionsText.value,
+            ],
+          ]
+        : []),
     ],
   };
 });
@@ -248,9 +343,20 @@ const searchHead = (key) => {
 };
 
 // ─── actions ──────────────────────────────────────────────────────────────────
+// a rrule chosen for a schedule that had none : it starts as a new one does (daily at midnight,
+// in the browser's zone)
+watch(
+  () => edit.value?.timing,
+  (timing) => {
+    if (timing === 'rrule' && !String(edit.value.rrule || '').trim()) {
+      edit.value.rrule = defaultRrule(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
+  },
+);
+
 /**
- * Saves the fields of every tab : a one time run keeps its time and no cron, a recurring one
- * its cron.
+ * Saves the fields of every tab : the timing chosen (a cron, a rrule, or a one time run and its
+ * time), the other two emptied ; a repository's schedule is saved into its file.
  */
 async function save() {
   const e = edit.value;
@@ -258,18 +364,18 @@ async function save() {
     toast.warning(t('settings.schedules.fieldsRequired'));
     return;
   }
-  if (cronError.value) {
-    toast.warning(cronError.value);
+  if (cronError.value || rruleError.value) {
+    toast.warning(cronError.value || rruleError.value);
     return;
   }
-  const data = {
+  const common = {
     name: e.name.trim(),
+    description: e.description,
     form: e.form,
-    one_time_run: e.one_time_run ? 1 : 0,
-    cron: e.one_time_run ? '' : e.cron,
-    run_at: e.one_time_run ? e.run_at : null,
+    enabled: e.enabled ? 1 : 0,
     extra_vars: e.extra_vars,
   };
+  const data = scheduleTiming(e.timing, { ...common, cron: e.cron, rrule: e.rrule, one_time_run: e.one_time_run });
   try {
     await axios.put(`/api/v2/schedule/${encodeURIComponent(scheduleId.value)}`, data);
     toast.success(t('settings.common.nameUpdated', { name: data.name }));
@@ -322,6 +428,10 @@ onMounted(async () => {
     <template #default>
       <p class="mb-0 fs-6 user-select-none">
         {{ t('settings.common.deleteConfirm') }} <strong>{{ schedule?.name }}</strong>?
+      </p>
+      <!-- a repository's : its file goes too, for the repository's Push -->
+      <p v-if="inRepository" class="mt-2 mb-0 small text-body-secondary user-select-none">
+        {{ t('settings.schedules.deleteFileHint', { file: schedule?.repo_file, name: schedule?.repository }) }}
       </p>
     </template>
     <template #footer>
@@ -381,6 +491,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a schedules repository's file ; nothing for the app's own -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="schedule" />
               <BsInput
                 class="af-schedule-field"
                 v-model="edit.name"
@@ -390,6 +502,14 @@ onMounted(async () => {
                 :required="true"
                 :help="t('settings.repositories.helpName')"
                 :label="t('settings.fields.name')"
+              />
+              <BsInput
+                class="af-schedule-field"
+                v-model="edit.description"
+                v-show="fieldShown('description')"
+                icon="info-circle"
+                :isFloating="false"
+                :label="t('settings.fields.description')"
               />
               <BsInput
                 class="af-schedule-field"
@@ -405,7 +525,7 @@ onMounted(async () => {
                 :label="t('settings.fields.form')"
               />
               <!-- where it stands : each a field of the column, read only, as a repository's status ; after
-                   its name and form, as every record page's Details -->
+                   its name, description and form, as every record page's Details -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
                 <span v-html="statusPill(t, schedule.status)"></span>
@@ -436,8 +556,19 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.schedules.nextRun') }}</div>
                 <span>{{ schedule.next_run ? Helpers.formatServerDate(schedule.next_run) : '–' }}</span>
               </div>
+              <div v-show="fieldShown('enabled')" class="form-check form-switch mb-3">
+                <input
+                  id="af-schedule-enabled"
+                  v-model="edit.enabled"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                />
+                <label class="form-check-label" for="af-schedule-enabled">{{ t('settings.schedules.enabled') }}</label>
+                <div class="form-text">{{ t('settings.schedules.enabledHelp') }}</div>
+              </div>
             </template>
-            <!-- Schedule : once at a time, or on a cron schedule -->
+            <!-- Schedule : on a cron, on a rrule, or once at a time -->
             <template v-if="tabShown('schedule')">
               <template v-if="searching && searchHead('schedule')">
                 <hr v-if="!searchHead('schedule').first" class="mt-4 mb-0 af-search-line" />
@@ -448,19 +579,47 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('schedule').tab.icon" class="me-1" />{{ searchHead('schedule').tab.label }}
                 </h6>
               </template>
-              <div v-show="fieldShown('one_time_run')" class="form-check form-switch mb-3">
-                <input
-                  id="af-schedule-once"
-                  v-model="edit.one_time_run"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                />
-                <label class="form-check-label" for="af-schedule-once">{{ t('settings.schedules.oneTimeRun') }}</label>
+              <!-- how it is timed : the same three choices wherever it is kept -->
+              <div
+                v-show="fieldShown('timing')"
+                class="mb-3 af-radio-group"
+                role="radiogroup"
+                :aria-label="t('settings.schedules.timing')"
+              >
+                <div v-for="kind in TIMINGS" :key="kind" class="form-check af-short-check">
+                  <input
+                    :id="'af-schedule-timing-' + kind"
+                    v-model="edit.timing"
+                    class="form-check-input"
+                    type="radio"
+                    name="af-schedule-timing"
+                    :value="kind"
+                  />
+                  <label class="form-check-label" :for="'af-schedule-timing-' + kind">
+                    <span class="af-short-label">{{ timingLabel(kind) }}</span>
+                    <span class="text-body-secondary small">{{ timingHint(kind) }}</span>
+                  </label>
+                </div>
               </div>
-              <div v-if="edit.one_time_run" v-show="fieldShown('run_at')" class="af-schedule-field mb-0">
-                <label class="form-label">{{ t('settings.schedules.runAt') }}</label>
-                <BsDateTime v-model="edit.run_at" icon="calendar" dateType="datetime" :convertToUtc="true" teleport />
+              <!-- timed by a rrule : its next runs under it -->
+              <div v-if="edit.timing === 'rrule'" v-show="fieldShown('rrule')" class="af-schedule-cron mb-0">
+                <label class="form-label fw-bold">{{ t('settings.schedules.rrule') }}</label>
+                <BsRrule v-model="edit.rrule" :hasError="!!rruleError" />
+                <div class="form-text">{{ t('settings.schedules.rruleHelp') }}</div>
+              </div>
+              <div
+                v-else-if="edit.timing === 'once'"
+                v-show="fieldShown('one_time_run')"
+                class="af-schedule-field mb-0"
+              >
+                <label class="form-label">{{ t('settings.schedules.oneTimeRun') }}</label>
+                <BsDateTime
+                  v-model="edit.one_time_run"
+                  icon="calendar"
+                  dateType="datetime"
+                  :convertToUtc="true"
+                  teleport
+                />
                 <div class="form-text">{{ t('settings.schedules.runAtHelp') }}</div>
               </div>
               <div v-else v-show="fieldShown('cron')" class="af-schedule-cron mb-0">
@@ -491,6 +650,12 @@ onMounted(async () => {
                 :help="t('settings.schedules.extraVarsHelp')"
                 :label="t('settings.fields.extraVars')"
               />
+              <!-- a repository schedule's prompts from its file : read only, edited in the file -->
+              <div v-if="launchOptionsText" v-show="fieldShown('launch_options')" class="mt-3 af-schedule-field">
+                <div class="form-label fw-bold">{{ t('settings.schedules.launchOptions') }}</div>
+                <pre class="af-launch-options mb-1">{{ launchOptionsText }}</pre>
+                <div class="form-text">{{ t('settings.schedules.launchOptionsHelp') }}</div>
+              </div>
             </template>
             <div v-if="searching && !shownTabs.length" class="text-body-secondary fst-italic">
               {{ t('settings.settingsPage.searchNone') }}
@@ -521,6 +686,15 @@ onMounted(async () => {
 .af-schedule-field,
 .af-schedule-cron {
   max-width: 40rem;
+}
+/* a repository schedule's prompts : read only, as code */
+.af-launch-options {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  background-color: var(--bs-tertiary-bg);
+  white-space: pre-wrap;
 }
 /* the tab ends a little above the card's edge, as every record's page (24px in all) */
 .af-schedule-tab {

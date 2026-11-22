@@ -97,8 +97,9 @@ export function effectiveRolesOfDirectoryUser(roles, type, username, groups) {
  *   roles (object[]): the config's roles.
  *
  * Returns:
- *   object[]: each { id, source, username, description, email, group_ids, role_count, seen,
- *     blocked, last_login, first_seen } - id type/username, group_ids the groups seen (the
+ *   object[]: each { id, source, username, description (its note, else its display name),
+ *     display_name, note (what an admin or its repository entry says it is), email, group_ids,
+ *     role_count, seen, blocked, last_login, first_seen, repository, repo_file } - id type/username, group_ids the groups seen (the
  *     list counts them).
  */
 export function directoryUserRows(seen, roles) {
@@ -111,7 +112,10 @@ export function directoryUserRows(seen, roles) {
       id: `${u.type}/${u.username}`,
       source: u.type,
       username: u.username,
-      description: u.display_name || '',
+      // what an admin or its repository entry says it is, else the name its directory gave it
+      description: u.description || u.display_name || '',
+      display_name: u.display_name || '',
+      note: u.description || '',
       email: u.email || '',
       group_ids: u.groups,
       role_count: rolesOfDirectoryUser(roles, u.type, u.username, u.groups).length,
@@ -119,6 +123,9 @@ export function directoryUserRows(seen, roles) {
       blocked: !!u.blocked,
       first_seen: u.first_seen || null,
       last_login: u.last_login || null,
+      // the users repository's entry it follows, if any (lib/repoObjects/users.js)
+      repository: u.repository || null,
+      repo_file: u.repo_file || null,
     });
   }
   // named by a role, never signed in : roles by name alone, no group known

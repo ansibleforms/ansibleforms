@@ -30,6 +30,7 @@ import { useRouteTab } from '@/composables/useRouteTab';
 import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { useAppStore } from '@/stores/app';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -231,6 +232,8 @@ const tabFields = computed(() => {
   const vault = isVault.value;
   return {
     details: [
+      // one kept in a repository : where it comes from
+      ...repositorySourceFields(t, store.value),
       ['name', t('settings.fields.name'), t('settings.secretStores.nameHelp')],
       ['description', t('settings.fields.description')],
     ],
@@ -479,6 +482,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="store" />
               <BsInput
                 class="af-store-field"
                 v-model="edit.name"

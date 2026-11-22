@@ -263,7 +263,7 @@ const Disclaimer = {
    */
   async versions() {
     const rows = await mysql.do(
-      'SELECT v.version AS id, v.version, v.title, v.text, v.checkbox_label, v.created_by, v.created_at, ' +
+      'SELECT v.version AS id, v.version, v.title, v.text, v.checkbox_label, v.created_by, v.created_at, v.repository, v.repo_file, ' +
         '(SELECT COUNT(*) FROM AnsibleForms.`disclaimer_acceptances` a WHERE a.version = v.version) AS acceptances ' +
         'FROM AnsibleForms.`disclaimer_versions` v ORDER BY v.version DESC',
     );
@@ -295,6 +295,26 @@ const Disclaimer = {
   },
 
   /**
+   * The words a declaration gives (a disclaimer repository's file, the config seed) as they are
+   * stored : each one given cleaned and within its length, as words() writes it - so a text that
+   * ends on a line break (a YAML block) compares equal to the one stored, and is not taken for a
+   * correction on every read. The other fields as they are.
+   *
+   * Args:
+   *   data (object): the declaration (title, text, checkbox_label among its fields).
+   *
+   * Returns:
+   *   object: a copy, the words it gives cleaned.
+   */
+  cleanWords(data) {
+    const out = { ...data };
+    for (const [key, max] of [['title', MAX_TITLE], ['text', MAX_TEXT], ['checkbox_label', MAX_CHECKBOX]]) {
+      if (out[key] !== undefined && out[key] !== null) out[key] = clean(out[key], max);
+    }
+    return out;
+  },
+
+  /**
    * The words of a version as they are written : a title, a text and the label of its checkbox,
    * each cleaned and within its length, all three needed.
    *
@@ -323,7 +343,8 @@ const Disclaimer = {
    * new latest does not take its place).
    *
    * Args:
-   *   data (object): title, text, checkbox_label.
+   *   data (object): title, text, checkbox_label ; version, the number a disclaimer repository's
+   *     file (or the config seed) gives it, else the next one.
    *   admin (string): who adds it.
    *
    * Returns:
@@ -335,8 +356,9 @@ const Disclaimer = {
     if (current.version) {
       await mysql.do('UPDATE AnsibleForms.`settings` SET disclaimer_version = ? WHERE disclaimer_version IS NULL', [current.version]);
     }
+    // its number : the next one, or the one a disclaimer repository's file (or the seed) gives it
     const latest = await mysql.do('SELECT COALESCE(MAX(version), 0) AS v FROM AnsibleForms.`disclaimer_versions`');
-    const next = (latest[0]?.v || 0) + 1;
+    const next = data?.version ? Number(data.version) : (latest[0]?.v || 0) + 1;
     await mysql.do('INSERT INTO AnsibleForms.`disclaimer_versions` SET ?', {
       version: next,
       ...w,

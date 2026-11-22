@@ -63,7 +63,7 @@ describe("the inventories: the local folder and the repositories that are invent
       { repository: "production", root: path.join(base, "repos/production") },
     ];
     Repository.claimForWrite = async () => undefined;
-    // no forms repository : a write checks it is no form file (Form.formsFileTest)
+    // no forms repository : no form file among them (Form.formsFileTest)
     Repository.getFormsFolders = async () => [];
     Repo.hasChanges = vi.fn(async () => true);
     ({ default: ProjectFiles } = await import("../src/models/projectFiles.model.js"));

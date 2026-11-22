@@ -20,6 +20,9 @@ import Helpers from "../lib/common.js";
 import Settings from './settings.model.js';
 import AJVErrorParser from './ajvErrorParser.model.js';
 import { repoFolder } from "./repo.model.js";
+import { findOwner, formsSkipTest, realPathOf } from "../lib/repoObjects/ownedPaths.js";
+import { isInside } from "../lib/projectFiles.js";
+import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
 
 
 const ajv = new Ajv({allErrors: true, allowUnionTypes: true});
@@ -46,6 +49,9 @@ const formsSchema = (() => {
   schema.properties.forms = { type: "array", default: [], items: formItems };
   return schema;
 })();
+// the types a form is of (form_schema.json, one branch each) : a file whose entries are of none of
+// them is not a forms file (a playbook's plays, an inventory)
+const FORM_TYPES = new Set((formSchema.oneOf || []).flatMap((branch) => branch?.properties?.type?.enum || []));
 const jsonSchemaDraft6 = JSON.parse(fs.readFileSync(path.join(__dirname, "../../node_modules/ajv/lib/refs/json-schema-draft-06.json"), "utf8"));
 
 // The paths, read from appConfig each time they are used : the settings page changes
@@ -129,14 +135,17 @@ async function resolveRestoreInDatabase(){
 // Settings.saveActiveConfig resolve it. When that file lives in a repository
 // working tree, claim its write-lock so this write can't race a concurrent
 // scheduled pull/sync (issue #414).
-async function restoreConfigFile(snapshot){
+// text : the text to write in its place (the snapshot's base, its keys held by repositories
+// written back to their files, restoreActiveSnapshot) ; none : the snapshot copied as it is
+async function restoreConfigFile(snapshot, text){
   const targetConfigPath = (await Repository.getConfigPath()) || appConfig.configPath
   logger.debug(`Copying config file '${snapshot}'->'${targetConfigPath}'`)
   const repoName = configRepoFromPath(targetConfigPath, appConfig.repoPath)
   const token = repoName ? await Repository.claimForWrite(repoName) : undefined
   try{
     fse.ensureDirSync(path.dirname(targetConfigPath))
-    fse.copySync(snapshot,targetConfigPath)
+    if(text === undefined) fse.copySync(snapshot,targetConfigPath)
+    else fs.writeFileSync(targetConfigPath, text)
   }finally{
     if(repoName && token !== undefined){
       await Repository.releaseWrite(repoName, token).catch(e => logger.error(`Failed to release write-lock on '${repoName}': ${e.message}`))
@@ -258,8 +267,11 @@ async function getSaveTargets() {
   const names = new Set(repoFolders.map(f => f.name).filter(Boolean))
   const configRepo = configRepoFromPath(targetConfigPath, appConfig.repoPath)
   if (configRepo) names.add(configRepo)
+  // and the repositories that hold the roles, the categories or the constants (lib/configKeys.js)
+  const sources = await keySources()
+  for (const source of sources) if (!source.missing) names.add(source.repository)
   const repoNames = [...names]
-  return { configPath: targetConfigPath, formsDirs, repoMode, repoNames }
+  return { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: sources }
 }
 
 // ===========================================================================
@@ -286,10 +298,16 @@ async function getSaveTargets() {
  *   kept. Before, one unreadable subfolder threw out of the whole walk and the
  *   complete forms folder looked empty.
  *
+ * - a file or a folder skip says to skip (one a usage type of a repository owns, or a
+ *   file giving a type's key : lib/repoObjects/ownedPaths.js formsSkipTest) is neither
+ *   listed nor walked.
+ *
  * Args:
  *   root (string): The forms folder to walk.
  *   onWarn (function): Optional callback receiving a human readable warning for
  *     every skipped folder or broken link. Defaults to logger.warning.
+ *   skip (function|null): Optional (absolute path) => truthy for a file or a folder
+ *     to leave out. Defaults to none.
  *
  * Returns:
  *   string[]: The yaml file paths, relative to root, in walk order.
@@ -298,7 +316,7 @@ async function getSaveTargets() {
  *   Error: When root itself cannot be read ; the callers treat that as "this forms
  *     folder failed to load" and skip it as a whole.
  */
-function walkYamlFiles(root, onWarn = (m) => logger.warning(m)) {
+function walkYamlFiles(root, onWarn = (m) => logger.warning(m), skip = null) {
   const files = []
   const visited = new Set()
   const walk = (dir, isRoot) => {
@@ -330,6 +348,8 @@ function walkYamlFiles(root, onWarn = (m) => logger.warning(m)) {
     for (const entry of entries) {
       if (entry.name === ".git") continue
       const fullPath = path.join(dir, entry.name)
+      // a file or a folder the caller leaves out (owned by a usage type) : never listed nor walked
+      if (skip && skip(fullPath)) continue
       // A SYMLINK is neither isDirectory() nor isFile() - readdirSync does not follow
       // them - so resolve it. A symlinked form yaml is a normal way to share one form
       // between an app and a git checkout, and must be both listed and deletable.
@@ -359,9 +379,10 @@ function walkYamlFiles(root, onWarn = (m) => logger.warning(m)) {
 }
 
 // recursively list the yaml files of a forms folder, relative to it ; used to
-// remove forms that were deleted in the designer (same walk as the loader)
-function listYamlFiles(dir) {
-  return walkYamlFiles(dir)
+// remove forms that were deleted in the designer (same walk as the loader, the files a
+// usage type owns left out the same way : skip, formsSkipTest's)
+function listYamlFiles(dir, skip = null) {
+  return walkYamlFiles(dir, undefined, skip)
 }
 
 function copyConfigTemplate(to) {
@@ -429,6 +450,19 @@ async function saveRenamedRole(renamed) {
   }
 }
 
+/**
+ * A configuration file's text : read, or rendered with ytt (USE_YTT), its lib folder beside it.
+ *
+ * Args:
+ *   file (string): the file.
+ *
+ * Returns:
+ *   string: its text.
+ */
+function renderConfigFile(file) {
+  return appConfig.useYtt ? execYtt(file, path.join(path.dirname(file), "/lib")) : fs.readFileSync(file, 'utf8')
+}
+
 async function getBaseConfig() {
   var rawdata=''
 
@@ -479,11 +513,18 @@ async function getBaseConfig() {
     }
   }
 
+  // the roles, the categories and the constants a repository holds, each from its own file (or its
+  // config.yaml, deprecated), laid over the base (lib/configKeys.js)
+  const sources = await keySources()
+  rawdata = composeConfig(rawdata, sources, renderConfigFile)
+
   // now let's see if it's valid yaml - kept by the text's hash, a deep copy each time : the base
   // config is read on every Form.load and every role check
   try{
     const hash = crypto.createHash("sha256").update(String(rawdata)).digest("hex")
     if (baseConfigCache.hash === hash && !(baseConfigCache.retryAt <= Date.now())) return structuredClone(baseConfigCache.config)
+    // a key read from a repository's config.yaml : said once per load, not on each request
+    for (const source of sources.filter((x) => x.deprecated)) logger.warning(`Repository '${source.repository}': ${deprecationNotice(source)}`)
     // a config from before 7 names the role every user has `public` : renamed `default`, and
     // written back where it came from - once per text, the cache below keeps the result ; a
     // refused write is tried again a minute later
@@ -717,15 +758,12 @@ function checkFormRole(form, userRoles) {
 // ===========================================================================
 
 /**
- * The forms folders with their repository name, in the order the loader reads them : the forms
- * repositories' in the order they were added (Repository.getFormsFolders, each its forms
- * subfolder, or its root), then the staging folder when it is there (new forms not yet pushed, no
- * repository) ; or the local forms folder when no repository serves forms. A form name defined in
- * two of them resolves to the first one's copy, the same one every time.
+ * The folders the forms are read from, in the order they are read : each forms repository's
+ * (in the order they were added, Repository.getFormsFolders), then the staging folder (new forms not pushed yet) ; the
+ * local forms folder when no repository is used for forms.
  *
  * Returns:
- *   Promise<object[]>: [{ name (the repository, null for a local or the staging folder), path,
- *     dedicated, staging (the staging folder) }].
+ *   Promise<object[]>: [{ name (the repository, null for a local folder), path, staging }].
  */
 async function formsFolders() {
   const repoFolders = await Repository.getFormsFolders()
@@ -753,8 +791,7 @@ function formPlace(dir, source) {
 }
 
 /**
- * The warning of a form name defined twice : the copy used (the first read) and the one skipped,
- * both named. The loader records it, a forms repository's pull output and page say it.
+ * The notice of a form name defined twice : the copy used (the first read) and the one skipped.
  *
  * Args:
  *   name (string): the form.
@@ -762,7 +799,7 @@ function formPlace(dir, source) {
  *   skipped (object): the copy skipped ({ place }).
  *
  * Returns:
- *   string: the warning.
+ *   string: the notice.
  */
 export function duplicateNotice(name, used, skipped) {
   return `Form '${name}' is defined twice: ${used.place} is used, ${skipped.place} is skipped (form names must be unique across forms repositories)`
@@ -770,8 +807,11 @@ export function duplicateNotice(name, used, skipped) {
 
 /**
  * Every form of the folders, each with where it is, in the order they are read (the folders in
- * turn, the files of each sorted) : what the loader goes through, and what the designer's checks
- * of the forms it never received read (Form.unloaded, Form.duplicates).
+ * turn, the files of each sorted). A file a usage type of a repository owns, or any file giving a
+ * type's key at its top level (credentials:, roles:, defaults: ... : lib/repoObjects/ownedPaths.js
+ * formsSkipTest), is never read as forms : a form is a map with a type, and a repository holding
+ * objects that serves its forms from its root would give each of them as a form that does not
+ * validate.
  *
  * Args:
  *   formsdirs (object[]): the folders (formsFolders).
@@ -779,16 +819,15 @@ export function duplicateNotice(name, used, skipped) {
  *   error (function): (message) => an error (a file that cannot be read or parsed).
  *
  * Returns:
- *   object[]: [{ form, repository (its repository, null for a local or the staging folder), dir
- *     (its folder), file (the file, relative to the folder), place (where it is, as people read
- *     it : formPlace) }].
+ *   Promise<object[]>: [{ form, repository, place }].
  */
-function collectForms(formsdirs, warn, error) {
+async function collectForms(formsdirs, warn, error) {
   const out = []
+  // what the usage types own and the files giving a type's key, tested once for every folder
+  const owned = await formsSkipTest()
   // when several forms repos exist, tag each form with the repo it came from so a save writes it
   // back there even if another repo has a same-named file
   const tagRepository = formsdirs.filter((d) => d.name).length > 1
-  // Loop through each forms directory (with its repository name)
   for (const formsdir of formsdirs) {
     const formsdirpath = formsdir.path
     var files;
@@ -797,7 +836,7 @@ function collectForms(formsdirs, warn, error) {
       // walkYamlFiles skips an unreadable subfolder on its own (with a warning) and
       // guards against symbolic link loops
       if (fs.existsSync(formsdirpath)) {
-        files = walkYamlFiles(formsdirpath, warn);
+        files = walkYamlFiles(formsdirpath, warn, owned);
       } else {
         warn(`Failed to load forms directory '${formsdirpath}'.`);
         continue; // skip this directory
@@ -810,9 +849,7 @@ function collectForms(formsdirs, warn, error) {
     logger.debug(`Found ${files.length} form file(s) in '${formsdirpath}'`)
     // sort for deterministic order
     files.sort();
-    // read files
     for (const item of files) {
-      // read the file and add to the forms array
       logger.debug(`Loading forms from file ${item} in ${formsdirpath}`);
       try{
         const fileForms = getFormsFromFile(formsdirpath,item) // get the forms from the file, including subpaths
@@ -822,7 +859,7 @@ function collectForms(formsdirs, warn, error) {
           for (const ff of fileForms) ff.repository = formsdir.name
         }
         const place = formPlace(formsdir, item)
-        for (const form of fileForms) out.push({ form, repository: formsdir.name, dir: formsdir, file: item, place })
+        for (const form of fileForms) out.push({ form, repository: formsdir.name, dir: formsdir, place, file: item })
       }
       catch (e) {
         error(e.message);
@@ -834,15 +871,14 @@ function collectForms(formsdirs, warn, error) {
 
 /**
  * The form names defined more than once across the forms folders : the copy used (the first
- * read, Form.load's) and each one skipped, with the roles of both, so that a designer without
- * designAllForms is told only of copies they reach (lib/designerForms.js duplicateShown).
+ * read, Form.load's) and each one skipped.
  *
  * Args:
  *   entries (object[]): the forms with where they are (collectForms).
  *
  * Returns:
  *   object[]: [{ name, used: { repository, place, roles }, skipped: { repository, place, roles },
- *     notice (the loader's warning, duplicateNotice) }].
+ *     notice }].
  */
 function duplicatesOf(entries) {
   const first = new Map()
@@ -857,8 +893,9 @@ function duplicatesOf(entries) {
     const used = first.get(name)
     out.push({
       name,
-      used: { repository: used.repository, place: used.place, roles: Array.isArray(used.form.roles) ? used.form.roles : [] },
-      skipped: { repository: e.repository, place: e.place, roles: Array.isArray(e.form.roles) ? e.form.roles : [] },
+      // the roles of each copy : a designer without designAllForms is told only of copies they reach
+      used: { repository: used.repository, place: used.place, roles: used.form.roles || [] },
+      skipped: { repository: e.repository, place: e.place, roles: e.form.roles || [] },
       notice: duplicateNotice(name, used, e),
     })
   }
@@ -866,14 +903,27 @@ function duplicatesOf(entries) {
 }
 
 /**
- * The lines a forms repository's pull output says of the form names it shares with another
- * folder : one warning each, naming the copy used and the one skipped.
+ * The form names a forms repository shares with another folder : for its page and its pull output.
+ *
+ * Args:
+ *   repository (string): the repository ; none for every one.
+ *
+ * Returns:
+ *   Promise<object[]>: the duplicates (duplicatesOf) it holds a copy of, used or skipped.
+ */
+Form.duplicates = async function(repository = null) {
+  const all = duplicatesOf(await collectForms(await formsFolders(), () => {}, () => {}))
+  return repository ? all.filter((d) => d.used.repository === repository || d.skipped.repository === repository) : all
+}
+
+/**
+ * The lines a forms repository's pull output says of the form names it shares with another folder.
  *
  * Args:
  *   repository (string): the repository.
  *
  * Returns:
- *   Promise<string>: the lines, each starting with a newline ; '' for none.
+ *   Promise<string>: the lines, starting with a newline ; '' for none.
  */
 Form.duplicateLines = async function(repository) {
   try {
@@ -883,6 +933,113 @@ Form.duplicateLines = async function(repository) {
     return ""
   }
 }
+
+/**
+ * The copies of a form the loader skips, by their file : a name a folder read before already
+ * defines (duplicatesOf). The designer never sees them, so a save never sends them ; they are kept
+ * in their files when the file is written again, as forms that do not load are (formsToKeep).
+ *
+ * Args:
+ *   formsDirs (object[]): the forms folders, in the order they are read (formsFolders).
+ *
+ * Returns:
+ *   Promise<Map<string, Set<string>>>: by the file's absolute path, the names of the copies skipped in it.
+ */
+async function skippedCopies(formsDirs) {
+  const entries = await collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+  const first = new Set()
+  const out = new Map()
+  for (const e of entries) {
+    const name = e.form?.name
+    if (!name) continue
+    if (!first.has(name)) {
+      first.add(name)
+      continue
+    }
+    const abs = path.resolve(e.dir.path, e.file)
+    if (!out.has(abs)) out.set(abs, new Set())
+    out.get(abs).add(name)
+  }
+  return out
+}
+
+/**
+ * Which paths are form files, as the loader reads them (formsFolders) : anything in a folder that
+ * is the forms' own (a forms repository's forms folder, the staging folder, the local forms
+ * folder, those two whether they are read now or not), and every yaml file of a forms repository serving its forms from its root. The
+ * designer's other explorers (models/projectFiles.model.js) never write one : a form written there
+ * skips every check of Form.save (its name, its roles, its validation, the forms hidden from a
+ * designer).
+ *
+ * Returns:
+ *   Promise<function>: (absolute path) => whether it is a form file, by the path as written and
+ *     as the disk resolves it (links followed).
+ */
+Form.formsFileTest = async function() {
+  const inside = (root, p) => {
+    const rel = path.relative(root, p)
+    return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel)
+  }
+  // the forms repositories' folders, and the staging and the local forms folders whether they are
+  // read now or not (a file made there is a form once they are) ; a folder not configured holds none
+  const folders = [...(await Repository.getFormsFolders()), { name: null, path: appConfig.formsStagingPath }, { name: null, path: appConfig.formsFolderPath }]
+  const roots = folders.filter((d) => d.path).map((d) => ({ own: !d.name || !!d.staging || !!d.dedicated, paths: [path.resolve(d.path), realPathOf(d.path)] }))
+  return (abs) => {
+    const candidates = [path.resolve(abs), realPathOf(abs)]
+    return roots.some((r) => candidates.some((p) => r.paths.some((root) => inside(root, p)) && (r.own || /\.(yaml|yml)$/i.test(p))))
+  }
+}
+
+/**
+ * The forms the loader leaves out because they do not load (no name aside : failing validation),
+ * each the copy its name resolves to (a later copy of a name is a skipped one, duplicatesOf) : the
+ * designer never receives them, a save keeps them (formsToKeep). A designer without designAllForms
+ * is refused their names and their files when they are not theirs (lib/designerForms.js).
+ *
+ * Returns:
+ *   Promise<object[]>: [{ form (as read), source (its file in its folder), repository (its
+ *     repository, null for a local or the staging folder) }].
+ */
+Form.unloaded = async function() {
+  const first = new Map()
+  for (const e of await collectForms(await formsFolders(), () => {}, () => {})) {
+    if (e.form?.name && !first.has(e.form.name)) first.set(e.form.name, e)
+  }
+  // validated as the loader validates them : a form that loads is answered from its cache
+  const loads = (form) => {
+    try {
+      validatedForm(form)
+      return true
+    } catch {
+      return false
+    }
+  }
+  return [...first.values()].filter((e) => !loads(e.form)).map((e) => ({ form: e.form, source: e.file, repository: e.repository }))
+}
+
+/**
+ * The error the loader records for a form failing validation : what a designer without
+ * designAllForms is not shown of a form hidden from them (lib/designerForms.js).
+ *
+ * Args:
+ *   name (string): the form.
+ *   message (string): why it fails ; '' for the start every such error has.
+ *
+ * Returns:
+ *   string: the error.
+ */
+Form.validationError = (name, message) => `Failed to validate form '${name}'.\r\n${message}`
+
+/**
+ * What a save says of a form name it cannot take, to a designer who is not told where it is.
+ *
+ * Args:
+ *   name (string): the name.
+ *
+ * Returns:
+ *   string: the message.
+ */
+Form.nameTaken = (name) => `The form name '${name}' is already taken`
 
 /**
  * Refuses a save that would put a form new to its forms repository (or the staging folder) under
@@ -895,12 +1052,15 @@ Form.duplicateLines = async function(repository) {
  *   conceal (boolean): say only that the name is taken, not where (a designer without
  *     designAllForms : a copy may be one hidden from them).
  *
+ * Returns:
+ *   Promise<void>
+ *
  * Raises:
  *   Errors.ConflictError: the names, and where each is already defined (a 409).
  */
-function assertNoDuplicateForms(groups, formsDirs, conceal = false) {
+async function assertNoDuplicateForms(groups, formsDirs, conceal = false) {
   // where each name is defined now, by folder
-  const existing = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
+  const existing = await collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
   const clashes = []
   for (const g of groups) for (const f of g.forms || []) {
     const copies = existing.filter((e) => e.form?.name === f.name)
@@ -918,10 +1078,8 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   var errors = []
   var warnings = []
   
-  // Get the forms folders with their repository name - can be multiple from
-  // repositories (in the order they were added) or a single default path. In repository
-  // mode the staging folder is added (new forms not yet pushed) with no repository
-  // (formsFolders).
+  // the forms folders with their repository name, in the order they are read (formsFolders) :
+  // the forms repositories in the order they were added, then the staging folder ; or the local folder
   const formsdirs = await formsFolders()
 
   logger.debug(`Loading forms from ${formsdirs.length} folder(s): ${formsdirs.map(d => d.path).join(", ")}`)
@@ -973,9 +1131,8 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   if (unvalidatedBase.forms !== undefined && unvalidatedBase.forms !== null && !(Array.isArray(unvalidatedBase.forms) && unvalidatedBase.forms.length === 0)) {
     error("The base config has a 'forms' section. Since 7.0.0 forms are no longer read from the base config - move each form to its own file in the forms folder (FORMS_FOLDER_PATH).")
   }
-  // every form of the folders, with where it is, in the order they are read (collectForms) ;
-  // the forms are the files' only
-  const entries = collectForms(formsdirs, warn, error)
+  // every form of the folders, with where it is, in the order they are read
+  const entries = await collectForms(formsdirs, warn, error)
   var unvalidatedForms = entries.map((e) => e.form);
   // the first copy of each name : the one used, named when another copy is skipped
   const firstOf = new Map()
@@ -1129,7 +1286,6 @@ function subformNamesOf(parentForm, unvalidated){
   }
   return names
 }
-// the subforms a form uses : the designer's for a user without designAllForms (lib/designerForms.js)
 Form.subformNamesOf = subformNamesOf
 
 function collectSubformsForForm(parentForm, unvalidated, errors){
@@ -1148,136 +1304,6 @@ function collectSubformsForForm(parentForm, unvalidated, errors){
     }
   }
   return result
-}
-
-// ===========================================================================
-// WHAT A DESIGNER WITHOUT designAllForms IS NOT TOLD
-// ===========================================================================
-// The designer of a user whose role option designAllForms is off shows only the forms of their
-// roles (lib/designerForms.js). These read what the loader leaves out or says of a form (a form
-// that does not load, a name defined twice), so that nothing of a form hidden from them is named.
-
-/**
- * A path as the disk resolves it, links followed : the deepest part of it that exists resolved
- * (realpath), the rest added as written. A file not made yet is resolved through the folders it
- * would be made in, so a link to a folder (sub -> .) cannot hide where it lands.
- *
- * Args:
- *   abs (string): the path, absolute.
- *
- * Returns:
- *   string: the path resolved ; as written when nothing of it resolves.
- */
-function realPathOf(abs) {
-  let probe = path.resolve(abs)
-  const rest = []
-  for (;;) {
-    try {
-      return path.join(fs.realpathSync(probe), ...rest)
-    } catch {
-      const parent = path.dirname(probe)
-      if (parent === probe) return path.resolve(abs)
-      rest.unshift(path.basename(probe))
-      probe = parent
-    }
-  }
-}
-
-/**
- * The form names defined more than once across the forms folders (duplicatesOf) : the copy used
- * (the first read, Form.load's) and each one skipped, with where each is and the roles of both,
- * so that a designer without designAllForms is told only of copies they reach
- * (lib/designerForms.js duplicateShown). A forms repository's page and pull output say those it
- * holds a copy of.
- *
- * Args:
- *   repository (string): the repository whose copies are asked for ; none for every one.
- *
- * Returns:
- *   Promise<object[]>: [{ name, used: { repository, place, roles }, skipped: { repository, place,
- *     roles }, notice (the loader's warning, duplicateNotice) }].
- */
-Form.duplicates = async function(repository = null) {
-  const all = duplicatesOf(collectForms(await formsFolders(), () => {}, () => {}))
-  return repository ? all.filter((d) => d.used.repository === repository || d.skipped.repository === repository) : all
-}
-
-/**
- * The forms the loader leaves out because they do not load (no name aside : failing validation),
- * each the copy its name resolves to (a later copy of a name is a skipped one) : the designer never
- * receives them, a save keeps them (formsToKeep). A designer without designAllForms is refused
- * their names and their files when they are not theirs (lib/designerForms.js).
- *
- * Returns:
- *   Promise<object[]>: [{ form (as read), source (its file in its folder), repository (its
- *     repository, null for a local or the staging folder) }].
- */
-Form.unloaded = async function() {
-  const first = new Map()
-  for (const e of collectForms(await formsFolders(), () => {}, () => {})) {
-    if (e.form?.name && !first.has(e.form.name)) first.set(e.form.name, e)
-  }
-  // validated as the loader validates them : a form that loads is answered from its cache
-  const loads = (form) => {
-    try {
-      validatedForm(form)
-      return true
-    } catch {
-      return false
-    }
-  }
-  return [...first.values()].filter((e) => !loads(e.form)).map((e) => ({ form: e.form, source: e.file, repository: e.repository }))
-}
-
-/**
- * The error the loader records for a form failing validation : what a designer without
- * designAllForms is not shown of a form hidden from them (lib/designerForms.js).
- *
- * Args:
- *   name (string): the form.
- *   message (string): why it fails ; '' for the start every such error has.
- *
- * Returns:
- *   string: the error.
- */
-Form.validationError = (name, message) => `Failed to validate form '${name}'.\r\n${message}`
-
-/**
- * What a save says of a form name it cannot take, to a designer who is not told where it is.
- *
- * Args:
- *   name (string): the name.
- *
- * Returns:
- *   string: the message.
- */
-Form.nameTaken = (name) => `The form name '${name}' is already taken`
-
-/**
- * Which paths are form files, as the loader reads them (formsFolders) : anything in a folder that
- * is the forms' own (a forms repository's forms folder, the staging folder, the local forms
- * folder, those two whether they are read now or not), and every yaml file of a forms repository
- * serving its forms from its root. The designer's other explorers (models/projectFiles.model.js)
- * never write one : a form written there skips every check of Form.save (its name, its roles, its
- * validation, the forms hidden from a designer).
- *
- * Returns:
- *   Promise<function>: (absolute path) => whether it is a form file, by the path as written and
- *     as the disk resolves it (links followed).
- */
-Form.formsFileTest = async function() {
-  const inside = (root, p) => {
-    const rel = path.relative(root, p)
-    return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel)
-  }
-  // the forms repositories' folders, and the staging and the local forms folders whether they are
-  // read now or not (a file made there is a form once they are) ; a folder not configured holds none
-  const folders = [...(await Repository.getFormsFolders()), { name: null, path: appConfig.formsStagingPath }, { name: null, path: appConfig.formsFolderPath }]
-  const roots = folders.filter((d) => d.path).map((d) => ({ own: !d.name || !!d.dedicated, paths: [path.resolve(d.path), realPathOf(d.path)] }))
-  return (abs) => {
-    const candidates = [path.resolve(abs), realPathOf(abs)]
-    return roots.some((r) => candidates.some((p) => r.paths.some((root) => inside(root, p)) && (r.own || /\.(yaml|yml)$/i.test(p))))
-  }
 }
 
 // load the forms config
@@ -1747,6 +1773,47 @@ Form.remove = function(backupName){
     fse.removeSync(backupformsdir)
   }
 }
+/**
+ * The keys of an 'active' config snapshot a repository holds now (the roles, the categories, the
+ * constants : lib/configKeys.js), each written back to its file - its claim taken - when the
+ * snapshot's differs from what is served : the snapshot is the configuration as it was served,
+ * the base with those keys laid over it. Copied whole onto the base, those keys would land in the
+ * base, where the repository's file hides them, and the restore would change nothing of them.
+ *
+ * Args:
+ *   snapshot (string): the snapshot file.
+ *   toDatabase (boolean): whether the base is the database copy (else the config file).
+ *
+ * Returns:
+ *   Promise<string|null|undefined>: the base's text to write ; null when the base's keys are the
+ *     ones there (nothing to write) ; undefined when no repository holds a key, or the snapshot is
+ *     a ytt template (the snapshot written as it is, as before).
+ *
+ * Raises:
+ *   Errors.ConflictError: a key that cannot be written (its repository not cloned, its file or the
+ *     base a ytt template).
+ */
+async function restoreHeldKeys(snapshot, toDatabase){
+  const sources = await keySources()
+  const text = fs.readFileSync(snapshot,'utf8')
+  if(!sources.length || isTemplate(text)) return undefined
+  const doc = yaml.parse(text) || {}
+  let served
+  let servedText
+  try{
+    servedText = (await Settings.getActiveConfig()) || ''
+    served = yaml.parse(servedText) || {}
+  }catch{
+    served = undefined
+    servedText = undefined
+  }
+  const targetConfigPath = (await Repository.getConfigPath()) || appConfig.configPath
+  const baseText = toDatabase ? (await Settings.findFormsYaml()).forms_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath,'utf8') : '')
+  // the base's text first : a change it refuses (a ytt template) refused before a file is written
+  const base = mergeIntoBase(baseText, withoutHeldKeys(doc, sources), served, { text, servedText, held: sources.map((s) => s.key) })
+  await writeConfigKeys(doc, sources, { claim: true, served, text })
+  return base
+}
 Form.restoreBackup = async function(backupName,configOnly=false){
   const targetFormsPath = formsPath()
   const suffix = getBackupSuffix(backupName)
@@ -1760,18 +1827,23 @@ Form.restoreBackup = async function(backupName,configOnly=false){
   // Restore config.yaml
   if(fs.existsSync(backupconfigfile)){
     const toDatabase = configSource==='database' || (configSource==='active' && await resolveRestoreInDatabase())
-    if(toDatabase){
+    // an 'active' snapshot is the configuration as it was served : the keys a repository holds
+    // now go back to their files, the rest to the base (null : the base unchanged)
+    const text = configSource==='active' ? await restoreHeldKeys(backupconfigfile, toDatabase) : undefined
+    if(text === null){
+      logger.debug(`The base config of '${backupconfigfile}' is the one there : not written`)
+    }else if(toDatabase){
       // the base config lives in the database : reinstate the snapshot into the
       // settings row (writing only to disk would leave the DB config untouched). A
       // 'database' snapshot (Settings.importConfig) goes here even when a file is
       // what currently serves the config.
       logger.debug(`Restoring database config from '${backupconfigfile}'`)
-      await Settings.update({ config_yaml: fs.readFileSync(backupconfigfile,'utf8') })
+      await Settings.update({ config_yaml: text ?? fs.readFileSync(backupconfigfile,'utf8') })
     }else{
       // a 'file' snapshot (Settings.exportConfig) goes back onto the config file,
       // which is what undoing that export means - reinstating it into the database
       // would replace the live config with a stale disk copy instead
-      await restoreConfigFile(backupconfigfile)
+      await restoreConfigFile(backupconfigfile, text)
     }
   }
 
@@ -1816,8 +1888,8 @@ function assertUniqueFormNames(forms){
   }
 }
 
-// options.conceal : a name another forms repository holds is said taken, never where it is (a
-// designer without designAllForms : a copy may be one hidden from them, lib/designerForms.js)
+// options.conceal : a refused name is said taken, never where it is (a designer without
+// designAllForms, lib/designerForms.js)
 Form.save = async function(data, options = {}){
   // The checks of what the user sent come first, and each answers as the user's mistake
   // (lib/errors.js) : the controller turns them into a 400 or a 409 with their message,
@@ -1831,7 +1903,14 @@ Form.save = async function(data, options = {}){
     throw new Errors.BadRequestError(Helpers.getError(err))
   }
   assertUniqueFormNames(formsConfig.forms)
-  const { configPath: targetConfigPath, formsDirs, repoMode, repoNames } = await getSaveTargets()
+  const { configPath: targetConfigPath, formsDirs, repoMode, repoNames, keySources: keySourcesHeld } = await getSaveTargets()
+  // the configuration served now : a key a repository holds is written only when the save changes
+  // it (the designer sends every key with each save of a form), the base only when one of its keys
+  // changed (lib/configKeys.js)
+  const served = keySourcesHeld.length ? await getBaseConfig().catch(() => undefined) : undefined
+  // a key changed that cannot be written (its repository not cloned, its file a ytt template) :
+  // refused before anything is written
+  assertKeysWritable(formsConfig, keySourcesHeld, served)
   logger.info(`Saving forms to ${formsDirs.map(d => d.path).join(", ")}`)
   var groups={}  // key "<repository>\0<source>" -> { repository, source, forms:[] }
 
@@ -1859,22 +1938,52 @@ Form.save = async function(data, options = {}){
   })
 
   // a form 'source' is client-controlled ; reject any that would escape its
-  // forms folder (path traversal / absolute path) before it is used as a path
+  // forms folder (path traversal / absolute path) before it is used as a path.
+  // No '..' part at all : the folder it is joined to may be a repository's root, where
+  // '../other/roles.yaml' reached the next repository's files
   for (const g of Object.values(groups)) {
     const probe = path.resolve(formsPath(), g.source)
-    if (g.source.includes("\0") || path.isAbsolute(g.source) || !probe.startsWith(path.resolve(formsPath()) + path.sep)) {
+    if (g.source.includes("\0") || path.isAbsolute(g.source) || path.win32.isAbsolute(g.source) || g.source.split(/[\\/]/).includes("..") || !probe.startsWith(path.resolve(formsPath()) + path.sep)) {
       throw new Errors.BadRequestError(`Invalid form source '${g.source}': must be a path inside the forms folder`)
     }
   }
 
+  // the folders other usages own inside a forms repository serving its forms from its root : its
+  // playbooks folder, its vars folder (Repository.getAnsiblePath, getVarsFilesPath)
+  const otherFolders = formsDirs.some((d) => d.name && !d.dedicated)
+    ? [await Repository.getAnsiblePath(), await Repository.getVarsFilesPath()].filter(Boolean).map((f) => path.resolve(f))
+    : []
+
   // resolve the target folder per group (own repo, then existing holder, then staging)
   for (const g of Object.values(groups)) {
     g.dir = resolveTargetDir(g.repository, g.source, formsDirs, (d, src) => fs.existsSync(path.join(d.path, src)))
+    // A new file goes to the staging folder, and a Push moves it into the forms repository pushed
+    // (Repository.flushStagingInto) : each check below is made where it is written, and in each one
+    const into = [...(g.dir ? [g.dir] : []), ...(g.dir?.staging ? formsDirs.filter((d) => d.name) : [])]
+    for (const d of into) {
+      const target = path.join(d.path, g.source)
+      // a file a usage type of a repository owns (a file giving roles:, credentials:, general:
+      // ... of a repository holding them, config.yaml : lib/repoObjects/ownedPaths.js), in
+      // whichever repository the file really lands (links followed) : never written as a forms
+      // file
+      const owner = await findOwner(target)
+      if (owner) throw new Errors.ConflictError(`The form file '${g.source}' belongs to the ${owner.label} of repository '${owner.repository}': save the form to another file`)
+      // the playbooks or the vars files of a repository serving its forms from its root, or a file
+      // there holding no form (a playbook, an inventory) : not the forms', saving a form named
+      // like one of its plays would replace it. A forms folder of its own holds forms only.
+      if (!d.name || d.dedicated) continue
+      if (otherFolders.some((f) => isInside(path.resolve(d.path), f) && (isInside(f, target) || isInside(f, realPathOf(target))))) {
+        throw new Errors.ConflictError(`The form file '${g.source}' is in the playbooks or the vars files folder: save the form to another file`)
+      }
+      const onDisk = fs.existsSync(target) ? readFileForms(target, g.source) : null
+      if (onDisk?.forms.length && !onDisk.forms.some((f) => f.isForm)) {
+        throw new Errors.ConflictError(`The file '${g.source}' holds no forms: save the form to another file`)
+      }
+    }
   }
 
-  // a form new to its forms repository (or the staging folder) whose name another forms
-  // repository already defines : refused, the loader would skip one of the two copies
-  assertNoDuplicateForms(Object.values(groups), formsDirs, options.conceal === true)
+  // a form name defined twice, or new here and already another forms repository's : refused
+  await assertNoDuplicateForms(Object.values(groups), formsDirs, options.conceal)
 
   // repository and source are internal placement fields : never write them to a form file or config
   // source is re-stamped from the filename on load ; repository pins a form to its repo
@@ -1915,8 +2024,11 @@ Form.save = async function(data, options = {}){
       Object.values(groups).flatMap(g => (g.forms || []).map(f => f?.name)).filter(Boolean)
     )
     // the copies the loader skipped (a form name another forms folder defines first) : never in
-    // the payload, so a file holding one with other forms would lose it when written again
-    const skipped = skippedCopies(formsDirs)
+    // the payload, so a file holding one with other forms would lose it when written again ; kept
+    const skipped = await skippedCopies(formsDirs)
+    // what the usage types own, and the files giving a type's key : never a candidate for removal,
+    // as the loader never reads them
+    const owned = await formsSkipTest()
     for (const dirEntry of formsDirs) {
       const dirGroups = Object.values(groups).filter(g => g.dir === dirEntry)
       const dirFiles = dirGroups.map(g => g.source)
@@ -1937,7 +2049,7 @@ Form.save = async function(data, options = {}){
             // writing over it would lose them all
             throw new Errors.BadRequestError(`The file '${g.source}' cannot be read as forms ; fix it, or save the form to another file`)
           }
-          // the skipped copy of a form name another forms folder defines first : the designer
+          // the skipped copy of a form name another forms repository defines first : the designer
           // never had it either, so it stays as it is, in its place, like a form that does not load
           const skippedHere = skipped.get(path.resolve(target))
           if (skippedHere?.size) {
@@ -1969,7 +2081,7 @@ Form.save = async function(data, options = {}){
       // ending in /forms, which the old test could not tell from a dedicated subfolder.
       const managed = !repoMode || dirEntry.staging || dirEntry.dedicated === true
       if (managed && fs.existsSync(dirEntry.path)) {
-        for (const existing of listYamlFiles(dirEntry.path)) {
+        for (const existing of listYamlFiles(dirEntry.path, owned)) {
           if (!dirFiles.includes(existing)) {
             // "absent from the payload" is NOT the same as "the user deleted it".
             // Form.load silently drops a file it cannot parse, a form failing validation,
@@ -2024,9 +2136,20 @@ Form.save = async function(data, options = {}){
 
     // the base config only : categories, roles, constants - the forms are in their files
     delete formsConfig.forms
-    const configYaml = yaml.stringify(formsConfig)
+    // the keys a repository holds : each written back to the file it was read from (its claim held
+    // above), the rest into the base config, its other keys kept (lib/configKeys.js)
+    let configYaml = yaml.stringify(formsConfig)
+    if (keySourcesHeld.length) {
+      const baseText = useDatabase ? configSettings.config_yaml : (fs.existsSync(targetConfigPath) ? fs.readFileSync(targetConfigPath, 'utf8') : '')
+      // the base's text first : a change it refuses (a ytt template) refused before a file is
+      // written ; null : none of its keys changed, nothing to write
+      configYaml = mergeIntoBase(baseText, withoutHeldKeys(formsConfig, keySourcesHeld), served)
+      await writeConfigKeys(formsConfig, keySourcesHeld, { claim: false, served })
+    }
 
-    if (useDatabase) {
+    if (configYaml === null) {
+      logger.debug("The base config is unchanged: not written")
+    } else if (useDatabase) {
       logger.debug("Writing base config to database")
       await Settings.update({ config_yaml: configYaml })
     } else {
@@ -2061,10 +2184,6 @@ Form.save = async function(data, options = {}){
 // forms the designer sent, so such a form was dropped from its file - and from git at the
 // next push - by a save of ANOTHER form of the same file. These helpers find those forms on
 // disk so the save writes them back exactly as they were.
-//
-// The same goes for the copy of a form name the loader skips because a forms folder read before
-// already defines it (skippedCopies) : the designer never receives it either, so it is kept in
-// its file the same way.
 
 /**
  * Tells whether the loader would leave a form of a file out (Form.load) : not a mapping, no
@@ -2102,8 +2221,8 @@ function notLoaded(item, filename) {
  *   filename (string): the file, relative to its forms folder.
  *
  * Returns:
- *   object|null: { forms: [{ name, notLoaded, text }], single (the file holds one form, not
- *   a list) } ; null when the file cannot be read or parsed as forms (the loader then left
+ *   object|null: { forms: [{ name, notLoaded, isForm (of a form type, FORM_TYPES), text }],
+ *   single (the file holds one form, not a list) } ; null when the file cannot be read or parsed as forms (the loader then left
  *   the whole file out).
  */
 function readFileForms(fullPath, filename) {
@@ -2150,39 +2269,9 @@ function readFileForms(fullPath, filename) {
       text = String(one)
     }
     const value = values[i]
-    return { name: value?.name, notLoaded: notLoaded(value, filename), text }
+    return { name: value?.name, notLoaded: notLoaded(value, filename), isForm: FORM_TYPES.has(value?.type), text }
   })
   return { forms, single: !yaml.isSeq(contents) }
-}
-
-/**
- * The copies of a form the loader skips, by their file : a name a folder read before already
- * defines (Form.load keeps the first copy, warns of the others). The designer never sees them, so
- * a save never sends them ; they are kept in their files when the file is written again, as the
- * forms that do not load are (formsToKeep).
- *
- * Args:
- *   formsDirs (object[]): the forms folders, in the order they are read (getSaveTargets).
- *
- * Returns:
- *   Map<string, Set<string>>: by the file's absolute path, the names of the copies skipped in it.
- */
-function skippedCopies(formsDirs) {
-  const entries = collectForms(formsDirs.filter((d) => fs.existsSync(d.path)), () => {}, () => {})
-  const first = new Set()
-  const out = new Map()
-  for (const e of entries) {
-    const name = e.form?.name
-    if (!name) continue
-    if (!first.has(name)) {
-      first.add(name)
-      continue
-    }
-    const abs = path.resolve(e.dir.path, e.file)
-    if (!out.has(abs)) out.set(abs, new Set())
-    out.get(abs).add(name)
-  }
-  return out
 }
 
 /**

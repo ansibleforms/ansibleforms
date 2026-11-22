@@ -642,6 +642,22 @@ textarea:focus::placeholder {
   font-weight: 600;
 }
 
+// A list of options with a few grey words each (a dialog's radios, a Type tab, a repository's
+// Usage) : the options tight, their labels one width so the grey words line up in a column,
+// and one another record already has greyed as a whole
+.af-short-check {
+  margin-bottom: 0.6rem;
+}
+.af-short-label {
+  display: inline-block;
+  min-width: 12rem;
+}
+.af-taken .form-check-label,
+.af-taken .form-check-label span {
+  color: var(--bs-secondary-color) !important;
+  opacity: 0.6;
+}
+
 // the Default badge of the record the app picks (a type's default runner, the mail channel, the
 // main LDAP directory) : the same shape, dark grey with white text, so it does not read as a
 // limit the way Required and Never signed in do
@@ -649,6 +665,16 @@ textarea:focus::placeholder {
   background-color: var(--bs-secondary);
   border: 1px solid var(--bs-secondary);
   color: var(--bs-white);
+  font-weight: 600;
+}
+
+// the Repository badge of an object kept in a repository (a schedule's, a credential's, a runner's
+// page : AppRepositorySource) : the shape of the other row badges, in the info tone, its file in
+// the tooltip
+.af-source-badge {
+  background-color: var(--bs-info-bg-subtle);
+  border: 1px solid var(--bs-info-border-subtle);
+  color: var(--bs-info-text-emphasis);
   font-weight: 600;
 }
 

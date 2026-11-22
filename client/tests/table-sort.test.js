@@ -2,8 +2,11 @@
 // yes / no by value, text alphabetically with "file2" before "file10" ; and an empty cell is an en
 // dash (lib/tableCells.js).
 import { describe, it, expect } from 'vitest';
-import { isSortable, compareRows } from '@/lib/dataTable';
+import { createI18n } from 'vue-i18n';
+import { isSortable, compareRows, htmlToText } from '@/lib/dataTable';
 import { orEmpty, EMPTY_CELL } from '@/lib/tableCells';
+import getSettings from '@/config/settings';
+import de from '@/locales/de.js';
 
 const text = (row, col) => String(row[col.key] ?? '');
 const sorted = (rows, col, dir = 1) => [...rows].sort((a, b) => compareRows(a, b, col, dir, text));
@@ -26,7 +29,21 @@ describe('the order of a table', () => {
     expect(sorted([{ n: 10 }, { n: 2 }], { key: 'n', label: 'N' }).map((r) => r.n)).toEqual([2, 10]);
     expect(sorted([{ on: true }, { on: false }], { key: 'on', label: 'On' }).map((r) => r.on)).toEqual([false, true]);
     const col = { key: 'when', label: 'When', sortValue: (r) => Date.parse(r.when) };
-    expect(sorted([{ when: '2026-10-15' }, { when: '2026-01-02' }], col).map((r) => r.when)).toEqual(['2026-01-02', '2026-10-15']);
+    expect(sorted([{ when: '2026-10-15' }, { when: '2026-01-02' }], col).map((r) => r.when)).toEqual([
+      '2026-01-02',
+      '2026-10-15',
+    ]);
+  });
+
+  it('a text sortValue sorts by what the cell shows, in its language (a runner RTE Mode)', () => {
+    const i18n = createI18n({ legacy: false, locale: 'de', messages: { de } });
+    const col = getSettings(i18n.global.t).runners.fields.find((f) => f.key === 'rte_mode_column');
+    const rows = ['outbound', 'inbound', 'database'].map((m) => ({ type: 'rte', rte_mode: m }));
+    const cell = (row, c) => htmlToText(c.render(undefined, row));
+    const shown = (dir) => [...rows].sort((a, b) => compareRows(a, b, col, dir, cell)).map((r) => cell(r, col));
+    // the pills as shown, A to Z in German (Ausgehend, Datenbank, Eingehend), not by their raw value
+    expect(shown(1)).toEqual([...shown(1)].sort((a, b) => a.localeCompare(b)));
+    expect(shown(-1)).toEqual([...shown(1)].reverse());
   });
 });
 

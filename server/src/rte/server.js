@@ -2,8 +2,8 @@
 // 7.3, removed in 8.0 - rte/start.js picks the mode). It runs playbooks for an AnsibleForms app
 // and nothing else - no web interface, no scheduler, no seed. The socket modes are rte/socket.
 //
-// It shares the app's database, so it reads the job and writes the output and the final
-// status itself, with the only code that runs a playbook (ansible-core.js). The app says
+// It shares the controller's database, so it reads the job and writes the output and the final
+// status itself, with the only code that runs a playbook (ansible-core.js). The controller says
 // "run job N" and hands it the job's secrets, resolved and sealed for this RTE
 // (lib/sealedSecrets.js) : the RTE never reads the credentials table nor a secret store, and
 // needs ENCRYPTION_SECRET only to register itself (its token is stored encrypted).
@@ -46,7 +46,7 @@ import { httpServerOptions } from "../lib/httpServerOptions.js";
 const activeJobs = new Set();
 
 // true from startRte until the database and its schema answered : the RTE listens meanwhile, but
-// /ready says "starting" and a job is refused with a 503 busy, so the app tries again later
+// /ready says "starting" and a job is refused with a 503 busy, so the controller tries again later
 let starting = false;
 
 // how many playbooks run at once (RTE_MAX_JOBS, 0 : no limit), and how long a stop waits for
@@ -57,7 +57,7 @@ const drainSeconds = () => Math.max(0, parseInt(process.env.RTE_DRAIN_SECONDS ??
 /**
  * Waits for the running playbooks to end, for RTE_DRAIN_SECONDS at most : a stop (a rolling
  * update, a scale down) lets them finish instead of cutting them off. New jobs are refused
- * meanwhile (acceptJob answers 503), so the app sends them to another RTE or waits.
+ * meanwhile (acceptJob answers 503), so the controller sends them to another RTE or waits.
  *
  * Returns:
  *   Promise<void>: settles when none runs, or the time is up.
@@ -99,8 +99,8 @@ async function abandonOwnJobs() {
 
 /**
  * Waits until the database answers and its schema is there, then abandons the jobs a previous
- * start of this RTE left running. On a fresh install the app and the RTE start together (a helm
- * sidecar, compose without depends_on) : the app is still creating the schema, the jobs table is
+ * start of this RTE left running. On a fresh install the controller and the RTE start together (a helm
+ * sidecar, compose without depends_on) : the controller is still creating the schema, the jobs table is
  * not there yet, and this tries again - with a backoff and a line that says why - instead of
  * failing the start. It gives up only when the process stops.
  *
@@ -126,12 +126,12 @@ export async function prepareDatabase({ firstDelayMs = 1000, maxDelayMs = 15000 
       continue;
     }
     try {
-      // the first query on the jobs table : it fails while the app has not created the schema
+      // the first query on the jobs table : it fails while the controller has not created the schema
       await abandonOwnJobs();
       if (failed) logger.notice("RTE: the database and its schema are ready");
       return true;
     } catch (e) {
-      logger.warning(`RTE: database schema not ready yet (${e.message || e}) - the app creates it on its first start - trying again in ${delay / 1000} seconds`);
+      logger.warning(`RTE: database schema not ready yet (${e.message || e}) - the controller creates it on its first start - trying again in ${delay / 1000} seconds`);
       failed = true;
       await new Promise((r) => setTimeout(r, delay));
       delay = Math.min(delay * 2, maxDelayMs);
@@ -142,12 +142,12 @@ export async function prepareDatabase({ firstDelayMs = 1000, maxDelayMs = 15000 
 async function acceptJob(req, res) {
   const jobId = parseInt(req.body?.jobId, 10);
   if (!Number.isInteger(jobId) || jobId <= 0) return res.status(400).json({ error: "jobId is required" });
-  // the app says which contract it speaks (rte/contract.js) ; an app of another contract would
+  // the controller says which contract it speaks (rte/contract.js) ; a controller of another contract would
   // read and write the job differently, so the job is refused rather than run half right
   if (req.body?.contract !== undefined && req.body.contract !== RTE_CONTRACT) {
-    return res.status(409).json({ error: `this RTE speaks contract ${RTE_CONTRACT}, the app contract ${req.body.contract}: run the same contract on both` });
+    return res.status(409).json({ error: `this RTE speaks contract ${RTE_CONTRACT}, the controller contract ${req.body.contract}: run the same contract on both` });
   }
-  // starting, stopping, or full : not claimed, the app tries again (runners/rte.js)
+  // starting, stopping, or full : not claimed, the controller tries again (runners/rte.js)
   if (starting) return res.status(503).json({ error: "this RTE is starting: its database is not ready yet", busy: true });
   if (isStopping()) return res.status(503).json({ error: "this RTE is stopping", busy: true });
   if (maxJobs() && activeJobs.size >= maxJobs() && !activeJobs.has(jobId)) {
@@ -158,7 +158,7 @@ async function acceptJob(req, res) {
   if (rows[0].status !== "running") return res.status(409).json({ error: `job ${jobId} is ${rows[0].status}, not running` });
   // an RTE runs playbooks : never claim an AWX job or a multistep, whose tracker drives them
   if (rows[0].job_type !== "ansible") return res.status(409).json({ error: `job ${jobId} is a ${rows[0].job_type || "?"} job, not a playbook` });
-  // the job's secrets, sealed by the app for this RTE and this job : one that does not open
+  // the job's secrets, sealed by the controller for this RTE and this job : one that does not open
   // was not sealed with this RTE's token, and nothing is claimed
   let secrets;
   try {
@@ -215,7 +215,7 @@ export { acceptJob, jobStatus, cancelJob, activeJobs, bearer, drainJobs };
  * Starts the RTE : it listens first, then waits for the database and its schema
  * (prepareDatabase), then starts what needs them. Until then /live answers, /ready says
  * "starting" and a job gets a 503 busy : a probe sees a process that is starting, not a hung one,
- * and the app waits for it. Anything that fails after the listen exits non-zero, so the
+ * and the controller waits for it. Anything that fails after the listen exits non-zero, so the
  * container restarts clean instead of staying up half started.
  *
  * Args:
@@ -235,10 +235,10 @@ export async function startRte({ firstDelayMs, maxDelayMs } = {}) {
   // the jobs read and their output written in the database (rte/jobio-db.js)
   useJobIO(dbJobIO);
 
-  // a job's secrets come sealed from the app : the key only stores this RTE's token when it
+  // a job's secrets come sealed from the controller : the key only stores this RTE's token when it
   // registers itself (RTE_REGISTER). Without registration it needs no ENCRYPTION_SECRET at all.
   if (appConfig.encryptionSecretIsDefault && String(process.env.RTE_REGISTER ?? "").trim() !== "0") {
-    logger.warning('[SECURITY] ENCRYPTION_SECRET is not set. This RTE registers itself and stores its token encrypted with the default key, which is public in the source code: set the same ENCRYPTION_SECRET as the app, or RTE_REGISTER=0 and add the runner under Connections > Runners or in the config seed.');
+    logger.warning('[SECURITY] ENCRYPTION_SECRET is not set. This RTE registers itself and stores its token encrypted with the default key, which is public in the source code: set the same ENCRYPTION_SECRET as the controller, or RTE_REGISTER=0 and add the runner under Connections > Runners or in the config seed.');
   }
   // not ready until the database work below is done
   starting = true;
@@ -296,7 +296,7 @@ export async function startRte({ firstDelayMs, maxDelayMs } = {}) {
   // a stop : no new jobs. A playbook still running ends with the container ; this RTE abandons
   // it when it comes back under the same name, the worker when it does not
   onShutdown("server", () => new Promise((resolve) => server.close(() => resolve())));
-  // listening first : on a fresh install the app may still be creating the schema, and an RTE
+  // listening first : on a fresh install the controller may still be creating the schema, and an RTE
   // that waits for it without listening looks hung to its probes
   // every interface, unless LISTEN_HOST names one
   const host = listenHost();

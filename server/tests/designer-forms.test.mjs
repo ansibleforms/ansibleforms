@@ -465,9 +465,8 @@ describe("designAllPlaybooks and designAllWorkflows off : no other way to a hidd
     const push = "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\n create mode 100644 team.yml\n delete mode 100644 old.yml\n rename a.yml => b.yml (100%)\nTo origin";
     assert.equal(designerGitOutput(push, user), "[main abc123] Playbooks sync by olga\n 2 files changed, 3 insertions(+)\nTo origin");
     assert.equal(designerGitOutput(push, everything), push);
-    // a repository's stored pull and push outputs, as the user reads them ; a form name defined
-    // twice, one copy the team's : its line left out of the pull output (a line stored by an
-    // earlier pull too : only those naming forms the user reaches now are kept)
+    // a form name defined twice, one copy the team's : its line left out of the pull output (a line
+    // stored by an earlier pull too : only those naming forms the user reaches now are kept)
     const d = { notice: duplicateNotice("Team deploy", { place: "forms/forms/deploy.yaml" }, { place: "staging/dup.yaml" }) };
     const pull = `Updating 1..2\n forms/team.yaml | 3 ++-\n 1 file changed\nWarning: ${d.notice}`;
     const [row] = await designerRepositories([{ name: "forms", pull_output: pull, push_output: push }], limited);

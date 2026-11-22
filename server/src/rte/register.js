@@ -3,7 +3,7 @@
 // click or a seed. It can, because it has what that row needs : the database, its RTE_TOKEN and
 // the ENCRYPTION_SECRET to store that token encrypted. The token never goes through `nodes`.
 //
-// The address the app reaches it on :
+// The address the controller reaches it on :
 //   RTE_URL set : that (http://rte:8000, a compose service or a kubernetes service) - one row
 //                 named after its host, shared by every replica behind it
 //   not set     : http(s)://<this container's IP>:<PORT>, named after the node (rte-<host>-<port>)
@@ -47,7 +47,7 @@ export function registration(env = process.env, { https = false, port = 8000, ip
   if (String(env.RTE_REGISTER ?? "").trim() === "0") return null;
   const given = stripTrailingSlashes(String(env.RTE_URL || "").trim());
   if (!given) {
-    if (!ip) throw new Error("this container has no IPv4 address to register: set RTE_URL to the address the app reaches it on");
+    if (!ip) throw new Error("this container has no IPv4 address to register: set RTE_URL to the address the controller reaches it on");
     return { uri: `${https ? "https" : "http"}://${ip}:${port}`, name: nodeId, token: env.RTE_TOKEN || "", nodeId };
   }
   let url;

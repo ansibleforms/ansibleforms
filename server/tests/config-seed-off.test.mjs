@@ -56,6 +56,12 @@ vi.mock("../src/models/db.model.js", () => ({
         audits.push(vars);
         return { insertId: audits.length };
       }
+      // the fields the seed manages per field (lib/seedManaged.js), kept in the settings row
+      if (/^SELECT seed_managed_fields FROM/.test(sql)) return (tables.settings || []).slice(0, 1);
+      if (/^UPDATE AnsibleForms\.`settings` SET seed_managed_fields = \?/.test(sql)) {
+        for (const r of tables.settings || []) r.seed_managed_fields = vars[0];
+        return { affectedRows: 1 };
+      }
       if (/^SELECT name FROM .* WHERE managed=1$/.test(sql)) {
         return (tables[table] || []).filter((r) => r.managed === 1).map((r) => ({ name: r.name }));
       }
@@ -107,6 +113,17 @@ afterEach(() => {
 });
 
 describe("CONFIG_SEED_PATH unset releases what the seed managed", () => {
+  test("the fields its Appearance and mcp sections declared are released too, each named by its section and the key the seed gave it", async () => {
+    appConfig.configSeedPath = "";
+    tables.settings[0].seed_managed_fields = JSON.stringify(["app_name", "logo", "icon", "default_theme", "forms_view", "header_links", "MCP_READ_ONLY"]);
+    await applyConfigSeed();
+    assert.equal(tables.settings[0].seed_managed_fields, null);
+    const detail = JSON.parse(audits[0][7]);
+    for (const name of ["name:app_name", "logo:logo", "icon:icon", "defaults:default_theme", "defaults:default_forms_view", "links:header_links", "mcp:MCP_READ_ONLY"]) {
+      assert.ok(detail.released.includes(name), `${name} in ${JSON.stringify(detail)}`);
+    }
+  });
+
   test("every managed row becomes editable, with its values kept", async () => {
     appConfig.configSeedPath = "";
     assert.equal(await applyConfigSeed(), null, "an off seed still reports nothing applied");

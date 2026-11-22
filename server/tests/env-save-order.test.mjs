@@ -25,6 +25,8 @@ vi.mock("../src/lib/envSettings.js", () => {
     default: {
       REFUSED,
       ENV_EDIT_DISABLED_REASON: "disabled",
+      OWNED_ELSEWHERE: /^$/,
+      SECRET_ENV_NAME: /_PASSWORD$/,
       RELOCATES: new Set(),
       classify: () => "live",
       isOverridden: () => false,

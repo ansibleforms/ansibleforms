@@ -107,16 +107,17 @@ export function useUserLinks(who) {
   );
 
   /**
-   * When a schedule runs : a one-time run at its Run at, a recurring one at its cron's next time.
+   * When a schedule runs : a one-time run at its moment (one_time_run), a recurring one at its
+   * cron's next time.
    *
    * Args:
-   *   s (object): a schedule row, with run_at and next_run.
+   *   s (object): a schedule row, with one_time_run and next_run.
    *
    * Returns:
    *   string|null: the date, as the server sent it ; null when there is none.
    */
   function nextRunOf(s) {
-    return (s.one_time_run ? s.run_at : s.next_run) || null;
+    return s.one_time_run || s.next_run || null;
   }
 
   /**

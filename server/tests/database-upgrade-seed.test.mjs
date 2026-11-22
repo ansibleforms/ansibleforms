@@ -161,7 +161,9 @@ describe("the seed's databases section", () => {
 // ------------------------------------------------------------------
 describe("the credential a database names", () => {
   test("counts as used : its delete and its rename are refused (assertUnused reads usageCounts)", () => {
-    const usage = /static async usageCounts\(\) \{([\s\S]*?)\n {2}\}/.exec(read("src/models/credential.model.v2.js"))[1];
-    expect(usage).toMatch(/SELECT credential FROM AnsibleForms\.`databases`/);
+    // the tables that name a credential (Credential.USED_BY), which usageCounts reads
+    const src = read("src/models/credential.model.v2.js");
+    expect(src).toMatch(/\{ table: 'databases', column: 'credential'/);
+    expect(src).toMatch(/this\.USED_BY\.map/);
   });
 });

@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS `directory_users` (
   `first_seen` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `blocked` tinyint(4) NOT NULL DEFAULT 0,
+  -- what the user is, as an admin or its repository entry says
+  `description` varchar(250) DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_directory_users_type_username` (`type`, `username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

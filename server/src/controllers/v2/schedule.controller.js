@@ -6,6 +6,11 @@ import Errors from "../../lib/errors.js";
 import cronService from "../../services/cron.service.js";
 import logger from "../../lib/logger.js";
 import i18n from "../../lib/i18n.js";
+import ScheduleRepo from "../../models/scheduleRepo.model.js";
+import { validateRruleAsync, nextRunsAsync, zoneOf } from "../../lib/scheduleRrule.js";
+
+// how many runs a rrule's preview shows : four, on one line in a dialog, as a cron's (BsCron)
+const PREVIEW_RUNS = 4;
 
 const scheduleController = {
   async find(req, res) {
@@ -39,7 +44,7 @@ const scheduleController = {
       const created = await Schedule.findById(insertId);
       // Add to cron service
       logger.info(`Adding schedule '${created.name}' (ID: ${created.id}) to cron service`);
-      cronService.addSchedule(created.id, created.name, created.cron, created.one_time_run, created.run_at);
+      cronService.addScheduleRow(created);
       return res.status(201).json(RestResult.single(i18n.t(req, 'resources.scheduleAdded'), created));
     } catch (err) {
       Errors.ReturnError(res, err);
@@ -62,7 +67,7 @@ const scheduleController = {
       const updated = await Schedule.findById(req.params.id);
       // Update cron service with complete record
       logger.info(`Updating schedule '${updated.name}' (ID: ${updated.id}) in cron service`);
-      cronService.addSchedule(updated.id, updated.name, updated.cron, updated.one_time_run, updated.run_at);
+      cronService.addScheduleRow(updated);
       return res.json(RestResult.single(updated));
     } catch (err) {
       Errors.ReturnError(res, err);
@@ -85,6 +90,50 @@ const scheduleController = {
     try {
       await Schedule.queue(req.params.id);
       return res.json(RestResult.single(i18n.t(req, 'resources.scheduleQueued'), req.params.id));
+    } catch (err) {
+      Errors.ReturnError(res, err);
+    }
+  },
+
+  /**
+   * The schedules repositories (use_for_schedules) : where a new schedule may live besides the
+   * app, for the New schedule dialog.
+   *
+   * Args:
+   *   req (object): the request.
+   *   res (object): the response, { records: [{ name }] }.
+   */
+  async repositories(req, res) {
+    try {
+      const names = await ScheduleRepo.repositories();
+      return res.json(RestResult.list(names.map((name) => ({ name }))));
+    } catch (err) {
+      Errors.ReturnError(res, err);
+    }
+  },
+
+  /**
+   * A rrule checked, and its next runs (the preview) : its time zone,
+   * the next four runs as UTC ISO strings, or why it is refused.
+   *
+   * Args:
+   *   req (object): the request, ?rrule=<the rrule>.
+   *   res (object): the response, { valid, errors, timezone, next }.
+   */
+  async previewRrule(req, res) {
+    try {
+      const rrule = String(req.query?.rrule ?? "");
+      const errors = await validateRruleAsync(rrule);
+      let next = [];
+      // its runs from now, in their thread, awaited : one that cannot be worked out in time says so
+      if (!errors.length) {
+        try {
+          next = (await nextRunsAsync(rrule, { count: PREVIEW_RUNS })).map((d) => d.toISOString());
+        } catch (e) {
+          errors.push(e.message);
+        }
+      }
+      return res.json(RestResult.single({ valid: !errors.length, errors, timezone: errors.length ? null : zoneOf(rrule), next }));
     } catch (err) {
       Errors.ReturnError(res, err);
     }

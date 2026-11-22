@@ -12,6 +12,7 @@ import Profile from '@/lib/Profile';
 import { useSettingsRow } from '@/composables/useSettingsRow';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 
@@ -47,9 +48,12 @@ useUnsavedGuard(
 
 const title = computed(() => t('sidebar.name'));
 
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
-  if (authenticated.value) await load();
+  if (authenticated.value) await Promise.all([load(), loadSeedManaged()]);
   loaded.value = true;
 });
 </script>
@@ -86,15 +90,20 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="1" />
         <template v-else>
-          <BsInput
-            class="af-interface-field"
-            :isFloating="false"
-            icon="font"
-            v-model="look.app_name"
-            placeholder="AnsibleForms"
-            :label="t('settings.interface.appName')"
-            :help="t('settings.interface.appNameHelp')"
-          />
+          <!-- kept under name: in a repository's file : which one, and the file -->
+          <AppRepositorySource type="name" />
+          <AppSeedNotice v-if="seeded('app_name')" />
+          <fieldset :disabled="seeded('app_name')">
+            <BsInput
+              class="af-interface-field"
+              :isFloating="false"
+              icon="font"
+              v-model="look.app_name"
+              placeholder="AnsibleForms"
+              :label="t('settings.interface.appName')"
+              :help="t('settings.interface.appNameHelp')"
+            />
+          </fieldset>
         </template>
       </template>
     </AppSettings>

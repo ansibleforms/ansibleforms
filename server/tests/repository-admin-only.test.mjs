@@ -1,4 +1,4 @@
-// A repository marked use_for_config, use_for_forms or use_for_playbooks (or workflows,
+// A repository marked use_for_roles, use_for_forms or use_for_playbooks (or workflows,
 // inventories) is pulled into the configuration, the forms and the playbooks AnsibleForms runs. A
 // user with only connections access (showConnectionsSettings without the admin role) who could add
 // one, point one at their own git server, or mark one of theirs so, would write the roles (and make
@@ -18,7 +18,7 @@ process.env.DB_PASSWORD ||= "test";
 
 const repos = {
   forms: { id: 1, name: "forms", uri: "https://git.local/forms.git", branch: "main", description: "", cron: null,
-    use_for_forms: 1, use_for_config: 0, use_for_playbooks: 0, use_for_workflows: 0, use_for_inventories: 0, credential: null, password: "" },
+    use_for_forms: 1, use_for_roles: 0, use_for_playbooks: 0, use_for_workflows: 0, use_for_inventories: 0, credential: null, password: "" },
 };
 const calls = [];
 vi.mock("../src/models/repository.model.js", () => ({
@@ -40,6 +40,8 @@ vi.mock("../src/models/credential.model.v2.js", () => ({
 vi.mock("../src/services/cron.service.js", () => ({ default: { addRepository() {}, removeRepository() {} } }));
 
 const { default: controller } = await import("../src/controllers/v2/repository.controller.js");
+const { default: Repository } = await import("../src/models/repository.model.js");
+const { default: logger } = await import("../src/lib/logger.js");
 
 /**
  * Calls a controller handler as the given user, and answers what it sent.
@@ -74,7 +76,7 @@ beforeEach(() => { calls.length = 0; });
 
 describe("a connections user", () => {
   test("may not add a repository, whatever it is used for", async () => {
-    for (const flags of [{ use_for_config: 1 }, { use_for_forms: 1 }, { use_for_playbooks: 1 }, {}]) {
+    for (const flags of [{ use_for_roles: 1 }, { use_for_forms: 1 }, { use_for_playbooks: 1 }, {}]) {
       const r = await call(controller.create, ops, { body: { name: "evil", uri: "https://evil/x.git", branch: "main", ...flags } });
       expect(r.status).toBe(403);
     }
@@ -89,18 +91,29 @@ describe("a connections user", () => {
   test.each([
     ["its address", { uri: "https://evil/forms.git" }],
     ["its branch", { branch: "evil" }],
-    ["use_for_config on", { use_for_config: true }],
+    ["use_for_roles on", { use_for_roles: true }],
     ["use_for_playbooks on", { use_for_playbooks: "1" }],
     ["use_for_inventories on", { use_for_inventories: 1 }],
     ["use_for_workflows on", { use_for_workflows: true }],
+    // its schedules run as the Schedule Service, with the admin role
+    ["use_for_schedules on", { use_for_schedules: 1 }],
     ["use_for_forms off", { use_for_forms: false }],
+    // deprecated, the three flags it is now
+    ["use_for_config on", { use_for_config: true }],
   ])("may not change %s", async (_label, body) => {
     expect((await call(controller.update, ops, { body })).status).toBe(403);
     expect(calls).toEqual([]);
   });
 
+  // the table stores any truthy value as on : a value the rule read as off turned the usage on
+  test.each([["yes"], [2], ["on"], ["TRUE "], [[1]], [{}]])("may not turn a usage on with %j, nor have it stored", async (v) => {
+    const r = await call(controller.update, ops, { body: { use_for_roles: v, use_for_repositories: v, use_for_general: v } });
+    expect([400, 403]).toContain(r.status);
+    expect(calls).toEqual([]);
+  });
+
   test("may save it with those fields sent back unchanged, and change its description", async () => {
-    const body = { ...repos.forms, uri: " https://git.local/forms.git ", use_for_forms: true, use_for_config: false, description: "ours" };
+    const body = { ...repos.forms, uri: " https://git.local/forms.git ", use_for_forms: true, use_for_roles: false, description: "ours" };
     const r = await call(controller.update, ops, { body });
     expect(r.status).toBeLessThan(300);
     expect(calls[0][0]).toBe("update");
@@ -121,9 +134,94 @@ describe("a connections user", () => {
 
 describe("an admin", () => {
   test("may add, change and delete one", async () => {
-    expect((await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_config: 1 } })).status).toBeLessThan(300);
-    expect((await call(controller.update, admin, { body: { uri: "https://git/new.git", branch: "dev", use_for_config: 1 } })).status).toBeLessThan(300);
+    expect((await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_roles: 1 } })).status).toBeLessThan(300);
+    expect((await call(controller.update, admin, { body: { uri: "https://git/new.git", branch: "dev", use_for_roles: 1 } })).status).toBeLessThan(300);
     expect((await call(controller.delete, admin)).status).toBeLessThan(300);
     expect(calls.map((c) => c[0])).toEqual(["create", "update", "delete"]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// use_for_config, deprecated
+// ---------------------------------------------------------------------------------------------
+
+describe("use_for_config sent by a client of before", () => {
+  test("is applied as use_for_roles, use_for_categories and use_for_constants, on a create and an update", async () => {
+    await call(controller.create, admin, { body: { name: "cfg", uri: "https://git/cfg.git", branch: "main", use_for_config: 1 } });
+    await call(controller.update, admin, { body: { use_for_config: false } });
+    expect(calls.map((c) => [c[0], c[1].use_for_config, c[1].use_for_roles, c[1].use_for_categories, c[1].use_for_constants])).toEqual([
+      ["create", undefined, 1, 1, 1],
+      ["update", undefined, 0, 0, 0],
+    ]);
+  });
+
+  test("said applied in the server log only when the save is : never for one refused", async () => {
+    const warning = vi.spyOn(logger, "warning").mockImplementation(() => {});
+    try {
+      // refused : another repository holds the roles (the model's 400)
+      const refused = Object.assign(new Error("Repository 'other' is already used for roles"), { status: 400 });
+      vi.spyOn(Repository, "update").mockRejectedValueOnce(refused);
+      const r = await call(controller.update, admin, { body: { use_for_config: true } });
+      expect(r.status).toBe(400);
+      expect(warning.mock.calls.filter(([m]) => /use_for_config/.test(m))).toEqual([]);
+      // applied
+      await call(controller.update, admin, { body: { use_for_config: true } });
+      expect(warning.mock.calls.filter(([m]) => /applied as use_for_roles/.test(m)).length).toBe(1);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// A flag, read one way everywhere
+// ---------------------------------------------------------------------------------------------
+
+describe("a usage flag", () => {
+  test("is stored as it is read : on, off, or refused", async () => {
+    const { normalizeUsageFlags, flagOn } = await import("../src/lib/repoObjects/types.js");
+    expect(normalizeUsageFlags({ use_for_roles: "true", use_for_forms: " 1", use_for_general: "False", use_for_sso: 0, use_for_ldap: "" })).toEqual({
+      use_for_roles: 1, use_for_forms: 1, use_for_general: 0, use_for_sso: 0, use_for_ldap: "",
+    });
+    for (const v of ["yes", 2, "on", {}]) expect(() => normalizeUsageFlags({ use_for_roles: v })).toThrow(/use_for_roles must be true or false/);
+    expect(flagOn("TRUE")).toBe(true);
+    expect(flagOn("yes")).toBe(false);
+  });
+
+  test("an admin's 'yes' is refused too : it would skip the one-repository rule", async () => {
+    const r = await call(controller.update, admin, { body: { use_for_roles: "yes" } });
+    expect(r.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// What turning usages on would do : each type with its own page's right
+// ---------------------------------------------------------------------------------------------
+
+describe("the usage preview", () => {
+  test("names the objects of a type only to who may read that type's page", async () => {
+    const { default: RepoObjects } = await import("../src/lib/repoObjects/index.js");
+    const asked = [];
+    const spy = vi.spyOn(RepoObjects, "previewTypes").mockImplementation(async (name, keys) => {
+      asked.push(keys);
+      return Object.fromEntries(keys.map((k) => [k, {}]));
+    });
+    const types = "credentials,runners,sso,ldap,syslog,disclaimer,schedules,general,defaults,logo,icon,name,labels";
+    // the request's query : the helper above sends none, so the request is made here
+    const callWith = (user) =>
+      new Promise((resolve) => {
+        const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, json(data) { resolve({ status: this.statusCode, data }); return this; } };
+        controller.usagePreview({ params: { name: "forms" }, query: { types }, user: { user } }, res);
+      });
+    await callWith(ops);
+    await callWith({ username: "art", roles: ["art"], options: { showConnectionsSettings: true, showAppearanceSettings: true, allowScheduledJobs: true } });
+    await callWith(admin);
+    expect(asked).toEqual([
+      ["credentials", "runners"],
+      ["credentials", "runners", "schedules", "defaults", "logo", "icon", "name", "labels"],
+      types.split(","),
+    ]);
+    spy.mockRestore();
   });
 });

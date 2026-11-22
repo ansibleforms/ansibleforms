@@ -116,6 +116,13 @@ describe('loading', () => {
     await c.load();
     expect(c.isTemplated.value).toBe(true);
   });
+
+  it('a ytt template the server finds in a file a repository holds a key in is flagged read-only too', async () => {
+    http.get = () => Promise.resolve({ data: { config_yaml: 'categories: []\n', baseHash: 'h', templated: true } });
+    const c = useFormsConfig();
+    await c.load();
+    expect(c.isTemplated.value).toBe(true);
+  });
 });
 
 describe('saving', () => {

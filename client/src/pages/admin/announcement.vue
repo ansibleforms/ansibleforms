@@ -18,6 +18,7 @@ import Helpers from '@/lib/Helpers';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useSingleTab } from '@/composables/useSingleTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -156,6 +157,8 @@ const pageCrumbs = computed(() => [
 const { search, searching, matchingKeys } = useRecordSearch();
 const shownFields = computed(() =>
   matchingKeys([
+    // one kept in a repository : where it comes from
+    ...repositorySourceFields(t, record.value),
     ['message', t('settings.interface.banner'), t('settings.interface.bannerHelp')],
     ['level', t('settings.interface.bannerLevel'), t('settings.interface.bannerLevelHelp')],
     ['start', t('settings.interface.bannerStart'), t('settings.interface.bannerStartHelp')],
@@ -236,6 +239,8 @@ onMounted(async () => {
           <h6 v-if="searching && shownFields.length" class="fw-bold text-body-secondary af-search-tab af-search-first">
             <FaIcon :icon="tabs[0].icon" class="me-1" />{{ tabs[0].label }}
           </h6>
+          <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+          <AppRepositorySource v-show="fieldShown('source')" :record="record" />
           <BsInput
             v-show="fieldShown('message')"
             class="af-announcement-field"

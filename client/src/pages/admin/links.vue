@@ -27,6 +27,7 @@ import { useSettingsRow } from '@/composables/useSettingsRow';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useRecordSearch } from '@/composables/useRecordSearch';
+import { useSeedManaged } from '@/composables/useSeedManaged';
 
 const { t } = useI18n();
 const authenticated = ref(false);
@@ -358,9 +359,12 @@ async function save() {
   await Promise.all([State.loadAppConfig(), State.loadHeaderLinks()]);
 }
 
+// the fields the config seed manages : read only here
+const { seeded, loadSeedManaged } = useSeedManaged();
+
 onMounted(async () => {
   authenticated.value = !!(await Profile.load());
-  if (authenticated.value) await Promise.all([loadEnvironmentVariables(), loadOwn()]);
+  if (authenticated.value) await Promise.all([loadEnvironmentVariables(), loadOwn(), loadSeedManaged()]);
   loaded.value = true;
 });
 </script>
@@ -396,7 +400,7 @@ onMounted(async () => {
         <BsButton
           v-if="activeTab === 'custom' && !searching"
           icon="plus"
-          :disabled="own.header_links.length >= MAX_LINKS * (1 + MAX_INSIDE)"
+          :disabled="seeded('header_links') || own.header_links.length >= MAX_LINKS * (1 + MAX_INSIDE)"
           @click="addLink()"
           >{{ t('settings.interface.addLink') }}</BsButton
         >
@@ -408,6 +412,9 @@ onMounted(async () => {
         <!-- the first load : the fields as grey placeholders, in their place -->
         <AppSkeleton v-if="!loaded" shape="form" :count="4" />
         <template v-else>
+          <!-- kept under links: in a repository's file : which one, and the file -->
+          <AppRepositorySource v-show="!searching" type="links" />
+          <AppSeedNotice v-if="seeded('header_links', 'show_designer')" />
           <div v-if="envRestartPending.length" class="alert alert-warning py-2">
             <FaIcon icon="triangle-exclamation" class="me-2" />
             {{ t('settings.settingsPage.envRestartPending', { names: envRestartPending.join(', ') }) }}
@@ -424,10 +431,12 @@ onMounted(async () => {
             >
               <FaIcon :icon="searchHead('builtin').tab.icon" class="me-1" />{{ searchHead('builtin').tab.label }}
             </h6>
-            <AppEnvField v-for="e in shownBuiltin" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
+            <fieldset :disabled="seeded('show_designer')">
+              <AppEnvField v-for="e in shownBuiltin" :key="e.name" v-model="envEdits[e.name]" :e="e" :asSwitch="true" />
+            </fieldset>
           </div>
           <!-- Custom : the instance's own links, in the header's order -->
-          <div v-show="tabShown('custom')">
+          <fieldset v-show="tabShown('custom')" :disabled="seeded('header_links')">
             <template v-if="searching && searchHead('custom')">
               <hr v-if="!searchHead('custom').first" class="mt-4 mb-0 af-search-line" />
               <h6
@@ -571,7 +580,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
         </template>
       </template>
     </AppSettings>

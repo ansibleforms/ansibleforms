@@ -375,8 +375,8 @@ async function lastBackupCheck() {
 async function configSourceFacts() {
   const settings = await Settings.findConfigYaml();
   const inDatabase = Settings.resolveConfigInDatabase(settings);
-  const active = await Settings.getActiveConfig().catch(() => '');
-  const templated = /^\s*#@/m.test(active || '');
+  // its base and each file a repository holds a key in, as they are written
+  const templated = await Settings.isTemplated().catch(() => false);
   return {
     source: inDatabase ? 'database' : 'file/repository',
     configInDatabase: inDatabase,

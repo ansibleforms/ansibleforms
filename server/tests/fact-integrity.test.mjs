@@ -45,7 +45,7 @@ describe("getConfigPath reports failure instead of inventing an answer", () => {
   const fn = slice("static async getConfigPath()", "static async getFormsFolders()");
 
   test("the slice really is the function, so these assertions are not vacuous", () => {
-    assert.match(fn, /use_for_config/);
+    assert.match(fn, /use_for_roles/);
   });
 
   test("no catch answers the empty string", () => {
@@ -150,13 +150,13 @@ describe("the background clone cannot vanish", () => {
   const fn = slice("static async create(data, opts = {})", "static async update(data, name, opts = {})");
 
   test("the slice really is the function, so these assertions are not vacuous", () => {
-    assert.match(fn, /Repository\.clone\(data\.name\)/);
+    assert.match(fn, /Repository\.clone\(data\.name\b[^)]*\)/);
   });
 
   test("its rejection is caught and recorded on the row", () => {
     // clone() throws BEFORE writing any status when the claim fails, so the row was left
     // with no status and no output and the reason reached only the process-level logger
-    assert.match(fn, /Repository\.clone\(data\.name\)\.catch\(/);
+    assert.match(fn, /Repository\.clone\(data\.name\b[^)]*\)\.catch\(/);
     assert.match(fn, /status = 'failed'/);
   });
 });
@@ -375,8 +375,10 @@ describe("the forms walk and the delete pass see the same files", () => {
   test("both walks skip .git, being the same walk", () => {
     assert.match(walk, /entry\.name === "\.git"/);
     const lister = src.slice(src.indexOf("function listYamlFiles"), src.indexOf("function listYamlFiles") + 200);
-    assert.match(lister, /return walkYamlFiles\(dir\)/);
-    assert.match(src, /files = walkYamlFiles\(formsdirpath, warn\)/);
+    assert.match(lister, /return walkYamlFiles\(dir, undefined, skip\)/);
+    assert.match(src, /files = walkYamlFiles\(formsdirpath, warn, owned\)/);
+    // the files a usage type owns left out of both the same way
+    assert.match(src, /listYamlFiles\(dirEntry\.path, owned\)/);
   });
 });
 
@@ -401,7 +403,7 @@ describe("forms live in files only (7.0.0)", () => {
     const refuse = save.indexOf("Every form must be saved");
     const write = save.indexOf("yaml.stringify(formsConfig)");
     assert.ok(refuse > -1 && write > refuse);
-    assert.match(save.slice(write - 200, write), /delete formsConfig\.forms/);
+    assert.match(save.slice(write - 400, write), /delete formsConfig\.forms/);
   });
 
   test("nothing reads forms.yaml or FORMS_PATH any more", () => {

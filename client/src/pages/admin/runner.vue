@@ -45,6 +45,7 @@ import { recordButtons } from '@/lib/recordButtons';
 import { useRecordSearch } from '@/composables/useRecordSearch';
 import { reloadKeepingEdits } from '@/lib/keepEdits';
 import { askConfirm } from '@/lib/confirmPrompt';
+import { repositorySourceFields } from '@/lib/repositoryUsage';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -325,6 +326,8 @@ const tabFields = computed(() => {
   const e = edit.value || {};
   return {
     details: [
+      // a runner kept in a repository : where it comes from
+      ...repositorySourceFields(t, runner.value),
       ['name', t('settings.fields.name'), t('settings.runners.nameHelp')],
       ['description', t('settings.fields.description')],
       ['is_default', t('settings.runners.isDefault'), t('settings.runners.defaultHelp', { forms: defaultFor.value })],
@@ -665,6 +668,8 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('details').tab.icon" class="me-1" />{{ searchHead('details').tab.label }}
                 </h6>
               </template>
+              <!-- where it comes from : a repository's file ; nothing for one kept in the app only -->
+              <AppRepositorySource v-show="fieldShown('source')" :record="runner" />
               <BsInput
                 class="af-runner-field"
                 v-model="edit.name"

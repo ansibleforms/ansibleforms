@@ -5,16 +5,18 @@ import mysql from './db.model.js';
 class Group extends CrudModel {
     static modelName = 'groups';
 
-    static async create(data) {
-        return super.create(this.modelName, data);
+    // opts as the crud model takes them (fromRepo : a repository's entry writes it,
+    // lib/repoObjects/groups.js)
+    static async create(data, opts = {}) {
+        return super.create(this.modelName, data, opts);
     }
-    static async update(data, id) {
+    static async update(data, id, opts = {}) {
         // The admins group keeps its name - check by name, not ID. Its description may change.
         const group = await super.findById(this.modelName, id);
         if (group && group.name === 'admins' && data.name !== undefined && data.name !== 'admins') {
             throw new Error("You cannot rename group 'admins'");
         }
-        return super.update(this.modelName, data, id);
+        return super.update(this.modelName, data, id, opts);
     }
     static async delete(id) {
         // Prevent deletion of admins group - check by name, not ID

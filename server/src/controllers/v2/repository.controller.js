@@ -8,8 +8,13 @@ import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
 import CredentialModel from '../../models/credential.model.v2.js';
 import Errors from '../../lib/errors.js';
 import { isAdminRequest } from '../../lib/adminGrants.js';
-import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+import { repositoryDeprecations, repositoryKeyProblems, repositoryKeyNotices } from '../../lib/configKeys.js';
 import Form from '../../models/form.model.js';
+import { duplicateShown, designerRepositories, designerGitOutput } from '../../lib/designerForms.js';
+import _ from 'lodash';
+import { USAGE_FLAGS, typeOf, flagOn, normalizeUsageFlags, mayReadType } from '../../lib/repoObjects/types.js';
+import { foldConfigItem } from '../../lib/seed-schema.js';
 
 /**
  * Whether a credential carries what git signs in with : a password or a token (stored, or read
@@ -83,15 +88,17 @@ async function guardRepositoryCredential(req, existing) {
 // ---------------------------------------------------------------------------------------------
 
 // the flags that make a repository's content what AnsibleForms loads and runs : its configuration
-// (roles, and with them who is an admin), its forms, playbooks, workflows and inventories
-const USE_FOR_FLAGS = ['use_for_config', 'use_for_forms', 'use_for_playbooks', 'use_for_workflows', 'use_for_inventories'];
+// (roles, and with them who is an admin), its forms, playbooks, workflows, inventories, and the
+// objects it holds (schedules that run as the Schedule Service, credentials, runners ...) - every
+// usage type (lib/repoObjects/types.js)
+const USE_FOR_FLAGS = USAGE_FLAGS;
 
 // where its content comes from : the remote and the branch it pulls
 const SOURCE_FIELDS = ['uri', 'branch'];
 
 /**
  * Refuses to a user who is not an admin a write that chooses what AnsibleForms loads or runs. A
- * repository marked use_for_config, use_for_forms or use_for_playbooks (or workflows,
+ * repository marked use_for_roles, use_for_forms or use_for_playbooks (or workflows,
  * inventories) is pulled into the configuration, the forms and the playbooks : a user with only
  * connections access who could add one, point an existing one at a git server of their own, or
  * mark one of theirs so, would write the roles (and make themselves admin) or the code the
@@ -121,14 +128,53 @@ function assertRepositoryAdminFields(req, existing) {
   const data = req.body || {};
   // text compared trimmed, so the dialog sending the same value back is no change
   const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
-  // a flag compared as on or off, whatever it is sent as (true, 1, '1', 'true', or off)
-  const flag = (v) => v === true || v === 1 || v === '1' || v === 'true';
+  // a flag compared as on or off, as it is stored (normalizeUsageFlags ran first)
+  const flag = flagOn;
   for (const field of SOURCE_FIELDS) {
     if (data[field] !== undefined && text(data[field]) !== text(existing[field])) refuse();
   }
   for (const field of USE_FOR_FLAGS) {
     if (data[field] !== undefined && flag(data[field]) !== flag(existing[field])) refuse();
   }
+}
+
+/**
+ * A request's use_for_config (deprecated since 7.8.0, removed in 8) as the three flags it is now,
+ * use_for_roles, use_for_categories and use_for_constants, as the config seed and a
+ * repositories: entry take it (foldConfigItem) : before anything reads the request's flags, so the
+ * admin rule and the one-repository rule apply to them. Said in the server log once the save is
+ * applied (configUsageApplied), never for a save refused. Then every flag as the table stores it
+ * (normalizeUsageFlags).
+ *
+ * Args:
+ *   req (object): the request ; its body replaced when it sends use_for_config.
+ *
+ * Returns:
+ *   boolean: true when it sent use_for_config.
+ *
+ * Raises:
+ *   Errors.BadRequestError: a flag that is neither on nor off.
+ */
+function foldConfigUsage(req) {
+  const folded = req.body?.use_for_config !== undefined;
+  if (folded) req.body = foldConfigItem(req.body);
+  // every flag as the table stores it, so the admin rule reads what is written ('yes' refused)
+  normalizeUsageFlags(req.body);
+  return folded;
+}
+
+/**
+ * Says in the server log that a save sent use_for_config and that it was applied as the three
+ * flags it is now : once the save is done.
+ *
+ * Args:
+ *   name (string): the repository.
+ *
+ * Returns:
+ *   void
+ */
+function configUsageApplied(name) {
+  logger.warning(`The repository '${name}' was sent use_for_config, deprecated since 7.8.0 and removed in 8: applied as use_for_roles, use_for_categories and use_for_constants, send those instead`);
 }
 
 const find = async function(req, res) {
@@ -146,10 +192,17 @@ const create = async function(req, res) {
     return res.status(400).json(RestResult.error(i18n.t(req, 'errors.requiredFields')));
   }
   try {
+    const folded = foldConfigUsage(req);
     // a new repository is a new source of configuration, forms or playbooks : an admin's
     assertRepositoryAdminFields(req, null);
     await guardRepositoryCredential(req, null);
-    const insertId = await Repository.create(req.body);
+    const insertId = await RepoObjects.holding('repositories', async () => {
+      const id = await Repository.create(req.body);
+      // the repositories repository, when there is one : written to its repositories: entries
+      await RepoObjects.appCreated('repositories', id);
+      return id;
+    });
+    if (folded) configUsageApplied(req.body.name);
     // Fetch the created record to get all fields including cron
     const created = await Repository.findByName(req.body.name);
     // Add to cron service if cron expression exists
@@ -167,13 +220,19 @@ const findByName = async function(req, res) {
   try {
     // its pull and push outputs as the user reads them (lib/designerForms.js)
     const [repository] = await designerRepositories(await Repository.withUnpushed([await Repository.findByName(req.params.name)]), req.user?.user);
+    // its roles, categories or constants read from config.yaml : deprecated, said on its page
+    if (repository) repository.deprecations = await repositoryDeprecations(repository.name).catch(() => []);
+    // and those of its key files that are not read : why, said on its page
+    if (repository) repository.keyProblems = await repositoryKeyProblems(repository.name).catch(() => []);
+    // and what is said of its roles, role by role (refused, kept, naming what is not there)
+    if (repository) repository.keyNotices = await repositoryKeyNotices(repository.name).catch(() => []);
     // a form name it shares with another forms repository : which copy is used, which skipped
     // (without designAllForms, only those naming forms the user's roles reach ; the roles not sent)
     if (repository?.use_for_forms) {
       const user = req.user?.user;
       repository.formDuplicates = (await Form.duplicates(repository.name).catch(() => []))
         .filter((d) => duplicateShown(d, user))
-        .map((d) => ({ name: d.name, used: { repository: d.used.repository, place: d.used.place }, skipped: { repository: d.skipped.repository, place: d.skipped.place }, notice: d.notice }));
+        .map((d) => ({ name: d.name, used: _.omit(d.used, "roles"), skipped: _.omit(d.skipped, "roles"), notice: d.notice }));
     }
     repository.password = SECRET_MASK; // mask the password for api
     res.json(RestResult.single(repository));
@@ -189,10 +248,19 @@ const update = async function(req, res) {
   try {
     const existing = await Repository.findByName(req.params.name);
     if (!existing) throw new Errors.NotFoundError(i18n.t(req, 'resources.failedFindRepository'));
+    const folded = foldConfigUsage(req);
     // its address, branch and use_for_* flags : an admin's (the rest is the connections user's too)
     assertRepositoryAdminFields(req, existing);
     const { dropPassword } = await guardRepositoryCredential(req, existing);
-    await Repository.update(req.body, req.params.name, { dropPassword });
+    // what turning its object usages on or off did (Repository.afterUsageChange), by type, for the
+    // answer
+    const report = {};
+    await RepoObjects.holding([], async () => {
+      await Repository.update(req.body, req.params.name, { dropPassword, report });
+      // one of the repositories repository : its repositories: entry rewritten where it changed
+      if (existing.repository) await RepoObjects.appUpdated('repositories', existing, existing.id);
+    }, existing);
+    if (folded) configUsageApplied(req.params.name);
     // The record may have been RENAMED : `name` is an editable field on the repositories
     // page. Reading it back by req.params.name found nothing and threw, so a rename that
     // had already committed was reported as a 500 - and neither cron call below ran, so
@@ -213,7 +281,7 @@ const update = async function(req, res) {
       logger.info(`Removing repository '${updated.name}' from cron service (no schedule)`);
       cronService.removeRepository(updated.name);
     }
-    res.json(RestResult.single(null));
+    res.json(RestResult.single(Object.keys(report).length ? report : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedUpdateRepository'), err.message || String(err)));
   }
@@ -223,13 +291,49 @@ const deleteRepository = async function(req, res) {
   try {
     // deleting one takes away what the configuration, the forms or the playbooks load : an admin's
     assertRepositoryAdminFields(req, null);
-    await Repository.delete(req.params.name);
+    const report = {};
+    const before = await Repository.findByName(req.params.name).catch(() => null);
+    await RepoObjects.holding([], async () => {
+      await Repository.delete(req.params.name, { report });
+      // one of the repositories repository : its repositories: entry removed
+      if (before?.repository) await RepoObjects.appDeleted('repositories', before);
+    }, before);
     // Remove from cron service
     logger.info(`Removing repository '${req.params.name}' from cron service`);
     cronService.removeRepository(req.params.name);
-    res.json(RestResult.single(null));
+    res.json(RestResult.single(Object.keys(report).length ? report : null));
   } catch(err) {
     res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedDeleteRepository'), err.message || String(err)));
+  }
+};
+
+/**
+ * What turning a repository's object usages on (or off) would do, changing nothing : for each type
+ * asked (?types=schedules,credentials), the app's objects it would write to it, those that stay in
+ * the app and why, those written without their secrets, the files whose name an app's object has
+ * (git wins), the objects it holds now ; and whether it has changes not pushed yet. For the one
+ * question its dialog and page ask before the flags are saved. A type whose page the user may not
+ * read (mayReadType : the SSO providers, the syslog servers to a connections user) is left out.
+ *
+ * Args:
+ *   req (object): the request, /:name (one not made yet may be named too : its files are none),
+ *     ?types=<type>,<type>.
+ *   res (object): the response, { unpushed, types: { <type>: preview } }.
+ */
+const usagePreview = async function(req, res) {
+  try {
+    const name = req.params.name ? String(req.params.name) : null;
+    // only the types whose page the user may read : the preview names their objects
+    const keys = String(req.query?.types || '').split(',').map((k) => k.trim()).filter((k) => typeOf(k)?.objects && mayReadType(k, req.user?.user));
+    const types = await RepoObjects.previewTypes(name, keys);
+    let unpushed = false;
+    if (name) {
+      const [withState] = await Repository.withUnpushed([{ name }]);
+      unpushed = !!withState?.unpushed;
+    }
+    res.json(RestResult.single({ unpushed, types }));
+  } catch(err) {
+    res.status(err.status || 500).json(RestResult.error(i18n.t(req, 'resources.failedFindRepository'), err.message || String(err)));
   }
 };
 
@@ -378,6 +482,7 @@ export default {
     update,
     "delete": deleteRepository,
     clone,
+    usagePreview,
     reset,
     pull,
     sync,

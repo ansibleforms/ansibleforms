@@ -10,6 +10,7 @@ import i18n from '../../lib/i18n.js';
 import { publicError } from './publicError.js';
 import { withEnds } from '../../models/listOrder.js';
 import { SECRET_MASK, isMasked } from '../../lib/secretMask.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
 
 // a directory's connection : its credential's when the credential holds one (Ldap.withConnection)
 const CONNECTION_KEYS = ['server', 'port', 'enable_tls', 'ignore_certs', 'cert', 'ca_bundle'];
@@ -108,7 +109,12 @@ const findById = async function (req, res) {
 const create = async function (req, res) {
   try {
     assertBody(req);
-    const id = await Ldap.create({ ...new Ldap(req.body), managed: 0 });
+    const id = await RepoObjects.holding('ldap', async () => {
+      const id = await Ldap.create({ ...new Ldap(req.body), managed: 0 });
+      // the LDAP repository, when there is one : written to it as a new file, without its password
+      await RepoObjects.appCreated('ldap', id);
+      return id;
+    });
     res.status(201).json(RestResultv2.single({ id, message: i18n.t(req, 'resources.ldapCreated') }));
   } catch (err) {
     logger.error("Error adding an LDAP directory: ", err);
@@ -136,7 +142,11 @@ const update = async function (req, res) {
     if (await Ldap.connectionOf(record.credential).catch(() => null)) {
       for (const key of CONNECTION_KEYS) record[key] = existing[key] ?? null;
     }
-    await Ldap.updateById(existing.id, record);
+    await RepoObjects.holding([], async () => {
+      await Ldap.updateById(existing.id, record);
+      // one of the LDAP repository : its changed fields written to its file
+      if (existing.repository) await RepoObjects.appUpdated('ldap', existing, existing.id);
+    }, existing);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.ldapUpdated') }));
   } catch (err) {
     logger.error("Error updating the LDAP directory: ", err);
@@ -146,7 +156,12 @@ const update = async function (req, res) {
 
 const remove = async function (req, res) {
   try {
-    await Ldap.deleteById(req.params.id);
+    const before = await Ldap.findById(req.params.id).catch(() => null);
+    await RepoObjects.holding([], async () => {
+      await Ldap.deleteById(req.params.id);
+      // one of the LDAP repository : its file goes too, for the repository's Push
+      if (before?.repository) await RepoObjects.appDeleted('ldap', before);
+    }, before);
     res.status(200).json(RestResultv2.single({ message: i18n.t(req, 'resources.ldapDeleted') }));
   } catch (err) {
     logger.error("Error deleting the LDAP directory: ", err);
@@ -157,7 +172,8 @@ const remove = async function (req, res) {
 // one place up or down in the lookup order : { direction: 'up' | 'down' }
 const move = async function (req, res) {
   try {
-    const moved = await Ldap.move(req.params.id, req.body?.direction);
+    // every place numbered again : the LDAP repository's files follow
+    const moved = await RepoObjects.following('ldap', () => Ldap.move(req.params.id, req.body?.direction));
     res.status(200).json(RestResultv2.single({ moved }));
   } catch (err) {
     logger.error("Error moving the LDAP directory: ", err);

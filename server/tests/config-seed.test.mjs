@@ -32,7 +32,7 @@ vi.mock("../src/models/db.model.js", () => ({
   },
 }));
 
-const { validateSeed, interpolateEnv, foldRunnerSecretsIntoCredentials } = await import("../src/lib/seed-schema.js");
+const { validateSeed, interpolateEnv, foldRunnerSecretsIntoCredentials, foldOauth2Values } = await import("../src/lib/seed-schema.js");
 const appConfig = (await import("./__mocks__/app.config.js")).default;
 appConfig.encryptionSecret ||= "0123456789abcdef0123456789abcdef";
 const { buildRecord, listSections, canonicalJson, applyChat, differs } = await import("../src/lib/seed.js");
@@ -69,7 +69,7 @@ describe("the seed schema refuses anything it does not understand", () => {
   });
 
   test("an unknown top level section is rejected", () => {
-    assert.throws(() => validateSeed({ users: { items: [] } }), /validation failed/);
+    assert.throws(() => validateSeed({ widgets: { items: [] } }), /validation failed/);
   });
 
   test("a missing required field is rejected", () => {
@@ -204,19 +204,43 @@ describe("the seed schema refuses anything it does not understand", () => {
   test("two enabled oauth2 providers of the SAME type are rejected", () => {
     assert.throws(
       () => validateSeed({ oauth2: { items: [
-        { name: "a", provider: "azuread", client_id: "c", client_secret: "s", enable: true },
+        { name: "a", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
+        { name: "b", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
+      ] } }),
+      /enables more than one 'oidc' oauth2 provider: a, b/
+    );
+  });
+
+  // entraid is Microsoft Entra ID, stored azuread : azuread (deprecated) is the same type
+  test("an entraid and an azuread provider both enabled are the SAME type, rejected", () => {
+    assert.throws(
+      () => validateSeed({ oauth2: { items: [
+        { name: "a", provider: "entraid", client_id: "c", client_secret: "s", enable: true },
         { name: "b", provider: "azuread", client_id: "c", client_secret: "s", enable: true },
       ] } }),
-      /enables more than one 'azuread' oauth2 provider: a, b/
+      /enables more than one 'entraid' oauth2 provider: a, b/
     );
   });
 
   // different provider types are independent, so this must stay allowed
   test("two enabled oauth2 providers of DIFFERENT types are fine", () => {
     assert.equal(validateSeed({ oauth2: { items: [
-      { name: "a", provider: "azuread", client_id: "c", client_secret: "s", enable: true },
+      { name: "a", provider: "entraid", client_id: "c", client_secret: "s", enable: true },
       { name: "b", provider: "oidc", client_id: "c", client_secret: "s", enable: true },
     ] } }), true);
+  });
+
+  test("provider: entraid is applied as azuread, the type stored ; azuread still read, said deprecated", () => {
+    const seed = { oauth2: { items: [
+      { name: "a", provider: "entraid", client_id: "c", client_secret: "s" },
+      { name: "b", provider: "azuread", client_id: "c", client_secret: "s" },
+      { name: "c", provider: "oidc", client_id: "c", client_secret: "s" },
+    ] } };
+    assert.equal(validateSeed(seed), true);
+    const { doc, deprecated } = foldOauth2Values(seed);
+    assert.deepEqual(doc.oauth2.items.map((i) => i.provider), ["azuread", "azuread", "oidc"]);
+    assert.deepEqual(deprecated, [{ name: "b", notice: "provider: azuread is deprecated since 7.8.0 and removed in 8: read as provider: entraid, declare that instead" }]);
+    assert.deepEqual(foldOauth2Values({}).doc, {}, "a seed without oauth2 as it is");
   });
 
   // One restart should tell the operator everything that is wrong, not the first thing.

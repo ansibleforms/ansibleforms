@@ -36,6 +36,10 @@ CREATE TABLE `runners` (
   `rte_cache_mb` int(11) DEFAULT NULL,
   `rte_files` varchar(10) DEFAULT NULL,
   `rte_drain_seconds` int(11) DEFAULT NULL,
+  -- the repository and the file (runners/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_runners_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

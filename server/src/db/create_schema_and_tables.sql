@@ -10,6 +10,10 @@ CREATE TABLE `groups`(
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `description` varchar(250) DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_AnsibleForms_groups_natural_key` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
@@ -26,6 +30,10 @@ CREATE TABLE `users`(
   `blocked` tinyint(4) NOT NULL DEFAULT 0,
   -- its latest sign-in (lib/signInGate.js), NULL until it signs in
   `last_login` datetime DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_AnsibleForms_users_natural_key` (`username`),
     KEY `FK_users_group` (`group_id`),
@@ -91,6 +99,10 @@ CREATE TABLE `credentials` (
   -- the secret store a credential reads its user and password from, and where in it
   `secret_store` varchar(250) DEFAULT NULL,
   `secret_ref` varchar(500) DEFAULT NULL,
+  -- the credentials repository and the file (credentials/<file>.yaml) it comes from ; NULL for
+  -- one kept in the app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_credentials_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -132,6 +144,10 @@ CREATE TABLE `notification_channels` (
   `verify_tls` tinyint(4) DEFAULT 1,
   `payload` text DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (notifications/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_notification_channels_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -157,6 +173,10 @@ CREATE TABLE `syslog_servers` (
   `receives` varchar(10) NOT NULL DEFAULT 'both',
   `enabled` tinyint(4) DEFAULT 1,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (syslog/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_syslog_servers_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -175,6 +195,10 @@ CREATE TABLE `labels` (
   -- its place among the labels, lowest first
   `position` int(11) NOT NULL DEFAULT 0,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (labels/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_labels_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -213,6 +237,10 @@ CREATE TABLE `secret_stores` (
   `pvwa_auth` varchar(20) DEFAULT NULL,
   `platform_id` varchar(250) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (secret-stores/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_secret_stores_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -227,6 +255,10 @@ CREATE TABLE `databases` (
   `description` text DEFAULT NULL,
   `credential` varchar(250) NOT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_databases_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -272,6 +304,10 @@ CREATE TABLE `runners` (
   `rte_cache_mb` int(11) DEFAULT NULL,
   `rte_files` varchar(10) DEFAULT NULL,
   `rte_drain_seconds` int(11) DEFAULT NULL,
+  -- the runners repository and the file (runners/<file>.yaml) it comes from ; NULL for one kept
+  -- in the app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_runners_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -310,6 +346,10 @@ CREATE TABLE `ldap` (
   `groupfilter` varchar(250) DEFAULT NULL,
   `enable` tinyint(4) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (ldap/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -414,6 +454,9 @@ CREATE TABLE `settings` (
   `disclaimer_enabled` tinyint(4) NOT NULL DEFAULT 0,
   -- the disclaimer version users accept, Restore's choice ; none : the latest
   `disclaimer_version` int(11) DEFAULT NULL,
+  -- the fields the config seed's defaults, logo, icon, name, links and mcp sections declare (JSON
+  -- list) : read only in the app (lib/seedManaged.js)
+  `seed_managed_fields` text DEFAULT NULL,
   `forms_view` varchar(10) DEFAULT NULL,
   `default_timezone` varchar(64) DEFAULT NULL,
   `default_date_format` varchar(20) DEFAULT NULL,
@@ -453,6 +496,10 @@ CREATE TABLE `oauth2_providers` (
   `userinfo_url` TEXT DEFAULT NULL,
   `extra` JSON DEFAULT NULL, -- for any additional provider-specific config
   `managed` tinyint(4) DEFAULT 0,
+  -- the repository and the file (sso/<file>.yaml) it comes from ; NULL for one kept in the
+  -- app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   UNIQUE KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 -- create repositories table
@@ -468,11 +515,43 @@ CREATE TABLE `repositories` (
   `use_for_playbooks` tinyint(4) DEFAULT NULL,
   -- added by a patch on an existing install ; keep both paths in sync (schema.model.js)
   `branch` varchar(250) DEFAULT NULL,
+  -- the Config usage of before 7.8.0 : split into the three below by a patch, no longer read
   `use_for_config` tinyint(4) DEFAULT 0,
+  -- the roles, the categories and the constants, each from its own file (lib/configKeys.js)
+  `use_for_roles` tinyint(4) DEFAULT 0,
+  `use_for_categories` tinyint(4) DEFAULT 0,
+  `use_for_constants` tinyint(4) DEFAULT 0,
   -- the workflows the designer builds (one repository only)
   `use_for_workflows` tinyint(4) DEFAULT 0,
   -- the inventories the playbook forms name (inventory: <name>)
   `use_for_inventories` tinyint(4) DEFAULT 0,
+  -- the schedules in its schedules folder, one per file (models/scheduleRepo.model.js)
+  `use_for_schedules` tinyint(4) DEFAULT 0,
+  -- the objects it holds, one YAML file each in the type's folder (lib/repoObjects) ; one
+  -- repository at most per type
+  `use_for_repositories` tinyint(4) DEFAULT 0,
+  `use_for_credentials` tinyint(4) DEFAULT 0,
+  `use_for_secret_stores` tinyint(4) DEFAULT 0,
+  `use_for_databases` tinyint(4) DEFAULT 0,
+  `use_for_runners` tinyint(4) DEFAULT 0,
+  `use_for_notifications` tinyint(4) DEFAULT 0,
+  `use_for_sso` tinyint(4) DEFAULT 0,
+  `use_for_ldap` tinyint(4) DEFAULT 0,
+  `use_for_syslog` tinyint(4) DEFAULT 0,
+  `use_for_chat_assistant` tinyint(4) DEFAULT 0,
+  `use_for_mcp` tinyint(4) DEFAULT 0,
+  -- the local groups and their members, the users (local, LDAP and SSO)
+  `use_for_groups` tinyint(4) DEFAULT 0,
+  `use_for_users` tinyint(4) DEFAULT 0,
+  `use_for_disclaimer` tinyint(4) DEFAULT 0,
+  `use_for_defaults` tinyint(4) DEFAULT 0,
+  `use_for_logo` tinyint(4) DEFAULT 0,
+  `use_for_icon` tinyint(4) DEFAULT 0,
+  `use_for_name` tinyint(4) DEFAULT 0,
+  `use_for_links` tinyint(4) DEFAULT 0,
+  `use_for_labels` tinyint(4) DEFAULT 0,
+  `use_for_announcements` tinyint(4) DEFAULT 0,
+  `use_for_general` tinyint(4) DEFAULT 0,
   `credential` varchar(250) DEFAULT NULL,
   `cron` varchar(50) DEFAULT NULL,
   `status` varchar(50) DEFAULT NULL,
@@ -492,6 +571,10 @@ CREATE TABLE `repositories` (
   `head` varchar(50) DEFAULT NULL,    
   `rebase_on_start` tinyint(4) DEFAULT NULL,
   `managed` tinyint(4) DEFAULT 0,
+  -- the repositories repository and its file (repositories.yaml) it comes from ; NULL for one kept
+  -- in the app only (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_AnsibleForms_repositories_natural_key` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -514,12 +597,22 @@ CREATE TABLE `schedule` (
   `extra_vars` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `output` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- added by a patch on an existing install ; keep both paths in sync (schema.model.js)
-  `one_time_run` tinyint(4) DEFAULT 0,
-  `run_at` datetime DEFAULT NULL,
+  -- the moment of its one run ; NULL for one timed by its cron or rrule
+  `one_time_run` datetime DEFAULT NULL,
   -- the user a planned job ("Run later") runs as ; NULL for an admin-level schedule
   `owner` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- a planned job's raw field values, for the launch validation when it fires
   `raw_form_data` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- what it is for, in a few words
+  `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- timed by an iCal rrule instead of a cron or a one time run
+  `rrule` TEXT DEFAULT NULL,
+  -- the schedules repository and the file (schedules/<file>.yaml) it comes from ; NULL for one
+  -- kept in the app only
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
+  -- its file's prompts as the reserved extra vars a job reads (__limit__, __tags__ ...), JSON
+  `launch_options` LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   -- the stored job a planned job's values came from (lib/storedJobUse.js) : its last use is
   -- written when the run fires ; NULL for a schedule, which keeps its own copy of the values
   `stored_job_id` int(11) DEFAULT NULL,
@@ -636,6 +729,12 @@ CREATE TABLE `directory_users` (
   `first_seen` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `blocked` tinyint(4) NOT NULL DEFAULT 0,
+  -- what the user is, as an admin or its repository entry says
+  `description` varchar(250) DEFAULT NULL,
+  -- the repository and the file it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_directory_users_type_username` (`type`, `username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -662,6 +761,13 @@ CREATE TABLE `announcements` (
   `end_at` datetime DEFAULT NULL,
   `created_by` varchar(250) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  -- its name : a seed's or a repository's announcement is found again by it ; none for one made
+  -- in the app until a repository writes it
+  `name` varchar(100) DEFAULT NULL,
+  -- the repository and the file (announcements/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -675,6 +781,10 @@ CREATE TABLE `disclaimer_versions` (
   `checkbox_label` varchar(200) NOT NULL,
   `created_by` varchar(250) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  -- the repository and the file (disclaimer/<file>.yaml) it comes from ; NULL for one kept in the app only
+  -- (lib/repoObjects)
+  `repository` varchar(250) DEFAULT NULL,
+  `repo_file` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 DROP TABLE IF EXISTS `disclaimer_acceptances`;
