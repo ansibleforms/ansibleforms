@@ -58,7 +58,8 @@
         "ansibleCredentials": {"not":{}},
         "steps": {"not":{}},
         "expression": {"not":{}},
-        "playbookSubPath": {"not":{}}
+        "playbookSubPath": {"not":{}},
+        "playbookRepository": {"not":{}}
       },
       "required": ["roles"],
       "oneOf": [{ "required": ["template"] }, { "required": ["job"] }]
@@ -75,6 +76,7 @@
         "steps": {"not":{}},
         "expression": {"not":{}},
         "playbookSubPath": {"not":{}},
+        "playbookRepository": {"not":{}},
         "awxCredentials": {"not":{}},
         "executionEnvironment": {"not":{}},
         "scm_branch": {"not":{}},
@@ -106,7 +108,8 @@
         "executionEnvironment": {"not":{}},
         "instanceGroups": {"not":{}},
         "expression": {"not":{}},
-        "playbookSubPath": {"not":{}}
+        "playbookSubPath": {"not":{}},
+        "playbookRepository": {"not":{}}
       },
       "required": ["steps", "roles"]
     },
@@ -117,6 +120,7 @@
         },
         "playbook": {"not":{}},
         "playbookSubPath": {"not":{}},
+        "playbookRepository": {"not":{}},
         "runner": {"not":{}},
         "template": {"not":{}},
         "awx": {"not":{}},
@@ -145,6 +149,7 @@
         "workflow": {"not":{}},
         "playbook": {"not":{}},
         "playbookSubPath": {"not":{}},
+        "playbookRepository": {"not":{}},
         "runner": {"not":{}},
         "template": {"not":{}},
         "awx": {"not":{}},
@@ -460,6 +465,7 @@
           "name": {"type": "string"},
           "playbook": {"type": "string"},
           "playbookSubPath": {"type": "string"},
+          "playbookRepository": {"type": "string", "description": "The repository used for playbooks whose playbook the form runs, from its root"},
           "key": {"type": "string"},
           "ifExtraVar": {
             "$ref": "/formfield"
@@ -586,6 +592,7 @@
     },
     "playbook": {"type": "string"},
     "playbookSubPath": {"type": "string"},
+    "playbookRepository": {"type": "string", "description": "The repository used for playbooks whose playbook the form runs, from its root"},
     "workflow": {"type": "string"},
     "key": {"type": "string"},
     "abortable": {"type": "boolean"},

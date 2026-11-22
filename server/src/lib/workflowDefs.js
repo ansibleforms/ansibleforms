@@ -104,8 +104,8 @@ function linksOf(node, kind) {
  * Returns:
  *   object[]: { name, description, extra_vars, nodes : [{ identifier, type, name, description,
  *     timeout, converge, success, failure, always, extra_data, inventory, credentials, limit,
- *     job_tags, skip_tags, verbosity, diff_mode, job_type, runner, if_extra_var,
- *     extra_vars_key }] }. The last three are AnsibleForms' own (AWX ignores them) : the runner a
+ *     job_tags, skip_tags, verbosity, diff_mode, job_type, runner, playbook_repository,
+ *     if_extra_var, extra_vars_key }] }. The last four are AnsibleForms' own (AWX ignores them) : the runner a
  *     job template node runs a template or job on (none : a designer playbook on the RTE), the
  *     extravar that must be true for the node to run, the extravar whose value is all the node
  *     gets.
@@ -144,6 +144,9 @@ export function workflowsOf(text) {
             diff_mode: n.diff_mode === true,
             job_type: n.job_type ? String(n.job_type) : "",
             runner: n.runner ? String(n.runner) : "",
+            // AnsibleForms' own : the repository a playbook node runs from (its root), as a form's
+            // playbookRepository
+            playbook_repository: n.playbook_repository ? String(n.playbook_repository) : "",
             if_extra_var: n.if_extra_var ? String(n.if_extra_var) : "",
             extra_vars_key: n.extra_vars_key ? String(n.extra_vars_key) : "",
           };

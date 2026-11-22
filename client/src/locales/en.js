@@ -1345,7 +1345,7 @@ export default {
       },
       usageHints: {
         forms: 'Form files and their vars files, edited and pushed back by the designer',
-        playbooks: 'Ansible playbooks the forms run (one repository only)',
+        playbooks: 'Ansible playbooks the forms run, the first repository unless a form names another',
         workflows: 'Workflows the designer builds, edited and pushed back by the designer',
         inventories: 'An inventory: inventory.yaml, group_vars and host_vars at its root',
         schedules: 'Schedules, entries of a controller_schedules: list in any of its YAML files',
@@ -2587,6 +2587,10 @@ export default {
     runnerDefault: 'Default runner of its type',
     helpIcon: 'Shown on its tile and in the forms list.',
     helpPlaybook: 'The playbook it runs.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repository',
+    helpPlaybookRepository: "Runs the playbook from this repository's root, with its ansible.cfg.",
+    visualFirstPlaybookRepository: 'First playbooks repository',
     formWorkflow: 'Workflow',
     helpWorkflow: 'The workflow it runs, one of Designer > Workflows.',
     helpTemplate: 'The template it launches on the runner: an AWX job or workflow template, a Semaphore template.',

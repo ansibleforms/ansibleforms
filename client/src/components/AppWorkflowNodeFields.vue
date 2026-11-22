@@ -14,7 +14,8 @@
 /*      section: String - 'runs' or 'settings'                    */
 /*      choices: Function - type -> the names it may run, or null */
 /*         (then typed)                                           */
-/*      refs: Object - { inventories, credentials, runners } :    */
+/*      refs: Object - { inventories, credentials, runners,       */
+/*        playbookRepositories } :                              */
 /*         the instance's names (runners : { name, type }), null  */
 /*         when unknown                                           */
 /*      readOnly: Boolean - shown, not editable                   */
@@ -79,7 +80,9 @@ function setRuns(value) {
 // a job template node on a template runner (AWX, Semaphore, Rundeck, Jenkins) runs that runner's
 // template or job : its name is typed, the designer's playbooks are not it
 const onRunner = computed(() => !!target.value && target.value !== 'rte');
-const runChoices = computed(() => (onRunner.value ? null : props.choices(props.node.type)));
+const runChoices = computed(() =>
+  onRunner.value ? null : props.choices(props.node.type, props.node.playbook_repository),
+);
 // what it runs is called after where : a playbook, a template (AWX, Semaphore), a job (Rundeck, Jenkins)
 const runNameLabel = computed(() => {
   if (!target.value) return t(`workflowEditor.runName.${props.node.type}`, t('workflowEditor.name'));
@@ -268,6 +271,32 @@ function removeCredential(name) {
   <!-- how its playbook runs -->
   <template v-else-if="section === 'settings'">
     <div class="row g-3 mb-3">
+      <!-- the repository its playbook runs from, at its root ; none : the first one used for playbooks -->
+      <div
+        v-if="!onRunner && (node.playbook_repository || (refs.playbookRepositories || []).length > 1)"
+        class="col-md-6"
+      >
+        <label class="form-label fw-bold">{{ t('designer.formPlaybookRepository') }}</label>
+        <div class="input-group">
+          <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="code-branch" /></span>
+          <select
+            class="form-select"
+            :value="node.playbook_repository || ''"
+            :disabled="readOnly"
+            @change="emit('set', 'playbook_repository', $event.target.value)"
+          >
+            <option value="">{{ t('designer.visualFirstPlaybookRepository') }}</option>
+            <option
+              v-for="r in withCurrent(sorted(refs.playbookRepositories || []), node.playbook_repository)"
+              :key="r"
+              :value="r"
+            >
+              {{ r }}
+            </option>
+          </select>
+        </div>
+        <div class="form-text">{{ t('designer.helpPlaybookRepository') }}</div>
+      </div>
       <div class="col-md-6">
         <label class="form-label fw-bold">{{ t('workflowEditor.inventory') }}</label>
         <div class="input-group">

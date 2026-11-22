@@ -380,6 +380,8 @@ export function nodeForm(workflow, node, types, runnerType = "", formCredentials
   const roles = credentialRoles(node.credentials, types);
   const form = { type: "ansible", name: `${workflow.name} - ${node.identifier}`, playbook: node.name };
   if (node.runner) form.runner = node.runner;
+  // the repository the playbook runs from (its root), as a form's playbookRepository
+  if (node.playbook_repository) form.playbookRepository = node.playbook_repository;
   if (node.inventory) form.inventory = node.inventory;
   if (node.limit) form.limit = node.limit;
   if (node.job_tags) form.tags = node.job_tags;

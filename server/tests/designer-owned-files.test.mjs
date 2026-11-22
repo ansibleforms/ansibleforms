@@ -36,6 +36,8 @@ vi.mock("../src/models/repository.model.js", async () => {
       getInventoryRoots: async () => [{ repository: null, root: path.join(fx.ROOT, "local") }, ops],
       // its playbooks : its root (no playbooks folder)
       getAnsiblePath: async () => ops.root,
+      // the one repository used for playbooks : no other one under its name
+      playbooksRepositories: async () => [{ id: 1, name: "ops" }],
       getVarsFilesPath: async () => path.join(fx.ROOT, "vars"),
     },
   };

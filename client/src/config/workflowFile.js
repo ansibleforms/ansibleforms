@@ -9,6 +9,7 @@
 // on the YAML document itself so comments and order stay (the edit* functions), and a
 // workflow's graph laid out (workflowGraph). AppWorkflowEditor draws and edits it.
 import YAML from 'yaml';
+import { playbookChoices } from '@/lib/playbookChoices';
 
 // ─── what a workflow file holds ───────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ export const LINK_KINDS = ['success', 'failure', 'always'];
 // all it gets - as a multistep's step runner, ifExtraVar and key
 export const NODE_RUN_KEYS = [
   'runner',
+  'playbook_repository',
   'if_extra_var',
   'extra_vars_key',
   'inventory',
@@ -40,6 +42,22 @@ export const NODE_RUN_KEYS = [
 
 // an identifier : what AWX's export writes (a uuid) or a name a person types
 const IDENTIFIER = /^[A-Za-z0-9_.:-]+$/;
+
+/**
+ * The playbooks a playbook node may name : the first repository's, or the one it names
+ * (playbook_repository), from its root (lib/playbookChoices.js).
+ *
+ * Args:
+ *   refs (object): what the instance has ({ playbooks, playbookFiles }).
+ *   repository (string): the node's playbook_repository.
+ *
+ * Returns:
+ *   string[]: the names.
+ */
+function playbooksOf(refs, repository) {
+  if (!repository || !refs.playbookFiles) return refs.playbooks || [];
+  return playbookChoices(refs.playbookFiles.files, refs.playbookFiles.repositories, repository);
+}
 
 /** The text of a scalar node, or of a plain value. */
 function textOf(node) {
@@ -192,6 +210,7 @@ export function workflowFileOf(text) {
         diff_mode: textOf(n.get('diff_mode', true)),
         job_type: textOf(n.get('job_type', true)),
         runner: textOf(n.get('runner', true)),
+        playbook_repository: textOf(n.get('playbook_repository', true)),
         if_extra_var: textOf(n.get('if_extra_var', true)),
         extra_vars_key: textOf(n.get('extra_vars_key', true)),
         line: lineOf(lineCounter, n),
@@ -346,7 +365,7 @@ export function workflowProblems(file, refs = {}) {
         n.type === 'job_template' &&
         !onTemplateRunner(n, refs) &&
         refs.playbooks &&
-        !refs.playbooks.includes(n.name)
+        !playbooksOf(refs, n.playbook_repository).includes(n.name)
       )
         add('nodeUnknownPlaybook', { identifier: n.identifier, name: n.name }, n.line);
       else if (n.type === 'workflow_job_template') {

@@ -6184,7 +6184,7 @@
         ],
         "responses": {
           "200": {
-            "description": "RestResult with data { repository, repositories, exists, truncated, dirty, roots, files: [{ path, size, modified }] }"
+            "description": "RestResult with data { repository, repositories: [{ name, prefix, folder, dirty }], exists, truncated, dirty, roots, files: [{ path, size, modified }] }. The playbooks are the first repository used for them, then each other one under its name (prefix) ; folder is where a root is inside its repository (playbooks, or empty for its root), as a form naming it with playbookRepository names its playbook."
           },
           "400": {
             "description": "Unknown kind"
@@ -9769,7 +9769,7 @@
         ],
         "responses": {
           "200": {
-            "description": "RestResult with data { repository, repositories, exists, truncated, dirty, roots, files: [{ path, size, modified }] }"
+            "description": "RestResult with data { repository, repositories: [{ name, prefix, folder, dirty }], exists, truncated, dirty, roots, files: [{ path, size, modified }] }. The playbooks are the first repository used for them, then each other one under its name (prefix) ; folder is where a root is inside its repository (playbooks, or empty for its root), as a form naming it with playbookRepository names its playbook."
           },
           "400": {
             "description": "Unknown kind"

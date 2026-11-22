@@ -1374,7 +1374,7 @@ export default {
       },
       usageHints: {
         forms: 'File dei moduli e delle variabili, modificati e reinviati dal designer',
-        playbooks: 'Playbook Ansible eseguiti dai moduli (un solo repository)',
+        playbooks: 'Playbook Ansible eseguiti dai moduli, dal primo repository se un modulo non ne indica un altro',
         workflows: 'Workflow che il designer costruisce, modificati e reinviati dal designer',
         inventories: 'Un inventario: inventory.yaml, group_vars e host_vars nella radice',
         schedules: 'Pianificazioni, voci di una lista controller_schedules: in uno qualsiasi dei suoi file YAML',
@@ -2638,6 +2638,10 @@ export default {
     runnerDefault: 'Runner predefinito del suo tipo',
     helpIcon: 'Mostrata sul suo riquadro e nella lista dei moduli.',
     helpPlaybook: 'Il playbook che esegue.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repository',
+    helpPlaybookRepository: 'Esegue il playbook dalla radice di questo repository, con il suo ansible.cfg.',
+    visualFirstPlaybookRepository: 'Primo repository di playbook',
     formWorkflow: 'Workflow',
     helpWorkflow: 'Il workflow che esegue, uno di Designer > Workflow.',
     helpTemplate: 'Il template che avvia sul runner: un job o workflow template di AWX, un template di Semaphore.',

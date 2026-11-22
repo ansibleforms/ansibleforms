@@ -418,12 +418,29 @@ async function rteRunners() {
 }
 
 /**
+ * Where the playbooks a form names are : the first repository used for playbooks (its playbooks
+ * folder, as it runs them) and the root of each repository used for playbooks, by its name (a
+ * form naming one with playbookRepository runs from its root).
+ *
+ * Returns:
+ *   Promise<object>: { playbookRoot, repositoryRoots ({ name: folder }) }.
+ */
+async function playbookRootsOf() {
+  const { default: Repository } = await import("../models/repository.model.js");
+  const { default: Repo } = await import("../models/repo.model.js");
+  const repositoryRoots = {};
+  for (const r of await Repository.playbooksRepositories()) repositoryRoots[r.name] = path.resolve(Repo.folderOf(r.name));
+  return { playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root, repositoryRoots };
+}
+
+/**
  * The playbooks and the workflow files some forms use, by absolute path, and those some workflows
  * run (a workflow file about to be saved : its nodes, and the nested workflows they run).
  *
  * Args:
  *   forms (object[]): the forms.
- *   ctx (object): { playbookRoot (the playbooks folder), workflows (workflowFiles), rteRunners
+ *   ctx (object): { playbookRoot (the playbooks folder), repositoryRoots (each playbooks repository's
+ *     root, by its name), workflows (workflowFiles), rteRunners
  *     (rteRunners) }.
  *   workflows (object[]): workflows read from a file's text (workflowsOf) ; none when not given.
  *
@@ -435,9 +452,12 @@ function usedBy(forms, ctx, workflows = []) {
   const files = new Set();
   const seen = new Set();
   // a playbook named literally (an expression resolves only at launch : nothing to compare)
-  const addPlaybook = (playbook, subPath) => {
+  // a form naming its repository (playbookRepository) : from that repository's root
+  const addPlaybook = (playbook, subPath, repository) => {
     if (typeof playbook !== "string" || !playbook.trim() || /\$\(|\{\{/.test(playbook)) return;
-    playbooks.add(path.resolve(ctx.playbookRoot, String(subPath || ""), playbook.trim().replace(/^(\.\/|\/)+/, "")));
+    const root = repository ? ctx.repositoryRoots?.[repository] : ctx.playbookRoot;
+    if (!root) return;
+    playbooks.add(path.resolve(root, String(subPath || ""), playbook.trim().replace(/^(\.\/|\/)+/, "")));
   };
   // a node running a playbook : on the app, or on an rte runner (every runner when unknown)
   const runsPlaybook = (node) => node.type === "job_template" && (!node.runner || !ctx.rteRunners || ctx.rteRunners.has(node.runner));
@@ -446,7 +466,7 @@ function usedBy(forms, ctx, workflows = []) {
   // second one never shows the first)
   const addNodes = (workflow, depth) => {
     for (const node of workflow.nodes || []) {
-      if (runsPlaybook(node)) addPlaybook(node.name);
+      if (runsPlaybook(node)) addPlaybook(node.name, "", node.playbook_repository);
       else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
     }
   };
@@ -460,9 +480,11 @@ function usedBy(forms, ctx, workflows = []) {
     }
   };
   for (const f of forms || []) {
-    if (f?.type === "ansible" || (f?.playbook && !f?.type)) addPlaybook(f.playbook, f.playbookSubPath);
+    if (f?.type === "ansible" || (f?.playbook && !f?.type)) addPlaybook(f.playbook, f.playbookSubPath, f.playbookRepository);
     for (const step of Array.isArray(f?.steps) ? f.steps : []) {
-      if (step?.type === "ansible") addPlaybook(step.playbook, step.playbookSubPath ?? f.playbookSubPath);
+      if (step?.type === "ansible") {
+        addPlaybook(step.playbook, step.playbookSubPath ?? f.playbookSubPath, step.playbookRepository ?? f.playbookRepository);
+      }
     }
     if (f?.type === "workflow") addWorkflow(f.workflow, 0);
   }
@@ -489,7 +511,7 @@ async function visibilityOf(kind, user) {
   const unloaded = (await Form.unloaded()).map((u) => u.form);
   const { visible } = designerScope(forms, user);
   const roles = user?.roles || [];
-  const ctx = { playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root, workflows: await workflowFiles(), rteRunners: await rteRunners() };
+  const ctx = { ...(await playbookRootsOf()), workflows: await workflowFiles(), rteRunners: await rteRunners() };
   const all = usedBy([...forms, ...unloaded], ctx)[kind];
   const theirs = usedBy([...forms.filter((f) => visible.has(f.name)), ...unloaded.filter((f) => Form.checkFormRole(rolesOf(f), roles))], ctx)[kind];
   return { shown: (abs) => !all.has(abs) || theirs.has(abs), ctx };

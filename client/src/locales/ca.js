@@ -1376,7 +1376,8 @@ export default {
       },
       usageHints: {
         forms: 'Formularis i els seus fitxers vars, editats i enviats pel dissenyador',
-        playbooks: "Playbooks d'Ansible que executen els formularis (un sol repositori)",
+        playbooks:
+          "Playbooks d'Ansible dels formularis, del primer repositori tret que un formulari n'indiqui un altre",
         workflows: 'Workflows del dissenyador, editats i enviats de tornada pel dissenyador',
         inventories: 'Un inventari: inventory.yaml, group_vars i host_vars a la seva arrel',
         schedules: "Programacions, entrades d'una llista controller_schedules: en qualsevol dels seus fitxers YAML",
@@ -2644,6 +2645,10 @@ export default {
     runnerDefault: 'Runner predeterminat del seu tipus',
     helpIcon: 'Es mostra al seu mosaic i a la llista de formularis.',
     helpPlaybook: 'El playbook que executa.',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'Repositori',
+    helpPlaybookRepository: "Executa el playbook des de l'arrel d'aquest repositori, amb el seu ansible.cfg.",
+    visualFirstPlaybookRepository: 'Primer repositori de playbooks',
     formWorkflow: 'Workflow',
     helpWorkflow: 'El workflow que executa, un de Dissenyador > Workflows.',
     helpTemplate:

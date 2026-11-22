@@ -1176,6 +1176,7 @@ function findVariableDependencies() {
     '__instanceGroups__',
     '__scmBranch__',
     '__playbookSubPath__',
+    '__playbookRepository__',
     '__skipTags__',
     '__verbosity__',
   ];

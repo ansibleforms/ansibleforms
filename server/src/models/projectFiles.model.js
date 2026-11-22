@@ -6,7 +6,8 @@
 // Listed, read, written and deleted here ; a repository's are then pushed to its remote (Push,
 // as the forms' Save to repo).
 //
-// A kind has one root ; the inventories have the local folder (one folder per inventory) and
+// A kind has one root ; the playbooks the first repository used for them, then each other one under
+// its name (a form names it with playbookRepository) ; the inventories have the local folder (one folder per inventory) and
 // a root per inventories repository, each an inventory of its own : its paths start with its name
 // (production/inventory.yaml), as a local inventory's start with its folder's.
 //
@@ -59,7 +60,15 @@ ProjectFiles.roots = async function (kind) {
     return (await Repository.getWorkflowsRoots()).map((r) => ({ prefix: r.repository || "", root: path.resolve(r.root), repository: r.repository }));
   }
   const root = path.resolve(kind === "playbooks" ? (await Repository.getAnsiblePath()) || ansibleConfig.path : await Repository.getVarsFilesPath());
-  return [{ prefix: "", root, repository: configRepoFromPath(root, path.resolve(appConfig.repoPath)) }];
+  const roots = [{ prefix: "", root, repository: configRepoFromPath(root, path.resolve(appConfig.repoPath)) }];
+  if (kind === "playbooks") {
+    // the other repositories used for playbooks, each under its name and whole : a form names one
+    // with playbookRepository and its playbook runs from that repository's root
+    for (const r of (await Repository.playbooksRepositories()).slice(1)) {
+      roots.push({ prefix: r.name, root: path.resolve(Repo.folderOf(r.name)), repository: r.name });
+    }
+  }
+  return roots;
 };
 
 /**
@@ -272,7 +281,11 @@ ProjectFiles.list = async function (kind) {
           logger.warning(`Cannot tell whether '${r.repository}' has changes: ${e.message}`);
         }
       }
-      repositories.push({ name: r.repository, prefix: r.prefix, dirty });
+      // where its root is in the repository ('playbooks' for the first playbooks repository's
+      // playbooks folder, '' for its root) : a form naming it with playbookRepository names its
+      // playbook from the repository's root
+      const folder = path.relative(path.resolve(Repo.folderOf(r.repository)), r.root).split(path.sep).join("/");
+      repositories.push({ name: r.repository, prefix: r.prefix, folder: folder.startsWith("..") ? "" : folder, dirty });
     }
   }
   return {

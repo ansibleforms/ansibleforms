@@ -1346,7 +1346,8 @@ export default {
       },
       usageHints: {
         forms: 'フォームファイルとその変数ファイル。デザイナーで編集してプッシュします',
-        playbooks: 'フォームが実行する Ansible Playbook (1 つのリポジトリのみ)',
+        playbooks:
+          'フォームが実行する Ansible Playbook。フォームが別のリポジトリを指定しない限り最初のリポジトリのもの',
         workflows: 'デザイナーで作るワークフロー。デザイナーで編集してプッシュします',
         inventories: 'インベントリ: ルートに inventory.yaml、group_vars、host_vars',
         schedules: 'スケジュール。任意の YAML ファイルの controller_schedules: リストの項目',
@@ -2581,6 +2582,10 @@ export default {
     runnerDefault: 'その種類の既定のランナー',
     helpIcon: 'タイルとフォーム一覧に表示されます。',
     helpPlaybook: '実行する playbook。',
+    // the repository a playbook runs from, at its root (a form's playbookRepository, a node's playbook_repository)
+    formPlaybookRepository: 'リポジトリ',
+    helpPlaybookRepository: 'このリポジトリのルートから playbook を実行し、その ansible.cfg を使います。',
+    visualFirstPlaybookRepository: '最初の playbook リポジトリ',
     formWorkflow: 'ワークフロー',
     helpWorkflow: '実行するワークフロー (デザイナー > ワークフロー のいずれか)。',
     helpTemplate:

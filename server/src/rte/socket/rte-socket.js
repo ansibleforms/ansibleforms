@@ -306,6 +306,13 @@ const socketJobIO = {
   },
   async playbookDirectory(jobId, playbookSubPath = "") {
     const entry = jobs.get(jobId);
+    // a form naming its repository (playbookRoot) : that repository's root, sent or cloned here
+    if (entry?.paths?.playbookRoot) {
+      const repo = entry.paths.playbookRepo;
+      const root = entry.dirs?.playbooks || (entry.dirs ? null : Repo.folderOf(repo));
+      if (!root || !fs.existsSync(root)) throw new Error(`playbookRepository '${repo}' is not a repository used for playbooks`);
+      return playbookSubPath ? path.join(root, playbookSubPath) : root;
+    }
     const root = entry?.dirs?.playbooks || localPlaybookRoot(entry?.paths?.playbookRepo || null);
     return playbookSubPath ? path.join(root, playbookSubPath) : root;
   },

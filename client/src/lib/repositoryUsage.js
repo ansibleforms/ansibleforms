@@ -55,7 +55,8 @@ export const USAGE_TYPES = [
   },
   { key: 'forms', flag: 'use_for_forms', category: 'designer' },
   { key: 'inventories', flag: 'use_for_inventories', category: 'designer' },
-  { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer', oneOnly: true },
+  // several : a form runs the first one's playbooks, or names its own (playbookRepository)
+  { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer' },
   { key: 'workflows', flag: 'use_for_workflows', category: 'designer' },
   {
     key: 'schedules',
