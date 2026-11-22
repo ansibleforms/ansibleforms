@@ -47,8 +47,30 @@ const KEY_LINE = new RegExp(`^["']?(${FILE_KEYS.join("|")})["']?[ \\t]*:[ \\t]*(
 // a form's line : its type (a form that cannot be read is the forms load's to say, never a type's)
 const FORM_LINE = /^["']?type["']?[ \t]*:/m;
 
-// a file written as one flow map ({ credentials: [...] }) : parsed too
-const FLOW_START = /^(?:\s*(?:#[^\n]*)?\n)*\s*(?:---\s*\n\s*)?\{/;
+/**
+ * Whether a file is written as one flow map ({ credentials: [...] }) : its first line that is no
+ * blank line nor a comment opens a map, after one document marker (---) at most. Read line by line,
+ * never by a regex that could backtrack over a long run of blank or comment lines.
+ *
+ * Args:
+ *   source (string): the file's text.
+ *
+ * Returns:
+ *   boolean: true when it is parsed as a flow map.
+ */
+function startsAsFlowMap(source) {
+  let marker = false;
+  for (const line of source.split("\n")) {
+    const text = line.trim();
+    if (!text || text.startsWith("#")) continue;
+    if (text === "---" && !marker) {
+      marker = true;
+      continue;
+    }
+    return text.startsWith("{");
+  }
+  return false;
+}
 
 // a document marker line (--- or ...) : a text with one may hold several documents
 const DOC_MARKER = /^(?:---|\.\.\.)(?:[ \t]|\r?$)/m;
@@ -143,7 +165,7 @@ export function contentOf(text) {
   }
   // a form (its type at its top level) : none, never parsed here
   if (FORM_LINE.test(lines)) return none;
-  if (!hints.length && !FLOW_START.test(source)) return none;
+  if (!hints.length && !startsAsFlowMap(source)) return none;
   const doc = YAML.parseDocument(source, { prettyErrors: false });
   if (doc.errors.length) return { ...none, errors: [`not valid YAML: ${doc.errors[0].message}`], hints };
   if (!YAML.isMap(doc.contents)) return none;

@@ -135,16 +135,42 @@ const NUMBER_PARTS = {
  * Returns:
  *   object: { errors (string[]), text (the rrule trimmed) }.
  */
+/**
+ * How many DTSTART properties a rule's text gives : DTSTART, its parameters if any (;TZID=...), a
+ * colon and a date-time (20261020T020000, Z or not). Counted by a scan, never by a regex that could
+ * backtrack over the whole text from every DTSTART.
+ *
+ * Args:
+ *   text (string): the rule's text.
+ *
+ * Returns:
+ *   number: the DTSTART properties found.
+ */
+function countDtstarts(text) {
+  const moment = /[0-9]+T[0-9]+/y;
+  let count = 0;
+  for (let i = text.indexOf("DTSTART"); i !== -1; i = text.indexOf("DTSTART", i + 7)) {
+    let colon = i + 7;
+    // its parameters : up to the next colon, at least one character
+    if (text[colon] === ";") colon = text.indexOf(":", colon + 2);
+    if (colon === -1) break;
+    if (text[colon] !== ":") continue;
+    moment.lastIndex = colon + 1;
+    if (moment.test(text)) count++;
+  }
+  return count;
+}
+
 function readErrors(value) {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return { errors: ["This field may not be blank."], text };
   // step 1 : what is checked on the text ; EXDATE and RDATE end the check at once, said on
   // their own
   const errors = [];
-  const dtstarts = text.match(/DTSTART(;[^:]+)?:[0-9]+T[0-9]+Z?/g) || [];
-  if (!dtstarts.length) errors.push("Valid DTSTART required in rrule. Value should start with: DTSTART:YYYYMMDDTHHMMSSZ");
+  const dtstarts = countDtstarts(text);
+  if (!dtstarts) errors.push("Valid DTSTART required in rrule. Value should start with: DTSTART:YYYYMMDDTHHMMSSZ");
   if (/DTSTART:[0-9]+T[0-9]+ /.test(text)) errors.push("DTSTART cannot be a naive datetime.  Specify ;TZINFO= or YYYYMMDDTHHMMSSZZ.");
-  if (dtstarts.length > 1) errors.push("Multiple DTSTART is not supported.");
+  if (dtstarts > 1) errors.push("Multiple DTSTART is not supported.");
   if (!/rrule:/i.test(text)) errors.push("One or more rule required in rrule.");
   if (/exdate:/i.test(text)) return { errors: ["EXDATE not allowed in rrule."], text };
   if (/rdate:/i.test(text)) return { errors: ["RDATE not allowed in rrule."], text };
