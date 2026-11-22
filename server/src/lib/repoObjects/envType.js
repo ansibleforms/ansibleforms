@@ -1,8 +1,8 @@
 'use strict';
 // The environment types of the repository-backed objects (lib/repoObjects/engine.js, its single
 // mode) : what a page that saves environment variables saves, under its key in a repository's
-// file, keyed by the variables' names - System > General's (general:) and Connections > MCP's
-// (mcp:). One way for both, written once : the variables a page owns (lib/envSave.js
+// file, keyed by the variables' names in lower case (job_retention_days for JOB_RETENTION_DAYS) -
+// System > General's (general:) and Connections > MCP's (mcp:). One way for both, written once : the variables a page owns (lib/envSave.js
 // ownsVariable : never one variable for two pages, never a refused one, nor one set in the real
 // environment), a secret one (its name ends in _PASSWORD, _SECRET, _TOKEN or _SECRET_PREVIOUS)
 // an ${ENV} reference only, as the page masks it. A pull applies the file as the page's Save does
@@ -17,8 +17,59 @@ import { mapFieldSet } from "./fields.js";
 import { seedHold } from "./seedHold.js";
 import { singleType } from "./singleType.js";
 
-// a secret by its name, as the page masks it
-const isSecret = (name) => EnvSettings.SECRET_ENV_NAME.test(name);
+// a secret by its name (or its key in a file), as the page masks it
+const isSecret = (name) => EnvSettings.SECRET_ENV_NAME.test(String(name).toUpperCase());
+
+/**
+ * The key a file gives a variable by : its name in lower case, as every other key of a file.
+ *
+ * Args:
+ *   name (string): the variable (JOB_RETENTION_DAYS).
+ *
+ * Returns:
+ *   string: its key (job_retention_days).
+ */
+export const keyOfVariable = (name) => String(name).toLowerCase();
+
+/**
+ * An object with each of its keys translated, its values as they are.
+ *
+ * Args:
+ *   obj (object|null): the object.
+ *   to (function): the translation of a key.
+ *
+ * Returns:
+ *   object: the object translated (an empty one for none).
+ */
+const renamed = (obj, to) => Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [to(k), v]));
+
+/**
+ * The fields of an environment type : its map's keys the variables' names in lower case, the app's
+ * object keyed by the names themselves. A key that is not in lower case (JOB_RETENTION_DAYS) is
+ * refused, naming the key to write instead.
+ *
+ * Returns:
+ *   object: a field set (lib/repoObjects/fields.js mapFieldSet), translating the keys.
+ */
+function variableFieldSet() {
+  const base = mapFieldSet({ isSecret });
+  const toKeys = (obj) => renamed(obj, keyOfVariable);
+  const toNames = (obj) => renamed(obj, (k) => String(k).toUpperCase());
+  function check(raw, opts = {}) {
+    const upper = Object.keys(raw || {}).filter((k) => k !== keyOfVariable(k));
+    if (upper.length) return { errors: [`keys are in lower case: ${upper.map((k) => `${keyOfVariable(k)}, not ${k}`).join("; ")}`], object: null };
+    const checked = base.check(raw, opts);
+    return checked.errors.length ? checked : { errors: [], object: toNames(checked.object) };
+  }
+  return {
+    keys: base.keys,
+    check,
+    read: (raw) => ({ ...check(raw), absent: false, raw }),
+    toFile: (map) => base.toFile(toKeys(map)),
+    editsOf: (after, before) => base.editsOf(toKeys(after), toKeys(before)),
+    keyOrderOf: (after, before) => base.keyOrderOf(toKeys(after), toKeys(before)),
+  };
+}
 
 /**
  * A variable's value as its file gives it : in the YAML type of the variable's documented type
@@ -61,14 +112,14 @@ export function envType(spec) {
   // command the server runs, the database, a path ...), refused when a file sets it, never written
   const owns = (name, docs) => ownsVariable(spec.key, name, docs) && !repositoryRefusal(name);
   // the config seed's hold on the page's variables ; none for a type it does not hold
-  const hold = seedHold((name) => !!spec.seedHeld && ENV_OWNERS[spec.key](String(name)));
+  const hold = seedHold((name) => !!spec.seedHeld && ENV_OWNERS[spec.key](String(name)), keyOfVariable);
   const seeded = (current, opts = {}) => (opts.fromSeed ? [] : hold.seededOf(current));
 
   /**
    * The variables of a file checked as the page's Save checks them, before anything is applied.
    *
    * Args:
-   *   declared (object): { NAME: value }.
+   *   declared (object): { NAME: value } (the names, its keys translated).
    *   opts (object): { fromSeed (true : the config seed's declaration - a variable set in the
    *     environment is said when it is applied, not refused) }.
    *
@@ -83,16 +134,18 @@ export function envType(spec) {
     const managed = await EnvSettings.readManaged();
     const problems = [];
     for (const [name, value] of Object.entries(declared)) {
-      if (!docs.has(name)) problems.push(`${name} is not a known environment variable`);
-      else if (!ownsVariable(spec.key, name, docs)) problems.push(`${name} is not one ${spec.page} changes`);
-      else if (repositoryRefusal(name)) problems.push(`${name} is not one a repository may set: ${repositoryRefusal(name)} (change it on ${spec.page})`);
+      // said by its key, as the file has it
+      const key = keyOfVariable(name);
+      if (!docs.has(name)) problems.push(`${key} is not a known environment variable`);
+      else if (!ownsVariable(spec.key, name, docs)) problems.push(`${key} is not one ${spec.page} changes`);
+      else if (repositoryRefusal(name)) problems.push(`${key} is not one a repository may set: ${repositoryRefusal(name)} (change it on ${spec.page})`);
       // the seed's : the environment's value kept, said when it is applied (lib/envSave.js)
       else if (EnvSettings.isOverridden(name, managed)) {
-        if (!opts.fromSeed) problems.push(`${name} is set in the environment and cannot be changed from here`);
+        if (!opts.fromSeed) problems.push(`${key} is set in the environment and cannot be changed from here`);
       }
       else {
         const problem = EnvSettings.validate(name, value, docs.get(name));
-        if (problem) problems.push(problem);
+        if (problem) problems.push(problem.split(name).join(key));
       }
     }
     if (problems.length) throw new Error(problems.join("; "));
@@ -120,8 +173,10 @@ export function envType(spec) {
     key: spec.key,
     title: spec.title,
     noun: spec.noun,
-    fields: mapFieldSet({ isSecret }),
+    fields: variableFieldSet(),
     secretsOf: (current) => Object.keys(current || {}).filter(isSecret),
+    // a variable's key in the file : its name in lower case
+    keyOf: keyOfVariable,
     // the variables the page edits : those saved from it (the managed file), or every one with
     // its documented default ; never one set in the real environment
     current: async () => {
@@ -163,4 +218,4 @@ export function envType(spec) {
   });
 }
 
-export default { envType };
+export default { envType, keyOfVariable };

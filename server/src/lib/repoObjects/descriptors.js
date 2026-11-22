@@ -20,6 +20,7 @@ const LOADERS = {
   chat_assistant: () => import("./chatAssistant.js"),
   general: () => import("./general.js"),
   mcp: () => import("./mcp.js"),
+  ssh: () => import("./ssh.js"),
   defaults: () => import("./defaults.js"),
   logo: () => import("./logo.js"),
   icon: () => import("./icon.js"),

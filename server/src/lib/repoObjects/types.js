@@ -79,6 +79,8 @@ export const USAGE_TYPES = [
   // the databases forms query, each naming its credential of type database
   { key: "databases", references: ["credentials"], flag: "use_for_databases", category: "connections", objects: true, oneOnly: true, label: "databases" },
   { key: "runners", references: ["credentials"], flag: "use_for_runners", category: "connections", objects: true, oneOnly: true, label: "runners" },
+  // the app's SSH key and the hosts it trusts (Settings > Connections > SSH) : one map
+  { key: "ssh", single: true, flag: "use_for_ssh", category: "connections", objects: true, oneOnly: true, label: "SSH" },
   { key: "notifications", references: ["credentials"], flag: "use_for_notifications", category: "connections", objects: true, oneOnly: true, label: "notifications" },
   { key: "chat_assistant", single: true, references: ["credentials"], flag: "use_for_chat_assistant", category: "connections", objects: true, oneOnly: true, label: "chat assistant" },
   { key: "mcp", single: true, flag: "use_for_mcp", category: "connections", objects: true, oneOnly: true, label: "MCP settings" },
@@ -168,6 +170,9 @@ export const APPLY_ORDER = [
   // the repositories after the credentials they sign in with, before every other type : one made
   // from its repositories: entries may hold any of them
   "repositories",
+  // the SSH key and the known hosts right after : a repository is cloned once the pass is done,
+  // over SSH with the key and the hosts read just here
+  "ssh",
   "secret_stores",
   // the databases after the credentials they connect with
   "databases",

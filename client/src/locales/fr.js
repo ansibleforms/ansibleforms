@@ -1378,6 +1378,7 @@ export default {
         syslog: "Serveurs syslog, entrées d'une liste controller_syslog: dans l'un de ses fichiers YAML",
         chat_assistant:
           "L'interrupteur et les réglages de l'assistant de chat, sous controller_chat_assistant: dans l'un de ses fichiers YAML, la clé uniquement en référence d'environnement",
+        ssh: "La clé SSH et les hôtes connus, sous controller_ssh: dans l'un de ses fichiers YAML, la clé uniquement en référence d'environnement",
         mcp: "Les paramètres MCP par leur nom d'environnement, sous controller_mcp: dans l'un de ses fichiers YAML",
         defaults:
           "Le thème, la couleur, la vue des formulaires, le fuseau horaire, le format de date et la langue, sous controller_defaults: dans l'un de ses fichiers YAML",

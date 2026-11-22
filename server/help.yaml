@@ -6870,7 +6870,7 @@
       | `controller_groups:` | a list of local groups, each found by its `name`, listing its members | `- name: ops` |
       | `controller_users:` | a list of users, each found by its `type` (local when not said) and `username` | `- username: alice` |
       | `controller_disclaimer:` | a list of versions, each found by its `version` | `- version: 2` |
-      | `controller_general:`, `controller_mcp:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
+      | `controller_general:`, `controller_mcp:`, `controller_ssh:`, `controller_chat_assistant:`, `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:` | one map, what the app has one of | `default_theme: dark` |
       | `controller_roles:`, `controller_categories:`, `controller_constants:` | the base configuration's key, as before | |
 
       A file may hold several types, and a type may be spread over many files. A file whose keys are no type's
@@ -7051,10 +7051,15 @@
       | --- | --- | --- | --- | --- |
       | Secret stores | `controller_secret_stores:` | an item of the seed's `secret_stores:` | `credential` | `token`, `client_key` |
       | Databases | `controller_databases:` | an item of `databases:` | `credential` (of type database) | |
-      | Notifications | `controller_notifications:` | an item of `notification_channels:` | `credential`, `token_credential` | `webhook_url` |
-      | SSO | `controller_sso:` | an item of `oauth2:` (by its name) | `credential` | `client_secret` |
+      | Notifications | `controller_notifications:` | an item of `notifications:` | `credential`, `token_credential` | `webhook_url` |
+      | SSO | `controller_sso:` | an item of `sso:` (by its name) | `credential` | `client_secret` |
       | LDAP | `controller_ldap:` | the seed's `ldap:` section with `name`, `position` and `domains` | `credential` | `bind_user_pw` |
-      | Syslog | `controller_syslog:` | an item of `syslog_servers:` | | |
+      | Syslog | `controller_syslog:` | an item of `syslog:` | | |
+
+      Every seed section is named as the repository's key without `controller_` (`sso:` for `controller_sso:`). The
+      seed's names before 7.8.0 are still read, deprecated and removed in 8.0, said in the server log: `oauth2:` for
+      `sso:`, `syslog_servers:` for `syslog:`, `notification_channels:` for `notifications:` and `chat:` for
+      `chat_assistant:`. A seed giving a section by both names is refused.
       | Labels | `controller_labels:` | an item of `labels:` | | |
 
       ```yaml
@@ -7071,7 +7076,7 @@
           enable: true
       ```
 
-      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `oauth2:`
+      An SSO provider's `provider` is `entraid` for Microsoft Entra ID, or `oidc`, as in the config seed's `sso:`
       items. `azuread`, its name before, is still read the same (deprecated, removed in 8.0, said in the pull output).
 
       An entry may leave a secret out: the one in the database stays (an object of the app is written to git without
@@ -7144,13 +7149,13 @@
       it (said in the pull output), so an entry the app writes next makes a file that never deletes the others.
 
   - name: Settings, chat, appearance, announcements and the disclaimer kept in a git repository
-    short: The last usage types, eight of them one map under their key
+    short: The last usage types, nine of them one map under their key
     version: v7.8.0
     description: |
-      The last ten usage types work as the others (two ways, the same question before turning them on or off,
+      The last eleven usage types work as the others (two ways, the same question before turning them on or off,
       the same pull output, `${ENV}` references only for their secrets, **Repository: <name>** on their pages).
-      Eight are things the app has one of (chat, general settings, MCP, and the Appearance pages Defaults, Logo,
-      Icon, Name and Links): each is **one map** under its key (`controller_chat_assistant:`, `controller_general:`, `controller_mcp:`,
+      Nine are things the app has one of (chat, general settings, MCP, SSH, and the Appearance pages Defaults, Logo,
+      Icon, Name and Links): each is **one map** under its key (`controller_chat_assistant:`, `controller_general:`, `controller_mcp:`, `controller_ssh:`,
       `controller_defaults:`, `controller_logo:`, `controller_icon:`, `controller_name:`, `controller_links:`) in any YAML file of the repository, one file at most
       giving it (two are refused, both named, nothing applied), holding what its menu item's page saves and
       nothing else, so a save on a page writes its own map only. Several of them may share a file. Turning the
@@ -7161,11 +7166,11 @@
 
       **Chat assistant** (`controller_chat_assistant:`): what Settings > Connections > Chat assistant saves, every field
       optional: its switch `enable_chat` (the `ENABLE_CHAT` environment setting, named as its variable in lower case,
-      as Defaults' `default_language`), then the settings in the config seed's `chat:` format. The switch is checked
+      as Defaults' `default_language`), then the settings in the config seed's `chat_assistant:` format. The switch is checked
       and saved as the page's Save (the chat turns on or off at once, no restart, audited), and a save of the switch on
       the page rewrites it in the map; the app writes it on or off. When the real environment sets `ENABLE_CHAT`
       the app never writes it, and a map giving it is refused, nothing applied, as General refuses such a variable.
-      General never holds it. The config seed's `chat:` section has no switch. `api_key` only as `${ENV}`, or left
+      General never holds it. The config seed's `chat_assistant:` section has no switch. `api_key` only as `${ENV}`, or left
       out (the one in the database stays); `credential` names an api credential, and the map waits while it is missing.
       ```yaml
       controller_chat_assistant:
@@ -7176,8 +7181,8 @@
         allow_job_status: false
       ```
 
-      **General** (`controller_general:`): Settings > System > General by environment variable names, only those that
-      page changes (never one another page or the deployment owns, a refused one, or one set in the real
+      **General** (`controller_general:`): Settings > System > General by environment variable names in lower case
+      (`job_retention_days` for `JOB_RETENTION_DAYS`; a key in upper case is refused), only those that page changes (never one another page or the deployment owns, a refused one, or one set in the real
       environment). Never a variable that runs, connects or loads code either, which the page alone changes: a
       command the server runs (`*_COMMAND`), the app's database (`DB_*`), a path (`*_PATH`),
       `ENABLE_CONFIG_IN_DATABASE`, ytt (`USE_YTT`, `YTT_*`), `EXPRESSION_SANITIZER`, `CONTENT_SECURITY_POLICY`,
@@ -7192,13 +7197,13 @@
       `1`): both are read the same.
       ```yaml
       controller_general:
-        JOB_RETENTION_DAYS: 30
-        LOG_LEVEL: info
-        METRICS_TOKEN: ${METRICS_TOKEN}
+        job_retention_days: 30
+        log_level: info
+        metrics_token: ${METRICS_TOKEN}
       ```
 
-      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names, every switch that page
-      changes (`ENABLE_MCP`, `MCP_READ_ONLY`, `MCP_CHAT_FORMS_ONLY`) with its value, its documented default when
+      **MCP** (`controller_mcp:`): Settings > Connections > MCP by environment variable names in lower case, every
+      switch that page changes (`enable_mcp`, `mcp_read_only`, `mcp_chat_forms_only`) with its value, its documented default when
       never saved (one set in the real environment is left out). Applied as the page saves them, the same way as
       General (checked, written, the nodes told, audited): the MCP server turns on or off at once, no restart.
       General never holds these variables: each variable has one page, and one type. The config seed has an `mcp:`
@@ -7207,9 +7212,22 @@
       server log, the seed's value not applied, and the start goes on.
       ```yaml
       controller_mcp:
-        ENABLE_MCP: true
-        MCP_READ_ONLY: true
-        MCP_CHAT_FORMS_ONLY: false
+        enable_mcp: true
+        mcp_read_only: true
+        mcp_chat_forms_only: false
+      ```
+
+      **SSH** (`controller_ssh:`): Settings > Connections > SSH, the app's private key and its known hosts. The
+      `private_key` only as `${ENV}`, never written to git: left out, the app keeps its own, and its public key is
+      made from a new one as the page makes it. `known_hosts` is the list of the servers the app trusts, one
+      known_hosts line each (the hosts, the key type and the key), written in the order ssh reads them; a page's
+      Add or Remove rewrites it, and an empty list clears them. It is read right after the repositories, before they
+      are cloned. The config seed has an `ssh:` section in the same format, applied at each start, never locked.
+      ```yaml
+      controller_ssh:
+        private_key: ${SSH_PRIVATE_KEY}
+        known_hosts:
+          - git.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
       ```
 
       **Defaults** (`controller_defaults:`): what Settings > Appearance > Defaults saves, the theme and its colour, the

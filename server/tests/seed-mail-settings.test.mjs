@@ -76,26 +76,26 @@ describe("the mail keys of the settings become a mail channel", () => {
     expect(doc.credentials.items).toEqual([
       { name: "mail-login", description: "The mail server of the config seed's settings", credential_type: "smtp", host: "smtp.example.com", user: "mailer", port: 587, secure: true, password: "pw" },
     ]);
-    expect(doc.notification_channels.items).toEqual([
+    expect(doc.notifications.items).toEqual([
       { name: "default", description: "From the config seed's mail settings", type: "mail", from_address: "af@example.com", credential: "mail-login", server: "", port: "", secure: false },
     ]);
     // never is_active : the first mail channel is the active one, one made by hand stays it
-    expect(doc.notification_channels.items[0].is_active).toBeUndefined();
+    expect(doc.notifications.items[0].is_active).toBeUndefined();
   });
 
   test("a relay (no user) : a channel with its own server and no credential", () => {
     const { doc, credential } = foldMailSettingsIntoChannel({ settings: { ...MAIL, mail_username: "", mail_password: "", url: "" } });
     expect(credential).toBe(null);
     expect(doc.credentials.items).toEqual([]);
-    expect(doc.notification_channels.items[0]).toMatchObject({ name: "default", type: "mail", server: "smtp.example.com", port: 587, secure: true });
+    expect(doc.notifications.items[0]).toMatchObject({ name: "default", type: "mail", server: "smtp.example.com", port: 587, secure: true });
     // its credential declared empty : a channel that had a login stops naming it
-    expect(doc.notification_channels.items[0].credential).toBe("");
+    expect(doc.notifications.items[0].credential).toBe("");
   });
 
   test("switched between a login and a relay, the managed channel keeps no trace of the other", () => {
-    const relay = foldMailSettingsIntoChannel({ settings: { ...MAIL, mail_username: "", mail_password: "", url: "" } }).doc.notification_channels.items[0];
-    const login = foldMailSettingsIntoChannel({ settings: { ...MAIL, url: "" } }).doc.notification_channels.items[0];
-    const section = listSections.find((x) => x.key === "notification_channels");
+    const relay = foldMailSettingsIntoChannel({ settings: { ...MAIL, mail_username: "", mail_password: "", url: "" } }).doc.notifications.items[0];
+    const login = foldMailSettingsIntoChannel({ settings: { ...MAIL, url: "" } }).doc.notifications.items[0];
+    const section = listSections.find((x) => x.key === "notifications");
     // each as the seed writes it : the credential, or the own server, port and TLS, stored null
     const asRelay = { ...relay, credential: null, secure: 1, managed: 1 };
     const asLogin = { ...login, server: null, port: null, secure: 0, managed: 1 };
@@ -117,20 +117,20 @@ describe("the mail keys of the settings become a mail channel", () => {
     const { channel, credential, doc } = foldMailSettingsIntoChannel(
       {
         settings: { ...MAIL, url: "" },
-        notification_channels: { items: [{ name: "default", type: "slack", webhook_url: "https://hooks.example.com/x" }] },
+        notifications: { items: [{ name: "default", type: "slack", webhook_url: "https://hooks.example.com/x" }] },
         credentials: { items: [{ name: "mail-login", user: "u" }] },
       },
       { channels: ["default-2"], credentials: ["mail-login-2"] },
     );
     expect([channel, credential]).toEqual(["default-3", "mail-login-3"]);
-    expect(doc.notification_channels.items.map((c) => c.name)).toEqual(["default", "default-3"]);
+    expect(doc.notifications.items.map((c) => c.name)).toEqual(["default", "default-3"]);
   });
 
   test("a seed of before 7.6 validates, with or without its mail keys, and url is still required", () => {
     expect(validateSeed({ settings: { ...MAIL, url: "https://x" } })).toBe(true);
     expect(validateSeed({ settings: { url: "https://x" } })).toBe(true);
     // its channel named like one the seed declares : a free name, no duplicate
-    expect(validateSeed({ settings: { ...MAIL, url: "" }, notification_channels: { items: [{ name: "default", type: "mail", server: "x" }] } })).toBe(true);
+    expect(validateSeed({ settings: { ...MAIL, url: "" }, notifications: { items: [{ name: "default", type: "mail", server: "x" }] } })).toBe(true);
     expect(() => validateSeed({ settings: { ...MAIL } })).toThrow(/required property 'url'/);
   });
 });
@@ -184,7 +184,7 @@ describe("a seed with mail keys, applied", () => {
 
   test("writes the credential, then the channel naming it ; no mail column is written to the settings", async () => {
     await apply(SEED);
-    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login", "notification_channels:default"]);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login", "notifications:default"]);
     expect(created[1].data).toMatchObject({ type: "mail", credential: "mail-login", managed: true });
     const writes = queries.filter((q) => /^UPDATE AnsibleForms\.`settings`/.test(q.sql));
     expect(JSON.stringify(writes)).not.toMatch(/mail_/);
@@ -193,7 +193,7 @@ describe("a seed with mail keys, applied", () => {
   test("a hand-made Slack channel named 'default' is not adopted : the mail channel is default-2", async () => {
     channelRows = [{ name: "default", type: "slack", managed: 0 }];
     await apply(SEED);
-    expect(created.find((c) => c.section === "notification_channels").data.name).toBe("default-2");
+    expect(created.find((c) => c.section === "notifications").data.name).toBe("default-2");
   });
 
   test("a hand-made mail channel 'default' and smtp credential 'mail-login' are never taken over : default-2 and mail-login-2, said in the log", async () => {
@@ -201,7 +201,7 @@ describe("a seed with mail keys, applied", () => {
     credentialRows = [{ name: "mail-login", credential_type: "smtp", managed: 0 }];
     const warning = vi.spyOn(logger, "warning");
     await apply(SEED);
-    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notifications:default-2"]);
     expect(created[1].data.credential).toBe("mail-login-2");
     const said = warning.mock.calls.map(([m]) => String(m));
     expect(said.some((m) => /'default'.*made by hand.*'default-2'/.test(m))).toBe(true);
@@ -215,7 +215,7 @@ describe("a seed with mail keys, applied", () => {
     channelRows = [{ name: "default-2", type: "mail", credential: "mail-login-2", managed: 1 }];
     credentialRows = [{ name: "mail-login-2", credential_type: "smtp", managed: 1 }];
     await apply(SEED);
-    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notifications:default-2"]);
   });
 
   test("its records managed and the hand-made ones still there : the seed's own, never the hand-made", async () => {
@@ -228,13 +228,13 @@ describe("a seed with mail keys, applied", () => {
       { name: "mail-login-2", credential_type: "smtp", managed: 1 },
     ];
     await apply(SEED);
-    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notification_channels:default-2"]);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["credentials:mail-login-2", "notifications:default-2"]);
   });
 
   test("a relay : a hand-made mail channel 'default' is not taken over either", async () => {
     channelRows = [{ name: "default", type: "mail", credential: null, managed: 0 }];
     await apply("version: 1\nsettings:\n  url: https://af.example.com\n  mail_server: relay.example.com\n");
-    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["notification_channels:default-2"]);
+    expect(created.map((c) => `${c.section}:${c.data.name}`)).toEqual(["notifications:default-2"]);
   });
 
   test("says the deprecation once per process, not at every apply", async () => {

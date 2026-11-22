@@ -28,7 +28,7 @@ import yaml from "yaml";
 import logger from "./logger.js";
 import appConfig from "../../config/app.config.js";
 import { validateSeed, interpolateEnv, foldAwxIntoRunners, foldRunnerSecretsIntoCredentials, runnerOwnsSecrets, foldMailSettingsIntoChannel, seedHasMailSettings } from "./seed-schema.js";
-import { foldConfigFlag, APPEARANCE_SECTIONS, foldOauth2Values } from "./seed-schema.js";
+import { foldConfigFlag, APPEARANCE_SECTIONS, foldOauth2Values, foldSectionAliases } from "./seed-schema.js";
 import CrudModel from "../models/crud.model.js";
 import OAuth2 from "../models/oauth2.model.js";
 import Credential from "../models/credential.model.v2.js";
@@ -106,9 +106,9 @@ const listSections = [
     adopt: (d, row) => Runner.adoptRegistered(d, row, seedOpts),
   },
   {
-    key: "oauth2",
+    key: "sso",
     modelName: "oauth2",
-    label: "oauth2",
+    label: "SSO provider",
     create: (d) => OAuth2.create(d, seedOpts),
     update: (d, row) => OAuth2.update(d, row.id, seedOpts),
     remove: (row) => OAuth2.delete(row.id, seedOpts),
@@ -147,7 +147,7 @@ const listSections = [
   },
   {
     // where the server log and the audit entries go (Connections > Syslog)
-    key: "syslog_servers",
+    key: "syslog",
     modelName: "syslogserver",
     label: "syslog server",
     defaults: { description: "" },
@@ -158,7 +158,7 @@ const listSections = [
   {
     // where notifications go (Connections > Notifications) : SMTP servers, Slack, Teams,
     // Telegram and webhooks. After the credentials : a channel names one
-    key: "notification_channels",
+    key: "notifications",
     modelName: "notificationchannel",
     label: "notification channel",
     defaults: { description: "" },
@@ -383,11 +383,11 @@ export async function applyChat(declared, summary) {
   }
   if (!stored?.managed) {
     logger.warning("Config seed adopts the existing chat settings, which were not managed before: its declared fields are now enforced from the seed file");
-    summary.adopted.push("chat");
+    summary.adopted.push("chat_assistant");
   }
   record.managed = 1;
   await ChatSettings.update(record);
-  summary.updated.push("chat");
+  summary.updated.push("chat_assistant");
 }
 
 /**
@@ -446,7 +446,7 @@ function warnMailSettingsOnce(mail) {
     ? ` (applied now as the mail channel '${mail.channel}'${mail.credential ? ` and its smtp credential '${mail.credential}'` : ", a relay without a credential"})`
     : " (no mail_server : no mail channel is declared for them)";
   logger.warning(
-    `The config seed's settings carry mail_server, mail_port, mail_secure, mail_username, mail_password or mail_from, deprecated since 7.6 and removed in 8: declare a mail channel under notification_channels: and its smtp credential under credentials:${applied}`,
+    `The config seed's settings carry mail_server, mail_port, mail_secure, mail_username, mail_password or mail_from, deprecated since 7.6 and removed in 8: declare a mail channel under notifications: and its smtp credential under credentials:${applied}`,
   );
 }
 
@@ -566,6 +566,13 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
     throw new Error("Seed file must contain a yaml mapping at the top level");
   }
   doc = interpolateEnv(doc);
+  // a section by its name before 7.8.0 (oauth2:, syslog_servers:, notification_channels:, chat:) :
+  // read as its section, deprecated and removed in 8
+  const aliases = foldSectionAliases(doc);
+  doc = aliases.doc;
+  for (const [old, section] of aliases.renamed) {
+    logger.warning(`The config seed's ${old}: section is deprecated since 7.8.0 and removed in 8: call it ${section}:, as a repository's controller_${section}: (applied now as ${section}:)`);
+  }
   // a repository's use_for_config : deprecated since 7.8.0, removed in 8 - the roles, the categories
   // and the constants, each a flag of its own now
   // the repository holding them already (the one the schema patch gave them to) keeps them ; the
@@ -617,7 +624,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
   // (azuread) ; provider: azuread still read, deprecated since 7.8.0 (lib/seed-schema.js OAUTH2_VALUES)
   const oauth2Values = foldOauth2Values(doc);
   doc = oauth2Values.doc;
-  for (const d of oauth2Values.deprecated) logger.warning(`The config seed's oauth2 provider '${d.name}' says ${d.notice}`);
+  for (const d of oauth2Values.deprecated) logger.warning(`The config seed's SSO provider '${d.name}' says ${d.notice}`);
 
   // the settings' mail keys : deprecated since 7.6 (the settings row has no mail columns), removed
   // in 8. Applied as a mail channel and its smtp credential (foldMailSettingsIntoChannel). Every
@@ -680,7 +687,7 @@ async function applySeedNow({ schemaIsReady = true } = {}) {
 export const singleRowSections = [
   { key: "ldap", table: "ldap" },
   { key: "settings", table: "settings" },
-  { key: "chat", table: "chat_settings" },
+  { key: "chat_assistant", table: "chat_settings" },
 ];
 
 /**
@@ -887,20 +894,21 @@ async function applySections(doc, summary, opts = {}) {
     if (res.affectedRows > 0) summary.released.push("settings");
   }
 
-  if (doc.chat) {
-    await applyChat(doc.chat, summary);
+  if (doc.chat_assistant) {
+    await applyChat(doc.chat_assistant, summary);
   } else {
     const res = await mysql.do("UPDATE AnsibleForms.`chat_settings` SET managed=0 WHERE managed=1");
-    if (res.affectedRows > 0) summary.released.push("chat");
+    if (res.affectedRows > 0) summary.released.push("chat_assistant");
   }
 
-  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the announcements,
-  // the disclaimer versions, the local groups and the users : read through the descriptors a
+  // the Appearance pages' (defaults, logo, icon, name, links), the MCP settings, the SSH key and
+  // known hosts, the announcements, the disclaimer versions, the local groups and the users : read through the descriptors a
   // repository holding them uses (lib/repoObjects), made or changed, never managed nor deleted ;
   // the groups before the users, whose new local ones take the groups listing them
   const sections = [
     ...Object.keys(APPEARANCE_SECTIONS).map((key) => [key, key, key]),
     ["mcp", "mcp", "MCP"],
+    ["ssh", "ssh", "SSH"],
     ["announcements", "announcements", "announcement"],
     ["disclaimer", "disclaimer", "disclaimer version"],
     ["groups", "groups", "group"],

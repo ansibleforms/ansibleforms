@@ -474,7 +474,7 @@ describe("a mail channel with an entraid credential", () => {
 
   test("a seed declaring a server on such a channel : written once, then unchanged at every start", async () => {
     const { applyListSection, listSections } = await import("../src/lib/seed.js");
-    const section = listSections.find((s) => s.key === "notification_channels");
+    const section = listSections.find((s) => s.key === "notifications");
     // the channel as the seed's first apply left it : the declared server emptied by normalise
     channels = [{ id: 4, name: "m365-mail", type: "mail", description: "", credential: "m365", send_through: "graph", from_address: "noreply@contoso.com", server: null, port: null, secure: 0, managed: 1 }];
     const item = { name: "m365-mail", type: "mail", credential: "m365", from_address: "noreply@contoso.com", server: "relay.corp.local", port: 25, secure: true };

@@ -336,12 +336,13 @@ describe("the app's repositories to repositories.yaml", () => {
       "secret_stores",
       "databases",
       "runners",
+      "ssh",
       "notifications",
       "chat_assistant",
       "mcp",
       "syslog",
     ]);
-    assert.equal(types.USAGE_FLAGS.length, 30);
+    assert.equal(types.USAGE_FLAGS.length, 31);
     // a file holds each by its key ; the seed's sections keep their names, one format for both
     const chat = await RepoObjects.descriptorOf("chat_assistant");
     const notifications = await RepoObjects.descriptorOf("notifications");
@@ -350,7 +351,7 @@ describe("the app's repositories to repositories.yaml", () => {
     assert.equal(notifications.key, "notifications");
     assert.equal(notifications.single, undefined);
     const { itemValidator, chatFileItem } = await import("../src/lib/seed-schema.js");
-    assert.deepEqual(notifications.keyOrder, itemValidator("notification_channels").keys);
+    assert.deepEqual(notifications.keyOrder, itemValidator("notifications").keys);
     assert.deepEqual(chat.keyOrder, itemValidator(chatFileItem).keys);
   });
 });

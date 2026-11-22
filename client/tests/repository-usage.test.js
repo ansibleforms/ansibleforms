@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('the usage types', () => {
-  it('are the 30 types of the server, in six groups, each flag once', () => {
+  it('are the 31 types of the server, in six groups, each flag once', () => {
     const pick = (u) => ({
       key: u.key,
       flag: u.flag,
@@ -76,7 +76,7 @@ describe('the usage types', () => {
     });
     expect(USAGE_TYPES.map(pick)).toEqual(server.USAGE_TYPES.map(pick));
     expect(USAGE_CATEGORIES).toEqual(server.CATEGORIES);
-    expect(new Set(USAGE_FLAGS).size).toBe(30);
+    expect(new Set(USAGE_FLAGS).size).toBe(31);
     // the Designer group in the Designer menu's order, Schedules last
     expect(typesOf('designer').map((u) => u.key)).toEqual([
       'categories',
@@ -96,6 +96,7 @@ describe('the usage types', () => {
       'secret_stores',
       'databases',
       'runners',
+      'ssh',
       'notifications',
       'chat_assistant',
       'mcp',
@@ -177,6 +178,7 @@ describe('a group box ticks every type of it that can be ticked', () => {
       'use_for_secret_stores',
       'use_for_databases',
       'use_for_runners',
+      'use_for_ssh',
       'use_for_notifications',
       'use_for_chat_assistant',
       'use_for_mcp',
@@ -250,6 +252,7 @@ describe('one question when a save turns several object types on or off', () => 
     const all = [
       'credentials',
       'repositories',
+      'ssh',
       'secret_stores',
       'databases',
       'runners',
@@ -717,6 +720,26 @@ describe('the MCP settings : one mcp: map, in Connections', () => {
       expect(r.usageHints.mcp, lang).toContain('mcp:');
       expect(r.usageHints.general, lang).toContain('general:');
       expect(r.usageTypes.settings, lang).toBeUndefined();
+    }
+  });
+});
+
+describe('the SSH key and known hosts : one ssh: map, in Connections', () => {
+  it('after Runners as in the menu, named as its menu item, read right after the repositories', async () => {
+    expect(USAGE_TYPES.find((u) => u.key === 'ssh')).toMatchObject({
+      flag: 'use_for_ssh',
+      category: 'connections',
+      labelKey: 'sidebar.ssh',
+      single: true,
+      oneOnly: true,
+      objects: true,
+    });
+    expect(server.APPLY_ORDER.indexOf('ssh')).toBe(server.APPLY_ORDER.indexOf('repositories') + 1);
+    // its page : the repository line on the key's tab
+    expect(read('pages/admin/ssh.vue')).toContain('<AppRepositorySource v-show="!searching" type="ssh" />');
+    for (const lang of LANGS) {
+      const r = (await import(`../src/locales/${lang}.js`)).default.settings.repositories;
+      expect(r.usageHints.ssh, lang).toContain('controller_ssh:');
     }
   });
 });

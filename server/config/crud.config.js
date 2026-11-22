@@ -357,6 +357,7 @@ const crudConfigs = {
       { name: 'use_for_syslog', isBoolean: true },
       { name: 'use_for_chat_assistant', isBoolean: true },
       { name: 'use_for_mcp', isBoolean: true },
+      { name: 'use_for_ssh', isBoolean: true },
       { name: 'use_for_disclaimer', isBoolean: true },
       { name: 'use_for_defaults', isBoolean: true },
       { name: 'use_for_logo', isBoolean: true },

@@ -81,7 +81,12 @@ onMounted(async () => {
       </template>
     </AppAdminMulti>
     <!-- KEY : the key pair ; the form draws the same tabs, and the search box of the settings pages -->
-    <AppAdminSingle v-else-if="authenticated" :apiVersion="2" :settings="settings.ssh" :tabs="tabs" searchable />
+    <AppAdminSingle v-else-if="authenticated" :apiVersion="2" :settings="settings.ssh" :tabs="tabs" searchable>
+      <!-- kept under controller_ssh: in a repository's file (the key and the known hosts) : which one, and the file -->
+      <template #tab-top-key="{ searching }">
+        <AppRepositorySource v-show="!searching" type="ssh" />
+      </template>
+    </AppAdminSingle>
   </AppSettingsPage>
 </template>
 <route lang="yaml">

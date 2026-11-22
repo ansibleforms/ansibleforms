@@ -3,6 +3,26 @@ import KnownHosts from '../../models/knownhosts.model.js';
 import RestResult from '../../models/restResult.model.v2.js';
 import Errors from '../../lib/errors.js';
 import i18n from '../../lib/i18n.js';
+import RepoObjects from '../../lib/repoObjects/index.js';
+
+/**
+ * Changes the known hosts as the page does, written after into the SSH repository's ssh: map
+ * (its known_hosts), under its write claim.
+ *
+ * Args:
+ *   change (function): async () => the change's result.
+ *
+ * Returns:
+ *   Promise<any>: its result.
+ */
+async function withSshFile(change) {
+  return RepoObjects.holding('ssh', async () => {
+    const before = await RepoObjects.snapshot('ssh');
+    const result = await change();
+    await RepoObjects.appUpdated('ssh', before);
+    return result;
+  });
+}
 
 // Controller following v2 response conventions
 const knownhostsController = {
@@ -23,7 +43,7 @@ const knownhostsController = {
       if (!host) {
         return res.status(400).json(RestResult.error(i18n.t(req, 'resources.hostValueRequired')));
       }
-      const result = await KnownHosts.add(host);
+      const result = await withSshFile(() => KnownHosts.add(host));
       return res.status(201).json(RestResult.single(result));
     } catch (err) {
       Errors.ReturnError(res, err);
@@ -40,7 +60,7 @@ const knownhostsController = {
       }
       // if full line provided ("hostname keytype key"), extract first token
       const hostToken = raw.split(/\s+/)[0];
-      const result = await KnownHosts.remove(hostToken);
+      const result = await withSshFile(() => KnownHosts.remove(hostToken));
       return res.json(RestResult.single(result));
     } catch (err) {
       Errors.ReturnError(res, err);

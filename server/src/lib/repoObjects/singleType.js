@@ -60,6 +60,8 @@ import { yamlKeys } from "./yamlKeys.js";
  *       mapFieldSet : the settings by their environment names).
  *     secretsOf (function): (current) => its secret fields when they depend on what it holds (the
  *       settings' are known by their names).
+ *     keyOf (function): (field) => the key its map gives a field by, when not its name (the
+ *       settings' : their names in lower case).
  *
  * Returns:
  *   object: the descriptor (lib/repoObjects/engine.js, its single mode).
@@ -82,6 +84,8 @@ export function singleType(spec) {
     noun: spec.noun,
     secrets: spec.secrets || [],
     secretsOf: spec.secretsOf,
+    // the key a file gives a field by, when not its name (an environment type's : in lower case)
+    keyOf: spec.keyOf,
     references: spec.references || [],
     besides: spec.besides || [],
     keyOrder: fields.keys,
