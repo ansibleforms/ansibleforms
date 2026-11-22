@@ -41,6 +41,9 @@ import {
   editArgsText,
 } from '@/config/playbookEdit';
 
+// each task field's icon, in front of its box as every field of the Designer
+const TASK_ICONS = { when: 'code-branch', register: 'floppy-disk', tags: 'tags', notify: 'bell' };
+
 const props = defineProps({
   modelValue: { type: String, default: '' },
   readOnly: { type: Boolean, default: false },
@@ -85,6 +88,23 @@ function addRole(pi) {
   if (!name || plays.value[pi].roles.includes(name)) return;
   apply((text) => editRoles(text, pi, [...plays.value[pi].roles, name]));
   roleToAdd.value = { ...roleToAdd.value, [pi]: '' };
+}
+
+// the plays whose role field was opened with Add role while they had no role
+const addingRole = ref({});
+/**
+ * Add role : opens the field when it is hidden (a play without roles), else adds the role typed.
+ *
+ * Args:
+ *   pi (number): the play's place.
+ *   play (object): the play.
+ */
+function onAddRole(pi, play) {
+  if (!play.roles.length && !addingRole.value[pi]) {
+    addingRole.value = { ...addingRole.value, [pi]: true };
+    return;
+  }
+  addRole(pi);
 }
 
 // ─── a task : its dialog ───
@@ -167,23 +187,32 @@ function pickSection(pi) {
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
-              <input
-                class="form-control"
-                :value="play.name"
-                :disabled="readOnly"
-                @change="apply((text) => editPlay(text, pi, 'name', $event.target.value.trim()))"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <input
+                  class="form-control"
+                  :value="play.name"
+                  :disabled="readOnly"
+                  @change="apply((text) => editPlay(text, pi, 'name', $event.target.value.trim()))"
+                />
+              </div>
             </div>
+            <!-- its hosts on a line of their own, under its name -->
+            <div class="w-100 m-0"></div>
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.hosts') }}</label>
-              <input
-                class="form-control"
-                :class="{ 'is-invalid': !play.hosts }"
-                :value="play.hosts"
-                :disabled="readOnly"
-                spellcheck="false"
-                @change="apply((text) => editPlay(text, pi, 'hosts', $event.target.value.trim()))"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="server" /></span>
+                <input
+                  class="form-control"
+                  :class="{ 'is-invalid': !play.hosts }"
+                  :value="play.hosts"
+                  :disabled="readOnly"
+                  spellcheck="false"
+                  @change="apply((text) => editPlay(text, pi, 'hosts', $event.target.value.trim()))"
+                />
+              </div>
+              <div class="form-text">{{ t('playbookEditor.hostsHelp') }}</div>
             </div>
           </div>
           <!-- become, gather facts : a line each, titled as a field is -->
@@ -205,35 +234,50 @@ function pickSection(pi) {
           </div>
           <!-- its roles : pills to remove, one more typed -->
           <label class="form-label fw-bold">{{ t('playbookOutline.sections.roles') }}</label>
-          <div v-if="play.rolesEditable" class="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <span v-for="r in play.roles" :key="r" class="badge rounded-pill af-pbe-role">
-              <FaIcon icon="cubes" class="me-1" />{{ r }}
-              <button
-                v-if="!readOnly"
-                type="button"
-                class="btn-close btn-close-sm ms-1"
-                :aria-label="t('playbookEditor.removeRole')"
-                @click="
-                  apply((text) =>
-                    editRoles(
-                      text,
-                      pi,
-                      play.roles.filter((x) => x !== r),
-                    ),
-                  )
-                "
-              ></button>
-            </span>
-            <div v-if="!readOnly" class="d-flex gap-2">
-              <input
-                v-model="roleToAdd[pi]"
-                class="form-control af-pbe-role-input"
-                :placeholder="t('playbookEditor.role')"
-                spellcheck="false"
-                @keyup.enter="addRole(pi)"
-              />
-              <BsButton icon="plus" :title="t('playbookEditor.addRole')" @click="addRole(pi)" />
+          <div v-if="play.rolesEditable" class="mb-3">
+            <!-- none yet : said, as the other empty lists -->
+            <div v-if="!play.roles.length" class="text-body-secondary fst-italic mb-2">
+              {{ t('playbookEditor.noRoles') }}
             </div>
+            <!-- the roles it has, as pills to remove -->
+            <div v-else class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span v-for="r in play.roles" :key="r" class="badge rounded-pill af-pbe-role">
+                <FaIcon icon="cubes" class="me-1" />{{ r }}
+                <button
+                  v-if="!readOnly"
+                  type="button"
+                  class="btn-close btn-close-sm ms-1"
+                  :aria-label="t('playbookEditor.removeRole')"
+                  @click="
+                    apply((text) =>
+                      editRoles(
+                        text,
+                        pi,
+                        play.roles.filter((x) => x !== r),
+                      ),
+                    )
+                  "
+                ></button>
+              </span>
+            </div>
+            <!-- one more : typed with its icon in front, as every field, Add role on a line of its own under it -->
+            <template v-if="!readOnly">
+              <!-- the field : shown once the play has a role, or Add role was clicked -->
+              <div v-if="play.roles.length || addingRole[pi]" class="input-group af-pbe-role-input">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="cubes" /></span>
+                <input
+                  v-model="roleToAdd[pi]"
+                  autofocus
+                  class="form-control"
+                  :placeholder="t('playbookEditor.role')"
+                  spellcheck="false"
+                  @keyup.enter="addRole(pi)"
+                />
+              </div>
+              <div :class="{ 'mt-2': play.roles.length || addingRole[pi] }">
+                <BsButton icon="plus" @click="onAddRole(pi, play)">{{ t('playbookEditor.addRole') }}</BsButton>
+              </div>
+            </template>
           </div>
           <div v-else class="d-flex align-items-center gap-2 mb-3">
             <span class="text-body-secondary">{{ play.roles.join(', ') }}</span>
@@ -306,10 +350,13 @@ function pickSection(pi) {
           <!-- a section it does not have yet -->
           <div v-if="!readOnly && missing(play).length" class="d-flex gap-2 align-items-center">
             <!-- picked is added, as a node's credential : no button to press after the choice -->
-            <select v-model="sectionToAdd[pi]" class="form-select af-pbe-section-select" @change="pickSection(pi)">
-              <option :value="undefined">{{ t('playbookEditor.addSection') }}...</option>
-              <option v-for="k in missing(play)" :key="k" :value="k">{{ t(`playbookOutline.sections.${k}`) }}</option>
-            </select>
+            <div class="input-group af-pbe-section-select">
+              <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="layer-group" /></span>
+              <select v-model="sectionToAdd[pi]" class="form-select" @change="pickSection(pi)">
+                <option :value="undefined">{{ t('playbookEditor.addSection') }}...</option>
+                <option v-for="k in missing(play)" :key="k" :value="k">{{ t(`playbookOutline.sections.${k}`) }}</option>
+              </select>
+            </div>
           </div>
         </template>
       </div>
@@ -324,23 +371,29 @@ function pickSection(pi) {
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.name') }}</label>
-              <input
-                class="form-control"
-                :value="task.name"
-                :disabled="readOnly"
-                @change="onTask((x, p, s, i) => editTask(x, p, s, i, 'name', $event.target.value.trim()))"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="font" /></span>
+                <input
+                  class="form-control"
+                  :value="task.name"
+                  :disabled="readOnly"
+                  @change="onTask((x, p, s, i) => editTask(x, p, s, i, 'name', $event.target.value.trim()))"
+                />
+              </div>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-bold">{{ t('playbookEditor.module') }}</label>
-              <input
-                class="form-control font-monospace"
-                list="af-pbe-modules"
-                :value="task.module"
-                :disabled="readOnly"
-                spellcheck="false"
-                @change="onTask((x, p, s, i) => editModule(x, p, s, i, $event.target.value.trim()))"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="puzzle-piece" /></span>
+                <input
+                  class="form-control font-monospace"
+                  list="af-pbe-modules"
+                  :value="task.module"
+                  :disabled="readOnly"
+                  spellcheck="false"
+                  @change="onTask((x, p, s, i) => editModule(x, p, s, i, $event.target.value.trim()))"
+                />
+              </div>
               <datalist id="af-pbe-modules">
                 <option v-for="m in COMMON_MODULES" :key="m" :value="m" />
               </datalist>
@@ -348,31 +401,38 @@ function pickSection(pi) {
           </div>
           <!-- its arguments : a line (free form), or its key / value pairs -->
           <label class="form-label fw-bold">{{ t('playbookEditor.arguments') }}</label>
-          <input
-            v-if="task.args === 'text'"
-            class="form-control font-monospace mb-3"
-            :value="task.argsText"
-            :disabled="readOnly"
-            spellcheck="false"
-            @change="onTask((x, p, s, i) => editArgsText(x, p, s, i, $event.target.value))"
-          />
+          <div v-if="task.args === 'text'" class="input-group mb-3">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="terminal" /></span>
+            <input
+              class="form-control font-monospace"
+              :value="task.argsText"
+              :disabled="readOnly"
+              spellcheck="false"
+              @change="onTask((x, p, s, i) => editArgsText(x, p, s, i, $event.target.value))"
+            />
+          </div>
           <template v-else>
             <div v-for="pa in task.params" :key="pa.key" class="d-flex gap-2 mb-2">
-              <input
-                class="form-control font-monospace af-pbe-arg-key"
-                :value="pa.key"
-                :disabled="readOnly"
-                spellcheck="false"
-                @change="onTask((x, p, s, i) => editRenameArg(x, p, s, i, pa.key, $event.target.value.trim()))"
-              />
-              <input
-                v-if="!pa.complex"
-                class="form-control"
-                :value="pa.value"
-                :disabled="readOnly"
-                spellcheck="false"
-                @change="onTask((x, p, s, i) => editArg(x, p, s, i, pa.key, $event.target.value))"
-              />
+              <div class="input-group af-pbe-arg-key">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
+                <input
+                  class="form-control font-monospace"
+                  :value="pa.key"
+                  :disabled="readOnly"
+                  spellcheck="false"
+                  @change="onTask((x, p, s, i) => editRenameArg(x, p, s, i, pa.key, $event.target.value.trim()))"
+                />
+              </div>
+              <div v-if="!pa.complex" class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+                <input
+                  class="form-control"
+                  :value="pa.value"
+                  :disabled="readOnly"
+                  spellcheck="false"
+                  @change="onTask((x, p, s, i) => editArg(x, p, s, i, pa.key, $event.target.value))"
+                />
+              </div>
               <button
                 v-else
                 type="button"
@@ -391,19 +451,25 @@ function pickSection(pi) {
               />
             </div>
             <div v-if="!readOnly" class="d-flex gap-2 mb-3">
-              <input
-                v-model="newArg.key"
-                class="form-control font-monospace af-pbe-arg-key"
-                :placeholder="t('playbookEditor.argName')"
-                spellcheck="false"
-              />
-              <input
-                v-model="newArg.value"
-                class="form-control"
-                :placeholder="t('playbookEditor.argValue')"
-                spellcheck="false"
-                @keyup.enter="addArg()"
-              />
+              <div class="input-group af-pbe-arg-key">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="key" /></span>
+                <input
+                  v-model="newArg.key"
+                  class="form-control font-monospace"
+                  :placeholder="t('playbookEditor.argName')"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="pen" /></span>
+                <input
+                  v-model="newArg.value"
+                  class="form-control"
+                  :placeholder="t('playbookEditor.argValue')"
+                  spellcheck="false"
+                  @keyup.enter="addArg()"
+                />
+              </div>
               <BsButton icon="plus" :title="t('playbookEditor.addArg')" @click="addArg()" />
             </div>
           </template>
@@ -411,14 +477,19 @@ function pickSection(pi) {
           <div class="row g-3 mb-3">
             <div v-for="key in TASK_FIELDS.filter((k) => !TASK_SWITCHES.includes(k))" :key="key" class="col-md-6">
               <label class="form-label fw-bold">{{ t(`playbookEditor.fields.${key}`) }}</label>
-              <input
-                class="form-control"
-                :class="{ 'font-monospace': key === 'when' || key === 'register' }"
-                :value="task[key]"
-                :disabled="readOnly"
-                spellcheck="false"
-                @change="onTask((x, p, s, i) => editTask(x, p, s, i, key, $event.target.value.trim()))"
-              />
+              <div class="input-group">
+                <span class="input-group-text text-gray-500"
+                  ><FaIcon :fixedwidth="true" :icon="TASK_ICONS[key]"
+                /></span>
+                <input
+                  class="form-control"
+                  :class="{ 'font-monospace': key === 'when' || key === 'register' }"
+                  :value="task[key]"
+                  :disabled="readOnly"
+                  spellcheck="false"
+                  @change="onTask((x, p, s, i) => editTask(x, p, s, i, key, $event.target.value.trim()))"
+                />
+              </div>
             </div>
           </div>
           <div class="d-flex flex-wrap gap-4">
@@ -481,7 +552,7 @@ function pickSection(pi) {
   font-size: 0.55rem;
 }
 .af-pbe-role-input {
-  width: 12rem;
+  max-width: 20rem;
 }
 .af-pbe-section-select {
   max-width: 14rem;

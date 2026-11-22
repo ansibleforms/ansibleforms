@@ -48,6 +48,8 @@ export default {
     play: 'Play {n}',
     other: 'Geen play: bewerk het in de YAML',
     name: 'Naam',
+    noRoles: 'Nog geen rollen geconfigureerd.',
+    hostsHelp: 'Een host, groep of patroon; meerdere gescheiden zoals web,db of all:!backup.',
     hosts: 'Hosts',
     become: 'Become',
     gatherFacts: 'Facts verzamelen',

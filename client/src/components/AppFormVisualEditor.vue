@@ -776,23 +776,29 @@ defineExpose({
         <div class="af-form-span2 af-form-newrow">
           <label class="form-label fw-bold">{{ t('designer.formDescription') }}</label>
           <!-- a sentence or two : as tall as two lines, as the help below -->
-          <textarea
-            class="form-control af-text-box"
-            rows="3"
-            :value="form.description"
-            :disabled="locked"
-            @change="setText('description', $event.target.value)"
-          ></textarea>
+          <div class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="circle-info" /></span>
+            <textarea
+              class="form-control af-text-box"
+              rows="3"
+              :value="form.description"
+              :disabled="locked"
+              @change="setText('description', $event.target.value)"
+            ></textarea>
+          </div>
         </div>
         <div class="af-form-span2">
           <label class="form-label fw-bold">{{ t('designer.helpText') }}</label>
-          <textarea
-            class="form-control af-text-box"
-            rows="3"
-            :value="setting('help')"
-            :disabled="locked"
-            @change="setText('help', $event.target.value)"
-          ></textarea>
+          <div class="input-group">
+            <span class="input-group-text text-gray-500"><FaIcon :fixedwidth="true" icon="circle-question" /></span>
+            <textarea
+              class="form-control af-text-box"
+              rows="3"
+              :value="setting('help')"
+              :disabled="locked"
+              @change="setText('help', $event.target.value)"
+            ></textarea>
+          </div>
         </div>
         <!-- its categories and roles : what it has, as pills to remove, and a list to add from -->
         <div v-for="key in isSubform ? [] : ['categories', 'roles']" :key="key" class="af-form-wide">

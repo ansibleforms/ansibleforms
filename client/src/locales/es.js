@@ -48,6 +48,8 @@ export default {
     play: 'Play {n}',
     other: 'No es un play: edítalo en el YAML',
     name: 'Nombre',
+    noRoles: 'Aún no hay roles configurados.',
+    hostsHelp: 'Un host, un grupo o un patrón; varios separados como web,db o all:!backup.',
     hosts: 'Hosts',
     become: 'Become',
     gatherFacts: 'Recoger facts',

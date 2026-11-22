@@ -48,6 +48,8 @@ export default {
     play: 'プレイ {n}',
     other: 'プレイではありません: YAML で編集してください',
     name: '名前',
+    noRoles: 'ロールはまだ設定されていません。',
+    hostsHelp: 'ホスト、グループ、パターンを指定。複数は web,db や all:!backup のように区切ります。',
     hosts: 'ホスト',
     become: 'Become',
     gatherFacts: 'facts を収集',
