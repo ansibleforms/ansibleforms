@@ -48,6 +48,9 @@ const props = defineProps({
   readOnly: { type: Boolean, default: false },
   // the Preview tab : a dry run, nothing edited - a click makes a node fail or succeed
   preview: { type: Boolean, default: false },
+  // the repository the workflow file is in (a node's playbook_repository: __self__) ; none : the
+  // local workflows folder
+  ownRepository: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue', 'reveal']);
 const { t } = useI18n();
@@ -143,6 +146,7 @@ onMounted(async () => {
     playbooks: playbookList ? playbookChoices(playbookList.files, playbookList.repositories) : null,
     playbookFiles: playbookList,
     playbookRepositories: playbookList ? playbookList.repositories.map((r) => r.name) : null,
+    ownRepository: props.ownRepository,
     inventories,
     credentials,
     repositories,
@@ -399,7 +403,7 @@ function choicesFor(type, playbookRepository = '') {
   const wf = workflows.value[wizard.value ? wizard.value.wi : wfIndex.value];
   if (type === 'job_template') {
     const list = refs.value.playbookFiles;
-    return list ? playbookChoices(list.files, list.repositories, playbookRepository) : null;
+    return list ? playbookChoices(list.files, list.repositories, playbookRepository, props.ownRepository) : null;
   }
   if (type === 'workflow_job_template') return workflows.value.map((w) => w.name).filter((n) => n && n !== wf?.name);
   if (type === 'project') return refs.value.repositories ? sorted(refs.value.repositories) : null;

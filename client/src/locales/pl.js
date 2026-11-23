@@ -2648,6 +2648,8 @@ export default {
     formPlaybookRepository: 'Repozytorium',
     helpPlaybookRepository: 'Uruchamia playbook z katalogu głównego tego repozytorium, z jego ansible.cfg.',
     visualFirstPlaybookRepository: 'Pierwsze repozytorium playbooków',
+    visualOwnFormRepository: 'Repozytorium tego formularza ({name})',
+    visualOwnWorkflowRepository: 'Repozytorium tego workflow ({name})',
     formWorkflow: 'Workflow',
     helpWorkflow: 'Workflow, który uruchamia, jeden z Projektant > Workflow.',
     helpTemplate: 'Szablon uruchamiany na runnerze: szablon zadania lub workflow AWX, szablon Semaphore.',

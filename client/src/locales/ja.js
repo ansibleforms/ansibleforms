@@ -2586,6 +2586,8 @@ export default {
     formPlaybookRepository: 'リポジトリ',
     helpPlaybookRepository: 'このリポジトリのルートから playbook を実行し、その ansible.cfg を使います。',
     visualFirstPlaybookRepository: '最初の playbook リポジトリ',
+    visualOwnFormRepository: 'このフォームのリポジトリ ({name})',
+    visualOwnWorkflowRepository: 'このワークフローのリポジトリ ({name})',
     formWorkflow: 'ワークフロー',
     helpWorkflow: '実行するワークフロー (デザイナー > ワークフロー のいずれか)。',
     helpTemplate:

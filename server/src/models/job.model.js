@@ -36,6 +36,7 @@ import { runWorkflow, findWorkflow } from "./workflowRun.js";
 import { workflowHash, fromFailedNodeCheck } from "../lib/workflowRelaunch.js";
 import { jobTypeOf } from "../lib/jobTypes.js";
 import { hostsFromEvents, hostsFromRecap, ranHostsFromRecap, rerunDiffers, rerunLimit, fallbackLimit } from "../lib/failedHosts.js";
+import { SELF_REPOSITORY } from "../lib/selfRepository.js";
 import { storedJobOfLaunch, markStoredJobUsed } from "../lib/storedJobUse.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +82,11 @@ function pushForminfoToExtravars(formObj, extravars, creds = {}) {
     ) {
       extravars[`__${fieldName}__`] = formObj[fieldName];
     }
+  }
+  // playbookRepository: __self__ still : the form is in no repository (Form.load resolves it), so
+  // its playbook has no root to run from
+  if (extravars.__playbookRepository__ === SELF_REPOSITORY) {
+    throw new Errors.BadRequestError(`Form '${formObj.name}' runs its playbook from its own repository (playbookRepository: ${SELF_REPOSITORY}), and the form is in none`);
   }
   // the form schema spells it scm_branch ; the reserved key stayed __scmBranch__
   if (extravars.__scmBranch__ === undefined && formObj.scm_branch !== undefined) extravars.__scmBranch__ = formObj.scm_branch;

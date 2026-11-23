@@ -28,6 +28,28 @@ describe("a playbook's repository", () => {
     expect(playbookChoices(files, repositories, 'first')).toEqual(['playbooks/site.yml', 'playbooks/team/web.yml']);
   });
 
+  it('__self__ : the repository the form or the workflow file is in ; none outside one', () => {
+    expect(playbookChoices(files, repositories, '__self__', 'infra')).toEqual([
+      'playbooks/deploy.yml',
+      'roles/x/tasks/main.yml',
+    ]);
+    expect(playbookChoices(files, repositories, '__self__', '')).toEqual([]);
+    // a forms repository not used for playbooks
+    expect(playbookChoices(files, repositories, '__self__', 'forms')).toEqual([]);
+  });
+
+  it('the form and the playbook node offer __self__, named in every language', async () => {
+    expect(read('components/AppFormVisualEditor.vue')).toContain(':value="SELF_REPOSITORY"');
+    expect(read('components/AppWorkflowNodeFields.vue')).toContain('<option value="__self__">');
+    for (const lang of LANGS) {
+      const d = (await import(`../src/locales/${lang}.js`)).default.designer;
+      for (const key of ['visualOwnFormRepository', 'visualOwnWorkflowRepository']) {
+        expect(d[key], `${lang} ${key}`).toContain('{name}');
+        expect(d[key].length, `${lang} ${key}`).toBeLessThanOrEqual(45);
+      }
+    }
+  });
+
   it('Playbooks may be on several repositories', () => {
     expect(USAGE_TYPES.find((u) => u.key === 'playbooks').oneOnly).toBeFalsy();
   });

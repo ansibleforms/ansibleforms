@@ -2649,6 +2649,8 @@ export default {
     formPlaybookRepository: 'Repositori',
     helpPlaybookRepository: "Executa el playbook des de l'arrel d'aquest repositori, amb el seu ansible.cfg.",
     visualFirstPlaybookRepository: 'Primer repositori de playbooks',
+    visualOwnFormRepository: "Repositori d'aquest formulari ({name})",
+    visualOwnWorkflowRepository: "Repositori d'aquest workflow ({name})",
     formWorkflow: 'Workflow',
     helpWorkflow: 'El workflow que executa, un de Dissenyador > Workflows.',
     helpTemplate:

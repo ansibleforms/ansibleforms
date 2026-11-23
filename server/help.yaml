@@ -2777,7 +2777,7 @@
             under the workflow's `extra_vars` and the form's values. It is the node job's
             artifacts (Show artifacts, on its page) ; the workflow job keeps all of them.
 
-            Three keys of a node are AnsibleForms' own (AWX ignores them), so a workflow does what
+            Four keys of a node are AnsibleForms' own (AWX ignores them), so a workflow does what
             a multistep does:
             - `runner: <name>` on a job template node runs that runner's template or job instead
               of a designer playbook - AWX, Semaphore, Rundeck, Jenkins - so one workflow mixes
@@ -2786,6 +2786,9 @@
               `ifExtraVar`) ; not met, it is skipped, and what follows it runs as after a success.
             - `extra_vars_key: <key>`: the node gets only that key of the extravars, the user
               copied in (as a step's `key`).
+            - `playbook_repository: <name>` on a job template node runs its playbook from that
+              repository's root, as a form's `playbookRepository` ; `__self__` names the repository
+              the workflow file is in.
           examples:
           - name: Deploy through a workflow
             code: |
@@ -3160,7 +3163,9 @@
           The repository whose playbook the form runs, one with the **Playbooks** usage. The playbook then runs from that
           repository's root: its `ansible.cfg` applies (and with it its `roles` and `collections` paths), `playbook` is
           read from the root (`playbooks/site.yml`) and a relative `__inventory__` too (`inventories/prod/hosts.yaml`).
-          `playbookSubPath` still moves the run folder, from that root. Without it, the form runs the playbooks of the
+          `playbookSubPath` still moves the run folder, from that root. `__self__` names the repository the form is in,
+          so a form and its playbook kept together never name their repository: a form in no repository (the local
+          forms folder) is then refused at its launch. Without it, the form runs the playbooks of the
           repository used for playbooks first, from its `playbooks` folder, else its root, as before. A name that is no
           repository used for playbooks fails the job, saying so. An `ansible` step of a multistep form names its own.
           An RTE runner needs 7.8.0 or later to run such a form.
@@ -3172,6 +3177,12 @@
               playbookRepository: infra
               playbook: playbooks/site.yml
               inventory: inventories/production/hosts.yaml
+        - name: The repository the form is in
+          code: |
+            - name: Deploy the web servers
+              type: ansible
+              playbookRepository: __self__
+              playbook: playbooks/site.yml
       - name: vaultCredentials
         type: string
         with_types: ansible

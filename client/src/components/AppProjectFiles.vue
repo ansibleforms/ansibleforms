@@ -157,6 +157,12 @@ const isWorkflows = computed(() => props.kind === 'workflows');
 const inventoryDepth = computed(() => 0);
 // the inventories that are repositories : their folder shows git's mark
 const repositoryInventories = computed(() => (listing.value.repositories || []).map((r) => r.name));
+// the repository the selected file is in : the one its first folder names (a workflow node's
+// playbook_repository: __self__) ; none : the local folder
+const selectedRepository = computed(() => {
+  const first = String(selected.value || '').split('/')[0];
+  return (listing.value.repositories || []).find((r) => r.prefix && r.prefix === first)?.name || '';
+});
 // what the file open is in its inventory : the inventory, a group's or a host's vars, other
 const fileRole = computed(() => (isInventories.value ? inventoryFileRole(selected.value) : null));
 // the inventory file open : edited in the Visual tab, drawn as a tree in the Preview
@@ -627,7 +633,13 @@ defineExpose({
         <AppValuesPreview v-else :text="content" mode="vars" :file="selected" :forms="forms" @reveal="reveal" />
       </div>
       <!-- the Preview tab of a workflow file : a dry run of its workflows -->
-      <AppWorkflowEditor v-else-if="view === 'preview' && isWorkflows" :modelValue="content" readOnly preview />
+      <AppWorkflowEditor
+        v-else-if="view === 'preview' && isWorkflows"
+        :modelValue="content"
+        :ownRepository="selectedRepository"
+        readOnly
+        preview
+      />
       <!-- the Visual tab : a vars file as its variables -->
       <div v-else-if="view === 'visual'" class="af-files-visual">
         <div v-if="lang !== 'yaml'" class="empty-state">
@@ -637,7 +649,13 @@ defineExpose({
         <!-- a playbook : its plays and tasks, field by field -->
         <AppPlaybookEditor v-else-if="kind === 'playbooks'" v-model="content" :readOnly="readOnly" @reveal="reveal" />
         <!-- a workflow file : its workflows as graphs, its job templates -->
-        <AppWorkflowEditor v-else-if="isWorkflows" v-model="content" :readOnly="readOnly" @reveal="reveal" />
+        <AppWorkflowEditor
+          v-else-if="isWorkflows"
+          v-model="content"
+          :ownRepository="selectedRepository"
+          :readOnly="readOnly"
+          @reveal="reveal"
+        />
         <!-- an inventory : its groups and hosts, edited -->
         <AppInventoryEditor v-else-if="isInventoryFile" v-model="content" :readOnly="readOnly" @reveal="reveal" />
         <div v-else-if="fileKind.kind === 'invalid'" class="alert alert-warning d-flex align-items-center gap-2">

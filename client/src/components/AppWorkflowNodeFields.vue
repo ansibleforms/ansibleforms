@@ -286,8 +286,14 @@ function removeCredential(name) {
             @change="emit('set', 'playbook_repository', $event.target.value)"
           >
             <option value="">{{ t('designer.visualFirstPlaybookRepository') }}</option>
+            <option value="__self__">
+              {{ t('designer.visualOwnWorkflowRepository', { name: refs.ownRepository || '-' }) }}
+            </option>
             <option
-              v-for="r in withCurrent(sorted(refs.playbookRepositories || []), node.playbook_repository)"
+              v-for="r in withCurrent(
+                sorted(refs.playbookRepositories || []),
+                node.playbook_repository === '__self__' ? '' : node.playbook_repository,
+              )"
               :key="r"
               :value="r"
             >

@@ -3296,6 +3296,12 @@ async function deleteLock(proceed = true) {
 // forms repositories (issue #414) : the forms live in git, the designer
 // saves into the working trees and 'Push to repo' commits & pushes them
 const formsRepos = ref([]);
+// the repository the form shown is in (its playbookRepository: __self__) : the one it was read
+// from, or the only forms repository ; none : the local forms folder
+const currentFormRepository = computed(
+  () =>
+    formMeta.value[currentForm.value]?.repository || (formsRepos.value.length === 1 ? formsRepos.value[0].name : ''),
+);
 const configRepo = ref(''); // the repository that holds config.yaml
 const stagedForms = ref(false); // new forms saved but not yet pushed to a repo
 const configInDatabase = ref(false); // true when config_yaml is stored in and served from the database
@@ -5312,6 +5318,7 @@ onBeforeUnmount(() => {
                         :categoryOptions="visualCategoryOptions"
                         :roleOptions="visualRoleOptions"
                         :otherForms="visualOtherForms"
+                        :ownRepository="currentFormRepository"
                       />
                     </div>
                     <div v-else-if="editorTarget" :key="'formeditor-' + currentForm">

@@ -1607,7 +1607,7 @@
               },
               "playbookRepository": {
                 "type": "string",
-                "description": "The repository used for playbooks whose playbook the form runs, from its root"
+                "description": "The repository used for playbooks whose playbook the form runs, from its root ; __self__ : the repository the form is in"
               },
               "key": {
                 "type": "string"
@@ -1855,7 +1855,7 @@
         },
         "playbookRepository": {
           "type": "string",
-          "description": "The repository used for playbooks whose playbook the form runs, from its root"
+          "description": "The repository used for playbooks whose playbook the form runs, from its root ; __self__ : the repository the form is in"
         },
         "workflow": {
           "type": "string"
@@ -6174,7 +6174,7 @@
                 },
                 "playbookRepository": {
                   "type": "string",
-                  "description": "The repository used for playbooks whose playbook the form runs, from its root"
+                  "description": "The repository used for playbooks whose playbook the form runs, from its root ; __self__ : the repository the form is in"
                 },
                 "key": {
                   "type": "string"
@@ -6422,7 +6422,7 @@
           },
           "playbookRepository": {
             "type": "string",
-            "description": "The repository used for playbooks whose playbook the form runs, from its root"
+            "description": "The repository used for playbooks whose playbook the form runs, from its root ; __self__ : the repository the form is in"
           },
           "workflow": {
             "type": "string"
