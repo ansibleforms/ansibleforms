@@ -270,7 +270,7 @@ export async function resolveWizard({ formConfig, formObj, user, drafts = {}, sk
     warnings.push(...(res.warnings || []));
     passwordsVisible.push(...(res._passwordsVisible || []));
     // the later steps read this one's resolved values (its defaults filled in), not its draft
-    const { __parent__, __user__, ...resolved } = res._values || {}; // eslint-disable-line no-unused-vars
+    const { __parent__, __user__, __repository__, ...resolved } = res._values || {}; // eslint-disable-line no-unused-vars
     parent[step.name] = resolved;
     values[step.name] = resolved;
     const at = (n) => `${step.name}.${n}`;

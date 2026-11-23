@@ -1153,7 +1153,7 @@ function findVariableDependencies() {
   });
 
   // check for reserved/internal field names that would cause conflicts
-  const reservedNames = ['__user__', '__parent__', '__output__', '__jobid__'];
+  const reservedNames = ['__user__', '__repository__', '__parent__', '__output__', '__jobid__'];
   // topFields from job.model.js - these are safe to use as they're wrapped and passed to playbooks
   const safeDoubleUnderscoreNames = [
     '__template__',
@@ -1793,6 +1793,15 @@ function initForm() {
     ? tokenUser
     : { ...tokenUser, groups: store.profile?.groups || [] };
   fieldOptions.value['__user__'] = {
+    type: 'expression',
+  };
+  // the repository the form is in, { name, path } (the server's, for the form and its subforms) ;
+  // both empty for a form in no repository
+  form.value['__repository__'] = {
+    name: props.currentForm.ownRepository?.name || '',
+    path: props.currentForm.ownRepository?.path || '',
+  };
+  fieldOptions.value['__repository__'] = {
     type: 'expression',
   };
 

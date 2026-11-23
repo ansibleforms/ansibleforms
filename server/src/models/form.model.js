@@ -1218,6 +1218,9 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         if(formName){
           form.subforms = collectSubformsForForm(form, unvalidatedForms, errors)
         }
+        // the repository the form is in, as its fields read it ($(__repository__.name), .path) :
+        // its subforms (list rows, wizard steps) read the same
+        if(formName && !loadFullConfig) attachOwnRepository(form, entry.repository)
         baseConfig.forms.push(form);   // merge the form into the base forms
         // if we are loading full config, we can return the form right away
         if(formName){
@@ -1251,6 +1254,22 @@ export function resolveSelfRepository(form, repository, error = () => {}) {
   }
   resolve(form)
   for (const step of Array.isArray(form?.steps) ? form.steps : []) resolve(step)
+}
+
+/**
+ * The repository a form is in, as its fields read it with $(__repository__.name) and
+ * $(__repository__.path) : its name and its folder on the server. A form in no repository (the
+ * local forms folder, the staging folder) reads both empty. Its subforms (list rows, wizard steps)
+ * read the form's.
+ *
+ * Args:
+ *   form (object): the form, as it runs, with its subforms inlined (changed in place).
+ *   repository (string|null): the repository the form is read from ; null : none.
+ */
+export function attachOwnRepository(form, repository) {
+  const own = { name: repository || "", path: repository ? path.resolve(repoFolder(repository)) : "" }
+  form.ownRepository = own
+  for (const sub of Array.isArray(form.subforms) ? form.subforms : []) if (sub && typeof sub === "object") sub.ownRepository = own
 }
 
 // Walk a field tree and collect every subform name referenced by a "list"

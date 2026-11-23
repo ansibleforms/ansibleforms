@@ -147,6 +147,11 @@ export async function resolveForm({
   for (const [k, v] of Object.entries(constants || {})) { vals[k] = v; fieldOptions[k] = { type: "constant" }; }
   for (const [k, v] of Object.entries(vars || {})) { vals[k] = v; fieldOptions[k] = { type: "constant" }; }
   if (user !== undefined) { vals.__user__ = user; fieldOptions.__user__ = { type: "expression" }; }
+  // the repository the form is in ({ name, path }), as Form.load gives it to the form and its subforms
+  if (form?.ownRepository && typeof form.ownRepository === 'object') {
+    vals.__repository__ = form.ownRepository;
+    fieldOptions.__repository__ = { type: "expression" };
+  }
   if (parent && typeof parent === 'object' && Object.keys(parent).length > 0) {
     vals.__parent__ = parent;
     fieldOptions.__parent__ = { type: "constant" };
@@ -453,7 +458,7 @@ export async function resolveForm({
       return;
     }
     rowBudget.left -= todo;
-    const { __user__, ...parentValues } = vals; // eslint-disable-line no-unused-vars
+    const { __user__, __repository__, ...parentValues } = vals; // eslint-disable-line no-unused-vars
     const rowServices = typeof services.forSubform === 'function' ? services.forSubform(sub.name) : services;
     const failing = [];
     const out = [];
