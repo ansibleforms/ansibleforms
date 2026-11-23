@@ -2653,6 +2653,8 @@ export default {
     formPlaybookRepository: 'Dépôt',
     helpPlaybookRepository: 'Exécute le playbook depuis la racine de ce dépôt, avec son ansible.cfg.',
     visualFirstPlaybookRepository: 'Premier dépôt de playbooks',
+    visualOwnFormRepository: 'Dépôt de ce formulaire ({name})',
+    visualOwnWorkflowRepository: 'Dépôt de ce workflow ({name})',
     formWorkflow: 'Workflow',
     helpWorkflow: "Le workflow qu'il exécute, un de Designer > Workflows.",
     helpTemplate: "Le modèle qu'il lance sur le runner : un modèle de job ou de workflow AWX, un modèle Semaphore.",

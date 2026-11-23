@@ -55,6 +55,7 @@ import ProjectFiles from "../models/projectFiles.model.js";
 import mysql from "../models/db.model.js";
 import { workflowFiles, workflowCandidates } from "../models/workflowRun.js";
 import { workflowsOf } from "./workflowDefs.js";
+import { selfRepository } from "./selfRepository.js";
 import { runsOnServer } from "./expressionPolicy.js";
 import Errors from "./errors.js";
 import logger from "./logger.js";
@@ -423,14 +424,20 @@ async function rteRunners() {
  * form naming one with playbookRepository runs from its root).
  *
  * Returns:
- *   Promise<object>: { playbookRoot, repositoryRoots ({ name: folder }) }.
+ *   Promise<object>: { playbookRoot, repositoryRoots ({ name: folder }), formsRepository (the only
+ *     forms repository : the one a form names with __self__ when it is not tagged with its own) }.
  */
 async function playbookRootsOf() {
   const { default: Repository } = await import("../models/repository.model.js");
   const { default: Repo } = await import("../models/repo.model.js");
   const repositoryRoots = {};
   for (const r of await Repository.playbooksRepositories()) repositoryRoots[r.name] = path.resolve(Repo.folderOf(r.name));
-  return { playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root, repositoryRoots };
+  const formsRepositories = await Repository.getFormsFolders();
+  return {
+    playbookRoot: (await ProjectFiles.roots("playbooks"))[0].root,
+    repositoryRoots,
+    formsRepository: formsRepositories.length === 1 ? formsRepositories[0].name : null,
+  };
 }
 
 /**
@@ -440,8 +447,8 @@ async function playbookRootsOf() {
  * Args:
  *   forms (object[]): the forms.
  *   ctx (object): { playbookRoot (the playbooks folder), repositoryRoots (each playbooks repository's
- *     root, by its name), workflows (workflowFiles), rteRunners
- *     (rteRunners) }.
+ *     root, by its name), formsRepository (the only forms repository, for a form's __self__),
+ *     workflows (workflowFiles), rteRunners (rteRunners) }.
  *   workflows (object[]): workflows read from a file's text (workflowsOf) ; none when not given.
  *
  * Returns:
@@ -464,9 +471,9 @@ function usedBy(forms, ctx, workflows = []) {
   // a workflow and the ones it nests : its file, and the playbooks of its job template nodes ;
   // every workflow the reference may mean (two of a name : the form cannot run either, and a
   // second one never shows the first)
-  const addNodes = (workflow, depth) => {
+  const addNodes = (workflow, depth, repository = null) => {
     for (const node of workflow.nodes || []) {
-      if (runsPlaybook(node)) addPlaybook(node.name, "", node.playbook_repository);
+      if (runsPlaybook(node)) addPlaybook(node.name, "", selfRepository(node.playbook_repository, repository));
       else if (node.type === "workflow_job_template") addWorkflow(node.name, depth + 1);
     }
   };
@@ -476,14 +483,16 @@ function usedBy(forms, ctx, workflows = []) {
       files.add(path.resolve(found.file));
       if (seen.has(found)) continue;
       seen.add(found);
-      addNodes(found.workflow, depth);
+      addNodes(found.workflow, depth, found.repository);
     }
   };
   for (const f of forms || []) {
-    if (f?.type === "ansible" || (f?.playbook && !f?.type)) addPlaybook(f.playbook, f.playbookSubPath, f.playbookRepository);
+    // __self__ : the repository the form is tagged with, or the only forms repository
+    const own = f?.repository || ctx.formsRepository || null;
+    if (f?.type === "ansible" || (f?.playbook && !f?.type)) addPlaybook(f.playbook, f.playbookSubPath, selfRepository(f.playbookRepository, own));
     for (const step of Array.isArray(f?.steps) ? f.steps : []) {
       if (step?.type === "ansible") {
-        addPlaybook(step.playbook, step.playbookSubPath ?? f.playbookSubPath, step.playbookRepository ?? f.playbookRepository);
+        addPlaybook(step.playbook, step.playbookSubPath ?? f.playbookSubPath, selfRepository(step.playbookRepository ?? f.playbookRepository, own));
       }
     }
     if (f?.type === "workflow") addWorkflow(f.workflow, 0);

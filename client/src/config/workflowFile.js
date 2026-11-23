@@ -48,7 +48,8 @@ const IDENTIFIER = /^[A-Za-z0-9_.:-]+$/;
  * (playbook_repository), from its root (lib/playbookChoices.js).
  *
  * Args:
- *   refs (object): what the instance has ({ playbooks, playbookFiles }).
+ *   refs (object): what the instance has ({ playbooks, playbookFiles, ownRepository (the
+ *     repository the file is in, for __self__) }).
  *   repository (string): the node's playbook_repository.
  *
  * Returns:
@@ -56,7 +57,7 @@ const IDENTIFIER = /^[A-Za-z0-9_.:-]+$/;
  */
 function playbooksOf(refs, repository) {
   if (!repository || !refs.playbookFiles) return refs.playbooks || [];
-  return playbookChoices(refs.playbookFiles.files, refs.playbookFiles.repositories, repository);
+  return playbookChoices(refs.playbookFiles.files, refs.playbookFiles.repositories, repository, refs.ownRepository);
 }
 
 /** The text of a scalar node, or of a plain value. */

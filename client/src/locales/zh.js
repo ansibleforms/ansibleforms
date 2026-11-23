@@ -2516,6 +2516,8 @@ export default {
     formPlaybookRepository: '仓库',
     helpPlaybookRepository: '从此仓库的根目录运行 playbook，并使用其 ansible.cfg。',
     visualFirstPlaybookRepository: '第一个 playbook 仓库',
+    visualOwnFormRepository: '此表单的仓库 ({name})',
+    visualOwnWorkflowRepository: '此工作流的仓库 ({name})',
     formWorkflow: '工作流',
     helpWorkflow: '它运行的工作流，来自 设计器 > 工作流。',
     helpTemplate: '它在运行器上启动的模板：AWX 的作业或工作流模板、Semaphore 的模板。',

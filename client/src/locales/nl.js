@@ -2641,6 +2641,8 @@ export default {
     formPlaybookRepository: 'Repository',
     helpPlaybookRepository: 'Voert het playbook uit vanuit de hoofdmap van deze repository, met zijn ansible.cfg.',
     visualFirstPlaybookRepository: 'Eerste playbook-repository',
+    visualOwnFormRepository: 'Repository van dit formulier ({name})',
+    visualOwnWorkflowRepository: 'Repository van deze workflow ({name})',
     formWorkflow: 'Workflow',
     helpWorkflow: 'De workflow die het uitvoert, een uit Designer > Workflows.',
     helpTemplate: 'Het sjabloon dat het op de runner start: een AWX job- of workflowsjabloon, een Semaphore-sjabloon.',

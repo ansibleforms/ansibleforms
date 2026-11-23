@@ -72,7 +72,7 @@ import {
   orderFor,
 } from '@/lib/formDoc';
 import { yamlText } from '@/lib/yamlBlock';
-import { playbookChoices } from '@/lib/playbookChoices';
+import { playbookChoices, SELF_REPOSITORY } from '@/lib/playbookChoices';
 import BsSwitch from './BsSwitch.vue';
 
 const props = defineProps({
@@ -82,6 +82,8 @@ const props = defineProps({
   roleOptions: { type: Array, default: () => [] },
   // the other forms of the forms list, { name, order } : the places this one can go
   otherForms: { type: Array, default: () => [] },
+  // the repository the form is in (playbookRepository: __self__) ; none : the local forms folder
+  ownRepository: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue']);
 const { t } = useI18n();
@@ -502,7 +504,12 @@ const playbookRepositories = computed(() => playbookFiles.value.repositories.map
 // the playbooks offered : the first repository's, as it runs them, without a playbookRepository ;
 // the named repository's, from its root, with one
 const playbookNames = computed(() =>
-  playbookChoices(playbookFiles.value.files, playbookFiles.value.repositories, form.value?.playbookRepository),
+  playbookChoices(
+    playbookFiles.value.files,
+    playbookFiles.value.repositories,
+    form.value?.playbookRepository,
+    props.ownRepository,
+  ),
 );
 // the designer's workflows (Designer > Workflows), offered as a workflow form's workflow : its file
 // (a workflow's name still works) ; none (the list needs the designer's permission) : it is typed
@@ -881,8 +888,15 @@ defineExpose({
               @change="setText('playbookRepository', $event.target.value)"
             >
               <option value="">{{ t('designer.visualFirstPlaybookRepository') }}</option>
+              <option :value="SELF_REPOSITORY">
+                {{ t('designer.visualOwnFormRepository', { name: ownRepository || '-' }) }}
+              </option>
               <option
-                v-if="form.playbookRepository && !playbookRepositories.includes(form.playbookRepository)"
+                v-if="
+                  form.playbookRepository &&
+                  form.playbookRepository !== SELF_REPOSITORY &&
+                  !playbookRepositories.includes(form.playbookRepository)
+                "
                 :value="form.playbookRepository"
               >
                 {{ form.playbookRepository }}

@@ -36,6 +36,7 @@ import Runner from "./runner.model.js";
 import { workflowsOf, workflowErrors, nextStep, workflowFailed, varsOf, ancestorArtifacts } from "../lib/workflowDefs.js";
 import { workflowSummaryLines } from "../lib/workflowSummary.js";
 import { workflowHash, carriedNodes } from "../lib/workflowRelaunch.js";
+import { selfRepository } from "../lib/selfRepository.js";
 
 // how often the run looks at its jobs, its approval and an abort
 const TICK_MS = 1000;
@@ -80,11 +81,12 @@ function yamlFilesIn(root, depth = MAX_DEPTH_DIRS) {
  * repositories used for workflows, a file's workflows each.
  *
  * Returns:
- *   Promise<object[]>: { workflow (workflowsOf), file (its absolute path) }.
+ *   Promise<object[]>: { workflow (workflowsOf), file (its absolute path), rel, repository (the
+ *     repository the file is in ; null : the workflows folder) }.
  */
 async function allWorkflows() {
   const found = [];
-  for (const { root } of await Repository.getWorkflowsRoots()) {
+  for (const { root, repository } of await Repository.getWorkflowsRoots()) {
     for (const file of yamlFilesIn(root)) {
       let text;
       try {
@@ -102,7 +104,7 @@ async function allWorkflows() {
       }
       // its path in its folder, as a form names it (workflows/deploy.yml), with forward slashes
       const rel = path.relative(root, file).split(path.sep).join("/");
-      for (const wf of workflows) found.push({ workflow: wf, file, rel });
+      for (const wf of workflows) found.push({ workflow: wf, file, rel, repository: repository || null });
     }
   }
   return found;
@@ -369,11 +371,14 @@ export function credentialRoles(credentials, types) {
  *   workflow (object): the workflow.
  *   node (object): the node.
  *   types (Map): name -> the instance's credential_type.
+ *   runnerType (string): the type of the node's runner.
+ *   formCredentials (object): the workflow form's credentials.
+ *   repository (string|null): the repository the workflow file is in (a node's __self__).
  *
  * Returns:
  *   object: the step's form (as a multistep's step).
  */
-export function nodeForm(workflow, node, types, runnerType = "", formCredentials = {}) {
+export function nodeForm(workflow, node, types, runnerType = "", formCredentials = {}, repository = null) {
   const formType = node.runner ? FORM_TYPE_OF_RUNNER[runnerType] : "ansible";
   if (!formType) throw new Error(`node '${node.identifier}' names runner '${node.runner}', which is no runner a node can run on`);
   if (formType !== "ansible") return templateNodeForm(workflow, node, formType);
@@ -381,7 +386,8 @@ export function nodeForm(workflow, node, types, runnerType = "", formCredentials
   const form = { type: "ansible", name: `${workflow.name} - ${node.identifier}`, playbook: node.name };
   if (node.runner) form.runner = node.runner;
   // the repository the playbook runs from (its root), as a form's playbookRepository
-  if (node.playbook_repository) form.playbookRepository = node.playbook_repository;
+  // (__self__ : the repository the workflow file is in)
+  if (node.playbook_repository) form.playbookRepository = selfRepository(node.playbook_repository, repository);
   if (node.inventory) form.inventory = node.inventory;
   if (node.limit) form.limit = node.limit;
   if (node.job_tags) form.tags = node.job_tags;
@@ -530,7 +536,7 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
     await end("failed", `[ERROR]: ${e.message}`);
     return;
   }
-  const { workflow, file } = found;
+  const { workflow, file, repository } = found;
   const nodes = workflow.nodes;
   // the workflow it runs, as a hash : a relaunch from its failed node compares it (lib/workflowRelaunch.js)
   const hash = workflowHash(workflow);
@@ -766,7 +772,7 @@ export async function runWorkflow({ Job, form, formObj, user, extravars, credent
           if (!row) throw new Error(`no runner named '${node.runner}' - add it under Connections > Runners`);
           runnerType = row.type;
         }
-        await runChild(node, nodeForm(workflow, node, types, runnerType, formObj.credentials), nodeExtravars(extravars, workflow, node, inherited));
+        await runChild(node, nodeForm(workflow, node, types, runnerType, formObj.credentials, repository), nodeExtravars(extravars, workflow, node, inherited));
       } else if (node.type === "workflow_job_template") {
         const child = { type: "workflow", name: `${workflow.name} - ${node.identifier}`, workflow: node.name, __workflowDepth: (Number(formObj.__workflowDepth) || 0) + 1 };
         // the form's credentials reach a nested workflow's nodes too

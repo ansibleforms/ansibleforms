@@ -23,6 +23,7 @@ import { repoFolder } from "./repo.model.js";
 import { findOwner, formsSkipTest, realPathOf } from "../lib/repoObjects/ownedPaths.js";
 import { isInside } from "../lib/projectFiles.js";
 import { keySources, composeConfig, deprecationNotice, writeConfigKeys, mergeIntoBase, assertKeysWritable, withoutHeldKeys, isTemplate } from "../lib/configKeys.js";
+import { SELF_REPOSITORY } from "../lib/selfRepository.js";
 
 
 const ajv = new Ajv({allErrors: true, allowUnionTypes: true});
@@ -1191,6 +1192,9 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
         error(Form.validationError(f.name, e.message));
       }  
       if(form){
+        // a form running its playbook from its own repository (playbookRepository: __self__) :
+        // that repository's name, so the launch runs from its root
+        if(formName && !loadFullConfig) resolveSelfRepository(form, entry.repository, error)
         // Load varsFiles if this is a single form request and varsFiles is defined
         if(formName && form.varsFiles){
           logger.debug(`Loading varsFiles for form ${f.name}`);
@@ -1228,6 +1232,26 @@ Form.load = async function(userRoles,formName='',loadFullConfig=false,baseOnly=f
   baseConfig.warnings = warnings; // add warnings to the base config
   return baseConfig; // return the base config with the forms
 };
+
+/**
+ * A form naming its own repository as its playbook's (playbookRepository: __self__, on the form or
+ * on a step) : the repository the form is read from. A form in no repository (the local forms
+ * folder, the staging folder) keeps __self__, and its launch is refused (Repository.playbookRepositoryRoot).
+ *
+ * Args:
+ *   form (object): the form, as it runs (changed in place).
+ *   repository (string|null): the repository the form is read from ; null : none.
+ *   error (function): (message) => a load error.
+ */
+export function resolveSelfRepository(form, repository, error = () => {}) {
+  const resolve = (holder) => {
+    if (holder?.playbookRepository !== SELF_REPOSITORY) return
+    if (repository) holder.playbookRepository = repository
+    else error(`Form '${form.name}': playbookRepository ${SELF_REPOSITORY} names the repository the form is in, and the form is in none`)
+  }
+  resolve(form)
+  for (const step of Array.isArray(form?.steps) ? form.steps : []) resolve(step)
+}
 
 // Walk a field tree and collect every subform name referenced by a "list"
 // field. Recurses into subform definitions as well so we pick up nested

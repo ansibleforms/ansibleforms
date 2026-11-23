@@ -26,6 +26,7 @@ const OBJECT_FLAGS = USAGE_TYPES.filter((t) => t.objects).map((t) => t.flag);
 // sync runs for that long, so it is the remains of one that hung
 const CLAIM_MAX_HOURS = 2;
 import { friendlyPullError, configRepoFromPath } from "../lib/forms-git.js";
+import { SELF_REPOSITORY } from "../lib/selfRepository.js";
 
 // the user git sends with a token when a credential keeps none : any one works with a GitHub,
 // GitLab or Azure DevOps token, oauth2 is GitLab's documented one
@@ -730,9 +731,13 @@ class Repository extends CrudModel {
    *   Promise<string>: its folder.
    *
    * Raises:
-   *   Error: no repository of that name is used for playbooks.
+   *   Error: no repository of that name is used for playbooks, or __self__ (in none).
    */
   static async playbookRepositoryRoot(name) {
+    // __self__ left as it is : the form (or the workflow file) is in no repository
+    if (name === SELF_REPOSITORY) {
+      throw new Error(`playbookRepository '${SELF_REPOSITORY}' names the repository the form or the workflow is in, and it is in none`)
+    }
     const repositories = await Repository.playbooksRepositories()
     if (!repositories.some((r) => r.name === name)) {
       throw new Error(`playbookRepository '${name}' is not a repository used for playbooks`)
