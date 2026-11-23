@@ -711,7 +711,7 @@ export function createHandlers({ user, deps, policy = {} }) {
     async getForm({ name }) {
       const { formConfig, formObj } = await loadForm(name);
       const fields = normalizeFields(formObj.fields);
-      const known = [...Object.keys(formConfig.constants || {}), ...Object.keys(formObj.vars || {}), '__user__'];
+      const known = [...Object.keys(formConfig.constants || {}), ...Object.keys(formObj.vars || {}), '__user__', '__repository__'];
       const graph = scanDependencies(fields, known);
       // a wizard's fields are its steps' : each step's subform fields, as the step shows them
       const steps = isWizard(formObj) ? wizardSteps(formObj).map((step) => {

@@ -101,8 +101,9 @@ export async function resolveExpression(req) {
 
 /**
  * The form-bound half of resolveExpression. Same rules as resolveFormQuery : the text comes
- * from the definition loaded with the caller's roles, constants, varsFiles and __user__ come
- * from the configuration and the token, only field values come from the caller.
+ * from the definition loaded with the caller's roles, constants, varsFiles, __user__ and
+ * __repository__ come from the configuration, the token and the form's repository, only field
+ * values come from the caller.
  */
 export async function resolveFormExpression({ user, formName, subformName, fieldName, values, literals, formConfig }) {
   const loaded = formConfig || await Form.load((user || {}).roles, formName);
@@ -132,6 +133,12 @@ export async function resolveFormExpression({ user, formName, subformName, field
       // who is asking is the token's answer, never the body's
       const path = name.slice(root.length).replace(/^\./, '');
       vals[name] = path ? readUserPath(user, path) : user;
+      asSource.add(name);
+    } else if (root === '__repository__') {
+      // the repository the form is in is the server's answer (Form.load), never the body's
+      const own = owner?.ownRepository || formObj?.ownRepository || { name: "", path: "" };
+      const path = name.slice(root.length).replace(/^\./, '');
+      vals[name] = path ? readUserPath(own, path) : own;
       asSource.add(name);
     } else if (Object.prototype.hasOwnProperty.call(fixed, root)) {
       if (fixed[root] !== null && typeof fixed[root] === 'object') asSource.add(name);

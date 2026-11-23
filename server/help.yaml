@@ -7751,6 +7751,18 @@
       expression: "'$(__user__.username)'"
       expression: $(__user__.groups)
       expression: $(__user__.roles)
+  - name: Repository Form
+    short: Read the repository the form is in
+    description: |
+      The field `__repository__` is automatically added in the form: the repository the form is read from, with
+      its `name` and its `path` (its folder on the server). A form's subforms (list rows, wizard steps) read the
+      form's. A form in no repository (the local forms folder) reads both empty. With it, a form reads a file kept
+      in its repository without naming the repository or its folder.
+    language: yaml
+    version: 7.8.0
+    code: |
+      expression: "'$(__repository__.name)'"
+      expression: "fn.fnReadYamlFile('$(__repository__.path)/extra_vars/my_defined_variables.yml', '.my_list')"
   - name: Customization
     short: Customize AnsibleForms
     description: |
