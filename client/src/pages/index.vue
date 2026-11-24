@@ -278,41 +278,39 @@ onMounted(async () => {
                 </div>
               </template>
               <div v-if="viewMode === 'tiles'" class="row align-content-stretch g-4">
-                <TransitionGroup>
-                  <div class="col-md-6 col-lg-4 col-xxl-3" v-for="form in getForms" :key="form.name">
-                    <router-link
-                      :to="formPath(form.name)"
-                      class="card h-100 p-4 text-reset text-decoration-none"
-                      :class="getFormClass(form)"
-                    >
-                      <div class="row">
-                        <div v-if="form.image || form.icon" class="col-3 text-center">
-                          <img v-if="form.image" :src="form.image" alt="Image" class="img-fluid" />
-                          <span v-if="form.icon" class="icon is-large text-body">
-                            <FaIcon
-                              :icon="form.icon"
-                              :size="form.iconSize"
-                              :color="form.iconColor"
-                              :overlayIcon="form.overlayIcon"
-                              :overlayIconCircle="form.overlayIconCircle"
-                              :overlayIconTransform="form.overlayIconTransform"
-                              :overlayIconColor="form.overlayIconColor"
-                              :overlayIconText="form.overlayIconText"
-                              :overlayIconTextPosition="form.overlayIconTextPosition"
-                              :overlayIconTextColor="form.overlayIconTextColor"
-                            />
-                          </span>
-                        </div>
-                        <div class="col text-body">
-                          <p class="fw-bold" :class="getFormClass(form)">
-                            {{ form.name }}
-                          </p>
-                          <p>{{ form.description }}</p>
-                        </div>
+                <div class="col-md-6 col-lg-4 col-xxl-3" v-for="form in getForms" :key="form.name">
+                  <router-link
+                    :to="formPath(form.name)"
+                    class="card h-100 p-4 text-reset text-decoration-none"
+                    :class="getFormClass(form)"
+                  >
+                    <div class="row">
+                      <div v-if="form.image || form.icon" class="col-3 text-center">
+                        <img v-if="form.image" :src="form.image" alt="Image" class="img-fluid" />
+                        <span v-if="form.icon" class="icon is-large text-body">
+                          <FaIcon
+                            :icon="form.icon"
+                            :size="form.iconSize"
+                            :color="form.iconColor"
+                            :overlayIcon="form.overlayIcon"
+                            :overlayIconCircle="form.overlayIconCircle"
+                            :overlayIconTransform="form.overlayIconTransform"
+                            :overlayIconColor="form.overlayIconColor"
+                            :overlayIconText="form.overlayIconText"
+                            :overlayIconTextPosition="form.overlayIconTextPosition"
+                            :overlayIconTextColor="form.overlayIconTextColor"
+                          />
+                        </span>
                       </div>
-                    </router-link>
-                  </div>
-                </TransitionGroup>
+                      <div class="col text-body">
+                        <p class="fw-bold" :class="getFormClass(form)">
+                          {{ form.name }}
+                        </p>
+                        <p>{{ form.description }}</p>
+                      </div>
+                    </div>
+                  </router-link>
+                </div>
               </div>
               <div v-else class="table-responsive af-list-frame">
                 <table v-fit-columns class="table table-bordered table-hover mb-0">
@@ -461,15 +459,5 @@ onMounted(async () => {
 // messages carry \r\n between the summary and the reason, which text nodes collapse
 .text-prewrap {
   white-space: pre-line;
-}
-
-.v-enter-active,
-.v-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.v-enter-from,
-.v-leave-to {
-  opacity: 0;
 }
 </style>
