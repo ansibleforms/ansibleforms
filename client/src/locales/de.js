@@ -3056,10 +3056,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'Dies ist Ihr eigener Job, und seine Genehmigung erlaubt keine Selbstgenehmigung. Ein anderer Genehmiger muss ihn genehmigen; Sie können ihn weiterhin ablehnen, um ihn zurückzuziehen.',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Details',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Warnung',
+      warning: 'Erfordert Aufmerksamkeit',
     },
     menu: {
       past: 'Vergangenheit',
@@ -3072,6 +3074,7 @@ export default {
       running: 'Läuft',
       approve: 'Wartet auf Genehmigung',
       success: 'Erfolgreich',
+      warning: 'Erfordert Aufmerksamkeit',
       failed: 'Fehlgeschlagen',
       aborted: 'Abgebrochen',
       rejected: 'Abgelehnt',
@@ -3092,6 +3095,8 @@ export default {
       approve:
         'Jobs, die vor dem Start auf eine Genehmigung warten. Genehmigen oder lehnen Sie sie mit den Symbolen vor jedem Job ab.',
       success: 'Jobs, die erfolgreich beendet wurden.',
+      warning:
+        'Jobs, die fertig sind, aber noch von jemandem nachbearbeitet werden müssen. Öffnen Sie einen, um den Grund zu lesen.',
       failed:
         'Jobs, die mit einem Fehler beendet wurden. Öffnen Sie einen, um in seiner Ausgabe zu sehen, was schiefging.',
       aborted: 'Jobs, die vor ihrem Ende abgebrochen wurden.',
@@ -3406,7 +3411,7 @@ export default {
     running: 'Läuft',
     finished: 'Abgeschlossen',
     failed: 'Fehlgeschlagen',
-    finishedWithWarning: 'Mit Warnung abgeschlossen',
+    finishedWithWarning: 'Fertig, erfordert Aufmerksamkeit',
     waitingForApproval: 'Wartet auf Freigabe',
     abandoned: 'Abgebrochen',
     rejected: 'Abgelehnt',

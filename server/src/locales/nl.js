@@ -336,7 +336,7 @@ export default {
         aborted: "Afgebroken",
         rejected: "Afgewezen",
         abandoned: "Achtergelaten",
-        warning: "Waarschuwing",
+        warning: "Vraagt aandacht",
       },
     },
     // the test mail of the mail settings

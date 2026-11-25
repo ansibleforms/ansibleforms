@@ -2980,10 +2980,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'これはあなた自身のジョブで、その承認設定では自分で承認できません。別の承認者が承認する必要があります。却下して取り下げることはできます。',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: '詳細',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: '警告',
+      warning: '要対応',
     },
     menu: {
       past: '過去',
@@ -2996,6 +2998,7 @@ export default {
       running: '実行中',
       approve: '承認待ち',
       success: '成功',
+      warning: '要対応',
       failed: '失敗',
       aborted: '中止',
       rejected: '却下',
@@ -3014,6 +3017,7 @@ export default {
       running: '現在実行中のジョブです。ジョブを開いて出力をリアルタイムで追跡したり、中止したりできます。',
       approve: '実行前に承認を待っているジョブです。各ジョブの前にあるアイコンで承認または却下してください。',
       success: '正常に完了したジョブです。',
+      warning: '完了したものの、誰かのフォローアップが必要なジョブです。開いて理由を確認してください。',
       failed: 'エラーで終了したジョブです。ジョブを開くと、出力で問題の内容を確認できます。',
       aborted: '完了前に停止されたジョブです。',
       rejected: '承認者が却下したジョブです。実行されていません。',
@@ -3315,7 +3319,7 @@ export default {
     running: '実行中',
     finished: '完了',
     failed: '失敗',
-    finishedWithWarning: '警告ありで完了',
+    finishedWithWarning: '完了（要対応）',
     waitingForApproval: '承認待ち',
     abandoned: '放棄',
     rejected: '却下',

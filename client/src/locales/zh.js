@@ -2900,10 +2900,12 @@ export default {
   },
   jobs: {
     ownJobRejectOnly: '这是您自己的作业，其审批设置不允许自行批准。必须由其他审批人批准；您仍可以拒绝以撤回该作业。',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: '详情',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: '警告',
+      warning: '需要关注',
     },
     menu: {
       past: '过去',
@@ -2916,6 +2918,7 @@ export default {
       running: '运行中',
       approve: '等待审批',
       success: '成功',
+      warning: '需要关注',
       failed: '失败',
       aborted: '已中止',
       rejected: '已拒绝',
@@ -2934,6 +2937,7 @@ export default {
       running: '当前正在运行的作业。打开作业可实时跟踪其输出，或中止它。',
       approve: '运行前需要审批的作业。使用每个作业前面的图标批准或拒绝它们。',
       success: '已成功完成的作业。',
+      warning: '已完成但仍需有人跟进的作业。打开一个查看原因。',
       failed: '以错误结束的作业。打开作业可在其输出中查看出错原因。',
       aborted: '在完成前被停止的作业。',
       rejected: '被审批人拒绝的作业：它们从未运行。',
@@ -3204,7 +3208,7 @@ export default {
     running: '运行中',
     finished: '已完成',
     failed: '失败',
-    finishedWithWarning: '已完成，但有警告',
+    finishedWithWarning: '已完成，需要关注',
     waitingForApproval: '等待审批',
     abandoned: '已放弃',
     rejected: '已拒绝',

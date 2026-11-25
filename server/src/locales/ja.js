@@ -336,7 +336,7 @@ export default {
         aborted: "中止",
         rejected: "却下",
         abandoned: "放棄",
-        warning: "警告",
+        warning: "要対応",
       },
     },
     // the test mail of the mail settings

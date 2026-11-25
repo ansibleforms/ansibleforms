@@ -21,6 +21,7 @@ describe('jobsPath', () => {
       'running',
       'approval',
       'succeeded',
+      'attention',
       'failed',
       'aborted',
       'rejected',

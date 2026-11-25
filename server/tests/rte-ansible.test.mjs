@@ -596,6 +596,56 @@ describe("the job log a playbook writes", () => {
   });
 });
 
+describe("the job status file (.joblogs/job_status_<id>.yml)", () => {
+  const statusFile = () => path.join(dir, ".joblogs", "job_status_11.yml");
+  const writeStatus = (yaml) => {
+    fs.mkdirSync(path.join(dir, ".joblogs"), { recursive: true });
+    fs.writeFileSync(statusFile(), yaml);
+  };
+
+  test("a playbook that succeeded and asks for attention ends as warning, with its message", async () => {
+    row({ __playbook__: "site.yml" });
+    writeStatus("status: attention\nmessage: >\n  3 items wait for approval\ndetail:\n  - id: 1\n    object: group-a\n");
+    await runToEnd(() => runJob());
+    assert.equal(jobRow.status, "warning");
+    assert.equal(jobRow.status_message, "3 items wait for approval");
+    assert.deepEqual(JSON.parse(jobRow.status_detail), [{ id: 1, object: "group-a" }]);
+    assert.ok(outputs.at(-1).output.includes("[WARNING]: Needs attention: 3 items wait for approval"));
+    assert.equal(JSON.parse(jobRow.awx_artifacts).af_job_status, undefined, "not kept among the artifacts");
+    assert.equal(fs.existsSync(statusFile()), false, "the file is removed");
+  });
+
+  test("a failed playbook stays failed, whatever the file says", async () => {
+    row({ __playbook__: "site.yml" });
+    writeStatus("status: attention\nmessage: m\n");
+    await runToEnd(() => runJob(), 2).catch(() => {});
+    assert.equal(jobRow.status, "failed");
+    assert.equal(jobRow.status_message, null);
+    assert.equal(fs.existsSync(statusFile()), false, "the file is removed");
+  });
+
+  test("a file that is not valid leaves the job a success, with a warning line", async () => {
+    row({ __playbook__: "site.yml" });
+    writeStatus("status: attention\n");
+    await runToEnd(() => runJob());
+    assert.equal(jobRow.status, "success");
+    assert.ok(outputs.at(-1).output.includes("[WARNING]: The job status was ignored"));
+  });
+
+  test("set_stats af_job_status does the same as the file", async () => {
+    row({ __playbook__: "site.yml" });
+    const done = runJob();
+    await new Promise((r) => setTimeout(r, 20));
+    const artifactsFile = spawned.at(-1).options.env.AF_ARTIFACTS_FILE;
+    assert.ok(artifactsFile, "the playbook is told where set_stats goes");
+    fs.writeFileSync(artifactsFile, JSON.stringify({ af_job_status: { status: "attention", message: "via set_stats" } }));
+    child.emit("exit", 0);
+    await done;
+    assert.equal(jobRow.status, "warning");
+    assert.equal(jobRow.status_message, "via set_stats");
+  });
+});
+
 describe("the approval gate", () => {
   test("halts the job with the APPROVE line and never runs the playbook", async () => {
     row({ __playbook__: "site.yml" });

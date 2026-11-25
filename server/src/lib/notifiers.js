@@ -184,7 +184,7 @@ export function telegramBody(message, chatId, buttonLabel = "Open") {
  *   message (object): the notification.
  *
  * Returns:
- *   object: title, text, status, event, jobId, form, user, link.
+ *   object: title, text, status, event, statusMessage, jobId, form, user, link.
  */
 export function payloadValues(message) {
   return {
@@ -192,6 +192,8 @@ export function payloadValues(message) {
     text: message.text,
     status: message.status,
     event: message.event,
+    // why a job needs attention (status warning) ; empty otherwise
+    statusMessage: message.statusMessage || "",
     jobId: message.job?.id,
     form: message.job?.form,
     user: message.job?.user,

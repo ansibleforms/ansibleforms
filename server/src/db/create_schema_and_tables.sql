@@ -407,6 +407,9 @@ CREATE TABLE `jobs` (
   -- kept so a runner removed or renamed later leaves the link (lib/runnerJobLinks.js)
   `runner_job_url` varchar(1000) DEFAULT NULL,
   `job_log` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- a job that ended needing attention (status 'warning') : why, and what to follow up (lib/jobAttention.js)
+  `status_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status_detail` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `tracker` varchar(250) DEFAULT NULL,
   -- a workflow job of the designer's : the hash of the workflow it ran, so a relaunch from its
   -- failed node runs only while the workflow is the same (models/workflowRun.js)

@@ -317,7 +317,7 @@ export default {
         aborted: "已中止",
         rejected: "已拒绝",
         abandoned: "已放弃",
-        warning: "警告",
+        warning: "需要关注",
       },
     },
     // the test mail of the mail settings

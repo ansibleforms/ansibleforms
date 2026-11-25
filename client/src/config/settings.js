@@ -282,7 +282,17 @@ export const CHANNEL_ICONS = {
 };
 // the placeholders a webhook's payload may use, as its help lists them (written out here : the
 // translations cannot hold a brace)
-export const PAYLOAD_PLACEHOLDERS = ['title', 'text', 'status', 'event', 'jobId', 'form', 'user', 'link']
+export const PAYLOAD_PLACEHOLDERS = [
+  'title',
+  'text',
+  'status',
+  'statusMessage',
+  'event',
+  'jobId',
+  'form',
+  'user',
+  'link',
+]
   .map((name) => `{{${name}}}`)
   .join(', ');
 // the body a webhook channel sends when it has none of its own (models/notificationChannel.js)

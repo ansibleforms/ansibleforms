@@ -144,8 +144,8 @@ describe("the multistep ends as aborted when its last step is aborted", () => {
       outputs.push(data);
       return flagged(jobid);
     };
-    Job.endJobStatus = async (jobid, counter, stream, status, message) => {
-      ended = { status, message };
+    Job.endJobStatus = async (jobid, counter, stream, status, message, artifacts, opts = {}) => {
+      ended = { status, message, statusMessage: opts.statusMessage };
     };
     // each step is a job of its own ; it runs until the test ends it or it is aborted
     beforeLaunch = null;
@@ -159,7 +159,10 @@ describe("the multistep ends as aborted when its last step is aborted", () => {
       });
       return { id, completionPromise };
     };
-    Job.findById = async (user, id) => ({ status: jobs.find((j) => j.id == id).status });
+    Job.findById = async (user, id) => {
+      const j = jobs.find((x) => x.id == id);
+      return { status: j.status, status_message: j.status_message };
+    };
   });
   afterEach(() => Object.assign(Job, saved));
 
@@ -254,5 +257,17 @@ describe("the multistep ends as aborted when its last step is aborted", () => {
     step().finish("failed");
     await run;
     assert.equal(ended?.status, "warning");
+  });
+
+  test("a step that needs attention : the next one runs, and the multistep needs attention, with its message", async () => {
+    const run = Multistep.launch({ form: "two steps", steps: twoSteps(), user: admin, jobid: 30 });
+    const first = () => jobs.find((j) => j.id == 31);
+    while (!first()) await new Promise((r) => setImmediate(r));
+    first().status_message = "3 items wait";
+    first().finish("warning");
+    await runStep(32, false);
+    await run;
+    assert.equal(ended?.status, "warning");
+    assert.match(ended.statusMessage, /: 3 items wait$/);
   });
 });

@@ -5769,7 +5769,7 @@
             with_types: list
             short: Allow table/list delete
             description: |
-              A table can be used to modify existing data.  If you don't was recoreds to be deleted, set this property to false.
+              A list can be used to modify existing data. If you don't want records to be deleted, set this property to false.
           - name: deleteMarker
             type: string
             group: output
@@ -7498,6 +7498,56 @@
 
       **Typical use case:**  
       A custom Python Ansible module that performs a long sequence of API calls or data operations (e.g. a SnapMirror DR workflow) can append one line per step to the log file. The operator watching the job in AnsibleForms will see live progress in the Log file section as each polling cycle refreshes the output.
+  - name: Job Needs Attention
+    short: End a job as "needs attention", with a message
+    version: v7.8.0
+    description: |
+      A playbook can finish as designed and still leave work for an operator: an approval elsewhere, a manual step, a partial apply. Ending it as **failed** looks like broken automation, and **success** hides that something is left. The playbook can then end the job as **Needs attention** (status `warning`), with a short message and, optionally, a detail to follow up.
+
+      **How a playbook says so**, in one of two ways:
+      - a **status file** next to the playbook, read once the playbook ends and then removed: works on a runner of type rte
+        ```
+        <playbook_dir>/.joblogs/job_status_<jobid>.yml   (or .yaml)
+        ```
+      - **`set_stats`** with the key `af_job_status`: works on a runner of type rte and on AWX / AAP
+        ```yaml
+        - ansible.builtin.set_stats:
+            data:
+              af_job_status:
+                status: attention
+                message: "3 items wait for operator approval"
+        ```
+      The status file wins when a playbook does both. Semaphore, Rundeck and Jenkins jobs are not supported.
+
+      **The file:**
+      ```yaml
+      status: attention        # or warning ; success leaves the job a success
+      message: >               # required: one line, shown in the jobs list and on the job's page
+        Follow-up required: 3 items are waiting for operator approval.
+      detail:                  # optional: anything, shown as YAML on the job's page
+        - id: 1
+          action: create
+          object: group-a
+      ```
+      **AnsibleForms passes `__jobid__` automatically**, so the playbook can write it with:
+      ```yaml
+      - ansible.builtin.copy:
+          dest: "{{ playbook_dir }}/.joblogs/job_status_{{ __jobid__ }}.yml"
+          content: "{{ {'status': 'attention', 'message': 'Waiting for dual control', 'detail': pending} | to_nice_yaml }}"
+      ```
+
+      **The exit code decides first:**
+      - only a playbook that **succeeded** (exit code 0) can end as Needs attention
+      - a failed playbook stays **failed** and an aborted one **aborted**, whatever the file says: a real failure is never hidden
+      - a file that is not valid (no message, an unknown status, broken YAML) is ignored: the job stays a success, with a `[WARNING]` line in its output that says why
+
+      **Where it shows:**
+      - the jobs list: its own entry **Needs attention** under Past (`/jobs/attention`), an amber status, and the message as the status's tooltip
+      - the job's page: the message in an amber box under the job's title, the detail folded under it
+      - the output: the job's last line, `[WARNING]: Needs attention: <message>`
+      - notifications: `onStatus: [warning]` sends them for these jobs only; the mail, the channels' text and a webhook's `{{statusMessage}}` placeholder carry the message
+      - a multistep: a step that needs attention passes, the next step runs, and the multistep ends as Needs attention with the step's message
+      - a workflow: the job counts as successful for the next node, as a multistep with warnings did already
   - name: Cascaded Dropdowns
     short: Make cascaded dropdowns
     description: |

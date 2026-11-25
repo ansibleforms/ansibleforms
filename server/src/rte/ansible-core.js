@@ -28,6 +28,7 @@ import { createOutputBatcher } from "../lib/outputBatcher.js";
 import { resolveInventory } from "../lib/inventories.js";
 import { createEventTail } from "./events.js";
 import { prepareSshKey } from "./sshKey.js";
+import { ATTENTION_KEY, takeStatusFile } from "../lib/jobAttention.js";
 import { isLiteralHost, limitFileContent } from "../lib/failedHosts.js";
 
 // ─── the job's I/O ────────────────────────────────────────────────────────────
@@ -878,6 +879,16 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         // what set_stats gathered, stored on the job whatever its end (AWX keeps a failed job's too)
         const artifacts = takeArtifacts(artifactsFile);
         removeEventsDir(artifactsDir);
+        // the status the playbook left (.joblogs/job_status_<id>.yml) : handed on as the artifact
+        // set_stats would give (af_job_status), which the controller reads (lib/jobAttention.js).
+        // The file wins over set_stats.
+        const statusFile = takeStatusFile(directory, jobid);
+        if (statusFile?.error) {
+          await io.writeOutput(jobid, { output: `[WARNING]: The job status file could not be read: ${statusFile.error}`, output_type: "stderr", job_id: jobid, order: ++counter })
+            .catch((err) => logger.error("Failed to create output: ", err));
+        } else if (statusFile) {
+          artifacts[ATTENTION_KEY] = statusFile.value;
+        }
         // the log as the playbook left it, before the job ends
         await syncJobLog(true);
         // Clear the PID and host from the database as the process has ended
@@ -948,6 +959,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
         removeExtravarsFiles();
         takeArtifacts(artifactsFile);
         removeEventsDir(artifactsDir);
+        takeStatusFile(directory, jobid);
         await syncJobLog(true);
         // Clear the PID and host from the database as the process has errored
         logger.debug(`[Job ${jobid}] Process with PID ${child.pid} encountered an error`);

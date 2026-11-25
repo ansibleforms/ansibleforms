@@ -2983,10 +2983,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'This is your own job, and its approval does not allow approving it yourself. Another approver has to approve it; you can still reject it to withdraw it.',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Details',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Warning',
+      warning: 'Needs attention',
     },
     menu: {
       past: 'Past',
@@ -2999,6 +3001,7 @@ export default {
       running: 'Running',
       approve: 'Waiting for approval',
       success: 'Succeeded',
+      warning: 'Needs attention',
       failed: 'Failed',
       aborted: 'Aborted',
       rejected: 'Rejected',
@@ -3018,6 +3021,7 @@ export default {
       approve:
         'Jobs that wait for an approval before they run. Approve or reject them with the icons in front of each job.',
       success: 'Jobs that finished successfully.',
+      warning: 'Jobs that finished, but need someone to follow them up. Open one to read why.',
       failed: 'Jobs that ended with an error. Open one to see in its output what went wrong.',
       aborted: 'Jobs that were stopped before they finished.',
       rejected: 'Jobs an approver rejected: they never ran.',
@@ -3322,7 +3326,7 @@ export default {
     running: 'Running',
     finished: 'Finished',
     failed: 'Failed',
-    finishedWithWarning: 'Finished with warning',
+    finishedWithWarning: 'Finished, needs attention',
     waitingForApproval: 'Waiting for approval',
     abandoned: 'Abandoned',
     rejected: 'Rejected',
