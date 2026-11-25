@@ -1596,7 +1596,7 @@
     default: UTC
     version: 5.0.10
     description: |
-      Sets the timezone for log timestamps. Use a valid IANA timezone string (e.g., UTC, Europe/Amsterdam, America/New_York).  Also used for the job timestamps.
+      Sets the timezone for log timestamps. Use a valid IANA timezone string (e.g., UTC, Europe/Amsterdam, America/New_York). Job times are stored in UTC and shown in each user's own time zone (Profile > Preferences), whatever LOG_TZ is.
   - name: LOG_SYSLOG_HOST
     type: string
     allowed: a valid IP or FQDN
