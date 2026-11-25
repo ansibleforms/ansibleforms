@@ -344,7 +344,7 @@ export default {
         aborted: "Abgebrochen",
         rejected: "Abgelehnt",
         abandoned: "Verworfen",
-        warning: "Warnung",
+        warning: "Erfordert Aufmerksamkeit",
       },
     },
     // the test mail of the mail settings

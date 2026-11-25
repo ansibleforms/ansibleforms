@@ -3037,10 +3037,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'Questo job è tuo e la sua approvazione non consente di approvarlo da solo. Deve approvarlo un altro approvatore; puoi comunque rifiutarlo per ritirarlo.',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Dettagli',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Avviso',
+      warning: 'Richiede attenzione',
     },
     menu: {
       past: 'Passato',
@@ -3053,6 +3055,7 @@ export default {
       running: 'In esecuzione',
       approve: 'In attesa di approvazione',
       success: 'Riuscito',
+      warning: 'Richiede attenzione',
       failed: 'Fallito',
       aborted: 'Interrotto',
       rejected: 'Rifiutato',
@@ -3073,6 +3076,7 @@ export default {
       approve:
         "I job che attendono un'approvazione prima di partire. Approvali o rifiutali con le icone davanti a ogni job.",
       success: 'I job terminati con successo.',
+      warning: 'Job terminati che richiedono ancora un intervento. Aprine uno per leggerne il motivo.',
       failed: 'I job terminati con un errore. Aprine uno per vedere nel suo output cosa è andato storto.',
       aborted: 'I job interrotti prima della fine.',
       rejected: 'Job che un approvatore ha rifiutato: non sono mai stati eseguiti.',
@@ -3388,7 +3392,7 @@ export default {
     running: 'In esecuzione',
     finished: 'Completato',
     failed: 'Fallito',
-    finishedWithWarning: 'Completato con avviso',
+    finishedWithWarning: 'Terminato, richiede attenzione',
     waitingForApproval: 'In attesa di approvazione',
     abandoned: 'Abbandonato',
     rejected: 'Rifiutato',

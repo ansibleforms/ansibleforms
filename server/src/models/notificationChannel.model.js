@@ -41,7 +41,7 @@ export const DEFAULT_PAYLOAD = `{
   "link": "{{link}}"
 }`;
 // the placeholders a webhook's template may use
-export const PAYLOAD_PLACEHOLDERS = ['title', 'text', 'status', 'event', 'jobId', 'form', 'user', 'link'];
+export const PAYLOAD_PLACEHOLDERS = ['title', 'text', 'status', 'statusMessage', 'event', 'jobId', 'form', 'user', 'link'];
 
 /**
  * A webhook's body : its template with each {{placeholder}} filled in. A placeholder that is a

@@ -93,6 +93,7 @@ const MENU_STATUSES = {
   // what ran : ended one way or the other
   past: [
     { status: 'success', icon: 'check', label: () => t('jobs.menu.success') },
+    { status: 'warning', icon: 'triangle-exclamation', label: () => t('jobs.menu.warning') },
     { status: 'failed', icon: 'xmark', label: () => t('jobs.menu.failed') },
     { status: 'aborted', icon: 'ban', label: () => t('jobs.menu.aborted') },
     { status: 'rejected', icon: 'thumbs-down', label: () => t('jobs.menu.rejected') },

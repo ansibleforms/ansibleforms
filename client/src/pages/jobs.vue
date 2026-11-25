@@ -145,7 +145,7 @@ const durationSeconds = (j) => runSeconds(j, now.value);
  *   string: a CSS width in px.
  */
 function statusWidth() {
-  const labels = ['running', 'approve', 'success', 'failed', 'aborted'].map((s) => t(`jobs.menu.${s}`));
+  const labels = ['running', 'approve', 'success', 'warning', 'failed', 'aborted'].map((s) => t(`jobs.menu.${s}`));
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
   return `${Math.max(pxOf(pillWidth(labels, 1.8 * rem)), pxOf(headerWidth(t('jobs.status'))))}px`;
 }
@@ -322,6 +322,12 @@ const MENU_STATUSES = [
     description: () => t('jobs.description.success'),
   },
   {
+    status: 'warning',
+    icon: 'triangle-exclamation',
+    label: () => t('jobs.menu.warning'),
+    description: () => t('jobs.description.warning'),
+  },
+  {
     status: 'failed',
     icon: 'xmark',
     label: () => t('jobs.menu.failed'),
@@ -451,6 +457,17 @@ const steps = computed(() =>
 
 // ─── the job at a glance (its page's summary) ─────────────────────────────────
 // the extravars or the artifacts, when one of them is shown (one at a time)
+// what a job that needs attention gives to follow up (jobs.status_detail, JSON) : as YAML ; none when
+// there is none or it cannot be read
+const statusDetailYaml = computed(() => {
+  const raw = job.value?.status_detail;
+  if (!raw) return '';
+  try {
+    return YAML.stringify(JSON.parse(raw)).trimEnd();
+  } catch {
+    return '';
+  }
+});
 const dataShown = computed(() => {
   if (!job.value) return null;
   if (showExtraVars.value) return { value: job.value.extravars ?? {} };
@@ -1602,7 +1619,14 @@ onMounted(async () => {
                     <td v-if="col.key === 'id'" role="button" class="text-end af-col-end" @click="openRow(j)">
                       {{ j.id }}
                     </td>
-                    <td v-else-if="col.key === 'status'" role="button" class="text-start" @click="openRow(j)">
+                    <!-- a job that needs attention : why, as the pill's tooltip -->
+                    <td
+                      v-else-if="col.key === 'status'"
+                      role="button"
+                      class="text-start"
+                      :title="j.status === 'warning' ? j.status_message || '' : ''"
+                      @click="openRow(j)"
+                    >
                       <AppStatusPill :status="j.status" />
                     </td>
                     <!-- the form in the link blue, as a list's name : the row opens the job -->
@@ -1776,6 +1800,20 @@ onMounted(async () => {
                 <h3 class="af-job-number">{{ job.form || t('jobs.jobTitle', { id: '#' + jobId }) }}</h3>
                 <AppStatusPill :status="job.status" />
                 <AppStatusPill :label="jobTypeName(job)" tone="grey" />
+              </div>
+              <!-- a job that needs attention : why, and what to follow up, seen even with the details folded -->
+              <div
+                v-if="job.status === 'warning' && job.status_message"
+                class="alert alert-warning af-job-attention mt-2 mb-0"
+                role="status"
+              >
+                <FaIcon icon="triangle-exclamation" class="me-2" /><span class="af-job-attention-message">{{
+                  job.status_message
+                }}</span>
+                <details v-if="statusDetailYaml" class="mt-2">
+                  <summary>{{ t('jobs.attentionDetail') }}</summary>
+                  <pre class="mb-0 mt-2 af-job-attention-detail">{{ statusDetailYaml }}</pre>
+                </details>
               </div>
               <dl v-show="!summaryCollapsed" class="af-job-facts">
                 <!-- an ansible job : the hosts it ran on (its limit, else its inventories, else the
@@ -2103,6 +2141,16 @@ onMounted(async () => {
   </div>
 </template>
 <style scoped lang="scss">
+/* a job that needs attention : the message kept whole, the detail scrolled when long */
+.af-job-attention-message {
+  white-space: pre-line;
+}
+.af-job-attention-detail {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre;
+  font-size: 0.85em;
+}
 /* the relaunch dialog's body : 1rem above and below it, as the other dialogs' sentence (py-3), its
    last line without a margin of its own, whichever lines it shows */
 .af-relaunch-body {

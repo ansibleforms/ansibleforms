@@ -664,7 +664,7 @@ const SCHEMA_MANIFEST = {
                               'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs',
                               'system_task_runs'],
                      columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
-                               'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log',
+                               'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log', 'jobs.status_message', 'jobs.status_detail',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
                                'repositories.use_for_workflows', 'repositories.use_for_inventories',
                                'schedule.claim_node', 'schedule.claim_since', 'runners.flavour', 'runners.project',
@@ -1118,6 +1118,9 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addTable("disclaimer_acceptances", disclaimerTables), messages, success, failed);
   await checkPromise(copyAwxToRunners(), messages, success, failed);
   await checkPromise(addColumn("jobs", "job_log", "longtext", true, "NULL"), messages, success, failed);
+  // a job that ended needing attention (status 'warning') : why, and what to follow up (lib/jobAttention.js)
+  await checkPromise(addColumn("jobs", "status_message", "text", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("jobs", "status_detail", "longtext", true, "NULL"), messages, success, failed);
 
   // 7 : a worker and several app nodes on one database (lib/nodes.js, lib/epochs.js,
   // the designer lock in models/lock.model.js, the node following a job)

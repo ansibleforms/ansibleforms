@@ -32,7 +32,7 @@ import State from '@/lib/State';
 const STORAGE_KEY = 'af_job_notifications';
 
 // the statuses a job ends with : the jobs menu's Past
-export const FINAL_STATUSES = ['success', 'failed', 'aborted', 'rejected', 'abandoned'];
+export const FINAL_STATUSES = ['success', 'warning', 'failed', 'aborted', 'rejected', 'abandoned'];
 
 // how many of the user's newest jobs are compared : a job ending is one of its latest
 const MINE_SHOWN = 25;
@@ -442,7 +442,8 @@ async function look({ t, router, store }) {
     const duration = formatDuration(durationSeconds(j));
     show({
       title: `${name(j)}: ${t(`jobs.menu.${j.status}`)}`,
-      body: t('profilePage.notificationsBody', { id: j.id, duration }),
+      // a job that needs attention : why, under the job's number
+      body: [t('profilePage.notificationsBody', { id: j.id, duration }), j.status_message].filter(Boolean).join('\n'),
       tag: `af-job-${j.id}-${j.status}`,
       id: j.id,
       form: j.form,

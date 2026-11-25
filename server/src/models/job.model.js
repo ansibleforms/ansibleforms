@@ -37,6 +37,7 @@ import { jobTypeOf } from "../lib/jobTypes.js";
 import { hostsFromEvents, hostsFromRecap, ranHostsFromRecap, rerunDiffers, rerunLimit, fallbackLimit } from "../lib/failedHosts.js";
 import { SELF_REPOSITORY } from "../lib/selfRepository.js";
 import { storedJobOfLaunch, markStoredJobUsed } from "../lib/storedJobUse.js";
+import { attentionFromArtifacts, withoutAttention, MESSAGE_MAX } from "../lib/jobAttention.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -607,14 +608,35 @@ Job.endJobStatus = async (
   opts = {}
 ) => {
   try {
+    // a playbook that succeeded may say it needs attention (lib/jobAttention.js) : the job then
+    // ends as 'warning', with the playbook's message. A failed or aborted job stays what it is.
+    // opts.statusMessage : the message of a warning the app itself decides on (a multistep).
+    let statusMessage = opts.statusMessage || null;
+    let statusDetail = null;
+    const attention = attentionFromArtifacts(awx_artifacts);
+    if (attention && status === "success") {
+      if (attention.error) {
+        message += `\n[WARNING]: The job status was ignored: ${attention.error}`;
+      } else if (attention.attention) {
+        status = "warning";
+        stream = "stdout";
+        statusMessage = attention.message;
+        statusDetail = attention.detail;
+        message += `\n[WARNING]: Needs attention: ${attention.message}`;
+        if (attention.detailDropped) message += `\n[WARNING]: The job status detail was too large and was not stored`;
+      }
+    }
     // the end is written once : a second writer (a late RTE, a sweep, the app failing it) finds
     // the job ended and leaves it - no second last line, no second mail
     // the abort flag is answered in the same statement : an ended job never carries it
     const moved = await Job.transitionStatus(jobid, ENDS_FROM, {
       status: status,
       end: getTimestamp(),
-      awx_artifacts: JSON.stringify(awx_artifacts),
+      awx_artifacts: JSON.stringify(withoutAttention(awx_artifacts)),
       abort_requested: 0,
+      // masked as the output is : a message that echoes a credential does not store it
+      status_message: status === "warning" && statusMessage ? maskOutput(jobid, String(statusMessage).slice(0, MESSAGE_MAX)) : null,
+      status_detail: status === "warning" && statusDetail != null ? maskOutput(jobid, JSON.stringify(statusDetail)) : null,
     });
     if (!moved) {
       logger.debug(`Job ${jobid} has ended already: not ending it again as ${status}`);
@@ -1056,13 +1078,13 @@ Job.findAll = async function (user, records, filter = {}) {
   var query;
   if (seesAllJobs(user)) {
     query =
-      "SELECT id,form,target,status,start,end,user,user_type,job_type,parent_id,approval,runner,runner_kind FROM AnsibleForms.`jobs` WHERE " + narrowed + " ORDER BY id DESC LIMIT ?";
+      "SELECT id,form,target,status,start,end,user,user_type,job_type,parent_id,approval,runner,runner_kind,status_message FROM AnsibleForms.`jobs` WHERE " + narrowed + " ORDER BY id DESC LIMIT ?";
     return await mysql.do(query, [...vars, records], true);
   } else {
     // their own jobs, and the ones waiting for an approval one of their roles may give
     const approver = approverCondition(user);
     query =
-      "SELECT id,form,target,status,start,end,user,user_type,job_type,parent_id,approval,runner,runner_kind FROM AnsibleForms.`jobs` WHERE ((user=? AND user_type=?) OR " + approver.sql + ") AND " + narrowed + " ORDER BY id DESC LIMIT ?";
+      "SELECT id,form,target,status,start,end,user,user_type,job_type,parent_id,approval,runner,runner_kind,status_message FROM AnsibleForms.`jobs` WHERE ((user=? AND user_type=?) OR " + approver.sql + ") AND " + narrowed + " ORDER BY id DESC LIMIT ?";
     return await mysql.do(query, [user.username, user.type, ...approver.params, ...vars, records], true);
   }
 };
@@ -1227,13 +1249,13 @@ Job.findById = async function (user, id, asText, logSafe = false) {
   
   if (seesAllJobs(user)) {
     query =
-      "SELECT j.id,j.form,j.target,j.status,j.start,j.end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=?;";
+      "SELECT j.id,j.form,j.target,j.status,j.start,j.end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.status_message,j.status_detail,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=?;";
     params = [id, id];
   } else {
     // the owner, or an approver of the job's approval while it waits for it (approverCondition)
     const approver = approverCondition(user, "j.");
     query =
-      "SELECT j.id,j.form,j.target,j.status,j.start,j.end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs WHERE user=? AND user_type=?)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=? AND ((j.user=? AND j.user_type=?) OR " + approver.sql + ");";
+      "SELECT j.id,j.form,j.target,j.status,j.start,j.end,j.user,j.user_type,j.job_type,j.runner,j.runner_kind,j.extravars,j.credentials,j.notifications,j.approval,j.step,j.parent_id,j.awx_id,j.awx_artifacts,j.awx_workflow,j.runner_job_url,j.job_log,j.status_message,j.status_detail,j.abort_requested,j.raw_form_data,j.stored_job_id,sj.subjobs,j2.no_of_records,o.counter FROM AnsibleForms.jobs j LEFT JOIN (SELECT parent_id,GROUP_CONCAT(id separator ',') subjobs FROM AnsibleForms.jobs GROUP BY parent_id) sj ON sj.parent_id=j.id,(SELECT COUNT(id) no_of_records FROM AnsibleForms.jobs WHERE user=? AND user_type=?)j2,(SELECT max(`order`)+1 counter FROM AnsibleForms.job_output WHERE job_output.job_id=?)o WHERE j.id=? AND ((j.user=? AND j.user_type=?) OR " + approver.sql + ");";
     params = [user.username, user.type, id, id, user.username, user.type, ...approver.params];
   }
   try {
@@ -2595,7 +2617,7 @@ Job._sendMails = async function (mailChannels, options) {
  * Returns:
  *   Promise<boolean>: true when one channel at least got it.
  */
-Job._notifyChannels = async function ({ channels, recipients = [], title, text, status = "", event = "", job = {}, jobid, buttonLabel, context }) {
+Job._notifyChannels = async function ({ channels, recipients = [], title, text, status = "", statusMessage = "", event = "", job = {}, jobid, buttonLabel, context }) {
   if (!Array.isArray(channels) || !channels.length) return false;
   try {
     const config = await Settings.findUrl().catch(() => ({}));
@@ -2607,6 +2629,7 @@ Job._notifyChannels = async function ({ channels, recipients = [], title, text, 
         title,
         text,
         status,
+        statusMessage,
         event,
         job: { id: jobid, form: job.form || "", user: job.user || "" },
         link: url ? `${url}/jobs/${jobid}` : "",
@@ -2707,8 +2730,10 @@ Job.sendStatusNotification = async function (jobid) {
       channels: others,
       recipients: notifications.recipients || [],
       title: subject,
-      text: i18n.t(null, 'notifications.statusText', { jobid, form: job.form, status: Job.mailWord('status', job.status) }),
+      // and why it needs attention, when it does
+      text: [i18n.t(null, 'notifications.statusText', { jobid, form: job.form, status: Job.mailWord('status', job.status) }), job.status_message].filter(Boolean).join("\n"),
       status: job.status,
+      statusMessage: job.status_message || "",
       event: "status",
       job,
       jobid,
@@ -2946,6 +2971,7 @@ Multistep.launch = async function ({
   try {
     var finalSuccessStatus = true; // multistep success from start to end ?
     var partialstatus = false; // was there a step that failed and had continue ?
+    const attentionSteps = []; // the steps that ended needing attention : "<step>: <message>"
     var approve = false; // flag to halt at approval
     for await (const step of steps) {
       try {
@@ -3126,6 +3152,8 @@ Multistep.launch = async function ({
                   );
                 }
                 
+                // a step that needs attention passes, and so does the multistep - needing attention too
+                if (childStatus === 'warning') attentionSteps.push(`${step.name}: ${childJob.status_message || "needs attention"}`);
                 await Job.printJobOutput(
                   `ok: [Completed step ${step.name} with jobid '${jobSuccess.id}']`,
                   "stdout",
@@ -3214,14 +3242,17 @@ Multistep.launch = async function ({
         // if multistep was success
         // (an abort that came too late, after every step had finished, is cleared)
         if (abort_requested) await Job.resetAbortRequested(jobid);
-        if (partialstatus) {
-          // but a step failed with continue => mark as warning
+        if (partialstatus || attentionSteps.length) {
+          // but a step failed with continue, or a step needs attention => mark as warning
+          const statusMessage = [partialstatus ? "Finished multistep with warnings" : "", ...attentionSteps].filter(Boolean).join(" ; ");
           await Job.endJobStatus(
             jobid,
             ++counter,
             "stdout",
             "warning",
-            "[WARNING]: Finished multistep with warnings"
+            "[WARNING]: Finished multistep with warnings",
+            {},
+            { statusMessage }
           );
         } else {
           // mark as full success

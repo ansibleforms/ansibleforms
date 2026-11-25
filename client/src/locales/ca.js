@@ -3045,10 +3045,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       "Aquesta tasca és teva i la seva aprovació no permet que l'aprovis tu mateix. L'ha d'aprovar un altre aprovador; encara la pots rebutjar per retirar-la.",
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Detalls',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Avís',
+      warning: 'Cal atenció',
     },
     menu: {
       past: 'Passat',
@@ -3061,6 +3063,7 @@ export default {
       running: 'En execució',
       approve: 'Esperant aprovació',
       success: 'Correctes',
+      warning: 'Cal atenció',
       failed: 'Fallides',
       aborted: 'Avortades',
       rejected: 'Rebutjat',
@@ -3080,6 +3083,7 @@ export default {
       approve:
         "Tasques que esperen una aprovació abans d'executar-se. Aprova-les o rebutja-les amb les icones que hi ha davant de cada tasca.",
       success: 'Tasques que han acabat correctament.',
+      warning: "Tasques que han acabat però que algú ha de revisar. Obre'n una per veure'n el motiu.",
       failed: "Tasques que han acabat amb un error. Obre'n una per veure a la sortida què ha anat malament.",
       aborted: "Tasques que s'han aturat abans d'acabar.",
       rejected: 'Feines que un aprovador va rebutjar: no es van executar mai.',
@@ -3394,7 +3398,7 @@ export default {
     running: 'En execució',
     finished: 'Acabada',
     failed: 'Fallida',
-    finishedWithWarning: 'Acabada amb avisos',
+    finishedWithWarning: 'Acabada, cal atenció',
     waitingForApproval: "Pendent d'aprovació",
     abandoned: 'Abandonada',
     rejected: 'Rebutjada',

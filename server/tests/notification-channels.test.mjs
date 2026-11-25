@@ -125,6 +125,12 @@ describe("a webhook's payload template", () => {
     });
     expect(DEFAULT_PAYLOAD).toContain("{{link}}");
   });
+
+  test("statusMessage : why a job needs attention, empty when there is none", () => {
+    expect(notifiers.payloadValues(message).statusMessage).toBe("");
+    const body = renderPayload('{ "why": "{{statusMessage}}" }', notifiers.payloadValues({ ...message, status: "warning", statusMessage: "3 items wait" }));
+    expect(JSON.parse(body)).toEqual({ why: "3 items wait" });
+  });
 });
 
 describe("the body each type sends", () => {

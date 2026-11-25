@@ -3036,10 +3036,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'Dit is uw eigen job en de goedkeuring ervan staat niet toe dat u hem zelf goedkeurt. Een andere goedkeurder moet hem goedkeuren; u kunt hem nog wel afwijzen om hem in te trekken.',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Details',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Waarschuwing',
+      warning: 'Vraagt aandacht',
     },
     menu: {
       past: 'Verleden',
@@ -3052,6 +3054,7 @@ export default {
       running: 'Bezig',
       approve: 'Wacht op goedkeuring',
       success: 'Geslaagd',
+      warning: 'Vraagt aandacht',
       failed: 'Mislukt',
       aborted: 'Afgebroken',
       rejected: 'Afgewezen',
@@ -3071,6 +3074,7 @@ export default {
       approve:
         'Jobs die op een goedkeuring wachten voordat ze starten. Keur ze goed of af met de iconen voor elke job.',
       success: 'Jobs die geslaagd zijn.',
+      warning: 'Jobs die klaar zijn, maar nog opvolging nodig hebben. Open er een om te lezen waarom.',
       failed: 'Jobs die met een fout zijn geëindigd. Open er een om in de uitvoer te zien wat er misging.',
       aborted: 'Jobs die zijn afgebroken voordat ze klaar waren.',
       rejected: 'Jobs die een goedkeurder heeft afgewezen: ze zijn nooit uitgevoerd.',
@@ -3385,7 +3389,7 @@ export default {
     running: 'Actief',
     finished: 'Voltooid',
     failed: 'Mislukt',
-    finishedWithWarning: 'Voltooid met waarschuwing',
+    finishedWithWarning: 'Klaar, vraagt aandacht',
     waitingForApproval: 'Wacht op goedkeuring',
     abandoned: 'Verlaten',
     rejected: 'Afgewezen',

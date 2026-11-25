@@ -3043,10 +3043,12 @@ export default {
   jobs: {
     ownJobRejectOnly:
       'To jest Twoje własne zadanie, a jego zatwierdzenie nie pozwala na samodzielne zatwierdzenie. Musi je zatwierdzić inna osoba; nadal możesz je odrzucić, aby je wycofać.',
+    // the heading of what a job that needs attention gives to follow up (its page)
+    attentionDetail: 'Szczegóły',
     // the jobs page's left menu
     // a job's status where the menu has no entry for it
     statusLabel: {
-      warning: 'Ostrzeżenie',
+      warning: 'Wymaga uwagi',
     },
     menu: {
       past: 'Przeszłe',
@@ -3059,6 +3061,7 @@ export default {
       running: 'Uruchomione',
       approve: 'Oczekuje na zatwierdzenie',
       success: 'Zakończone powodzeniem',
+      warning: 'Wymaga uwagi',
       failed: 'Nieudane',
       aborted: 'Przerwane',
       rejected: 'Odrzucone',
@@ -3079,6 +3082,7 @@ export default {
       approve:
         'Zadania, które przed uruchomieniem czekają na zatwierdzenie. Zatwierdź je lub odrzuć ikonami przy każdym zadaniu.',
       success: 'Zadania zakończone powodzeniem.',
+      warning: 'Zadania, które się zakończyły, ale wymagają jeszcze czyjejś reakcji. Otwórz jedno, aby zobaczyć powód.',
       failed: 'Zadania zakończone błędem. Otwórz zadanie, aby w jego wyniku sprawdzić, co poszło nie tak.',
       aborted: 'Zadania zatrzymane przed zakończeniem.',
       rejected: 'Zadania odrzucone przez zatwierdzającego: nigdy nie zostały uruchomione.',
@@ -3394,7 +3398,7 @@ export default {
     running: 'Uruchomione',
     finished: 'Zakończone',
     failed: 'Nieudane',
-    finishedWithWarning: 'Zakończone z ostrzeżeniem',
+    finishedWithWarning: 'Zakończono, wymaga uwagi',
     waitingForApproval: 'Oczekuje na zatwierdzenie',
     abandoned: 'Porzucone',
     rejected: 'Odrzucone',

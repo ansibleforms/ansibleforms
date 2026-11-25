@@ -329,7 +329,7 @@ export default {
         aborted: "Aborted",
         rejected: "Rejected",
         abandoned: "Abandoned",
-        warning: "Warning",
+        warning: "Needs attention",
       },
     },
     // the test mail of the mail settings
