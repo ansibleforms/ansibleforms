@@ -978,7 +978,6 @@ export default {
       label: 'Builder',
       description: 'Els builders que compilen les imatges RTE i les pugen al seu registre.',
       nameHelp: "El seu nom, amb què s'hi va unir (RTE_NAME).",
-      versionIs: 'versió {version}',
       waitingNotice: '1 builder espera aprovació. | {count} builders esperen aprovació.',
       builds: 'Compilacions',
       image: 'Imatge',

@@ -45,12 +45,14 @@ async function check(runner) {
   const http = client(runner);
   try {
     await http.get("/api/ping");
+    // the version it runs : its info says it ; none when it does not, the test passing all the same
+    const version = await http.get("/api/info").then((res) => res?.data?.version, () => undefined);
     const { data: user } = await http.get("/api/user");
     const { data: project } = await http.get(projectPath(runner)).catch((err) => {
       err.what = "project";
       throw err;
     });
-    return { user: user?.username, project: project?.name, projectId: project?.id };
+    return { user: user?.username, project: project?.name, projectId: project?.id, ...(version ? { version: String(version) } : {}) };
   } catch (err) {
     throw new Errors.BadRequestError(describe(err, runner));
   }

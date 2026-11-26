@@ -131,6 +131,9 @@ const crudConfigs = {
       { name: 'rte_files' },
       { name: 'rte_drain_seconds' },
       { name: 'rte_image' },
+      // the version its server said it runs, and when : its connection test's only (Runner.check)
+      { name: 'server_version' },
+      { name: 'server_version_at' },
       // the runners repository and the file (runners/<file>.yaml) it comes from : written by
       // lib/repoObjects alone (isRepoLink : never from a request body)
       { name: 'repository', isRepoLink: true },

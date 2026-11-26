@@ -120,7 +120,12 @@ export async function check(awx) {
     throw new Errors.BadRequestError(`AWX at ${awx.uri} is unreachable: ${err.code || err.message}`);
   }
   if (!data?.results) throw new Errors.BadRequestError(`AWX at ${awx.uri} did not answer like AWX (no job templates list)`);
-  return { templates: data.count ?? data.results.length };
+  // the version it runs : its ping says it (AWX, AAP and Ascender alike) ; none when it does not
+  // answer, the test passing all the same
+  const version = await axios
+    .get(`${uri}/ping/`, { ...getAuthorization(awx), timeout: 10000 })
+    .then((res) => res?.data?.version, () => undefined);
+  return { templates: data.count ?? data.results.length, ...(version ? { version: String(version) } : {}) };
 }
 
 const Awx = {};

@@ -697,6 +697,8 @@ const SCHEMA_MANIFEST = {
                                'schedule.stored_job_id',
                                'jobs.stored_job_id',
                                'stored_jobs.unused_days',
+                               'runners.server_version',
+                               'runners.server_version_at',
                                'schedule.ends', 'schedule.end_at', 'schedule.end_count', 'schedule.end_action',
                                'schedule.run_count', 'schedule.remove_after_run',
                                'jobs.schedule_id', 'system_task_runs.launched_by'],
@@ -1253,6 +1255,9 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("runners", "rte_drain_seconds", "int(11)", true, "NULL"), messages, success, failed);
   // the image an AnsibleForms runner's container runs (published, or an RTE image of the Designer)
   await checkPromise(addColumn("runners", "rte_image", "varchar(500)", true, "NULL"), messages, success, failed);
+  // the version a runner of another kind said it runs, and when (models/runner.model.js check)
+  await checkPromise(addColumn("runners", "server_version", "varchar(100)", true, "NULL"), messages, success, failed);
+  await checkPromise(addColumn("runners", "server_version_at", "datetime", true, "NULL"), messages, success, failed);
   // how a schedule ends (lib/scheduleEnd.js) : never (every schedule from before), on a date or
   // after a number of runs, then turned off (the default) or removed ; the jobs it started are
   // counted. A one-time run is removed after its run, as before, unless remove_after_run says not

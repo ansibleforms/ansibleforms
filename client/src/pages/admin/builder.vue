@@ -193,6 +193,7 @@ const crumbs = computed(() => {
 const tabFields = computed(() => ({
   details: [
     ['socket', t('settings.runners.socket')],
+    ['version', t('settings.runners.version')],
     ['name', t('settings.fields.name'), t('settings.builders.nameHelp')],
     ['description', t('settings.fields.description')],
     ['enabled', t('settings.runners.enabled'), t('settings.builders.enabledHelp')],
@@ -361,9 +362,11 @@ onMounted(async () => {
               <div v-if="socket" v-show="fieldShown('socket')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.runners.socket') }}</div>
                 <span v-html="socketPill(t, { socket })"></span>
-                <span v-if="socket.version" class="text-body-secondary small ms-2">{{
-                  t('settings.builders.versionIs', { version: socket.version })
-                }}</span>
+              </div>
+              <!-- the builder release it runs, as it said when it connected ; a dash until then -->
+              <div v-if="socket" v-show="fieldShown('version')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.version') }}</div>
+                <div>{{ (socket.connected !== false && socket.version) || '–' }}</div>
               </div>
               <div v-show="fieldShown('enabled')" class="mb-3">
                 <label class="form-label fw-bold d-block" for="af-builder-enabled">{{

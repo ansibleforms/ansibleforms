@@ -49,6 +49,9 @@ class Runner extends CrudModel {
       // (rteHub.authenticate) ; cleared by update() when anyone else changes the bundle
       delete data.rte_cert_sha256;
     }
+    // the version its server said it runs : its connection test's only (check)
+    delete data.server_version;
+    delete data.server_version_at;
     if (data.type !== undefined && !RUNNER_TYPES.includes(data.type)) {
       throw new Errors.BadRequestError(`Unknown runner type '${data.type}' - use one of ${RUNNER_TYPES.join(', ')}`);
     }
@@ -483,11 +486,34 @@ class Runner extends CrudModel {
     await mysql.do('UPDATE AnsibleForms.`jobs` SET runner = ? WHERE runner = ?', [to, from]);
   }
 
-  /** proves the runner answers and accepts us ; what it reports is up to the runner type */
+  /**
+   * Proves the runner answers and accepts us ; what it reports is up to the runner type. The
+   * version a runner of another kind than the AnsibleForms ones says it runs is kept on its row
+   * with when it was read, and stays while the server is unreachable (an AnsibleForms runner
+   * says its own over its socket).
+   *
+   * Args:
+   *   runner (object): the runner.
+   *
+   * Returns:
+   *   Promise<object>: what its type reports (version among it, when it gives one).
+   *
+   * Raises:
+   *   BadRequestError: a type without a connection test, or the test failed.
+   */
   static async check(runner) {
     const impl = getRunner(runner.type);
     if (!impl.check) throw new Errors.BadRequestError(`A ${runner.type} runner has no connection test`);
-    return impl.check(runner);
+    const info = await impl.check(runner);
+    const version = String(info?.version ?? '').trim().slice(0, 100);
+    if (version && runner?.id && !['rte', 'builder'].includes(runner.type)) {
+      await mysql
+        .do('UPDATE AnsibleForms.`runners` SET server_version = ?, server_version_at = NOW() WHERE id = ?', [version, runner.id])
+        // the cached rows dropped, here and on the other processes, so its page shows it at once
+        .then(() => CrudModel.changed(this.modelName))
+        .catch((e) => logger.warning(`Could not keep the version of runner '${runner.name}': ${e.message}`));
+    }
+    return info;
   }
 }
 
