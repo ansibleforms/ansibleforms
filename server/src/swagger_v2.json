@@ -1856,6 +1856,15 @@
         "responses": { "200": { "description": "Type list" } }
       }
     },
+    "/runner/images": {
+      "get": {
+        "security": [ { "bearerAuth": [] } ],
+        "tags": ["runner"],
+        "summary": "The images a new AnsibleForms runner can run",
+        "description": "The New runner dialog's Image choices: the published rte-full and rte-core of this release's major, then every runtime environment of the Designer with a successful build, its image as that build pushed it. One never built is not listed.",
+        "responses": { "200": { "description": "The images: image, name, label, published" } }
+      }
+    },
     "/runner/{id}": {
       "get": {
         "security": [ { "bearerAuth": [] } ],

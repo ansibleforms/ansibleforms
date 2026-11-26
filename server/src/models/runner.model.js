@@ -61,6 +61,8 @@ class Runner extends CrudModel {
     // (jenkins signs in with a user and its API token : username and token, no password)
     if (TOKEN_AND_PROJECT.includes(data.type) || data.type === 'jenkins') data.use_credentials = 0;
     if (typeof data.project === 'string') data.project = data.project.trim() || null;
+    // the image its container runs (informational) : trimmed, empty is none
+    if (typeof data.rte_image === 'string') data.rte_image = data.rte_image.trim() || null;
     // an RTE's mode : database, outbound or inbound ; empty is database (as before 7.3)
     if (data.rte_mode !== undefined) {
       if (data.rte_mode === '' || data.rte_mode === null) data.rte_mode = null;

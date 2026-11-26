@@ -163,6 +163,8 @@ const runnerItem = {
     rte_cache_mb: { type: "integer", minimum: 0, maximum: 1048576 },
     rte_files: { type: "string", enum: ["transfer", "local"] },
     rte_drain_seconds: { type: "integer", minimum: 0, maximum: 86400 },
+    // the image its container runs (informational)
+    rte_image: { type: "string", maxLength: 500 },
   },
 };
 

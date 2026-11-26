@@ -130,6 +130,7 @@ const crudConfigs = {
       { name: 'rte_cache_mb' },
       { name: 'rte_files' },
       { name: 'rte_drain_seconds' },
+      { name: 'rte_image' },
       // the runners repository and the file (runners/<file>.yaml) it comes from : written by
       // lib/repoObjects alone (isRepoLink : never from a request body)
       { name: 'repository', isRepoLink: true },

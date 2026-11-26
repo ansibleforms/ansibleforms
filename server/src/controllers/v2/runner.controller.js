@@ -9,6 +9,9 @@ import { socketState, isSocketRunner, dropSocket, pushSettings } from "../../run
 import { publish } from "../../lib/liveEvents.js";
 import { isAdminRequest } from "../../lib/adminGrants.js";
 import RepoObjects from "../../lib/repoObjects/index.js";
+import { listImages } from "../../lib/rteImages.js";
+import { listBuilds } from "../../lib/rteBuilds.js";
+import { appVersion } from "../../lib/version.js";
 
 // the token and password are stored encrypted and decrypted on read, so they never leave
 // here unmasked
@@ -58,6 +61,36 @@ async function withSocket(list) {
     return { ...r, socket: { connected: true, node: st.node_id, direction: st.direction, rteId: st.rte_id, version: info.version, ansible: info.ansible, capacity: info.capacity, files: info.files, settings: info.settings, env: info.env } };
   }));
 }
+
+/**
+ * GET /api/v2/runner/images : the images a new AnsibleForms runner can run, for the New runner
+ * dialog's Image step - the published rte-full and rte-core of this release's major, then every
+ * runtime environment of the Designer that has a successful build, its image as that build pushed
+ * it. One never built is not listed : there is no image to run yet.
+ */
+const images = async (req, res) => {
+  try {
+    const major = String(appVersion || "").split(".")[0] || "7";
+    const records = ["full", "core"].map((kind) => ({
+      image: `ghcr.io/ansibleforms/ansibleforms-rte-${kind}:${major}`,
+      name: `rte-${kind}`,
+      label: `rte-${kind}`,
+      published: true,
+    }));
+    const [defined, builds] = await Promise.all([listImages().catch(() => []), listBuilds().catch(() => [])]);
+    const names = new Set(defined.filter((d) => !d.error).map((d) => d.name));
+    // the newest successful build of each : the builds come newest first
+    const seen = new Set();
+    for (const b of builds) {
+      if (b.status !== "success" || !b.ref || !names.has(b.image) || seen.has(b.image)) continue;
+      seen.add(b.image);
+      records.push({ image: b.ref, name: b.image, label: `${b.image} (${b.ref})`, published: false });
+    }
+    return res.json(RestResult.list(records));
+  } catch (err) {
+    Errors.ReturnError(res, err);
+  }
+};
 
 // the types a runner can have, with what each can run
 const types = async (req, res) => {
@@ -274,4 +307,4 @@ const deleteJoinToken = async (req, res) => {
   }
 };
 
-export default { find, types, create, findById, update, delete: deleteRunner, check, approve, reject, pendingCount, findJoinTokens, createJoinToken, revokeJoinToken, deleteJoinToken };
+export default { find, types, images, create, findById, update, delete: deleteRunner, check, approve, reject, pendingCount, findJoinTokens, createJoinToken, revokeJoinToken, deleteJoinToken };
