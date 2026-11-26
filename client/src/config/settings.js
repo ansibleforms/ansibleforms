@@ -494,8 +494,9 @@ export const CREDENTIAL_TYPES = [
   'semaphore',
   'rundeck',
   'jenkins',
-  // what a builder pushes an RTE image with
+  // what a builder pushes an RTE image with, and signs it with
   'registry',
+  'signing_key',
 ];
 // the types that carry the server they log in to (server : models/credential.model.v2.js URL_TYPES)
 export const SERVER_CREDENTIAL_TYPES = [
@@ -2441,6 +2442,7 @@ export default function getSettings(t) {
           // an AWX, AAP or Ascender one signing in with a token has none
           showWhen: (r) =>
             !TOKEN_CREDENTIAL_TYPES.includes(r.credential_type) &&
+            r.credential_type !== 'signing_key' &&
             !(AWX_CREDENTIAL_TYPES.includes(r.credential_type) && !awxUsesPassword(r)) &&
             !smtpRelay(r) &&
             !(r.credential_type === 'git' && r.git_auth !== 'password') &&
@@ -2520,7 +2522,11 @@ export default function getSettings(t) {
               : credentialLabels(t, r.credential_type, r.awx_auth, r.git_auth).passwordHelp,
           // a cyberark credential has a client key instead (an entraid one signing in with a
           // certificate keeps its client secret, optional, for the SSO sign-in) ; none typed when the user and password are read from a secret store
-          showWhen: (r) => r.credential_type !== 'cyberark' && !sshUsesKey(r) && !smtpRelay(r) && !readFromStore(r),
+          showWhen: (r) =>
+            !['cyberark', 'signing_key'].includes(r.credential_type) &&
+            !sshUsesKey(r) &&
+            !smtpRelay(r) &&
+            !readFromStore(r),
           // a new one that signs in with what is typed here : an AWX, AAP or Ascender one (its
           // token or its user's password), an smtp one with a login, a git one (its token or
           // password), an ssh one with its password ; an existing one keeps its stored one when
@@ -2663,26 +2669,43 @@ export default function getSettings(t) {
           icon: 'key',
           type: 'textarea',
           label: t('settings.secretStores.clientKey'),
-          dialogLabel: (r) => (r.credential_type === 'ssh' ? t('settings.credentials.privateKey') : null),
-          help: (r) =>
+          dialogLabel: (r) =>
             r.credential_type === 'ssh'
+              ? t('settings.credentials.privateKey')
+              : r.credential_type === 'signing_key'
+                ? t('settings.credentials.signingKey')
+                : null,
+          help: (r) =>
+            r.credential_type === 'signing_key'
               ? r.id
                 ? t('settings.credentials.privateKeyKeep')
-                : t('settings.credentials.privateKeyHelp')
-              : r.id
-                ? t('settings.credentials.clientKeyKeep')
-                : t('settings.secretStores.clientKeyHelp'),
+                : t('settings.credentials.signingKeyHelp')
+              : r.credential_type === 'ssh'
+                ? r.id
+                  ? t('settings.credentials.privateKeyKeep')
+                  : t('settings.credentials.privateKeyHelp')
+                : r.id
+                  ? t('settings.credentials.clientKeyKeep')
+                  : t('settings.secretStores.clientKeyHelp'),
           placeholder: (r) =>
-            r.credential_type === 'ssh' ? '-----BEGIN OPENSSH PRIVATE KEY-----' : '-----BEGIN PRIVATE KEY-----',
+            r.credential_type === 'ssh'
+              ? '-----BEGIN OPENSSH PRIVATE KEY-----'
+              : r.credential_type === 'signing_key'
+                ? '-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----'
+                : '-----BEGIN PRIVATE KEY-----',
           hidden: true,
           noTable: true,
           // shown empty : the stored key is never sent back ; left empty, it stays
           initial: () => '',
           // a cyberark one's, an entraid one's signing in with a certificate, or an ssh one's
           // private key when it logs in with one
-          showWhen: (r) => r.credential_type === 'cyberark' || sshUsesKey(r) || entraCertificate(r),
-          // a new ssh one logging in with a key : the key it logs in with
-          requiredWhen: (r) => sshUsesKey(r) && !r.id,
+          showWhen: (r) =>
+            r.credential_type === 'cyberark' ||
+            r.credential_type === 'signing_key' ||
+            sshUsesKey(r) ||
+            entraCertificate(r),
+          // a new ssh one logging in with a key : the key it logs in with ; a new signing key : its key
+          requiredWhen: (r) => (sshUsesKey(r) || r.credential_type === 'signing_key') && !r.id,
         },
         {
           // an ssh one's private key's passphrase : loaded into an ssh-agent for the job on the RTE
@@ -2692,14 +2715,18 @@ export default function getSettings(t) {
           type: 'password',
           label: t('settings.credentials.keyPassphrase'),
           help: (r) =>
-            r.id ? t('settings.credentials.keyPassphraseKeep') : t('settings.credentials.keyPassphraseHelp'),
+            r.id
+              ? t('settings.credentials.keyPassphraseKeep')
+              : r.credential_type === 'signing_key'
+                ? t('settings.credentials.signingKeyPassphraseHelp')
+                : t('settings.credentials.keyPassphraseHelp'),
           hidden: true,
           noTable: true,
           required: false,
           // shown empty : the stored one is never sent back ; left empty, it stays
           initial: () => '',
-          // only for an ssh one logging in with a private key
-          showWhen: (r) => sshUsesKey(r),
+          // only for an ssh one logging in with a private key, and a signing key (cosign's password)
+          showWhen: (r) => sshUsesKey(r) || r.credential_type === 'signing_key',
         },
         {
           key: 'secret_store',

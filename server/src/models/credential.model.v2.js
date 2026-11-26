@@ -43,9 +43,10 @@ class CredentialModel extends CrudModel {
   // rte, awx, aap, ascender, semaphore, rundeck and jenkins : how a runner of that kind signs in,
   // and where (its url) ; vault : how a HashiCorp Vault secret store logs in (its password the
   // token), and where ; registry : how a builder pushes an RTE image to a container registry (a
-  // user and its token or password), and where
+  // user and its token or password), and where ; signing_key : the cosign key a builder signs an
+  // RTE image with (client_key) and its password (key_passphrase)
   static TYPES = ['userpass', 'ssh', 'git', 'api', 'database', 'cyberark', 'smtp', 'ldap', 'entraid', 'oidc',
-    'rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'registry'];
+    'rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'registry', 'signing_key'];
 
   /**
    * Keeps a credential's type and its is_database flag in step : the type sets the flag, and
@@ -305,8 +306,9 @@ class CredentialModel extends CrudModel {
 
   // the types a sign-in reads its client, its tenant or issuer, or its bind account from : an LDAP
   // directory's bind account, an Entra ID or Open ID provider's client. Whoever changes one
-  // chooses who signs in, and where the sign-in sends its secret : an admin's to change.
-  static SIGNIN_TYPES = ['ldap', 'entraid', 'oidc'];
+  // chooses who signs in, and where the sign-in sends its secret : an admin's to change. The
+  // signing key of the RTE images too : whoever has it signs images as the team.
+  static SIGNIN_TYPES = ['ldap', 'entraid', 'oidc', 'signing_key'];
 
   // the fields that say where a credential's secret goes : its server (host and port), its
   // provider (issuer, tenant) or its address (url). A change of any of them by a user who did not
@@ -483,6 +485,15 @@ class CredentialModel extends CrudModel {
    *   BadRequestError: an SSH credential whose private key is not one.
    */
   static checkSshKey(data, creating = false) {
+    // a signing key : its key must be a private key, its password stays (cosign's)
+    if (data.credential_type === 'signing_key') {
+      const key = data.client_key;
+      if (typeof key === 'string' && key.trim() !== '' && !isMasked(key) && !/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(key)) {
+        throw new Errors.BadRequestError("A signing key credential's key is a cosign private key, from -----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY----- to its END line");
+      }
+      if (creating && (typeof key !== 'string' || !key.trim())) throw new Errors.BadRequestError('A signing key credential needs its private key');
+      return data;
+    }
     // step 1 : a passphrase belongs to an ssh credential's key only
     if (data.credential_type !== undefined && data.credential_type !== null && data.credential_type !== '' && data.credential_type !== 'ssh') {
       if (creating || data.key_passphrase !== undefined) data.key_passphrase = null;

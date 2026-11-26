@@ -58,7 +58,7 @@ const credentialItem = {
     is_database: bool,
     // what it is for (is_database follows it) ; without it, is_database decides
     credential_type: { type: "string", enum: ["userpass", "ssh", "git", "api", "database", "cyberark", "smtp", "ldap", "entraid", "oidc",
-      "rte", "awx", "aap", "ascender", "semaphore", "rundeck", "jenkins", "vault", "registry"] },
+      "rte", "awx", "aap", "ascender", "semaphore", "rundeck", "jenkins", "vault", "registry", "signing_key"] },
     // a cyberark one's client certificate and key ; an entraid one's, signing in with them
     // instead of its secret when it sends mail through Microsoft 365 ; an ssh one's private key is
     // its client_key too (PEM or OpenSSH text, usually an env-var reference), and key_passphrase
