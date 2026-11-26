@@ -532,6 +532,8 @@ CREATE TABLE `repositories` (
   `use_for_constants` tinyint(4) DEFAULT 0,
   -- the workflows the designer builds (one repository only)
   `use_for_workflows` tinyint(4) DEFAULT 0,
+  -- the RTE images a builder builds (runner_rte:), any number of repositories
+  `use_for_rte` tinyint(4) DEFAULT 0,
   -- the inventories the playbook forms name (inventory: <name>)
   `use_for_inventories` tinyint(4) DEFAULT 0,
   -- the schedules in its schedules folder, one per file (models/scheduleRepo.model.js)

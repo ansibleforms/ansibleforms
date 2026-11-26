@@ -38,6 +38,10 @@ export const CATEGORIES = ["designer", "jobs", "system", "appearance", "access",
 //   single     the app has one object of it (a map under its key, in one file at most) : the
 //              others are lists of objects, found by their name
 //   config     a key of the base configuration (lib/configKeys.js), read from the file giving it
+//   file       read from the files giving its key by its own reader, not the engine (the RTE
+//              images : lib/rteImages.js), any number of repositories
+//   prefix     the start of its file key, when not controller_ (KEY_PREFIX) : runner_ for what a
+//              runner is built from (runner_rte:)
 //   map        a configuration key whose value is one map (the constants) : the others a list
 //   oneOnly    one repository at most (the server refuses a second)
 //   label      how the server's messages name it
@@ -51,6 +55,9 @@ export const USAGE_TYPES = [
   { key: "inventories", flag: "use_for_inventories", category: "designer", label: "inventories" },
   { key: "playbooks", flag: "use_for_playbooks", category: "designer", label: "playbooks" },
   { key: "workflows", flag: "use_for_workflows", category: "designer", label: "workflows" },
+  // the RTE images a builder builds and runners run (lib/rteImages.js) : runner_rte:, a list of
+  // definitions, in as many repositories as the teams like
+  { key: "rte", file: true, prefix: "runner_", flag: "use_for_rte", category: "designer", label: "Runtime environments" },
   { key: "schedules", flag: "use_for_schedules", category: "jobs", objects: true, oneOnly: true, label: "schedules" },
   { key: "general", single: true, flag: "use_for_general", category: "system", objects: true, oneOnly: true, label: "general settings" },
   // the Appearance pages, one key each, in the menu's order
@@ -99,21 +106,22 @@ const CATEGORY_OPTIONS = {
 
 // the types a repository's YAML files hold by a top-level key (lib/repoObjects/repoFiles.js) : each
 // object type and each configuration key, by its type's key
-export const CONTENT_KEYS = USAGE_TYPES.filter((t) => t.objects || t.config).map((t) => t.key);
+export const CONTENT_KEYS = USAGE_TYPES.filter((t) => t.objects || t.config || t.file).map((t) => t.key);
 
 // the prefix of every top-level key a type is given by in a repository's files
 export const KEY_PREFIX = "controller_";
 
 /**
- * The top-level key a repository's files give a type by : the prefix and the type's key.
+ * The top-level key a repository's files give a type by : its prefix (controller_, unless the type
+ * names its own) and the type's key.
  *
  * Args:
  *   key (string): the type (credentials).
  *
  * Returns:
- *   string: its file key (controller_credentials).
+ *   string: its file key (controller_credentials, runner_rte).
  */
-export const fileKeyOf = (key) => `${KEY_PREFIX}${key}`;
+export const fileKeyOf = (key) => `${USAGE_TYPES.find((t) => t.key === key)?.prefix ?? KEY_PREFIX}${key}`;
 
 // the top-level keys a repository's YAML files hold the types by, in CONTENT_KEYS' order
 export const FILE_KEYS = CONTENT_KEYS.map(fileKeyOf);
@@ -149,9 +157,8 @@ export function fitsType(key, value) {
  *   string|null: the type (credentials) ; null when it gives none (a plain credentials: among them).
  */
 export function typeKeyOf(fileKey) {
-  if (typeof fileKey !== "string" || !fileKey.startsWith(KEY_PREFIX)) return null;
-  const key = fileKey.slice(KEY_PREFIX.length);
-  return CONTENT_KEYS.includes(key) ? key : null;
+  if (typeof fileKey !== "string") return null;
+  return CONTENT_KEYS.find((key) => fileKeyOf(key) === fileKey) ?? null;
 }
 
 // every usage flag, as the repositories table, its API and the config seed know them

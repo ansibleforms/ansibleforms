@@ -20,6 +20,8 @@ import getSettings from '@/config/settings';
 defineProps({
   type: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
+  // its words when the kind it makes says it better (New registry) ; New credential without
+  label: { type: String, default: '' },
 });
 const emit = defineEmits(['created']);
 const { t } = useI18n();
@@ -28,7 +30,7 @@ const creator = ref(null);
 </script>
 <template>
   <BsButton icon="plus" :disabled="disabled" @click="creator?.newItem(type ? { credential_type: type } : {})">{{
-    t('settings.repositories.newCredential')
+    label || t('settings.repositories.newCredential')
   }}</BsButton>
   <!-- the credentials' dialog only, over the page -->
   <div class="af-nested-dialogs">

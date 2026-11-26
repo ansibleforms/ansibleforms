@@ -10,8 +10,9 @@ import rte from "./rte.js";
 import semaphore from "./semaphore.js";
 import rundeck from "./rundeck.js";
 import jenkins from "./jenkins.js";
+import builder from "./builder.js";
 
-export const RUNNERS = { awx, rte, semaphore, rundeck, jenkins };
+export const RUNNERS = { awx, rte, semaphore, rundeck, jenkins, builder };
 export const RUNNER_TYPES = Object.keys(RUNNERS);
 
 export function getRunner(type) {

@@ -1078,7 +1078,8 @@ function shapeInlineSecret(name, payload) {
  *   object: the credential.
  */
 function overlaySshKey(result) {
-  const isSsh = result.credential_type === "ssh";
+  // an ssh one's, and a signing key's (the cosign key a builder signs the RTE images with)
+  const isSsh = result.credential_type === "ssh" || result.credential_type === "signing_key";
   const key = result.client_key;
   const passphrase = result.key_passphrase;
   delete result.credential_type;

@@ -235,6 +235,31 @@ describe("an RTE calling in", () => {
   });
 });
 
+describe("a builder calling in (AF_ROLE=builder)", () => {
+  const builder = (extra = {}) => headers({ "x-af-peer-kind": "builder", ...extra });
+
+  test("unknown, without a join token : a builder waiting for approval, never a runner", async () => {
+    const res = await authenticate(builder());
+    assert.equal(res.pending, true);
+    assert.equal(created[0].type, "builder");
+    assert.equal(created[0].pending, 1);
+  });
+
+  test("a join token adds it as a builder, its token in an rte credential", async () => {
+    const res = await authenticate(builder({ "x-af-rte-join": "afj_good" }));
+    assert.equal(res.runner.type, "builder");
+    assert.equal(credCreated[0].credential_type, "rte");
+  });
+
+  test("a builder never takes a runner's name, nor a runner a builder's ; it is never dialed", async () => {
+    runners["dmz-1"] = { id: 1, name: "dmz-1", type: "rte", token: "rte-token-0123456789", rte_mode: "outbound" };
+    assert.equal((await authenticate(builder())).status, 409);
+    runners["dmz-1"].type = "builder";
+    assert.equal((await authenticate(headers())).status, 409);
+    assert.equal((await authenticate(builder(), { mode: "inbound", url: "https://b:8000" })).status, 400);
+  });
+});
+
 describe("an RTE's items", () => {
   const entry = { rteId: "rte-host-8000", runner: { name: "dmz-1" } };
 

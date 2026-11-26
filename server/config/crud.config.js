@@ -339,6 +339,7 @@ const crudConfigs = {
       { name: 'use_for_forms', isBoolean: true },
       { name: 'use_for_playbooks', isBoolean: true },
       { name: 'use_for_workflows', isBoolean: true },
+      { name: 'use_for_rte', isBoolean: true },
       { name: 'use_for_inventories', isBoolean: true },
       // the schedules in its schedules folder, one YAML file each (models/scheduleRepo.model.js)
       { name: 'use_for_schedules', isBoolean: true },

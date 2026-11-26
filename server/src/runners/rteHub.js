@@ -469,7 +469,7 @@ async function renewTick(entry) {
     logger.debug(`Runner '${name}': reading its runner failed: ${e.message}`);
     row = entry.runner;
   }
-  if (!row || row.type !== "rte") {
+  if (!row || row.type !== entry.runner.type) {
     logger.warning(`Runner '${name}': its runner is gone (rejected or deleted), closing its socket`);
     entry.session.close(CLOSE.UNAUTHORIZED, "this runner was removed under Connections > Runners");
     return;
@@ -551,6 +551,10 @@ export async function authenticate(headers, opts = {}) {
   const name = String(headers["x-af-rte-name"] || "").trim();
   const join = String(headers["x-af-rte-join"] || "").trim();
   const url = String(opts.url || headers["x-af-rte-url"] || "").trim();
+  // what dials : a runner, or a builder (ansibleforms/builder : it builds the RTE images, runs no
+  // playbook), which joins the same way and is kept as a runner of type builder, outbound only
+  const kind = String(headers["x-af-peer-kind"] || "").trim() === "builder" ? "builder" : "rte";
+  if (kind === "builder" && mode !== "outbound") return { status: 400, error: "a builder dials the controller (outbound): it is never dialed" };
   if (token.length < 16) return { status: 401, error: "the runner's token (RTE_TOKEN) is missing or shorter than 16 characters" };
   if (!name || !/^[A-Za-z0-9_.:@-]{1,250}$/.test(name)) return { status: 400, error: "the runner's name (RTE_NAME) is missing or not a valid runner name" };
   if (mode === "inbound" && !/^https?:\/\//i.test(url)) return { status: 400, error: "an inbound runner registers with its address (RTE_URL), which the controller dials" };
@@ -567,7 +571,9 @@ export async function authenticate(headers, opts = {}) {
   // what the runner becomes : its mode, and an inbound one's address
   const fields = mode === "inbound" ? { rte_mode: "inbound", uri: url } : { rte_mode: "outbound", ...(url ? { uri: url } : {}) };
   const runner = await Runner.findByName(name);
-  if (runner && runner.type !== "rte") return { status: 409, error: `'${name}' is a ${runner.type} runner, not an AnsibleForms runner` };
+  if (runner && runner.type !== kind) {
+    return { status: 409, error: `'${name}' is a ${runner.type} runner, not ${kind === "builder" ? "a builder" : "an AnsibleForms runner"}` };
+  }
   if (runner && safeEqual(token, runner.token)) {
     const moved = runner.rte_mode !== fields.rte_mode || (mode === "inbound" && runner.uri !== url);
     // a runner of 7.2 (database mode, the mode of a runner with none) whose RTE now talks over
@@ -640,7 +646,7 @@ export async function authenticate(headers, opts = {}) {
   }
   if (!join) {
     if (runner) return { status: 401, error: `the token of runner '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
-    return askToJoin({ name, token, mode, url, fields, headers, ip: opts.ip, cert });
+    return askToJoin({ name, token, mode, url, fields, headers, ip: opts.ip, cert, kind });
   }
   // a seeded runner first : refused before the join token is used, which would cost it a use
   if (runner?.managed) return { status: 409, error: `runner '${name}' is managed by the config seed: its token is set there` };
@@ -665,7 +671,7 @@ export async function authenticate(headers, opts = {}) {
     await updateHeld("runners", runner, { credential, token: null, rte_mode: fields.rte_mode, ...(mode === "inbound" ? { uri: "" } : {}) });
     logger.notice(`Runner '${name}', waiting for approval, got a new token (credential '${credential}') through the join token '${used.name}'`);
   } else {
-    await Runner.create({ name, type: "rte", uri: "", credential, rte_mode: fields.rte_mode, description: `Joined with the join token '${used.name}'` }, { fromRte: true });
+    await Runner.create({ name, type: kind, uri: "", credential, rte_mode: fields.rte_mode, description: `Joined with the join token '${used.name}'` }, { fromRte: true });
     logger.notice(`Runner '${name}' (${mode}) added through the join token '${used.name}', signing in with the credential '${credential}'`);
   }
   return { runner: await Runner.findByName(name) };
@@ -705,11 +711,11 @@ function askToJoin(req) {
  * Returns:
  *   Promise<object>: { runner, pending: true }, or { status, error } when refused.
  */
-async function addPending({ name, token, mode, url, fields, headers, ip, cert = null }) {
+async function addPending({ name, token, mode, url, fields, headers, ip, cert = null, kind = "rte" }) {
   // asked twice at once (the socket and the registration call) : the first one added it
   const already = await Runner.findByName(name);
   if (already) {
-    if (already.type === "rte" && safeEqual(token, already.token)) return { runner: already, pending: !!Number(already.pending) };
+    if (already.type === kind && safeEqual(token, already.token)) return { runner: already, pending: !!Number(already.pending) };
     return { status: 401, error: `the token of runner '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
   }
   if ((await Runner.countPending()) >= PENDING_MAX) {
@@ -729,7 +735,7 @@ async function addPending({ name, token, mode, url, fields, headers, ip, cert = 
   };
   const { name: credential } = await storeToken(name, token, mode === "inbound" ? url : "", null, cert);
   await Runner.create({
-    name, type: "rte", uri: "", credential, rte_mode: fields.rte_mode, enabled: 0,
+    name, type: kind, uri: "", credential, rte_mode: fields.rte_mode, enabled: 0,
     pending: 1, pending_since: new Date(), pending_info: JSON.stringify(info),
     description: `Asked to join from ${info.host || info.ip || "an unknown host"}`,
   }, { fromRte: true });
@@ -1250,6 +1256,71 @@ async function runMessage(jobId, entry) {
 }
 
 /**
+ * What a build's run message carries (a builder's job, lib/rteBuilds.js) : what to build and where
+ * to push it, with the registry's login and the signing key sealed for the builder, as a
+ * playbook's credentials are for a runner.
+ *
+ * Args:
+ *   jobId (number): the build's job.
+ *   entry (object): the builder's session entry.
+ *
+ * Returns:
+ *   Promise<object>: the message.
+ */
+async function buildMessage(jobId, entry) {
+  const rows = await mysql.do("SELECT extravars FROM AnsibleForms.`jobs` WHERE id=?", [jobId]);
+  if (!rows?.length) throw new Error(`job ${jobId} does not exist`);
+  const build = safeParse(rows[0].extravars, {}, `job.extravars id=${jobId}`).__build__;
+  if (!build?.files?.Dockerfile || !build.ref) throw new Error("the job is no RTE build");
+  const secrets = await buildSecrets(build);
+  if (build.signing && !secrets.signing?.key) throw new Error(`the signing key credential '${build.signing}' has no private key`);
+  await registerBuildMask(jobId, secrets);
+  return {
+    t: "run",
+    jobId,
+    contract: SOCKET_CONTRACT,
+    sealed: sealJobSecrets(secrets, entry.runner.token, jobId),
+    job: { lastOrder: await Job.lastOrder(jobId) },
+    build: { image: build.image, files: build.files, ref: build.ref, arch: build.arch || build.image?.arch || "all", sbom: !!build.sbom, sign: !!secrets.signing },
+  };
+}
+
+/**
+ * A build's secrets : its registry's login and its signing key, resolved from their credentials.
+ *
+ * Args:
+ *   build (object): the build (the job's __build__).
+ *
+ * Returns:
+ *   Promise<object>: { registry: { url, user, password } | null, signing: { key, password } | null }.
+ */
+async function buildSecrets(build) {
+  const registry = build.registry ? await Credential.resolveCredential(build.registry) : null;
+  const signing = build.signing ? await Credential.resolveCredential(build.signing) : null;
+  return {
+    registry: registry ? { url: registry.url || "", user: registry.user || "", password: registry.password || "" } : null,
+    signing: signing?.private_key ? { key: signing.private_key, password: signing.private_key_passphrase || "" } : null,
+  };
+}
+
+/**
+ * Registers what a build's output must not show : the registry's password, the key and its
+ * password.
+ *
+ * Args:
+ *   jobId (number): the build's job.
+ *   secrets (object): its secrets (buildSecrets).
+ *
+ * Returns:
+ *   Promise<void>
+ */
+async function registerBuildMask(jobId, secrets) {
+  const extra = [secrets.registry?.password, secrets.signing?.key, secrets.signing?.password].filter((v) => typeof v === "string" && v);
+  await Job.registerOutputSecrets(jobId, { form: null, extravars: {}, credentials: {}, extra });
+  masked.add(jobId);
+}
+
+/**
  * The hashes of a job's files : the playbooks folder and the inventories, as this app sees them.
  * A job whose form names its repository (playbookRepository) gets that repository's root ; none
  * when it is not a repository used for playbooks (the RTE then says so).
@@ -1313,6 +1384,11 @@ async function ensureMask(jobId) {
   const rows = await mysql.do("SELECT form, extravars, credentials FROM AnsibleForms.`jobs` WHERE id=?", [jobId]);
   if (!rows?.length) return;
   const extravars = safeParse(rows[0].extravars, {}, `job.extravars id=${jobId}`);
+  // a build's : its registry's and its key's
+  if (extravars.__build__) {
+    await registerBuildMask(jobId, await buildSecrets(extravars.__build__).catch(() => ({})));
+    return;
+  }
   const secrets = await resolveJobSecrets(extravars, safeParse(rows[0].credentials, {}, `job.credentials id=${jobId}`)).catch(() => ({}));
   await registerMask(jobId, rows[0].form, extravars, secrets);
 }
@@ -1472,7 +1548,8 @@ async function handOver(jobId, entry) {
   }
   let msg;
   try {
-    msg = await runMessage(jobId, entry);
+    // a builder is handed a build, a runner a playbook
+    msg = entry.runner.type === "builder" ? await buildMessage(jobId, entry) : await runMessage(jobId, entry);
   } catch (e) {
     await failJob(jobId, `could not prepare the job for the runner: ${e.message}`);
     return;
@@ -1509,7 +1586,7 @@ async function dispatch() {
   if (!ready.length) return;
   const byName = new Map(ready.map((e) => [e.runner.name, e]));
   const rows = await mysql.do(
-    "SELECT id, runner, abort_requested FROM AnsibleForms.`jobs` WHERE status='running' AND job_type='ansible' AND host IS NULL AND runner IN (?)",
+    "SELECT id, runner, abort_requested FROM AnsibleForms.`jobs` WHERE status='running' AND job_type IN ('ansible','build') AND host IS NULL AND runner IN (?)",
     [[...byName.keys()]],
     true
   );
@@ -1797,7 +1874,7 @@ export function startRteHub(httpServer) {
  *   boolean
  */
 export function isSocketRunner(runner) {
-  return runner?.type === "rte" && SOCKET_MODES.includes(runner.rte_mode);
+  return (runner?.type === "rte" || runner?.type === "builder") && SOCKET_MODES.includes(runner.rte_mode);
 }
 
 /**

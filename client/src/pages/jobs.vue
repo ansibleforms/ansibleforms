@@ -1099,7 +1099,8 @@ watch(
       relaunchOptionsFor.value = null;
     }
     if (!page || !id || status === 'running' || status === 'approve') return;
-    if (!canRelaunchJobs.value || !canManage(job.value)) return;
+    // an RTE image's build : no form to relaunch (built again from the Designer)
+    if (!canRelaunchJobs.value || !canManage(job.value) || job.value?.job_type === 'build') return;
     // read with the job (GET /api/v2/job/:id carries them for an ended job) : shown at once, with
     // the page's other buttons
     if (job.value && 'relaunchOptions' in job.value) {
@@ -1435,6 +1436,7 @@ onMounted(async () => {
                   job.status != 'approve' &&
                   canRelaunchJobs &&
                   canManage(job) &&
+                  job.job_type !== 'build' &&
                   relaunchOptionsFor === String(job.id)
                 "
               >
@@ -1667,14 +1669,26 @@ onMounted(async () => {
                         <!-- what can be done with it, apart from opening it -->
                         <li
                           v-if="
-                            (j.status != 'running' && j.status != 'approve' && canRelaunchJobs && canManage(j)) ||
+                            (j.status != 'running' &&
+                              j.status != 'approve' &&
+                              j.job_type !== 'build' &&
+                              canRelaunchJobs &&
+                              canManage(j)) ||
                             (j.status == 'running' && !j.abort_requested && canManage(j)) ||
                             (j.status == 'approve' && approvalAllowed(j))
                           "
                         >
                           <hr class="dropdown-divider" />
                         </li>
-                        <li v-if="j.status != 'running' && j.status != 'approve' && canRelaunchJobs && canManage(j)">
+                        <li
+                          v-if="
+                            j.status != 'running' &&
+                            j.status != 'approve' &&
+                            j.job_type !== 'build' &&
+                            canRelaunchJobs &&
+                            canManage(j)
+                          "
+                        >
                           <a
                             class="dropdown-item"
                             href="#"

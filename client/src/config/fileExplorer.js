@@ -88,7 +88,7 @@ export function firstExplorerFile(paths, accept = () => true) {
 
 /**
  * Opens a section on the first item its explorer lists, the one way every Designer section does
- * it (the files, the forms) : nothing when an item is open already, else the first
+ * it (the files, the forms, the RTE images) : nothing when an item is open already, else the first
  * item by firstExplorerFile, opened through the section's own open - which fills every tab (its
  * YAML, its Visual, its Preview), whichever one shows.
  *
