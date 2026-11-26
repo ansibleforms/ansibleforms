@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.8.0](https://github.com/ansibleforms/ansibleforms/compare/7.7.0...7.8.0) (2026-11-26)
+
+
+### Added
+
+* a form or a workflow node names the repository its playbook runs from ([a17de36](https://github.com/ansibleforms/ansibleforms/commit/a17de3667cd4c3933471784f5d8fe03f4603c256))
+* a form's fields read the repository the form is in with `__repository__` ([eb6f33c](https://github.com/ansibleforms/ansibleforms/commit/eb6f33caeb82efb36a78279c16e6a54f15008f03))
+* a playbook can end its job as needs attention, with a message ([#1527](https://github.com/ansibleforms/ansibleforms/issues/1527)) ([0a47b8d](https://github.com/ansibleforms/ansibleforms/commit/0a47b8d56a39f35d4d1391607b2db8921307d276))
+* a schedule ends on a date or after a number of runs ([fdf22f5](https://github.com/ansibleforms/ansibleforms/commit/fdf22f56f06eca200c7ad0d433947e9b582e934e))
+* config as code: objects and settings kept in git ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* schedules timed by a rrule ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* the config seed's chat takes a credential for its API key ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* the system's maintenance tasks listed under Jobs ([84fae89](https://github.com/ansibleforms/ansibleforms/commit/84fae89658306f954cb5df9d7aa48fc6c66a87a5))
+
+
+### Fixed
+
+* a dialog's field says what is wrong, not [object Object] ([9c1e76a](https://github.com/ansibleforms/ansibleforms/commit/9c1e76a6bc663e05d51acce5e0d3f5d2be3afe53))
+* a new record's dropdown starts on its first choice ([9c1e76a](https://github.com/ansibleforms/ansibleforms/commit/9c1e76a6bc663e05d51acce5e0d3f5d2be3afe53))
+* a new record's title and a wizard's buttons read right in every language ([ab5fa1b](https://github.com/ansibleforms/ansibleforms/commit/ab5fa1b1846b5fc0deac3b480ede2acea0c6dcca))
+* job times are no longer shifted by the LOG_TZ offset ([#1528](https://github.com/ansibleforms/ansibleforms/issues/1528)) ([bc70606](https://github.com/ansibleforms/ansibleforms/commit/bc706069f5d433b73d0475282c34b7515242f8b4))
+* the forms tiles no longer jump on a category click ([14e00c8](https://github.com/ansibleforms/ansibleforms/commit/14e00c868d0cf1ae038f8b279e3d88eee5a57b6d))
+
+
+### Changed
+
+* a repository's usages are grouped in five categories ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* a schedule shows its last launch and next three runs ([fdf22f5](https://github.com/ansibleforms/ansibleforms/commit/fdf22f56f06eca200c7ad0d433947e9b582e934e))
+* dialogs show labels above fields, input icons and On/Off switches ([9c1e76a](https://github.com/ansibleforms/ansibleforms/commit/9c1e76a6bc663e05d51acce5e0d3f5d2be3afe53))
+* repositories are deleted one at a time ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* roles, groups and users are made in wizards ([9c1e76a](https://github.com/ansibleforms/ansibleforms/commit/9c1e76a6bc663e05d51acce5e0d3f5d2be3afe53))
+* the config seed's sections are named as the repository keys ([97619b0](https://github.com/ansibleforms/ansibleforms/commit/97619b0db8fde6988352dc88de9ae24f7f5e3405))
+* the controller is called controller everywhere ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* the Designer's Forms section opens on its first form ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* while the roles repository can't be read, only local admins have access ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+
+
+### Security
+
+* a form file name with .. is refused ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* a form is never saved over another usage's folder ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* a usage flag other than true or false is refused ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+* designers can't reach a repository's config.yaml ([4ac254d](https://github.com/ansibleforms/ansibleforms/commit/4ac254d69b9ba554fc545dab8f8d67c21569d7d3))
+
 ## [7.7.0](https://github.com/ansibleforms/ansibleforms/compare/7.6.0...7.7.0) (2026-11-18)
 
 
