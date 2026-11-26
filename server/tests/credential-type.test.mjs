@@ -151,11 +151,20 @@ describe("the RTE's pin (rte_cert_sha256)", () => {
   });
 });
 
-describe("the RTE images' credentials : a container registry", () => {
+describe("the RTE images' credentials : a container registry, a signing key", () => {
   test("a registry needs its address, an admin's to change", async () => {
     assert.equal(Credential.mirrorType({ credential_type: "registry" }).is_database, 0);
     assert.throws(() => Credential.requireTypeFields({ credential_type: "registry" }, true), /registry credential needs its server/);
     assert.equal(Credential.requireTypeFields({ credential_type: "registry", url: "https://registry.example.com/" }, true).url, "https://registry.example.com");
     assert.equal(await Credential.isAdminGuarded({ credential_type: "registry" }), true);
+  });
+
+  test("a signing key : a private key, its password kept, an admin's to change", async () => {
+    assert.throws(() => Credential.checkSshKey({ credential_type: "signing_key" }, true), /needs its private key/);
+    assert.throws(() => Credential.checkSshKey({ credential_type: "signing_key", client_key: "not a key" }, true), /cosign private key/);
+    const key = "-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----\nabc\n-----END ENCRYPTED SIGSTORE PRIVATE KEY-----";
+    assert.equal(Credential.checkSshKey({ credential_type: "signing_key", client_key: key, key_passphrase: "pw" }, true).key_passphrase, "pw");
+    assert.equal(Credential.requireTypeFields({ credential_type: "signing_key", url: "x" }, true).url, null);
+    assert.equal(await Credential.isAdminGuarded({ credential_type: "signing_key" }), true);
   });
 });

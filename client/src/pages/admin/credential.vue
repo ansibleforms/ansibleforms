@@ -177,6 +177,7 @@ const managed = computed(() => !!credential.value?.managed);
 // of the one server they log in to, the sign-in kinds, and any credential a runner names.
 const ADMIN_ONLY_TYPES = [
   'registry',
+  'signing_key',
   'rte',
   'awx',
   'aap',
