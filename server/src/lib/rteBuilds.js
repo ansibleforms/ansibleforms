@@ -55,7 +55,7 @@ export async function builders() {
  */
 export async function pickBuilder() {
   const online = (await builders()).filter((b) => b.online).sort((a, b) => a.running - b.running);
-  if (!online.length) throw new Errors.ConflictError("No builder is online: start one and approve it in the Designer's RTE builders");
+  if (!online.length) throw new Errors.ConflictError("No builder is online: start one and approve it under Connections > Builders");
   return online[0].runner;
 }
 

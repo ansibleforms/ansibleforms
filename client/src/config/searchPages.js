@@ -154,6 +154,7 @@ export function searchPages(t, options) {
       icon: 'rocket',
       link: '/settings/runners',
     },
+    { title: t('sidebar.builders'), section: settings, icon: 'hammer', link: '/settings/builders' },
     { title: t('sidebar.ssh'), section: settings, icon: 'key', link: '/settings/ssh' },
     {
       title: t('sidebar.knownHosts'),

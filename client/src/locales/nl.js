@@ -978,6 +978,7 @@ export default {
       label: 'Builder',
       description: 'De builders die de RTE-images bouwen en naar hun registry pushen.',
       nameHelp: 'Zijn naam, waarmee hij lid werd (RTE_NAME).',
+      versionIs: 'versie {version}',
       waitingNotice: '1 builder wacht op goedkeuring. | {count} builders wachten op goedkeuring.',
       builds: 'Builds',
       image: 'Image',

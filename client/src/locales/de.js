@@ -981,6 +981,7 @@ export default {
       label: 'Builder',
       description: 'Die Builder, die die RTE-Images bauen und in ihre Registry pushen.',
       nameHelp: 'Sein Name, mit dem er beigetreten ist (RTE_NAME).',
+      versionIs: 'Version {version}',
       waitingNotice: '1 Builder wartet auf Freigabe. | {count} Builder warten auf Freigabe.',
       builds: 'Builds',
       image: 'Image',

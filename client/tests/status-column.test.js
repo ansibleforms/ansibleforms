@@ -41,6 +41,15 @@ describe('the Status column of every job table', () => {
       'duration',
       'status',
     ]);
+    // a builder's builds (7.9.0)
+    expect(keysOf(read('src/pages/admin/builder.vue'), 'const buildColumns', ']);')).toEqual([
+      'image',
+      'ref',
+      'started',
+      'ended',
+      'duration',
+      'status',
+    ]);
     const system = keysOf(read('src/pages/system-task.vue'), 'const runColumns', ']);');
     expect(system.slice(1, 5)).toEqual(['started_at', 'ended_at', 'duration', 'outcome']);
   });

@@ -973,6 +973,7 @@ export default {
       label: 'ビルダー',
       description: 'RTE イメージをビルドしてレジストリにプッシュするビルダー。',
       nameHelp: '参加時の名前 (RTE_NAME)。',
+      versionIs: 'バージョン {version}',
       waitingNotice: '{count} 台のビルダーが承認を待っています。',
       builds: 'ビルド',
       image: 'イメージ',

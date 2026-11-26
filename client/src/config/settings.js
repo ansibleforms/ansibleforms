@@ -4597,6 +4597,7 @@ export default function getSettings(t) {
   all.ldapDirectories = ldapDirectories(t, all.ldap);
   // the databases forms query (Connections > Databases)
   all.databases = databaseSettings(t);
+  all.builders = builderSettings(t);
   // a credential whose user and password a secret store gives : its Login step only when it has
   // something else to ask (a server's address, a database's name ...) ; a plain login has none,
   // and its Save comes with the Store step (#1314)
@@ -5262,6 +5263,8 @@ function ldapDirectories(t, ldap) {
 // ─── databases (Connections > Databases) ─────────────────────────────────────
 // the databases forms query : their list, and each one's page (pages/admin/database.vue)
 export const DATABASES_PATH = '/settings/databases';
+// the RTE builders' list (Connections > Builders)
+export const BUILDERS_PATH = '/settings/builders';
 
 // the database types a credential of type database connects to, as its Database type dropdown
 // lists them (credentials) and a database's column shows its credential's (databases)
@@ -5301,6 +5304,96 @@ export function isDatabaseCredential(credential) {
  * Returns:
  *   object: the list's settings (AppAdminMulti), the page's fields too (AppAdminSingle).
  */
+/**
+ * The RTE builders' list (Connections > Builders) : runners of type builder (the image
+ * ansibleforms-rte-builder), each online or not, its version and what it builds. New is a dialog in
+ * steps, as a runner's : the builder, then the credential it signs in with (an RTE token) ; one that
+ * asked to join instead waits in the notice above the list.
+ *
+ * Args:
+ *   t (function): the translation function.
+ *
+ * Returns:
+ *   object: the list's settings.
+ */
+function builderSettings(t) {
+  return {
+    pageTitle: t('sidebar.builders'),
+    type: 'runner',
+    listQuery: '?type=builder',
+    label: t('settings.builders.label'),
+    properNoun: true,
+    description: t('settings.builders.description'),
+    icon: 'hammer',
+    selectable: false,
+    openPage: (item) => `${BUILDERS_PATH}/${item.id}`,
+    // the dialog in steps, as a runner's : what it is, then the credential it signs in with
+    steps: [
+      { key: 'builder', label: t('settings.builders.stepBuilder') },
+      { key: 'credentials', label: t('settings.runners.stepAuth') },
+    ],
+    // a builder : a runner of its own type that dials the controller
+    beforeSave: (item) => ({ ...item, type: 'builder', rte_mode: 'outbound', enabled: 1 }),
+    rowFilter: (item) => !Number(item?.pending),
+    actions: [
+      { name: 'edit', title: t('common.edit'), icon: 'pencil', color: 'edit' },
+      { name: 'test', title: t('settings.common.testConnection'), icon: 'plug', color: 'test', dividerBefore: true },
+      ...enableActions(t('settings.runners.enable'), t('settings.runners.disable')),
+      {
+        // the credential it signs in with : its page's Credentials tab, as a runner's
+        name: 'change_credentials',
+        title: t('settings.repositories.changeCredentials'),
+        icon: 'key',
+        color: 'change',
+        dividerBefore: true,
+        to: (r) => `${BUILDERS_PATH}/${r.id}/credentials`,
+      },
+      { name: 'delete', title: t('common.delete'), icon: 'trash', color: 'delete' },
+    ],
+    fields: [
+      { key: 'id', label: t('settings.fields.id'), noInput: true, hidden: true, icon: 'key' },
+      // taking builds or not : turned on or off from the row menu and its page
+      { key: 'enabled', label: t('settings.runners.enabled'), type: 'checkbox', noInput: true },
+      {
+        key: 'name',
+        icon: 'heading',
+        label: t('settings.fields.name'),
+        required: true,
+        filterable: true,
+        help: t('settings.builders.nameHelp'),
+        step: 'builder',
+      },
+      {
+        key: 'description',
+        icon: 'info-circle',
+        label: t('settings.fields.description'),
+        filterable: true,
+        step: 'builder',
+      },
+      {
+        // the RTE token it signs in with : a credential of Connections > Credentials, made here if none
+        key: 'credential',
+        step: 'credentials',
+        icon: 'key',
+        label: t('settings.runners.credential'),
+        help: t('settings.builders.credentialHelp'),
+        type: 'select',
+        parent: 'credentials',
+        values: 'credential',
+        valueKey: 'name',
+        labelKey: 'name',
+        required: true,
+        choicesWhen: (c) => !c?.name || c.credential_type === 'rte',
+        createWith: 'credentials',
+        createLabel: t('settings.repositories.newCredential'),
+        createDefaults: () => ({ credential_type: 'rte' }),
+        hidden: true,
+        noTable: true,
+      },
+    ],
+  };
+}
+
 function databaseSettings(t) {
   return {
     // the page title is the menu entry's label (AppSidebar), so the two always match

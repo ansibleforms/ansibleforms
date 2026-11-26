@@ -976,6 +976,7 @@ export default {
       label: 'Builder',
       description: 'Buildery, które budują obrazy RTE i wypychają je do ich rejestru.',
       nameHelp: 'Jego nazwa, z którą dołączył (RTE_NAME).',
+      versionIs: 'wersja {version}',
       waitingNotice:
         '1 builder czeka na zatwierdzenie. | {count} buildery czekają na zatwierdzenie. | {count} builderów czeka na zatwierdzenie.',
       builds: 'Buildy',
