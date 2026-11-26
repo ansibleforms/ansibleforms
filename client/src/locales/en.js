@@ -970,7 +970,6 @@ export default {
       label: 'Builder',
       description: 'The builders that build the RTE images and push them to their registry.',
       nameHelp: 'Its name, as it joined (RTE_NAME).',
-      versionIs: 'version {version}',
       waitingNotice: '1 builder is waiting for approval. | {count} builders are waiting for approval.',
       builds: 'Builds',
       image: 'Image',

@@ -34,7 +34,7 @@ import { useI18n } from 'vue-i18n';
 import Profile from '@/lib/Profile';
 import Helpers from '@/lib/Helpers';
 import { useAppStore } from '@/stores/app';
-import { RUNNER_KINDS, PROJECT_RUNNER_KINDS, runnerKind, socketPill, noCredentialsText } from '@/config/settings';
+import { PROJECT_RUNNER_KINDS, runnerKind, socketPill, noCredentialsText } from '@/config/settings';
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard';
 import { useRouteTab } from '@/composables/useRouteTab';
 import { useFormLinks } from '@/composables/useFormLinks';
@@ -85,8 +85,6 @@ const EDITED = [
   'is_default',
   'enabled',
 ];
-// how an RTE talks to the app (RTE_MODE) : outbound, inbound or database (deprecated)
-const RTE_MODES = ['outbound', 'inbound', 'database'];
 // a socket-mode RTE's settings (server rte/socket/settings.js) : its key in what the RTE says,
 // its column, the variable on the RTE it overrides (used when empty), its default ; the
 // numbers with their unit after the field
@@ -140,15 +138,16 @@ const appStore = useAppStore();
 const readOnly = computed(() => managed.value || !appStore.isAdmin);
 // a Semaphore or a Rundeck : a project on its server, signed in with a token
 const hasProject = computed(() => PROJECT_RUNNER_KINDS.includes(edit.value?.kind));
-// the kinds in the order of their names, in the language shown, as the dialog's ; read only here :
-// a runner keeps the type and the mode it was made with (an RTE says its mode itself when it connects)
-const sortedKinds = computed(() =>
-  [...RUNNER_KINDS].sort((a, b) => t(`settings.runners.type_${a}`).localeCompare(t(`settings.runners.type_${b}`))),
-);
-// an RTE's modes in the order of their names, in the language shown, as the dialog's
-const sortedModes = computed(() =>
-  [...RTE_MODES].sort((a, b) => t(`settings.runners.rteMode_${a}`).localeCompare(t(`settings.runners.rteMode_${b}`))),
-);
+// its type, as the New runner dialog named it
+const kindText = computed(() => (edit.value?.kind ? t(`settings.runners.type_${edit.value.kind}`) : ''));
+// the version it runs : an AnsibleForms runner's as it said when it connected (null when it has no
+// socket), another kind's as its server said at its last connection test ; a dash when none yet
+const shownVersion = computed(() => {
+  const r = runner.value;
+  if (!r) return null;
+  if (r.type === 'rte') return r.socket ? (r.socket.connected && r.socket.version) || '–' : null;
+  return r.server_version || '–';
+});
 // a Jenkins signs in with a user and that user's API token ; its folder (project) is optional
 const isJenkins = computed(() => edit.value?.kind === 'jenkins');
 // the credentials it can sign in with : those of its kind (rte, awx, aap, ascender, semaphore,
@@ -237,7 +236,6 @@ async function update(data) {
 // the dialog's steps : Runner, Type, Credentials ; then what runs on it
 const tabs = computed(() => [
   { key: 'details', label: t('settings.common.tabDetails'), icon: 'sliders' },
-  { key: 'type', label: t('settings.runners.stepType'), icon: 'shapes' },
   // an RTE : its mode, its connection and its settings
   ...(runner.value?.type === 'rte' ? [{ key: 'rte', label: t('settings.runners.tabRte'), icon: 'gauge' }] : []),
   { key: 'credentials', label: t('settings.runners.stepAuth'), icon: 'key' },
@@ -337,26 +335,15 @@ const tabFields = computed(() => {
       ...repositorySourceFields(t, runner.value),
       ['name', t('settings.fields.name'), t('settings.runners.nameHelp')],
       ['description', t('settings.fields.description')],
-      // an AnsibleForms runner : how it talks to the controller, and its connection
+      // what it is and the version it runs, then for an AnsibleForms runner how it talks to the
+      // controller and its connection
+      ['type', t('settings.runners.stepType'), kindText.value],
+      shownVersion.value !== null && ['version', t('settings.runners.version'), shownVersion.value],
       runner.value?.type === 'rte' && ['rte_mode_text', t('settings.runners.rteMode')],
       runner.value?.socket && ['socket', t('settings.runners.socket')],
       ['is_default', t('settings.runners.isDefault'), t('settings.runners.defaultHelp', { forms: defaultFor.value })],
       ['enabled', t('settings.runners.enabled'), t('settings.runners.enabledHelp')],
     ].filter(Boolean),
-    type: [
-      ...sortedKinds.value.map((kind) => [
-        `kind-${kind}`,
-        t(`settings.runners.type_${kind}`),
-        t(`settings.runners.type_${kind}Hint`),
-      ]),
-      ...(e.kind === 'rte'
-        ? sortedModes.value.map((mode) => [
-            `mode-${mode}`,
-            t(`settings.runners.rteMode_${mode}`),
-            t(`settings.runners.rteMode_${mode}Hint`),
-          ])
-        : []),
-    ],
     credentials: [
       ['credential', t('settings.runners.credential'), t(`settings.runners.credentialHelp_${e.kind || 'rte'}`)],
       e.credential && !chosenServer.value && !outboundRte.value && ['no_server', t('settings.credentials.noServer')],
@@ -705,6 +692,17 @@ onMounted(async () => {
                 :isFloating="false"
                 :label="t('settings.fields.description')"
               />
+              <!-- what it is : its type, read only (a runner keeps the type it was made with) -->
+              <div v-show="fieldShown('type')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.stepType') }}</div>
+                <div>{{ kindText }}</div>
+              </div>
+              <!-- the version it runs, under its type : an AnsibleForms runner's from its connection,
+                   another kind's from its last connection test ; a dash until known -->
+              <div v-if="shownVersion !== null" v-show="fieldShown('version')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.version') }}</div>
+                <div>{{ shownVersion }}</div>
+              </div>
               <!-- an AnsibleForms runner, after its name and description : how it talks to the controller,
                    in words (it is chosen on the Type tab), then its connection -->
               <div v-if="runner.type === 'rte'" v-show="fieldShown('rte_mode_text')" class="mb-3">
@@ -739,47 +737,6 @@ onMounted(async () => {
               </div>
             </template>
             <!-- Type : RTE, AWX, AAP, Ascender, Semaphore or Rundeck, each its label and a few grey words -->
-            <template v-if="tabShown('type')">
-              <template v-if="searching && searchHead('type')">
-                <hr v-if="!searchHead('type').first" class="mt-4 mb-0 af-search-line" />
-                <h6
-                  class="fw-bold text-body-secondary af-search-tab"
-                  :class="{ 'af-search-first': searchHead('type').first }"
-                >
-                  <FaIcon :icon="searchHead('type').tab.icon" class="me-1" />{{ searchHead('type').tab.label }}
-                </h6>
-              </template>
-              <AppTypeOptions
-                :options="
-                  sortedKinds.map((kind) => ({
-                    value: kind,
-                    label: t(`settings.runners.type_${kind}`),
-                    hint: t(`settings.runners.type_${kind}Hint`),
-                  }))
-                "
-                :selected="edit.kind"
-                name="runner-kind"
-                :shown="(kind) => fieldShown(`kind-${kind}`)"
-              />
-              <!-- an RTE's mode : how it talks to the app (RTE_MODE on the RTE) -->
-              <template v-if="edit.kind === 'rte'">
-                <div v-show="RTE_MODES.some((m) => fieldShown(`mode-${m}`))" class="form-label fw-bold mt-4 mb-2">
-                  {{ t('settings.runners.rteMode') }}
-                </div>
-                <AppTypeOptions
-                  :options="
-                    sortedModes.map((mode) => ({
-                      value: mode,
-                      label: t(`settings.runners.rteMode_${mode}`),
-                      hint: t(`settings.runners.rteMode_${mode}Hint`),
-                    }))
-                  "
-                  :selected="edit.rte_mode"
-                  name="runner-mode"
-                  :shown="(mode) => fieldShown(`mode-${mode}`)"
-                />
-              </template>
-            </template>
             <!-- RTE : how it talks to the app and its connection ; in a socket mode its settings,
                  sent to it over its socket : they win over the same variables on the RTE, which
                  fill the empty ones -->

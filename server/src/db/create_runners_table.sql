@@ -38,6 +38,10 @@ CREATE TABLE `runners` (
   `rte_drain_seconds` int(11) DEFAULT NULL,
   -- the image an AnsibleForms runner's container runs (the New runner wizard's Image step) : informational
   `rte_image` varchar(500) DEFAULT NULL,
+  -- the version an AWX, an AAP, an Ascender, a Semaphore, a Rundeck or a Jenkins said it runs, and
+  -- when : read by its connection test (Test connection, the status page), kept while it is unreachable
+  `server_version` varchar(100) DEFAULT NULL,
+  `server_version_at` datetime DEFAULT NULL,
   -- the repository and the file (runners/<file>.yaml) it comes from ; NULL for one kept in the app only
   -- (lib/repoObjects)
   `repository` varchar(250) DEFAULT NULL,
