@@ -88,13 +88,13 @@ export async function registerOnce(reg) {
 
   if (mine?.managed) {
     if (mine.token !== reg.token) {
-      logger.warning(`RTE: the config seed declares runner '${mine.name}' (${reg.uri}) with another token than this RTE's RTE_TOKEN: jobs on it will be refused`);
+      logger.warning(`Runner: the config seed declares runner '${mine.name}' (${reg.uri}) with another token than this runner's RTE_TOKEN: jobs on it will be refused`);
     }
     // a row an RTE registered at the same address : written while the seed created its own
     // (both found no row), so this RTE would be two runners. The seed's row stays.
     for (const twin of atMyAddress.filter((r) => !r.managed && r.node_id)) {
       await Runner.removeDuplicate(twin, mine);
-      said.push(`removed runner '${twin.name}', the config seed declares this RTE as '${mine.name}'`);
+      said.push(`removed runner '${twin.name}', the config seed declares this runner as '${mine.name}'`);
     }
     return said.length ? said.join(" ; ") : null;
   }
@@ -107,16 +107,16 @@ export async function registerOnce(reg) {
     if (mine.node_id && mine.node_id !== reg.nodeId && gone.has(mine.node_id)) change.node_id = reg.nodeId;
     if (Object.keys(change).length) {
       await Runner.update(change, mine.id, opts);
-      if (change.token) said.push(`runner '${mine.name}' now has this RTE's RTE_TOKEN`);
+      if (change.token) said.push(`runner '${mine.name}' now has this runner's RTE_TOKEN`);
     }
   } else {
     const taken = rows.find((r) => r.name === reg.name);
     if (taken) {
-      logger.warning(`RTE: a runner named '${reg.name}' exists with another address (${taken.uri}): not registering ${reg.uri} - change RTE_URL, or add this RTE under Connections > Runners`);
+      logger.warning(`Runner: a runner named '${reg.name}' exists with another address (${taken.uri}): not registering ${reg.uri} - change RTE_URL, or add this runner under Connections > Runners`);
       return null;
     }
     const id = await Runner.create(
-      { name: reg.name, type: "rte", uri: reg.uri, token: reg.token, node_id: reg.nodeId, description: "Registered by the RTE itself" },
+      { name: reg.name, type: "rte", uri: reg.uri, token: reg.token, node_id: reg.nodeId, description: "Registered by the runner itself" },
       opts,
     );
     mine = { id, name: reg.name, is_default: !rows.some((r) => r.type === "rte" && r.is_default) };
@@ -139,24 +139,24 @@ export function registerSelf(env = process.env, { https = false, port = 8000, ch
   try {
     reg = registration(env, { https, port });
   } catch (e) {
-    logger.error(`RTE: ${e.message} ; not registering as a runner`);
+    logger.error(`Runner: ${e.message} ; not registering as a runner`);
     return null;
   }
   if (!reg) {
-    logger.notice("RTE: RTE_REGISTER=0, so this RTE does not add itself as a runner: add it under Connections > Runners");
+    logger.notice("runner: RTE_REGISTER=0, so this runner does not add itself as a runner: add it under Connections > Runners");
     return null;
   }
-  logger.notice(`RTE: registers itself as runner '${reg.name}' (${reg.uri})${env.RTE_URL ? "" : " ; set RTE_URL for a fixed address and name"}`);
+  logger.notice(`Runner: registers itself as runner '${reg.name}' (${reg.uri})${env.RTE_URL ? "" : " ; set RTE_URL for a fixed address and name"}`);
   let failing = false;
   let timer = null;
   const tick = async () => {
     try {
       const done = await registerOnce(reg);
-      if (done) logger.notice(`RTE: ${done}`);
+      if (done) logger.notice(`Runner: ${done}`);
       failing = false;
     } catch (e) {
       // the first failure says why ; the next ones only in debug, until it works again
-      const message = `RTE: could not register as a runner, retrying: ${e.message || e}`;
+      const message = `Runner: could not register as a runner, retrying: ${e.message || e}`;
       if (failing) logger.debug(message);
       else logger.warning(message);
       failing = true;

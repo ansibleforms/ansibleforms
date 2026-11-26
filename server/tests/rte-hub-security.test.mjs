@@ -178,13 +178,13 @@ describe("what an RTE sends", () => {
     assert.equal(queries.length, 0, "not even looked up");
     entry.hashes.add("a".repeat(64));
     hub.onFetch(entry, { t: "fetch", hash: "a".repeat(64) });
-    assert.match(entry.session.sent[0].error, /not sent to this RTE/);
+    assert.match(entry.session.sent[0].error, /not sent to this runner/);
   });
 
   test("files are sent only when they are the files of a job sent to that RTE", () => {
     const entry = entryOf(runners["dmz-1"]);
     hub.onFetch(entry, { t: "fetch", hash: "b".repeat(64) });
-    assert.match(entry.session.sent[0].error, /not sent to this RTE/);
+    assert.match(entry.session.sent[0].error, /not sent to this runner/);
   });
 });
 
@@ -570,7 +570,7 @@ describe("the socket's door", () => {
         }
         const said = warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes("Runner 'in-2'") && !m.includes("plain http"));
         assert.equal(said.length, 1, said.join("\n"));
-        assert.match(said[0], /cannot reach its RTE at ws:\/\/127\.0\.0\.1:\d+\/rte\/v1\/socket/);
+        assert.match(said[0], /cannot reach it at ws:\/\/127\.0\.0\.1:\d+\/rte\/v1\/socket/);
         assert.match(said[0], /HTTP 401: wrong token/);
         assert.match(said[0], /RTE_TOKEN/);
         assert.ok(!said[0].includes("rte-token-0123456789"), "never the token");

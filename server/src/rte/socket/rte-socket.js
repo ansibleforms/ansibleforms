@@ -97,7 +97,7 @@ export function certToSend(env = process.env, tls = httpsConfig) {
     // said once : certToSend runs on every registration attempt
     if (!certWarned) {
       certWarned = true;
-      logger.warning(`RTE '${rteName()}': HTTPS_CERT is not sent to the controller (${e.message}): the controller does not pin it and checks this RTE's certificate as any other`);
+      logger.warning(`Runner '${rteName()}': HTTPS_CERT is not sent to the controller (${e.message}): the controller does not pin it and checks this runner's certificate as any other`);
     }
     return null;
   }
@@ -193,7 +193,7 @@ function onSettings(msg) {
   cache?.setMaxBytes(now.cacheMb * 1048576);
   stopWithin((now.drainSeconds + 8) * 1000);
   const changed = RTE_SETTINGS.filter((s) => before[s.key] !== now[s.key]).map((s) => `${s.key} ${now[s.key]}`);
-  if (changed.length) logger.notice(`RTE '${rteName()}': settings from its runner: ${changed.join(", ")}`);
+  if (changed.length) logger.notice(`Runner '${rteName()}': settings from its runner: ${changed.join(", ")}`);
   sendHealth();
 }
 
@@ -249,7 +249,7 @@ function pump(jobId) {
  */
 function emit(jobId, item) {
   const entry = jobs.get(jobId);
-  if (!entry) throw new Error(`job ${jobId} is not on this RTE`);
+  if (!entry) throw new Error(`job ${jobId} is not on this runner`);
   entry.spool.append(item);
   pump(jobId);
 }
@@ -395,11 +395,11 @@ async function onRun(msg) {
   const jobId = parseInt(msg.jobId, 10);
   const refuse = (error, busy = false) => session?.send({ t: "refused", jobId, error, busy });
   if (!Number.isInteger(jobId) || jobId <= 0) return refuse("jobId is required");
-  if (msg.contract !== SOCKET_CONTRACT) return refuse(`this RTE speaks contract ${SOCKET_CONTRACT}, the controller sent contract ${msg.contract}`);
+  if (msg.contract !== SOCKET_CONTRACT) return refuse(`this runner speaks contract ${SOCKET_CONTRACT}, the controller sent contract ${msg.contract}`);
   if (jobs.get(jobId)?.running) return session?.send({ t: "claimed", jobId });
-  if (isStopping()) return refuse("this RTE is stopping", true);
+  if (isStopping()) return refuse("this runner is stopping", true);
   const cap = capacity();
-  if (cap.maxJobs && cap.running >= cap.maxJobs) return refuse(`this RTE runs ${cap.running} jobs already (RTE_MAX_JOBS)`, true);
+  if (cap.maxJobs && cap.running >= cap.maxJobs) return refuse(`this runner runs ${cap.running} jobs already (RTE_MAX_JOBS)`, true);
   let secrets;
   try {
     secrets = openJobSecrets(msg.sealed, process.env.RTE_TOKEN || "", jobId);
@@ -421,10 +421,10 @@ async function onRun(msg) {
   // a cancel that came before this run : the job starts aborted (the run polls the flag)
   if (takeEarlyCancel(jobId)) {
     entry.abort = true;
-    logger.notice(`RTE: job ${jobId} was cancelled before it arrived: stopping it at once`);
+    logger.notice(`Runner: job ${jobId} was cancelled before it arrived: stopping it at once`);
   }
   session?.send({ t: "claimed", jobId });
-  logger.notice(`RTE: running job ${jobId}`);
+  logger.notice(`Runner: running job ${jobId}`);
   (async () => {
     try {
       await ensureFiles(jobId, entry);
@@ -434,7 +434,7 @@ async function onRun(msg) {
     }
     await runAnsibleJob({ jobId, secrets });
   })()
-    .catch((err) => logger.error(`RTE: job ${jobId} failed: ${err.message || err}`))
+    .catch((err) => logger.error(`Runner: job ${jobId} failed: ${err.message || err}`))
     .finally(() => {
       // what the job unpacked and wrote goes with it
       cache.release(entry.folder);
@@ -497,7 +497,7 @@ function onCancel(msg) {
     try {
       process.kill(-entry.pid, "SIGTERM");
     } catch (e) {
-      logger.debug(`RTE: could not signal job ${msg.jobId}: ${e.message}`);
+      logger.debug(`Runner: could not signal job ${msg.jobId}: ${e.message}`);
     }
   }
 }
@@ -533,14 +533,14 @@ function attach(sess) {
   sess.on("m:welcome", (msg) => {
     welcomed = true;
     sess.peer = msg;
-    logger.notice(`RTE '${rteName()}': connected to the controller (node ${msg.node || "?"})`);
-    if (msg.pending) logger.warning(`RTE '${rteName()}': waiting for an admin to approve it under Connections > Runners (fingerprint ${fingerprint(process.env.RTE_TOKEN || "")})`);
+    logger.notice(`Runner '${rteName()}': connected to the controller (node ${msg.node || "?"})`);
+    if (msg.pending) logger.warning(`Runner '${rteName()}': waiting for an admin to approve it under Connections > Runners (fingerprint ${fingerprint(process.env.RTE_TOKEN || "")})`);
     for (const [jobId, entry] of jobs) {
       entry.spool.rewind();
       pump(jobId);
     }
   });
-  sess.on("m:run", (msg) => onRun(msg).catch((e) => logger.error(`RTE: run: ${e.message}`)));
+  sess.on("m:run", (msg) => onRun(msg).catch((e) => logger.error(`Runner: run: ${e.message}`)));
   sess.on("m:cancel", onCancel);
   sess.on("m:ack", onAck);
   sess.on("m:file", (msg) => cache.deliver(msg));
@@ -552,7 +552,7 @@ function attach(sess) {
       // no cache before startSocketRte() made it (a socket opened by the tests alone)
       cache?.failAll(new Error("the socket to the controller closed while the job's files came"));
     }
-    logger.warning(`RTE '${rteName()}': socket to the controller closed (${code}${reason ? `: ${reason}` : ""})`);
+    logger.warning(`Runner '${rteName()}': socket to the controller closed (${code}${reason ? `: ${reason}` : ""})`);
   });
   sess.send({
     t: "hello",
@@ -670,7 +670,7 @@ export function dialOut(token) {
       delay = 1000;
       // back after failures : said once, at the default level
       const back = report.connected();
-      if (back) logger.notice(`RTE '${rteName()}': reached the controller at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
+      if (back) logger.notice(`Runner '${rteName()}': reached the controller at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
       attach(new Session(ws, "app"));
     });
     ws.on("unexpected-response", (req, res) => {
@@ -689,7 +689,7 @@ export function dialOut(token) {
       // the first error is the cause ; what follows it (the abort after a refusal, a reset after
       // a TLS failure) is not
       if (!failure && !refusedStatus) failure = { error: err };
-      logger.debug(`RTE: socket to ${shown}: ${scrub(err.message, secrets)}`);
+      logger.debug(`Runner: socket to ${shown}: ${scrub(err.message, secrets)}`);
     });
     ws.on("close", (code) => {
       if (isStopping() || stopped) return;
@@ -700,16 +700,16 @@ export function dialOut(token) {
         // the dial itself failed : why, at warning, the first time and on a change of cause,
         // then at most every few minutes while the same cause lasts
         const why = describeDialFailure(failure || { status: refusedStatus, code }, { side: "app", url, proxy: !!options.agent, secrets });
-        const line = failureLine(report, why, `RTE '${rteName()}': cannot reach the controller at ${shown}`);
+        const line = failureLine(report, why, `Runner '${rteName()}': cannot reach the controller at ${shown}`);
         if (line) logger.warning(`${line}: dialing again in ${again}${next.refused ? ", or restart it once an admin acted" : ""}`);
-        else logger.debug(`RTE: dialing the controller again in ${again} (${why.text})`);
-      } else if (next.refused && code === CLOSE.CONTRACT) logger.warning(`RTE '${rteName()}': the controller speaks another contract (an upgrade in progress?): dialing again in ${Math.round(next.wait / 1000)} seconds`);
-      else if (next.refused) logger.warning(`RTE '${rteName()}': the controller refused this RTE (${refusedStatus || code}): dialing again in ${Math.round(next.wait / 60000)} minutes, or restart it once an admin acted`);
-      else logger.info(`RTE: dialing the controller again in ${Math.round(next.wait / 1000)} seconds`);
+        else logger.debug(`Runner: dialing the controller again in ${again} (${why.text})`);
+      } else if (next.refused && code === CLOSE.CONTRACT) logger.warning(`Runner '${rteName()}': the controller speaks another contract (an upgrade in progress?): dialing again in ${Math.round(next.wait / 1000)} seconds`);
+      else if (next.refused) logger.warning(`Runner '${rteName()}': the controller refused this runner (${refusedStatus || code}): dialing again in ${Math.round(next.wait / 60000)} minutes, or restart it once an admin acted`);
+      else logger.info(`Runner: dialing the controller again in ${Math.round(next.wait / 1000)} seconds`);
       setTimeout(connect, next.wait).unref?.();
     });
   };
-  logger.notice(`RTE '${rteName()}': dialing the controller at ${shown}${options.agent ? " through the proxy" : ""}`);
+  logger.notice(`Runner '${rteName()}': dialing the controller at ${shown}${options.agent ? " through the proxy" : ""}`);
   connect();
   return () => {
     stopped = true;
@@ -760,17 +760,17 @@ async function registerInbound(token) {
       const cert = certToSend();
       const body = { mode: "inbound", url: process.env.RTE_URL, ...(cert ? { cert } : {}) };
       const { data } = await axios.post(url, body, { headers, httpsAgent, proxy: false, timeout: 15000 });
-      if (data.pending) logger.warning(`RTE '${rteName()}': asked to join as inbound runner '${data.runner}': the controller dials it once an admin approves it under Connections > Runners (fingerprint ${fingerprint(token)})`);
-      else logger.notice(`RTE '${rteName()}': registered with the controller as inbound runner '${data.runner}' at ${data.uri}: the controller dials it from now on`);
+      if (data.pending) logger.warning(`Runner '${rteName()}': asked to join as inbound runner '${data.runner}': the controller dials it once an admin approves it under Connections > Runners (fingerprint ${fingerprint(token)})`);
+      else logger.notice(`Runner '${rteName()}': registered with the controller as inbound runner '${data.runner}' at ${data.uri}: the controller dials it from now on`);
       return;
     } catch (err) {
       const status = err?.response?.status;
       const why = err?.response?.data?.error || err.message;
       if (status && status < 500 && status !== 429) {
-        logger.error(`RTE '${rteName()}': the controller refused the registration (${status}): ${why}`);
+        logger.error(`Runner '${rteName()}': the controller refused the registration (${status}): ${why}`);
         return;
       }
-      logger.warning(`RTE '${rteName()}': could not register with the controller yet (${why}), trying again in ${delay / 1000} seconds`);
+      logger.warning(`Runner '${rteName()}': could not register with the controller yet (${why}), trying again in ${delay / 1000} seconds`);
       await new Promise((r) => setTimeout(r, delay));
       delay = Math.min(delay * 2, 60000);
     }
@@ -793,52 +793,52 @@ export async function startSocketRte(rteMode) {
   mode = rteMode;
   const token = process.env.RTE_TOKEN || "";
   if (token.length < 16) {
-    console.error("RTE: set RTE_TOKEN (at least 16 characters) ; refusing to start");
+    console.error("runner: set RTE_TOKEN (at least 16 characters) ; refusing to start");
     process.exit(1);
   }
   if (mode === "outbound" && !controllerUrl()) {
-    console.error("RTE: RTE_MODE=outbound needs CONTROLLER_URL, the controller's address (https://forms.example.com) ; refusing to start");
+    console.error("runner: RTE_MODE=outbound needs CONTROLLER_URL, the controller's address (https://forms.example.com) ; refusing to start");
     process.exit(1);
   }
   if (mode === "outbound") {
     try {
       socketUrl(controllerUrl());
     } catch (e) {
-      console.error(`RTE: ${e.message} ; refusing to start`);
+      console.error(`Runner: ${e.message} ; refusing to start`);
       process.exit(1);
     }
   }
   if (mode === "inbound" && controllerUrl() && !process.env.RTE_URL) {
-    console.error("RTE: RTE_MODE=inbound with CONTROLLER_URL registers with the controller, which then dials RTE_URL : set RTE_URL (http://this-host:8000) ; refusing to start");
+    console.error("runner: RTE_MODE=inbound with CONTROLLER_URL registers with the controller, which then dials RTE_URL : set RTE_URL (http://this-host:8000) ; refusing to start");
     process.exit(1);
   }
   if (mode === "inbound" && !controllerUrl()) {
-    logger.notice("RTE: inbound without CONTROLLER_URL: its runner is added under Connections > Runners or in the config seed (type RTE, mode inbound, a credential with its address and RTE_TOKEN)");
+    logger.notice("runner: inbound without CONTROLLER_URL: its runner is added under Connections > Runners or in the config seed (type rte, mode inbound, a credential with its address and RTE_TOKEN)");
   }
-  installFatalHandlers("RTE");
+  installFatalHandlers("runner");
   useJobIO(socketJobIO);
   fs.mkdirSync(spoolDir(), { recursive: true, mode: 0o700 });
-  for (const line of envSettingWarnings()) logger.warning(`RTE: ${line}`);
+  for (const line of envSettingWarnings()) logger.warning(`Runner: ${line}`);
   cache = new FileCache(cacheDir(), settings().cacheMb * 1048576, nodeId);
   ansible = await ansibleVersion();
 
   // the items an earlier start left : sent once connected ; a job that had not ended cannot go on
   for (const sp of JobSpool.loadAll(spoolDir())) {
-    if (!sp.ended) sp.append({ kind: "abandon", message: "the RTE restarted while the playbook ran" });
+    if (!sp.ended) sp.append({ kind: "abandon", message: "the runner restarted while the playbook ran" });
     jobs.set(sp.jobId, { spool: sp, job: {}, paths: {}, files: {}, dirs: null, abort: false, pid: null, running: false });
-    logger.warning(`RTE: job ${sp.jobId} left by an earlier start: sending what the controller has not stored`);
+    logger.warning(`Runner: job ${sp.jobId} left by an earlier start: sending what the controller has not stored`);
   }
 
   stopWithin((drainSeconds() + 8) * 1000);
   onShutdown("running jobs", async () => {
     const until = Date.now() + drainSeconds() * 1000;
     const running = () => [...jobs.values()].filter((j) => j.running).length;
-    if (running()) logger.notice(`RTE: stopping, waiting up to ${drainSeconds()} seconds for ${running()} running job(s)`);
+    if (running()) logger.notice(`Runner: stopping, waiting up to ${drainSeconds()} seconds for ${running()} running job(s)`);
     while (running() && Date.now() < until) await new Promise((r) => setTimeout(r, 500));
     // the last items go before the socket closes
     await new Promise((r) => setTimeout(r, 1000));
   });
-  onShutdown("socket", () => session?.close(CLOSE.GOING_AWAY, "the RTE stops"));
+  onShutdown("socket", () => session?.close(CLOSE.GOING_AWAY, "the runner stops"));
 
   // the probes and the metrics, as a database-mode RTE's ; ready : connected to the controller
   const app = express();
@@ -850,9 +850,9 @@ export async function startSocketRte(rteMode) {
     isStopping() ? res.status(503).json({ status: "not ready", reason: "stopping" })
       : mode === "outbound" && !welcomed ? res.status(503).json({ status: "not ready", reason: "not connected to the controller" })
         : res.json({ status: "ready" }));
-  addScrapeGauge("af_rte_running_jobs", "The playbooks this RTE runs now", [], async (g) => g.set(capacity().running));
-  addScrapeGauge("af_rte_max_jobs", "How many playbooks this RTE runs at once (RTE_MAX_JOBS, 0: no limit)", [], async (g) => g.set(maxJobs()));
-  addScrapeGauge("af_rte_socket_connected", "Whether this RTE's socket to the controller is open (1) or not (0)", [], async (g) => g.set(welcomed ? 1 : 0));
+  addScrapeGauge("af_rte_running_jobs", "The playbooks this runner runs now", [], async (g) => g.set(capacity().running));
+  addScrapeGauge("af_rte_max_jobs", "How many playbooks this runner runs at once (RTE_MAX_JOBS, 0: no limit)", [], async (g) => g.set(maxJobs()));
+  addScrapeGauge("af_rte_socket_connected", "Whether this runner's socket to the controller is open (1) or not (0)", [], async (g) => g.set(welcomed ? 1 : 0));
   app.get("/metrics", metricsHandler());
 
   const port = appConfig.port;
@@ -860,7 +860,7 @@ export async function startSocketRte(rteMode) {
     ? https.createServer({ ...httpServerOptions(), key: httpsConfig.httpsKey, cert: httpsConfig.httpsCert }, app)
     : http.createServer(httpServerOptions(), app);
   server.on("error", (err) => {
-    console.error(`RTE: cannot listen on port ${port}: ${err.message}`);
+    console.error(`Runner: cannot listen on port ${port}: ${err.message}`);
     process.exit(1);
   });
   onShutdown("server", () => new Promise((resolve) => server.close(() => resolve())));
@@ -873,7 +873,7 @@ export async function startSocketRte(rteMode) {
       const url = new URL(req.url, "http://x");
       if (url.pathname !== RTE_SOCKET_PATH) return socket.destroy();
       if (!safeEqual(bearerToken(req.headers.authorization), token)) {
-        logger.warning(`RTE: refused a socket without the right token from ${req.socket.remoteAddress}`);
+        logger.warning(`Runner: refused a socket without the right token from ${req.socket.remoteAddress}`);
         socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
         return socket.destroy();
       }
@@ -884,17 +884,17 @@ export async function startSocketRte(rteMode) {
   // every interface, unless LISTEN_HOST names one (127.0.0.1 : a native outbound RTE)
   const host = listenHost();
   await new Promise((resolve) => server.listen(port, host, resolve));
-  logger.notice(`RTE '${rteName()}' ${version} (${mode}, files ${filesMode()}) listening on ${httpsConfig.https ? "https" : "http"} ${host ? `${host}:` : "port "}${port}, token fingerprint ${fingerprint(token)}`);
+  logger.notice(`Runner '${rteName()}' ${version} (${mode}, files ${filesMode()}) listening on ${httpsConfig.https ? "https" : "http"} ${host ? `${host}:` : "port "}${port}, token fingerprint ${fingerprint(token)}`);
   if (mode === "inbound" && httpsConfig.https && httpsConfig.httpsCert) {
     const pem = httpsConfig.httpsCert.toString("utf8");
-    logger.notice(`RTE '${rteName()}': certificate fingerprint ${certFingerprint(pem) || "?"}${certToSend() ? " (sent to the controller when it registers: the controller dials it pinned to it)" : ""}`);
-    if (isTemplateCert(pem)) logger.warning(`[SECURITY] RTE '${rteName()}': HTTPS_CERT is the sample certificate shipped in the image, whose private key is public: mount a certificate of your own (HTTPS_CERT, HTTPS_KEY)`);
+    logger.notice(`Runner '${rteName()}': certificate fingerprint ${certFingerprint(pem) || "?"}${certToSend() ? " (sent to the controller when it registers: the controller dials it pinned to it)" : ""}`);
+    if (isTemplateCert(pem)) logger.warning(`[SECURITY] runner '${rteName()}': HTTPS_CERT is the sample certificate shipped in the image, whose private key is public: mount a certificate of your own (HTTPS_CERT, HTTPS_KEY)`);
   } else if (mode === "inbound" && /^http:\/\//i.test(String(process.env.RTE_URL || ""))) {
-    logger.warning(`RTE '${rteName()}': inbound over plain http: the controller sends RTE_TOKEN in clear. Set HTTPS=1 and an https RTE_URL so the controller pins this RTE's certificate`);
+    logger.warning(`Runner '${rteName()}': inbound over plain http: the controller sends RTE_TOKEN in clear. Set HTTPS=1 and an https RTE_URL so the controller pins this runner's certificate`);
   }
   if (mode === "outbound") dialOut(token);
   // inbound with the controller's address : one call so the controller knows this RTE and dials it
-  else if (controllerUrl()) registerInbound(token).catch((e) => logger.error(`RTE: registration: ${e.message}`));
+  else if (controllerUrl()) registerInbound(token).catch((e) => logger.error(`Runner: registration: ${e.message}`));
 
   // its health to the controller every 20 s : what it runs and its free slots ; and its jobs folder
   // said alive, so an RTE sharing the cache never takes it for one that is gone

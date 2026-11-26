@@ -119,7 +119,7 @@ describe("registering", () => {
 
   test("a row added by hand: found by its address, its token follows RTE_TOKEN, it stays hand-made", async () => {
     rows.push({ id: 2, name: "my-rte", type: "rte", uri: "http://rte:8000/", token: "old-token-old-token", node_id: null, managed: 0, is_default: 1 });
-    assert.match(await registerOnce(reg), /'my-rte' now has this RTE's RTE_TOKEN/);
+    assert.match(await registerOnce(reg), /'my-rte' now has this runner's RTE_TOKEN/);
     assert.deepEqual(writes.map((w) => w.data), [{ token: TOKEN }]);
   });
 

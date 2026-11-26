@@ -164,7 +164,7 @@ export default {
     passwordIsUsername: "Hasło nie może być nazwą użytkownika",
     runnerConnectionOk: "Połączenie z runnerem działa poprawnie",
     runnerConnectionOkDetails: "Połączenie z runnerem działa poprawnie: {details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "na węźle {node}",

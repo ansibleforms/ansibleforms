@@ -116,7 +116,7 @@ function manifest(root) {
             continue;
           }
           if (!inside(target, realRoot)) {
-            logger.warning(`Not sending ${relPath} of ${root} to the RTE: it is a link to ${target}, outside the folder`);
+            logger.warning(`Not sending ${relPath} of ${root} to the runner: it is a link to ${target}, outside the folder`);
             continue;
           }
           // a link to a folder of the folder : walked like the folder itself
@@ -218,7 +218,7 @@ export async function bundleOf(root) {
   if (Date.now() - lastPrune > PRUNE_EVERY_MS) pruneBundles();
   const { entries, lines, bytes } = manifest(root);
   if (bytes > maxBytes()) {
-    throw new Error(`the folder ${root} holds ${Math.round(bytes / 1048576)} MB, more than RTE_FILES_MAX_MB (${maxBytes() / 1048576}): mount it on the RTE and set RTE_FILES=local there`);
+    throw new Error(`the folder ${root} holds ${Math.round(bytes / 1048576)} MB, more than RTE_FILES_MAX_MB (${maxBytes() / 1048576}): mount it on the runner and set RTE_FILES=local there`);
   }
   const hash = crypto.createHash("sha256").update(`${path.resolve(root)}\n${lines.join("\n")}`).digest("hex");
   const file = path.join(BUNDLE_DIR, `${hash}.tgz`);

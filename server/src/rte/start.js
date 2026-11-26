@@ -16,14 +16,14 @@ export async function startRteInMode() {
   const raw = String(process.env.RTE_MODE ?? "").trim().toLowerCase();
   const mode = raw || "database";
   if (!MODES.includes(mode)) {
-    console.error(`RTE: RTE_MODE='${process.env.RTE_MODE}' is not one of ${MODES.join(", ")} ; refusing to start`);
+    console.error(`Runner: RTE_MODE='${process.env.RTE_MODE}' is not one of ${MODES.join(", ")} ; refusing to start`);
     process.exit(1);
   }
   if (mode === "database") {
     const { startRte } = await import("./server.js");
     const { default: logger } = await import("../lib/logger.js");
     logger.warning(
-      `[DEPRECATED] This RTE runs in database mode${raw ? "" : " (RTE_MODE is not set)"}: it holds the database's credentials and reads and writes it itself. ` +
+      `[DEPRECATED] This runner runs in database mode${raw ? "" : " (RTE_MODE is not set)"}: it holds the database's credentials and reads and writes it itself. ` +
         "Set RTE_MODE=outbound (it dials the controller, CONTROLLER_URL) or RTE_MODE=inbound (the controller dials it, RTE_URL), and drop DB_* from its environment. " +
         "Database mode is removed in 8.0.0."
     );

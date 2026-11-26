@@ -163,7 +163,7 @@ export default {
     passwordIsUsername: "Het wachtwoord mag niet de gebruikersnaam zijn",
     runnerConnectionOk: "Runner verbinding is OK",
     runnerConnectionOkDetails: "Runner verbinding is OK: {details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "op node {node}",

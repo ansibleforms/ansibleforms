@@ -1,7 +1,7 @@
 # Your own RTE
 
-Since 7, playbooks run in an RTE (runtime environment) container. It is the
-AnsibleForms server started with `AF_ROLE=rte`, next to python and ansible. We publish
+Since 7, playbooks run on an AnsibleForms runner, a container started from an RTE (runtime
+environment) image: the AnsibleForms server with `AF_ROLE=rte`, next to python and ansible. We publish
 it in three layers, each built on the one before. Build your own on the layer that fits.
 
 | Image | What is in it | Use it |
@@ -22,14 +22,14 @@ docker build -f examples/rte/Dockerfile.netapp -t my-rte-netapp .
 
 Run it like the published image, in a socket mode: it holds no database credentials, only its
 `RTE_TOKEN` (at least 16 characters). In `inbound` mode the controller dials it, as the Docker Compose
-project, the Helm chart and [the scale example](../scale) run their RTE:
+project, the Helm chart and [the scale example](../scale) run their runner:
 
 ```bash
 docker run -d --name rte -e RTE_MODE=inbound -e RTE_TOKEN=change-me-at-least-16-characters \
   -e HTTPS=0 -e PORT=8000 my-rte-netapp
 ```
 
-The controller then needs its runner: type RTE, mode inbound, and an RTE credential with the address
+The controller then needs its runner: type AnsibleForms, mode inbound, and an AnsibleForms credential with the address
 the controller reaches it on and the same token. Add it under Connections > Runners, or declare it in
 the config seed:
 
@@ -48,16 +48,16 @@ runners:
       credential: rte-netapp
 ```
 
-Forms run on it with `runner: rte-netapp`. An RTE that the controller cannot reach dials the controller
+Forms run on it with `runner: rte-netapp`. A runner that the controller cannot reach dials the controller
 instead (`RTE_MODE=outbound` with `CONTROLLER_URL`), and joins once an admin approves it or with a join
 token (`RTE_JOIN_TOKEN`). The mode without a socket, `database`, is deprecated and removed in
-8.0.0. See [the RTE modes](https://ansibleforms.com/rte/modes.html) and
+8.0.0. See [the runner modes](https://ansibleforms.com/rte/modes.html) and
 [the runners README](../../server/src/runners/README.md).
 
 ## Keep it on the controller's release
 
-An RTE runs the controller's own server code. Build FROM the same release as the controller: `:7` follows
-the controller's `:7`, and an exact `:7.x.y` pins both. An RTE on an older release keeps working as
+A runner runs the controller's own server code. Build FROM the same release as the controller: `:7` follows
+the controller's `:7`, and an exact `:7.x.y` pins both. A runner on an older release keeps working as
 long as it speaks the same contract (`server/src/rte/contract.js`). The Status page says when
 one must be rebuilt.
 

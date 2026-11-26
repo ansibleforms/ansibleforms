@@ -159,7 +159,7 @@ export default {
     passwordIsUsername: "パスワードにユーザー名は使えません",
     runnerConnectionOk: "ランナーの接続は正常です",
     runnerConnectionOkDetails: "ランナーの接続は正常です: {details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "ノード {node} 経由",

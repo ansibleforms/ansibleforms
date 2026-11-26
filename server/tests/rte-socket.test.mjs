@@ -299,7 +299,7 @@ describe("the RTE dialing the controller again", async () => {
       await new Promise((r) => setTimeout(r, 2300));
       const warned = said(warn, "cannot reach the controller");
       assert.equal(warned.length, 1, warned.join("\n"));
-      assert.match(warned[0], /at ws:\/\/127\.0\.0\.1:\d+\/af\/api\/v2\/rte\/socket: no RTE socket at this address \(HTTP 404: nothing here\)/);
+      assert.match(warned[0], /at ws:\/\/127\.0\.0\.1:\d+\/af\/api\/v2\/rte\/socket: no runner socket at this address \(HTTP 404: nothing here\)/);
       assert.match(warned[0], /CONTROLLER_URL.*BASE_URL/);
       assert.ok(!warned[0].includes("joe") && !warned[0].includes("pw@"), "no credentials of the address");
       assert.ok(!warned[0].includes(token), "never the token");

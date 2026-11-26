@@ -152,7 +152,7 @@ export default {
     passwordIsUsername: "密码不能是用户名",
     runnerConnectionOk: "运行器连接正常",
     runnerConnectionOkDetails: "运行器连接正常：{details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "位于节点 {node}",

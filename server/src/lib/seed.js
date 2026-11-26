@@ -252,7 +252,7 @@ async function applyListSection(section, cfg, summary) {
     // second row next to it
     const adoptable = section.findAdoptable ? await section.findAdoptable(item) : null;
     if (adoptable) {
-      logger.warning(`Config seed adopts the ${section.label} '${adoptable.name}' (${adoptable.uri}), which its RTE registered itself, as '${item.name}': its declared fields are now enforced from the seed file`);
+      logger.warning(`Config seed adopts the ${section.label} '${adoptable.name}' (${adoptable.uri}), which its runner registered itself, as '${item.name}': its declared fields are now enforced from the seed file`);
       summary.adopted.push(`${section.label}:${item.name}`);
       await section.adopt(buildRecord(section, item, true), adoptable);
       summary.updated.push(`${section.label}:${item.name}`);

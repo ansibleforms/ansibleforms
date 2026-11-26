@@ -48,7 +48,7 @@ const NEEDS = {
 };
 
 // how the error names a runner type
-const RUNNER_LABEL = { rte: "an RTE", awx: "an awx", semaphore: "a semaphore", rundeck: "a rundeck", jenkins: "a jenkins" };
+const RUNNER_LABEL = { rte: "an AnsibleForms", awx: "an awx", semaphore: "a semaphore", rundeck: "a rundeck", jenkins: "a jenkins" };
 
 // `awx: <name>` on a form is the 7.x way of naming the AWX connection : an alias of
 // `runner: <name>` since 7, removed in 8. Said once per name, not on every job.

@@ -9,14 +9,14 @@ One image, started in different roles (`AF_ROLE`):
 | `worker` | the background work: the database bootstrap and the config seed, the schedules, the nightly backup, the repository syncs, the cleanups | 1 at work; more wait and take over |
 | `rte` | the playbooks (the `ansibleforms-rte-full` image) | as many as you like |
 
-[compose.yaml](compose.yaml) runs two controller nodes behind nginx, two workers, one RTE and a database.
+[compose.yaml](compose.yaml) runs two controller nodes behind nginx, two workers, one runner and a database.
 Copy [.env.example](.env.example) to `.env` and fill in the secrets first.
 
-The RTE runs in `inbound` mode (`RTE_MODE=inbound`): the controller dials it at `http://rte:8000` with its
-`RTE_TOKEN` and keeps one WebSocket open, held by one node at a time. The RTE holds no database
+The runner runs in `inbound` mode (`RTE_MODE=inbound`): the controller dials it at `http://rte:8000` with its
+`RTE_TOKEN` and keeps one WebSocket open, held by one node at a time. The runner holds no database
 credentials and reads none of the `.env`. Its runner `rte` and the credential it signs in with are
 declared by the config seed, [seed.yaml](seed.yaml), which the worker applies at every start
-(`CONFIG_SEED_PATH`). See [the RTE modes](https://ansibleforms.com/rte/modes.html).
+(`CONFIG_SEED_PATH`). See [the runner modes](https://ansibleforms.com/rte/modes.html).
 
 ## What the nodes share
 
@@ -31,8 +31,8 @@ declared by the config seed, [seed.yaml](seed.yaml), which the worker applies at
 - **`ACCESS_TOKEN_SECRET`**, the same on every controller node, or a token signed by one node is refused
   by the next. A controller node refuses to start without it.
 - **`ENCRYPTION_SECRET`**, the same on every controller node and worker, or a credential stored by one
-  cannot be read by another. The RTE needs none: the controller sends it each job's secrets.
-- **`RTE_TOKEN`**, the same on the RTE and in its credential (the seed reads it from `.env`).
+  cannot be read by another. The runner needs none: the controller sends it each job's secrets.
+- **`RTE_TOKEN`**, the same on the runner and in its credential (the seed reads it from `.env`).
 
 ## How it behaves
 
@@ -45,8 +45,8 @@ declared by the config seed, [seed.yaml](seed.yaml), which the worker applies at
 - **The schema is the worker's.** On an empty database the worker creates it, and on an upgrade it
   patches it; controller nodes wait until both are done, and say in their log what is still missing.
 - **Every container names itself** `<role>-<hostname>-<port>`: nothing to set. The Status page
-  lists them all, RTEs included.
-- **Jobs belong to a container.** A job running on an RTE belongs to that RTE; it carries on when
+  lists them all, runners included.
+- **Jobs belong to a container.** A job running on a runner belongs to that runner; it carries on when
   the controller node that started it goes. Any other job (an AWX job, the steps of a multistep form)
   belongs to the controller node that started it. A container that restarts ends its own unfinished
   jobs; one that disappears (a replaced pod) has them ended by the worker after two minutes
@@ -59,7 +59,7 @@ declared by the config seed, [seed.yaml](seed.yaml), which the worker applies at
 
 Upgrade the **worker first**, then the controller nodes. The worker patches the schema; a controller node of
 the new version waits until the schema is patched (it logs what it is waiting for), so controller nodes
-upgraded first stay unready until the worker follows - the old ones keep serving meanwhile. RTEs
+upgraded first stay unready until the worker follows - the old ones keep serving meanwhile. Runners
 can follow at any time while they speak the same contract (`server/src/rte/contract.js`).
 
 ## Limits

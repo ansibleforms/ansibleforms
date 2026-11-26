@@ -65,7 +65,7 @@ class Runner extends CrudModel {
     if (data.rte_mode !== undefined) {
       if (data.rte_mode === '' || data.rte_mode === null) data.rte_mode = null;
       else if (!RTE_MODES.includes(data.rte_mode)) {
-        throw new Errors.BadRequestError(`Unknown RTE mode '${data.rte_mode}' - use one of ${RTE_MODES.join(', ')}`);
+        throw new Errors.BadRequestError(`Unknown runner mode '${data.rte_mode}' - use one of ${RTE_MODES.join(', ')}`);
       }
     }
     // turned on or off (Enable / Disable) : 1 or 0, whatever the client or the seed sends
@@ -176,7 +176,7 @@ class Runner extends CrudModel {
       }
       return;
     }
-    if (row.type === 'rte' && !row.token) missing('a token (the RTE_TOKEN of the RTE)');
+    if (row.type === 'rte' && !row.token) missing('a token (the RTE_TOKEN of the runner)');
     if (TOKEN_AND_PROJECT.includes(row.type)) {
       if (!row.token) missing('an API token');
       if (!row.project) missing(row.type === 'semaphore' ? 'a project (the project id)' : 'a project (the project name)');

@@ -381,7 +381,7 @@ describe("health reports problems, not just ok", () => {
     runnerState = { runners: [{ name: "rte-1", type: "rte" }, { name: "aap", type: "awx", is_default: 1 }], error: null };
     const r = await Health.check();
     assert.equal(statusOf(r, "runners"), "warning");
-    assert.equal(checkOf(r, "runners").value, "no default RTE");
+    assert.equal(checkOf(r, "runners").value, "no default AnsibleForms runner");
   });
 
   test("runners: an unreachable one is an error naming it", async () => {
