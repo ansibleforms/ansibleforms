@@ -176,6 +176,7 @@ const managed = computed(() => !!credential.value?.managed);
 // (controllers/v2/credential.controller.js assertMayChange). The kinds that carry the address
 // of the one server they log in to, the sign-in kinds, and any credential a runner names.
 const ADMIN_ONLY_TYPES = [
+  'registry',
   'rte',
   'awx',
   'aap',

@@ -150,3 +150,12 @@ describe("the RTE's pin (rte_cert_sha256)", () => {
     assert.equal("rte_cert_sha256" in Credential.guardRtePin({ name: "x" }, stored), false);
   });
 });
+
+describe("the RTE images' credentials : a container registry", () => {
+  test("a registry needs its address, an admin's to change", async () => {
+    assert.equal(Credential.mirrorType({ credential_type: "registry" }).is_database, 0);
+    assert.throws(() => Credential.requireTypeFields({ credential_type: "registry" }, true), /registry credential needs its server/);
+    assert.equal(Credential.requireTypeFields({ credential_type: "registry", url: "https://registry.example.com/" }, true).url, "https://registry.example.com");
+    assert.equal(await Credential.isAdminGuarded({ credential_type: "registry" }), true);
+  });
+});
