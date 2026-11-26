@@ -337,6 +337,9 @@ const tabFields = computed(() => {
       ...repositorySourceFields(t, runner.value),
       ['name', t('settings.fields.name'), t('settings.runners.nameHelp')],
       ['description', t('settings.fields.description')],
+      // an AnsibleForms runner : how it talks to the controller, and its connection
+      runner.value?.type === 'rte' && ['rte_mode_text', t('settings.runners.rteMode')],
+      runner.value?.socket && ['socket', t('settings.runners.socket')],
       ['is_default', t('settings.runners.isDefault'), t('settings.runners.defaultHelp', { forms: defaultFor.value })],
       ['enabled', t('settings.runners.enabled'), t('settings.runners.enabledHelp')],
     ].filter(Boolean),
@@ -367,13 +370,11 @@ const tabFields = computed(() => {
     rte:
       runner.value?.type === 'rte'
         ? [
-            ['rte_mode_text', t('settings.runners.rteMode')],
             runner.value?.rte_image && [
               'rte_image',
               t('settings.runners.rteImage'),
               t('settings.runners.rteImageHelp'),
             ],
-            runner.value?.socket && ['socket', t('settings.runners.socket')],
             ...(socketRte.value
               ? [
                   ...RTE_NUMBERS.map((f) => [
@@ -704,6 +705,17 @@ onMounted(async () => {
                 :isFloating="false"
                 :label="t('settings.fields.description')"
               />
+              <!-- an AnsibleForms runner, after its name and description : how it talks to the controller,
+                   in words (it is chosen on the Type tab), then its connection -->
+              <div v-if="runner.type === 'rte'" v-show="fieldShown('rte_mode_text')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.rteMode') }}</div>
+                <div>{{ rteModeText }}</div>
+              </div>
+              <!-- a socket-mode RTE : its socket, connected or not, as a badge -->
+              <div v-if="runner.socket" v-show="fieldShown('socket')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.socket') }}</div>
+                <span v-html="socketPill(t, runner)"></span>
+              </div>
               <div v-show="fieldShown('is_default')" class="mb-3">
                 <label class="form-label fw-bold d-block" for="af-runner-default">{{
                   t('settings.runners.isDefault')
@@ -781,11 +793,6 @@ onMounted(async () => {
                   <FaIcon :icon="searchHead('rte').tab.icon" class="me-1" />{{ searchHead('rte').tab.label }}
                 </h6>
               </template>
-              <!-- how it talks to the app, in words (it is chosen on the Type tab) -->
-              <div v-show="fieldShown('rte_mode_text')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.runners.rteMode') }}</div>
-                <div>{{ rteModeText }}</div>
-              </div>
               <!-- the image its container runs (the New runner wizard's Image step) -->
               <div v-if="runner.rte_image" v-show="fieldShown('rte_image')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.runners.rteImage') }}</div>
@@ -795,11 +802,6 @@ onMounted(async () => {
                   <BsButton icon="copy" :title="t('designer.rte.copy')" @click="copyImage" />
                 </div>
                 <div class="form-text">{{ t('settings.runners.rteImageStart') }}</div>
-              </div>
-              <!-- a socket-mode RTE : its socket, connected or not, as a badge -->
-              <div v-if="runner.socket" v-show="fieldShown('socket')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('settings.runners.socket') }}</div>
-                <span v-html="socketPill(t, runner)"></span>
               </div>
               <template v-if="socketRte">
                 <div v-for="f in RTE_NUMBERS" :key="f.column" v-show="fieldShown(f.column)">
