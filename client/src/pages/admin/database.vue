@@ -168,7 +168,7 @@ onMounted(async () => {
              to the page's, and would show on the other tabs too -->
         <AppLinkedTable
           v-if="active || searching"
-          :search="search || null"
+          :search="search"
           :exportName="`${database?.name || databaseId}-used-by`"
           :columns="usedByColumns"
           :rows="usedBy"
