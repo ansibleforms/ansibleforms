@@ -243,6 +243,29 @@ describe("as it is written : its comments, a ytt template", () => {
     assert.deepEqual(readObj("design", "constants.yaml"), { controller_constants: { base: 1 } });
     assert.deepEqual(YAML.parse(keys.composeConfig(read(BASE), await keys.keySources(), read)).constants, { base: 1 });
   });
+
+  test("a designer backup restored while the configuration is kept in the database : the keys to their file, the rest to the database", async () => {
+    writeRaw("access", "roles.yaml", `# the roles\ncontroller_roles:\n${ROLES_TEXT}`);
+    fx.cloneEmpty("design");
+    const dbBase = YAML.stringify({ roles: [{ name: "db-role" }], categories: [{ name: "Base" }], constants: { base: 1 } });
+    fx.state.tables.settings = [{ id: 1, config_source: "database", config_yaml: dbBase }];
+    const backups = fs.mkdtempSync(path.join(os.tmpdir(), "af-config-backups-"));
+    realConfig.formsBackupPath = backups;
+    realConfig.formsFolderPath = path.join(backups, "forms-folder");
+    realConfig.oldBackupDays = 3650;
+    const { default: Form } = await import("../src/models/form.model.js");
+    const name = await Form.backup(true);
+    assert.ok(name);
+    // changed since : in git and in the database
+    writeRaw("access", "roles.yaml", `# the roles\ncontroller_roles:\n${ROLES_TEXT}  - name: later\n    groups:\n      - local/later\n`);
+    fx.state.tables.settings[0].config_yaml = YAML.stringify({ roles: [{ name: "db-role" }], categories: [{ name: "Base" }], constants: { base: 2 } });
+    await Form.restoreBackup(name, true);
+    assert.equal(read(path.join(fx.ROOT, "access", "roles.yaml")), `# the roles\ncontroller_roles:\n${ROLES_TEXT}`);
+    const restored = YAML.parse(fx.state.tables.settings[0].config_yaml);
+    assert.deepEqual(restored.roles, [{ name: "db-role" }], "the repository's roles not baked into the database's base");
+    assert.deepEqual(readObj("design", "constants.yaml"), { controller_constants: { base: 1 } });
+    assert.equal(YAML.parse(read(BASE)).constants.base, 1, "the config file untouched");
+  });
 });
 
 describe("the Config usage of before", () => {
