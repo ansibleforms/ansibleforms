@@ -93,6 +93,9 @@ describe('designAllPlaybooks and designAllWorkflows : right after Edit playbooks
       'designAllWorkflows',
       'allowInventoryDesign',
       'allowVarsFileDesign',
+      'allowRteDesign',
+      'allowRteBuild',
+      'manageBuilders',
     ]);
     for (const key of ['designAllPlaybooks', 'designAllWorkflows']) {
       expect(roleOptionDefaults('ops')[key]).toBe(true);

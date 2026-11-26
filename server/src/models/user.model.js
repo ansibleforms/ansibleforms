@@ -45,6 +45,11 @@ export function applyOptionDefaults(options, isAdmin) {
   if (options.allowWorkflowDesign === undefined) options.allowWorkflowDesign = true;
   if (options.allowInventoryDesign === undefined) options.allowInventoryDesign = true;
   if (options.allowVarsFileDesign === undefined) options.allowVarsFileDesign = true;
+  // the RTE images (the Designer) : edited by every designer, built and their builders managed by
+  // the admins unless a role says otherwise
+  if (options.allowRteDesign === undefined) options.allowRteDesign = true;
+  if (options.allowRteBuild === undefined) options.allowRteBuild = isAdmin;
+  if (options.manageBuilders === undefined) options.manageBuilders = isAdmin;
   if (options.showLogs === undefined) options.showLogs = isAdmin;
   // the audit log on its own (the settings give it too) : as the server log, the admins'
   if (options.showAuditLog === undefined) options.showAuditLog = isAdmin;

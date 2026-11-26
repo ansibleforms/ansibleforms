@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "Je mag de formulieren in de designer niet bewerken",
     noPlaybookDesignAccess: "Je mag de playbooks in de designer niet bewerken",
     noWorkflowDesignAccess: "Je mag de workflows in de designer niet bewerken",
+    noRteDesignAccess: "Je mag de RTE-images in de designer niet bewerken",
+    noRteBuildAccess: "Je mag de RTE-images niet bouwen",
     noInventoryDesignAccess: "Je mag de inventarissen in de designer niet bewerken",
     noVarsFileDesignAccess: "Je mag de variabelenbestanden in de designer niet bewerken",
     noLogsAccess: "U heeft geen toegang tot logs",

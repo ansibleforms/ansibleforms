@@ -50,6 +50,9 @@ export const roleOptionGroups = [
       'designAllWorkflows',
       'allowInventoryDesign',
       'allowVarsFileDesign',
+      'allowRteDesign',
+      'allowRteBuild',
+      'manageBuilders',
     ],
   },
   {
@@ -131,6 +134,9 @@ export const roleOptionNeeds = {
   allowWorkflowDesign: 'showDesigner',
   allowInventoryDesign: 'showDesigner',
   allowVarsFileDesign: 'showDesigner',
+  allowRteDesign: 'showDesigner',
+  allowRteBuild: 'showDesigner',
+  manageBuilders: 'showDesigner',
   // extended tokens add Never expires to the tokens (lib/tokenLifetime.js)
   extendedTokenExpiration: 'allowApiTokens',
   // sharing a stored job, and loading the ones others shared, are part of the stored jobs
@@ -176,6 +182,9 @@ export const roleOptionKeys = [
   'designAllWorkflows',
   'allowInventoryDesign',
   'allowVarsFileDesign',
+  'allowRteDesign',
+  'allowRteBuild',
+  'manageBuilders',
   'showJobs',
   'showAllJobLogs',
   'manageAllJobs',
@@ -215,6 +224,7 @@ const trueByDefaultOptions = [
   'designAllWorkflows',
   'allowInventoryDesign',
   'allowVarsFileDesign',
+  'allowRteDesign',
   'allowVerboseMode',
   'showJobs',
   'showDebugButtons',
@@ -245,6 +255,8 @@ export const adminByDefaultOptions = [
   'showAuditLog',
   'manageAllJobs',
   'allowApiTokens',
+  'allowRteBuild',
+  'manageBuilders',
 ];
 
 // Effective value of every option for a role that does not spell it out.

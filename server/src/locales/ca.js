@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "No podeu editar els formularis al dissenyador",
     noPlaybookDesignAccess: "No podeu editar els playbooks al dissenyador",
     noWorkflowDesignAccess: "No podeu editar els fluxos de treball al dissenyador",
+    noRteDesignAccess: "No podeu editar les imatges RTE al dissenyador",
+    noRteBuildAccess: "No podeu compilar les imatges RTE",
     noInventoryDesignAccess: "No podeu editar els inventaris al dissenyador",
     noVarsFileDesignAccess: "No podeu editar els fitxers de variables al dissenyador",
     noLogsAccess: "No tens accés als registres",

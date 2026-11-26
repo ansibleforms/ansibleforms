@@ -57,6 +57,9 @@ const FILE_DESIGN_GUARDS = new Map([
   ['inventories', permissionGuard(u => u.options.allowInventoryDesign, 'errors.noInventoryDesignAccess')],
   ['vars', permissionGuard(u => u.options.allowVarsFileDesign, 'errors.noVarsFileDesignAccess')],
 ])
+// the Designer's RTE images : changed with allowRteDesign, built with allowRteBuild
+Middleware.checkRteDesignMiddleware = permissionGuard(u => u.options.allowRteDesign, 'errors.noRteDesignAccess')
+Middleware.checkRteBuildMiddleware = permissionGuard(u => u.options.allowRteBuild, 'errors.noRteBuildAccess')
 Middleware.checkFileDesignMiddleware = (req, res, next) => {
   const guard = FILE_DESIGN_GUARDS.get(req.params?.kind)
   return typeof guard === 'function' ? guard(req, res, next) : next()

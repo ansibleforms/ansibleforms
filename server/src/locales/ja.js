@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "デザイナーでフォームを編集することはできません",
     noPlaybookDesignAccess: "デザイナーで playbook を編集することはできません",
     noWorkflowDesignAccess: "デザイナーでワークフローを編集することはできません",
+    noRteDesignAccess: "デザイナーで RTE イメージを編集することはできません",
+    noRteBuildAccess: "RTE イメージをビルドすることはできません",
     noInventoryDesignAccess: "デザイナーでインベントリを編集することはできません",
     noVarsFileDesignAccess: "デザイナーで変数ファイルを編集することはできません",
     noLogsAccess: "ログへのアクセス権がありません",
