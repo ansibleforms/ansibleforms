@@ -42,9 +42,10 @@ class CredentialModel extends CrudModel {
   // login (none for a relay)
   // rte, awx, aap, ascender, semaphore, rundeck and jenkins : how a runner of that kind signs in,
   // and where (its url) ; vault : how a HashiCorp Vault secret store logs in (its password the
-  // token), and where
+  // token), and where ; registry : how a builder pushes an RTE image to a container registry (a
+  // user and its token or password), and where
   static TYPES = ['userpass', 'ssh', 'git', 'api', 'database', 'cyberark', 'smtp', 'ldap', 'entraid', 'oidc',
-    'rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault'];
+    'rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'registry'];
 
   /**
    * Keeps a credential's type and its is_database flag in step : the type sets the flag, and
@@ -299,8 +300,8 @@ class CredentialModel extends CrudModel {
   }
 
   // the types that carry the address of the one server they log in to (Credential.url) : a
-  // runner's and a secret store's
-  static URL_TYPES = ['rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'cyberark'];
+  // runner's, a secret store's and a container registry's
+  static URL_TYPES = ['rte', 'awx', 'aap', 'ascender', 'semaphore', 'rundeck', 'jenkins', 'vault', 'cyberark', 'registry'];
 
   // the types a sign-in reads its client, its tenant or issuer, or its bind account from : an LDAP
   // directory's bind account, an Entra ID or Open ID provider's client. Whoever changes one

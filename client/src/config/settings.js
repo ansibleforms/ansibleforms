@@ -494,6 +494,8 @@ export const CREDENTIAL_TYPES = [
   'semaphore',
   'rundeck',
   'jenkins',
+  // what a builder pushes an RTE image with
+  'registry',
 ];
 // the types that carry the server they log in to (server : models/credential.model.v2.js URL_TYPES)
 export const SERVER_CREDENTIAL_TYPES = [
@@ -506,6 +508,7 @@ export const SERVER_CREDENTIAL_TYPES = [
   'semaphore',
   'rundeck',
   'jenkins',
+  'registry',
 ];
 // the types that may carry a host and an optional port : those that connect there (ssh, a
 // database, a mail server, a directory) and those whose host and port are only handed to the
@@ -525,6 +528,7 @@ export const CREDENTIAL_SERVER_EXAMPLE = {
   semaphore: 'https://semaphore.example.com',
   rundeck: 'https://rundeck.example.com',
   jenkins: 'https://jenkins.example.com',
+  registry: 'https://registry.example.com',
 };
 
 /**
@@ -580,6 +584,7 @@ export function credentialLabels(t, type, awxAuth = 'token', gitAuth = 'token') 
         semaphore: t('settings.credentials.apiToken'),
         rundeck: t('settings.credentials.apiToken'),
         jenkins: t('settings.credentials.apiToken'),
+        registry: t('settings.credentials.registryPassword'),
       }[type] ||
       (awx ? (awxPassword ? t('settings.fields.password') : t('settings.fields.token')) : null) ||
       (gitToken ? t('settings.fields.token') : null),
@@ -591,7 +596,9 @@ export function credentialLabels(t, type, awxAuth = 'token', gitAuth = 'token') 
     serverHelp: SERVER_CREDENTIAL_TYPES.includes(type)
       ? ['vault', 'cyberark'].includes(type)
         ? t('settings.credentials.serverHelp')
-        : t(`settings.runners.uriHelp_${type}`)
+        : type === 'registry'
+          ? t('settings.credentials.registryServerHelp')
+          : t(`settings.runners.uriHelp_${type}`)
       : null,
   };
 }
@@ -2441,7 +2448,10 @@ export default function getSettings(t) {
           // an AWX, AAP, Ascender, smtp or git one signing in with a password : the user it signs
           // in as
           requiredWhen: (r) =>
-            (awxUsesPassword(r) || smtpUsesPassword(r) || (r.credential_type === 'git' && r.git_auth === 'password')) &&
+            (awxUsesPassword(r) ||
+              smtpUsesPassword(r) ||
+              (r.credential_type === 'git' && r.git_auth === 'password') ||
+              r.credential_type === 'registry') &&
             !readFromStore(r),
           // no column : what it is depends on the type (a user, a bind DN, a client id), its page
           // shows it
