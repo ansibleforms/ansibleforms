@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "No puede editar los formularios en el diseñador",
     noPlaybookDesignAccess: "No puede editar los playbooks en el diseñador",
     noWorkflowDesignAccess: "No puede editar los flujos de trabajo en el diseñador",
+    noRteDesignAccess: "No puede editar las imágenes RTE en el diseñador",
+    noRteBuildAccess: "No puede compilar las imágenes RTE",
     noInventoryDesignAccess: "No puede editar los inventarios en el diseñador",
     noVarsFileDesignAccess: "No puede editar los archivos de variables en el diseñador",
     noLogsAccess: "No tienes acceso a los registros",

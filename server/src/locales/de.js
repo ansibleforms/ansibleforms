@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "Sie dürfen die Formulare im Designer nicht bearbeiten",
     noPlaybookDesignAccess: "Sie dürfen die Playbooks im Designer nicht bearbeiten",
     noWorkflowDesignAccess: "Sie dürfen die Workflows im Designer nicht bearbeiten",
+    noRteDesignAccess: "Sie dürfen die RTE-Images im Designer nicht bearbeiten",
+    noRteBuildAccess: "Sie dürfen die RTE-Images nicht bauen",
     noInventoryDesignAccess: "Sie dürfen die Inventare im Designer nicht bearbeiten",
     noVarsFileDesignAccess: "Sie dürfen die Variablendateien im Designer nicht bearbeiten",
     noLogsAccess: "Du hast keinen Zugriff auf Logs",

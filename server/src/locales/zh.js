@@ -11,6 +11,8 @@ export default {
     noFormDesignAccess: "您不能在设计器中编辑表单",
     noPlaybookDesignAccess: "您不能在设计器中编辑 playbook",
     noWorkflowDesignAccess: "您不能在设计器中编辑工作流",
+    noRteDesignAccess: "您不能在设计器中编辑 RTE 镜像",
+    noRteBuildAccess: "您不能构建 RTE 镜像",
     noInventoryDesignAccess: "您不能在设计器中编辑清单",
     noVarsFileDesignAccess: "您不能在设计器中编辑变量文件",
     noLogsAccess: "您无权访问日志",
