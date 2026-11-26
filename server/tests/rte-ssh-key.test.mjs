@@ -92,7 +92,7 @@ describe("a key with a passphrase, without ssh-agent", () => {
     const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_8_"));
     const err = await prepareSshKey(8, KEY, "phrase", missing).catch((e) => e);
     expect(err).toBeInstanceOf(SshKeyError);
-    expect(err.message).toMatch(/ssh-agent is not available on this RTE/);
+    expect(err.message).toMatch(/ssh-agent is not available on this runner/);
     expect(err.message).toMatch(/Install the OpenSSH client/);
     const after = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_8_"));
     expect(after).toEqual(before);

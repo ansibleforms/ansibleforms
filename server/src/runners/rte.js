@@ -53,10 +53,10 @@ function client(runner) {
 // what the job output (or the connection test) says when the RTE does not take the call
 function describe(err, url) {
   const status = err?.response?.status;
-  if (status === 401) return `the RTE at ${url} refused the token: check its RTE_TOKEN and the token stored here`;
-  if (status === 409) return `the RTE at ${url} did not take the job: ${err.response.data?.error || "conflict"}`;
-  if (status) return `the RTE at ${url} answered ${status}: ${err.response.data?.error || err.message}`;
-  return `the RTE at ${url} is unreachable: ${err.code || err.message}`;
+  if (status === 401) return `the runner at ${url} refused the token: check its RTE_TOKEN and the token stored here`;
+  if (status === 409) return `the runner at ${url} did not take the job: ${err.response.data?.error || "conflict"}`;
+  if (status) return `the runner at ${url} answered ${status}: ${err.response.data?.error || err.message}`;
+  return `the runner at ${url} is unreachable: ${err.code || err.message}`;
 }
 
 // a job that cannot run : failed, unless it ended already (runners/common.js)
@@ -112,12 +112,12 @@ async function track(jobId, rte) {
           unknown = 0;
           continue;
         }
-        return failJob(jobId, `the RTE '${rte.name}' lost job ${jobId}`);
+        return failJob(jobId, `the runner '${rte.name}' lost job ${jobId}`);
       }
     } catch (err) {
       // unreachable for a while : keep waiting, the RTE writes the end itself, and an RTE
       // that restarts abandons its own jobs, which ends this wait too
-      logger.debug(`Job ${jobId}: RTE status check failed: ${err.message}`);
+      logger.debug(`Job ${jobId}: runner status check failed: ${err.message}`);
     }
   }
 }
@@ -143,8 +143,8 @@ async function check(runner) {
   };
   if (data?.contract !== RTE_CONTRACT) {
     const theirs = data?.contract === undefined ? "no contract (a preview build)" : `contract ${data.contract}`;
-    const what = (data?.contract || 0) < RTE_CONTRACT ? "update the RTE" : "update this app";
-    throw new Errors.BadRequestError(`the RTE at ${rte.url} (${data?.version}) speaks ${theirs}, this app (${appVersion}) needs contract ${RTE_CONTRACT}: ${what}`);
+    const what = (data?.contract || 0) < RTE_CONTRACT ? "update the runner" : "update this app";
+    throw new Errors.BadRequestError(`the runner at ${rte.url} (${data?.version}) speaks ${theirs}, this app (${appVersion}) needs contract ${RTE_CONTRACT}: ${what}`);
   }
   return details;
 }
@@ -165,13 +165,13 @@ async function checkSocket(runner) {
   const state = await (await hub()).socketState(runner.name);
   if (!state?.alive) {
     const how = runner.rte_mode === "outbound"
-      ? "it has not dialed the controller: check its CONTROLLER_URL, its token and the network from the RTE to the controller"
-      : `no controller node could dial it at ${runner.uri}: check its RTE_URL, its token and the network from the controller to the RTE`;
-    throw new Errors.BadRequestError(`the RTE '${runner.name}' (${runner.rte_mode}) is not connected: ${how}`);
+      ? "it has not dialed the controller: check its CONTROLLER_URL, its token and the network from the runner to the controller"
+      : `no controller node could dial it at ${runner.uri}: check its RTE_URL, its token and the network from the controller to the runner`;
+    throw new Errors.BadRequestError(`the runner '${runner.name}' (${runner.rte_mode}) is not connected: ${how}`);
   }
   const info = state.info || {};
   if (info.contract !== undefined && info.contract !== SOCKET_CONTRACT) {
-    throw new Errors.BadRequestError(`the RTE '${runner.name}' (${info.version}) speaks contract ${info.contract}, this app (${appVersion}) needs contract ${SOCKET_CONTRACT}`);
+    throw new Errors.BadRequestError(`the runner '${runner.name}' (${info.version}) speaks contract ${info.contract}, this app (${appVersion}) needs contract ${SOCKET_CONTRACT}`);
   }
   return {
     id: state.rte_id, version: info.version, contract: info.contract, ansible: info.ansible,
@@ -200,7 +200,7 @@ async function trackSocket(jobId, runner) {
     if (!queueMinutes() || Date.now() - since < queueMinutes() * 60000 + 60000) continue;
     // never claimed : no connected RTE took it (the holder fails a busy one itself)
     if (!(await claimedBy(jobId).catch(() => "?"))) {
-      return failJob(jobId, `no controller node holds a socket to RTE '${runner.name}' and it took no job for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES): is it connected?`);
+      return failJob(jobId, `no controller node holds a socket to runner '${runner.name}' and it took no job for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES): is it connected?`);
     }
   }
 }
@@ -231,7 +231,7 @@ async function handOver(rte, jobId, sealed) {
     } catch (err) {
       if (err?.response?.status !== 503) throw err;
       if (Date.now() >= until) {
-        throw Object.assign(new Error(`the RTE '${rte.name}' stayed busy for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES)`), { response: { status: 503, data: { error: "busy" } } });
+        throw Object.assign(new Error(`the runner '${rte.name}' stayed busy for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES)`), { response: { status: 503, data: { error: "busy" } } });
       }
       if (!said) {
         said = true;
@@ -254,14 +254,14 @@ export default {
   async launch(ctx) {
     const { jobId, runner } = ctx;
     if (isSocket(runner)) {
-      await Job.printJobOutput(`ok: [Running on RTE ${runner.name} (${runner.rte_mode})]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
+      await Job.printJobOutput(`ok: [Running on runner ${runner.name} (${runner.rte_mode})]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
       // the node holding its socket sends it : this one at once, another within seconds
       (await hub()).kick(jobId, runner);
       return trackSocket(jobId, runner);
     }
     const rte = { ...client(runner), name: runner.name };
     // written before the hand-over, never after : from then on the RTE writes the output
-    await Job.printJobOutput(`ok: [Running on RTE ${runner.name} (${rte.url})]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
+    await Job.printJobOutput(`ok: [Running on runner ${runner.name} (${rte.url})]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
     // the job's secrets, resolved here and sealed for this RTE and this job
     let sealed;
     try {
@@ -270,7 +270,7 @@ export default {
       const creds = safeParse(rows?.[0]?.credentials, {}, `job.credentials id=${jobId}`);
       sealed = sealJobSecrets(await resolveJobSecrets(extravars, creds), runner.token, jobId);
     } catch (err) {
-      return failJob(jobId, `could not prepare the job's credentials for the RTE: ${err.message}`);
+      return failJob(jobId, `could not prepare the job's credentials for the runner: ${err.message}`);
     }
     try {
       await handOver(rte, jobId, sealed);
@@ -285,7 +285,7 @@ export default {
       if (err?.response || !(await claimedBy(jobId).catch(() => null))) {
         return failJob(jobId, err?.response?.status === 503 ? err.message : describe(err, rte.url));
       }
-      logger.warning(`Job ${jobId}: no answer from the RTE at ${rte.url}, but it claimed the job: following it`);
+      logger.warning(`Job ${jobId}: no answer from the runner at ${rte.url}, but it claimed the job: following it`);
     }
     return track(jobId, rte);
   },
@@ -300,7 +300,7 @@ export default {
     try {
       await rte.http.post(`/jobs/${ctx.jobId}/cancel`);
     } catch (err) {
-      logger.warning(`Job ${ctx.jobId}: the RTE did not take the cancel (${err.message}) ; the abort flag will stop it`);
+      logger.warning(`Job ${ctx.jobId}: the runner did not take the cancel (${err.message}) ; the abort flag will stop it`);
     }
   },
 };

@@ -108,7 +108,7 @@ describe("the hand-over", () => {
     const ok = await rte.launch({ jobId: 7, runner });
     assert.equal(ok, false);
     assert.equal(posted.length, 0);
-    assert.match(ended[0].line, /could not prepare the job's credentials for the RTE: secret store unreachable/);
+    assert.match(ended[0].line, /could not prepare the job's credentials for the runner: secret store unreachable/);
   });
 
   test("refused by the RTE (409): the job fails with the RTE's reason, and an abort flag is cleared", async () => {

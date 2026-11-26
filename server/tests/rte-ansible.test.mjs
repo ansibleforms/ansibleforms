@@ -401,7 +401,7 @@ describe("an SSH credential with a private key as the ansible login", () => {
     assert.equal(ok, false);
     assert.equal(spawned.length, 0, "no playbook ran");
     assert.equal(jobRow.status, "failed");
-    assert.ok(outputs.some((o) => /ssh-agent is not available on this RTE/.test(o.output)), JSON.stringify(outputs));
+    assert.ok(outputs.some((o) => /ssh-agent is not available on this runner/.test(o.output)), JSON.stringify(outputs));
     assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("af_sshkey_11_")), before, "no key left behind");
   });
 
@@ -561,7 +561,7 @@ describe("every way out removes the files holding the credentials, and ends the 
     assert.equal(ok, false);
     assert.equal(spawned.length, 0, "nothing ran");
     assert.equal(jobRow.status, "failed");
-    assert.ok(outputs.some((o) => /playbook folder .*not\/mounted does not exist on RTE/.test(o.output)), "the line names the folder and what to do");
+    assert.ok(outputs.some((o) => /playbook folder .*not\/mounted does not exist on runner/.test(o.output)), "the line names the folder and what to do");
   });
 });
 
@@ -725,7 +725,7 @@ describe("which runner runs a playbook job", () => {
     // a runner of another type : refused, with the type to name
     await assert.rejects(resolveRunner({ jobType: "awx", formType: "semaphore", extravars: { __runner__: "rd" } }), /Runner 'rd' is a rundeck runner, this form is of type semaphore: name a semaphore runner/);
     await assert.rejects(resolveRunner({ jobType: "awx", formType: "awx", extravars: { __runner__: "sem" } }), /Runner 'sem' is a semaphore runner, this form is of type awx: name an awx runner/);
-    await assert.rejects(resolveRunner({ jobType: "ansible", formType: "ansible", extravars: { __runner__: "ci" } }), /Runner 'ci' is a jenkins runner, this form is of type ansible: name an RTE runner/);
+    await assert.rejects(resolveRunner({ jobType: "ansible", formType: "ansible", extravars: { __runner__: "ci" } }), /Runner 'ci' is a jenkins runner, this form is of type ansible: name an AnsibleForms runner/);
     // no default of its type : what to add
     await assert.rejects(resolveRunner({ jobType: "awx", formType: "jenkins", extravars: {} }), /No runner for a form of type jenkins: add one of type jenkins/);
   });

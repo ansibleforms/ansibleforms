@@ -219,7 +219,7 @@ export async function failRteJob(jobId, message) {
  *   Promise<void>
  */
 export async function abortWhileWaiting(jobId) {
-  await Job.endJobStatus(jobId, (await Job.lastOrder(jobId)) + 1, "stderr", "aborted", "Playbook was aborted by the operator while it waited for the RTE");
+  await Job.endJobStatus(jobId, (await Job.lastOrder(jobId)) + 1, "stderr", "aborted", "Playbook was aborted by the operator while it waited for the runner");
   await Job.resetAbortRequested(jobId).catch(() => {});
 }
 
@@ -236,5 +236,5 @@ export async function abortWhileWaiting(jobId) {
  *   Promise<void>
  */
 export async function sayWaitingForSlot(jobId, name, why) {
-  await Job.printJobOutput(`ok: [Waiting for a free slot on RTE ${name}: ${why || "busy"}]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
+  await Job.printJobOutput(`ok: [Waiting for a free slot on runner ${name}: ${why || "busy"}]`, "stdout", jobId, (await Job.lastOrder(jobId)) + 1);
 }

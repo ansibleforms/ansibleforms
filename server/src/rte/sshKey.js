@@ -134,7 +134,7 @@ export function removeKeyDir(dir) {
  */
 function notAvailable(program) {
   return new SshKeyError(
-    `${program} is not available on this RTE: a private key with a passphrase is loaded into an ssh-agent for the job. Install the OpenSSH client (ssh-agent and ssh-add) on the RTE, or use a key without a passphrase`,
+    `${program} is not available on this runner: a private key with a passphrase is loaded into an ssh-agent for the job. Install the OpenSSH client (ssh-agent and ssh-add) on the runner, or use a key without a passphrase`,
   );
 }
 
@@ -235,7 +235,7 @@ export async function stopAgent(agent) {
  */
 function cannotExecute(dir, detail) {
   return new SshKeyError(
-    `the askpass script in ${path.dirname(dir)} cannot be run (${detail}): the temporary folder is likely mounted noexec. Set TMPDIR on the RTE to a folder that allows running programs`,
+    `the askpass script in ${path.dirname(dir)} cannot be run (${detail}): the temporary folder is likely mounted noexec. Set TMPDIR on the runner to a folder that allows running programs`,
   );
 }
 

@@ -159,7 +159,7 @@ export default {
     passwordIsUsername: "A palavra-passe não pode ser o nome de utilizador",
     runnerConnectionOk: "A ligação ao runner está OK",
     runnerConnectionOkDetails: "A ligação ao runner está OK: {details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "no nó {node}",

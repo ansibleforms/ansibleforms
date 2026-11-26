@@ -162,7 +162,7 @@ export default {
     passwordIsUsername: "La contrasenya no pot ser el nom d'usuari",
     runnerConnectionOk: "La connexió amb el runner és correcta",
     runnerConnectionOkDetails: "La connexió amb el runner és correcta: {details}",
-    runnerRteRelease: "RTE {version}",
+    runnerRteRelease: "AnsibleForms {version}",
     runnerAnsibleCore: "Ansible core {version}",
     runnerAnsible: "Ansible {version}",
     runnerOnNode: "al node {node}",

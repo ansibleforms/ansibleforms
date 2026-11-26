@@ -53,7 +53,7 @@ export const FROM_REPO = { fromRepo: true };
 // why an object of the app stays in the app, by its code (the client says it in its language)
 export const KEPT_REASONS = {
   seed: "managed by the config seed",
-  registered: "registered by its RTE",
+  registered: "registered by its runner",
   pending: "waiting for approval",
   holder: "it holds the repositories itself, never in its own file",
   uriSecret: "its uri carries a user or a token: give it a credential instead",

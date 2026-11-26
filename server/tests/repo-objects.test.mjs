@@ -420,7 +420,7 @@ describe("made the credentials repository, it takes the app's credentials", () =
       { id: 2, name: "asking", type: "rte", pending: 1 },
     );
     const p = await RepoObjects.preview(runners, "ops");
-    assert.deepEqual(p.kept.map((k) => k.reason), ["waiting for approval", "registered by its RTE"]);
+    assert.deepEqual(p.kept.map((k) => k.reason), ["waiting for approval", "registered by its runner"]);
   });
 });
 

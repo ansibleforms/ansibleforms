@@ -257,7 +257,7 @@ async function rteHeartbeat(entry) {
       );
     }
   } catch (e) {
-    logger.debug(`RTE heartbeat for ${entry.rteId}: ${e.message}`);
+    logger.debug(`Runner heartbeat for ${entry.rteId}: ${e.message}`);
   }
 }
 
@@ -312,7 +312,7 @@ async function rteIdTaken(name, rteId) {
   );
   const node = nodes?.[0];
   if (node && node.role !== "rte") return `it is the id of a node of role ${node.role}`;
-  if (node && Number(node.alive) && safeParse(node.info, {}, `nodes.info ${rteId}`)?.runner !== name) return "a live RTE of another runner goes by it";
+  if (node && Number(node.alive) && safeParse(node.info, {}, `nodes.info ${rteId}`)?.runner !== name) return "a live runner of another runner goes by it";
   // step 2 : the socket of another approved runner's RTE, held now by any controller node (a runner
   // waiting for approval holds nothing : it cannot keep an id from its RTE)
   const leases = await mysql.do(
@@ -321,7 +321,7 @@ async function rteIdTaken(name, rteId) {
     [rteId, name],
     true
   );
-  if (leases?.length) return `the RTE of runner '${leases[0].runner}' goes by it`;
+  if (leases?.length) return `the runner of runner '${leases[0].runner}' goes by it`;
   return null;
 }
 
@@ -338,7 +338,7 @@ async function rteIdTaken(name, rteId) {
 function adopt(session, runner, direction) {
   const name = runner.name;
   const previous = sessions.get(name);
-  if (previous && previous.session !== session) previous.session.close(CLOSE.REPLACED, "a newer socket of this RTE took over");
+  if (previous && previous.session !== session) previous.session.close(CLOSE.REPLACED, "a newer socket of this runner took over");
   // allowed : jobId -> Promise<boolean>, whether this RTE may write a job (itemAllowed) ;
   // refused : the jobs it was refused, said once in the log ; hashes : the job files sent to
   // it, the only ones it may fetch
@@ -356,13 +356,13 @@ function adopt(session, runner, direction) {
   session.on("m:hello", async (msg) => {
     // one hello per socket : a second one is ignored, never a second lease timer
     if (helloSeen) {
-      logger.debug(`RTE '${name}': a second hello on the same socket, ignored`);
+      logger.debug(`Runner '${name}': a second hello on the same socket, ignored`);
       return;
     }
     helloSeen = true;
     clearTimeout(hello);
     if (msg.contract !== SOCKET_CONTRACT) {
-      logger.warning(`RTE '${name}' speaks contract ${msg.contract}, this app (${appVersion}) contract ${SOCKET_CONTRACT}: refused`);
+      logger.warning(`Runner '${name}' speaks contract ${msg.contract}, this app (${appVersion}) contract ${SOCKET_CONTRACT}: refused`);
       session.close(CLOSE.CONTRACT, `this app speaks contract ${SOCKET_CONTRACT}`);
       return;
     }
@@ -372,13 +372,13 @@ function adopt(session, runner, direction) {
     try {
       taken = await rteIdTaken(name, rteId);
     } catch (e) {
-      logger.error(`RTE '${name}': could not check its id: ${e.message}`);
+      logger.error(`Runner '${name}': could not check its id: ${e.message}`);
       session.close(CLOSE.LEASE_LOST, "no lease");
       return;
     }
     if (!current()) return;
     if (taken) {
-      logger.warning(`RTE '${name}' says it is '${rteId}', refused: ${taken}`);
+      logger.warning(`Runner '${name}' says it is '${rteId}', refused: ${taken}`);
       session.close(CLOSE.ID_TAKEN, `the id ${rteId} is taken: ${taken}`);
       return;
     }
@@ -388,7 +388,7 @@ function adopt(session, runner, direction) {
     try {
       await takeLease(name, direction, entry.rteId);
     } catch (e) {
-      logger.error(`RTE '${name}': could not take its lease: ${e.message}`);
+      logger.error(`Runner '${name}': could not take its lease: ${e.message}`);
       session.close(CLOSE.LEASE_LOST, "no lease");
       return;
     }
@@ -398,7 +398,7 @@ function adopt(session, runner, direction) {
     session.send({ t: "welcome", node: nodeId, contract: SOCKET_CONTRACT, version: appVersion, pending: isPending(entry) });
     // its settings from its runner page, before any job
     sendSettings(entry);
-    logger.notice(`RTE '${name}' (${entry.rteId}, ${msg.version}, ${direction}) connected`);
+    logger.notice(`Runner '${name}' (${entry.rteId}, ${msg.version}, ${direction}) connected`);
     await renewLease(entry).catch(() => {});
     if (!current()) return;
     await rteHeartbeat(entry);
@@ -407,12 +407,12 @@ function adopt(session, runner, direction) {
     // step 4 : the jobs it came back without : abandoned (an approved runner's only : one
     // waiting for approval has no job)
     if (!isPending(entry)) {
-      await abandonLost(entry, msg).catch((e) => logger.error(`RTE '${name}': ${e.message}`));
+      await abandonLost(entry, msg).catch((e) => logger.error(`Runner '${name}': ${e.message}`));
       if (!current()) return;
     }
     // step 5 : its lease and its heartbeat kept, every RENEW_MS
     clearInterval(entry.renew);
-    entry.renew = setInterval(() => renewTick(entry).catch((e) => logger.debug(`RTE '${name}': ${e.message}`)), RENEW_MS);
+    entry.renew = setInterval(() => renewTick(entry).catch((e) => logger.debug(`Runner '${name}': ${e.message}`)), RENEW_MS);
     entry.renew.unref?.();
     // its jobs waiting already : sent now
     dispatch().catch(() => {});
@@ -442,7 +442,7 @@ function adopt(session, runner, direction) {
     // the cancels sent on this socket : sent again on the next one (the RTE that comes back
     // may be a new container, or may have missed them)
     forgetCancels(entry);
-    logger.warning(`RTE '${name}' disconnected (${code}${reason ? `: ${reason}` : ""})`);
+    logger.warning(`Runner '${name}' disconnected (${code}${reason ? `: ${reason}` : ""})`);
     publish("runners");
   });
 }
@@ -466,11 +466,11 @@ async function renewTick(entry) {
   try {
     row = await Runner.findByName(name);
   } catch (e) {
-    logger.debug(`RTE '${name}': reading its runner failed: ${e.message}`);
+    logger.debug(`Runner '${name}': reading its runner failed: ${e.message}`);
     row = entry.runner;
   }
   if (!row || row.type !== "rte") {
-    logger.warning(`RTE '${name}': its runner is gone (rejected or deleted), closing its socket`);
+    logger.warning(`Runner '${name}': its runner is gone (rejected or deleted), closing its socket`);
     entry.session.close(CLOSE.UNAUTHORIZED, "this runner was removed under Connections > Runners");
     return;
   }
@@ -480,12 +480,12 @@ async function renewTick(entry) {
   // step 2 : the lease
   try {
     if (!(await renewLease(entry))) {
-      logger.warning(`RTE '${name}': another node holds its socket now, closing this one`);
+      logger.warning(`Runner '${name}': another node holds its socket now, closing this one`);
       entry.session.close(CLOSE.LEASE_LOST, "lease taken by another node");
       return;
     }
   } catch (e) {
-    logger.debug(`RTE '${name}': lease renewal failed: ${e.message}`);
+    logger.debug(`Runner '${name}': lease renewal failed: ${e.message}`);
   }
   // step 3 : the heartbeat
   await rteHeartbeat(entry);
@@ -509,7 +509,7 @@ async function abandonLost(entry, hello) {
   const rows = await mysql.do("SELECT id FROM AnsibleForms.`jobs` WHERE status='running' AND host=? AND runner=?", [entry.rteId, name]);
   for (const { id } of rows || []) {
     if (known.has(Number(id))) continue;
-    if (await abandonJobs({ id, host: entry.rteId, runner: name })) logger.warning(`Job ${id}: RTE '${name}' came back without it: abandoned`);
+    if (await abandonJobs({ id, host: entry.rteId, runner: name })) logger.warning(`Job ${id}: runner '${name}' came back without it: abandoned`);
     forgetJob(Number(id));
   }
 }
@@ -551,23 +551,23 @@ export async function authenticate(headers, opts = {}) {
   const name = String(headers["x-af-rte-name"] || "").trim();
   const join = String(headers["x-af-rte-join"] || "").trim();
   const url = String(opts.url || headers["x-af-rte-url"] || "").trim();
-  if (token.length < 16) return { status: 401, error: "the RTE's token (RTE_TOKEN) is missing or shorter than 16 characters" };
-  if (!name || !/^[A-Za-z0-9_.:@-]{1,250}$/.test(name)) return { status: 400, error: "the RTE's name (RTE_NAME) is missing or not a valid runner name" };
-  if (mode === "inbound" && !/^https?:\/\//i.test(url)) return { status: 400, error: "an inbound RTE registers with its address (RTE_URL), which the controller dials" };
+  if (token.length < 16) return { status: 401, error: "the runner's token (RTE_TOKEN) is missing or shorter than 16 characters" };
+  if (!name || !/^[A-Za-z0-9_.:@-]{1,250}$/.test(name)) return { status: 400, error: "the runner's name (RTE_NAME) is missing or not a valid runner name" };
+  if (mode === "inbound" && !/^https?:\/\//i.test(url)) return { status: 400, error: "an inbound runner registers with its address (RTE_URL), which the controller dials" };
   // an inbound RTE's certificate : only with an https address, certificates only
   let cert = null;
   if (opts.cert) {
-    if (mode !== "inbound" || !/^https:\/\//i.test(url)) return { status: 400, error: "a certificate (cert) is sent only by an inbound RTE with an https address (RTE_URL)" };
+    if (mode !== "inbound" || !/^https:\/\//i.test(url)) return { status: 400, error: "a certificate (cert) is sent only by an inbound runner with an https address (RTE_URL)" };
     try {
       cert = parseCertBundle(opts.cert).pem;
     } catch (e) {
-      return { status: 400, error: `the RTE's certificate (cert) is not one: ${e.message}` };
+      return { status: 400, error: `the runner's certificate (cert) is not one: ${e.message}` };
     }
   }
   // what the runner becomes : its mode, and an inbound one's address
   const fields = mode === "inbound" ? { rte_mode: "inbound", uri: url } : { rte_mode: "outbound", ...(url ? { uri: url } : {}) };
   const runner = await Runner.findByName(name);
-  if (runner && runner.type !== "rte") return { status: 409, error: `'${name}' is a ${runner.type} runner, not an RTE` };
+  if (runner && runner.type !== "rte") return { status: 409, error: `'${name}' is a ${runner.type} runner, not an AnsibleForms runner` };
   if (runner && safeEqual(token, runner.token)) {
     const moved = runner.rte_mode !== fields.rte_mode || (mode === "inbound" && runner.uri !== url);
     // a runner of 7.2 (database mode, the mode of a runner with none) whose RTE now talks over
@@ -579,7 +579,7 @@ export async function authenticate(headers, opts = {}) {
     // a seeded runner keeps the mode its seed declares : the seed is changed first, then the
     // RTE ; one the seed already declares in this mode is not moved, so it gets here unrefused
     if (moved && runner.managed && fromDatabase) {
-      return { status: 409, error: `runner '${name}' is managed by the config seed in database mode: set rte_mode: ${mode} for it in the seed (and its credential${mode === "inbound" ? " with the address the controller dials, RTE_URL" : ""}), then restart this RTE` };
+      return { status: 409, error: `runner '${name}' is managed by the config seed in database mode: set rte_mode: ${mode} for it in the seed (and its credential${mode === "inbound" ? " with the address the controller dials, RTE_URL" : ""}), then restart this runner` };
     }
     if (moved && runner.managed) return { status: 409, error: `runner '${name}' is managed by the config seed: its mode and address are set there` };
     // a database-mode runner is always approved (pending ones only ever came over the socket) :
@@ -594,21 +594,21 @@ export async function authenticate(headers, opts = {}) {
     const credManaged = !!(cred && cred.credential_type === "rte" && cred.managed);
     // a hand-made runner naming a credential of the config seed : the seed sets the address and
     // the bundle there, the RTE never does (storeToken would refuse it on every registration)
-    if (moved && credManaged) return { status: 409, error: `the credential '${runner.credential}' of runner '${name}' is managed by the config seed: the RTE's address is set there` };
+    if (moved && credManaged) return { status: 409, error: `the credential '${runner.credential}' of runner '${name}' is managed by the config seed: the runner's address is set there` };
     if (repinned && credManaged) {
-      logger.warning(`Runner '${name}': its credential '${runner.credential}' is managed by the config seed: the certificate its RTE sent (fingerprint ${certFingerprint(cert)}) is not stored, set its ca_bundle there`);
+      logger.warning(`Runner '${name}': its credential '${runner.credential}' is managed by the config seed: the certificate its runner sent (fingerprint ${certFingerprint(cert)}) is not stored, set its ca_bundle there`);
       repinned = false;
     }
     // a bundle an admin set by hand is theirs : the RTE's certificate never replaces it
     if (repinned && !runner.managed) {
       const stored = viaCredential && cred?.credential_type === "rte" ? cred : runner;
       if (!rteMayPin(stored.ca_bundle, stored.rte_cert_sha256)) {
-        logger.warning(`Runner '${name}': its ca_bundle was set by hand: the certificate its RTE sent (fingerprint ${certFingerprint(cert)}) is not stored. Empty the ca_bundle to have the RTE's certificate pinned again`);
+        logger.warning(`Runner '${name}': its ca_bundle was set by hand: the certificate its runner sent (fingerprint ${certFingerprint(cert)}) is not stored. Empty the ca_bundle to have the runner's certificate pinned again`);
         repinned = false;
       }
     }
     if (repinned && runner.managed) {
-      logger.warning(`Runner '${name}' is managed by the config seed: the certificate its RTE sent (fingerprint ${certFingerprint(cert)}) is not stored, set its ca_bundle there`);
+      logger.warning(`Runner '${name}' is managed by the config seed: the certificate its runner sent (fingerprint ${certFingerprint(cert)}) is not stored, set its ca_bundle there`);
     } else if (moved || repinned) {
       const pin = repinned ? { ca_bundle: cert, ignore_certs: 0, rte_cert_sha256: bundleDigest(cert) } : {};
       // a runner its 7.2 RTE registered itself (node_id) is no longer that RTE's row once it
@@ -627,7 +627,7 @@ export async function authenticate(headers, opts = {}) {
         await updateHeld("runners", runner, { ...fields, ...pin, ...registered });
       }
       if (moved && fromDatabase) {
-        logger.notice(`Runner '${name}' moved from database mode to ${mode}${mode === "inbound" ? ` at ${url}` : ""}: its RTE signed in with the runner's own token`);
+        logger.notice(`Runner '${name}' moved from database mode to ${mode}${mode === "inbound" ? ` at ${url}` : ""}: its runner signed in with the runner's own token`);
       } else if (moved) {
         logger.notice(`Runner '${name}' is ${mode} now${mode === "inbound" ? ` at ${url}` : ""}`);
       }
@@ -639,7 +639,7 @@ export async function authenticate(headers, opts = {}) {
     return { runner: { ...runner, ...fields, ...(repinned && !runner.managed ? { ca_bundle: cert, ignore_certs: 0 } : {}) } };
   }
   if (!join) {
-    if (runner) return { status: 401, error: `the token of RTE '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
+    if (runner) return { status: 401, error: `the token of runner '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
     return askToJoin({ name, token, mode, url, fields, headers, ip: opts.ip, cert });
   }
   // a seeded runner first : refused before the join token is used, which would cost it a use
@@ -647,7 +647,7 @@ export async function authenticate(headers, opts = {}) {
   // an approved runner : its own token only, never a join token (refused before the join token
   // is used, too)
   if (runner && !Number(runner.pending)) {
-    logger.warning(`RTE '${name}': a join token was offered for the approved runner of that name with another token: refused`);
+    logger.warning(`Runner '${name}': a join token was offered for the approved runner of that name with another token: refused`);
     return {
       status: 409,
       error: `runner '${name}' exists and is approved: a join token cannot give it a new token. Use its current RTE_TOKEN, or have an admin change the token in its credential (or remove the runner) under Connections`,
@@ -710,10 +710,10 @@ async function addPending({ name, token, mode, url, fields, headers, ip, cert = 
   const already = await Runner.findByName(name);
   if (already) {
     if (already.type === "rte" && safeEqual(token, already.token)) return { runner: already, pending: !!Number(already.pending) };
-    return { status: 401, error: `the token of RTE '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
+    return { status: 401, error: `the token of runner '${name}' is not the one stored for its runner: check its RTE_TOKEN` };
   }
   if ((await Runner.countPending()) >= PENDING_MAX) {
-    return { status: 429, error: `${PENDING_MAX} RTEs already wait for approval under Connections > Runners: approve or reject them first` };
+    return { status: 429, error: `${PENDING_MAX} runners already wait for approval under Connections > Runners: approve or reject them first` };
   }
   const info = {
     host: String(headers["x-af-rte-host"] || "").slice(0, 250) || null,
@@ -733,7 +733,7 @@ async function addPending({ name, token, mode, url, fields, headers, ip, cert = 
     pending: 1, pending_since: new Date(), pending_info: JSON.stringify(info),
     description: `Asked to join from ${info.host || info.ip || "an unknown host"}`,
   }, { fromRte: true });
-  logger.notice(`RTE '${name}' (${mode}, fingerprint ${info.fingerprint}${cert ? `, certificate ${info.cert_fingerprint}` : ""}) asked to join from ${info.ip || "?"}: approve it under Connections > Runners`);
+  logger.notice(`Runner '${name}' (${mode}, fingerprint ${info.fingerprint}${cert ? `, certificate ${info.cert_fingerprint}` : ""}) asked to join from ${info.ip || "?"}: approve it under Connections > Runners`);
   publish("runners");
   return { runner: await Runner.findByName(name), pending: true };
 }
@@ -781,7 +781,7 @@ async function updateHeld(key, row, data) {
   if (!before) return;
   import("../lib/repoObjects/index.js")
     .then(({ default: RepoObjects }) => RepoObjects.holding([], () => RepoObjects.appUpdated(key, before, row.id), before))
-    .catch((e) => logger.warning(`The file of ${key === "runners" ? "runner" : "credential"} '${row.name}' in repository '${before.repository}' does not follow its RTE yet: ${e.message || e}`));
+    .catch((e) => logger.warning(`The file of ${key === "runners" ? "runner" : "credential"} '${row.name}' in repository '${before.repository}' does not follow its runner yet: ${e.message || e}`));
 }
 
 /**
@@ -812,7 +812,7 @@ async function storeToken(runnerName, token, url, current, cert = null) {
       // a bundle an admin set by hand stays : the RTE's certificate is not stored
       let pinned = !!cert;
       if (cert && !rteMayPin(cred.ca_bundle, cred.rte_cert_sha256)) {
-        logger.warning(`Runner '${runnerName}': the ca_bundle of its credential '${current}' was set by hand: the certificate its RTE sent (fingerprint ${certFingerprint(cert)}) is not stored`);
+        logger.warning(`Runner '${runnerName}': the ca_bundle of its credential '${current}' was set by hand: the certificate its runner sent (fingerprint ${certFingerprint(cert)}) is not stored`);
         pinned = false;
       }
       const pin = pinned ? { ca_bundle: cert, ignore_certs: 0, rte_cert_sha256: bundleDigest(cert) } : {};
@@ -828,7 +828,7 @@ async function storeToken(runnerName, token, url, current, cert = null) {
     password: token,
     url: url || null,
     ...(cert ? { ca_bundle: cert, ignore_certs: 0, rte_cert_sha256: bundleDigest(cert) } : {}),
-    description: `The token of the RTE '${runnerName}' (its RTE_TOKEN), stored when it joined`,
+    description: `The token of the runner '${runnerName}' (its RTE_TOKEN), stored when it joined`,
   }, { fromRte: true });
   return { name, pinned: !!cert };
 }
@@ -894,13 +894,13 @@ export async function registerHandler(req, res) {
   try {
     const out = await authenticate(req.headers, { mode: req.body?.mode, url: req.body?.url, cert: req.body?.cert, ip: req.ip });
     if (!out.runner) {
-      logger.warning(`Refused an RTE registration from ${req.ip}: ${out.error}`);
+      logger.warning(`Refused a runner registration from ${req.ip}: ${out.error}`);
       return res.status(out.status).json({ error: out.error });
     }
     publish("runners");
     return res.json({ runner: out.runner.name, mode: out.runner.rte_mode, uri: out.runner.uri || null, pending: !!Number(out.runner.pending) });
   } catch (e) {
-    logger.error(`RTE registration: ${e.message}`);
+    logger.error(`Runner registration: ${e.message}`);
     return res.status(500).json({ error: e.message });
   }
 }
@@ -1025,7 +1025,7 @@ export function handleUpgrade(req, socket, head) {
   authenticate(req.headers, { ip })
     .then((res) => {
       if (!res.runner) {
-        logger.warning(`Refused an RTE socket from ${ip}: ${res.error}`);
+        logger.warning(`Refused a runner socket from ${ip}: ${res.error}`);
         const body = JSON.stringify({ error: res.error });
         socket.write(`HTTP/1.1 ${res.status} Refused\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`);
         socket.destroy();
@@ -1036,7 +1036,7 @@ export function handleUpgrade(req, socket, head) {
       wss.handleUpgrade(req, socket, head, (ws) => adopt(new Session(ws, `rte '${res.runner.name}'`), res.runner, "outbound"));
     })
     .catch((e) => {
-      logger.error(`RTE socket: ${e.message}`);
+      logger.error(`Runner socket: ${e.message}`);
       socket.write("HTTP/1.1 500 Internal Server Error\r\nConnection: close\r\n\r\n");
       socket.destroy();
     });
@@ -1102,7 +1102,7 @@ function warnPlain(name, uri) {
   }
   if (url.protocol !== "http:" || isLoopback(url.hostname) || plainWarned.has(name)) return;
   plainWarned.add(name);
-  logger.warning(`[SECURITY] Runner '${name}': the controller dials its RTE over plain http (${url.origin}): its token crosses the network in clear. Run the RTE with HTTPS=1 and an https RTE_URL, so the controller pins its certificate`);
+  logger.warning(`[SECURITY] Runner '${name}': the controller dials its runner over plain http (${url.origin}): its token crosses the network in clear. Run the runner with HTTPS=1 and an https RTE_URL, so the controller pins its certificate`);
 }
 
 /**
@@ -1129,7 +1129,7 @@ async function dialInbound() {
       dialing.delete(name);
       // an address that is not one stays so until an admin fixes it : said as a failed dial,
       // so not every round
-      const line = failureLine(dialReportOf(name), { cause: "address", text: `its address is not one (${e.message})` }, `Runner '${name}': cannot dial its RTE at ${scrub(runner.uri, [runner.token])}`);
+      const line = failureLine(dialReportOf(name), { cause: "address", text: `its address is not one (${e.message})` }, `Runner '${name}': cannot dial it at ${scrub(runner.uri, [runner.token])}`);
       if (line) logger.error(line);
       continue;
     }
@@ -1152,7 +1152,7 @@ async function dialInbound() {
       dialing.delete(name);
       // back after failures : said once, at the default level
       const back = dialReportOf(name).connected();
-      if (back) logger.notice(`Runner '${name}': reached its RTE at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
+      if (back) logger.notice(`Runner '${name}': reached its runner at ${shown} again, after ${back.failures} failed dial(s) in ${ago(Date.now() - back.since)}`);
       adopt(new Session(ws, `rte '${name}'`), runner, "inbound");
     });
     ws.on("unexpected-response", (req, res) => {
@@ -1179,7 +1179,7 @@ async function dialInbound() {
       // the dial itself failed : why, at warning, the first time and on a change of cause, then
       // at most every few minutes while the same cause lasts
       const why = describeDialFailure(failure || { status: refusedStatus, code }, { side: "rte", url, secrets });
-      const line = failureLine(dialReportOf(name), why, `Runner '${name}': cannot reach its RTE at ${shown}`);
+      const line = failureLine(dialReportOf(name), why, `Runner '${name}': cannot reach it at ${shown}`);
       if (line) logger.warning(line);
     });
   }
@@ -1453,7 +1453,7 @@ async function handOver(jobId, entry) {
   const busy = async (why) => {
     wait.retryAt = Date.now() + RETRY_MS;
     if (queueMinutes() && Date.now() - wait.firstWait > queueMinutes() * 60000) {
-      await failJob(jobId, `the RTE '${name}' stayed busy for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES)`);
+      await failJob(jobId, `the runner '${name}' stayed busy for ${queueMinutes()} minutes (RTE_QUEUE_MINUTES)`);
       return;
     }
     if (!wait.said) {
@@ -1474,7 +1474,7 @@ async function handOver(jobId, entry) {
   try {
     msg = await runMessage(jobId, entry);
   } catch (e) {
-    await failJob(jobId, `could not prepare the job for the RTE: ${e.message}`);
+    await failJob(jobId, `could not prepare the job for the runner: ${e.message}`);
     return;
   }
   const answer = new Promise((resolve) => {
@@ -1486,13 +1486,13 @@ async function handOver(jobId, entry) {
   const res = await answer;
   if (res.claimed) {
     if (waiting.get(jobId) === wait) waiting.delete(jobId);
-    logger.notice(`Job ${jobId}: RTE '${name}' took it`);
+    logger.notice(`Job ${jobId}: runner '${name}' took it`);
     return;
   }
   // not taken : the claim goes back, so it can be sent again (this node or the next holder)
   await mysql.do("UPDATE AnsibleForms.`jobs` SET host=NULL WHERE id=? AND host=? AND status='running'", [jobId, entry.rteId]);
   if (res.busy || res.lost) return busy(res.error || "busy");
-  await failJob(jobId, `the RTE '${name}' did not take the job: ${res.error}`);
+  await failJob(jobId, `the runner '${name}' did not take the job: ${res.error}`);
 }
 
 /**
@@ -1520,7 +1520,7 @@ async function dispatch() {
       continue;
     }
     if (claims.has(r.id)) continue;
-    sendJob(r.id, byName.get(r.runner)).catch((e) => logger.error(`Job ${r.id}: handing it to RTE '${r.runner}' failed: ${e.message}`));
+    sendJob(r.id, byName.get(r.runner)).catch((e) => logger.error(`Job ${r.id}: handing it to runner '${r.runner}' failed: ${e.message}`));
   }
   const ids = ready.map((e) => e.rteId).filter(Boolean);
   if (!ids.length) return;
@@ -1551,7 +1551,7 @@ async function dispatch() {
 export function kick(jobId, runner) {
   const entry = sessions.get(runner.name);
   if (canRun(entry) && !claims.has(jobId)) {
-    sendJob(jobId, entry).catch((e) => logger.error(`Job ${jobId}: handing it to RTE '${runner.name}' failed: ${e.message}`));
+    sendJob(jobId, entry).catch((e) => logger.error(`Job ${jobId}: handing it to runner '${runner.name}' failed: ${e.message}`));
   }
 }
 
@@ -1627,7 +1627,7 @@ function onItem(entry, msg) {
   const item = msg.item || {};
   if (!Number.isInteger(jobId) || jobId <= 0) return;
   if (isPending(entry)) {
-    logger.warning(`Job ${jobId}: RTE '${entry.runner.name}' waits for approval and sent an item of it: dropped`);
+    logger.warning(`Job ${jobId}: runner '${entry.runner.name}' waits for approval and sent an item of it: dropped`);
     return;
   }
   const prev = writing.get(jobId) || Promise.resolve();
@@ -1642,7 +1642,7 @@ function onItem(entry, msg) {
         if (!entry.refused.has(jobId)) {
           while (entry.refused.size >= ALLOWED_MAX) entry.refused.delete(entry.refused.values().next().value);
           entry.refused.add(jobId);
-          logger.warning(`Job ${jobId}: RTE '${entry.runner.name}' (${entry.rteId}) sent an item of a job that is not its own: dropped`);
+          logger.warning(`Job ${jobId}: runner '${entry.runner.name}' (${entry.rteId}) sent an item of a job that is not its own: dropped`);
         }
         return;
       }
@@ -1651,7 +1651,7 @@ function onItem(entry, msg) {
       entry.session.send({ t: "ack", jobId, seq: item.seq });
     })
     .catch((e) => {
-      logger.error(`Job ${jobId}: storing what RTE '${entry.runner.name}' sent failed, closing its socket so it sends it again: ${e.message}`);
+      logger.error(`Job ${jobId}: storing what runner '${entry.runner.name}' sent failed, closing its socket so it sends it again: ${e.message}`);
       entry.storeFailed = true;
       entry.session.close(CLOSE.GOING_AWAY, "an item could not be stored: send again");
     })
@@ -1701,13 +1701,13 @@ async function storeItem(entry, jobId, item) {
       break;
     case "abandon":
       if (await abandonJobs({ id: jobId })) {
-        await Job.printJobOutput(`[ERROR]: ${item.message || "the RTE lost the job"}`, "stderr", jobId, (await Job.lastOrder(jobId)) + 1);
+        await Job.printJobOutput(`[ERROR]: ${item.message || "the runner lost the job"}`, "stderr", jobId, (await Job.lastOrder(jobId)) + 1);
         publish("jobs");
       }
       forgetJob(jobId);
       break;
     default:
-      logger.debug(`Job ${jobId}: an item of an unknown kind '${item.kind}' (a newer RTE) was skipped`);
+      logger.debug(`Job ${jobId}: an item of an unknown kind '${item.kind}' (a newer runner) was skipped`);
   }
 }
 
@@ -1722,11 +1722,11 @@ async function storeItem(entry, jobId, item) {
 function onFetch(entry, msg) {
   const hash = String(msg.hash || "");
   if (isPending(entry) || !entry.hashes.has(hash)) {
-    logger.warning(`RTE '${entry.runner.name}' asked for files that were not sent to it (${hash.slice(0, 12)}): refused`);
-    entry.session.send({ t: "file", hash, error: "these files were not sent to this RTE" });
+    logger.warning(`Runner '${entry.runner.name}' asked for files that were not sent to it (${hash.slice(0, 12)}): refused`);
+    entry.session.send({ t: "file", hash, error: "these files were not sent to this runner" });
     return;
   }
-  sendFiles(entry, hash).catch((e) => logger.error(`RTE '${entry.runner.name}': sending files: ${e.message}`));
+  sendFiles(entry, hash).catch((e) => logger.error(`Runner '${entry.runner.name}': sending files: ${e.message}`));
 }
 
 /**
@@ -1745,7 +1745,7 @@ async function sendFiles(entry, hash) {
     entry.session.send({ t: "file", hash, error: "this controller node does not have these files (they changed since): the job is sent again" });
     return;
   }
-  logger.info(`RTE '${entry.runner.name}': sending the job files ${hash.slice(0, 12)} (${Math.round(b.size / 1024)} KB)`);
+  logger.info(`Runner '${entry.runner.name}': sending the job files ${hash.slice(0, 12)} (${Math.round(b.size / 1024)} KB)`);
   await readChunks(b.file, CHUNK_BYTES, async (buf, last) => {
     entry.session.send({ t: "file", hash, data: buf.toString("base64"), last, sha256: last ? b.sha256 : undefined });
     // a slow link : the socket's buffer drains before the next chunk
@@ -1778,7 +1778,7 @@ export function startRteHub(httpServer) {
   // the same work, written as its own row (lib/hubLoops.js)
   startLoops({ runnerDispatch: dispatch, runnerDial: dialInbound, runnerPrune: pruneEnded });
   setTimeout(() => dialInbound().catch(() => {}), 2000).unref?.();
-  logger.notice(`Taking RTE sockets on ${appConfig.baseUrl || ""}${APP_SOCKET_PATH}`);
+  logger.notice(`Taking runner sockets on ${appConfig.baseUrl || ""}${APP_SOCKET_PATH}`);
   return {
     stop() {
       stopLoops();

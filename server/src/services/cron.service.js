@@ -650,12 +650,12 @@ class CronService {
       try {
         const runners = (await Runner.removeUnresponsive()) || 0;
         if (runners > 0) {
-          logger.warning(`Removed ${runners} runner(s) registered by an RTE that stopped answering`);
+          logger.warning(`Removed ${runners} runner(s) registered by a runner that stopped answering`);
           done.push(`removed ${counted(runners, 'runner')} that stopped answering`);
           changed += runners;
         }
       } catch (err) {
-        logger.error('Failed to remove the runners of stopped RTEs:', err);
+        logger.error('Failed to remove the runners of stopped runners:', err);
         errors.push(`runners: ${err.message || err}`);
       }
       // and the RTEs that asked to join and nobody approved within a day

@@ -400,19 +400,19 @@
     type: string
     allowed: outbound, inbound or database
     default: database
-    short: How an RTE talks to the controller
-    hint: "Read by an RTE: outbound dials the controller, inbound is dialed by it; database is deprecated."
+    short: How a runner talks to the controller
+    hint: "Read by a runner: outbound dials the controller, inbound is dialed by it; database is deprecated."
     description: |
-      Read by an RTE (`AF_ROLE=rte`).
+      Read by a runner (`AF_ROLE=rte`).
 
-      `outbound`: the RTE dials the controller (`CONTROLLER_URL`) and keeps one WebSocket open,
-      redialing when it drops. Nothing reaches the RTE from outside: only its zone to the
+      `outbound`: the runner dials the controller (`CONTROLLER_URL`) and keeps one WebSocket open,
+      redialing when it drops. Nothing reaches the runner from outside: only its zone to the
       controller on the controller's port, through a proxy if `HTTPS_PROXY` says so. The first
       time it joins with `RTE_JOIN_TOKEN`.
 
       `HTTPS_PROXY` and `NO_PROXY` (lower case read too) are the system's own proxy variables,
-      set on the RTE's container rather than here, and a playbook keeps them: the socket to the
-      controller and an inbound RTE's registration call go through `HTTPS_PROXY`, unless the
+      set on the runner's container rather than here, and a playbook keeps them: the socket to the
+      controller and an inbound runner's registration call go through `HTTPS_PROXY`, unless the
       controller's host is in `NO_PROXY` (host names, `.domain` suffixes, or `*` for every host).
 
       A dial that fails is logged at warning with its cause and a hint: a name that does not
@@ -420,32 +420,32 @@
       the controller refusing the socket (401 the token, 404 the `CONTROLLER_URL` path or
       `BASE_URL`). The first failure and every change of cause are logged at once, the same cause
       again at most every 5 minutes while it lasts, and reaching the controller again at notice.
-      The controller does the same for an inbound RTE it cannot dial. The token is never logged.
+      The controller does the same for an inbound runner it cannot dial. The token is never logged.
 
-      `inbound`: the RTE listens and the controller dials it at its runner's address (`RTE_URL`),
+      `inbound`: the runner listens and the controller dials it at its address (`RTE_URL`),
       one controller node at a time. With `CONTROLLER_URL` (and `RTE_JOIN_TOKEN` the first time)
-      it registers itself with one call ; without, add its runner under Connections > Runners
-      (type RTE, mode inbound, its address and `RTE_TOKEN`).
+      it registers itself with one call ; without, add it under Connections > Runners
+      (type AnsibleForms, mode inbound, its address and `RTE_TOKEN`).
 
-      In both socket modes the RTE holds no database credentials: the controller sends it each job
+      In both socket modes the runner holds no database credentials: the controller sends it each job
       and stores what comes back - the output, the events, the end - exactly once, and sends the
       end notifications. The job's files come with it unless `RTE_FILES=local`.
 
-      `database` (deprecated, removed in 8.0.0): the RTE reads and writes the controller's database
+      `database` (deprecated, removed in 8.0.0): the runner reads and writes the controller's database
       itself, with `DB_*` and the same `ENCRYPTION_SECRET` - the only mode before 7.3, and the one
-      of an RTE without `RTE_MODE` throughout 7.x. It logs a deprecation warning at its start.
+      of a runner without `RTE_MODE` throughout 7.x. It logs a deprecation warning at its start.
   - name: CONTROLLER_URL
     version: 7.8.0
     type: string
     allowed: an http:// or https:// address
-    short: The controller's address an RTE dials
-    hint: "On an outbound RTE (and an inbound one that registers itself): the controller's address."
+    short: The controller's address a runner dials
+    hint: "On an outbound runner (and an inbound one that registers itself): the controller's address."
     description: |
-      On an RTE in `outbound` mode: the controller's address as people open it -
-      `https://forms.example.com`, with its `BASE_URL` if any. The RTE adds the socket's path
+      On a runner in `outbound` mode: the controller's address as people open it -
+      `https://forms.example.com`, with its `BASE_URL` if any. The runner adds the socket's path
       (`/api/v2/rte/socket`) and dials it over `wss://` (`ws://` for an http address).
 
-      On an RTE in `inbound` mode: the address of its one registration call (with `RTE_URL` and,
+      On a runner in `inbound` mode: the address of its one registration call (with `RTE_URL` and,
       the first time, `RTE_JOIN_TOKEN`) ; the controller dials it from then on.
 
       The certificate is checked: name a private CA with `NODE_EXTRA_CA_CERTS`, or turn the check
@@ -456,10 +456,10 @@
     type: number
     allowed: 0 or 1
     default: 1
-    short: Whether an RTE checks the controller's certificate
-    hint: "On an RTE: 0 accepts the controller's self-signed certificate, inside one trusted network only."
+    short: Whether a runner checks the controller's certificate
+    hint: "On a runner: 0 accepts the controller's self-signed certificate, inside one trusted network only."
     description: |
-      On an RTE that dials the controller (`CONTROLLER_URL`). 1: the controller's certificate must
+      On a runner that dials the controller (`CONTROLLER_URL`). 1: the controller's certificate must
       be valid for its name (a private CA through `NODE_EXTRA_CA_CERTS`). 0: any certificate is
       accepted - only inside one trusted network, such as a compose project or a pod, where the
       controller's certificate is self-signed. Replaces `APP_TLS_VERIFY`, still read when this one
@@ -468,7 +468,7 @@
     version: 7.3.0
     type: string
     allowed: an http:// or https:// address
-    short: The controller's address an RTE dials (deprecated)
+    short: The controller's address a runner dials (deprecated)
     description: |
       **Deprecated: use `CONTROLLER_URL` ; removed in 8.0.** Still read when `CONTROLLER_URL` is not
       set, with a warning in the log at start ; when both are set, `CONTROLLER_URL` wins.
@@ -477,7 +477,7 @@
     type: number
     allowed: 0 or 1
     default: 1
-    short: Whether an RTE checks the controller's certificate (deprecated)
+    short: Whether a runner checks the controller's certificate (deprecated)
     description: |
       **Deprecated: use `CONTROLLER_TLS_VERIFY` ; removed in 8.0.** Still read when
       `CONTROLLER_TLS_VERIFY` is not set, with a warning in the log at start ; when both are set,
@@ -486,24 +486,24 @@
     version: 7.3.0
     type: string
     allowed: a join token of Connections > Runners (afj_...)
-    short: The token an RTE joins the controller with, once
-    hint: "On an RTE: a join token that approves it at once, for unattended installs."
+    short: The token a runner joins the controller with, once
+    hint: "On a runner: a join token that approves it at once, for unattended installs."
     description: |
-      On an RTE in a socket mode, the first time, optional. Without it an RTE the controller does not
+      On a runner in a socket mode, the first time, optional. Without it a runner the controller does not
       know asks to join and waits for an admin's approval under Connections > Runners. With it
-      the RTE is approved at once - for unattended installs - and the controller adds it as a runner
+      the runner is approved at once - for unattended installs - and the controller adds it under Connections > Runners
       (or gives a runner of that name still waiting for approval the new token ; an approved
       runner keeps its token, which only an admin changes). Join tokens are made through the
-      API (`POST /api/v2/runner/jointoken`, an admin). From then on the RTE signs in with its own
+      API (`POST /api/v2/runner/jointoken`, an admin). From then on the runner signs in with its own
       token ; the join token can expire or be revoked without affecting it.
   - name: RTE_NAME
     version: 7.3.0
     type: string
     allowed: "letters, digits and . _ - : @"
-    short: The runner name an RTE joins as
-    hint: "On an RTE in a socket mode: its runner's name; default its node id."
+    short: The name a runner joins as
+    hint: "On a runner in a socket mode: its name under Connections > Runners; default its node id."
     description: |
-      On an RTE in a socket mode: the name of its runner under Connections > Runners, which forms
+      On a runner in a socket mode: its name under Connections > Runners, which forms
       name with `runner:`. Not set: its node id (`rte-<hostname>-<port>`), which changes when the
       container is recreated - set it in production.
   - name: RTE_FILES
@@ -511,45 +511,45 @@
     type: string
     allowed: transfer or local
     default: transfer
-    short: Where a socket-mode RTE gets a job's files
-    hint: "On an RTE in a socket mode: transfer gets them from the controller, local uses its own folders."
+    short: Where a socket-mode runner gets a job's files
+    hint: "On a runner in a socket mode: transfer gets them from the controller, local uses its own folders."
     description: |
-      On an RTE in a socket mode. `transfer`: the controller sends the playbooks folder and the
-      inventories with the job, packed and named by a hash of their content ; the RTE keeps them
+      On a runner in a socket mode. `transfer`: the controller sends the playbooks folder and the
+      inventories with the job, packed and named by a hash of their content ; the runner keeps them
       packed (`RTE_CACHE_PATH`) and an unchanged folder is never sent twice. Each job unpacks
       them in a private folder of its own, removed when it ends. It needs no shared disk and
-      no access to the repositories. `local`: the RTE runs from its own folders, as a
-      database-mode RTE - mount the playbooks (`ANSIBLE_PATH`) and repositories (`REPO_PATH`).
-      It can be set on the runner page (Connections > Runners > the runner > RTE) ; a value
+      no access to the repositories. `local`: the runner runs from its own folders, as a
+      database-mode runner - mount the playbooks (`ANSIBLE_PATH`) and repositories (`REPO_PATH`).
+      It can be set on the runner page (Connections > Runners > the runner > Settings) ; a value
       there wins over this one.
   - name: RTE_FILES_MAX_MB
     version: 7.3.0
     type: number
     allowed: a positive integer
     default: 512
-    short: The largest folder the controller sends an RTE
-    hint: "Read by the controller: a bigger playbooks or inventory folder must be mounted on the RTE."
+    short: The largest folder the controller sends a runner
+    hint: "Read by the controller: a bigger playbooks or inventory folder must be mounted on the runner."
     description: |
-      Read by the controller: a playbooks or inventory folder bigger than this is not sent to an RTE
-      with `RTE_FILES=transfer` ; the job fails and says to mount the folder on the RTE instead.
+      Read by the controller: a playbooks or inventory folder bigger than this is not sent to a runner
+      with `RTE_FILES=transfer` ; the job fails and says to mount the folder on the runner instead.
   - name: RTE_SPOOL_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-spool"
-    short: Where a socket-mode RTE keeps what the controller has not stored yet
-    hint: "On an RTE in a socket mode: keep it on a volume so a restart resends what is left."
+    short: Where a socket-mode runner keeps what the controller has not stored yet
+    hint: "On a runner in a socket mode: keep it on a volume so a restart resends what is left."
     description: |
-      On an RTE in a socket mode: each job's output, events and end wait here until the controller acks
+      On a runner in a socket mode: each job's output, events and end wait here until the controller acks
       them, and are sent again after a reconnect - to the same controller node or another. On a volume,
-      an RTE that restarts sends what it had not delivered.
+      a runner that restarts sends what it had not delivered.
   - name: RTE_CACHE_PATH
     version: 7.3.0
     type: string
     default: "%PERSISTENT_FOLDER%/rte-files"
-    short: Where a socket-mode RTE keeps the job files the controller sent
-    hint: "On an RTE with RTE_FILES=transfer: the packed folders it got, up to RTE_CACHE_MB."
+    short: Where a socket-mode runner keeps the job files the controller sent
+    hint: "On a runner with RTE_FILES=transfer: the packed folders it got, up to RTE_CACHE_MB."
     description: |
-      On an RTE with `RTE_FILES=transfer`: the playbooks and inventory folders the controller sent,
+      On a runner with `RTE_FILES=transfer`: the playbooks and inventory folders the controller sent,
       packed, each under its hash ; those used most recently are kept, up to `RTE_CACHE_MB`. Each
       running job unpacks them under `jobs/` in a private folder, removed when the job ends.
   - name: RTE_CACHE_MB
@@ -557,120 +557,120 @@
     type: number
     allowed: 0 or a positive integer
     default: 1024
-    short: The size of a socket-mode RTE's job files cache
-    hint: "On an RTE with RTE_FILES=transfer, in MB; 0 keeps none. Also on its runner page."
+    short: The size of a socket-mode runner's job files cache
+    hint: "On a runner with RTE_FILES=transfer, in MB; 0 keeps none. Also on its runner page."
     description: |
-      On an RTE with `RTE_FILES=transfer`: how much the job files it keeps (`RTE_CACHE_PATH`)
+      On a runner with `RTE_FILES=transfer`: how much the job files it keeps (`RTE_CACHE_PATH`)
       may take, in MB. The ones used longest ago go first ; 0 keeps none, so the controller sends a
       job's files with every job. It can be set on the runner page (Connections >
-      Runners > the runner > RTE) ; a value there wins over this variable.
+      Runners > the runner > Settings) ; a value there wins over this variable.
   - name: RTE_TOKEN
     version: 7.0.0
     type: string
     allowed: at least 16 characters
-    short: The token between a controller and its RTE
+    short: The token between a controller and its runner
     description: |
-      On an RTE (`AF_ROLE=rte`): the bearer token every call must carry ; the RTE refuses to
+      On a runner (`AF_ROLE=rte`): the bearer token every call must carry ; the runner refuses to
       start without one. The controller stores the same token on the runner (Connections > Runners) ;
-      a socket-mode RTE that joins (`RTE_JOIN_TOKEN` or an admin's approval) puts it there. A
-      database-mode RTE that registers itself (`RTE_REGISTER`) does too, and keeps it in step.
+      a socket-mode runner that joins (`RTE_JOIN_TOKEN` or an admin's approval) puts it there. A
+      database-mode runner that registers itself (`RTE_REGISTER`) does too, and keeps it in step.
   - name: RTE_REGISTER
     version: 7.0.0
     type: number
     allowed: 0 or 1
-    short: A database-mode RTE adds itself as a runner (deprecated)
-    hint: "Deprecated, database-mode RTEs only: 1 adds it under Connections > Runners when it starts."
+    short: A database-mode runner registers itself (deprecated)
+    hint: "Deprecated, database-mode runners only: 1 adds it under Connections > Runners when it starts."
     default: "1"
     description: |
-      **Deprecated since 7.3.0, removed in 8.0.0 with database mode.** Read only by an RTE in
-      database mode (no `RTE_MODE`, or `RTE_MODE=database`). An RTE in a socket mode (`outbound`
+      **Deprecated since 7.3.0, removed in 8.0.0 with database mode.** Read only by a runner in
+      database mode (no `RTE_MODE`, or `RTE_MODE=database`). A runner in a socket mode (`outbound`
       or `inbound`) ignores it: it joins with `RTE_JOIN_TOKEN`, or asks to join and waits for an
       admin's approval under Connections > Runners.
 
-      On a database-mode RTE: 1 (the default) and the RTE adds itself under Connections >
-      Runners when it starts, and checks every 30 seconds that it is still there. The first RTE
+      On a database-mode runner: 1 (the default) and the runner adds itself under Connections >
+      Runners when it starts, and checks every 30 seconds that it is still there. The first runner
       becomes the default runner. Its address is `RTE_URL`, or this container's IP address and
       `PORT` when that is not set.
 
-      A runner the RTE registered shows as *automatic* on the Runners page, and as
-      *unresponsive* once the RTE stopped writing its heartbeat ; the worker removes it 10
+      A runner that registered itself shows as *automatic* on the Runners page, and as
+      *unresponsive* once the runner stopped writing its heartbeat ; the worker removes it 10
       minutes later. A recreated container registers again under its new address and takes the
       default from the one that stopped. A runner added by hand at the same address stays
       yours (its token follows `RTE_TOKEN`) ; one from the config seed is never touched.
 
-      0: the RTE does not register itself ; add it under Connections > Runners or in the seed.
+      0: the runner does not register itself ; add it under Connections > Runners or in the seed.
   - name: RTE_MAX_JOBS
     version: 7.0.0
     type: number
     allowed: 0 or a positive integer
     default: 10
-    short: How many playbooks an RTE runs at once
-    hint: Read by an RTE; 0 sets no limit.
+    short: How many playbooks a runner runs at once
+    hint: Read by a runner; 0 sets no limit.
     description: |
-      Read by an RTE (`AF_ROLE=rte`). A full RTE does not take another job: the job waits, says
+      Read by a runner (`AF_ROLE=rte`). A full runner does not take another job: the job waits, says
       so in its output, and is handed over as soon as a playbook ends (see RTE_QUEUE_MINUTES).
-      Size it to the RTE's cpu and memory: every playbook is an ansible-playbook process with its
-      forks. Run more RTE replicas to run more at once. On a socket-mode RTE it can be set on its
-      runner page (Connections > Runners > the runner > RTE) ; a value there wins over this one.
+      Size it to the runner's cpu and memory: every playbook is an ansible-playbook process with its
+      forks. Run more runner replicas to run more at once. On a socket-mode runner it can be set on its
+      runner page (Connections > Runners > the runner > Settings) ; a value there wins over this one.
   - name: RTE_DRAIN_SECONDS
     version: 7.0.0
     type: number
     allowed: 0 or a positive integer
     default: 25
-    short: How long a stopping RTE waits for its running playbooks
-    hint: "Read by an RTE; keep it below the container's stop timeout."
+    short: How long a stopping runner waits for its running playbooks
+    hint: "Read by a runner; keep it below the container's stop timeout."
     description: |
-      Read by an RTE. On a stop (SIGTERM: a rolling update, a scale down) it takes no new job and
+      Read by a runner. On a stop (SIGTERM: a rolling update, a scale down) it takes no new job and
       waits this long for the running playbooks to end ; those still running then end as
       abandoned. Keep it below what the platform waits before it kills the container:
       Kubernetes' terminationGracePeriodSeconds (30 by default), docker stop's --time (10). On a
-      socket-mode RTE it can be set on its runner page ; a value there wins over this one.
+      socket-mode runner it can be set on its runner page ; a value there wins over this one.
   - name: RTE_QUEUE_MINUTES
     version: 7.0.0
     type: number
     allowed: 0 or a positive integer
     default: 60
-    short: Wait for a busy or disconnected RTE (minutes)
+    short: Wait for a busy or disconnected runner (minutes)
     hint: Read by the controller nodes and the worker.
     description: |
-      A job handed to an RTE that is full (RTE_MAX_JOBS) or stopping waits for it, asking again
+      A job handed to a runner that is full (RTE_MAX_JOBS) or stopping waits for it, asking again
       every 10 seconds, for this many minutes ; then it fails and says why. An abort ends the
-      wait at once. It also covers the running jobs of a socket-mode RTE (outbound, inbound)
-      whose connection dropped: their playbooks run on and the RTE keeps their output, so they
+      wait at once. It also covers the running jobs of a socket-mode runner (outbound, inbound)
+      whose connection dropped: their playbooks run on and the runner keeps their output, so they
       stay running for this many minutes and go on when it reconnects, or end as abandoned
-      after that (or at once when the RTE comes back without them). 0 waits for ever.
+      after that (or at once when the runner comes back without them). 0 waits for ever.
   - name: LISTEN_HOST
     version: 7.3.0
     type: string
     allowed: an IP address or host name of this machine
-    short: The address an RTE listens on
-    hint: "On an RTE: 127.0.0.1 keeps it on its own host (a native outbound RTE)."
+    short: The address a runner listens on
+    hint: "On a runner: 127.0.0.1 keeps it on its own host (a native outbound runner)."
     description: |
-      On an RTE (`AF_ROLE=rte`): the address its listener binds (its probes, its metrics and,
+      On a runner (`AF_ROLE=rte`): the address its listener binds (its probes, its metrics and,
       inbound, the socket the controller dials). Not set: every interface, as before. `127.0.0.1` keeps
-      a native outbound RTE, which takes no call from the controller, reachable from its own host only.
-      An inbound RTE must listen where the controller reaches it (`RTE_URL`).
+      a native outbound runner, which takes no call from the controller, reachable from its own host only.
+      An inbound runner must listen where the controller reaches it (`RTE_URL`).
   - name: RTE_URL
     version: 7.0.0
     type: string
     allowed: an http:// or https:// address, without a slash on the end
-    short: The address the controller reaches an RTE on
-    hint: "On an inbound RTE: the address the controller dials it on, usually its service name."
+    short: The address the controller reaches a runner on
+    hint: "On an inbound runner: the address the controller dials it on, usually its service name."
     description: |
-      On an RTE in `inbound` mode: the address the controller dials it on, usually the service name -
-      `http://rte:8000` in docker compose, the service in kubernetes. It is required when the RTE
+      On a runner in `inbound` mode: the address the controller dials it on, usually the service name -
+      `http://rte:8000` in docker compose, the service in kubernetes. It is required when the runner
       registers itself with `CONTROLLER_URL` (it refuses to start without it), and becomes its runner's
-      address. On an `outbound` RTE it is optional: it is only recorded as the runner's address.
+      address. On an `outbound` runner it is optional: it is only recorded as the runner's address.
 
-      On a deprecated database-mode RTE that registers itself (`RTE_REGISTER`): the address it
+      On a deprecated database-mode runner that registers itself (`RTE_REGISTER`): the address it
       registers, its runner named after the host (`rte`). Not set: this container's IP address and
       `PORT`, named after the node (`rte-<hostname>-<port>`), which change when it is recreated.
 
-      An inbound RTE (`RTE_MODE=inbound`) over TLS: set `HTTPS=1` with its own `HTTPS_CERT` and
+      An inbound runner (`RTE_MODE=inbound`) over TLS: set `HTTPS=1` with its own `HTTPS_CERT` and
       `HTTPS_KEY`, and an `https://` address here. When it registers (`CONTROLLER_URL`) it sends its
       certificate, the controller keeps it as the ca_bundle of the runner's credential and dials the
-      RTE pinned to it, whatever name the certificate was made for. A runner waiting for
-      approval shows the certificate's fingerprint, which the RTE logs at its start. Over plain
+      runner pinned to it, whatever name the certificate was made for. A runner waiting for
+      approval shows the certificate's fingerprint, which the runner logs at its start. Over plain
       `http://` to another host the controller sends `RTE_TOKEN` in clear, and says so in its log.
   - name: JOB_RETENTION_DAYS
     version: 6.3.0
@@ -983,7 +983,7 @@
       Unset, Node's own limit applies: 16384 bytes (16 KB), or the value of `NODE_OPTIONS=--max-http-header-size` when
       the deployment sets it. Raise it when a reverse proxy or a client sends large headers (large cookies, a large
       `Authorization` header). A value that is not a number from 1024 to 1048576 is ignored and logged.
-      It applies to the web server, the RTE and the worker. The server reads it when it starts: a change takes effect
+      It applies to the web server, the runner and the worker. The server reads it when it starts: a change takes effect
       after a restart.
   - name: UPLOAD_MAX_GB
     type: number
@@ -1468,14 +1468,14 @@
   - name: PROCESS_MAX_BUFFER
     type: number
     allowed: a valid number
-    short: The playbook output an RTE stores per stream
-    hint: "Read by an RTE: past this many bytes on one stream, a playbook's output is no longer stored."
+    short: The playbook output a runner stores per stream
+    hint: "Read by a runner: past this many bytes on one stream, a playbook's output is no longer stored."
     default: 50 * 1024 * 1024
     description: |
-      Read by an RTE (`AF_ROLE=rte`): past this many bytes on one stream (stdout, stderr), a
+      Read by a runner (`AF_ROLE=rte`): past this many bytes on one stream (stdout, stderr), a
       playbook's output is no longer stored - one line in the job says so - and the playbook goes
       on to its end (until 7.0.0 it was stopped there, at 1 MiB by default). Since 7 the app runs
-      no playbook itself, so set this in the RTE container's environment ; it is not editable on
+      no playbook itself, so set this in the runner container's environment ; it is not editable on
       the Settings page.
     version: 5.0.8
   - name: METRICS_TOKEN
@@ -1487,7 +1487,7 @@
     hint: Unset, /api/v2/metrics answers 404; applied without a restart.
     description: |
       Set, a controller node (`AF_ROLE` `all` or `controller`) serves Prometheus metrics at `/api/v2/metrics`
-      and an RTE at `/metrics`, to a scraper that sends `Authorization: Bearer <METRICS_TOKEN>`.
+      and a runner at `/metrics`, to a scraper that sends `Authorization: Bearer <METRICS_TOKEN>`.
       Unset, they answer 404. A worker (`AF_ROLE=worker`) serves no metrics: it answers only
       `/api/v2/version` and `/health`, for its container healthcheck.
 
@@ -1495,7 +1495,7 @@
       - `af_http_requests_total{route,method,status}`, `af_http_request_duration_seconds{route}` ;
       - `af_jobs{status}` running and awaiting approval now, `af_jobs_ended_24h{status}` ;
       - `af_nodes{role,alive}` ; `af_login_failures_total`, `af_login_lockouts_total` ;
-      - an RTE: `af_rte_running_jobs`, `af_rte_max_jobs` ; a socket-mode RTE also `af_rte_socket_connected` (1 open, 0 not).
+      - a runner: `af_rte_running_jobs`, `af_rte_max_jobs` ; a socket-mode runner also `af_rte_socket_connected` (1 open, 0 not).
   - name: LOG_FORMAT
     version: 7.0.0
     type: string
@@ -1822,8 +1822,8 @@
       group_vars and host_vars), edited in the designer's Inventories section, next to the
       repositories used for inventories (each of them an inventory). A playbook form names one
       with `inventory: <name>`.
-      Read by the RTE as well, where the playbook runs: set it there too (or mount the same
-      folder) when the RTE runs elsewhere.
+      Read by the runner as well, where the playbook runs: set it there too (or mount the same
+      folder) when the runner runs elsewhere.
   - name: WORKFLOWS_PATH
     type: string
     allowed: a valid directory path
@@ -1849,7 +1849,7 @@
       Setting it, or changing it, re-encrypts every stored secret with it on the next start, in one
       transaction, so none is lost : from the default key the first time, from
       ENCRYPTION_SECRET_PREVIOUS after that. Set the same value on every controller node, the worker and
-      every RTE that registers itself.
+      every runner that registers itself.
   - name: ENCRYPTION_SECRET_PREVIOUS
     type: string
     allowed: the previous ENCRYPTION_SECRET
@@ -1867,11 +1867,11 @@
   - name: ANSIBLE_PATH
     type: string
     allowed: a valid path
-    short: Where an RTE finds the playbooks
+    short: Where a runner finds the playbooks
     default: "%PERSISTENT_FOLDER%/playbooks"
     description: |
-      Read by an RTE (`AF_ROLE=rte`): the folder its playbooks run from when no repository is
-      marked for playbooks. Since 7 the controller runs no playbook itself, so set this in the RTE
+      Read by a runner (`AF_ROLE=rte`): the folder its playbooks run from when no repository is
+      marked for playbooks. Since 7 the controller runs no playbook itself, so set this in the runner
       container's environment ; it is not editable on the Settings page.
   - name: REGEX_FILTER_JOB_OUTPUT
     type: string
@@ -2768,7 +2768,7 @@
             Runs one of the designer's workflows (Designer > Workflows), named with `workflow:`,
             as AWX runs a workflow job: its nodes run by AWX's rules (on success, on failure,
             always, all parents must converge), side by side when they can. A playbook node runs
-            on the RTE as a job of its own, with the node's inventory, credentials, limit and
+            on the runner as a job of its own, with the node's inventory, credentials, limit and
             tags ; an approval node holds the job for approval. The form's fields reach every
             node as extra vars. The jobs page draws the workflow, live.
 
@@ -2781,7 +2781,7 @@
             a multistep does:
             - `runner: <name>` on a job template node runs that runner's template or job instead
               of a designer playbook - AWX, Semaphore, Rundeck, Jenkins - so one workflow mixes
-              them ; an RTE runner runs the node's playbook there.
+              them ; an AnsibleForms runner runs the node's playbook there.
             - `if_extra_var: <key>`: the node runs only when that extravar is true (as a step's
               `ifExtraVar`) ; not met, it is skipped, and what follows it runs as after a success.
             - `extra_vars_key: <key>`: the node gets only that key of the extravars, the user
@@ -2966,7 +2966,7 @@
           **Job events**: while AnsibleForms follows a job on AWX, AAP or Ascender (type awx, aap,
           ascender), it reads the job's events from the runner (`jobs/<id>/job_events/` under its
           API prefix, with its credentials and certificate settings) and stores them as the events
-          of a playbook run on an RTE: the job page's Hosts and tasks panel and its recap show
+          of a playbook run on a runner: the job page's Hosts and tasks panel and its recap show
           them, and a host's result line in the output opens its details, whatever the job
           template's verbosity, as AWX itself always shows a task's details. A workflow adds
           the events of each node's job. They are masked as the output and deleted with the job
@@ -3053,7 +3053,7 @@
         description: | 
           This attribute is only used when the form type is `ansible`.  When using awx, use the property `template`.  
 
-          Name it by its **file** with its subfolders in the playbook folder (`team/deploy.yml`), or by its **name** without the extension (`deploy`): the RTE then runs `deploy.yml`, else `deploy.yaml` - as a workflow form names its workflow.
+          Name it by its **file** with its subfolders in the playbook folder (`team/deploy.yml`), or by its **name** without the extension (`deploy`): the runner then runs `deploy.yml`, else `deploy.yaml` - as a workflow form names its workflow.
             
           **Note**: You can also dynamically set the playbook by using a field called `__playbook__`.  It must be sent as extravar.  If this extravar is found it will overwrite the static playbook name.  
           **Note**: If you use multistep and you want to dynamically set every step, use the `key` property and `model` property to create separate extravars per step.        
@@ -3140,8 +3140,8 @@
         short: Pass ansible_user and ansible_password to ansible playbook using stored credentials
         description: |
           Ansible allows to pass default ansible credentials in the form of 2 extravars ansible_user and ansible_password
-          **Note**: An SSH credential can carry a private key (PEM or OpenSSH) instead of, or next to, its password. The RTE writes the key to a private file for that job only and passes it as `ansible_ssh_private_key_file`, then removes it when the job ends. (Added in 7.6.0)
-          **Note**: A key with a passphrase is loaded into an `ssh-agent` started for that job only, and the playbook gets its socket as `SSH_AUTH_SOCK`. The RTE needs `ssh-agent` and `ssh-add` (the OpenSSH client, in the RTE images) ; without them the job fails, saying so.
+          **Note**: An SSH credential can carry a private key (PEM or OpenSSH) instead of, or next to, its password. The runner writes the key to a private file for that job only and passes it as `ansible_ssh_private_key_file`, then removes it when the job ends. (Added in 7.6.0)
+          **Note**: A key with a passphrase is loaded into an `ssh-agent` started for that job only, and the playbook gets its socket as `SSH_AUTH_SOCK`. The runner needs `ssh-agent` and `ssh-add` (the OpenSSH client, in the runner images) ; without them the job fails, saying so.
           **Note**: The key and its passphrase are never shown by the API and are masked in the job output. A form's `credentials` that names the SSH credential hands its key to the playbook as `private_key` (and `private_key_passphrase`).
       - name: playbookSubPath
         type: string
@@ -3513,7 +3513,7 @@
         group: workflow
         version: 7.0.1
         description: |
-          A value that contains Jinja (`{{ }}`, `{% %}` or `{# #}`) is passed to the playbook as plain text - ansible receives it marked unsafe and never templates it. Without this, a user could type `{{ lookup('pipe', '...') }}` into a field and run commands on the RTE. AWX applies the same rule to launch-time extra vars by default.
+          A value that contains Jinja (`{{ }}`, `{% %}` or `{# #}`) is passed to the playbook as plain text - ansible receives it marked unsafe and never templates it. Without this, a user could type `{{ lookup('pipe', '...') }}` into a field and run commands on the runner. AWX applies the same rule to launch-time extra vars by default.
 
           Set this to `true` only when the form deliberately passes Jinja for the playbook to evaluate. Values without Jinja are never affected.
 
@@ -7053,7 +7053,7 @@
       **Turning it on** shows what it will do first: the app's objects written to the repository, and the file they
       go to (those whose secrets stay in the database said), the entries whose name an app object has (git's
       version wins, the secret in the database kept when the entry gives none), and what stays in the app: objects
-      the config seed manages, runners an RTE registered itself or waiting for approval, and an object named as an
+      the config seed manages, runners that registered themselves or waiting for approval, and an object named as an
       entry of the repository that is refused or waits (it follows that entry once it is read in, never a second
       entry of its name). It also lists what the repository's files hold, each file with the names of its objects,
       all read in when the usage is turned on; the result then says how many were read in from its files.
@@ -7473,8 +7473,8 @@
       > **Note:** This feature works for playbooks run on a runner of type rte. AWX / AAP templates are not supported.
 
       **How it works:**
-      - During a job run, the RTE watches for a log file at a well-known path inside the playbook folder
-      - Every 2 seconds, when the file changed, and once more when the playbook ends, the RTE stores its contents on the job ; the file is then removed (since 7)
+      - During a job run, the runner watches for a log file at a well-known path inside the playbook folder
+      - Every 2 seconds, when the file changed, and once more when the playbook ends, the runner stores its contents on the job ; the file is then removed (since 7)
       - The log file is displayed in a **Log file** section of the job's output, numbered as the output's lines: a log line's timestamp and level (ERROR, WARNING, INFO, DEBUG) are read and coloured as the output's, and ANSI colours are supported
 
       **Log file path convention:**
@@ -7491,7 +7491,7 @@
       **Responsibilities of the playbook / module developer:**
       - **Create** the log file (and its `.joblogs/` directory) at the start of the operation
       - **Write** meaningful progress messages as the operation proceeds
-      - Deleting it is not needed: the RTE removes it once the playbook ended (it is kept on the job)
+      - Deleting it is not needed: the runner removes it once the playbook ended (it is kept on the job)
 
       **ANSI colour coding is supported.**  
       You can use standard ANSI escape codes (e.g. `\033[92m` for green, `\033[91m` for red) in your log messages and they will be rendered as colours in the UI. This is ideal for distinguishing success, warning, and error states at a glance.

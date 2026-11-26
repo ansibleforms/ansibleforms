@@ -34,7 +34,7 @@ export class Session extends EventEmitter {
       this.lastHeard = Date.now();
       const msg = decode(data);
       if (!msg) {
-        logger.warning(`RTE socket (${this.label}): a message that is not one, closing`);
+        logger.warning(`Runner socket (${this.label}): a message that is not one, closing`);
         this.close(CLOSE.PROTOCOL, "unreadable message");
         return;
       }
@@ -48,10 +48,10 @@ export class Session extends EventEmitter {
       this.lastHeard = Date.now();
     });
     ws.on("close", (code, reason) => this._closed(code, String(reason || "")));
-    ws.on("error", (err) => logger.debug(`RTE socket (${this.label}): ${err.message}`));
+    ws.on("error", (err) => logger.debug(`Runner socket (${this.label}): ${err.message}`));
     this.timer = setInterval(() => {
       if (Date.now() - this.lastHeard > DEAD_MS) {
-        logger.warning(`RTE socket (${this.label}): nothing heard for ${DEAD_MS / 1000} seconds, dropping it`);
+        logger.warning(`Runner socket (${this.label}): nothing heard for ${DEAD_MS / 1000} seconds, dropping it`);
         ws.terminate();
         return;
       }

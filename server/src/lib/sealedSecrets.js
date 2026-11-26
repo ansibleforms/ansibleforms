@@ -28,7 +28,7 @@ const SALT = "ansibleforms-rte-job-secrets";
  *   {key: Buffer, aad: Buffer}: the AES-256 key and the data the tag also covers.
  */
 function keyFor(token, jobId) {
-  if (!token) throw new Error("no RTE token to seal the job's secrets with");
+  if (!token) throw new Error("no runner token to seal the job's secrets with");
   const info = `job:${jobId}`;
   return { key: Buffer.from(hkdfSync("sha256", String(token), SALT, info, 32)), aad: Buffer.from(info) };
 }
@@ -69,7 +69,7 @@ export function sealJobSecrets(secrets, token, jobId) {
  */
 export function openJobSecrets(sealed, token, jobId) {
   if (!sealed || typeof sealed !== "object") throw new Error("the job came without its sealed secrets");
-  if (sealed.v !== VERSION) throw new Error(`the job's secrets are sealed with version ${sealed.v}, this RTE reads version ${VERSION}`);
+  if (sealed.v !== VERSION) throw new Error(`the job's secrets are sealed with version ${sealed.v}, this runner reads version ${VERSION}`);
   const { key, aad } = keyFor(token, jobId);
   try {
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(String(sealed.iv), "base64"));
@@ -78,7 +78,7 @@ export function openJobSecrets(sealed, token, jobId) {
     const text = Buffer.concat([decipher.update(Buffer.from(String(sealed.data), "base64")), decipher.final()]).toString("utf8");
     return JSON.parse(text);
   } catch (err) {
-    throw new Error("the job's sealed secrets do not open with this RTE's token for this job", { cause: err });
+    throw new Error("the job's sealed secrets do not open with this runner's token for this job", { cause: err });
   }
 }
 

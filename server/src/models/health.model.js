@@ -283,7 +283,7 @@ async function nodesCheck() {
   }
   const workers = nodes.filter(n => n.isWorker).length;
   const rtes = nodes.filter(n => n.role === 'rte').length;
-  return check('nodes', OK, `${nodes.length - rtes} node(s), ${workers} worker, ${rtes} RTE`, { nodes: detail });
+  return check('nodes', OK, `${nodes.length - rtes} node(s), ${workers} worker, ${rtes} runner`, { nodes: detail });
 }
 
 // The dump tool is the one dependency that produces a convincing failure : the
@@ -516,7 +516,7 @@ async function secretStoresCheck() {
 async function runnersCheck() {
   const runners = await Runner.findAll() || [];
   if (!runners.length) {
-    return check('runners', WARNING, 'none configured', { reason: 'Since 7 jobs run on runners: add one under Connections > Runners (an RTE for playbooks ; AWX/AAP, Semaphore, Rundeck or Jenkins for templates)' });
+    return check('runners', WARNING, 'none configured', { reason: 'Since 7 jobs run on runners: add one under Connections > Runners (an AnsibleForms runner for playbooks ; AWX/AAP, Semaphore, Rundeck or Jenkins for templates)' });
   }
   const results = await Promise.all(runners.map(async (runner) => {
     const base = { name: runner.name, type: runner.type, uri: runner.uri, isDefault: !!runner.is_default };
@@ -539,8 +539,8 @@ async function runnersCheck() {
   const reason = failing.length === 1 ? failing[0].reason : undefined;
   // a playbook form that names no runner runs on the default RTE : without one it fails
   if (worst === OK && !runners.some((r) => r.type === 'rte' && r.is_default)) {
-    return check('runners', WARNING, 'no default RTE', {
-      reason: 'Playbook forms that name no runner fail: mark an RTE as default under Connections > Runners',
+    return check('runners', WARNING, 'no default AnsibleForms runner', {
+      reason: 'Playbook forms that name no runner fail: mark an AnsibleForms runner as default under Connections > Runners',
       runners: results,
     });
   }

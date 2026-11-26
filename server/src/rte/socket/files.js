@@ -67,7 +67,7 @@ export class FileCache {
       fs.mkdirSync(this.jobsDir, { recursive: true, mode: 0o700 });
       fs.writeFileSync(path.join(this.jobsDir, ALIVE), new Date(now).toISOString(), { mode: 0o600 });
     } catch (e) {
-      logger.warning(`RTE: could not write ${path.join(this.jobsDir, ALIVE)}: ${e.message}`);
+      logger.warning(`Runner: could not write ${path.join(this.jobsDir, ALIVE)}: ${e.message}`);
     }
     this._pruneOwners(now);
   }
@@ -221,7 +221,7 @@ export class FileCache {
     try {
       fs.rmSync(folder, { recursive: true, force: true });
     } catch (e) {
-      logger.warning(`RTE: could not remove the job folder ${folder}: ${e.message}`);
+      logger.warning(`Runner: could not remove the job folder ${folder}: ${e.message}`);
     }
   }
 
@@ -258,7 +258,7 @@ export class FileCache {
         fs.renameSync(entry.file, this.path(hash));
         clearTimeout(entry.timer);
         this.pending.delete(hash);
-        logger.notice(`RTE: received the job files ${hash.slice(0, 12)}`);
+        logger.notice(`Runner: received the job files ${hash.slice(0, 12)}`);
         // the one just come stays, whatever the size : its job unpacks it next
         this._evict(hash);
         entry.resolve(this.path(hash));
@@ -280,7 +280,7 @@ export class FileCache {
     try {
       fs.rmSync(entry.file, { force: true });
     } catch (e) {
-      logger.debug(`RTE: could not remove ${entry.file}: ${e.message}`);
+      logger.debug(`Runner: could not remove ${entry.file}: ${e.message}`);
     }
     entry.reject(err);
   }
@@ -337,7 +337,7 @@ export class FileCache {
     try {
       fs.rmSync(target, { recursive: true, force: true });
     } catch (e) {
-      logger.warning(`RTE: could not remove ${target}: ${e.message}`);
+      logger.warning(`Runner: could not remove ${target}: ${e.message}`);
     }
   }
 
@@ -370,7 +370,7 @@ export class FileCache {
         }
       }
       if (now - seen > OWNER_GONE_MS) {
-        logger.notice(`RTE: removing the jobs folder of an RTE that is gone: ${folder}`);
+        logger.notice(`Runner: removing the jobs folder of a runner that is gone: ${folder}`);
         this._remove(folder);
       }
     }

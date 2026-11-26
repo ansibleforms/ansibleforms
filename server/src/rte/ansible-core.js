@@ -57,7 +57,7 @@ export function useJobIO(io) {
  *   Error: none was set (a start that skipped useJobIO).
  */
 function currentIO() {
-  if (!jobIO) throw new Error("the RTE has no job I/O: useJobIO was not called at its start");
+  if (!jobIO) throw new Error("the runner has no job I/O: useJobIO was not called at its start");
   return jobIO;
 }
 
@@ -735,7 +735,7 @@ export function executeCommand(cmd, jobid, counter, io = currentIO()) {
       // the playbook folder is a mount or a repository on the RTE : say so, rather than fail
       // writing the extravars file into a folder that is not there
       if (!directory || !fs.existsSync(directory)) {
-        throw new Error(`the playbook folder ${directory || "(none)"} does not exist on RTE ${runnerIdentity()}: mount the playbooks or the repository there, or set ANSIBLE_PATH`);
+        throw new Error(`the playbook folder ${directory || "(none)"} does not exist on runner ${runnerIdentity()}: mount the playbooks or the repository there, or set ANSIBLE_PATH`);
       }
       if (extravarsFileName) {
         logger.debug(`Storing extravars to file ${extravarsFileName}`);

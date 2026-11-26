@@ -18,7 +18,7 @@
     { "name": "syslogserver", "description": "Syslog servers the server log and the audit entries are sent to" },
     { "name": "notificationchannel", "description": "Notification channels: SMTP servers, Slack, Microsoft Teams, Telegram and webhooks" },
     { "name": "database", "description": "Databases forms query (a field's dbConfig names one), each with the credential of type database it connects with" },
-    { "name": "runner", "description": "Runners : where a playbook runs (an RTE container)" },
+    { "name": "runner", "description": "Runners : where a job runs (AnsibleForms, AWX, AAP, Ascender, Semaphore, Rundeck or Jenkins)" },
     { "name": "config", "description": "Form configuration (config.yaml) and designer support" },
     { "name": "ssh", "description": "SSH key management" },
     { "name": "log", "description": "Application log access and download" },
@@ -1516,7 +1516,7 @@
         "tags": [
           "runner"
         ],
-        "summary": "How many RTEs wait for an admin's approval (the header bell)",
+        "summary": "How many runners wait for an admin's approval (the header bell)",
         "responses": {
           "200": {
             "description": "{ count }"
@@ -1534,7 +1534,7 @@
         "tags": [
           "runner"
         ],
-        "summary": "The join tokens RTEs add themselves with (never the tokens themselves)",
+        "summary": "The join tokens runners add themselves with (never the tokens themselves)",
         "responses": {
           "200": {
             "description": "{ count, records }"
@@ -1666,7 +1666,7 @@
         "tags": [
           "runner"
         ],
-        "summary": "Approve an RTE that asked to join : it takes jobs from now on (admin only)",
+        "summary": "Approve a runner that asked to join : it takes jobs from now on (admin only)",
         "parameters": [
           {
             "name": "id",
@@ -1700,7 +1700,7 @@
         "tags": [
           "runner"
         ],
-        "summary": "Reject an RTE that asked to join : removed with its credential, its socket closed (admin only)",
+        "summary": "Reject a runner that asked to join : removed with its credential, its socket closed (admin only)",
         "parameters": [
           {
             "name": "id",
@@ -2395,7 +2395,7 @@
         "tags": [
           "job"
         ],
-        "summary": "A job's structured events (a playbook on an RTE, a job on AWX, AAP or Ascender) : the host-by-task grid, the timeline and the recap",
+        "summary": "A job's structured events (a playbook on a runner, a job on AWX, AAP or Ascender) : the host-by-task grid, the timeline and the recap",
         "parameters": [
           {
             "name": "id",
@@ -2469,7 +2469,7 @@
         "security": [ { "bearerAuth": [] } ],
         "tags": ["job"],
         "summary": "A workflow node's extravars and artifacts",
-        "description": "For a workflow job (one the RTE ran, or an AWX, AAP or Ascender workflow): the extravars and the artifacts (set_stats data) of the job one of its nodes ran, by the node's id in the job's graph. An AWX node's job is read from that AWX. A node not run yet, an approval or a project update returns empty objects.",
+        "description": "For a workflow job (one the runner ran, or an AWX, AAP or Ascender workflow): the extravars and the artifacts (set_stats data) of the job one of its nodes ran, by the node's id in the job's graph. An AWX node's job is read from that AWX. A node not run yet, an approval or a project update returns empty objects.",
         "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }, { "name": "nodeId", "in": "path", "required": true, "schema": { "type": "string" } } ],
         "responses": {
           "200": { "description": "{ node, job, extravars, artifacts }" },
@@ -8286,8 +8286,8 @@
         "tags": [
           "runner"
         ],
-        "summary": "Register an RTE",
-        "description": "An RTE's one registration call, before an inbound RTE listens (so the app knows the address to dial); an outbound RTE registers when it dials. No user signs in: the RTE's own token, or a join token, is the proof. Limited per address, as the sign-in is.",
+        "summary": "Register a runner",
+        "description": "A runner's one registration call, before an inbound runner listens (so the app knows the address to dial); an outbound runner registers when it dials. No user signs in: the runner's own token, or a join token, is the proof. Limited per address, as the sign-in is.",
         "parameters": [
           {
             "name": "Authorization",
@@ -8296,7 +8296,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Bearer and the RTE's token (RTE_TOKEN), at least 16 characters"
+            "description": "Bearer and the runner's token (RTE_TOKEN), at least 16 characters"
           },
           {
             "name": "X-AF-RTE-Name",
@@ -8305,7 +8305,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The RTE's runner name (RTE_NAME)"
+            "description": "The runner's name (RTE_NAME)"
           },
           {
             "name": "X-AF-RTE-Join",
@@ -8314,7 +8314,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "A join token, for an RTE the app does not know yet"
+            "description": "A join token, for a runner the app does not know yet"
           }
         ],
         "requestBody": {
@@ -8330,15 +8330,15 @@
                       "inbound",
                       "outbound"
                     ],
-                    "description": "Inbound: the app dials the RTE ; outbound: the RTE dials the app"
+                    "description": "Inbound: the app dials the runner ; outbound: the runner dials the app"
                   },
                   "url": {
                     "type": "string",
-                    "description": "An inbound RTE's address, which the app dials (RTE_URL)"
+                    "description": "An inbound runner's address, which the app dials (RTE_URL)"
                   },
                   "cert": {
                     "type": "string",
-                    "description": "An inbound RTE's certificate (PEM), only with an https address"
+                    "description": "An inbound runner's certificate (PEM), only with an https address"
                   }
                 }
               }
@@ -8426,10 +8426,10 @@
           "is_default": { "type": "boolean", "description": "Used by playbook forms that name no runner" },
           "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
           "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
-          "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "node_id": { "type": "string", "readOnly": true, "description": "rte : the node of a runner that registered itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
           "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : runners.yaml)" },
-          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
+          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner that registered itself : automatic while it writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
         }
       },
       "SyslogServer": {
@@ -11412,8 +11412,8 @@
         "tags": [
           "runner"
         ],
-        "summary": "Register an RTE",
-        "description": "An RTE's one registration call, before an inbound RTE listens (so the app knows the address to dial); an outbound RTE registers when it dials. No user signs in: the RTE's own token, or a join token, is the proof. Limited per address, as the sign-in is.",
+        "summary": "Register a runner",
+        "description": "A runner's one registration call, before an inbound runner listens (so the app knows the address to dial); an outbound runner registers when it dials. No user signs in: the runner's own token, or a join token, is the proof. Limited per address, as the sign-in is.",
         "parameters": [
           {
             "name": "Authorization",
@@ -11422,7 +11422,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Bearer and the RTE's token (RTE_TOKEN), at least 16 characters"
+            "description": "Bearer and the runner's token (RTE_TOKEN), at least 16 characters"
           },
           {
             "name": "X-AF-RTE-Name",
@@ -11431,7 +11431,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The RTE's runner name (RTE_NAME)"
+            "description": "The runner's name (RTE_NAME)"
           },
           {
             "name": "X-AF-RTE-Join",
@@ -11440,7 +11440,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "A join token, for an RTE the app does not know yet"
+            "description": "A join token, for a runner the app does not know yet"
           }
         ],
         "requestBody": {
@@ -11456,15 +11456,15 @@
                       "inbound",
                       "outbound"
                     ],
-                    "description": "Inbound: the app dials the RTE ; outbound: the RTE dials the app"
+                    "description": "Inbound: the app dials the runner ; outbound: the runner dials the app"
                   },
                   "url": {
                     "type": "string",
-                    "description": "An inbound RTE's address, which the app dials (RTE_URL)"
+                    "description": "An inbound runner's address, which the app dials (RTE_URL)"
                   },
                   "cert": {
                     "type": "string",
-                    "description": "An inbound RTE's certificate (PEM), only with an https address"
+                    "description": "An inbound runner's certificate (PEM), only with an https address"
                   }
                 }
               }
@@ -11552,10 +11552,10 @@
           "is_default": { "type": "boolean", "description": "Used by playbook forms that name no runner" },
           "project": { "type": "string", "nullable": true, "description": "semaphore : the id of the project its templates are in. rundeck : the name of the project its jobs are in. jenkins : the folder its jobs are in (ops, or ops/web), none for the top" },
           "flavour": { "type": "string", "enum": ["aap", "ascender"], "nullable": true, "description": "awx : which product it is, Ansible Automation Platform or Ascender ; none is AWX. Its uri may carry its API path (https://aap.example.com/api/controller/v2)" },
-          "node_id": { "type": "string", "readOnly": true, "description": "rte : the RTE that registered this runner itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
+          "node_id": { "type": "string", "readOnly": true, "description": "rte : the node of a runner that registered itself (RTE_REGISTER) ; empty when added by hand or by the config seed" },
           "repository": { "type": "string", "nullable": true, "readOnly": true, "description": "The runners repository it comes from ; empty for one kept in the app only. Written by the repository's pull, never by a request" },
           "repo_file": { "type": "string", "nullable": true, "readOnly": true, "description": "The file its entry is in, in that repository (any name, any folder : runners.yaml)" },
-          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner an RTE registered itself : automatic while that RTE writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
+          "state": { "type": "string", "enum": ["automatic", "unresponsive"], "readOnly": true, "description": "Only on a runner that registered itself : automatic while it writes its heartbeat, unresponsive once it stopped (removed by the worker after 10 minutes)" }
         }
       },
       "SyslogServer": {

@@ -37,9 +37,9 @@ describe("the contract decides, not the release", () => {
     assert.equal(info.version, "0.1.0");
   });
 
-  test("an older contract: refused, update the RTE", async () => {
+  test("an older contract: refused, update the runner", async () => {
     health.contract = RTE_CONTRACT - 1;
-    await assert.rejects(rte.check(runner), /needs contract \d+: update the RTE/);
+    await assert.rejects(rte.check(runner), /needs contract \d+: update the runner/);
   });
 
   test("a newer contract: refused, update the app", async () => {
@@ -47,8 +47,8 @@ describe("the contract decides, not the release", () => {
     await assert.rejects(rte.check(runner), /update this app/);
   });
 
-  test("no contract at all (a preview build): refused, update the RTE", async () => {
+  test("no contract at all (a preview build): refused, update the runner", async () => {
     delete health.contract;
-    await assert.rejects(rte.check(runner), /no contract .* update the RTE/);
+    await assert.rejects(rte.check(runner), /no contract .* update the runner/);
   });
 });

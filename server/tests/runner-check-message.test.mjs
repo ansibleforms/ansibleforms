@@ -37,22 +37,22 @@ async function callCheck(req) {
 describe("the message of Test connection", () => {
   test("a socket-mode RTE: its release, its Ansible version and the node holding its socket", () => {
     const msg = checkMessage(inLanguage("en"), { type: "rte" }, { version: "7.3.0", ansible: "2.18.1", socketNode: "app-1" });
-    assert.equal(msg, "Runner connection is OK: RTE 7.3.0, Ansible core 2.18.1, on node app-1");
+    assert.equal(msg, "Runner connection is OK: AnsibleForms 7.3.0, Ansible core 2.18.1, on node app-1");
   });
 
   test("a database-mode RTE: its release and its Ansible version, no node", () => {
     const msg = checkMessage(inLanguage("en"), { type: "rte" }, { version: "7.3.0", ansible: "2.18.1" });
-    assert.equal(msg, "Runner connection is OK: RTE 7.3.0, Ansible core 2.18.1");
+    assert.equal(msg, "Runner connection is OK: AnsibleForms 7.3.0, Ansible core 2.18.1");
   });
 
   test("an older ansible that prints no core version: shown as it said it", () => {
     const msg = checkMessage(inLanguage("en"), { type: "rte" }, { version: "7.3.0", ansible: "ansible-playbook 2.9.27" });
-    assert.equal(msg, "Runner connection is OK: RTE 7.3.0, Ansible ansible-playbook 2.9.27");
+    assert.equal(msg, "Runner connection is OK: AnsibleForms 7.3.0, Ansible ansible-playbook 2.9.27");
   });
 
   test("an RTE without ansible: only its release", () => {
     const msg = checkMessage(inLanguage("en"), { type: "rte" }, { version: "7.3.0", ansible: null });
-    assert.equal(msg, "Runner connection is OK: RTE 7.3.0");
+    assert.equal(msg, "Runner connection is OK: AnsibleForms 7.3.0");
   });
 
   test("an RTE that said nothing of itself: the plain message", () => {
@@ -67,8 +67,8 @@ describe("the message of Test connection", () => {
 
   test("translated, with the language's own separator", () => {
     const details = { version: "7.3.0", ansible: "2.18.1", socketNode: "app-1" };
-    assert.equal(checkMessage(inLanguage("nl"), { type: "rte" }, details), "Runner verbinding is OK: RTE 7.3.0, Ansible core 2.18.1, op node app-1");
-    assert.equal(checkMessage(inLanguage("zh"), { type: "rte" }, details), "运行器连接正常：RTE 7.3.0，Ansible core 2.18.1，位于节点 app-1");
+    assert.equal(checkMessage(inLanguage("nl"), { type: "rte" }, details), "Runner verbinding is OK: AnsibleForms 7.3.0, Ansible core 2.18.1, op node app-1");
+    assert.equal(checkMessage(inLanguage("zh"), { type: "rte" }, details), "运行器连接正常：AnsibleForms 7.3.0，Ansible core 2.18.1，位于节点 app-1");
   });
 
   test("every language has every part", async () => {
@@ -86,7 +86,7 @@ describe("the check route", () => {
     stored = { id: 1, name: "rte-1", type: "rte" };
     health = { version: "7.3.0", ansible: "2.18.1", socketNode: "app-2" };
     const body = await callCheck(inLanguage("en"));
-    assert.equal(body.result, "Runner connection is OK: RTE 7.3.0, Ansible core 2.18.1, on node app-2");
+    assert.equal(body.result, "Runner connection is OK: AnsibleForms 7.3.0, Ansible core 2.18.1, on node app-2");
     assert.deepEqual(body.details, health);
   });
 });

@@ -20,7 +20,7 @@ import mysql from "../models/db.model.js";
  *   Error: neither id nor host given (it would abandon every running job).
  */
 export async function abandonJobs({ id, host, runner } = {}) {
-  if (id == null && !host) throw new Error("abandonJobs needs a job id or an RTE's host");
+  if (id == null && !host) throw new Error("abandonJobs needs a job id or a runner's host");
   // step 1 : only running jobs, narrowed by what was given
   const where = ["status='running'"];
   const params = [];
