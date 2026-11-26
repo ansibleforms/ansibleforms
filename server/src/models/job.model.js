@@ -3300,7 +3300,8 @@ Multistep.launch = async function ({
 // process writes jobs through (the app, the worker, the RTE), rather than at each caller :
 // a write path added later is covered as long as it goes through these functions.
 const CHANGES_A_JOB = [
-  "create", "update", "endJobStatus", "printJobOutput", "createOutput", "replaceTrackedOutput",
+  // createOutputOnce : a socket runner's output line, shown live as any other
+  "create", "update", "endJobStatus", "printJobOutput", "createOutput", "createOutputOnce", "replaceTrackedOutput",
   "deleteOutput", "delete", "abort", "requestAbort", "resetAbortRequested", "abandon",
   "abandonOwn", "abandonDeadNodes", "removeOlderThan", "approve", "reject", "continue",
   // the conditional writes : a status moved (an approval gate, a step's approval), a step begun
