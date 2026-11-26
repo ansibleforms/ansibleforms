@@ -663,7 +663,7 @@ const SCHEMA_MANIFEST = {
                               'directory_users', 'announcements', 'disclaimer_versions', 'disclaimer_acceptances', 'api_tokens', 'labels',
                               'runner_leases', 'runner_join_tokens', 'job_events', 'databases', 'workflow_node_runs',
                               'system_task_runs'],
-                     columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
+                     columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'runners.rte_image', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log', 'jobs.status_message', 'jobs.status_detail',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
                                'repositories.use_for_workflows', 'repositories.use_for_inventories', 'repositories.use_for_rte',
@@ -1251,6 +1251,8 @@ async function patchVersion7(messages, success, failed) {
   await checkPromise(addColumn("runners", "rte_cache_mb", "int(11)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("runners", "rte_files", "varchar(10)", true, "NULL"), messages, success, failed);
   await checkPromise(addColumn("runners", "rte_drain_seconds", "int(11)", true, "NULL"), messages, success, failed);
+  // the image an AnsibleForms runner's container runs (published, or an RTE image of the Designer)
+  await checkPromise(addColumn("runners", "rte_image", "varchar(500)", true, "NULL"), messages, success, failed);
   // how a schedule ends (lib/scheduleEnd.js) : never (every schedule from before), on a date or
   // after a number of runs, then turned off (the default) or removed ; the jobs it started are
   // counted. A one-time run is removed after its run, as before, unless remove_after_run says not

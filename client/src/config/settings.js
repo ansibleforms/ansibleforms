@@ -612,6 +612,14 @@ export const RUNNER_FLAVOURS = [
   { value: 'ascender', label: 'Ascender' },
 ];
 
+// the published RTE images a runner's container may run (publish.yml), on the app's major
+// the New runner dialog's Image dropdown : its last choice, an image typed in its own field
+export const RTE_OTHER_IMAGE = '__other__';
+export const RTE_PUBLISHED_IMAGES = {
+  full: 'ghcr.io/ansibleforms/ansibleforms-rte-full:7',
+  core: 'ghcr.io/ansibleforms/ansibleforms-rte-core:7',
+};
+
 // what a runner is, in the dialog : an RTE, an awx runner of one of its flavours (none is
 // AWX), a Semaphore UI, a Rundeck or a Jenkins - stored as its type and flavour
 // (the RTE first, the others alphabetically)
@@ -3181,6 +3189,8 @@ export default function getSettings(t) {
         { key: 'runner', label: t('settings.runners.stepRunner') },
         { key: 'type', label: t('settings.runners.stepType') },
         { key: 'mode', label: t('settings.runners.stepMode'), when: (i) => (i.kind || runnerKind(i)) === 'rte' },
+        // the image its container runs : a published one, or one the Designer built
+        { key: 'image', label: t('settings.runners.stepImage'), when: (i) => (i.kind || runnerKind(i)) === 'rte' },
         { key: 'credentials', label: t('settings.runners.stepAuth') },
       ],
       // the kind chosen is stored as a type and a flavour : an RTE, or an awx runner that is an
@@ -3195,9 +3205,18 @@ export default function getSettings(t) {
         state: _state,
         node_id: _nodeId,
         socket: _socket,
+        rte_image_choice: imageChoice,
+        rte_add_environment: _addEnvironment,
         ...item
       }) => ({
         ...item,
+        // the image its container runs : a published one, or the one typed ; none for the other kinds
+        rte_image:
+          kind === 'rte'
+            ? imageChoice === RTE_OTHER_IMAGE
+              ? String(item.rte_image || '').trim() || null
+              : imageChoice || null
+            : null,
         // an RTE's mode ; none for the other kinds
         rte_mode: kind === 'rte' ? item.rte_mode || 'outbound' : null,
         type: kind === 'rte' || PROJECT_RUNNER_KINDS.includes(kind) ? kind : 'awx',
@@ -3306,6 +3325,51 @@ export default function getSettings(t) {
           initial: (r) => (r && r.id ? r.rte_mode || 'database' : 'outbound'),
           dependency: 'kind',
           dependencyValues: ['rte'],
+          noTable: true,
+        },
+        {
+          // the image its container runs (informational : the container decides) : the published
+          // rte-full and rte-core, every runtime environment the Designer built (its last good
+          // build's image ; one never built is not listed), or Other, typed below
+          key: 'rte_image_choice',
+          step: 'image',
+          // the icon of the Designer's RTE images
+          icon: 'cubes',
+          label: t('settings.runners.rteImage'),
+          help: t('settings.runners.rteImageHelp'),
+          type: 'select',
+          parent: 'rteImages',
+          values: 'runner/images',
+          valueKey: 'image',
+          labelKey: 'label',
+          appendValues: () => [{ image: RTE_OTHER_IMAGE, label: t('settings.runners.rteImageOther') }],
+          initial: (r) => r?.rte_image || RTE_PUBLISHED_IMAGES.full,
+          dependency: 'kind',
+          dependencyValues: ['rte'],
+          noTable: true,
+          hidden: true,
+        },
+        {
+          // Add runtime environment, under the dropdown : the Designer in a new tab
+          key: 'rte_add_environment',
+          step: 'image',
+          label: '',
+          type: 'component',
+          component: defineAsyncComponent(() => import('@/components/AppAddRuntimeEnvironment.vue')),
+          dependency: 'kind',
+          dependencyValues: ['rte'],
+          noTable: true,
+          hidden: true,
+        },
+        {
+          key: 'rte_image',
+          step: 'image',
+          icon: 'cubes',
+          label: t('settings.runners.rteImage'),
+          placeholder: 'registry.example.com/af/rte-vmware:7.8.0',
+          showWhen: (r) => r.rte_image_choice === RTE_OTHER_IMAGE,
+          requiredWhen: (r) => r.rte_image_choice === RTE_OTHER_IMAGE,
+          hidden: true,
           noTable: true,
         },
         {

@@ -436,11 +436,14 @@ async function loadItems(force = true) {
       // a dropdown source can live on another api version than the page
       // itself
       const list = await loadList(field.values, false, field.valuesApiVersion);
-      // an optional reference (a credential's secret store) must be clearable : a
-      // select has no way back to "nothing" without an empty option
-      parentLists.value[field.parent] = field.clearable
-        ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }, ...list]
-        : list;
+      // an optional reference (a credential's secret store) must be clearable : a select has no
+      // way back to "nothing" without an empty option ; a choice of its own after the loaded ones
+      // (appendValues : a new runner's Other image) comes last
+      parentLists.value[field.parent] = [
+        ...(field.clearable ? [{ [field.valueKey]: '', [field.labelKey]: field.emptyLabel ?? '' }] : []),
+        ...list,
+        ...(typeof field.appendValues === 'function' ? field.appendValues() : field.appendValues || []),
+      ];
     }
     if (field.parent && field.values && Array.isArray(field.values)) {
       parentLists.value[field.parent] = field.values;

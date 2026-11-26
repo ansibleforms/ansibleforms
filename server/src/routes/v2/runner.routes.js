@@ -4,6 +4,8 @@ import runnerController from '../../controllers/v2/runner.controller.js';
 
 router.get('/', runnerController.find);
 router.get('/types', runnerController.types);
+// the images a new AnsibleForms runner can run : published, and the runtime environments built
+router.get('/images', runnerController.images);
 // how many RTEs wait for approval (the header bell)
 router.get('/pending', runnerController.pendingCount);
 // the join tokens RTEs add themselves with (Connections > Runners > Add runner)
