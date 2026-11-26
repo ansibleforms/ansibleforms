@@ -235,7 +235,7 @@ function pickSection(pi) {
           <!-- its roles : pills to remove, one more typed -->
           <label class="form-label fw-bold">{{ t('playbookOutline.sections.roles') }}</label>
           <div v-if="play.rolesEditable" class="mb-3">
-            <!-- none yet : said, as the other empty lists -->
+            <!-- none yet : said, as a runtime environment's collections -->
             <div v-if="!play.roles.length" class="text-body-secondary fst-italic mb-2">
               {{ t('playbookEditor.noRoles') }}
             </div>

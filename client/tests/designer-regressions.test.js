@@ -296,7 +296,7 @@ describe('renaming a form keeps that form open', () => {
   // The address follows the form shown : renaming it router.replace'd to the new name's slug,
   // and the route watcher then opened the first form of that slug, another form when two read
   // the same in an address ('Test 1', 'test-1'). Each guard was checked by removing it.
-  const watcher = designer.slice(designer.indexOf('() => route.path,'), designer.indexOf('watch(currentTab, () =>'));
+  const watcher = designer.slice(designer.indexOf('() => route.path,'), designer.indexOf('watch(currentTab, (tab) =>'));
 
   it('the route watcher ignores an address the designer wrote itself', () => {
     expect(watcher).toContain('designerAddress === route.path');

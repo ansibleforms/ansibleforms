@@ -49,6 +49,16 @@ import { repositorySourceFields } from '@/lib/repositoryUsage';
 import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t } = useI18n();
+
+/** Copies the runner's image, to start it from it where it runs. */
+async function copyImage() {
+  try {
+    await Helpers.copyToClipboard(runner.value?.rte_image || '');
+    toast.success(t('common.copied'));
+  } catch (e) {
+    toast.error(t('common.copyFailed', { error: e?.message || e }));
+  }
+}
 const route = useRoute();
 const router = useRouter();
 const authenticated = ref(false);
@@ -358,6 +368,11 @@ const tabFields = computed(() => {
       runner.value?.type === 'rte'
         ? [
             ['rte_mode_text', t('settings.runners.rteMode')],
+            runner.value?.rte_image && [
+              'rte_image',
+              t('settings.runners.rteImage'),
+              t('settings.runners.rteImageHelp'),
+            ],
             runner.value?.socket && ['socket', t('settings.runners.socket')],
             ...(socketRte.value
               ? [
@@ -770,6 +785,16 @@ onMounted(async () => {
               <div v-show="fieldShown('rte_mode_text')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.runners.rteMode') }}</div>
                 <div>{{ rteModeText }}</div>
+              </div>
+              <!-- the image its container runs (the New runner wizard's Image step) -->
+              <div v-if="runner.rte_image" v-show="fieldShown('rte_image')" class="mb-3">
+                <div class="form-label fw-bold">{{ t('settings.runners.rteImage') }}</div>
+                <!-- copied, to start the runner from it in its own setup (its env file, volumes, ports) -->
+                <div class="d-flex align-items-center gap-2">
+                  <code>{{ runner.rte_image }}</code>
+                  <BsButton icon="copy" :title="t('designer.rte.copy')" @click="copyImage" />
+                </div>
+                <div class="form-text">{{ t('settings.runners.rteImageStart') }}</div>
               </div>
               <!-- a socket-mode RTE : its socket, connected or not, as a badge -->
               <div v-if="runner.socket" v-show="fieldShown('socket')" class="mb-3">

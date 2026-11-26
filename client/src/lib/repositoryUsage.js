@@ -58,6 +58,8 @@ export const USAGE_TYPES = [
   // several : a form runs the first one's playbooks, or names its own (playbookRepository)
   { key: 'playbooks', flag: 'use_for_playbooks', category: 'designer' },
   { key: 'workflows', flag: 'use_for_workflows', category: 'designer' },
+  // the RTE images a builder builds (runner_rte:), in any number of repositories
+  { key: 'rte', flag: 'use_for_rte', category: 'designer' },
   {
     key: 'schedules',
     flag: 'use_for_schedules',

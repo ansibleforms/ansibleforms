@@ -42,6 +42,376 @@
     { "url": "/api/v2" }
   ],
   "paths": {
+    "/rte-images/versions": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "The runtime environment versions",
+        "description": "The pythons rte-base may get, the one rte-core brings, and the ansible-core releases with the pythons each runs on. Requires designer access.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/rte-images/builds": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "The runtime environment builds",
+        "description": "The build jobs, newest first: image, status, reference, digest, signed, SBOM. Requires designer access.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/rte-images/builders": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "The builders",
+        "description": "The builders (runners of type builder), each with whether it can take a build now. Requires designer access.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/rte-images/{name}/build": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Build a runtime environment",
+        "description": "Starts a build: a job of type build handed to the least busy builder online, which pushes the image to the registry of its registry credential. Requires designer access.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/rte-images": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "List the runtime environments",
+        "description": "Every runner_rte: entry of the repositories used for runtime environments, with its repository, file and any error. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Add a runtime environment",
+        "description": "Writes a new runtime environment to rte.yaml in a new folder of its name, in the repository given (the only one when there is one). Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "object",
+                    "description": "A runtime environment definition (runner_rte: entry): name, description, arch (amd64, arm64 or all), python, ansible_core, ansible_collections, python_packages, os_packages, registry {credential (a registry credential), path, tag (app or fixed)}, sbom, sign {credential (a signing key credential)}"
+                  },
+                  "repository": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rte-images/repositories": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "The repositories used for runtime environments",
+        "description": "Where a new runtime environment may go. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        }
+      }
+    },
+    "/rte-images/preview": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Preview a runtime environment's build",
+        "description": "The Dockerfile and the files a builder would be handed for a definition not saved yet, and the reference it is pushed to. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "object",
+                    "description": "A runtime environment definition (runner_rte: entry): name, description, arch (amd64, arm64 or all), python, ansible_core, ansible_collections, python_packages, os_packages, registry {credential (a registry credential), path, tag (app or fixed)}, sbom, sign {credential (a signing key credential)}"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rte-images/push": {
+      "post": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Commit and push the runtime environments",
+        "description": "Commits and pushes every repository used for runtime environments. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        }
+      }
+    },
+    "/rte-images/{name}": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "One runtime environment",
+        "description": "Its definition, where it is, its Dockerfile and build files. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Save a runtime environment",
+        "description": "Saves over its entry where it is, a rename included, keeping the file's comments. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "object",
+                    "description": "A runtime environment definition (runner_rte: entry): name, description, arch (amd64, arm64 or all), python, ansible_core, ansible_collections, python_packages, os_packages, registry {credential (a registry credential), path, tag (app or fixed)}, sbom, sign {credential (a signing key credential)}"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "designer"
+        ],
+        "summary": "Remove a runtime environment",
+        "description": "Removes its entry, and its file when nothing is left in it. Requires designer access; a change also requires the designer lock.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Not valid"
+          },
+          "423": {
+            "description": "The designer lock is someone else's"
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/version": {
       "get": {
         "tags": ["system"],

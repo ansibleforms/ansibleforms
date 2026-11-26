@@ -105,7 +105,8 @@ class Runner extends CrudModel {
     if (!rows.length) throw new Errors.BadRequestError(`No credential named '${row.credential}'`);
     const type = rows[0].credential_type;
     const kind = row.type === 'awx' ? row.flavour || 'awx' : row.type;
-    const wanted = row.type === 'awx' ? ['awx', 'aap', 'ascender'] : [row.type];
+    // a builder signs in as a runner does : its token in an rte credential
+    const wanted = row.type === 'awx' ? ['awx', 'aap', 'ascender'] : row.type === 'builder' ? ['rte'] : [row.type];
     if (wanted.includes(type)) return;
     const legacy = row.type === 'jenkins' ? ['userpass'] : row.type === 'awx' ? ['api', 'userpass'] : ['api'];
     if (opts.fromSeed && legacy.includes(type)) {
@@ -166,7 +167,7 @@ class Runner extends CrudModel {
   static assertComplete(row, credentialAddress = false) {
     const missing = (field) => { throw new Errors.BadRequestError(`A runner of type ${row.type} needs ${field}`); };
     // an outbound RTE dials the app : the app needs no address of it
-    const outbound = row.type === 'rte' && row.rte_mode === 'outbound';
+    const outbound = (row.type === 'rte' || row.type === 'builder') && row.rte_mode === 'outbound';
     if (!row.uri && !credentialAddress && !outbound) {
       missing('an address: a credential with a server address, or its own uri');
     }
@@ -229,7 +230,8 @@ class Runner extends CrudModel {
     // flag itself - setting it here would flip it back on every start.
     // ... never one waiting for approval : it becomes the default when it is approved ; nor one a
     // repository's file makes, which says itself whether it is the default (lib/repoObjects)
-    if (!data.is_default && !opts.fromSeed && !opts.fromRepo && !data.pending && !(await this.findDefault(data.type))) {
+    // a builder is never a default : no form runs on it
+    if (!data.is_default && data.type !== 'builder' && !opts.fromSeed && !opts.fromRepo && !data.pending && !(await this.findDefault(data.type))) {
       data.is_default = 1;
     }
     await this.assertDefaultAllowed(data, data.type, opts);
@@ -309,7 +311,7 @@ class Runner extends CrudModel {
     if (!row) throw new Errors.NotFoundError(`No runner with id ${id}`);
     if (!Number(row.pending)) throw new Errors.BadRequestError(`Runner '${row.name}' is not waiting for approval`);
     const data = { pending: 0, pending_since: null, pending_info: null, enabled: 1 };
-    if (!(await this.findDefault(row.type))) data.is_default = 1;
+    if (row.type !== 'builder' && !(await this.findDefault(row.type))) data.is_default = 1;
     await CrudModel.update(this.modelName, data, id, { fromRte: true });
     if (data.is_default) await this.clearOtherDefaults(id, row.type);
     logger.notice(`Runner '${row.name}' approved: it takes jobs from now on`);
@@ -372,7 +374,8 @@ class Runner extends CrudModel {
    *   Promise<number>
    */
   static async countPending() {
-    const rows = await mysql.do('SELECT COUNT(*) AS n FROM AnsibleForms.`runners` WHERE pending = 1');
+    // the runners' (the header bell, Connections > Runners) ; the builders wait in the Designer
+    const rows = await mysql.do("SELECT COUNT(*) AS n FROM AnsibleForms.`runners` WHERE pending = 1 AND type <> 'builder'");
     return Number(rows?.[0]?.n || 0);
   }
 

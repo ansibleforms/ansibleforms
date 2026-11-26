@@ -25,7 +25,10 @@ const find = async (req, res) => {
     if (req.query.name) {
       return res.json(RestResult.single(maskSecrets(await Runner.findByName(req.query.name))));
     }
-    const list = await withSocket(await Runner.findAll());
+    // the builders (?type=builder : the Designer's RTE builders) apart from the runners
+    const builders = req.query.type === 'builder';
+    const rows = (await Runner.findAll()).filter((r) => (r.type === 'builder') === builders);
+    const list = await withSocket(rows);
     return res.json(RestResult.list(list.map(maskSecrets)));
   } catch (err) {
     Errors.ReturnError(res, err);
@@ -59,7 +62,8 @@ async function withSocket(list) {
 // the types a runner can have, with what each can run
 const types = async (req, res) => {
   try {
-    return res.json(RestResult.list(RUNNER_TYPES.map((type) => ({ type, ...getRunner(type).capabilities }))));
+    // a builder is no runner a form can name
+    return res.json(RestResult.list(RUNNER_TYPES.filter((type) => type !== 'builder').map((type) => ({ type, ...getRunner(type).capabilities }))));
   } catch (err) {
     Errors.ReturnError(res, err);
   }
@@ -201,7 +205,7 @@ const reject = async (req, res) => {
  *   string: the message.
  */
 export function checkMessage(req, runner, details) {
-  if (runner?.type !== "rte") return i18n.t(req, "resources.runnerConnectionOk");
+  if (runner?.type !== "rte" && runner?.type !== "builder") return i18n.t(req, "resources.runnerConnectionOk");
   const parts = [];
   if (details?.version) parts.push(i18n.t(req, "resources.runnerRteRelease", { version: details.version }));
   // the RTE says "2.18.1" from "ansible-playbook [core 2.18.1]", or the whole first line of an

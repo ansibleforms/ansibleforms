@@ -75,7 +75,24 @@ const currentForm = ref(null);
 // on it), label what the menu shows, description the line under the page title
 const tabs = designerViews(t);
 // the sections still to build : every section but the ones built
-const BUILT_SECTIONS = ['Categories', 'Constants', 'Forms', 'Inventories', 'Playbooks', 'VarsFiles', 'Workflows'];
+const BUILT_SECTIONS = [
+  'Categories',
+  'Constants',
+  'Forms',
+  'Inventories',
+  'Playbooks',
+  'VarsFiles',
+  'Workflows',
+  'RteImages',
+];
+// the RTE images (AppRteImages) ; their builds are jobs (the Jobs page), their builders Connections > Builders :
+// each section its own component, its toolbar its actions
+const RTE_SECTIONS = ['RteImages'];
+const rteSection = ref(null);
+// building an RTE image (allowRteBuild) : an admin's
+// unless a role gives them ; the images themselves follow allowRteDesign
+const canBuildRte = computed(() => !!store.profile?.options?.allowRteBuild);
+const canDesignRte = computed(() => store.profile?.options?.allowRteDesign !== false);
 const draftSections = tabs.map((x) => x.name).filter((name) => !BUILT_SECTIONS.includes(name));
 // the views in the menu, alphabetically by their (translated) label
 const sortedTabs = computed(() => [...tabs].sort((a, b) => a.label().localeCompare(b.label(), locale.value)));
@@ -1683,6 +1700,8 @@ const editorView = ref('yaml');
 // a preview : a form as users see it, the categories as the forms list ; and, still to build, a
 // workflow drawn, an inventory as its tree of groups and hosts, the schedules' next runs in time
 const hasPreview = (view) => !!DESIGNER_TABS[slugOf(view)]?.includes('preview');
+// a YAML tab : every view but the RTE builds and the builders (tables, no file)
+const hasYaml = (view) => !!DESIGNER_TABS[slugOf(view)]?.includes('yaml');
 // the preview's address, and its key : a new key reloads it with the YAML as it is now
 const previewUrl = ref('');
 const previewKey = ref(0);
@@ -1766,7 +1785,9 @@ const menuPreview = computed(() => ({
  */
 function applyEditor(editor) {
   const view = currentTab.value;
-  const want = (editor === 'visual' && hasVisual(view)) || (editor === 'preview' && hasPreview(view)) ? editor : 'yaml';
+  const fallback = hasYaml(view) ? 'yaml' : 'visual';
+  const want =
+    (editor === 'visual' && hasVisual(view)) || (editor === 'preview' && hasPreview(view)) ? editor : fallback;
   if (want !== editorView.value) showView(want);
 }
 // another designer address while it is open (the header search, a link, Back) : its view, then
@@ -1805,7 +1826,8 @@ watch(
 );
 // another view opens on its YAML ; the preview and the visual tab are a form's : no form goes
 // back to the YAML, another form is previewed (or shown in the visual tab) in its place
-watch(currentTab, () => (editorView.value = 'yaml'));
+// a view without a YAML tab (the RTE builds, the builders) opens on its Visual one
+watch(currentTab, (tab) => (editorView.value = hasYaml(tab) ? 'yaml' : 'visual'));
 watch(currentForm, (form) => {
   if (currentTab.value !== 'Forms' || editorView.value === 'yaml') return;
   if (!form) editorView.value = 'yaml';
@@ -2372,6 +2394,14 @@ function isCurrentTab(name) {
 function selectTab(name) {
   if (projectFiles.value?.dirty && name !== currentTab.value) {
     projectFiles.value.leave(() => selectTab(name));
+    return;
+  }
+  // an RTE image with changes : asked first too
+  if (rteSection.value?.dirty && name !== currentTab.value) {
+    rteSection.value.leave(() => {
+      rteSection.value = null;
+      selectTab(name);
+    });
     return;
   }
   currentTab.value = name;
@@ -3705,6 +3735,9 @@ const toolbarActions = computed(() => {
     { key: 'diff', run: editorDiff, disabled: diffOff },
   ];
 
+  // the RTE images, their builds, the builders : their own (each component's actions)
+  if (RTE_SECTIONS.includes(currentTab.value)) return rteSection.value?.actions || [];
+
   // the playbooks, the vars files, the inventories : the file open
   if (FILE_SECTIONS[currentTab.value]) {
     const f = projectFiles.value;
@@ -4942,7 +4975,7 @@ onBeforeUnmount(() => {
              and constants as tables (Visual) ; a form's preview -->
         <template v-if="lock && lock.match && loaded" #tabs>
           <ul class="nav nav-tabs mb-0 designer-tabs">
-            <li class="nav-item">
+            <li v-if="hasYaml(currentTab)" class="nav-item">
               <a class="nav-link" :class="{ active: editorView === 'yaml' }" href="#" @click.prevent="showView('yaml')">
                 <FaIcon icon="code" class="me-1" />
                 YAML
@@ -4970,8 +5003,9 @@ onBeforeUnmount(() => {
                 href="#"
                 @click.prevent="showView('preview')"
               >
-                <FaIcon icon="eye" class="me-1" />
-                {{ t('designer.preview') }}
+                <FaIcon :icon="currentTab === 'RteImages' ? 'file-code' : 'eye'" class="me-1" />
+                <!-- an RTE image's : the files it builds from, the Dockerfile first -->
+                {{ currentTab === 'RteImages' ? t('designer.rte.files') : t('designer.preview') }}
               </a>
             </li>
           </ul>
@@ -5195,6 +5229,17 @@ onBeforeUnmount(() => {
                     dialogOnly
                     canCreateChoices
                     @created="onInventoryRepoCreated"
+                  />
+                </div>
+                <!-- the RTE images, their builds and the builders -->
+                <div v-else-if="loaded && RTE_SECTIONS.includes(currentTab)" class="designer-files">
+                  <AppRteImages
+                    ref="rteSection"
+                    :view="editorView"
+                    :readOnly="!(lock && lock.match) || !canDesignRte"
+                    :canBuild="canBuildRte"
+                    :theme="editorTheme"
+                    :editorStyle="editorStyle('100%')"
                   />
                 </div>
                 <!-- a section's preview, still to build -->

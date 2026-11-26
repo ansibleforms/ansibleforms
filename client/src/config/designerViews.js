@@ -54,6 +54,12 @@ export function designerViews(t) {
       icon: 'file-lines',
     },
     {
+      name: 'RteImages',
+      label: () => t('designer.rte.imagesLabel'),
+      description: () => t('designer.rte.imagesDescription'),
+      icon: 'cubes',
+    },
+    {
       // nodes joined by lines, as AWX draws a workflow
       name: 'Workflows',
       label: () => t('designer.workflows'),

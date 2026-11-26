@@ -17,6 +17,8 @@ export const DESIGNER_TABS = {
   varsfiles: ['yaml', 'visual', 'preview'],
   // a workflow as its graph (the Visual tab), and a dry run of it (the Preview tab)
   workflows: ['yaml', 'visual', 'preview'],
+  // an RTE image's fields (Visual), its entry (YAML), the Dockerfile it builds (Preview)
+  rteimages: ['yaml', 'visual', 'preview'],
 };
 
 /** Every tab a section may have. */

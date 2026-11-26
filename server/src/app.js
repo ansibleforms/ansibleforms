@@ -86,6 +86,7 @@ import configRoutesv2 from "./routes/v2/config.routes.js";
 import configSeedRoutesv2 from "./routes/v2/configseed.routes.js";
 import formsReposRoutes from "./routes/v2/forms-repos.routes.js";
 import projectFilesRoutes from "./routes/v2/projectFiles.routes.js";
+import rteImageRoutes from "./routes/v2/rteImage.routes.js";
 import mcpRoutes from "./mcp/router.js";
 
 // __dirname and __filename setup for ES modules
@@ -308,6 +309,8 @@ const load = async (app) => {
   app.use(`/api/v2/forms-repos`, cors(), authobj, Middleware.checkDesignerMiddleware, formsReposRoutes);
   // the designer's playbooks and vars files (their folder, or their repository)
   app.use(`/api/v2/files`, cors(), authobj, Middleware.checkDesignerMiddleware, projectFilesRoutes);
+  // the Designer's RTE images (lib/rteImages.js)
+  app.use(`/api/v2/rte-images`, cors(), authobj, Middleware.checkDesignerMiddleware, rteImageRoutes);
   app.use(`/api/v2/config`, cors(), authobj, configRoutesv2);
   // separate mount from /config on purpose : the seed is not the forms configuration and
   // does not share its permissions - this one is settings admin, like the pages it rewrites

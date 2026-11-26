@@ -666,7 +666,7 @@ const SCHEMA_MANIFEST = {
                      columns: ['job_events.result', 'jobs.workflow_hash', 'stored_jobs.visibility', 'runners.rte_mode', 'runners.enabled', 'schedule.enabled', 'runners.pending', 'runners.pending_since', 'runners.pending_info', 'runners.rte_cert_sha256', 'runners.rte_max_jobs', 'runners.rte_cache_mb', 'runners.rte_files', 'runners.rte_drain_seconds', 'schedule.owner', 'credentials.secret_store', 'credentials.secret_ref', 'settings.vault_env_imported_at', 'settings.syslog_env_imported_at', 'jobs.runner', 'jobs.runner_kind', 'jobs.runner_job_url',
                                'runners.username', 'runners.password', 'runners.use_credentials', 'runners.node_id', 'jobs.job_log', 'jobs.status_message', 'jobs.status_detail',
                                'jobs.tracker', 'repositories.claim_node', 'repositories.claim_since',
-                               'repositories.use_for_workflows', 'repositories.use_for_inventories',
+                               'repositories.use_for_workflows', 'repositories.use_for_inventories', 'repositories.use_for_rte',
                                'schedule.claim_node', 'schedule.claim_since', 'runners.flavour', 'runners.project',
                                'credentials.credential_type', 'repositories.credential', 'groups.description',
                                'secret_stores.credential', 'credentials.client_cert', 'credentials.client_key',
@@ -1139,6 +1139,8 @@ async function patchVersion7(messages, success, failed) {
   // a repository for the workflows the designer builds ; the vars files are no longer a usage of
   // their own : they are the forms repository's (its vars folder, Repository.getVarsFilesPath)
   await checkPromise(addColumn("repositories", "use_for_workflows", "tinyint(4)", true, "0"), messages, success, failed);
+  // a repository for the RTE images a builder builds (runner_rte:, lib/rteImages.js), any number of them
+  await checkPromise(addColumn("repositories", "use_for_rte", "tinyint(4)", true, "0"), messages, success, failed);
   // a repository for the inventories the playbook forms name (inventory: <name>)
   await checkPromise(addColumn("repositories", "use_for_inventories", "tinyint(4)", true, "0"), messages, success, failed);
   await checkPromise(dropColumn("repositories", "use_for_vars_files"), messages, success, failed);

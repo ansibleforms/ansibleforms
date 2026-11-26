@@ -47,6 +47,17 @@ export const DESIGNER_ACTIONS = {
   reload: { icon: 'arrows-rotate', title: 'designer.files.reload' },
   download: { icon: 'download', title: 'designer.download' },
   revert: { icon: 'clock-rotate-left', title: 'designer.revert' },
+  // an RTE image's YAML : a part of it set or added in a dialog, as a form's icon or roles
+  rteArch: { icon: 'server', title: 'designer.rte.setArch' },
+  rtePython: { icon: 'fab,python', title: 'designer.rte.setPython' },
+  rteCore: { icon: 'microchip', title: 'designer.rte.setCore' },
+  rteCollection: { icon: 'box-open', title: 'designer.rte.addCollection' },
+  rtePythonPackages: { icon: 'cubes', title: 'designer.rte.addPythonPackages' },
+  rteOsPackages: { icon: 'boxes-stacked', title: 'designer.rte.addOsPackages' },
+  rteRegistry: { icon: 'warehouse', title: 'designer.rte.setRegistry' },
+  rteSigning: { icon: 'signature', title: 'designer.rte.setSigning' },
+  // a runtime environment : built on a builder (removed with the explorer's ×, as every section's items)
+  build: { icon: 'hammer', title: 'designer.rte.build' },
 };
 
 /** The order of the actions : their keys as DESIGNER_ACTIONS lists them. */
