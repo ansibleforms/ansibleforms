@@ -416,8 +416,8 @@ export function applyConfigSeed(opts) {
  *   Promise<boolean>: true when it is.
  */
 async function configKeptInDatabase() {
-  const [settings] = (await mysql.do("SELECT config_source, forms_yaml FROM AnsibleForms.`settings` limit 1")) || [];
-  return !!settings && Settings.resolveConfigInDatabase(settings) && !!String(settings.forms_yaml ?? "").trim();
+  const [settings] = (await mysql.do("SELECT config_source, config_yaml FROM AnsibleForms.`settings` limit 1")) || [];
+  return !!settings && Settings.resolveConfigInDatabase(settings) && !!String(settings.config_yaml ?? "").trim();
 }
 
 export function reloadConfigSeed(opts) {

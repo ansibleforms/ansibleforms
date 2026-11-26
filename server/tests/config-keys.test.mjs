@@ -454,7 +454,8 @@ describe("the config seed's use_for_config checked as it is applied", () => {
 
 describe("the config seed applied with use_for_config", () => {
   test("the configuration kept in the database : a seed whose other repository has use_for_roles starts", async () => {
-    fx.state.tables.settings = [{ id: 1, config_source: "database", forms_yaml: "roles: []\n" }];
+    // a settings row of 7.6 or later : config_yaml, which forms_yaml became
+    fx.state.tables.settings = [{ id: 1, config_source: "database", config_yaml: "roles: []\n" }];
     // made on an earlier start : updated, the database's repository model is not the fixture's
     fx.state.tables.repositories = [
       { id: 1, name: "a", uri: "https://x/a.git", branch: "main", managed: 1 },
@@ -469,7 +470,7 @@ describe("the config seed applied with use_for_config", () => {
       // the sections after the repositories go to tables the fixture does not know : what matters
       // is that the validation let it through, and what the repositories' section applied
       const outcome = await applyConfigSeed().catch((e) => e);
-      assert.doesNotMatch(String(outcome?.message ?? ""), /Seed file/);
+      assert.doesNotMatch(String(outcome?.message ?? ""), /Seed file|Unknown column/);
       assert.ok(Number(fx.rowNamed("repositories", "b").use_for_roles));
       assert.ok(!Number(fx.rowNamed("repositories", "a").use_for_roles));
     } finally {

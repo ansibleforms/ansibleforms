@@ -152,7 +152,13 @@ export const db = {
       return { affectedRows: hit.length };
     }
     // a single-row table (the settings, the chat assistant's) : its row, a field of it, a write
-    if (/^SELECT (\*|[\w, ]+) FROM \S+ limit 1;?$/i.test(sql)) return copy(rows.slice(0, 1));
+    m = sql.match(/^SELECT (\*|[\w, ]+) FROM \S+ limit 1;?$/i);
+    if (m) {
+      // a column the row lacks is refused, as MySQL does (a name from before a rename)
+      const missing = m[1] === "*" || !rows.length ? undefined : m[1].split(",").map((c) => c.trim()).find((c) => !(c in rows[0]));
+      if (missing) throw Object.assign(new Error(`Unknown column '${missing}' in 'field list'`), { code: "ER_BAD_FIELD_ERROR" });
+      return copy(rows.slice(0, 1));
+    }
     if (/^UPDATE \S+ set \?$/i.test(sql)) {
       const values = Array.isArray(params) ? params[0] : params;
       rows.forEach((r) => Object.assign(r, values));
