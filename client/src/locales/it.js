@@ -978,6 +978,7 @@ export default {
       label: 'Builder',
       description: 'I builder che costruiscono le immagini RTE e le inviano al loro registro.',
       nameHelp: 'Il suo nome, con cui si è unito (RTE_NAME).',
+      versionIs: 'versione {version}',
       waitingNotice: "1 builder attende l'approvazione. | {count} builder attendono l'approvazione.",
       builds: 'Build',
       image: 'Immagine',

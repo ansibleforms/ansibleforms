@@ -81,6 +81,8 @@ export function settingsMenu(t) {
         { title: t('sidebar.secretStores'), icon: 'vault', link: '/settings/secret-stores' },
         { title: t('sidebar.databases'), icon: 'database', link: '/settings/databases' },
         { title: t('sidebar.runners'), icon: 'rocket', link: '/settings/runners' },
+        // the RTE builders, runners of another kind : they build the RTE images, run no job
+        { title: t('sidebar.builders'), icon: 'hammer', link: '/settings/builders' },
         { title: t('sidebar.ssh'), icon: 'key', link: '/settings/ssh' },
         { title: t('sidebar.notifications'), icon: 'bell', link: '/settings/notifications' },
         { title: t('sidebar.chat'), icon: 'comments', link: '/settings/chat' },

@@ -25,7 +25,7 @@ const find = async (req, res) => {
     if (req.query.name) {
       return res.json(RestResult.single(maskSecrets(await Runner.findByName(req.query.name))));
     }
-    // the builders (?type=builder : the Designer's RTE builders) apart from the runners
+    // the builders (?type=builder : Connections > Builders) apart from the runners
     const builders = req.query.type === 'builder';
     const rows = (await Runner.findAll()).filter((r) => (r.type === 'builder') === builders);
     const list = await withSocket(rows);

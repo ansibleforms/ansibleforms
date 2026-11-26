@@ -958,6 +958,7 @@ export default {
       label: '构建器',
       description: '构建 RTE 镜像并推送到其镜像仓库的构建器。',
       nameHelp: '加入时使用的名称 (RTE_NAME)。',
+      versionIs: '版本 {version}',
       waitingNotice: '{count} 个构建器等待批准。',
       builds: '构建',
       image: '镜像',

@@ -64,6 +64,8 @@ const secretStore = () => import('@/pages/admin/secret-store.vue');
 const databases = () => import('@/pages/admin/databases.vue');
 const database = () => import('@/pages/admin/database.vue');
 const runners = () => import('@/pages/admin/runners.vue');
+const builders = () => import('@/pages/admin/builders.vue');
+const builder = () => import('@/pages/admin/builder.vue');
 const runner = () => import('@/pages/admin/runner.vue');
 const audit = () => import('@/pages/admin/audit.vue');
 const roles = () => import('@/pages/admin/roles.vue');
@@ -426,6 +428,18 @@ const routes = [
     path: '/settings/runners',
     name: '/settings/runners',
     component: runners,
+    meta: { permission: ['showSettings', 'showConnectionsSettings'] },
+  },
+  {
+    path: '/settings/builders',
+    name: '/settings/builders',
+    component: builders,
+    meta: { permission: ['showSettings', 'showConnectionsSettings'] },
+  },
+  {
+    path: '/settings/builders/:id(\\d+)/:tab?',
+    name: '/settings/builders/:id',
+    component: builder,
     meta: { permission: ['showSettings', 'showConnectionsSettings'] },
   },
   {
