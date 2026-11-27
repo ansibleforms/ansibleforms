@@ -82,7 +82,7 @@ export function sortRows(rows, column, dir) {
  *   object: { sortColumn, sortDir, toggleSort, sortIcon, sorted } :
  *     sortColumn, sortDir: the column sorted by and its direction (1, -1 ; '' and 0 : none) ;
  *     toggleSort(column): a header clicked : A to Z, Z to A, then the order they came in ;
- *     sortIcon(column): the arrow its header shows (sort-up, sort-down), '' for none ;
+ *     sortIcon(column): the arrow its header shows (caret-up, caret-down), '' for none ;
  *     sorted: the rows sorted.
  */
 export function useColumnSort(rows, sortable = () => true) {
@@ -102,8 +102,10 @@ export function useColumnSort(rows, sortable = () => true) {
     }
   }
 
+  // caret-up and caret-down, not sort-up and sort-down : those are the halves of the pair (sort),
+  // drawn at its top or its bottom, so alone they sat high or low ; a caret is drawn in the middle
   const sortIcon = (column) =>
-    sortColumn.value === column && sortDir.value ? (sortDir.value === 1 ? 'sort-up' : 'sort-down') : '';
+    sortColumn.value === column && sortDir.value ? (sortDir.value === 1 ? 'caret-up' : 'caret-down') : '';
 
   const sorted = computed(() => (sortable() ? sortRows(unref(rows), sortColumn.value, sortDir.value) : unref(rows)));
 

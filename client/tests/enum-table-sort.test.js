@@ -82,10 +82,10 @@ describe('a header clicked', () => {
     expect(sortIcon('name')).toBe('');
     toggleSort('name');
     expect(column(sorted.value, 'name')[0]).toBe('esx-1');
-    expect(sortIcon('name')).toBe('sort-up');
+    expect(sortIcon('name')).toBe('caret-up');
     toggleSort('name');
     expect(column(sorted.value, 'name')[0]).toBe('kvm-10');
-    expect(sortIcon('name')).toBe('sort-down');
+    expect(sortIcon('name')).toBe('caret-down');
     toggleSort('name');
     expect(sorted.value).toBe(rows.value);
     expect([sortColumn.value, sortDir.value]).toEqual(['', 0]);
@@ -131,6 +131,14 @@ describe('the tables and the field', () => {
       expect(src).toMatch(/<span class="af-th-text">\{\{ l \}\}<\/span>/);
       expect(src).toMatch(/\.af-th-text \{[^}]*text-overflow: ellipsis;/);
       expect(src).toMatch(/\.af-th-sort \{[^}]*flex-shrink: 0;/);
+      // its arrow on the middle of the lowercase text : the header on the baseline, the arrow's
+      // centre at half the text's x-height
+      expect(src).toMatch(/\.af-th \{[^}]*align-items: baseline;/);
+      // the sorted column's arrow the secondary grey, the others the tertiary, a step lighter
+      expect(src).toMatch(/<font-awesome-icon v-else icon="sort" class="af-th-sort-idle" \/>/);
+      expect(src).toMatch(/\.af-th-sort \{\s*color: var\(--bs-secondary-color\);/);
+      expect(src).toMatch(/\.af-th-sort-idle \{\s*color: var\(--bs-tertiary-color\);/);
+      expect(src).toMatch(/\.af-th-sort svg \{[^}]*font-size: 0\.7em;[^}]*vertical-align: middle;/);
       expect(src).toMatch(/<font-awesome-icon v-if="sortIcon\(l\)" :icon="sortIcon\(l\)" \/>/);
       expect(src).toMatch(/v-for="\(?v(, i\))? in sorted"/);
       expect(src).toMatch(/select\(v\.index\)/);

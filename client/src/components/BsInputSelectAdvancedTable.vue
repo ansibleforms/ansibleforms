@@ -563,9 +563,9 @@ onMounted(() => {
               <!-- its text cut first (…), its arrow always shown -->
               <span class="af-th">
                 <span class="af-th-text">{{ l }}</span>
-                <span v-if="sortable" class="af-th-sort text-muted ms-1">
+                <span v-if="sortable" class="af-th-sort ms-1">
                   <font-awesome-icon v-if="sortIcon(l)" :icon="sortIcon(l)" />
-                  <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                  <font-awesome-icon v-else icon="sort" class="af-th-sort-idle" />
                 </span>
               </span>
             </th>
@@ -623,7 +623,7 @@ th.af-sortable * {
    arrow never */
 .af-th {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
 }
 .af-th-text {
@@ -634,7 +634,21 @@ th.af-sortable * {
 }
 .af-th-sort {
   flex-shrink: 0;
+}
+/* the arrow of the column sorted : the theme's secondary grey ; the others' its tertiary one, a
+   step lighter, darker than the jobs list's faint one and still seen at a glance */
+.af-th-sort {
+  color: var(--bs-secondary-color);
+}
+.af-th-sort-idle {
+  color: var(--bs-tertiary-color);
+}
+/* its arrow on the middle of the lowercase text, as a letter would sit : vertical-align middle
+   puts its centre at the baseline plus half the text's x-height (the box keeps the text's size,
+   only the arrow is smaller), not Font Awesome's -0.125em for an icon in running text */
+.af-th-sort svg {
   font-size: 0.7em;
+  vertical-align: middle;
 }
 
 .table td,
