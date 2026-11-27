@@ -275,6 +275,18 @@
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
       Replaces `CONFIG_SEED_RELOAD_SECONDS`, still read when this one is not set.
+  - name: CONFIG_SEED_RELOAD_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Config seed reload on
+    default: true
+    description: |
+      Whether the Config seed reload system task runs on its schedule (CONFIG_SEED_RELOAD_CRON). Turned off, the seed applies at startup only; it replaces CONFIG_SEED_RELOAD_SECONDS=0, deprecated.
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: CONFIG_SEED_RELOAD_SECONDS
     version: 6.3.0
     type: integer
@@ -723,6 +735,18 @@
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: JOB_CLEANUP_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Job cleanup on
+    default: true
+    description: |
+      Whether the Job cleanup system task runs on its schedule (JOB_CLEANUP_CRON). Turn it off to keep every finished job, or where they are cleaned up another way.
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: AUDIT_CLEANUP_CRON
     version: 7.8.0
     type: string
@@ -732,6 +756,18 @@
     description: |
       When the Audit log cleanup system task runs: it removes the audit entries older than AUDIT_RETENTION_DAYS.
       A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at 3:30 AM.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: AUDIT_CLEANUP_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Audit log cleanup on
+    default: true
+    description: |
+      Whether the Audit log cleanup system task runs on its schedule (AUDIT_CLEANUP_CRON). Turn it off to keep the audit log forever (shipped to a syslog server, for instance).
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
@@ -747,6 +783,18 @@
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: TOKEN_CLEANUP_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Expired tokens on
+    default: true
+    description: |
+      Whether the Expired tokens system task runs on its schedule (TOKEN_CLEANUP_CRON). Only housekeeping: an expired token is refused anyway.
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: STORED_JOB_CLEANUP_CRON
     version: 7.8.0
     type: string
@@ -759,6 +807,18 @@
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: STORED_JOB_CLEANUP_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Stored jobs cleanup on
+    default: true
+    description: |
+      Whether the Stored jobs cleanup system task runs on its schedule (STORED_JOB_CLEANUP_CRON). Turn it off to keep every stored job until it is deleted.
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
   - name: NIGHTLY_BACKUP_CRON
     version: 7.8.0
     type: string
@@ -768,6 +828,18 @@
     description: |
       When the Nightly backup system task runs: it backs up the database and removes the oldest nightly backups beyond NIGHTLY_BACKUP_RETENTION.
       A cron of 5 fields in the app's timezone (LOG_TZ); the default runs it every day at midnight.
+      Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
+      managed settings file and applies it at once on every node, without a restart. Set in the
+      real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.
+  - name: NIGHTLY_BACKUP_ENABLED
+    version: 7.9.0
+    type: boolean
+    allowed: true, false
+    short: Nightly backup on
+    default: true
+    description: |
+      Whether the Nightly backup system task runs on its schedule (NIGHTLY_BACKUP_CRON). Turn it off where the instance is backed up another way (volume snapshots, a managed database with its own backups).
+      Turned off, Run now on the task's page still runs it. false or 0 turns it off.
       Changed on the task's own page, Jobs > System > the task > Schedule, which saves it to the
       managed settings file and applies it at once on every node, without a restart. Set in the
       real environment (or with ALLOW_ENV_EDIT=0), the page shows it read only.

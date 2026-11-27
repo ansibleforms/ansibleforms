@@ -11,6 +11,11 @@
 // the one in force. The config seed reload's was a number of seconds before 7.8.0
 // (CONFIG_SEED_RELOAD_SECONDS) : still read, deprecated, as a cron (lib/seedReloadCron.js).
 //
+// A task that only keeps things tidy (the backup, the cleanups, the config seed reload) may be
+// turned off by an admin (canDisable : its switch setting, NIGHTLY_BACKUP_ENABLED and the like, on
+// the task's Schedule tab) : it then does not run on its cron, Run now still runs it. The others
+// keep the cluster working (jobs ended, locks freed, schedules ended and picked up) : never off.
+//
 // The runner hub's own loops (runners/rteHub.js : dispatch, inbound dial, ended jobs prune) are
 // listed beside them (HUB_LOOPS) : they run every few seconds on their own timers (lib/hubLoops.js),
 // each as often as its setting of seconds says (RUNNER_DISPATCH_SECONDS and the like, on the
@@ -52,6 +57,19 @@ const RETENTION_TAB = 'retention';
 const scheduleSetting = (env, config, deprecated = null) => ({ env, config, deprecated });
 
 /**
+ * A task's switch setting : the environment variable that turns it off (false) or on (true, its
+ * default), changed on the task's own page beside its cron, and its appConfig key.
+ *
+ * Args:
+ *   env (string): the variable (NIGHTLY_BACKUP_ENABLED).
+ *   config (string): its appConfig key (nightlyBackupEnabled).
+ *
+ * Returns:
+ *   object: { env, config }.
+ */
+const switchSetting = (env, config) => ({ env, config });
+
+/**
  * The maintenance tasks, in the order the scheduler registers them.
  *
  *   key: the task's name in the scheduler and in the table
@@ -62,6 +80,8 @@ const scheduleSetting = (env, config, deprecated = null) => ({ env, config, depr
  *     and the tab of Settings > System > General it is changed on (tab) ; null for none
  *   schedule: the setting that changes its cron (scheduleSetting), the cron above then only its
  *     default
+ *   canDisable: whether an admin may turn it off (its run only tidies up : backed up, cleaned up
+ *     or reloaded some other way) ; enabledSetting is then its switch (switchSetting)
  */
 export const SYSTEM_TASKS = [
   {
@@ -103,6 +123,8 @@ export const SYSTEM_TASKS = [
     description: 'Removes expired sign-in tokens, revocations and API tokens.',
     setting: null,
     schedule: scheduleSetting('TOKEN_CLEANUP_CRON', 'tokenCleanupCron'),
+    canDisable: true,
+    enabledSetting: switchSetting('TOKEN_CLEANUP_ENABLED', 'tokenCleanupEnabled'),
   },
   {
     key: 'auditCleanup',
@@ -111,6 +133,8 @@ export const SYSTEM_TASKS = [
     description: 'Removes audit log entries older than the audit retention.',
     setting: { env: 'AUDIT_RETENTION_DAYS', config: 'auditRetentionDays', tab: RETENTION_TAB },
     schedule: scheduleSetting('AUDIT_CLEANUP_CRON', 'auditCleanupCron'),
+    canDisable: true,
+    enabledSetting: switchSetting('AUDIT_CLEANUP_ENABLED', 'auditCleanupEnabled'),
   },
   {
     key: 'jobCleanup',
@@ -119,6 +143,8 @@ export const SYSTEM_TASKS = [
     description: 'Removes finished jobs older than the job retention.',
     setting: { env: 'JOB_RETENTION_DAYS', config: 'jobRetentionDays', tab: RETENTION_TAB },
     schedule: scheduleSetting('JOB_CLEANUP_CRON', 'jobCleanupCron'),
+    canDisable: true,
+    enabledSetting: switchSetting('JOB_CLEANUP_ENABLED', 'jobCleanupEnabled'),
   },
   {
     key: 'nightlyBackup',
@@ -127,6 +153,8 @@ export const SYSTEM_TASKS = [
     description: 'Backs up the database and removes the oldest nightly backups.',
     setting: { env: 'NIGHTLY_BACKUP_RETENTION', config: 'nightlyBackupRetention', tab: RETENTION_TAB },
     schedule: scheduleSetting('NIGHTLY_BACKUP_CRON', 'nightlyBackupCron'),
+    canDisable: true,
+    enabledSetting: switchSetting('NIGHTLY_BACKUP_ENABLED', 'nightlyBackupEnabled'),
   },
   {
     key: 'storedJobsCleanup',
@@ -135,6 +163,8 @@ export const SYSTEM_TASKS = [
     description: 'Removes expired or unused stored jobs, and forgets old nodes.',
     setting: { env: 'STORED_JOB_UNUSED_DAYS', config: 'storedJobUnusedDays', tab: RETENTION_TAB },
     schedule: scheduleSetting('STORED_JOB_CLEANUP_CRON', 'storedJobCleanupCron'),
+    canDisable: true,
+    enabledSetting: switchSetting('STORED_JOB_CLEANUP_ENABLED', 'storedJobCleanupEnabled'),
   },
   {
     key: 'configSeedReload',
@@ -149,6 +179,8 @@ export const SYSTEM_TASKS = [
       config: 'configSeedReloadSeconds',
       toCron: secondsToCron,
     }),
+    canDisable: true,
+    enabledSetting: switchSetting('CONFIG_SEED_RELOAD_ENABLED', 'configSeedReloadEnabled'),
   },
 ];
 
@@ -294,6 +326,41 @@ export const SCHEDULE_SETTINGS = SYSTEM_TASKS.filter((task) => task.schedule).ma
   default: task.cron,
 }));
 
+// every switch setting of a task that may be turned off, by its variable
+export const ENABLED_SETTINGS = SYSTEM_TASKS.filter((task) => task.canDisable).map((task) => ({
+  key: task.key,
+  env: task.enabledSetting.env,
+  config: task.enabledSetting.config,
+}));
+
+/**
+ * A switch setting's value read as on or off : false or 0 (any case) turns it off ; anything else,
+ * and not set at all, leaves it on (the default).
+ *
+ * Args:
+ *   value (string|boolean|undefined): the variable's value.
+ *
+ * Returns:
+ *   boolean: true for on.
+ */
+export function switchedOnValue(value) {
+  if (typeof value === 'boolean') return value;
+  return !/^(false|0)$/i.test(String(value ?? '').trim());
+}
+
+/**
+ * Why a value cannot be a switch setting's, or null when it can : true, false, 1 or 0 (any case).
+ *
+ * Args:
+ *   value (string): the value.
+ *
+ * Returns:
+ *   string|null: the problem, in English, or null.
+ */
+export function switchValueProblem(value) {
+  return /^(true|false|1|0)$/i.test(String(value ?? '').trim()) ? null : 'must be true or false';
+}
+
 /**
  * Why a cron cannot be a task's schedule, or null when it can : five fields (minute, hour,
  * day of the month, month, day of the week ; croner's sixth, the seconds, is not offered), that
@@ -360,20 +427,51 @@ export function deprecatedSchedule(task) {
 }
 
 /**
- * Whether a task runs here and now : the config seed reload only with a seed (CONFIG_SEED_PATH)
- * and not turned off by its deprecated seconds (0), every other task always.
+ * Whether an admin left a task on (its switch setting, NIGHTLY_BACKUP_ENABLED and the like) : a
+ * task that cannot be turned off always is, whatever its variable says.
  *
  * Args:
  *   key (string): the task's key.
  *
  * Returns:
- *   boolean: true when it runs.
+ *   boolean: false only for a task that may be turned off, and was.
  */
-export function taskEnabled(key) {
+export function taskSwitchedOn(key) {
+  const task = systemTask(key);
+  if (!task?.canDisable) return true;
+  return switchedOnValue(appConfig[task.enabledSetting.config]);
+}
+
+/**
+ * Whether a task can run here at all, on its cron or with Run now : the config seed reload only
+ * with a seed (CONFIG_SEED_PATH) and not turned off by its deprecated seconds (0), every other
+ * task always. An admin's switch does not change it : a task turned off still runs with Run now.
+ *
+ * Args:
+ *   key (string): the task's key.
+ *
+ * Returns:
+ *   boolean: true when it can run.
+ */
+export function taskRunnable(key) {
   const task = systemTask(key);
   if (!task) return false;
   if (task.key === 'configSeedReload') return !!appConfig.configSeedPath && !deprecatedSchedule(task)?.off;
   return true;
+}
+
+/**
+ * Whether a task runs on its cron here and now : it can run (taskRunnable) and an admin did not
+ * turn it off (taskSwitchedOn).
+ *
+ * Args:
+ *   key (string): the task's key.
+ *
+ * Returns:
+ *   boolean: true when it runs on its cron.
+ */
+export function taskEnabled(key) {
+  return taskRunnable(key) && taskSwitchedOn(key);
 }
 
 /**
@@ -610,4 +708,4 @@ export function resetPruneForTests() {
   launchers.clear();
 }
 
-export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, LOOP_SETTINGS, systemTask, hubLoop, loopSeconds, loopSecondsProblem, taskCron, deprecatedSchedule, taskEnabled, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded, launcherName, launchNext, takeLauncher };
+export default { SYSTEM_TASKS, HUB_LOOPS, SCHEDULE_SETTINGS, ENABLED_SETTINGS, LOOP_SETTINGS, systemTask, hubLoop, loopSeconds, loopSecondsProblem, taskCron, deprecatedSchedule, taskEnabled, taskRunnable, taskSwitchedOn, switchedOnValue, switchValueProblem, scheduleValue, scheduleCronProblem, counted, sentence, pruneRuns, recordRun, recorded, launcherName, launchNext, takeLauncher };

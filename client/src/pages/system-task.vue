@@ -4,30 +4,37 @@
 /*  A maintenance task's page (/jobs/system/<key>), opened from   */
 /*  the system tasks' list : one of the app's own tasks, in tabs, */
 /*  the tab kept in the url -                                     */
-/*    Details  its name and what it does, then read only : when   */
-/*             it runs, its last run and its result, its next     */
-/*             run, and the setting it applies (where it is       */
-/*             changed, or the environment variable that sets it) */
+/*    Details  its name and what it does, then read only : how    */
+/*             it last went (a failure's error on hover), when it */
+/*             last ran, its next run ; last, Enabled : a switch  */
+/*             for a task that may be turned off (the backup, the */
+/*             cleanups, the seed reload ; Run now still runs it  */
+/*             while off), saved with Save ; on and greyed out for*/
+/*             the others. What each run did, and on which node,  */
+/*             is on Runs                                         */
 /*    Schedule when it runs : its cron in the editor of a        */
 /*             schedule's Schedule tab, saved with Save (read     */
 /*             only when the environment sets it ; leaving with   */
 /*             a change asks first) ; a cron still read from a    */
 /*             deprecated variable says so under it. A runner hub */
 /*             loop has no cron : every so many seconds, a number */
-/*             within its bounds, saved the same way, and its     */
-/*             node on Details                                    */
+/*             within its bounds, saved the same way              */
 /*    Runs     its recent runs, the latest first                  */
 /*  Run now top right, beside Save, as a schedule's page : the    */
 /*  task run once at once, then read again (its last run, result  */
-/*  and Runs) ; disabled while it runs and for a task that is     */
-/*  off. A runner hub loop runs one pass on the node that answers */
-/*  (disabled where its hub does not run), in milliseconds.       */
+/*  and Runs) ; disabled while it runs and for a task that cannot */
+/*  run (the seed reload without a seed ; a task turned off still */
+/*  runs). A runner hub loop runs one pass on the node that       */
+/*  answers (disabled where its hub does not run), in ms.         */
 /*  No Delete, nothing else to edit - the task is the app's own.  */
 /*  The search of the title line narrows every tab at once.       */
+/*  The title's popover : what the page is for, then the setting  */
+/*  the task applies (its variable and value, and where it is     */
+/*  changed, or that the environment sets it).                    */
 /*                                                                */
 /******************************************************************/
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { toast } from 'vue-sonner';
 import { useI18n } from 'vue-i18n';
@@ -40,9 +47,11 @@ import { cronValidationMessage } from '@/config/cron';
 import { tableMatches } from '@/lib/recordSearch';
 import { statusPill } from '@/config/settings';
 import { taskName, taskDescription, taskTiming, runDuration, runLauncher } from '@/lib/systemTasks';
+import BsSwitch from '@/components/BsSwitch.vue';
 
 const { t, locale } = useI18n();
 const route = useRoute();
+const router = useRouter();
 const authenticated = ref(false);
 const loaded = ref(false);
 
@@ -54,6 +63,9 @@ const task = ref(null);
 const cronEdit = ref('');
 // a runner hub loop's seconds as edited on the Schedule tab, the saved ones until changed
 const secondsEdit = ref('');
+// a task that may be turned off : its switch as edited on the Schedule tab, the saved one until
+// changed
+const enabledEdit = ref(true);
 
 /**
  * Loads the task and its recent runs ; refused or failing, the page says it is not found. Its
@@ -74,13 +86,14 @@ async function load(keepEdit = false) {
   if (!keep) {
     cronEdit.value = task.value?.cron || '';
     secondsEdit.value = String(task.value?.interval_seconds ?? '');
+    enabledEdit.value = task.value?.switched_on !== false;
   }
   loaded.value = true;
 }
 
 // ─── its schedule ─────────────────────────────────────────────────────────────
-// a runner hub loop (its seconds, no cron) : its seconds in a number field ; what it did is the
-// memory of the node that answered (task.loop), named on Details
+// a runner hub loop (its seconds, no cron) : its seconds in a number field ; its last run is the
+// memory of the node that answered (task.loop)
 const isLoop = computed(() => !!task.value && task.value.interval_seconds != null);
 // its cron (a loop's seconds) is a setting (schedule_env), in the editor : changed here, not when
 // the environment sets its variable (or ALLOW_ENV_EDIT=0), the editor then read only, saying so
@@ -112,34 +125,60 @@ const cronProblem = computed(() => {
   if (cron.split(/\s+/).filter(Boolean).length !== 5) return t('jobs.system.cronFiveFields');
   return cronValidationMessage(t, cron);
 });
-// the cron (a loop's seconds) changed and not saved : Save turns orange, leaving asks first
-const dirty = computed(() => {
+// the cron (a loop's seconds) changed and not saved
+const cronDirty = computed(() => {
   if (!scheduleEditable.value) return false;
   if (isLoop.value) return String(secondsEdit.value ?? '').trim() !== String(task.value?.interval_seconds ?? '');
   return cronEdit.value.trim() !== (task.value?.cron || '');
 });
+// a task that may be turned off (the backup, the cleanups, the seed reload) : its switch, changed
+// here unless the environment sets its variable (or ALLOW_ENV_EDIT=0)
+const canDisable = computed(() => !!task.value?.can_disable);
+// why a task cannot run here at all, whatever its switch says, as the list says Off : the config
+// seed reload without a seed or with its deprecated seconds at 0, a runner hub loop on a node whose
+// hub does not run ; '' when it can. Its switch is then off and greyed out, this line under it
+const offReason = computed(() => {
+  const x = task.value;
+  if (!x) return '';
+  if (isLoop.value) return x.enabled === false ? t('jobs.system.offNoHub') : '';
+  if (x.runnable !== false) return '';
+  return deprecated.value?.off ? t('jobs.system.offDeprecated', { env: deprecated.value.env }) : t('jobs.system.offNoSeed');
+});
+const enabledEditable = computed(() => canDisable.value && !!task.value?.editable_enabled && !offReason.value);
+const enabledDirty = computed(() => enabledEditable.value && enabledEdit.value !== (task.value?.switched_on !== false));
+// the cron or the switch changed and not saved : Save turns orange, leaving asks first
+const dirty = computed(() => cronDirty.value || enabledDirty.value);
 // the problem said under the editor : once the cron is changed, so a cron of 6 fields read from
 // the deprecated variable is shown without an error
-const cronError = computed(() => (dirty.value ? cronProblem.value : ''));
-// Save : a changed cron, or the deprecated variable's cron as it is when it has 5 fields, saved as
-// the new variable
-const canSave = computed(() => dirty.value || (scheduleEditable.value && !!deprecated.value && !cronProblem.value));
+const cronError = computed(() => (cronDirty.value ? cronProblem.value : ''));
+// the deprecated variable's cron as it is, when it has 5 fields : Save writes it as the new variable
+const deprecatedSavable = computed(() => scheduleEditable.value && !!deprecated.value && !cronProblem.value);
+// Save : a changed cron or switch, or that deprecated cron ; shown when either may be changed
+const canSave = computed(() => dirty.value || deprecatedSavable.value);
+const showSave = computed(() => scheduleEditable.value || enabledEditable.value);
 useUnsavedGuard(dirty, () => save());
 
 /**
- * Saves the task's cron (PUT /api/v2/system/tasks/<key>/schedule), a runner hub loop's seconds,
- * then reads the task again : its next run and next runs follow the new cron or seconds.
+ * Saves the task's cron and its switch, what of them changed, in one request
+ * (PUT /api/v2/system/tasks/<key>/schedule), a runner hub loop's seconds, then reads the task
+ * again : its next run and next runs follow the new cron or seconds, none while it is off.
  *
  * Returns:
  *   Promise<boolean>: false when the cron was refused (the leave dialog then stays).
  */
 async function save() {
-  if (cronProblem.value) {
+  if (cronDirty.value && cronProblem.value) {
     toast.warning(cronProblem.value);
     return false;
   }
   try {
-    const body = isLoop.value ? { seconds: Number(String(secondsEdit.value).trim()) } : { cron: cronEdit.value.trim() };
+    let body;
+    if (isLoop.value) body = { seconds: Number(String(secondsEdit.value).trim()) };
+    else {
+      body = {};
+      if (cronDirty.value || deprecatedSavable.value) body.cron = cronEdit.value.trim();
+      if (enabledDirty.value) body.enabled = enabledEdit.value;
+    }
     await axios.put(`/api/v2/system/tasks/${encodeURIComponent(taskKey.value)}/schedule`, body);
     toast.success(t('settings.common.nameUpdated', { name: name.value }));
     await load();
@@ -155,9 +194,9 @@ async function save() {
 // elsewhere) disables Run now too
 const runAsked = ref(false);
 const running = computed(() => runAsked.value || !!task.value?.running);
-// a task that is off (the config seed reload without CONFIG_SEED_PATH) is not run, nor a runner hub
-// loop on a node whose hub does not run (its enabled false)
-const canRun = computed(() => !!task.value && task.value.enabled !== false && !running.value);
+// a task that cannot run (the config seed reload without CONFIG_SEED_PATH) is not run, nor a runner
+// hub loop on a node whose hub does not run ; a task an admin turned off still runs (runnable)
+const canRun = computed(() => !!task.value && (task.value.runnable ?? task.value.enabled) !== false && !running.value);
 // a run that goes on after the answer (the nightly backup) : read again every 2 seconds until it
 // is recorded, 30 minutes at most
 const FOLLOW_MS = 2000;
@@ -242,6 +281,18 @@ const lastRun = computed(() => task.value?.last_run || null);
 const launchError = computed(() => (lastRun.value?.outcome === 'failed' ? lastRun.value.result || '' : ''));
 // the setting it applies : its variable and value, then where it is changed or what sets it
 const setting = computed(() => task.value?.setting || null);
+// the title's popover (markdown) : what the page is for, then that setting, its link to where it is
+// changed (the app's own path, its base included) or that the environment sets it
+const pageInfo = computed(() => {
+  const about = t('jobs.system.description');
+  const s = setting.value;
+  if (!s) return about;
+  const where =
+    s.editable && s.link
+      ? `[${t('jobs.system.settingChange')}](${router.resolve(s.link).href})`
+      : t('jobs.system.settingEnv');
+  return `${about}\n\n**${t('jobs.system.setting')}**: \`${s.env}\` ${s.value ?? '–'} · ${where}`;
+});
 
 // ─── Runs ─────────────────────────────────────────────────────────────────────
 // its recent runs, the latest first (the server keeps a month of them) : when it started and ended,
@@ -326,7 +377,6 @@ const tabFields = computed(() => ({
     ['name', t('settings.fields.name'), name.value],
     ['description', t('settings.fields.description'), description.value],
     ['lastLaunch', t('settings.schedules.lastLaunch'), lastRun.value?.outcome],
-    ['result', t('jobs.system.result'), lastRun.value?.result],
     [
       'lastRun',
       t('settings.fields.lastRun'),
@@ -337,8 +387,11 @@ const tabFields = computed(() => ({
       t('settings.schedules.nextRun'),
       task.value?.next_run ? Helpers.formatServerDate(task.value.next_run) : '',
     ],
-    ['node', t('jobs.system.node'), task.value?.loop?.node],
-    ['setting', t('jobs.system.setting'), setting.value?.env, setting.value?.value],
+    [
+      'enabled',
+      t('settings.schedules.enabled'),
+      offReason.value || (canDisable.value ? t('settings.schedules.enabledHelp') : t('jobs.system.cannotDisable')),
+    ],
   ],
   // its cron's editor, found by the cron or its words ; a runner hub loop's seconds, or their words
   schedule: isLoop.value
@@ -390,7 +443,8 @@ onMounted(async () => {
         icon="gears"
         :title="name || taskKey"
         :crumbs="crumbs"
-        :description="t('jobs.system.description')"
+        :description="pageInfo"
+        descriptionMarkdown
       >
         <!-- narrows both tabs at once ; the search box of the other pages -->
         <template v-if="task" #headerActions>
@@ -459,12 +513,7 @@ onMounted(async () => {
                    (a failed run's result) -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
-                <span :title="launchError || undefined" v-html="statusPill(t, lastRun?.outcome)"></span>
-              </div>
-              <!-- what the last run did, or its error -->
-              <div v-show="fieldShown('result')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('jobs.system.result') }}</div>
-                <span>{{ lastRun?.result || '–' }}</span>
+                <span class="af-field-pill" :title="launchError || undefined" v-html="statusPill(t, lastRun?.outcome)"></span>
               </div>
               <!-- when it last ran : plain text, a dash when it never ran -->
               <div v-show="fieldShown('lastRun')" class="mb-3">
@@ -475,24 +524,28 @@ onMounted(async () => {
                 <div class="form-label fw-bold">{{ t('settings.schedules.nextRun') }}</div>
                 <span>{{ task.next_run ? Helpers.formatServerDate(task.next_run) : '–' }}</span>
               </div>
-              <!-- a runner hub loop : the node whose memory answered, its last run and outcome -->
-              <div v-if="isLoop" v-show="fieldShown('node')" class="mb-3">
-                <div class="form-label fw-bold">{{ t('jobs.system.node') }}</div>
-                <span>{{ task.loop?.node || '–' }}</span>
-              </div>
-              <!-- the setting it applies : its variable and value, then where it is changed, or that
-                   the environment sets it ; none, a dash. The tab's last field, no margin under it -->
-              <div v-show="fieldShown('setting')" class="mb-0">
-                <div class="form-label fw-bold">{{ t('jobs.system.setting') }}</div>
-                <span v-if="setting"
-                  ><code>{{ setting.env }}</code> {{ setting.value ?? '–' }}
-                  <span class="text-body-secondary mx-1">·</span>
-                  <router-link v-if="setting.editable && setting.link" :to="setting.link">{{
-                    t('jobs.system.settingChange')
-                  }}</router-link>
-                  <span v-else class="text-body-secondary">{{ t('jobs.system.settingEnv') }}</span></span
-                >
-                <span v-else>–</span>
+              <!-- Enabled, the tab's last field : for a task that may be turned off, saved with Save as
+                   every switch of a record page, read only when the environment sets its variable ;
+                   for every other task (a runner hub loop too) on and greyed out ; off and greyed out
+                   for one that cannot run here. The line under says which -->
+              <div v-show="fieldShown('enabled')" class="mb-0">
+                <label class="form-label fw-bold d-block" for="af-system-enabled">{{
+                  t('settings.schedules.enabled')
+                }}</label>
+                <!-- a task that cannot run here : off whatever its switch says, as the list says Off -->
+                <BsSwitch v-if="offReason" id="af-system-enabled" :modelValue="false" :disabled="true" class="mb-0" />
+                <BsSwitch v-else id="af-system-enabled" v-model="enabledEdit" :disabled="!enabledEditable" class="mb-0" />
+                <div class="form-text">
+                  {{
+                    offReason
+                      ? offReason
+                      : !canDisable
+                        ? t('jobs.system.cannotDisable')
+                        : enabledEditable
+                          ? t('settings.schedules.enabledHelp')
+                          : t('jobs.system.scheduleEnv', { env: task.enabled_env })
+                  }}
+                </div>
               </div>
             </template>
             <!-- Schedule : its cron in the editor of a schedule's Schedule tab (presets, fields, words,
@@ -562,15 +615,16 @@ onMounted(async () => {
             </div>
           </div>
         </template>
-        <!-- Run now, as a schedule's page (disabled while it runs, for a task that is off and for
-             a runner hub loop whose hub does not run on this node), then Save when its cron (a
-             loop's seconds) may be changed, as a record page's (orange while it is changed ;
+        <!-- Run now, as a schedule's page (disabled while it runs, for a task that cannot run and
+             for a runner hub loop whose hub does not run on this node ; a task turned off still
+             runs), then Save when its cron (a loop's seconds) or its switch may be changed, as a
+             record page's (orange while it is changed ;
              enabled too while the cron comes from a deprecated variable, which Save replaces) -->
         <template v-if="task" #actions>
           <BsButton icon="play" cssClass="text-nowrap" :disabled="!canRun" @click="runNow()">{{
             t('settings.schedules.runSchedule')
           }}</BsButton>
-          <BsButton v-if="scheduleEditable" icon="save" :disabled="!canSave" @click="save()">{{
+          <BsButton v-if="showSave" icon="save" :disabled="!canSave" @click="save()">{{
             t('settings.common.save')
           }}</BsButton>
         </template>

@@ -12,7 +12,7 @@ import { Cron } from 'croner';
 import mysql from './db.model.js';
 import appConfig from '../../config/app.config.js';
 import logConfig from '../../config/log.config.js';
-import { SYSTEM_TASKS, HUB_LOOPS, systemTask, hubLoop, taskCron, taskEnabled, deprecatedSchedule, loopSeconds } from '../lib/systemTasks.js';
+import { SYSTEM_TASKS, HUB_LOOPS, systemTask, hubLoop, taskCron, taskEnabled, taskRunnable, taskSwitchedOn, deprecatedSchedule, loopSeconds } from '../lib/systemTasks.js';
 import { loopState } from '../lib/hubLoops.js';
 import { readManaged, isOverridden } from '../lib/envSettings.js';
 
@@ -84,6 +84,23 @@ export function cronOf(task) {
 export function scheduleEditable(task, managed) {
   if (!task.schedule) return false;
   return !!appConfig.allowEnvEdit && !isOverridden(task.schedule.env, managed);
+}
+
+/**
+ * Whether an admin may turn a task off or on (PUT /api/v2/system/tasks/:key/schedule { enabled }) :
+ * a task that may be turned off (canDisable), the settings file writable (ALLOW_ENV_EDIT), and its
+ * switch's variable not set in the process's own environment, which the file cannot override.
+ *
+ * Args:
+ *   task (object): the task's entry of SYSTEM_TASKS.
+ *   managed (Map): the variables of the settings file (envSettings readManaged).
+ *
+ * Returns:
+ *   boolean: true when its switch may be changed.
+ */
+export function enabledEditable(task, managed) {
+  if (!task.canDisable) return false;
+  return !!appConfig.allowEnvEdit && !isOverridden(task.enabledSetting.env, managed);
 }
 
 /**
@@ -175,7 +192,8 @@ export function settingOf(task, managed) {
  * Returns:
  *   object: { key, name, description, cron, default_cron, schedule_env, editable_schedule,
  *     schedule_deprecated, interval_seconds, default_interval_seconds, interval_min, interval_max,
- *     loop, enabled, last_run, next_run, next_runs, timezone, setting }.
+ *     loop, enabled, can_disable, switched_on, enabled_env, editable_enabled, runnable, last_run,
+ *     next_run, next_runs, timezone, setting }.
  */
 function describe(task, lastRow, managed) {
   const lastRun = lastRow ? runOf(lastRow) : null;
@@ -203,7 +221,18 @@ function describe(task, lastRow, managed) {
     interval_max: null,
     // a runner hub loop's state on the node that answers (describeLoop) ; null for a task
     loop: null,
+    // whether it runs on its cron : it can run here, and an admin did not turn it off
     enabled: taskEnabled(task.key),
+    // whether an admin may turn it off (only the tasks that tidy up), its switch as set (true for a
+    // task that cannot be turned off), the variable of the switch and whether it may be changed
+    // here (as its cron : not when the environment sets it)
+    can_disable: !!task.canDisable,
+    switched_on: taskSwitchedOn(task.key),
+    enabled_env: task.enabledSetting?.env || null,
+    editable_enabled: enabledEditable(task, managed),
+    // whether Run now can run it : a task turned off still runs (not the config seed reload
+    // without a seed)
+    runnable: taskRunnable(task.key),
     last_run: lastRun,
     next_run: nextRunOf(task),
     // its next runs, the Schedule tab's preview
@@ -278,6 +307,12 @@ function describeLoop(loop, lastRow, managed) {
     interval_max: loop.schedule.max,
     loop: state,
     enabled: !!state?.running,
+    // never turned off ; Run now runs a pass where its hub runs
+    can_disable: false,
+    switched_on: true,
+    enabled_env: null,
+    editable_enabled: false,
+    runnable: !!state?.running,
     last_run: lastRun,
     next_run: next[0] || null,
     next_runs: next,

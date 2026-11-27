@@ -27,7 +27,7 @@ import { cleanupQuery } from '../lib/storedJobExpiry.js';
 // whether a schedule reached its end (its end date passed, or its runs done)
 import { endReached } from '../lib/scheduleEnd.js';
 // the maintenance tasks' crons, and the record of their runs (Jobs > System)
-import { taskCron, taskEnabled, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue, launchNext } from '../lib/systemTasks.js';
+import { taskCron, taskEnabled, taskRunnable, taskSwitchedOn, deprecatedSchedule, recorded, counted, sentence, systemTask, scheduleValue, launchNext } from '../lib/systemTasks.js';
 
 // the cron registry is re-read from the database even without a change notice (lib/epochs.js),
 // in case one was missed : the system task scheduleResync (SCHEDULE_RESYNC_CRON)
@@ -897,7 +897,7 @@ class CronService {
 
     // 5. Config seed reload - re-applies CONFIG_SEED_PATH when its content changes, every minute
     // by default (CONFIG_SEED_RELOAD_CRON, or the deprecated CONFIG_SEED_RELOAD_SECONDS while it
-    // is not set). Registered only with a seed (registerSystemTask, taskEnabled), and here rather
+    // is not set). Registered only with a seed (registerSystemTask, taskRunnable), and here rather
     // than as a watcher of its own so it stops with everything else.
     register('configSeedReload', async () => {
       // reloadConfigSeed handles its own failures - it must never throw into the scheduler,
@@ -920,9 +920,10 @@ class CronService {
    * Registers one system task on the cron it runs on now (lib/systemTasks.js taskCron), the one
    * in place stopped first : one left running keeps firing next to its successor. A schedule
    * setting that is not a valid cron (set by hand in the environment, the app refuses it) is
-   * logged, and the task runs on its default. A task that does not run (the config seed reload
-   * without CONFIG_SEED_PATH, or turned off by its deprecated seconds, taskEnabled) is not
-   * registered ; turned off by its seconds, the log says so.
+   * logged, and the task runs on its default. A task that cannot run (the config seed reload
+   * without CONFIG_SEED_PATH, or turned off by its deprecated seconds, taskRunnable) is not
+   * registered ; turned off by its seconds, the log says so. A task an admin turned off
+   * (taskSwitchedOn) is registered paused : it never fires on its cron, Run now still triggers it.
    *
    * Args:
    *   key (string): the task's key.
@@ -939,9 +940,9 @@ class CronService {
       previous.stop();
       this.jobs.system.delete(key);
     }
-    // step 2 : not registered when it does not run
+    // step 2 : not registered when it cannot run
     const task = systemTask(key);
-    if (!taskEnabled(key)) {
+    if (!taskRunnable(key)) {
       const deprecated = deprecatedSchedule(task);
       if (deprecated?.off) {
         logger.info(`Config seed reload is off (${deprecated.env}=${deprecated.value}), the seed applies at startup only`);
@@ -955,11 +956,15 @@ class CronService {
       logger.warning(`${task.schedule.env}=${set} is not a valid cron, the system task ${key} runs on its default ${cron}`);
     }
     // step 4 : registered, its run recorded ; protect : a run that lasts (a seeded repository
-    // being cloned) never has a second one started on top of it
+    // being cloned) never has a second one started on top of it. Turned off by an admin : paused,
+    // so it never fires on its cron, and Run now (runSystemTaskNow) still triggers it
+    const off = !taskSwitchedOn(key);
     this.jobs.system.set(key, new Cron(cron, {
       timezone: this.timezone,
-      protect: true
+      protect: true,
+      paused: off
     }, recorded(key, work)));
+    if (off) logger.info(`The system task ${key} is turned off (${task.enabledSetting.env}=false), it runs with Run now only`);
     return true;
   }
 

@@ -1,10 +1,10 @@
-import SystemTask, { scheduleEditable } from '../../models/systemTask.model.js';
+import SystemTask, { scheduleEditable, enabledEditable } from '../../models/systemTask.model.js';
 import RestResult from '../../models/restResult.model.v2.js';
 import Audit from '../../models/audit.model.js';
 import i18n from '../../lib/i18n.js';
 import helpers from '../../lib/common.js';
 import logger from '../../lib/logger.js';
-import { systemTask, hubLoop, launcherName, taskCron, taskEnabled, scheduleCronProblem, loopSeconds, loopSecondsProblem } from '../../lib/systemTasks.js';
+import { systemTask, hubLoop, launcherName, taskCron, taskRunnable, taskSwitchedOn, scheduleCronProblem, loopSeconds, loopSecondsProblem } from '../../lib/systemTasks.js';
 import { runNow, busyTasks } from '../../lib/systemTaskRun.js';
 import { runLoopNow } from '../../lib/hubLoops.js';
 import { nodeId } from '../../lib/role.js';
@@ -68,14 +68,17 @@ function refuse(req, res, status, detail) {
   res.status(status).json(RestResult.error(i18n.t(req, 'resources.systemTaskScheduleFailed'), detail));
 }
 
-// PUT /api/v2/system/tasks/:key/schedule { cron } : when a task runs ; { seconds } for a runner hub
-// loop, how often it runs (saveLoopSeconds). Saved as the settings page saves its variables
-// (lib/envSave.js : the settings file, the other nodes told, applied at once), its setting
-// re-registering the task on its new cron on the node that runs the tasks. 404 for a key no task
-// has, 403 for a task whose variable the environment sets (ALLOW_ENV_EDIT=0, or set in the
-// process's own environment), 400 for a cron that is not 5 fields croner runs. Saved, it wins over
-// a deprecated variable its cron came from (the config seed reload's CONFIG_SEED_RELOAD_SECONDS).
-// Answers the task as GET does.
+// PUT /api/v2/system/tasks/:key/schedule { cron, enabled } : when a task runs, and whether it runs on
+// its cron at all (a task that may be turned off : the backup, the cleanups, the config seed
+// reload), each optional, at least one, both saved with one write as the page's Save sends them ;
+// { seconds } for a runner hub loop, how often it runs (saveLoopSeconds). Saved as the settings
+// page saves its variables (lib/envSave.js : the settings file, the other nodes told, applied at
+// once), each setting re-registering the task on the node that runs the tasks : on its new cron,
+// paused while it is turned off (Run now still runs it). 404 for a key no task has, 403 for a
+// setting whose variable the environment sets (ALLOW_ENV_EDIT=0, or set in the process's own
+// environment), 400 for a cron that is not 5 fields croner runs, for enabled not a boolean, and
+// for enabled on a task that cannot be turned off. Saved, a cron wins over a deprecated variable
+// it came from (the config seed reload's CONFIG_SEED_RELOAD_SECONDS). Answers the task as GET does.
 const saveSchedule = async function (req, res) {
   try {
     // step 1 : the task ; a runner hub loop has seconds instead of a cron
@@ -89,37 +92,61 @@ const saveSchedule = async function (req, res) {
       res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
       return;
     }
-    // step 2 : the cron, 5 fields croner runs
-    const cron = String(req.body?.cron ?? '').trim();
-    const problem = scheduleCronProblem(cron);
+    // step 2 : what is sent : the cron, 5 fields croner runs ; enabled, a boolean, only for a task
+    // that may be turned off
+    const body = req.body || {};
+    const hasCron = body.cron !== undefined;
+    const hasEnabled = body.enabled !== undefined;
+    if (!hasCron && !hasEnabled) {
+      refuse(req, res, 400, 'Send the cron, enabled or both');
+      return;
+    }
+    const cron = String(body.cron ?? '').trim();
+    const problem = hasCron ? scheduleCronProblem(cron) : null;
     if (problem) {
       refuse(req, res, 400, `The cron ${problem}`);
       return;
     }
-    // step 3 : the settings file ours to write, the variable not the environment's
-    const env = task.schedule.env;
+    if (hasEnabled && !task.canDisable) {
+      refuse(req, res, 400, "This system task can't be turned off");
+      return;
+    }
+    if (hasEnabled && typeof body.enabled !== 'boolean') {
+      refuse(req, res, 400, 'enabled must be true or false');
+      return;
+    }
+    // step 3 : the settings file ours to write, each variable not the environment's
     if (!SystemTask.envEditAllowed()) {
       refuse(req, res, 403, ENV_EDIT_DISABLED_REASON);
       return;
     }
-    if (!scheduleEditable(task, await SystemTask.managed())) {
-      refuse(req, res, 403, `${env} is set in the environment and cannot be changed from here`);
+    const managed = await SystemTask.managed();
+    if (hasCron && !scheduleEditable(task, managed)) {
+      refuse(req, res, 403, `${task.schedule.env} is set in the environment and cannot be changed from here`);
       return;
     }
-    // step 4 : saved as the settings page saves (its own audit names the variable), then the
-    // change itself audited, the crons are not secrets
-    const before = taskCron(task.key);
-    await saveEnvValues({ [env]: cron }, { user: req.user?.user, ip: req.ip });
-    Audit.log({
-      user: req.user?.user,
-      ip: req.ip,
-      action: 'system.task.schedule',
-      outcome: 'success',
-      targetType: 'system_task',
-      target: task.key,
-      detail: { env, from: before, to: cron },
-    });
-    logger.notice(`The system task ${task.key} runs on ${cron} now (was ${before})`);
+    if (hasEnabled && !enabledEditable(task, managed)) {
+      refuse(req, res, 403, `${task.enabledSetting.env} is set in the environment and cannot be changed from here`);
+      return;
+    }
+    // step 4 : saved in one write as the settings page saves (its own audit names the variables),
+    // then each change itself audited, neither is a secret
+    const beforeCron = taskCron(task.key);
+    const beforeOn = taskSwitchedOn(task.key);
+    const values = {};
+    if (hasCron) values[task.schedule.env] = cron;
+    if (hasEnabled) values[task.enabledSetting.env] = String(body.enabled);
+    await saveEnvValues(values, { user: req.user?.user, ip: req.ip });
+    const audit = (action, detail) =>
+      Audit.log({ user: req.user?.user, ip: req.ip, action, outcome: 'success', targetType: 'system_task', target: task.key, detail });
+    if (hasCron) {
+      audit('system.task.schedule', { env: task.schedule.env, from: beforeCron, to: cron });
+      logger.notice(`The system task ${task.key} runs on ${cron} now (was ${beforeCron})`);
+    }
+    if (hasEnabled && body.enabled !== beforeOn) {
+      audit('system.task.enabled', { env: task.enabledSetting.env, from: beforeOn, to: body.enabled });
+      logger.notice(`The system task ${task.key} is turned ${body.enabled ? 'on' : 'off'} now`);
+    }
     res.json(RestResult.single(await SystemTask.get(task.key)));
   } catch (err) {
     if (err instanceof EnvSaveError) {
@@ -205,8 +232,8 @@ const RUN_REFUSED = {
 // in (lib/systemTaskRun.js). Answers the task as GET does once the run ended (200), or at once
 // while it still runs (202) : the nightly backup, which may outlast a request, and a run handed to
 // another node that did not end within the wait. A runner hub loop runs one pass on this node
-// (runLoop). 404 for a key no task has, 400 for a task that is off (the config seed reload without
-// CONFIG_SEED_PATH), 409 while a run of it is going, 503 when no node runs the tasks. Audited
+// (runLoop). 404 for a key no task has, 400 for a task that cannot run (the config seed reload
+// without CONFIG_SEED_PATH ; one an admin turned off still runs), 409 while a run of it is going, 503 when no node runs the tasks. Audited
 // (system.task.run), with where it ran and how it went.
 const run = async function (req, res) {
   const fail = (status, detail) =>
@@ -222,7 +249,7 @@ const run = async function (req, res) {
       res.status(404).json(RestResult.error(i18n.t(req, 'resources.systemTaskNotFound')));
       return;
     }
-    if (!taskEnabled(task.key)) {
+    if (!taskRunnable(task.key)) {
       fail(...RUN_REFUSED.off);
       return;
     }

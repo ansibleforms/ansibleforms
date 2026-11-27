@@ -712,7 +712,7 @@ onMounted(async () => {
               <!-- a socket-mode RTE : its socket, connected or not, as a badge -->
               <div v-if="runner.socket" v-show="fieldShown('socket')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.runners.socket') }}</div>
-                <span v-html="socketPill(t, runner)"></span>
+                <span class="af-field-pill" v-html="socketPill(t, runner)"></span>
               </div>
               <div v-show="fieldShown('is_default')" class="mb-3">
                 <label class="form-label fw-bold d-block" for="af-runner-default">{{

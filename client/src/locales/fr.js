@@ -3369,6 +3369,13 @@ export default {
       settingChange: 'À modifier dans les Paramètres',
       settingEnv: "Défini par une variable d'environnement",
       scheduleEnv: "Défini par la variable d'environnement {env}.",
+      // a task that cannot be turned off : its switch on and greyed out, why under it
+      cannotDisable: "Toujours active : l'application en a besoin pour fonctionner.",
+      // a task that cannot run here : its switch off and greyed out, why under it (no seed ; the
+      // deprecated seconds at 0 ; a runner hub loop on a node whose hub does not run)
+      offNoSeed: 'Désactivée : aucun config seed défini (CONFIG_SEED_PATH).',
+      offDeprecated: 'Désactivée : {env} vaut 0 (obsolète).',
+      offNoHub: "Désactivée sur ce nœud : le hub des runners n'y tourne pas.",
       scheduleDeprecated: 'De {env}, obsolète ; un cron enregistré ici la remplace.',
       intervalLabel: 'Intervalle',
       intervalUnit: 'secondes',

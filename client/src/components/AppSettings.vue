@@ -9,6 +9,9 @@
 /*      title: String                                             */
 /*      description: String - what the page is for, in a popover  */
 /*                   behind an info icon after the title          */
+/*      descriptionMarkdown: Boolean - the description is         */
+/*                   markdown (a system task's setting : its      */
+/*                   variable and a link where it is changed)     */
 /*      crumbs: Array of { title, icon, to } - a title in steps,  */
 /*              each a link when it has a route (to) ; a title of */
 /*              one step links to the page itself ; a step whose  */
@@ -72,6 +75,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  descriptionMarkdown: {
+    type: Boolean,
+    default: false,
+  },
   // a title in steps, each with its own icon (the forms page's sub categories :
   // Expressions › Test1) ; when given, it is shown instead of icon + title
   crumbs: {
@@ -119,13 +126,13 @@ const steps = computed(() => {
               ><span v-if="c.icon" class="me-2"><FaIcon :icon="c.icon" /></span>{{ c.title }}</template
             >
           </template>
-          <AppInfoPopover v-if="description" :text="description" />
+          <AppInfoPopover v-if="description" :text="description" :markdown="descriptionMarkdown" />
         </h3>
         <h3 v-else>
           <router-link :to="route.path" class="af-crumb-link"
             ><span class="me-2"> <FaIcon :icon="icon" /> </span>{{ title }}</router-link
           >
-          <AppInfoPopover v-if="description" :text="description" />
+          <AppInfoPopover v-if="description" :text="description" :markdown="descriptionMarkdown" />
         </h3>
         <slot name="feedback"></slot>
         <!-- the view controls, then the page's buttons : a row of their own under the title, on
