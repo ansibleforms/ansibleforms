@@ -268,6 +268,10 @@ function getLabels() {
     } else {
       if (labels.value.length > 0) valueLabel.value = labels.value[0];
     }
+  } else if (props.columns.length > 0) {
+    // no rows (none yet, or all moved to the other side) : the header still shows, the columns the
+    // field declares ; without them there is no row to read its columns from, the last ones stay
+    labels.value = [...props.columns];
   }
 }
 
