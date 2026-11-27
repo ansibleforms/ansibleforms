@@ -283,7 +283,8 @@ onMounted(() => {
 });
 </script>
 <template>
-  <div class="mt-2">
+  <!-- a column the side's full height : the message of no rows takes the room under the header -->
+  <div class="mt-2 d-flex flex-column h-100">
     <div class="pb-2">
       <div class="input-group">
         <span class="input-group-text text-gray-500">
@@ -338,11 +339,22 @@ onMounted(() => {
     </div>
     <!-- nothing to show : said under the header and its line, where the rows would be, in line with
          the cells' text -->
-    <p v-if="values.length == 0" class="px-2 py-2 mb-0">{{ t('common.noData') }}</p>
-    <p v-if="values.length > 0 && filtered.length == 0" class="px-2 py-2 mb-0">{{ t('common.noFilterMatch') }}</p>
+    <p v-if="values.length == 0" class="af-no-rows">{{ t('common.noData') }}</p>
+    <p v-if="values.length > 0 && filtered.length == 0" class="af-no-rows">{{ t('common.noFilterMatch') }}</p>
   </div>
 </template>
 <style scoped>
+/* no rows : said in the middle of the room under the header, both ways */
+.af-no-rows {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0;
+  padding: 0.5rem;
+}
+
 /* a header that sorts : the hand over all of it, its arrow too ; its text not selected by the
    clicks. Its click stops there (.stop) : its arrow is replaced as it sorts, so the dropdown's
    click-outside would find the clicked element gone, outside the table, and close it */

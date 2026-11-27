@@ -183,11 +183,22 @@ describe('the tables and the field', () => {
       const table = src.indexOf('<div class="table-container">');
       expect(src.indexOf("t('common.noData')"), file).toBeGreaterThan(table);
       expect(src.indexOf("t('common.noFilterMatch')"), file).toBeGreaterThan(table);
+      // said in the middle : across, and in the left-right selector down too
+      expect(src, file).toMatch(/t\('common\.noData'\)/);
       // with no rows the header still shows : the columns the field declares
       expect(src, file).toMatch(
         /\} else if \(props\.columns\.length > 0\) \{[^}]*labels\.value = \[\.\.\.props\.columns\];/,
       );
     }
+  });
+
+  it('centres no data, across in the dropdown, both ways in the left-right selector', () => {
+    expect(read('src/components/BsInputSelectAdvancedTable.vue')).toMatch(
+      /class="px-2 py-2 mb-0 text-center">\{\{ t\('common\.noData'\) \}\}/,
+    );
+    const side = read('src/components/BsInputSelectAdvancedTable2.vue');
+    expect(side).toMatch(/<div class="mt-2 d-flex flex-column h-100">/);
+    expect(side).toMatch(/\.af-no-rows \{[^}]*flex-grow: 1;[^}]*align-items: center;[^}]*justify-content: center;/);
   });
 
   it('the dropdown keeps the table inside its rounded corners', () => {
