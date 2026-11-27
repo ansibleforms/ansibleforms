@@ -2048,6 +2048,9 @@
                   "filterColumns": {
                     "not": {}
                   },
+                  "sortable": {
+                    "not": {}
+                  },
                   "allowDelete": {
                     "not": {}
                   },
@@ -2154,6 +2157,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "hide": {
@@ -2288,6 +2294,9 @@
                   "filterColumns": {
                     "not": {}
                   },
+                  "sortable": {
+                    "not": {}
+                  },
                   "runLocal": {
                     "not": {}
                   },
@@ -2409,6 +2418,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "expression": {
@@ -2538,6 +2550,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "runLocal": {
@@ -2940,6 +2955,9 @@
                   "filterColumns": {
                     "not": {}
                   },
+                  "sortable": {
+                    "not": {}
+                  },
                   "dbConfig": {
                     "not": {}
                   },
@@ -3030,6 +3048,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "dbConfig": {
@@ -3135,6 +3156,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "multiple": {
@@ -3534,6 +3558,9 @@
                   "filterColumns": {
                     "not": {}
                   },
+                  "sortable": {
+                    "not": {}
+                  },
                   "previewColumn": {
                     "not": {}
                   },
@@ -3696,6 +3723,9 @@
                   "filterColumns": {
                     "not": {}
                   },
+                  "sortable": {
+                    "not": {}
+                  },
                   "allowDelete": {
                     "not": {}
                   },
@@ -3811,6 +3841,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "allowDelete": {
@@ -3929,6 +3962,9 @@
                     "not": {}
                   },
                   "filterColumns": {
+                    "not": {}
+                  },
+                  "sortable": {
                     "not": {}
                   },
                   "allowDelete": {
@@ -4271,6 +4307,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "sortable": {
+                "type": "boolean"
               },
               "allowDelete": {
                 "type": "boolean"
@@ -6615,6 +6654,9 @@
                     "filterColumns": {
                       "not": {}
                     },
+                    "sortable": {
+                      "not": {}
+                    },
                     "allowDelete": {
                       "not": {}
                     },
@@ -6721,6 +6763,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "hide": {
@@ -6855,6 +6900,9 @@
                     "filterColumns": {
                       "not": {}
                     },
+                    "sortable": {
+                      "not": {}
+                    },
                     "runLocal": {
                       "not": {}
                     },
@@ -6976,6 +7024,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "expression": {
@@ -7105,6 +7156,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "runLocal": {
@@ -7507,6 +7561,9 @@
                     "filterColumns": {
                       "not": {}
                     },
+                    "sortable": {
+                      "not": {}
+                    },
                     "dbConfig": {
                       "not": {}
                     },
@@ -7597,6 +7654,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "dbConfig": {
@@ -7702,6 +7762,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "multiple": {
@@ -8101,6 +8164,9 @@
                     "filterColumns": {
                       "not": {}
                     },
+                    "sortable": {
+                      "not": {}
+                    },
                     "previewColumn": {
                       "not": {}
                     },
@@ -8263,6 +8329,9 @@
                     "filterColumns": {
                       "not": {}
                     },
+                    "sortable": {
+                      "not": {}
+                    },
                     "allowDelete": {
                       "not": {}
                     },
@@ -8378,6 +8447,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "allowDelete": {
@@ -8496,6 +8568,9 @@
                       "not": {}
                     },
                     "filterColumns": {
+                      "not": {}
+                    },
+                    "sortable": {
                       "not": {}
                     },
                     "allowDelete": {
@@ -8838,6 +8913,9 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "sortable": {
+                  "type": "boolean"
                 },
                 "allowDelete": {
                   "type": "boolean"

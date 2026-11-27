@@ -2801,6 +2801,7 @@ export default {
       columns: '表示する列。',
       pctColumns: 'パーセントバーで表示する列。',
       filterColumns: '絞り込みに使える列。',
+      sortable: '列の見出しをクリックすると表が並べ替わります。',
       allowDelete: '行を削除できる。',
       allowInsert: '行を追加できる。',
       readonlyColumns: '既存の行で読み取り専用のままになる列。',

@@ -2707,6 +2707,7 @@ defineExpose({
                     :columns="field.columns || []"
                     :pctColumns="field.pctColumns || []"
                     :filterColumns="field.filterColumns || []"
+                    :sortable="field.sortable !== false"
                     :previewColumn="field.previewColumn || ''"
                     :valueColumn="field.valueColumn || ''"
                     @update:modelValue="evaluateDynamicFields(field.name)"

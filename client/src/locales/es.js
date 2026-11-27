@@ -2863,6 +2863,7 @@ export default {
       columns: 'Las columnas que muestra.',
       pctColumns: 'Columnas mostradas como barra de porcentaje.',
       filterColumns: 'Columnas por las que se puede filtrar.',
+      sortable: 'Un clic en la cabecera de una columna ordena la tabla.',
       allowDelete: 'Se pueden eliminar filas.',
       allowInsert: 'Se pueden añadir filas.',
       readonlyColumns: 'Sus columnas que las filas existentes mantienen de solo lectura.',

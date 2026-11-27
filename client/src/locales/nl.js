@@ -2853,6 +2853,7 @@ export default {
       columns: 'De kolommen die het toont.',
       pctColumns: 'Kolommen getoond als percentagebalk.',
       filterColumns: 'Kolommen waarop gefilterd kan worden.',
+      sortable: 'Een klik op een kolomkop sorteert de tabel.',
       allowDelete: 'Rijen kunnen worden verwijderd.',
       allowInsert: 'Rijen kunnen worden toegevoegd.',
       readonlyColumns: 'Kolommen die bij bestaande rijen alleen-lezen blijven.',

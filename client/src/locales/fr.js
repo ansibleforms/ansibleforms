@@ -2865,6 +2865,7 @@ export default {
       columns: 'Les colonnes affichées.',
       pctColumns: 'Colonnes affichées en barre de pourcentage.',
       filterColumns: 'Colonnes sur lesquelles filtrer.',
+      sortable: "Un clic sur l'en-tête d'une colonne trie le tableau.",
       allowDelete: 'Les lignes peuvent être supprimées.',
       allowInsert: 'Les lignes peuvent être ajoutées.',
       readonlyColumns: 'Ses colonnes qui restent en lecture seule sur les lignes existantes.',

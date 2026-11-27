@@ -23,6 +23,7 @@
 /*      valueColumn: String                                       */
 /*      pctColumns: Array                                         */
 /*      filterColumns: Array                                      */
+/*      sortable: Boolean (a column's header sorts the rows)      */
 /*      sticky: Boolean                                           */
 /*      horizontal: Boolean                                       */
 /*      disabled: Boolean                                         */
@@ -54,6 +55,8 @@ const props = defineProps({
   valueColumn: { type: String },
   pctColumns: { type: Array, default: () => [] },
   filterColumns: { type: Array, default: () => [] },
+  // a column's header sorts the rows of its table ; false keeps the order they came in
+  sortable: { type: Boolean, default: true },
   sticky: { type: Boolean, default: false },
   horizontal: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
@@ -293,6 +296,7 @@ onMounted(() => {
             :columns="columns || []"
             :pctColumns="pctColumns || []"
             :filterColumns="filterColumns || []"
+            :sortable="sortable"
             :previewColumn="previewColumn || ''"
             :valueColumn="valueColumn || ''"
             :disabled="readonly || disabled"
@@ -319,6 +323,7 @@ onMounted(() => {
         :columns="columns || []"
         :pctColumns="pctColumns || []"
         :filterColumns="filterColumns || []"
+        :sortable="sortable"
         :previewColumn="previewColumn || ''"
         :valueColumn="valueColumn || ''"
         :disabled="readonly || disabled"
@@ -412,6 +417,7 @@ onMounted(() => {
             v-model="selectedValues"
             :columns="columns || []"
             :filterColumns="filterColumns || []"
+            :sortable="sortable"
             :previewColumn="previewColumn || ''"
             :valueColumn="valueColumn || ''"
             @reset="preview = ''"
@@ -430,6 +436,7 @@ onMounted(() => {
         v-model="selectedValues"
         :columns="columns || []"
         :filterColumns="filterColumns || []"
+        :sortable="sortable"
         :previewColumn="previewColumn || ''"
         :valueColumn="valueColumn || ''"
         :disabled="readonly || disabled"

@@ -17,6 +17,7 @@
 /*      previewColumn: String                                     */
 /*      valueColumn: String                                       */
 /*      filterColumns: Array                                      */
+/*      sortable: Boolean (a column's header sorts the rows)      */
 /*      disabled: Boolean                                         */
 /*                                                                */
 /******************************************************************/
@@ -41,6 +42,8 @@ const props = defineProps({
   previewColumn: { type: String, default: '' },
   valueColumn: { type: String },
   filterColumns: { type: Array, default: () => [] },
+  // a column's header sorts the rows of its table ; false keeps the order they came in
+  sortable: { type: Boolean, default: true },
   disabled: { type: Boolean, default: false },
 });
 
@@ -242,6 +245,7 @@ onMounted(() => {
           v-model="selectedToMoveRight"
           :columns="columns || []"
           :filterColumns="filterColumns || []"
+          :sortable="sortable"
           :previewColumn="previewColumn || ''"
           :valueColumn="valueColumn || ''"
           @reset="preview = ''"
@@ -272,6 +276,7 @@ onMounted(() => {
           v-model="selectedToMoveLeft"
           :columns="columns || []"
           :filterColumns="filterColumns || []"
+          :sortable="sortable"
           :previewColumn="previewColumn || ''"
           :valueColumn="valueColumn || ''"
           @reset="preview = ''"

@@ -23,12 +23,16 @@
 /*      pctColumns: Array                                         */
 /*      filterColumns: Array                                      */
 /*      focus: String                                             */
+/*      sortable: Boolean - a click on a column's header sorts the */
+/*                rows (A to Z, Z to A, then as they came) ;      */
+/*                true by default (composables/useColumnSort.js)  */
 /*                                                                */
 /******************************************************************/
 
 import { useTemplateRef, computed, toRaw } from 'vue';
 import Helpers from '@/lib/Helpers';
 import { useI18n } from 'vue-i18n';
+import { useColumnSort } from '@/composables/useColumnSort';
 
 // INIT
 
@@ -79,6 +83,8 @@ const props = defineProps({
   filterColumns: { type: Array, default: () => [] },
   focus: { type: String },
   disabled: { type: Boolean, default: false },
+  // a click on a column's header sorts the rows ; false keeps the order they came in
+  sortable: { type: Boolean, default: true },
 });
 
 // COMPUTED
@@ -144,6 +150,10 @@ const filtered = computed(() => {
     return filtered;
   }, []);
 });
+
+// the rows as shown : filtered (the search box), then sorted by a header clicked ; each keeps its
+// index in the values, which the selection goes by
+const { toggleSort, sortIcon, sorted } = useColumnSort(filtered, () => props.sortable);
 
 // WATCHERS
 
@@ -549,7 +559,16 @@ onMounted(() => {
               />
               <font-awesome-icon v-show="!checkAll" @click="disabled ? null : multicheck()" :icon="['far', 'square']" />
             </th>
-            <th :key="l" v-for="l in labels">{{ l }}</th>
+            <th :key="l" v-for="l in labels" :class="{ 'af-sortable': sortable }" @click.stop="toggleSort(l)">
+              <!-- its text cut first (…), its arrow always shown -->
+              <span class="af-th">
+                <span class="af-th-text">{{ l }}</span>
+                <span v-if="sortable" class="af-th-sort text-muted ms-1">
+                  <font-awesome-icon v-if="sortIcon(l)" :icon="sortIcon(l)" />
+                  <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                </span>
+              </span>
+            </th>
           </tr>
         </thead>
         <thead v-if="labels.length <= 1 && multiple">
@@ -572,7 +591,7 @@ onMounted(() => {
               sizeClass: sizeClass,
             }"
             :key="v.index"
-            v-for="(v, i) in filtered"
+            v-for="(v, i) in sorted"
             @click="disabled ? null : select(v.index)"
           >
             <td v-if="multiple" class="is-first">
@@ -592,6 +611,32 @@ onMounted(() => {
   </div>
 </template>
 <style scoped>
+/* a header that sorts : the hand over all of it, its arrow too ; its text not selected by the
+   clicks. Its click stops there (.stop) : its arrow is replaced as it sorts, so the dropdown's
+   click-outside would find the clicked element gone, outside the table, and close it */
+th.af-sortable,
+th.af-sortable * {
+  cursor: pointer;
+  user-select: none;
+}
+/* a header's text and its arrow on one line : the text cut (…) when the column is narrow, the
+   arrow never */
+.af-th {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.af-th-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.af-th-sort {
+  flex-shrink: 0;
+  font-size: 0.7em;
+}
+
 .table td,
 .table th {
   max-width: 0;

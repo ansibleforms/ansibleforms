@@ -56,6 +56,8 @@ defineProps({
   valueColumn: { type: String, default: '' },
   pctColumns: { type: Array, default: () => [] },
   filterColumns: { type: Array, default: () => [] },
+  // a column's header sorts the rows of an enum's table ; false keeps the order they came in
+  sortable: { type: Boolean, default: true },
   sticky: { type: Boolean, default: false },
   horizontal: { type: Boolean, default: false },
   multiple: { type: Boolean, default: false },
@@ -178,6 +180,7 @@ const hasFocus = ref(false);
         :valueColumn="valueColumn"
         :pctColumns="pctColumns"
         :filterColumns="filterColumns"
+        :sortable="sortable"
         :sticky="sticky"
         :horizontal="horizontal"
         :icon="icon"

@@ -5735,6 +5735,32 @@
                   filterColumns:
                   - name
                   - title                  
+          - name: sortable
+            type: boolean
+            group: interaction
+            version: 7.9.0
+            default: true
+            with_types: enum
+            short: Sort the table by clicking a column header
+            description: |
+              An `enum` with columns shows a table. A click on a column's header sorts its rows A to Z (0 to 9),
+              a second click Z to A, and a third shows them again in the order the expression or query returned.
+              Numbers sort as numbers, text as it reads (`kvm-9` before `kvm-10`), and empty cells always go last.  
+              The sort is only how the rows are shown: what is selected, and the value sent to the job, do not change.
+              The search box still filters, and its rows are sorted the same way.  
+              Set it to `false` to keep the rows in the order they came in.
+            examples:
+            - name: Keep the order of the query
+              code: |
+                - name: hosts
+                  type: enum
+                  dbConfig: CMDB
+                  query: SELECT name, free_ram_gb, free_vcpu FROM hosts ORDER BY priority
+                  columns:
+                  - name
+                  - free_ram_gb
+                  - free_vcpu
+                  sortable: false
           - name: valueColumn
             type: string
             group: data

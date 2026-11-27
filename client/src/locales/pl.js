@@ -2860,6 +2860,7 @@ export default {
       columns: 'Kolumny, które pokazuje.',
       pctColumns: 'Kolumny pokazywane jako pasek procentowy.',
       filterColumns: 'Kolumny, po których można filtrować.',
+      sortable: 'Kliknięcie nagłówka kolumny sortuje tabelę.',
       allowDelete: 'Wiersze można usuwać.',
       allowInsert: 'Wiersze można dodawać.',
       readonlyColumns: 'Kolumny, które w istniejących wierszach pozostają tylko do odczytu.',
