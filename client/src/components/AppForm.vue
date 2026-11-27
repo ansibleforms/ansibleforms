@@ -1153,7 +1153,7 @@ function findVariableDependencies() {
   });
 
   // check for reserved/internal field names that would cause conflicts
-  const reservedNames = ['__user__', '__repository__', '__parent__', '__output__', '__jobid__'];
+  const reservedNames = ['__user__', '__repository__', '__parent__', '__output__', '__jobid__', '__formname__'];
   // topFields from job.model.js - these are safe to use as they're wrapped and passed to playbooks
   const safeDoubleUnderscoreNames = [
     '__template__',
