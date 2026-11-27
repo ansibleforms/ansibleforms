@@ -67,7 +67,7 @@
     "swagger-ui-express": "~5.0.1",
     "tar": "~7.5.23",
     "thenby": "~1.4.1",
-    "undici": "~8.12.4",
+    "undici": "~8.13.1",
     "winston": "~3.19.0",
     "winston-daily-rotate-file": "~5.0.0",
     "winston-syslog": "~2.7.1",
