@@ -178,6 +178,11 @@ describe('the tables and the field', () => {
     expect(read('src/components/BsInputSelectAdvanced.vue')).toMatch(
       /\.af-dd-advanced\.dropdown-menu \{[^}]*overflow: hidden;/,
     );
+    // the always open boxes too, rounded as the dropdown
+    expect(
+      (read('src/components/BsInputSelectAdvanced.vue').match(/class="border rounded overflow-hidden mb-2"/g) || [])
+        .length,
+    ).toBe(2);
   });
 
   it('a field passes sortable (on unless false) down to its table', () => {

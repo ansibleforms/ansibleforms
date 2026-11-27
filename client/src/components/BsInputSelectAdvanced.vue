@@ -310,7 +310,13 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="!horizontal && sticky" tabindex="0" class="border mb-2" :class="{ 'border-danger': hasError }">
+    <!-- always open : a box with rounded corners as the dropdown's, its content kept inside them -->
+    <div
+      v-if="!horizontal && sticky"
+      tabindex="0"
+      class="border rounded overflow-hidden mb-2"
+      :class="{ 'border-danger': hasError }"
+    >
       <p class="m-3 text-body-secondary">{{ preview || 'Nothing selected' }}</p>
       <BsInputSelectAdvancedTable
         :defaultValue="defaultValue"
@@ -427,7 +433,12 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div class="border mb-2" :class="{ 'border-danger': hasError }" v-if="horizontal && sticky" tabindex="0">
+    <div
+      class="border rounded overflow-hidden mb-2"
+      :class="{ 'border-danger': hasError }"
+      v-if="horizontal && sticky"
+      tabindex="0"
+    >
       <BsInputSelectAdvanced2
         :required="required || false"
         :name="name"
