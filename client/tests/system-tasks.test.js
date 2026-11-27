@@ -164,8 +164,8 @@ describe("a task's page", () => {
       page.indexOf('v-if="tabShown(\'schedule\')"'),
     );
     const order = [...details.matchAll(/fieldShown\('(\w+)'\)/g)].map((m) => m[1]);
-    expect(order).toEqual(['name', 'description', 'lastLaunch', 'result', 'lastRun', 'nextRun', 'node', 'setting']);
-    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(6);
+    expect(order).toEqual(['name', 'description', 'lastLaunch', 'lastRun', 'nextRun', 'enabled']);
+    expect((details.match(/class="form-label fw-bold"/g) || []).length).toBe(3);
   });
 
   it("shows on its Schedule tab the editor, or a runner hub loop's seconds in a number field", () => {
@@ -179,9 +179,11 @@ describe("a task's page", () => {
     expect(page).not.toMatch(/scheduleOwned|nextRunsLabel/);
   });
 
-  it("names the node whose memory a runner hub loop's last run comes from", () => {
-    expect(page).toMatch(/<div v-if="isLoop" v-show="fieldShown\('node'\)" class="mb-3">/);
-    expect(page).toMatch(/\{\{ task\.loop\?\.node \|\| '–' \}\}/);
+  it("keeps what each run did and its node on Runs, not on Details, as a schedule's page", () => {
+    expect(page).not.toMatch(/fieldShown\('(result|node)'\)/);
+    const cols = page.slice(page.indexOf('const runColumns'), page.indexOf('// ─── tabs'));
+    expect(cols).toMatch(/key: 'result'/);
+    expect(cols).toMatch(/key: 'node'/);
   });
 
   it("lists a runner hub loop's rows on its Runs tab as a task's : an hourly summary's hour too", () => {
@@ -229,7 +231,7 @@ describe("a task's page", () => {
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
     expect(page).toMatch(
-      /<span :title="launchError \|\| undefined" v-html="statusPill\(t, lastRun\?\.outcome\)"><\/span>/,
+      /<span\s+class="af-field-pill"\s+:title="launchError \|\| undefined"\s+v-html="statusPill\(t, lastRun\?\.outcome\)"\s*><\/span>/,
     );
     expect(page).toMatch(/lastRun\.value\?\.outcome === 'failed' \? lastRun\.value\.result/);
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
@@ -240,12 +242,16 @@ describe("a task's page", () => {
     expect(list.slice(list.indexOf('last_run'))).toEqual(['last_run', 'next_run', 'status']);
   });
 
-  it('says where its setting is changed, or that the environment sets it', () => {
-    expect(page).toMatch(/<router-link v-if="setting\.editable && setting\.link" :to="setting\.link">/);
-    expect(page).toMatch(/t\('jobs\.system\.settingEnv'\)/);
+  it("says in the title's popover the setting it applies, where it is changed or that the environment sets it", () => {
+    // not a field of Details any more
+    expect(page).not.toMatch(/fieldShown\('setting'\)/);
+    expect(page).toMatch(/:description="pageInfo"\s*descriptionMarkdown/);
+    expect(page).toMatch(/\[\$\{t\('jobs\.system\.settingChange'\)\}\]\(\$\{router\.resolve\(s\.link\)\.href\}\)/);
+    expect(page).toMatch(/: t\('jobs\.system\.settingEnv'\);/);
+    expect(page).toMatch(/\*\*\$\{t\('jobs\.system\.setting'\)\}\*\*: \\`\$\{s\.env\}\\`/);
   });
 
-  it("has no Delete, and edits nothing but the task's cron", () => {
+  it("has no Delete, and edits nothing but the task's cron and its switch", () => {
     expect(page).not.toMatch(/icon="trash"/);
     expect(page).not.toMatch(/axios\.delete/);
     // its one post : Run now
@@ -254,6 +260,7 @@ describe("a task's page", () => {
     ]);
     expect([...page.matchAll(/v-model="(\w+)"/g)].map((m) => m[1]).sort()).toEqual([
       'cronEdit',
+      'enabledEdit',
       'search',
       'secondsEdit',
     ]);
@@ -323,9 +330,7 @@ describe("a task's Schedule tab", () => {
       /if \(isLoop\.value\) return String\(secondsEdit\.value \?\? ''\)\.trim\(\) !== String\(task\.value\?\.interval_seconds \?\? ''\);/,
     );
     expect(page).toMatch(/if \(isLoop\.value\) return secondsProblem\.value;/);
-    expect(page).toMatch(
-      /\? \{ seconds: Number\(String\(secondsEdit\.value\)\.trim\(\)\) \}\s*: \{ cron: cronEdit\.value\.trim\(\) \};/,
-    );
+    expect(page).toMatch(/if \(isLoop\.value\) body = \{ seconds: Number\(String\(secondsEdit\.value\)\.trim\(\)\) \};/);
     expect(page).toMatch(/secondsEdit\.value = String\(task\.value\?\.interval_seconds \?\? ''\);/);
     // one Save and one guard for both
     expect((page.match(/useUnsavedGuard\(/g) || []).length).toBe(1);
@@ -354,7 +359,7 @@ describe("a task's Schedule tab", () => {
     expect(tab).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.schedule_env \}\)/);
     // no Save then, Run now still
     expect(page).toMatch(/<template v-if="task" #actions>/);
-    expect(page).toMatch(/<BsButton v-if="scheduleEditable" icon="save" :disabled="!canSave" @click="save\(\)">/);
+    expect(page).toMatch(/<BsButton v-if="showSave" icon="save" :disabled="!canSave" @click="save\(\)">/);
   });
 
   it('BsCron greys out every preset, field and the expression when disabled', () => {
@@ -373,21 +378,21 @@ describe("a task's Schedule tab", () => {
     expect(page).toMatch(
       /axios\.put\(`\/api\/v2\/system\/tasks\/\$\{encodeURIComponent\(taskKey\.value\)\}\/schedule`, body\);/,
     );
-    expect(page).toMatch(/: \{ cron: cronEdit\.value\.trim\(\) \};/);
+    expect(page).toMatch(/if \(cronDirty\.value \|\| deprecatedSavable\.value\) body\.cron = cronEdit\.value\.trim\(\);/);
   });
 
   it('reads the task again after a save : its last run, next run and next runs follow', () => {
     const save = page.slice(page.indexOf('async function save()'), page.indexOf('const runAsked'));
     expect(save).toMatch(/await axios\.put[\s\S]*await load\(\);/);
     expect(page).toMatch(
-      /cronEdit\.value = task\.value\?\.cron \|\| '';\s*secondsEdit\.value = [^;]+;\s*\}\s*loaded\.value = true;/,
+      /cronEdit\.value = task\.value\?\.cron \|\| '';\s*secondsEdit\.value = [^;]+;\s*enabledEdit\.value = [^;]+;\s*\}\s*loaded\.value = true;/,
     );
   });
 
   it('refuses a cron of other than 5 fields before sending it, as the server does', () => {
     expect(page).toMatch(/\.length !== 5\) return t\('jobs\.system\.cronFiveFields'\)/);
     const save = page.slice(page.indexOf('async function save()'), page.indexOf('const runAsked'));
-    expect(save).toMatch(/if \(cronProblem\.value\) \{\s*toast\.warning\(cronProblem\.value\);\s*return false;/);
+    expect(save).toMatch(/if \(cronDirty\.value && cronProblem\.value\) \{\s*toast\.warning\(cronProblem\.value\);\s*return false;/);
   });
 });
 
@@ -405,12 +410,12 @@ describe("the config seed reload's Schedule tab, its cron from the deprecated se
     expect(page).toMatch(/const deprecated = computed\(\(\) => task\.value\?\.schedule_deprecated \|\| null\);/);
     expect(tab).toMatch(/t\('jobs\.system\.scheduleDeprecated', \{ env: deprecated\.env \}\)/);
     // the editor holds the cron in force (6 fields for seconds) : no error until it is changed
-    expect(page).toMatch(/const cronError = computed\(\(\) => \(dirty\.value \? cronProblem\.value : ''\)\);/);
+    expect(page).toMatch(/const cronError = computed\(\(\) => \(cronDirty\.value \? cronProblem\.value : ''\)\);/);
   });
 
   it('Save writes it as the new variable : enabled for its cron unchanged when it has 5 fields', () => {
     expect(page).toMatch(
-      /const canSave = computed\(\(\) => dirty\.value \|\| \(scheduleEditable\.value && !!deprecated\.value && !cronProblem\.value\)\);/,
+      /const deprecatedSavable = computed\(\(\) => scheduleEditable\.value && !!deprecated\.value && !cronProblem\.value\);\s*\/\/[^\n]*\n\s*const canSave = computed\(\(\) => dirty\.value \|\| deprecatedSavable\.value\);/,
     );
   });
 });
@@ -512,11 +517,32 @@ describe('Run now', () => {
     );
   });
 
-  it('is disabled while the task runs, and for a task that is off', () => {
+  it('is disabled while the task runs, and for a task that cannot run ; a task turned off still runs', () => {
     expect(page).toMatch(/const running = computed\(\(\) => runAsked\.value \|\| !!task\.value\?\.running\);/);
     expect(page).toMatch(
-      /const canRun = computed\(\(\) => !!task\.value && task\.value\.enabled !== false && !running\.value\);/,
+      /const canRun = computed\(\(\) => !!task\.value && \(task\.value\.runnable \?\? task\.value\.enabled\) !== false && !running\.value\);/,
     );
+  });
+
+  it("Enabled, Details' last field : a task that may be turned off, saved with Save, read only when the environment sets it", () => {
+    const tab = page.slice(page.indexOf('v-if="tabShown(\'details\')"'), page.indexOf('v-if="tabShown(\'schedule\')"'));
+    const sw = tab.slice(tab.indexOf("v-show=\"fieldShown('enabled')\""));
+    // every task shows it : greyed out, why under it, for one that cannot be turned off
+    expect(sw).toMatch(/!canDisable\s*\? t\('jobs\.system\.cannotDisable'\)/);
+    expect(sw).toMatch(/<label class="form-label fw-bold d-block" for="af-system-enabled">/);
+    expect(sw).toMatch(/<BsSwitch\s+v-else\s+id="af-system-enabled"\s+v-model="enabledEdit"\s+:disabled="!enabledEditable"/);
+    expect(sw).toMatch(/t\('settings\.schedules\.enabledHelp'\)/);
+    expect(sw).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.enabled_env \}\)/);
+    expect(page).toMatch(/const canDisable = computed\(\(\) => !!task\.value\?\.can_disable\);/);
+    // a change of the switch marks the page changed, sent only when changed
+    expect(page).toMatch(/const dirty = computed\(\(\) => cronDirty\.value \|\| enabledDirty\.value\);/);
+    expect(page).toMatch(/if \(enabledDirty\.value\) body\.enabled = enabledEdit\.value;/);
+    // a task that cannot run here : off and greyed out, why under it, as the list says Off
+    expect(page).toMatch(/if \(isLoop\.value\) return x\.enabled === false \? t\('jobs\.system\.offNoHub'\) : '';/);
+    expect(page).toMatch(/deprecated\.value\?\.off\s+\? t\('jobs\.system\.offDeprecated', \{ env: deprecated\.value\.env \}\)\s+: t\('jobs\.system\.offNoSeed'\)/);
+    expect(sw).toMatch(/<BsSwitch v-if="offReason" id="af-system-enabled" :modelValue="false" :disabled="true"/);
+    expect(page).toMatch(/!!task\.value\?\.editable_enabled && !offReason\.value\);/);
+    expect(page).toMatch(/const showSave = computed\(\(\) => scheduleEditable\.value \|\| enabledEditable\.value\);/);
   });
 
   it('posts the run, reads the task again, and says how it went ; a run still going is followed', () => {

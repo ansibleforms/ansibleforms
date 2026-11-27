@@ -625,7 +625,7 @@ onMounted(async () => {
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
                 <!-- the badge only ; why it started no job when hovered -->
-                <span :title="launchError || undefined" v-html="schedulePill(t, schedule)"></span>
+                <span class="af-field-pill" :title="launchError || undefined" v-html="schedulePill(t, schedule)"></span>
               </div>
               <!-- the job it started : opened to see how it ended -->
               <div v-if="startedJob" v-show="fieldShown('startedJob')" class="mb-3">

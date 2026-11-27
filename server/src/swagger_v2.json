@@ -3828,6 +3828,27 @@
                             "type": "boolean",
                             "description": "Whether PUT /system/tasks/{key}/schedule may change it (a runner hub loop's seconds too): its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                           },
+                          "can_disable": {
+                            "type": "boolean",
+                            "description": "Whether an admin may turn it off (nightlyBackup, jobCleanup, auditCleanup, storedJobsCleanup, tokenCleanup, configSeedReload); false for the others and for a runner hub loop"
+                          },
+                          "switched_on": {
+                            "type": "boolean",
+                            "description": "Its switch as set: false when an admin turned it off (it does not run on its cron, Run now still runs it); always true for a task that cannot be turned off"
+                          },
+                          "enabled_env": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The environment variable of its switch (NIGHTLY_BACKUP_ENABLED); null for a task that cannot be turned off"
+                          },
+                          "editable_enabled": {
+                            "type": "boolean",
+                            "description": "Whether PUT /system/tasks/{key}/schedule may turn it off or on: a task that can be turned off, its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
+                          },
+                          "runnable": {
+                            "type": "boolean",
+                            "description": "Whether Run now can run it: a task turned off still can; not the config seed reload without CONFIG_SEED_PATH, nor a runner hub loop on a node whose hub does not run"
+                          },
                           "schedule_deprecated": {
                             "type": "object",
                             "nullable": true,
@@ -4065,6 +4086,27 @@
                       "type": "boolean",
                       "description": "Whether PUT /system/tasks/{key}/schedule may change it (a runner hub loop's seconds too): its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
                     },
+                    "can_disable": {
+                      "type": "boolean",
+                      "description": "Whether an admin may turn it off (nightlyBackup, jobCleanup, auditCleanup, storedJobsCleanup, tokenCleanup, configSeedReload); false for the others and for a runner hub loop"
+                    },
+                    "switched_on": {
+                      "type": "boolean",
+                      "description": "Its switch as set: false when an admin turned it off (it does not run on its cron, Run now still runs it); always true for a task that cannot be turned off"
+                    },
+                    "enabled_env": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The environment variable of its switch (NIGHTLY_BACKUP_ENABLED); null for a task that cannot be turned off"
+                    },
+                    "editable_enabled": {
+                      "type": "boolean",
+                      "description": "Whether PUT /system/tasks/{key}/schedule may turn it off or on: a task that can be turned off, its variable not set by the environment (nor ALLOW_ENV_EDIT=0)"
+                    },
+                    "runnable": {
+                      "type": "boolean",
+                      "description": "Whether Run now can run it: a task turned off still can; not the config seed reload without CONFIG_SEED_PATH, nor a runner hub loop on a node whose hub does not run"
+                    },
                     "schedule_deprecated": {
                       "type": "object",
                       "nullable": true,
@@ -4296,7 +4338,7 @@
           "system"
         ],
         "summary": "Change when a maintenance task or a runner hub loop runs",
-        "description": "Saves the cron of a task as its environment variable (ABANDONED_JOBS_CRON, DEAD_NODES_CRON, SCHEDULE_ENDS_CRON, SCHEDULE_RESYNC_CRON, TOKEN_CLEANUP_CRON, AUDIT_CLEANUP_CRON, JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON, STORED_JOB_CLEANUP_CRON, CONFIG_SEED_RELOAD_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. Saved, CONFIG_SEED_RELOAD_CRON wins over the deprecated CONFIG_SEED_RELOAD_SECONDS. A runner hub loop takes seconds instead (runnerDispatch: RUNNER_DISPATCH_SECONDS, 1 to 60; runnerDial: RUNNER_DIAL_SECONDS, 2 to 300; runnerPrune: RUNNER_PRUNE_SECONDS, 10 to 3600), saved the same way: every node that runs the hub arms the loop's timer again at once at the new seconds. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
+        "description": "Saves the cron of a task, and for a task that may be turned off whether it runs on it (enabled), as their environment variables (ABANDONED_JOBS_CRON, DEAD_NODES_CRON, SCHEDULE_ENDS_CRON, SCHEDULE_RESYNC_CRON, TOKEN_CLEANUP_CRON, AUDIT_CLEANUP_CRON, JOB_CLEANUP_CRON, NIGHTLY_BACKUP_CRON, STORED_JOB_CLEANUP_CRON, CONFIG_SEED_RELOAD_CRON), written as Settings > System > General writes the settings file. It applies at once, without a restart: every node takes the new value, and the scheduler registers the task again on it. Turned off (NIGHTLY_BACKUP_ENABLED, JOB_CLEANUP_ENABLED, AUDIT_CLEANUP_ENABLED, STORED_JOB_CLEANUP_ENABLED, TOKEN_CLEANUP_ENABLED, CONFIG_SEED_RELOAD_ENABLED set to false), a task does not run on its cron; Run now still runs it. The other tasks cannot be turned off. Saved, CONFIG_SEED_RELOAD_CRON wins over the deprecated CONFIG_SEED_RELOAD_SECONDS. A runner hub loop takes seconds instead (runnerDispatch: RUNNER_DISPATCH_SECONDS, 1 to 60; runnerDial: RUNNER_DIAL_SECONDS, 2 to 300; runnerPrune: RUNNER_PRUNE_SECONDS, 10 to 3600), saved the same way: every node that runs the hub arms the loop's timer again at once at the new seconds. Audited. Requires settings access, and ALLOW_ENV_EDIT not 0.",
         "security": [
           {
             "bearerAuth": []
@@ -4319,7 +4361,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "{ cron } for a task, { seconds } for a runner hub loop",
+                "description": "{ cron, enabled } for a task, each optional but at least one; { seconds } for a runner hub loop",
                 "properties": {
                   "cron": {
                     "type": "string",
@@ -4330,6 +4372,10 @@
                     "type": "integer",
                     "description": "A runner hub loop's seconds, a whole number within its bounds (interval_min to interval_max)",
                     "example": 5
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether the task runs on its cron, for a task that may be turned off (can_disable); Run now still runs it while it is off. Audited (system.task.enabled)"
                   }
                 }
               }
@@ -4348,7 +4394,7 @@
             }
           },
           "400": {
-            "description": "Not a cron of 5 fields that croner runs, or for a runner hub loop not a whole number of seconds within its bounds"
+            "description": "Not a cron of 5 fields that croner runs, enabled not a boolean or sent for a task that cannot be turned off, or for a runner hub loop not a whole number of seconds within its bounds"
           },
           "403": {
             "description": "No settings access, or its variable set by the environment (or ALLOW_ENV_EDIT=0)"

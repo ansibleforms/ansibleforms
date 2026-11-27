@@ -260,6 +260,18 @@
   color: var(--bs-body-color);
   font-weight: normal;
 }
+/* a record page's field shown as a pill (a schedule's Last launch, a repository's last pull) :
+   while empty, its en dash where the text of the other fields starts, as their own dashes */
+.af-field-pill .af-pill.af-pill-empty {
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+.af-field-pill .af-pill-empty .af-pill-label {
+  display: inline;
+  text-box: normal;
+}
 
 /* the selection column's right padding : after the rules above for every cell and header (the
    class twice to outrank them), so the checkbox and its 0.5rem fit the column */

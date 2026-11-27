@@ -3366,6 +3366,13 @@ export default {
       settingChange: 'Canvia-ho a Configuració',
       settingEnv: "Definit per una variable d'entorn",
       scheduleEnv: "Definit per la variable d'entorn {env}.",
+      // a task that cannot be turned off : its switch on and greyed out, why under it
+      cannotDisable: "Sempre activa: l'aplicació la necessita per funcionar.",
+      // a task that cannot run here : its switch off and greyed out, why under it (no seed ; the
+      // deprecated seconds at 0 ; a runner hub loop on a node whose hub does not run)
+      offNoSeed: 'Desactivada: no hi ha cap config seed definit (CONFIG_SEED_PATH).',
+      offDeprecated: 'Desactivada: {env} val 0 (obsolet).',
+      offNoHub: "Desactivada en aquest node: el hub de runners no s'hi executa.",
       scheduleDeprecated: 'De {env}, obsoleta; un cron desat aquí la substitueix.',
       intervalLabel: 'Interval',
       intervalUnit: 'segons',

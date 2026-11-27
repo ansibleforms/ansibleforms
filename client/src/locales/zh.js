@@ -3216,6 +3216,13 @@ export default {
       settingChange: '在设置中更改',
       settingEnv: '由环境变量设置',
       scheduleEnv: '由环境变量 {env} 设置。',
+      // a task that cannot be turned off : its switch on and greyed out, why under it
+      cannotDisable: '始终开启：应用运行需要它。',
+      // a task that cannot run here : its switch off and greyed out, why under it (no seed ; the
+      // deprecated seconds at 0 ; a runner hub loop on a node whose hub does not run)
+      offNoSeed: '关闭：未设置配置种子（CONFIG_SEED_PATH）。',
+      offDeprecated: '关闭：{env} 为 0（已弃用）。',
+      offNoHub: '在此节点关闭：运行器中心不在此运行。',
       scheduleDeprecated: '来自已弃用的变量 {env}；在此保存的 cron 将替换它。',
       intervalLabel: '间隔',
       intervalUnit: '秒',

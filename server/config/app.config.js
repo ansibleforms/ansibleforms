@@ -117,6 +117,15 @@ var app_config = {
   jobCleanupCron: (process.env.JOB_CLEANUP_CRON || "").trim(),
   nightlyBackupCron: (process.env.NIGHTLY_BACKUP_CRON || "").trim(),
   storedJobCleanupCron: (process.env.STORED_JOB_CLEANUP_CRON || "").trim(),
+  // Whether the system tasks that only tidy up run on their cron (changed on the task's page,
+  // Jobs > System, beside its cron). DEFAULT true ; false or 0 turns one off, Run now still runs it
+  // (server/src/lib/systemTasks.js canDisable : the others can never be turned off).
+  nightlyBackupEnabled: !/^(false|0)$/i.test((process.env.NIGHTLY_BACKUP_ENABLED || "").trim()),
+  jobCleanupEnabled: !/^(false|0)$/i.test((process.env.JOB_CLEANUP_ENABLED || "").trim()),
+  auditCleanupEnabled: !/^(false|0)$/i.test((process.env.AUDIT_CLEANUP_ENABLED || "").trim()),
+  storedJobCleanupEnabled: !/^(false|0)$/i.test((process.env.STORED_JOB_CLEANUP_ENABLED || "").trim()),
+  tokenCleanupEnabled: !/^(false|0)$/i.test((process.env.TOKEN_CLEANUP_ENABLED || "").trim()),
+  configSeedReloadEnabled: !/^(false|0)$/i.test((process.env.CONFIG_SEED_RELOAD_ENABLED || "").trim()),
   // How often the runner hub's own loops run, each a whole number of seconds (changed on the loop's
   // page, Jobs > System). Empty : the loop's own default (server/src/lib/systemTasks.js HUB_LOOPS),
   // so the defaults and the bounds are declared in one place only.

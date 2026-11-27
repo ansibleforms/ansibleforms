@@ -3302,6 +3302,13 @@ export default {
       settingChange: '設定で変更',
       settingEnv: '環境変数で設定',
       scheduleEnv: '環境変数 {env} で設定されています。',
+      // a task that cannot be turned off : its switch on and greyed out, why under it
+      cannotDisable: '常にオン：アプリの動作に必要です。',
+      // a task that cannot run here : its switch off and greyed out, why under it (no seed ; the
+      // deprecated seconds at 0 ; a runner hub loop on a node whose hub does not run)
+      offNoSeed: 'オフ：構成シードが設定されていません（CONFIG_SEED_PATH）。',
+      offDeprecated: 'オフ：{env} が 0 です（非推奨）。',
+      offNoHub: 'このノードではオフ：ランナーハブがここで動いていません。',
       scheduleDeprecated: '非推奨の {env} によるもの。保存した cron で置き換わります。',
       intervalLabel: '間隔',
       intervalUnit: '秒ごと',

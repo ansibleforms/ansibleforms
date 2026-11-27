@@ -361,7 +361,7 @@ onMounted(async () => {
                    its version and its load on hover -->
               <div v-if="socket" v-show="fieldShown('socket')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.runners.socket') }}</div>
-                <span v-html="socketPill(t, { socket })"></span>
+                <span class="af-field-pill" v-html="socketPill(t, { socket })"></span>
               </div>
               <!-- the builder release it runs, as it said when it connected ; a dash until then -->
               <div v-if="socket" v-show="fieldShown('version')" class="mb-3">

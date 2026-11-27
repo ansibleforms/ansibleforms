@@ -3303,6 +3303,13 @@ export default {
       settingChange: 'Change it in Settings',
       settingEnv: 'Set by an environment variable',
       scheduleEnv: 'Set by the environment variable {env}.',
+      // a task that cannot be turned off : its switch on and greyed out, why under it
+      cannotDisable: 'Always on: the app needs it to keep working.',
+      // a task that cannot run here : its switch off and greyed out, why under it (no seed ; the
+      // deprecated seconds at 0 ; a runner hub loop on a node whose hub does not run)
+      offNoSeed: 'Off: no config seed is set (CONFIG_SEED_PATH).',
+      offDeprecated: 'Off: {env} is 0 (deprecated).',
+      offNoHub: "Off on this node: its runner hub doesn't run here.",
       scheduleDeprecated: 'From the deprecated {env}; a cron saved here replaces it.',
       intervalLabel: 'Interval',
       intervalUnit: 'seconds',

@@ -569,12 +569,12 @@ onMounted(async () => {
             <div v-show="fieldShown('pull')" class="mb-3">
               <div class="form-label fw-bold">{{ t('settings.fields.pull') }}</div>
               <!-- the last pull (clone, sync or reset) : running, success or failed -->
-              <span v-html="repositoryPullPill(t, repo)"></span>
+              <span class="af-field-pill" v-html="repositoryPullPill(t, repo)"></span>
             </div>
             <div v-show="fieldShown('push')" class="mb-3">
               <div class="form-label fw-bold">{{ t('settings.fields.push') }}</div>
               <!-- changes saved here and not pushed yet, or none -->
-              <span v-html="repositoryPushPill(t, repo)"></span>
+              <span class="af-field-pill" v-html="repositoryPushPill(t, repo)"></span>
             </div>
             <div v-show="fieldShown('head')" class="mb-3">
               <div class="form-label fw-bold">{{ t('settings.fields.head') }}</div>
