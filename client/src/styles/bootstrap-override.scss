@@ -444,8 +444,8 @@ textarea:focus::placeholder {
 // Vue Datepicker: align the input + popup background with Bootstrap's
 // form-control colors so it visually matches the surrounding text/select
 // inputs in both light, dark and color themes.
-:root .dp__theme_light,
-:root .dp__theme_dark {
+:root .dp--theme-light,
+:root .dp--theme-dark {
   --dp-background-color: var(--bs-body-bg);
   --dp-text-color: var(--bs-body-color);
   --dp-hover-color: var(--bs-secondary-bg);
