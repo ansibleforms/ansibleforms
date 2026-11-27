@@ -183,6 +183,10 @@ describe('the tables and the field', () => {
       const table = src.indexOf('<div class="table-container">');
       expect(src.indexOf("t('common.noData')"), file).toBeGreaterThan(table);
       expect(src.indexOf("t('common.noFilterMatch')"), file).toBeGreaterThan(table);
+      // with no rows the header still shows : the columns the field declares
+      expect(src, file).toMatch(
+        /\} else if \(props\.columns\.length > 0\) \{[^}]*labels\.value = \[\.\.\.props\.columns\];/,
+      );
     }
   });
 
