@@ -345,14 +345,16 @@ onMounted(() => {
   </div>
 </template>
 <style scoped>
-/* no rows : said in the middle of the room under the header, both ways */
+/* no rows : said in the middle of the room under the header, both ways ; the room reaches the
+   side's bottom edge through its padding (0.5rem, components/BsInputSelectAdvanced2.vue p-2), so
+   the space above the message and the space under it are the same */
 .af-no-rows {
   flex-grow: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  margin: 0;
+  margin: 0 0 -0.5rem;
   padding: 0.5rem;
 }
 

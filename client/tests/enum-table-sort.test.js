@@ -199,6 +199,8 @@ describe('the tables and the field', () => {
     const side = read('src/components/BsInputSelectAdvancedTable2.vue');
     expect(side).toMatch(/<div class="pt-2 d-flex flex-column h-100">/);
     expect(side).toMatch(/\.af-no-rows \{[^}]*flex-grow: 1;[^}]*align-items: center;[^}]*justify-content: center;/);
+    // its room down to the side's edge, through its padding : as much space under it as above
+    expect(side).toMatch(/\.af-no-rows \{[^}]*margin: 0 0 -0\.5rem;/);
   });
 
   it('the dropdown keeps the table inside its rounded corners', () => {
