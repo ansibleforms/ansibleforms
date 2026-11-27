@@ -37,7 +37,7 @@
     "helmet": "~8.3.0",
     "json-bigint": "~1.0.0",
     "ldap-authentication": "~4.4.1",
-    "ldapts": "~9.2.0",
+    "ldapts": "~9.2.1",
     "lodash": "4.18.1",
     "luxon": "3.7.2",
     "moment": "~2.31.0",
