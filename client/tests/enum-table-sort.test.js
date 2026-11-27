@@ -197,7 +197,7 @@ describe('the tables and the field', () => {
       /class="px-2 py-2 mb-0 text-center">\{\{ t\('common\.noData'\) \}\}/,
     );
     const side = read('src/components/BsInputSelectAdvancedTable2.vue');
-    expect(side).toMatch(/<div class="mt-2 d-flex flex-column h-100">/);
+    expect(side).toMatch(/<div class="pt-2 d-flex flex-column h-100">/);
     expect(side).toMatch(/\.af-no-rows \{[^}]*flex-grow: 1;[^}]*align-items: center;[^}]*justify-content: center;/);
   });
 

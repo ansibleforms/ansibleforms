@@ -283,8 +283,9 @@ onMounted(() => {
 });
 </script>
 <template>
-  <!-- a column the side's full height : the message of no rows takes the room under the header -->
-  <div class="mt-2 d-flex flex-column h-100">
+  <!-- a column the side's full height, its space above inside it (a margin ran it past the side's
+       end) : the message of no rows takes the room from the header's end down, in its middle -->
+  <div class="pt-2 d-flex flex-column h-100">
     <div class="pb-2">
       <div class="input-group">
         <span class="input-group-text text-gray-500">
