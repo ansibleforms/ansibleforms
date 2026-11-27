@@ -142,7 +142,9 @@ const offReason = computed(() => {
   if (!x) return '';
   if (isLoop.value) return x.enabled === false ? t('jobs.system.offNoHub') : '';
   if (x.runnable !== false) return '';
-  return deprecated.value?.off ? t('jobs.system.offDeprecated', { env: deprecated.value.env }) : t('jobs.system.offNoSeed');
+  return deprecated.value?.off
+    ? t('jobs.system.offDeprecated', { env: deprecated.value.env })
+    : t('jobs.system.offNoSeed');
 });
 const enabledEditable = computed(() => canDisable.value && !!task.value?.editable_enabled && !offReason.value);
 const enabledDirty = computed(() => enabledEditable.value && enabledEdit.value !== (task.value?.switched_on !== false));
@@ -513,7 +515,11 @@ onMounted(async () => {
                    (a failed run's result) -->
               <div v-show="fieldShown('lastLaunch')" class="mb-3">
                 <div class="form-label fw-bold">{{ t('settings.schedules.lastLaunch') }}</div>
-                <span class="af-field-pill" :title="launchError || undefined" v-html="statusPill(t, lastRun?.outcome)"></span>
+                <span
+                  class="af-field-pill"
+                  :title="launchError || undefined"
+                  v-html="statusPill(t, lastRun?.outcome)"
+                ></span>
               </div>
               <!-- when it last ran : plain text, a dash when it never ran -->
               <div v-show="fieldShown('lastRun')" class="mb-3">
@@ -534,7 +540,13 @@ onMounted(async () => {
                 }}</label>
                 <!-- a task that cannot run here : off whatever its switch says, as the list says Off -->
                 <BsSwitch v-if="offReason" id="af-system-enabled" :modelValue="false" :disabled="true" class="mb-0" />
-                <BsSwitch v-else id="af-system-enabled" v-model="enabledEdit" :disabled="!enabledEditable" class="mb-0" />
+                <BsSwitch
+                  v-else
+                  id="af-system-enabled"
+                  v-model="enabledEdit"
+                  :disabled="!enabledEditable"
+                  class="mb-0"
+                />
                 <div class="form-text">
                   {{
                     offReason
