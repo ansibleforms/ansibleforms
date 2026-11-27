@@ -2724,6 +2724,7 @@ export default {
       columns: '显示的列。',
       pctColumns: '以百分比条显示的列。',
       filterColumns: '可用于筛选的列。',
+      sortable: '点击列标题即可对表格排序。',
       allowDelete: '可以删除行。',
       allowInsert: '可以添加行。',
       readonlyColumns: '在已有行中保持只读的列。',

@@ -2862,6 +2862,7 @@ export default {
       columns: 'Les columnes que mostra.',
       pctColumns: 'Columnes mostrades com a barra de percentatge.',
       filterColumns: 'Columnes per les quals es pot filtrar.',
+      sortable: "Un clic a la capçalera d'una columna ordena la taula.",
       allowDelete: 'Es poden eliminar files.',
       allowInsert: 'Es poden afegir files.',
       readonlyColumns: 'Les columnes que les files existents mantenen de només lectura.',

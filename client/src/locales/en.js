@@ -2801,6 +2801,7 @@ export default {
       columns: 'The columns it shows.',
       pctColumns: 'Columns shown as a percentage bar.',
       filterColumns: 'Columns it can be filtered on.',
+      sortable: "A click on a column's header sorts the table.",
       allowDelete: 'Rows can be deleted.',
       allowInsert: 'Rows can be added.',
       readonlyColumns: 'Its columns that existing rows keep read only.',

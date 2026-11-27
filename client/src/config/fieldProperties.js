@@ -176,6 +176,10 @@ export const fieldProperties = [
     init: [],
   },
   {
+    key: 'sortable',
+    kind: 'switch',
+  },
+  {
     key: 'allowDelete',
     kind: 'switch',
   },

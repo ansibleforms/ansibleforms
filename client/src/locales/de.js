@@ -2873,6 +2873,7 @@ export default {
       columns: 'Die Spalten, die es zeigt.',
       pctColumns: 'Als Prozentbalken gezeigte Spalten.',
       filterColumns: 'Spalten, nach denen gefiltert werden kann.',
+      sortable: 'Ein Klick auf einen Spaltenkopf sortiert die Tabelle.',
       allowDelete: 'Zeilen können gelöscht werden.',
       allowInsert: 'Zeilen können hinzugefügt werden.',
       readonlyColumns: 'Spalten, die bei bestehenden Zeilen schreibgeschützt bleiben.',

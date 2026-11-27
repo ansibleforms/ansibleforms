@@ -2854,6 +2854,7 @@ export default {
       columns: 'Le colonne che mostra.',
       pctColumns: 'Colonne mostrate come barra percentuale.',
       filterColumns: 'Colonne su cui filtrare.',
+      sortable: "Un clic sull'intestazione di una colonna ordina la tabella.",
       allowDelete: 'Le righe si possono eliminare.',
       allowInsert: 'Le righe si possono aggiungere.',
       readonlyColumns: 'Le colonne che restano di sola lettura nelle righe esistenti.',

@@ -70,6 +70,7 @@ defineProps({
   valueColumn: { type: String, default: '' }, // Value column for select_advanced
   pctColumns: { type: Array, default: () => [] }, // Percentage columns for select_advanced
   filterColumns: { type: Array, default: () => [] }, // Filter columns for select_advanced
+  sortable: { type: Boolean, default: true }, // a column's header sorts the rows (select_advanced)
   sticky: { type: Boolean, default: false }, // Sticky flag for select_advanced
   horizontal: { type: Boolean, default: false }, // Horizontal flag for select_advanced
   multiple: { type: Boolean, default: false }, // Multiple flag for select_advanced
@@ -194,6 +195,7 @@ defineProps({
         :valueColumn="valueColumn"
         :pctColumns="pctColumns"
         :filterColumns="filterColumns"
+        :sortable="sortable"
         :sticky="sticky"
         :horizontal="horizontal"
         :icon="icon"
@@ -299,6 +301,7 @@ defineProps({
           :valueColumn="valueColumn"
           :pctColumns="pctColumns"
           :filterColumns="filterColumns"
+          :sortable="sortable"
           :sticky="sticky"
           :horizontal="horizontal"
           :icon="icon"
@@ -480,6 +483,7 @@ defineProps({
           :valueColumn="valueColumn"
           :pctColumns="pctColumns"
           :filterColumns="filterColumns"
+          :sortable="sortable"
           :sticky="sticky"
           :horizontal="horizontal"
           :icon="icon"
