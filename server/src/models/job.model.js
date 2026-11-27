@@ -92,6 +92,8 @@ function pushForminfoToExtravars(formObj, extravars, creds = {}) {
   if (extravars.__scmBranch__ === undefined && formObj.scm_branch !== undefined) extravars.__scmBranch__ = formObj.scm_branch;
   // `job:` is `template:` in a Rundeck's or a Jenkins' words : the runners read __template__
   if (extravars.__template__ === undefined && formObj.job !== undefined) extravars.__template__ = formObj.job;
+  // the form that started the job, for the playbook to read as `__formname__`
+  if (extravars.__formname__ === undefined && formObj.name !== undefined) extravars.__formname__ = formObj.name;
   extravars["__credentials__"] = { ...extravars["__credentials__"], ...creds };
   // console.log(extravars)
 }
