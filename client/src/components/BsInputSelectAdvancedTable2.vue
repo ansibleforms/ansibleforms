@@ -268,6 +268,10 @@ function getLabels() {
     } else {
       if (labels.value.length > 0) valueLabel.value = labels.value[0];
     }
+  } else if (props.columns.length > 0) {
+    // no rows (none yet, or all moved to the other side) : the header still shows, the columns the
+    // field declares ; without them there is no row to read its columns from, the last ones stay
+    labels.value = [...props.columns];
   }
 }
 
@@ -279,7 +283,9 @@ onMounted(() => {
 });
 </script>
 <template>
-  <div class="mt-2">
+  <!-- a column the side's full height, its space above inside it (a margin ran it past the side's
+       end) : the message of no rows takes the room from the header's end down, in its middle -->
+  <div class="pt-2 d-flex flex-column h-100">
     <div class="pb-2">
       <div class="input-group">
         <span class="input-group-text text-gray-500">
@@ -295,8 +301,6 @@ onMounted(() => {
         />
       </div>
     </div>
-    <p v-if="values.length == 0" class="pl-3">{{ t('common.noData') }}</p>
-    <p v-if="values.length > 0 && filtered.length == 0" class="ps-3">{{ t('common.noFilterMatch') }}</p>
     <div class="table-container">
       <table class="table table-hover border mb-0">
         <thead v-if="labels.length > 1">
@@ -305,9 +309,9 @@ onMounted(() => {
               <!-- its text cut first (…), its arrow always shown -->
               <span class="af-th">
                 <span class="af-th-text">{{ l }}</span>
-                <span v-if="sortable" class="af-th-sort text-muted ms-1">
+                <span v-if="sortable" class="af-th-sort ms-1">
                   <font-awesome-icon v-if="sortIcon(l)" :icon="sortIcon(l)" />
-                  <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                  <font-awesome-icon v-else icon="sort" class="af-th-sort-idle" />
                 </span>
               </span>
             </th>
@@ -334,9 +338,26 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
+    <!-- nothing to show : said under the header and its line, where the rows would be, in line with
+         the cells' text -->
+    <p v-if="values.length == 0" class="af-no-rows">{{ t('common.noData') }}</p>
+    <p v-if="values.length > 0 && filtered.length == 0" class="af-no-rows">{{ t('common.noFilterMatch') }}</p>
   </div>
 </template>
 <style scoped>
+/* no rows : said in the middle of the room under the header, both ways ; the room reaches the
+   side's bottom edge through its padding (0.5rem, components/BsInputSelectAdvanced2.vue p-2), so
+   the space above the message and the space under it are the same */
+.af-no-rows {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0 0 -0.5rem;
+  padding: 0.5rem;
+}
+
 /* a header that sorts : the hand over all of it, its arrow too ; its text not selected by the
    clicks. Its click stops there (.stop) : its arrow is replaced as it sorts, so the dropdown's
    click-outside would find the clicked element gone, outside the table, and close it */
@@ -349,7 +370,7 @@ th.af-sortable * {
    arrow never */
 .af-th {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
 }
 .af-th-text {
@@ -360,11 +381,29 @@ th.af-sortable * {
 }
 .af-th-sort {
   flex-shrink: 0;
+}
+/* the arrow of the column sorted : the theme's secondary grey ; the others' its tertiary one, a
+   step lighter, darker than the jobs list's faint one and still seen at a glance */
+.af-th-sort {
+  color: var(--bs-secondary-color);
+}
+.af-th-sort-idle {
+  color: var(--bs-tertiary-color);
+}
+/* its arrow on the middle of the lowercase text, as a letter would sit : vertical-align middle
+   puts its centre at the baseline plus half the text's x-height (the box keeps the text's size,
+   only the arrow is smaller), not Font Awesome's -0.125em for an icon in running text */
+.af-th-sort svg {
   font-size: 0.7em;
+  vertical-align: middle;
 }
 
 .table td,
 .table th {
+  /* each cell's content in the middle of its row : Bootstrap's tables put it at the top
+     (vertical-align: top), so a row taller than its text (a percentage bar, a checkbox) left
+     all its room under the text */
+  vertical-align: middle;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -386,6 +425,26 @@ table tbody tr {
   width: 100% !important;
   table-layout: fixed;
   cursor: pointer;
+}
+/* the line under the header set apart from the rows' : gray 500, two steps from their line in
+   either theme (darker than the light theme's gray 300, lighter than the dark theme's gray 700).
+   Drawn as the top of the rows' scrolling box, not under the header's cells : the header is the
+   rows' width (the scrollbar's room taken off, its columns over theirs), so its line stopped short
+   of the scrollbar ; the box's border runs over it, to the right end, and does not scroll */
+table thead th {
+  border-bottom-width: 0;
+}
+table thead + tbody {
+  border-top: var(--bs-border-width) solid var(--bs-gray-500);
+}
+/* in the dark theme darker, half gray 600 : gray 500 alone stood out a
+   little too much on the dark rows */
+[data-bs-theme='dark'] table thead + tbody {
+  border-top-color: color-mix(in srgb, var(--bs-gray-500) 50%, var(--bs-gray-600));
+}
+/* no line under the last row : the dropdown's (the table's) own edge ends it */
+table tbody tr:last-child > td {
+  border-bottom-width: 0;
 }
 table thead th.is-first,
 table tbody td.is-first {

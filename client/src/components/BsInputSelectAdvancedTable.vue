@@ -514,6 +514,10 @@ function getLabels() {
     } else {
       recalc();
     }
+  } else if (props.columns.length > 0) {
+    // no rows (none yet, or all moved to the other side) : the header still shows, the columns the
+    // field declares ; without them there is no row to read its columns from, the last ones stay
+    labels.value = [...props.columns];
   }
 }
 
@@ -529,7 +533,9 @@ onMounted(() => {
 // ON SHOW
 </script>
 <template>
-  <div class="my-2">
+  <!-- a margin above the search, none under the table : its last row and its scrollbar end on the
+       dropdown's (the box's) edge -->
+  <div class="mt-2">
     <div class="px-3 pb-2">
       <div class="input-group">
         <span class="input-group-text text-gray-500">
@@ -545,8 +551,6 @@ onMounted(() => {
         />
       </div>
     </div>
-    <p v-if="values.length == 0" class="pl-3">{{ t('common.noData') }}</p>
-    <p v-if="values.length > 0 && filtered.length == 0" class="ps-3">{{ t('common.noFilterMatch') }}</p>
     <div class="table-container">
       <table class="table table-hover mb-0">
         <thead v-if="labels.length > 1">
@@ -559,13 +563,19 @@ onMounted(() => {
               />
               <font-awesome-icon v-show="!checkAll" @click="disabled ? null : multicheck()" :icon="['far', 'square']" />
             </th>
-            <th :key="l" v-for="l in labels" :class="{ 'af-sortable': sortable }" @click.stop="toggleSort(l)">
+            <th
+              :key="l"
+              v-for="l in labels"
+              class="af-th-cell"
+              :class="{ 'af-sortable': sortable }"
+              @click.stop="toggleSort(l)"
+            >
               <!-- its text cut first (…), its arrow always shown -->
               <span class="af-th">
                 <span class="af-th-text">{{ l }}</span>
-                <span v-if="sortable" class="af-th-sort text-muted ms-1">
+                <span v-if="sortable" class="af-th-sort ms-1">
                   <font-awesome-icon v-if="sortIcon(l)" :icon="sortIcon(l)" />
-                  <font-awesome-icon v-else icon="sort" class="opacity-25" />
+                  <font-awesome-icon v-else icon="sort" class="af-th-sort-idle" />
                 </span>
               </span>
             </th>
@@ -600,7 +610,7 @@ onMounted(() => {
               <small class="ms-1 text-body-tertiary user-select-none">{{ v.index }}</small>
             </td>
             <template v-for="(l, i) in labels">
-              <td v-if="isPctColumn(l)" :key="l + i" v-html="getProgressHtml(v.value[l])"></td>
+              <td v-if="isPctColumn(l)" :key="l + i" class="af-td-bar" v-html="getProgressHtml(v.value[l])"></td>
               <td v-else v-html="highlightFilter(v.value[l], l)" :key="l"></td>
             </template>
             <td v-if="labels.length == 0" v-html="highlightFilter(v.value)" :class="{ 'border-top': i === 0 }"></td>
@@ -608,6 +618,12 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
+    <!-- nothing to show : said under the header and its line, where the rows would be, in line with
+         the cells' text -->
+    <p v-if="values.length == 0" class="px-2 py-2 mb-0 text-center">{{ t('common.noData') }}</p>
+    <p v-if="values.length > 0 && filtered.length == 0" class="px-2 py-2 mb-0 text-center">
+      {{ t('common.noFilterMatch') }}
+    </p>
   </div>
 </template>
 <style scoped>
@@ -623,7 +639,7 @@ th.af-sortable * {
    arrow never */
 .af-th {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
 }
 .af-th-text {
@@ -634,11 +650,29 @@ th.af-sortable * {
 }
 .af-th-sort {
   flex-shrink: 0;
+}
+/* the arrow of the column sorted : the theme's secondary grey ; the others' its tertiary one, a
+   step lighter, darker than the jobs list's faint one and still seen at a glance */
+.af-th-sort {
+  color: var(--bs-secondary-color);
+}
+.af-th-sort-idle {
+  color: var(--bs-tertiary-color);
+}
+/* its arrow on the middle of the lowercase text, as a letter would sit : vertical-align middle
+   puts its centre at the baseline plus half the text's x-height (the box keeps the text's size,
+   only the arrow is smaller), not Font Awesome's -0.125em for an icon in running text */
+.af-th-sort svg {
   font-size: 0.7em;
+  vertical-align: middle;
 }
 
 .table td,
 .table th {
+  /* each cell's content in the middle of its row : Bootstrap's tables put it at the top
+     (vertical-align: top), so a row taller than its text (a percentage bar, a checkbox) left
+     all its room under the text */
+  vertical-align: middle;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -650,6 +684,13 @@ th.af-sortable * {
     height: 1em;
     visibility: hidden;
   }
+}
+/* a header (its text and arrow, a flex box) and a percentage cell (its bar, a block) have their
+   height of their own : the zero-width space above, an empty cell's, went on a line of its own
+   under them, which set the header and the bar at the top of a taller row */
+.table th.af-th-cell::after,
+.table td.af-td-bar::after {
+  display: none;
 }
 
 table tbody {
@@ -670,6 +711,26 @@ table tbody tr {
   width: 100% !important;
   table-layout: fixed;
   cursor: pointer;
+}
+/* the line under the header set apart from the rows' : gray 500, two steps from their line in
+   either theme (darker than the light theme's gray 300, lighter than the dark theme's gray 700).
+   Drawn as the top of the rows' scrolling box, not under the header's cells : the header is the
+   rows' width (the scrollbar's room taken off, its columns over theirs), so its line stopped short
+   of the scrollbar ; the box's border runs over it, to the right end, and does not scroll */
+table thead th {
+  border-bottom-width: 0;
+}
+table thead + tbody {
+  border-top: var(--bs-border-width) solid var(--bs-gray-500);
+}
+/* in the dark theme darker, half gray 600 : gray 500 alone stood out a
+   little too much on the dark rows */
+[data-bs-theme='dark'] table thead + tbody {
+  border-top-color: color-mix(in srgb, var(--bs-gray-500) 50%, var(--bs-gray-600));
+}
+/* no line under the last row : the dropdown's (the table's) own edge ends it */
+table tbody tr:last-child > td {
+  border-bottom-width: 0;
 }
 
 table thead th.is-first,

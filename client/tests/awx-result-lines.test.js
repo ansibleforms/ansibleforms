@@ -17,7 +17,11 @@ const stdout = readFileSync(path.join(fixtures, 'awx-stdout.txt'), 'utf8');
 const events = JSON.parse(readFileSync(path.join(fixtures, 'awx-stored-events.json'), 'utf8'));
 
 // the job's output as the app stores it : its launch line, AWX's stdout, its end line
-const text = ['ok: [Launched template deploy with jobid 77]', ...stdout.split(/\r?\n/), 'ok: [Successfully completed template deploy]'];
+const text = [
+  'ok: [Launched template deploy with jobid 77]',
+  ...stdout.split(/\r?\n/),
+  'ok: [Successfully completed template deploy]',
+];
 const lines = text.map((t) => ({ text: t.trim(), level: lineLevel(t.trim()) }));
 const paired = pairResultLines(lines, events);
 const eventOf = (index) => events.find((e) => e.order === paired.get(index));
@@ -28,14 +32,15 @@ const RESULT_LINE = /^(ok|changed|failed|fatal|skipping|unreachable):\s+\[([^\]]
  */
 function taskOf(index) {
   for (let i = index; i >= 0; i--) {
-    if (lines[i].level === 3) return lines[i].text.replace(/^(TASK|RUNNING HANDLER) \[/, '').replace(/\]\s*\**\s*$/, '');
+    if (lines[i].level === 3)
+      return lines[i].text.replace(/^(TASK|RUNNING HANDLER) \[/, '').replace(/\]\s*\**\s*$/, '');
     if (lines[i].level) return null;
   }
   return null;
 }
 
-describe('an AWX job\'s output lines and its events', () => {
-  it('pairs every result line under a task with its host\'s event of that task', () => {
+describe("an AWX job's output lines and its events", () => {
+  it("pairs every result line under a task with its host's event of that task", () => {
     const results = lines.map((l, i) => [l, i]).filter(([l, i]) => RESULT_LINE.test(l.text) && taskOf(i));
     expect(results.length).toBeGreaterThan(20);
     for (const [line, index] of results) {
@@ -63,12 +68,16 @@ describe('an AWX job\'s output lines and its events', () => {
     ]);
   });
 
-  it('pairs a role\'s task, a handler, an unreachable host, a failure and its error, a body', () => {
+  it("pairs a role's task, a handler, an unreachable host, a failure and its error, a body", () => {
     const at = (re) => lines.findIndex((l) => re.test(l.text));
     expect(eventOf(at(/^ok: \[h1\] => \{$/))).toMatchObject({ type: 'ok', task: 'Say hello', host: 'h1' });
     // the body printed with the result : the same event
     expect(paired.get(at(/^"msg": "hello h1"$/))).toBe(paired.get(at(/^ok: \[h1\] => \{$/)));
-    expect(eventOf(at(/^fatal: \[h3\]: UNREACHABLE!/))).toMatchObject({ type: 'unreachable', host: 'h3', task: 'Change something' });
+    expect(eventOf(at(/^fatal: \[h3\]: UNREACHABLE!/))).toMatchObject({
+      type: 'unreachable',
+      host: 'h3',
+      task: 'Change something',
+    });
     const role = lines.findIndex((l, i) => taskOf(i) === 'web : Role task' && RESULT_LINE.test(l.text));
     expect(eventOf(role)).toMatchObject({ task: 'web : Role task' });
     const handler = lines.findIndex((l, i) => taskOf(i) === 'Restart web' && RESULT_LINE.test(l.text));
@@ -80,7 +89,7 @@ describe('an AWX job\'s output lines and its events', () => {
     expect(paired.get(error)).toBe(paired.get(fatal));
   });
 
-  it('leaves the app\'s own lines and the recap alone', () => {
+  it("leaves the app's own lines and the recap alone", () => {
     expect(paired.has(0)).toBe(false);
     expect(paired.has(lines.length - 1)).toBe(false);
     const recap = lines.findIndex((l) => /^PLAY RECAP/.test(l.text));
@@ -88,7 +97,7 @@ describe('an AWX job\'s output lines and its events', () => {
   });
 });
 
-describe('the job page reads an AWX job\'s events', () => {
+describe("the job page reads an AWX job's events", () => {
   it('reads them for an awx job (AWX, AAP, Ascender) as for a playbook, never for a workflow', async () => {
     const get = vi.spyOn(axios, 'get').mockResolvedValue({ data: { records: events } });
     try {

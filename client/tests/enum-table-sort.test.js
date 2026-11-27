@@ -82,10 +82,10 @@ describe('a header clicked', () => {
     expect(sortIcon('name')).toBe('');
     toggleSort('name');
     expect(column(sorted.value, 'name')[0]).toBe('esx-1');
-    expect(sortIcon('name')).toBe('sort-up');
+    expect(sortIcon('name')).toBe('caret-up');
     toggleSort('name');
     expect(column(sorted.value, 'name')[0]).toBe('kvm-10');
-    expect(sortIcon('name')).toBe('sort-down');
+    expect(sortIcon('name')).toBe('caret-down');
     toggleSort('name');
     expect(sorted.value).toBe(rows.value);
     expect([sortColumn.value, sortDir.value]).toEqual(['', 0]);
@@ -131,11 +131,88 @@ describe('the tables and the field', () => {
       expect(src).toMatch(/<span class="af-th-text">\{\{ l \}\}<\/span>/);
       expect(src).toMatch(/\.af-th-text \{[^}]*text-overflow: ellipsis;/);
       expect(src).toMatch(/\.af-th-sort \{[^}]*flex-shrink: 0;/);
+      // its arrow on the middle of the lowercase text : the header on the baseline, the arrow's
+      // centre at half the text's x-height
+      expect(src).toMatch(/\.af-th \{[^}]*align-items: baseline;/);
+      // the sorted column's arrow the secondary grey, the others the tertiary, a step lighter
+      expect(src).toMatch(/<font-awesome-icon v-else icon="sort" class="af-th-sort-idle" \/>/);
+      expect(src).toMatch(/\.af-th-sort \{\s*color: var\(--bs-secondary-color\);/);
+      expect(src).toMatch(/\.af-th-sort-idle \{\s*color: var\(--bs-tertiary-color\);/);
+      expect(src).toMatch(/\.af-th-sort svg \{[^}]*font-size: 0\.7em;[^}]*vertical-align: middle;/);
       expect(src).toMatch(/<font-awesome-icon v-if="sortIcon\(l\)" :icon="sortIcon\(l\)" \/>/);
       expect(src).toMatch(/v-for="\(?v(, i\))? in sorted"/);
       expect(src).toMatch(/select\(v\.index\)/);
     });
   }
+
+  it("centres each cell's content in its row, not at its top as Bootstrap's tables", () => {
+    for (const file of [
+      'src/components/BsInputSelectAdvancedTable.vue',
+      'src/components/BsInputSelectAdvancedTable2.vue',
+    ]) {
+      expect(read(file), file).toMatch(/\.table td,\s*\.table th \{[^}]*vertical-align: middle;/);
+      // nothing under the table : its last row and its scrollbar end on the box's edge
+      expect(read(file), file).not.toMatch(/<div class="my-2">/);
+      // the header's line set apart from the rows' in either theme
+      // drawn over the whole width, the scrollbar's too : the rows' box's top, not the header's cells
+      expect(read(file), file).toMatch(/table thead th \{\s*border-bottom-width: 0;/);
+      expect(read(file), file).toMatch(
+        /table thead \+ tbody \{\s*border-top: var\(--bs-border-width\) solid var\(--bs-gray-500\);/,
+      );
+      // a touch darker in the dark theme
+      expect(read(file), file).toMatch(
+        /\[data-bs-theme='dark'\] table thead \+ tbody \{\s*border-top-color: color-mix\(in srgb, var\(--bs-gray-500\) 50%, var\(--bs-gray-600\)\);/,
+      );
+      // no line under the last row, the table's edge ends it
+      expect(read(file), file).toMatch(/table tbody tr:last-child > td \{\s*border-bottom-width: 0;/);
+    }
+    // the header and the percentage bar not pushed up by the empty cell's zero-width space, on a
+    // line of its own under their block
+    const table = read('src/components/BsInputSelectAdvancedTable.vue');
+    expect(table).toMatch(/\.table th\.af-th-cell::after,\s*\.table td\.af-td-bar::after \{\s*display: none;/);
+    expect(table).toMatch(/class="af-th-cell"/);
+    expect(table).toMatch(/<td v-if="isPctColumn\(l\)" :key="l \+ i" class="af-td-bar"/);
+  });
+
+  it('says no data, or no match, under the header, where the rows would be', () => {
+    for (const file of [
+      'src/components/BsInputSelectAdvancedTable.vue',
+      'src/components/BsInputSelectAdvancedTable2.vue',
+    ]) {
+      const src = read(file);
+      const table = src.indexOf('<div class="table-container">');
+      expect(src.indexOf("t('common.noData')"), file).toBeGreaterThan(table);
+      expect(src.indexOf("t('common.noFilterMatch')"), file).toBeGreaterThan(table);
+      // said in the middle : across, and in the left-right selector down too
+      expect(src, file).toMatch(/t\('common\.noData'\)/);
+      // with no rows the header still shows : the columns the field declares
+      expect(src, file).toMatch(
+        /\} else if \(props\.columns\.length > 0\) \{[^}]*labels\.value = \[\.\.\.props\.columns\];/,
+      );
+    }
+  });
+
+  it('centres no data, across in the dropdown, both ways in the left-right selector', () => {
+    expect(read('src/components/BsInputSelectAdvancedTable.vue')).toMatch(
+      /class="px-2 py-2 mb-0 text-center">\{\{ t\('common\.noData'\) \}\}/,
+    );
+    const side = read('src/components/BsInputSelectAdvancedTable2.vue');
+    expect(side).toMatch(/<div class="pt-2 d-flex flex-column h-100">/);
+    expect(side).toMatch(/\.af-no-rows \{[^}]*flex-grow: 1;[^}]*align-items: center;[^}]*justify-content: center;/);
+    // its room down to the side's edge, through its padding : as much space under it as above
+    expect(side).toMatch(/\.af-no-rows \{[^}]*margin: 0 0 -0\.5rem;/);
+  });
+
+  it('the dropdown keeps the table inside its rounded corners', () => {
+    expect(read('src/components/BsInputSelectAdvanced.vue')).toMatch(
+      /\.af-dd-advanced\.dropdown-menu \{[^}]*overflow: hidden;/,
+    );
+    // the always open boxes too, rounded as the dropdown
+    expect(
+      (read('src/components/BsInputSelectAdvanced.vue').match(/class="border rounded overflow-hidden mb-2"/g) || [])
+        .length,
+    ).toBe(2);
+  });
 
   it('a field passes sortable (on unless false) down to its table', () => {
     expect(read('src/components/AppForm.vue')).toMatch(/:sortable="field\.sortable !== false"/);
