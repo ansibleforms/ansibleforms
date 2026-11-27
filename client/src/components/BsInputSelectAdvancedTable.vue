@@ -529,7 +529,9 @@ onMounted(() => {
 // ON SHOW
 </script>
 <template>
-  <div class="my-2">
+  <!-- a margin above the search, none under the table : its last row and its scrollbar end on the
+       dropdown's (the box's) edge -->
+  <div class="mt-2">
     <div class="px-3 pb-2">
       <div class="input-group">
         <span class="input-group-text text-gray-500">
@@ -559,7 +561,13 @@ onMounted(() => {
               />
               <font-awesome-icon v-show="!checkAll" @click="disabled ? null : multicheck()" :icon="['far', 'square']" />
             </th>
-            <th :key="l" v-for="l in labels" :class="{ 'af-sortable': sortable }" @click.stop="toggleSort(l)">
+            <th
+              :key="l"
+              v-for="l in labels"
+              class="af-th-cell"
+              :class="{ 'af-sortable': sortable }"
+              @click.stop="toggleSort(l)"
+            >
               <!-- its text cut first (…), its arrow always shown -->
               <span class="af-th">
                 <span class="af-th-text">{{ l }}</span>
@@ -600,7 +608,7 @@ onMounted(() => {
               <small class="ms-1 text-body-tertiary user-select-none">{{ v.index }}</small>
             </td>
             <template v-for="(l, i) in labels">
-              <td v-if="isPctColumn(l)" :key="l + i" v-html="getProgressHtml(v.value[l])"></td>
+              <td v-if="isPctColumn(l)" :key="l + i" class="af-td-bar" v-html="getProgressHtml(v.value[l])"></td>
               <td v-else v-html="highlightFilter(v.value[l], l)" :key="l"></td>
             </template>
             <td v-if="labels.length == 0" v-html="highlightFilter(v.value)" :class="{ 'border-top': i === 0 }"></td>
@@ -653,6 +661,10 @@ th.af-sortable * {
 
 .table td,
 .table th {
+  /* each cell's content in the middle of its row : Bootstrap's tables put it at the top
+     (vertical-align: top), so a row taller than its text (a percentage bar, a checkbox) left
+     all its room under the text */
+  vertical-align: middle;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -664,6 +676,13 @@ th.af-sortable * {
     height: 1em;
     visibility: hidden;
   }
+}
+/* a header (its text and arrow, a flex box) and a percentage cell (its bar, a block) have their
+   height of their own : the zero-width space above, an empty cell's, went on a line of its own
+   under them, which set the header and the bar at the top of a taller row */
+.table th.af-th-cell::after,
+.table td.af-td-bar::after {
+  display: none;
 }
 
 table tbody {
@@ -684,6 +703,26 @@ table tbody tr {
   width: 100% !important;
   table-layout: fixed;
   cursor: pointer;
+}
+/* the line under the header set apart from the rows' : gray 500, two steps from their line in
+   either theme (darker than the light theme's gray 300, lighter than the dark theme's gray 700).
+   Drawn as the top of the rows' scrolling box, not under the header's cells : the header is the
+   rows' width (the scrollbar's room taken off, its columns over theirs), so its line stopped short
+   of the scrollbar ; the box's border runs over it, to the right end, and does not scroll */
+table thead th {
+  border-bottom-width: 0;
+}
+table thead + tbody {
+  border-top: var(--bs-border-width) solid var(--bs-gray-500);
+}
+/* in the dark theme darker, half gray 600 : gray 500 alone stood out a
+   little too much on the dark rows */
+[data-bs-theme='dark'] table thead + tbody {
+  border-top-color: color-mix(in srgb, var(--bs-gray-500) 50%, var(--bs-gray-600));
+}
+/* no line under the last row : the dropdown's (the table's) own edge ends it */
+table tbody tr:last-child > td {
+  border-bottom-width: 0;
 }
 
 table thead th.is-first,

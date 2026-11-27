@@ -145,6 +145,41 @@ describe('the tables and the field', () => {
     });
   }
 
+  it("centres each cell's content in its row, not at its top as Bootstrap's tables", () => {
+    for (const file of [
+      'src/components/BsInputSelectAdvancedTable.vue',
+      'src/components/BsInputSelectAdvancedTable2.vue',
+    ]) {
+      expect(read(file), file).toMatch(/\.table td,\s*\.table th \{[^}]*vertical-align: middle;/);
+      // nothing under the table : its last row and its scrollbar end on the box's edge
+      expect(read(file), file).not.toMatch(/<div class="my-2">/);
+      // the header's line set apart from the rows' in either theme
+      // drawn over the whole width, the scrollbar's too : the rows' box's top, not the header's cells
+      expect(read(file), file).toMatch(/table thead th \{\s*border-bottom-width: 0;/);
+      expect(read(file), file).toMatch(
+        /table thead \+ tbody \{\s*border-top: var\(--bs-border-width\) solid var\(--bs-gray-500\);/,
+      );
+      // a touch darker in the dark theme
+      expect(read(file), file).toMatch(
+        /\[data-bs-theme='dark'\] table thead \+ tbody \{\s*border-top-color: color-mix\(in srgb, var\(--bs-gray-500\) 50%, var\(--bs-gray-600\)\);/,
+      );
+      // no line under the last row, the table's edge ends it
+      expect(read(file), file).toMatch(/table tbody tr:last-child > td \{\s*border-bottom-width: 0;/);
+    }
+    // the header and the percentage bar not pushed up by the empty cell's zero-width space, on a
+    // line of its own under their block
+    const table = read('src/components/BsInputSelectAdvancedTable.vue');
+    expect(table).toMatch(/\.table th\.af-th-cell::after,\s*\.table td\.af-td-bar::after \{\s*display: none;/);
+    expect(table).toMatch(/class="af-th-cell"/);
+    expect(table).toMatch(/<td v-if="isPctColumn\(l\)" :key="l \+ i" class="af-td-bar"/);
+  });
+
+  it('the dropdown keeps the table inside its rounded corners', () => {
+    expect(read('src/components/BsInputSelectAdvanced.vue')).toMatch(
+      /\.af-dd-advanced\.dropdown-menu \{[^}]*overflow: hidden;/,
+    );
+  });
+
   it('a field passes sortable (on unless false) down to its table', () => {
     expect(read('src/components/AppForm.vue')).toMatch(/:sortable="field\.sortable !== false"/);
     for (const [file, n] of [

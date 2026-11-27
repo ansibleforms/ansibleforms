@@ -478,9 +478,12 @@ onMounted(() => {
   right: 0 !important;
 }
 
-/* Prevent unintended horizontal scroll due to large dynamic width */
+/* Prevent unintended horizontal scroll due to large dynamic width ; its content kept inside its
+   rounded corners : the table and its scrollbar end on its bottom edge, and drew their square
+   corners over the rounding */
 .af-dd-advanced.dropdown-menu {
   max-width: 100vw;
   box-sizing: border-box;
+  overflow: hidden;
 }
 </style>

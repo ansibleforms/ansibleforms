@@ -379,6 +379,10 @@ th.af-sortable * {
 
 .table td,
 .table th {
+  /* each cell's content in the middle of its row : Bootstrap's tables put it at the top
+     (vertical-align: top), so a row taller than its text (a percentage bar, a checkbox) left
+     all its room under the text */
+  vertical-align: middle;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -400,6 +404,26 @@ table tbody tr {
   width: 100% !important;
   table-layout: fixed;
   cursor: pointer;
+}
+/* the line under the header set apart from the rows' : gray 500, two steps from their line in
+   either theme (darker than the light theme's gray 300, lighter than the dark theme's gray 700).
+   Drawn as the top of the rows' scrolling box, not under the header's cells : the header is the
+   rows' width (the scrollbar's room taken off, its columns over theirs), so its line stopped short
+   of the scrollbar ; the box's border runs over it, to the right end, and does not scroll */
+table thead th {
+  border-bottom-width: 0;
+}
+table thead + tbody {
+  border-top: var(--bs-border-width) solid var(--bs-gray-500);
+}
+/* in the dark theme darker, half gray 600 : gray 500 alone stood out a
+   little too much on the dark rows */
+[data-bs-theme='dark'] table thead + tbody {
+  border-top-color: color-mix(in srgb, var(--bs-gray-500) 50%, var(--bs-gray-600));
+}
+/* no line under the last row : the dropdown's (the table's) own edge ends it */
+table tbody tr:last-child > td {
+  border-bottom-width: 0;
 }
 table thead th.is-first,
 table tbody td.is-first {
