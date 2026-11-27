@@ -547,8 +547,6 @@ onMounted(() => {
         />
       </div>
     </div>
-    <p v-if="values.length == 0" class="pl-3">{{ t('common.noData') }}</p>
-    <p v-if="values.length > 0 && filtered.length == 0" class="ps-3">{{ t('common.noFilterMatch') }}</p>
     <div class="table-container">
       <table class="table table-hover mb-0">
         <thead v-if="labels.length > 1">
@@ -616,6 +614,10 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
+    <!-- nothing to show : said under the header and its line, where the rows would be, in line with
+         the cells' text -->
+    <p v-if="values.length == 0" class="px-2 py-2 mb-0">{{ t('common.noData') }}</p>
+    <p v-if="values.length > 0 && filtered.length == 0" class="px-2 py-2 mb-0">{{ t('common.noFilterMatch') }}</p>
   </div>
 </template>
 <style scoped>

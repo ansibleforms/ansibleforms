@@ -174,6 +174,18 @@ describe('the tables and the field', () => {
     expect(table).toMatch(/<td v-if="isPctColumn\(l\)" :key="l \+ i" class="af-td-bar"/);
   });
 
+  it('says no data, or no match, under the header, where the rows would be', () => {
+    for (const file of [
+      'src/components/BsInputSelectAdvancedTable.vue',
+      'src/components/BsInputSelectAdvancedTable2.vue',
+    ]) {
+      const src = read(file);
+      const table = src.indexOf('<div class="table-container">');
+      expect(src.indexOf("t('common.noData')"), file).toBeGreaterThan(table);
+      expect(src.indexOf("t('common.noFilterMatch')"), file).toBeGreaterThan(table);
+    }
+  });
+
   it('the dropdown keeps the table inside its rounded corners', () => {
     expect(read('src/components/BsInputSelectAdvanced.vue')).toMatch(
       /\.af-dd-advanced\.dropdown-menu \{[^}]*overflow: hidden;/,
