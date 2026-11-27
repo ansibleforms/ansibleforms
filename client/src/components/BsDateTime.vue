@@ -29,6 +29,7 @@ import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { useI18n } from 'vue-i18n';
 import Time from '@/lib/Time';
+import { WeekStart } from '@vuepic/vue-datepicker';
 
 // MODEL
 
@@ -599,6 +600,7 @@ watch(
     :time-config="timeConfig"
     :floating="floating"
     :dark="theme == 'dark'"
+    :week-start="WeekStart.Monday"
     :teleport="teleport ? 'body' : undefined"
   >
     <!-- the clock a moment is picked on, over the time : the browser's, the app's or UTC, else the
@@ -678,7 +680,7 @@ watch(
   font-size: 0.8rem;
 }
 /* a calendar opened on the page's body (teleport) : above the dialog it was opened from */
-body > .dp__outer_menu_wrap,
+body > .dp--outer-menu-wrap,
 body > .dp--menu-wrapper {
   z-index: 1070;
 }
