@@ -231,7 +231,7 @@ describe("a task's page", () => {
 
   it("splits its last run as a schedule's page : the badge with its error on hover, then the date", () => {
     expect(page).toMatch(
-      /<span class="af-field-pill" :title="launchError \|\| undefined" v-html="statusPill\(t, lastRun\?\.outcome\)"><\/span>/,
+      /<span\s+class="af-field-pill"\s+:title="launchError \|\| undefined"\s+v-html="statusPill\(t, lastRun\?\.outcome\)"\s*><\/span>/,
     );
     expect(page).toMatch(/lastRun\.value\?\.outcome === 'failed' \? lastRun\.value\.result/);
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
@@ -530,7 +530,7 @@ describe('Run now', () => {
     // every task shows it : greyed out, why under it, for one that cannot be turned off
     expect(sw).toMatch(/!canDisable\s*\? t\('jobs\.system\.cannotDisable'\)/);
     expect(sw).toMatch(/<label class="form-label fw-bold d-block" for="af-system-enabled">/);
-    expect(sw).toMatch(/<BsSwitch v-else id="af-system-enabled" v-model="enabledEdit" :disabled="!enabledEditable"/);
+    expect(sw).toMatch(/<BsSwitch\s+v-else\s+id="af-system-enabled"\s+v-model="enabledEdit"\s+:disabled="!enabledEditable"/);
     expect(sw).toMatch(/t\('settings\.schedules\.enabledHelp'\)/);
     expect(sw).toMatch(/t\('jobs\.system\.scheduleEnv', \{ env: task\.enabled_env \}\)/);
     expect(page).toMatch(/const canDisable = computed\(\(\) => !!task\.value\?\.can_disable\);/);
@@ -539,7 +539,7 @@ describe('Run now', () => {
     expect(page).toMatch(/if \(enabledDirty\.value\) body\.enabled = enabledEdit\.value;/);
     // a task that cannot run here : off and greyed out, why under it, as the list says Off
     expect(page).toMatch(/if \(isLoop\.value\) return x\.enabled === false \? t\('jobs\.system\.offNoHub'\) : '';/);
-    expect(page).toMatch(/deprecated\.value\?\.off \? t\('jobs\.system\.offDeprecated', \{ env: deprecated\.value\.env \}\) : t\('jobs\.system\.offNoSeed'\)/);
+    expect(page).toMatch(/deprecated\.value\?\.off\s+\? t\('jobs\.system\.offDeprecated', \{ env: deprecated\.value\.env \}\)\s+: t\('jobs\.system\.offNoSeed'\)/);
     expect(sw).toMatch(/<BsSwitch v-if="offReason" id="af-system-enabled" :modelValue="false" :disabled="true"/);
     expect(page).toMatch(/!!task\.value\?\.editable_enabled && !offReason\.value\);/);
     expect(page).toMatch(/const showSave = computed\(\(\) => scheduleEditable\.value \|\| enabledEditable\.value\);/);
