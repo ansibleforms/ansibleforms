@@ -1,17 +1,17 @@
 name: Refresh images
 
-# Rebuilds the latest release every week and pushes it again under its own tags (x.y.z, x.y,
-# x and latest), the controller and the three RTE layers alike. A release's images are
-# otherwise frozen on the day it was published : this gives them Debian's security fixes
-# (the Dockerfiles run apt-get upgrade) and gives ansibleforms-rte-full the newest
-# collections, between releases.
+# Rebuilds the controller's image of the latest release every week and pushes it again under
+# its own tags (x.y.z, x.y, x and latest). A release's image is otherwise frozen on the day it
+# was published : this gives it Debian's security fixes (the Dockerfile runs apt-get upgrade)
+# between releases. The RTE images are refreshed the same way, at the same hour, by
+# ansibleforms/rte.
 #
-# It builds from the release tag, so the code, the npm and pip pins and the base image digests
-# stay those of the release. Dependabot keeps moving those pins on main (docker daily, pip and
-# npm weekly) ; they reach the images with the next release, as every other change does.
+# It builds from the release tag, so the code, the npm pins and the base image digest stay
+# those of the release. Dependabot keeps moving those pins on main (docker daily, npm weekly) ;
+# they reach the image with the next release, as every other change does.
 #
-# Only the highest final release, and only from 7 on : 6.x has no RTE images and its
-# maintenance line publishes from release/6.x. No layer cache, and latest-rc is left alone
+# Only the highest final release, and only from 7 on : the maintenance line of 6.x publishes
+# from release/6.x. No layer cache, and latest-rc is left alone
 # (publish.yml, refresh: true).
 #
 #   Actions -> Refresh images -> Run workflow     to refresh now

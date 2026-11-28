@@ -51,7 +51,7 @@ The images, all on `ghcr.io/ansibleforms`, each for `linux/amd64` and `linux/arm
 |---|---|
 | `ansibleforms` | The web app: interface, API, schedules and background work |
 | `ansibleforms-rte-full` | The RTE playbooks run in: ansible with its collections. **The default** |
-| `ansibleforms-rte-core` | A smaller RTE, ansible-core only, to build your own on ([examples/rte](examples/rte)) |
+| `ansibleforms-rte-core` | A smaller RTE, ansible-core only, to build your own on ([examples](https://github.com/ansibleforms/rte/tree/main/examples)) |
 | `ansibleforms-rte-base` | The RTE without python or ansible, for your own versions of both |
 
 ## Release lines

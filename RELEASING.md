@@ -103,35 +103,32 @@ refuses when `server/package.json` at that tag names another version.
 
 ## The weekly refresh
 
-`refresh-images.yml` rebuilds the latest 7.x release every Monday and pushes it again under
-its own tags, so the images take Debian's security fixes and `rte-full` takes the newest
-collections between releases. It builds from the release tag, so the code, the npm and pip
-pins and the base image digests stay those of the release (Dependabot's newer pins ship with
-the next release). It builds without the layer cache and leaves `latest-rc` alone. Run it by
+`refresh-images.yml` rebuilds the controller's image of the latest 7.x release every Monday and
+pushes it again under its own tags, so it takes Debian's security fixes between releases. It
+builds from the release tag, so the code, the npm pins and the base image digest stay those of
+the release (Dependabot's newer pins ship with the next release). ansibleforms/rte refreshes
+the RTE images the same way, at the same hour. It builds without the layer cache and leaves `latest-rc` alone. Run it by
 hand from Actions → **Refresh images**.
 
 ## The RTE images
 
-The RTE is published in three layers, each built FROM the one before, in the same publish run
-and with the same tags as the controller :
+The RTE is published in three layers, `ansibleforms-rte-base`, `-rte-core` and `-rte-full`, with
+the same tags as the controller. They are built in [ansibleforms/rte](https://github.com/ansibleforms/rte)
+from this repository's `server/` : its CONTRIBUTING.md says how.
 
-| Image | Dockerfile | Adds |
-|---|---|---|
-| `ansibleforms-rte-base` | `docker/runner/rte-base/Dockerfile` | node (`node:26-trixie-slim`, pinned by digest) and the server, git, ssh - no python, no ansible |
-| `ansibleforms-rte-core` | `docker/runner/rte-core/Dockerfile` | python and the packages in `docker/runner/rte-core/requirements.txt` (ansible-core and a few libraries) |
-| `ansibleforms-rte-full` | `docker/runner/rte-full/Dockerfile` | the `ansible` package matching rte-core's ansible-core, the libraries and collections the 6.5 image had : `docker/runner/rte-full/requirements.txt`, `collections.yml` and a few os tools |
-
-- **Updates** : Dependabot moves the node pin in `docker/runner/rte-base/Dockerfile` and the
-  python pins in `docker/runner/rte*/requirements.txt`. Each one is a pull request, so an image
-  changes only with a commit. The collections of `-full` take their latest version at build time.
-- **The chain** : `docker/runner/rte-core` and `rte-full` take `BASE_IMAGE`. `publish.yml` passes
-  the digest it just pushed, and the Docker check (`docker.yml`) does the same through a registry
-  that lives only for the job. Built by hand, they default to the published `:7`.
+- **A release** : the `rte` job of `release.yml` sends `app-release` to it, once the controller's
+  image is out. It builds the images from the release's tag, pushes them under the release's tags
+  and releases that repository at the same version. Should it fail, run its **Follow app release**
+  by hand with the version.
+- **A release candidate** : the `rte` job of `rc.yml` sends `app-rc` with the candidate's version
+  and commit, and the RTE images of the candidate follow a few minutes after its image.
+- **Updates** : the RTE images' pins (node, uv, the python packages) are moved by Dependabot in
+  that repository, and its CI builds them against this repository's `main`.
 - **Architectures** : every image, the controller included, is published for `linux/amd64` and
   `linux/arm64` under the same tags. `publish.yml` builds each architecture on a runner of its
   own (`ubuntu-latest`, `ubuntu-24.04-arm`) and pushes it by digest; a last job then writes one
-  manifest list per image under every tag, so no tag moves unless both architectures built.
-  The Docker check builds and smoke tests both architectures too.
+  manifest list under every tag, so no tag moves unless both architectures built. The Docker
+  check builds both architectures too, as ansibleforms/rte does for the RTE images.
 - The controller (`docker/controller/Dockerfile`) needs only node, git, ssh, the mariadb client
   and ytt, and builds from `node:26-trixie-slim` (pinned by digest, moved by Dependabot).
 
@@ -146,7 +143,7 @@ only, so a stray `feat:` cannot make a 6.6.0.
 
 | What | Where | Used by |
 |---|---|---|
-| GitHub App `ansibleforms-release` (contents and pull requests: read and write) | installed on this repository, on `ansibleforms/website` (the release rebuilds the site), on `ansibleforms/helm-charts` (the release moves the chart's default image), on `ansibleforms/installer` (the release releases the installer), on `ansibleforms/builder` and `ansibleforms/runner` (the release releases them) and on `ansibleforms/docker` (the release tags its setup) | release.yml |
+| GitHub App `ansibleforms-release` (contents and pull requests: read and write) | installed on this repository, on `ansibleforms/website` (the release rebuilds the site), on `ansibleforms/helm-charts` (the release moves the chart's default image), on `ansibleforms/installer` (the release releases the installer), on `ansibleforms/rte`, `ansibleforms/builder` and `ansibleforms/runner` (the release and its candidates publish the RTE images, the release releases them all) and on `ansibleforms/docker` (the release tags its setup) | release.yml, rc.yml |
 | `RELEASE_APP_CLIENT_ID` | repository variable: the App's client ID | release.yml |
 | `RELEASE_APP_PRIVATE_KEY` | repository secret | release.yml |
 | ruleset on `main` and `release/*` | pull request required, squash only, required checks, no force push | everything |

@@ -108,9 +108,36 @@ jobs:
       channel: rc
     secrets: inherit
 
+  # The RTE images of the same candidate are built in ansibleforms/rte, from this pull
+  # request's commit : it publishes them under the candidate's version and latest-rc a few
+  # minutes after this image. The token comes from the release GitHub App, asked for that one
+  # repository.
+  rte:
+    name: Publish the RTE images
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: rte
+
+      - name: Send app-rc to ansibleforms/rte
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RC: ${{ needs.version.outputs.rc }}
+          SHA: ${{ needs.version.outputs.sha }}
+        run: |
+          gh api repos/ansibleforms/rte/dispatches -f event_type=app-rc \
+            -f "client_payload[version]=$RC" -f "client_payload[ref]=$SHA"
+          echo "ansibleforms/rte publishes the RTE images of $RC"
+
   comment:
     name: Comment
-    needs: [version, publish]
+    needs: [version, publish, rte]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -127,5 +154,6 @@ jobs:
             docker pull ${{ needs.version.outputs.ghcr }}-rte-core:${{ needs.version.outputs.rc }}
             ```
 
-            Also tagged `latest-rc`. Built from ${{ needs.version.outputs.sha }}.
+            Also tagged `latest-rc`. Built from ${{ needs.version.outputs.sha }}. The RTE images
+            follow a few minutes later, from [ansibleforms/rte](https://github.com/ansibleforms/rte/actions/workflows/app-rc.yml).
             Run the Release candidate workflow again to publish a newer candidate.

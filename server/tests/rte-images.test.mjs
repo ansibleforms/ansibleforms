@@ -185,9 +185,8 @@ describe("its build", () => {
     assert.equal(docker.imageRefOf(image, "https://registry.example.com/", "7.8.0"), "registry.example.com/af/rte-vmware:7.8.0");
     assert.equal(docker.imageRefOf({ ...image, registry: { ...image.registry, tag: "stable" } }, "registry.example.com", "7.8.0"), "registry.example.com/af/rte-vmware:stable");
   });
-  test("the same uv and ansible.cfg as the published layers", () => {
-    const core = fs.readFileSync(path.join(here, "..", "..", "docker", "runner", "rte-core", "Dockerfile"), "utf8");
-    assert.ok(core.includes(`FROM ${docker.UV_IMAGE} AS uv`));
+  // the uv and python against rte-core's Dockerfile : checked by ansibleforms/rte's CI, where it is built
+  test("the same ansible.cfg as the published layers", () => {
     assert.equal(fs.readFileSync(path.join(here, "..", "ansible.cfg"), "utf8").trim(), docker.ANSIBLE_CFG.trim());
   });
 });

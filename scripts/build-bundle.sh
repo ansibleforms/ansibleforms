@@ -18,8 +18,11 @@
 #     ansibleforms/bin/ytt         ytt, at the version and checksum of docker/controller/Dockerfile
 #     ansibleforms/rte/            the python requirements and collections of the RTE images
 #     ansibleforms/versions.env    the Node.js major (.nvmrc), and the Python and uv versions
-#                                  of docker/runner/rte-core/Dockerfile, which the installer installs
+#                                  of rte-core/Dockerfile, which the installer installs
 #   ansibleforms-<version>-linux-<arch>.tar.gz.sha256
+#
+# The RTE images are built in ansibleforms/rte : their requirements, collections and versions
+# are read from it, at RTE_REF (main by default, what its next publish builds from).
 
 set -euo pipefail
 
@@ -36,11 +39,19 @@ case "$(uname -m)" in
   *) echo "no bundle for $(uname -m)" >&2; exit 1 ;;
 esac
 
+# the RTE images' files, from ansibleforms/rte
+RTE_REF="${RTE_REF:-main}"
+RTE="$(mktemp -d)"
+for f in rte-core/Dockerfile rte-core/requirements.txt rte-full/requirements.txt rte-full/collections.yml; do
+  mkdir -p "$RTE/$(dirname "$f")"
+  curl -fsSL -o "$RTE/$f" "https://raw.githubusercontent.com/ansibleforms/rte/${RTE_REF}/$f"
+done
+
 # one source for each version: the files the images are built from
 arg() { sed -n "s/^ARG $1=//p" "$2" | head -1; }
 NODE_MAJOR="$(tr -d '[:space:]v' < .nvmrc)"
-PYTHON_VERSION="$(arg PYTHON_VERSION docker/runner/rte-core/Dockerfile)"
-UV_VERSION="$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' docker/runner/rte-core/Dockerfile | head -1)"
+PYTHON_VERSION="$(arg PYTHON_VERSION "$RTE/rte-core/Dockerfile")"
+UV_VERSION="$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' "$RTE/rte-core/Dockerfile" | head -1)"
 YTT_VERSION="$(arg YTT_VERSION docker/controller/Dockerfile)"
 YTT_SHA256="$(arg "YTT_SHA256_${ARCH^^}" docker/controller/Dockerfile)"
 for v in NODE_MAJOR PYTHON_VERSION UV_VERSION YTT_VERSION YTT_SHA256; do
@@ -53,7 +64,7 @@ echo "Bundle $VERSION for linux-$ARCH (Node.js $NODE_MAJOR, Python $PYTHON_VERSI
 # ─── a clean copy of what git tracks ─────────────────────────────────────────
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK" "$RTE"' EXIT
 git ls-files -z client server scripts | tar --null -T - -cf - | tar -xf - -C "$WORK"
 
 # ─── build, as the Dockerfile does ───────────────────────────────────────────
@@ -87,9 +98,9 @@ curl -fsSL -o "$STAGE/bin/ytt" "https://github.com/carvel-dev/ytt/releases/downl
 echo "$YTT_SHA256  $STAGE/bin/ytt" | sha256sum -c -
 chmod +x "$STAGE/bin/ytt"
 
-cp docker/runner/rte-core/requirements.txt "$STAGE/rte/requirements-core.txt"
-cp docker/runner/rte-full/requirements.txt "$STAGE/rte/requirements-full.txt"
-cp docker/runner/rte-full/collections.yml "$STAGE/rte/collections.yml"
+cp "$RTE/rte-core/requirements.txt" "$STAGE/rte/requirements-core.txt"
+cp "$RTE/rte-full/requirements.txt" "$STAGE/rte/requirements-full.txt"
+cp "$RTE/rte-full/collections.yml" "$STAGE/rte/collections.yml"
 
 cat > "$STAGE/versions.env" <<EOF
 VERSION=$VERSION

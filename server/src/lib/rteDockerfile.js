@@ -3,7 +3,7 @@
 /*                                                                */
 /*  An RTE image's build : what a builder is handed to build it   */
 /*  (lib/rteImages.js gives the definition). The Dockerfile, on   */
-/*  the published RTE layers as examples/rte does, and the files  */
+/*  the published RTE layers as ansibleforms/rte's examples do, and the files  */
 /*  it copies : the python packages as a requirements.txt, the    */
 /*  collections as a requirements.yml - never put on a RUN line,  */
 /*  so no value of the definition is ever run by a shell. Its OS  */
@@ -16,18 +16,18 @@ import YAML from "yaml";
 // THE BASES AND THEIR PYTHON
 // ===========================================================================
 
-// where the published RTE layers are (publish.yml)
+// where the published RTE layers are (ansibleforms/rte's publish.yml)
 export const BASE_REGISTRY = "ghcr.io/ansibleforms";
 
 // the uv that brings an image's python : the one rte-core is built with
-// (docker/runner/rte-core/Dockerfile, a test keeps the two the same)
+// (rte-core/Dockerfile of ansibleforms/rte, whose CI keeps the two the same)
 export const UV_IMAGE = "ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f";
 
-// the python the published rte-core runs (docker/runner/rte-core/Dockerfile PYTHON_VERSION) ; a
+// the python the published rte-core runs (ansibleforms/rte's rte-core/Dockerfile PYTHON_VERSION) ; a
 // runtime environment that names none gets the newest instead (DEFAULT_PYTHON)
 export const CORE_PYTHON = "3.14";
 
-// the distribution every RTE layer is built on (docker/runner/rte-base : node:26-trixie-slim)
+// the distribution every RTE layer is built on (ansibleforms/rte's rte-base : node:26-trixie-slim)
 export const RTE_OS = "Debian 13 (trixie)";
 
 // the pythons an image may run

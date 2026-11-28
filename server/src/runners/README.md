@@ -101,7 +101,7 @@ the RTE's `RTE_TOKEN`, its url the inbound RTE's address.
 | `rte/ansible-core.js` | The one place a playbook runs: `runAnsibleJob`, `buildAnsibleArgs` (no shell), `executeCommand` (process group, abort flag, output limit, job log). |
 | `models/runner.model.js` | The `runners` table: per-type validation, one default per type, masked secrets. |
 | `models/job.model.js` | `Job.launch`, `Job.continue` (approval), multistep, notifications, `Job.lastOrder`. |
-| `/docker/runner/rte-base`, `/docker/runner/rte-core`, `/docker/runner/rte-full`, `/examples/rte` | The RTE images in three layers - the base (no python, no ansible), core (ansible-core and the essentials), full (the ansible package with collections and what the v6 image had) - and examples to build your own on them. |
+| [ansibleforms/rte](https://github.com/ansibleforms/rte) | The RTE images in three layers, built there from this server: the base (no python, no ansible), core (ansible-core and the essentials), full (the ansible package with collections and what the v6 image had), and examples to build your own on them. |
 
 ### The runner contract
 
@@ -347,7 +347,7 @@ Customers make it their own by building FROM one of the three layers:
 - `ansibleforms-rte-core`, adding `RUN ansible-galaxy collection install ...` / `pip install ...` ;
 - `ansibleforms-rte-full`, ready to run with the ansible package, its collections and what the 6.5 image had.
 
-See [examples/rte](../../../examples/rte).
+See [the examples of ansibleforms/rte](https://github.com/ansibleforms/rte/tree/main/examples).
 
 ## Security
 
