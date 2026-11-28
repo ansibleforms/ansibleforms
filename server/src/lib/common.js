@@ -202,8 +202,49 @@ Helpers.friendlyAJVError= (e,property,label,o)=>{
   }
   return result
 }
-Helpers.formatOutput = (records,asText)=>{
+// An RTE build's output (job_type build) : BuildKit's plain progress, its steps in blocks as the
+// builder writes them (#N, its number, first). A blank line before each step, its title (its first
+// line) bold, DONE green, CACHED cyan, ERROR and CANCELED red ; Pushed and Signed amber, as a
+// changed line ; the controller's ok: line green ; the error stream red. ANSI codes a line may
+// carry are dropped.
+//
+// Args:
+//   records (object[]): the output's records, { output, output_type }.
+//
+// Returns:
+//   string: the lines as html, joined with \r\n.
+Helpers.formatBuildOutput = (records)=>{
+  const lines=[]
+  // the step of the line before : its number, "" for a line of none, null before any
+  let last=null
+  for(const el of records){
+    // eslint-disable-next-line no-control-regex -- \x1B is the ANSI escape byte dropped
+    const record=String(el.output??"").replace(/\r/g,"").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g,"")
+    for(const line of record.split("\n")){
+      if(!line.trim()) continue
+      const step=line.match(/^#(\d+) (.*)$/)
+      const key=step ? step[1] : ""
+      const fresh=key!==last
+      if(fresh && last!==null) lines.push("")
+      last=key
+      const escaped=Helpers.htmlEscape(line)
+      let cls=""
+      if(el.output_type=="stderr") cls="has-text-danger"
+      else if(step && fresh) cls="has-text-weight-bold"
+      else if(step && /^DONE\b/.test(step[2])) cls="has-text-success"
+      else if(step && /^CACHED\b/.test(step[2])) cls="has-text-info"
+      else if(step && /^(ERROR|CANCELED)\b/.test(step[2])) cls="has-text-danger"
+      else if(!step && /^ERROR\b/.test(line)) cls="has-text-danger"
+      else if(!step && /^(Pushed|Signed) /.test(line)) cls="has-text-warning"
+      else if(!step && /^ok: \[/.test(line)) cls="has-text-success"
+      lines.push(`<span class='${cls}'>${escaped}</span>`)
+    }
+  }
+  return lines.join("\r\n")
+}
+Helpers.formatOutput = (records,asText,jobType)=>{
   var output=[] // => is final output array
+  if(!asText && jobType==="build") return Helpers.formatBuildOutput(records)
   if(asText){
       // we loop all records, we generalize all newlines to \r\n (output can be mix)
       records.forEach(function(el){
