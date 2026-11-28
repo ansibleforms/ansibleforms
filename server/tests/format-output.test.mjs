@@ -153,3 +153,26 @@ test("an RTE build's steps come out in blocks, coloured", () => {
 test("a build's output as text is left as it is", () => {
   assert.equal(Helpers.formatOutput([record("#1 DONE 0.1s")], true, "build"), "#1 DONE 0.1s");
 });
+
+// BuildKit says a step again as it does more of it, and a layer's progress every few hundred ms
+test("an RTE build's step comes out once, its layers' progress and DONE their last line only", () => {
+  const d = "sha256:" + "a".repeat(64);
+  const out = Helpers.formatOutput(
+    [
+      record("#8 [stage-1 1/12] FROM base\n#8 " + d + " 1MB / 9MB 0.2s\n#7 [uv 1/1] FROM uv\n#8 ..."),
+      record("#8 " + d + " 9MB / 9MB 0.9s done\n#8 DONE 1.0s\n#7 DONE 0.5s"),
+      record("#8 [stage-1 1/12] FROM base\n#8 extracting " + d + "\n#8 extracting " + d + " 1.3s done\n#8 DONE 2.4s"),
+    ],
+    false,
+    "build",
+  );
+  assert.deepEqual(out.split("\r\n"), [
+    "<span class='has-text-weight-bold'>#8 [stage-1 1/12] FROM base</span>",
+    `<span class=''>#8 ${d} 9MB / 9MB 0.9s done</span>`,
+    `<span class=''>#8 extracting ${d} 1.3s done</span>`,
+    "<span class='has-text-success'>#8 DONE 2.4s</span>",
+    "",
+    "<span class='has-text-weight-bold'>#7 [uv 1/1] FROM uv</span>",
+    "<span class='has-text-success'>#7 DONE 0.5s</span>",
+  ]);
+});
