@@ -99,9 +99,9 @@ describe('the list', () => {
     expect(list.selectable).toBe(false);
   });
 
-  it("has the scheduled jobs' columns : name, when it runs, last run, next run, status", () => {
+  it("has the scheduled jobs' columns : enabled, name, when it runs, last run, next run, status", () => {
     const shown = list.fields.filter((f) => !f.hidden).map((f) => f.key);
-    expect(shown).toEqual(['name', 'cron', 'last_run', 'next_run', 'status']);
+    expect(shown).toEqual(['switched_on', 'name', 'cron', 'last_run', 'next_run', 'status']);
   });
 
   it('says when a task runs in words, its cron on hover', () => {
@@ -235,6 +235,14 @@ describe("a task's page", () => {
     );
     expect(page).toMatch(/lastRun\.value\?\.outcome === 'failed' \? lastRun\.value\.result/);
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
+  });
+
+  it("has the Scheduled list's Enabled column first, its page's switch", () => {
+    const fields = getSettings(t).system_tasks.fields;
+    const shown = fields.filter((f) => !f.hidden).map((f) => f.key);
+    expect(shown[0]).toBe('switched_on');
+    expect(fields.find((f) => f.key === 'switched_on')).toMatchObject({ type: 'checkbox', noInput: true });
+    expect(fields.find((f) => f.key === 'switched_on').label).toBe(t('settings.schedules.enabled'));
   });
 
   it("has the Scheduled list's columns in its order : Last run, Next run, Status", () => {
