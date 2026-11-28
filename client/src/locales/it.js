@@ -3258,6 +3258,9 @@ export default {
     jobTitle: 'Job {id}',
     output: 'Output',
     launchedBy: 'Avviato da',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'Nome RTE',
+    rteBuilder: 'Builder RTE',
     playbook: 'playbook',
     template: 'modello',
     awxJob: 'Job AWX',

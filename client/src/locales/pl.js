@@ -3265,6 +3265,9 @@ export default {
     jobTitle: 'Zadanie {id}',
     output: 'Wynik',
     launchedBy: 'Uruchomione przez',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'Nazwa RTE',
+    rteBuilder: 'Builder RTE',
     playbook: 'playbook',
     template: 'szablon',
     awxJob: 'Zadanie AWX',
