@@ -1,8 +1,8 @@
 name: Docker
 
-# Builds the images (the app and the three RTE layers) without publishing them, and runs a
-# playbook on the RTE, so "does the image still assemble and work" is answered at review time
-# instead of by hand during publish.sh. Built on amd64 and on arm64, each on a runner of its
+# Builds the controller's image without publishing it, so "does the image still assemble" is
+# answered at review time instead of during a publish. The RTE images are built and tested in
+# ansibleforms/rte, against this repository's main. Built on amd64 and on arm64, each on a runner of its
 # own, as publish.yml does. Path-filtered because it is the slow one - it runs npm ci and a
 # vite build inside the image - and for that reason it is not a check worth requiring in
 # branch protection.
@@ -12,7 +12,6 @@ on:
     branches: [main, 'release/**']
     paths:
       - 'docker/**'
-      - 'server/ansible.cfg'
       - 'server/healthcheck.js'
       - 'client/package.json'
       - 'client/package-lock.json'
@@ -42,19 +41,10 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    # a registry for this job only : the RTE layers build on one another through it
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
       - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v4
-        with:
-          # the builder reaches the job's registry on localhost
-          driver-opts: network=host
 
       - name: Build (no push)
         uses: docker/build-push-action@v7
@@ -69,87 +59,3 @@ jobs:
             GIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=app-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=app-${{ matrix.arch }}
-
-      # The RTE layers build FROM one another : each is pushed to a registry that lives only
-      # for this job, and the next one builds on it by digest, as publish.yml does on ghcr
-      - name: Build the RTE base (no publish)
-        id: rte_base
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/runner/rte-base/Dockerfile
-          push: true
-          tags: localhost:5000/ansibleforms-rte-base:ci
-          build-args: |
-            GIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=rte-base-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=rte-base-${{ matrix.arch }}
-
-      - name: Build the RTE (no publish)
-        id: rte
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/runner/rte-core/Dockerfile
-          push: true
-          tags: localhost:5000/ansibleforms-rte-core:ci
-          build-args: |
-            BASE_IMAGE=localhost:5000/ansibleforms-rte-base@${{ steps.rte_base.outputs.digest }}
-          cache-from: type=gha,scope=rte-core-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=rte-core-${{ matrix.arch }}
-
-      - name: Build the RTE full (no publish)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/runner/rte-full/Dockerfile
-          push: true
-          tags: localhost:5000/ansibleforms-rte-full:ci
-          build-args: |
-            BASE_IMAGE=localhost:5000/ansibleforms-rte-core@${{ steps.rte.outputs.digest }}
-          cache-from: type=gha,scope=rte-full-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=rte-full-${{ matrix.arch }}
-
-      # An image that builds can still run nothing : a python ansible does not support, a
-      # library without a wheel, a collection that fails to load. Run a playbook on both
-      # runnable layers, and on -full a collection module, the libraries 6.5 playbooks use and
-      # ytt (a binary per architecture : the wrong one does not even start).
-      - name: Smoke test the RTE images
-        run: |
-          set -euo pipefail
-          mkdir -p smoke
-          cat > smoke/core.yml <<'YAML'
-          - hosts: localhost
-            gather_facts: false
-            tasks:
-              - ansible.builtin.assert:
-                  that: "({'a': 1} | ansible.builtin.dict2items | map(attribute='key') | list) == ['a']"
-          YAML
-          cat > smoke/full.yml <<'YAML'
-          - hosts: localhost
-            gather_facts: false
-            tasks:
-              - community.general.read_csv:
-                  path: /etc/passwd
-                  delimiter: ':'
-                  fieldnames: [user, x, uid]
-                register: rows
-              - ansible.builtin.assert:
-                  that: rows.list | length > 0
-          YAML
-          for layer in core full; do
-            image="localhost:5000/ansibleforms-rte-$layer:ci"
-            docker pull -q "$image"
-            echo "::group::rte-$layer"
-            docker run --rm --entrypoint sh -v "$PWD/smoke:/smoke:ro" "$image" -c \
-              'python --version && ansible --version | head -1 && ansible-playbook /smoke/core.yml'
-            echo "::endgroup::"
-          done
-          docker run --rm --entrypoint sh -v "$PWD/smoke:/smoke:ro" localhost:5000/ansibleforms-rte-full:ci -c '
-            ansible-playbook /smoke/full.yml &&
-            for c in netapp.ontap netapp.elementsw netapp.um_info netapp.storagegrid amazon.aws community.general community.mysql; do
-              ansible-galaxy collection list "$c" >/dev/null 2>&1 || { echo "missing collection $c"; exit 1; }
-            done &&
-            python -c "import pandas, pyVmomi, boto3, netapp_ontap, netapp_lib, solidfire, hvac, lxml, openpyxl, pymysql, bs4, yaml" &&
-            ytt version &&
-            echo "rte-full : playbook, collections and libraries ok"'

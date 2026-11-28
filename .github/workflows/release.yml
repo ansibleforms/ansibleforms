@@ -16,8 +16,9 @@ name: Release
 #
 # A release also rebuilds ansibleforms.com : the site (ansibleforms/website) pulls
 # CHANGELOG.md and server/help.yaml from here when it is built. It moves the Helm chart's
-# default image (ansibleforms/helm-charts) and releases the installer, the RTE builder and the RTE
-# Runner with the same version (ansibleforms/installer, ansibleforms/builder, ansibleforms/runner).
+# default image (ansibleforms/helm-charts) and releases the installer, the RTE images, the RTE
+# builder and the RTE Runner with the same version (ansibleforms/installer, ansibleforms/rte,
+# ansibleforms/builder, ansibleforms/runner).
 
 on:
   push:
@@ -225,6 +226,34 @@ jobs:
         run: |
           gh api repos/ansibleforms/builder/dispatches -f event_type=app-release -f "client_payload[tag]=$TAG"
           echo "ansibleforms/builder releases $TAG"
+
+  # Tells ansibleforms/rte about the release, so the RTE images (ansibleforms-rte-base, -rte-core
+  # and -rte-full) of this version are published : its Follow app release workflow builds them
+  # from this repository's server at the tag, pushes them under the release's tags and releases
+  # that repository at the same version. The Helm chart, the installer and the docker setup
+  # wait for them. The token comes from the same GitHub App, asked for that one repository.
+  # Should this job fail, run "Follow app release" in ansibleforms/rte by hand with the version.
+  rte:
+    name: Publish the RTE images
+    needs: [release-please, publish]
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: rte
+
+      - name: Send app-release to ansibleforms/rte
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          gh api repos/ansibleforms/rte/dispatches -f event_type=app-release -f "client_payload[tag]=$TAG"
+          echo "ansibleforms/rte publishes the RTE images of $TAG"
 
   # Tells ansibleforms/runner about the release, so the RTE Runner (in Go) is released with the
   # same version : its Follow app release workflow checks the socket contract is still the Runner's,

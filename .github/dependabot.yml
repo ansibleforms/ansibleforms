@@ -47,37 +47,17 @@ updates:
     commit-message:
       prefix: ci
 
-  # Moves the digest pins (one Dockerfile per image folder) : node:26-trixie(-slim) in
-  # docker/controller, node:26-trixie-slim in docker/runner/rte-base, and the uv image
-  # docker/runner/rte-core takes its python from. rte-core and rte-full otherwise build FROM our
-  # own layers (BASE_IMAGE).
+  # Moves the digest pins of node:26-trixie(-slim) in docker/controller. The RTE images' pins
+  # are moved in ansibleforms/rte, where they are built.
   - package-ecosystem: docker
     open-pull-requests-limit: 100
     directories:
       - /docker/controller
-      - /docker/runner/*
     schedule:
       interval: daily
     commit-message:
       prefix: build
       include: scope
-
-  # The python packages of the RTE images (docker/runner/rte-core for ansibleforms-rte-core,
-  # docker/runner/rte-full for ansibleforms-rte-full) : pinned, so an image changes only with a commit here
-  - package-ecosystem: pip
-    open-pull-requests-limit: 100
-    directories:
-      - /docker/runner/rte-core
-      - /docker/runner/rte-full
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: build
-      include: scope
-    # boto3 pins its own botocore release : bumped apart, each pull request fails to install
-    groups:
-      boto:
-        patterns: ['boto3', 'botocore']
 
   # The maintenance line (release/6.x) : patch updates only - a minor of a dependency is
   # no business of a patch release. Dependabot reads this file from main only, so the

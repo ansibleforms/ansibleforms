@@ -1,8 +1,9 @@
 name: Publish
 
-# Builds and pushes the images, all with the same tags : the controller (ansibleforms,
-# docker/controller) and the runtime environment that runs its playbooks, in three layers -
-# ansibleforms-rte-base, ansibleforms-rte-core and ansibleforms-rte-full (docker/runner/rte-*).
+# Builds and pushes the controller's image (ansibleforms, docker/controller). The runtime
+# environment that runs its playbooks, ansibleforms-rte-base, -rte-core and -rte-full, is built
+# in ansibleforms/rte from this repository's server, under the same tags : release.yml and
+# rc.yml tell it, and it refreshes its own every week.
 # Called by release.yml when a release is created, by rc.yml for a release candidate and by
 # refresh-images.yml every week.
 # "Run workflow" re-publishes an existing release tag, for when a push failed half way. The
@@ -16,8 +17,8 @@ name: Publish
 #
 # Every image is multi-arch : linux/amd64 and linux/arm64 under the same tags. Each
 # architecture is built on a runner of its own (ubuntu-latest and ubuntu-24.04-arm, no
-# emulation) and pushed by digest only, without a tag. Once both have built all four images,
-# the merge job writes one manifest list per image under every tag. So a tag never moves to a
+# emulation) and pushed by digest only, without a tag. Once both have built the image, the
+# merge job writes one manifest list under every tag. So a tag never moves to a
 # half-built set : when a build fails on either architecture, no tag moves at all.
 #
 #   prepare (Dockerfiles) -> build amd64 + build arm64 (in parallel) -> merge (tags)
@@ -86,9 +87,6 @@ jobs:
       sha_short: ${{ steps.v.outputs.sha_short }}
       ghcr: ${{ steps.v.outputs.ghcr }}
       controller_file: ${{ steps.files.outputs.controller }}
-      rte_base_file: ${{ steps.files.outputs.rte_base }}
-      rte_core_file: ${{ steps.files.outputs.rte_core }}
-      rte_full_file: ${{ steps.files.outputs.rte_full }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -125,22 +123,20 @@ jobs:
           fi
           echo "manifest and release agree on $VERSION"
 
-      # Releases up to 7.5.0 keep their Dockerfiles at the root (Dockerfile, Dockerfile.rte-*) ;
-      # later ones in docker/controller and docker/runner/rte-*. A re-publish or a refresh of an
-      # older tag builds from the layout that tag has.
-      - name: Find the Dockerfiles
+      # Releases up to 7.5.0 keep their Dockerfile at the root ; later ones in
+      # docker/controller. A re-publish or a refresh of an older tag builds from the layout that
+      # tag has.
+      - name: Find the Dockerfile
         id: files
         run: |
           if [ -f docker/controller/Dockerfile ]; then
             echo "controller=docker/controller/Dockerfile" >> "$GITHUB_OUTPUT"
-            for l in base core full; do echo "rte_$l=docker/runner/rte-$l/Dockerfile" >> "$GITHUB_OUTPUT"; done
           else
             echo "controller=Dockerfile" >> "$GITHUB_OUTPUT"
-            for l in base core full; do echo "rte_$l=Dockerfile.rte-$l" >> "$GITHUB_OUTPUT"; done
           fi
           cat "$GITHUB_OUTPUT"
 
-  # ─── the four images for one architecture, on a runner of that architecture ───
+  # ─── the image for one architecture, on a runner of that architecture ───
   # Pushed by digest only : no tag moves here. The digests go to the merge job as an artifact.
   build:
     name: Build (${{ matrix.arch }})
@@ -195,71 +191,13 @@ jobs:
           no-cache: ${{ inputs.refresh == true }}
           cache-to: type=gha,mode=max,scope=app-${{ matrix.arch }}
 
-      # The RTE in three layers, each FROM the one before, by the digest this job just pushed :
-      # never a stale layer under a new one, and always the layer of the same architecture
-      - name: Build and push the RTE base
-        id: rte_base
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ needs.prepare.outputs.rte_base_file }}
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,name=${{ env.GHCR }}-rte-base,push-by-digest=true,name-canonical=true,push=true
-          build-args: |
-            GIT_SHA=${{ needs.prepare.outputs.sha_short }}
-            BUILD_TIME=${{ needs.prepare.outputs.build_time }}
-            VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=rte-base-${{ matrix.arch }}
-          # a refresh builds every layer again : the apt packages and collections are the point
-          no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-base-${{ matrix.arch }}
-
-      - name: Build and push the RTE
-        id: rte
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ needs.prepare.outputs.rte_core_file }}
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,name=${{ env.GHCR }}-rte-core,push-by-digest=true,name-canonical=true,push=true
-          build-args: |
-            BASE_IMAGE=${{ env.GHCR }}-rte-base@${{ steps.rte_base.outputs.digest }}
-            VERSION=${{ env.VERSION }}
-          cache-from: type=gha,scope=rte-core-${{ matrix.arch }}
-          # a refresh builds every layer again : the apt packages and collections are the point
-          no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-core-${{ matrix.arch }}
-
-      - name: Build and push the RTE (full)
-        id: rte_full
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ needs.prepare.outputs.rte_full_file }}
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,name=${{ env.GHCR }}-rte-full,push-by-digest=true,name-canonical=true,push=true
-          build-args: |
-            BASE_IMAGE=${{ env.GHCR }}-rte-core@${{ steps.rte.outputs.digest }}
-            VERSION=${{ env.VERSION }}
-            TARGETARCH=${{ matrix.arch }}
-          cache-from: type=gha,scope=rte-full-${{ matrix.arch }}
-          # a refresh builds every layer again : the apt packages and collections are the point
-          no-cache: ${{ inputs.refresh == true }}
-          cache-to: type=gha,mode=max,scope=rte-full-${{ matrix.arch }}
-
-      # one file per image, named after it, holding the digest of this architecture
-      - name: Keep the digests
+      # a file named after the image, holding the digest of this architecture
+      - name: Keep the digest
         env:
           APP: ${{ steps.app.outputs.digest }}
-          RTE_BASE: ${{ steps.rte_base.outputs.digest }}
-          RTE_CORE: ${{ steps.rte.outputs.digest }}
-          RTE_FULL: ${{ steps.rte_full.outputs.digest }}
         run: |
           mkdir -p digests
           echo "$APP" > digests/app
-          echo "$RTE_BASE" > digests/rte-base
-          echo "$RTE_CORE" > digests/rte-core
-          echo "$RTE_FULL" > digests/rte-full
           head digests/*
 
       - uses: actions/upload-artifact@v7
@@ -336,21 +274,9 @@ jobs:
           tags="${tags#,}"
           echo "APP_TAGS=$tags" >> "$GITHUB_ENV"
           echo "$tags" | tr ',' '\n'
-          # the three RTE layers (docker/runner/rte-base, rte-core, rte-full) : the same tags on
-          # their own image names
-          for image in rte-base rte-core rte-full; do
-            list=""
-            for n in $names; do
-              list="$list,$ghcr-$image:$n"
-            done
-            list="${list#,}"
-            name="${image//-/_}"
-            echo "${name^^}_TAGS=$list" >> "$GITHUB_ENV"
-            echo "$list" | tr ',' '\n'
-          done
 
       # imagetools copies nothing : the manifest list points at the images the build jobs
-      # pushed, in the same repository. Every tag of an image gets the same list.
+      # pushed, in the same repository. Every tag gets the same list.
       - name: Create the manifest lists
         run: |
           set -euo pipefail
@@ -366,9 +292,6 @@ jobs:
             echo "::endgroup::"
           }
           tag "$GHCR" "$APP_TAGS" app
-          tag "$GHCR-rte-base" "$RTE_BASE_TAGS" rte-base
-          tag "$GHCR-rte-core" "$RTE_CORE_TAGS" rte-core
-          tag "$GHCR-rte-full" "$RTE_FULL_TAGS" rte-full
 
       - name: Summary
         run: |
@@ -379,9 +302,6 @@ jobs:
             echo ""
             echo '```'
             echo "$APP_TAGS" | tr ',' '\n'
-            echo "$RTE_BASE_TAGS" | tr ',' '\n'
-            echo "$RTE_CORE_TAGS" | tr ',' '\n'
-            echo "$RTE_FULL_TAGS" | tr ',' '\n'
             echo '```'
             echo ""
             echo "from \`$SHA\`"

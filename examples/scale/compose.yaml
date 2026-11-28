@@ -49,7 +49,7 @@ services:
   # keeps one WebSocket open, from the controller node that holds it : the RTE holds no database
   # credentials, so it does not read the .env, and it is not published on the host. Its runner
   # 'rte' is declared by the config seed (seed.yaml). ansible with its collections ;
-  # ansibleforms-rte-core is the smaller one to build your own on (examples/rte)
+  # ansibleforms-rte-core is the smaller one to build your own on (ansibleforms/rte's examples)
   rte:
     image: ghcr.io/ansibleforms/ansibleforms-rte-full:7
     restart: unless-stopped
