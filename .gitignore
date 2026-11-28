@@ -73,3 +73,6 @@ server/views
 # Playwright's results and report (client/e2e)
 test-results
 playwright-report
+
+# local Claude Code settings, never in the repository
+.claude/
