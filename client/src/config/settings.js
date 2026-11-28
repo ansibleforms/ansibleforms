@@ -1984,6 +1984,14 @@ export default function getSettings(t) {
       fields: [
         { key: 'key', hidden: true, noInput: true },
         {
+          // first, as the scheduled jobs' : whether it runs on its schedule, as its page's Enabled
+          // switch says (the setting, else on)
+          key: 'switched_on',
+          label: t('settings.schedules.enabled'),
+          type: 'checkbox',
+          noInput: true,
+        },
+        {
           // in the user's language, from its key (the server's English for a task it does not know)
           key: 'name',
           icon: 'heading',
