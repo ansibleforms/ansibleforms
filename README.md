@@ -47,8 +47,7 @@ The [installation guide](https://ansibleforms.com/installation) covers every opt
 
 ## Release lines
 
-Two major versions are maintained, each on its own branch with its own changelog and image tags.
-Coming from 6? Read [Upgrading to 7](https://ansibleforms.com/upgrade-7) before you move over.
+Two major versions are maintained, each on its own branch; coming from 6, read [Upgrading to 7](https://ansibleforms.com/upgrade-7) first.
 
 | Branch | Version | Status |
 |---|---|---|
