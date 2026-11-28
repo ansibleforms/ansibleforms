@@ -417,10 +417,16 @@ async function loadItems(force = true) {
   // the rows the list shows : all, or those settings.rowFilter keeps (the runners waiting for
   // approval are in a table of their own above it)
   const rows = await loadList(objectType, isFlat, undefined, props.settings.listQuery || '');
-  itemList.value =
+  const kept =
     typeof props.settings.rowFilter === 'function' && Array.isArray(rows)
       ? rows.filter(props.settings.rowFilter)
       : rows;
+  // in the order settings.rowOrder says (a compare function), before a column is clicked : the
+  // system jobs A to Z by their name in the user's language ; else as the server sends them
+  itemList.value =
+    typeof props.settings.rowOrder === 'function' && Array.isArray(kept)
+      ? [...kept].sort(props.settings.rowOrder)
+      : kept;
   // kept for the records' pages : which buttons a record has, before it is read (lib/recordButtons.js)
   rememberRows(objectType, itemList.value);
   // Drop selected rows that are no longer there. resetSelection() clears the SINGLE

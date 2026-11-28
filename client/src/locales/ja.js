@@ -3334,44 +3334,50 @@ export default {
       notFound: '{key} という名前のシステム処理はありません。',
       tasks: {
         abandonedJobs: {
-          name: '放棄されたジョブ',
-          description: '出力がないまま1日経ち、どのランナーも受け取らなかったジョブを終了します。',
+          name: '放棄されたジョブを終了',
+          description: 'ランナーが取らず1日出力のないジョブを終了します。',
         },
         deadNodes: {
-          name: '停止したノード',
-          description: '応答しなくなったノードとランナーが保持していたものを解放します。',
+          name: '停止したノードを解放',
+          description: '応答しないノードとランナーが保持していたものを解放します。',
         },
-        scheduleEnds: { name: 'スケジュールの終了', description: '終了に達したスケジュールを無効化または削除します。' },
-        tokenCleanup: {
-          name: '期限切れトークン',
-          description: '期限切れのサインイントークン、失効情報、API トークンを削除します。',
+        scheduleEnds: {
+          name: '終わったスケジュールを終了',
+          description: '終了に達したスケジュールを無効化または削除します。',
         },
-        auditCleanup: { name: '監査ログの整理', description: '保持期間より古い監査ログのエントリを削除します。' },
-        jobCleanup: { name: 'ジョブの整理', description: 'ジョブの保持期間より古い完了済みジョブを削除します。' },
+        tokenCleanup: { name: '期限切れトークンを削除', description: '期限切れのトークンとその失効記録を削除します。' },
+        auditCleanup: {
+          name: '古い監査エントリを削除',
+          description: '保持期間を過ぎた監査ログのエントリを削除します。',
+        },
+        jobCleanup: { name: '古いジョブを削除', description: '保持期間を過ぎた終了済みジョブを出力ごと削除します。' },
         nightlyBackup: {
-          name: '夜間バックアップ',
-          description: 'データベースをバックアップし、古い夜間バックアップを削除します。',
+          name: 'データベースをバックアップ',
+          description: 'データベースをバックアップし、新しいものだけ残します。',
         },
         storedJobsCleanup: {
-          name: '保存済みジョブの整理',
-          description: '期限切れまたは未使用の保存済みジョブと古いノードを削除します。',
+          name: '未使用の保存済みジョブを削除',
+          description: '期限切れや未使用の保存済みジョブと古いノードを削除します。',
         },
         scheduleResync: {
-          name: 'スケジュール再同期',
-          description: 'いずれかのノードで変更されたスケジュールとリポジトリのプルを登録します。',
+          name: 'スケジュールを同期',
+          description: 'スケジューラを保存済みのスケジュールとプルに合わせます。',
         },
-        runnerDispatch: { name: 'ランナーへの配布', description: '待機中のジョブとキャンセルをランナーに渡します。' },
+        runnerDispatch: {
+          name: 'ジョブをランナーへ送信',
+          description: '待機中のジョブと中止要求をランナーへ渡します。',
+        },
         runnerDial: {
-          name: 'インバウンド接続',
-          description: 'このノードが保持できるインバウンドランナーに接続します。',
+          name: 'インバウンドランナーへ接続',
+          description: 'このノードが担当するインバウンドランナーへ接続します。',
         },
         runnerPrune: {
-          name: '終了ジョブの整理',
-          description: '他所で終了したジョブについて保持していたものを解放します。',
+          name: '古いランナージョブを整理',
+          description: '他のノードで終了したランナージョブの記録を破棄します。',
         },
         configSeedReload: {
-          name: '構成シードの再読み込み',
-          description: 'ファイルが変わったときに構成シードを再適用します。',
+          name: '構成シードを再適用',
+          description: '構成シードファイルの内容が変わると再適用します。',
         },
       },
     },
