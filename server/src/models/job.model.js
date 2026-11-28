@@ -1289,7 +1289,7 @@ Job.findById = async function (user, id, asText, logSafe = false) {
     );
 
     // the job log file a playbook writes is stored on the job by the runner (jobs.job_log)
-    return { ...job, ...{ output: Helpers.formatOutput(res, asText), job_log: job.job_log ?? null } };
+    return { ...job, ...{ output: Helpers.formatOutput(res, asText, job.job_type), job_log: job.job_log ?? null } };
   } catch (err) {
     // Rethrow. This used to `return []`, which swallowed the AccessDeniedError thrown a
     // few lines up - the comment above already described the symptom while the cause was

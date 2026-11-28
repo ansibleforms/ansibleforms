@@ -109,3 +109,76 @@ test("a workflow summary's lines : black, the status alone in its colour, the st
   assert.match(out, /<span class='has-text-danger'>failed<\/span>/);
   assert.match(out, /<span class='has-text-info'>skipped<\/span>/);
 });
+
+// an RTE build's output (job_type build) : BuildKit's steps, a blank line before each, coloured
+test("an RTE build's steps come out in blocks, coloured", () => {
+  const out = Helpers.formatOutput(
+    [
+      record("ok: [Building runtime environment x]"),
+      record("Building localhost:5000/af/x:7.9.0 on builder 'b'"),
+      record("\x1b[1m#1 [internal] load <Dockerfile>\x1b[0m\n#1 transferring\n#1 DONE 0.1s"),
+      record("#2 FROM base\n#2 CACHED"),
+      record("#3 RUN false\n#3 ERROR: exit code: 1\n#4 RUN x\n#4 CANCELED"),
+      record("ERROR: failed to solve\n\nPushed localhost:5000/af/x@sha256:1"),
+      record("Signed localhost:5000/af/x@sha256:1"),
+      record("the build failed", "stderr"),
+    ],
+    false,
+    "build",
+  );
+  assert.deepEqual(out.split("\r\n"), [
+    "<span class='has-text-success'>ok: [Building runtime environment x]</span>",
+    "<span class=''>Building localhost:5000/af/x:7.9.0 on builder &#39;b&#39;</span>",
+    "",
+    "<span class='has-text-weight-bold'>#1 [internal] load &lt;Dockerfile&gt;</span>",
+    "<span class=''>#1 transferring</span>",
+    "<span class='has-text-success'>#1 DONE 0.1s</span>",
+    "",
+    "<span class='has-text-weight-bold'>#2 FROM base</span>",
+    "<span class='has-text-info'>#2 CACHED</span>",
+    "",
+    "<span class='has-text-weight-bold'>#3 RUN false</span>",
+    "<span class='has-text-danger'>#3 ERROR: exit code: 1</span>",
+    "",
+    "<span class='has-text-weight-bold'>#4 RUN x</span>",
+    "<span class='has-text-danger'>#4 CANCELED</span>",
+    "",
+    "<span class='has-text-danger'>ERROR: failed to solve</span>",
+    "<span class='has-text-warning'>Pushed localhost:5000/af/x@sha256:1</span>",
+    "<span class='has-text-warning'>Signed localhost:5000/af/x@sha256:1</span>",
+    "<span class='has-text-danger'>the build failed</span>",
+  ]);
+});
+
+test("a build's output as text is left as it is", () => {
+  assert.equal(Helpers.formatOutput([record("#1 DONE 0.1s")], true, "build"), "#1 DONE 0.1s");
+});
+
+// BuildKit says a step again as it does more of it, and a layer's progress every few hundred ms
+test("an RTE build's step comes out once, its layers' progress and DONE their last line only", () => {
+  const d = "sha256:" + "a".repeat(64);
+  const out = Helpers.formatOutput(
+    [
+      record("#8 [stage-1 1/12] FROM base\n#8 " + d + " 1MB / 9MB 0.2s\n#7 [uv 1/1] FROM uv\n#8 ..."),
+      record("#8 " + d + " 9MB / 9MB 0.9s done\n#8 DONE 1.0s\n#7 DONE 0.5s"),
+      record("#8 [stage-1 1/12] FROM base\n#8 extracting " + d + "\n#8 extracting " + d + " 1.3s done\n#8 DONE 2.4s"),
+      record("#22 exporting to image\n#22 pushing layers\n#22 pushing layers 2.0s done\n#22 resolve x\n#22 resolve x\n#22 DONE 3s"),
+    ],
+    false,
+    "build",
+  );
+  assert.deepEqual(out.split("\r\n"), [
+    "<span class='has-text-weight-bold'>#8 [stage-1 1/12] FROM base</span>",
+    `<span class=''>#8 ${d} 9MB / 9MB 0.9s done</span>`,
+    `<span class=''>#8 extracting ${d} 1.3s done</span>`,
+    "<span class='has-text-success'>#8 DONE 2.4s</span>",
+    "",
+    "<span class='has-text-weight-bold'>#7 [uv 1/1] FROM uv</span>",
+    "<span class='has-text-success'>#7 DONE 0.5s</span>",
+    "",
+    "<span class='has-text-weight-bold'>#22 exporting to image</span>",
+    "<span class=''>#22 pushing layers 2.0s done</span>",
+    "<span class=''>#22 resolve x</span>",
+    "<span class='has-text-success'>#22 DONE 3s</span>",
+  ]);
+});

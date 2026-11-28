@@ -202,8 +202,89 @@ Helpers.friendlyAJVError= (e,property,label,o)=>{
   }
   return result
 }
-Helpers.formatOutput = (records,asText)=>{
+// An RTE build's output (job_type build) : BuildKit's plain progress, which mixes the steps it runs
+// side by side (#7, #8, #7 again) and says a step again each time it does more of it. Laid out
+// here, on the whole output, so a page shows it the same while it runs and after :
+//   - each step in one block, where it first came, a blank line before it ; its title once, bold
+//   - a layer's progress (sha256:..., extracting sha256:...) its last line only, and a line said
+//     again or with how it went (pushing layers, then pushing layers 2.0s done) the last one
+//   - DONE green (its last one only), CACHED cyan, ERROR and CANCELED red
+//   - the lines of no step as they come : Pushed and Signed amber, as a changed line ; the
+//     controller's ok: line green ; an ERROR line and the error stream red
+// ANSI codes a line may carry are dropped.
+//
+// Args:
+//   records (object[]): the output's records, { output, output_type }.
+//
+// Returns:
+//   string: the lines as html, joined with \r\n.
+Helpers.formatBuildOutput = (records)=>{
+  // the blocks in their order : { step (its number, null for lines of none), lines: [{ text, stderr }],
+  // and a step's title, its layers (where each one's line is) and how it ended (end) }
+  const blocks=[]
+  const byStep=new Map()
+  for(const el of records){
+    // eslint-disable-next-line no-control-regex -- \x1B is the ANSI escape byte dropped
+    const record=String(el.output??"").replace(/\r/g,"").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g,"")
+    const stderr=el.output_type=="stderr"
+    for(const text of record.split("\n")){
+      if(!text.trim()) continue
+      const step=text.match(/^#(\d+) (.*)$/)
+      if(!step){
+        const lastBlock=blocks[blocks.length-1]
+        if(lastBlock && lastBlock.step===null) lastBlock.lines.push({text,stderr})
+        else blocks.push({step:null,lines:[{text,stderr}]})
+        continue
+      }
+      const [,id,rest]=step
+      let block=byStep.get(id)
+      if(!block){
+        block={step:id,title:text,lines:[{text,stderr}],layers:new Map()}
+        byStep.set(id,block)
+        blocks.push(block)
+        continue
+      }
+      // its title again, and "#N ..." (BuildKit left it a while) : nothing new
+      if(text===block.title || rest==="...") continue
+      // a layer's progress : its last line, where its first one was
+      const layer=rest.match(/^((?:extracting )?sha256:[0-9a-f]+)\b/)
+      if(layer){
+        const at=block.layers.get(layer[1])
+        if(at!==undefined){ block.lines[at]={text,stderr}; continue }
+        block.layers.set(layer[1],block.lines.length)
+      }
+      // how it ended (DONE, CACHED, ERROR, CANCELED) : its last one, written at its end
+      if(/^(DONE|CACHED|ERROR|CANCELED)\b/.test(rest)){ block.end={text,stderr}; continue }
+      // the line before said again, or with how it went (pushing layers, then pushing layers 2.0s
+      // done) : the last one only
+      const prev=block.lines.length>1 ? block.lines[block.lines.length-1] : null
+      if(prev && (text===prev.text || text.startsWith(prev.text+" "))){ block.lines[block.lines.length-1]={text,stderr}; continue }
+      block.lines.push({text,stderr})
+    }
+  }
+  const out=[]
+  for(const block of blocks){
+    if(out.length) out.push("")
+    const lines=block.end ? [...block.lines,block.end] : block.lines
+    lines.forEach(({text,stderr},i)=>{
+      const rest=block.step!==null ? text.slice(block.step.length+2) : null
+      let cls=""
+      if(stderr) cls="has-text-danger"
+      else if(rest!==null && i===0) cls="has-text-weight-bold"
+      else if(rest!==null && /^DONE\b/.test(rest)) cls="has-text-success"
+      else if(rest!==null && /^CACHED\b/.test(rest)) cls="has-text-info"
+      else if(rest!==null && /^(ERROR|CANCELED)\b/.test(rest)) cls="has-text-danger"
+      else if(rest===null && /^ERROR\b/.test(text)) cls="has-text-danger"
+      else if(rest===null && /^(Pushed|Signed) /.test(text)) cls="has-text-warning"
+      else if(rest===null && /^ok: \[/.test(text)) cls="has-text-success"
+      out.push(`<span class='${cls}'>${Helpers.htmlEscape(text)}</span>`)
+    })
+  }
+  return out.join("\r\n")
+}
+Helpers.formatOutput = (records,asText,jobType)=>{
   var output=[] // => is final output array
+  if(!asText && jobType==="build") return Helpers.formatBuildOutput(records)
   if(asText){
       // we loop all records, we generalize all newlines to \r\n (output can be mix)
       records.forEach(function(el){
