@@ -38,6 +38,8 @@
   }
 }
 .af-output-count {
+  /* a little further from the title than the label's gap */
+  margin-left: 0.25rem;
   font-weight: 400;
   font-size: 0.8rem;
   color: var(--bs-secondary-color);
@@ -90,11 +92,22 @@
     background: var(--bs-danger-bg-subtle);
   }
 }
-.af-tool-sep {
-  width: 1px;
-  height: 1.25rem;
-  margin: 0 0.25rem;
-  background: var(--af-field-border);
+/* the toolbar's words on one line, the title's : the line count and the buttons' words, smaller,
+   sit on its baseline ; the icons and the icon-only buttons stay centred */
+.af-output-toolbar,
+.af-output-label,
+.af-output-actions,
+.af-output-toolbar .af-tool-btn {
+  align-items: baseline;
+}
+/* the toolbar's buttons a little under the title's size */
+.af-output-toolbar .af-tool-btn {
+  font-size: 0.9rem;
+}
+.af-output-toolbar .af-tool-btn > svg,
+.af-output-label > svg,
+.af-output-toolbar .af-tool-icon {
+  align-self: center;
 }
 /* the extravars or artifacts : a section under the toolbar, its own head, scrolled when long */
 .af-output-data {

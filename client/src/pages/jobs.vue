@@ -2019,7 +2019,6 @@ onMounted(async () => {
                   >
                     <FaIcon icon="table-cells" />{{ t('jobs.events.button') }}
                   </button>
-                  <span class="af-tool-sep" />
                   <!-- its two arrows turn and it says Refreshing... while the output reads again (useRefreshing) -->
                   <button
                     type="button"
@@ -2244,6 +2243,9 @@ onMounted(async () => {
   padding: 0.625rem 1.125rem;
   border-bottom: 1px solid var(--af-field-border);
   background: var(--bs-tertiary-bg);
+  /* over the facts : their hairline on top (a box-shadow 1px up) would cover its border's colour */
+  position: relative;
+  z-index: 1;
 }
 /* the collapse : as far in as the output's, as wide ; no line under a collapsed header */
 .af-job-collapse {

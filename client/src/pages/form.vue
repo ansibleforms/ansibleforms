@@ -2449,7 +2449,6 @@ onBeforeUnmount(() => {
                 >
                   <FaIcon icon="table-cells" />{{ t('jobs.events.button') }}
                 </button>
-                <span class="af-tool-sep" />
                 <button type="button" class="af-tool-btn" @click="copyOutput">
                   <FaIcon icon="copy" />{{ t('jobs.copyOutput') }}
                 </button>
