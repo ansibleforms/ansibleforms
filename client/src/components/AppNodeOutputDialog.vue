@@ -44,7 +44,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
     <div v-if="shown" class="af-node-modal">
       <BsModal size="xl" @close="emit('close')" icon="diagram-project">
         <template #title>
-          {{ shown.node.name }}
+          <!-- the workflow : the node's own name heads the card under it -->
+          {{ workflow?.name || shown.node.name }}
           <!-- the node's job in the product it ran on -->
           <a
             v-if="shown.node.ui_url"
@@ -61,7 +62,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
             :output="shown.html"
             :workflow="workflow"
             :jobId="jobId"
-            :copyLabel="t('jobs.copy')"
             numbered
             @copy="(text) => emit('copy', text)"
           />
@@ -81,6 +81,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
   + .modal-backdrop,
   .modal-backdrop {
     z-index: 1061;
+  }
+  /* the lines over and under the output's card : its header's line's colour (--af-field-border,
+     darker than Bootstrap's in the light theme, Bootstrap's in the dark one) */
+  > .modal > .modal-dialog > .modal-content {
+    > .modal-header {
+      border-bottom-color: var(--af-field-border);
+    }
+    > .modal-footer {
+      border-top-color: var(--af-field-border);
+    }
   }
   /* its header (the name, extravars, artifacts, run time) stays in place : only the part
      under it scrolls, its scrollbar starting under the header. Its own body only : a dialog

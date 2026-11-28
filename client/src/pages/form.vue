@@ -2414,7 +2414,11 @@ onBeforeUnmount(() => {
                 </button>
                 <FaIcon icon="terminal" />
                 <span>{{ t('jobs.output') }}</span>
-                <span class="af-output-count">{{ t('jobs.lines', { count: outputLines }) }}</span>
+                <!-- a bar, then its line count : as a section's header (AppAnsibleOutput) -->
+                <span class="af-output-sep" aria-hidden="true"></span>
+                <span class="af-output-count"
+                  ><FaIcon icon="list-ol" />{{ t('jobs.lines', { count: outputLines }) }}</span
+                >
               </div>
               <div class="af-output-actions">
                 <!-- the failed tasks (else the error lines) : each click the next one -->
@@ -2481,7 +2485,6 @@ onBeforeUnmount(() => {
                   :title="outputTitle"
                   :jobId="job.id"
                   :events="jobEvents"
-                  :copyLabel="t('jobs.copy')"
                   numbered
                   @copy="(text) => clip(text, true)"
                 >
@@ -2499,7 +2502,6 @@ onBeforeUnmount(() => {
                   :output="filteredSubJobOutput"
                   :jobLog="subjob.job_log"
                   :jobId="subjob.id"
-                  :copyLabel="t('jobs.copy')"
                   numbered
                   @copy="(text) => clip(text, true)"
                 >

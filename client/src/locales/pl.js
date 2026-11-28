@@ -3309,7 +3309,6 @@ export default {
     payload: 'Payload',
     showArtifacts: 'Pokaż artefakty',
     hideArtifacts: 'Ukryj artefakty',
-    refreshOutput: 'Odśwież',
     applyFilter: 'Zastosuj filtr',
     removeFilter: 'Usuń filtr',
     copyOutput: 'Kopiuj wynik',

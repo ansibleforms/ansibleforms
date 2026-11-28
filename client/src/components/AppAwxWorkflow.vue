@@ -618,7 +618,11 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
           </button>
           <FaIcon icon="diagram-project" />
           <span>{{ t('workflow.title') }}</span>
-          <span class="awx-workflow-count">{{ t('workflow.nodes', { count: workflow.nodes?.length || 0 }) }}</span>
+          <!-- a bar, then its node count : as the output's header and its sections' -->
+          <span class="awx-workflow-sep" aria-hidden="true"></span>
+          <span class="awx-workflow-count"
+            ><FaIcon icon="circle-nodes" />{{ t('workflow.nodes', { count: workflow.nodes?.length || 0 }) }}</span
+          >
         </div>
         <div class="awx-workflow-tools">
           <span class="awx-workflow-legend"
@@ -660,7 +664,7 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
             >
               <FaIcon icon="plus" />
             </button>
-            <button type="button" class="awx-tool-btn" @click="fitView()">
+            <button type="button" class="awx-tool-btn awx-fit" @click="fitView()">
               <FaIcon icon="arrows-left-right-to-line" />{{ t('workflow.fitScreen') }}
             </button>
           </template>
@@ -1008,6 +1012,10 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
   .awx-workflow-tools {
     font-size: 0.8125rem;
   }
+  /* the zoom's buttons a group, the fit apart from it */
+  .awx-fit {
+    margin-left: 1rem;
+  }
   .awx-zoom {
     min-width: 3.5rem;
     justify-content: center;
@@ -1030,6 +1038,8 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.375rem 0.5rem 0.375rem 1rem;
+    /* every header of a job's page one height : the output toolbar's, with its buttons */
+    min-height: 2.875rem;
     border-bottom: 1px solid var(--af-field-border);
     background: var(--bs-tertiary-bg);
   }
@@ -1055,25 +1065,34 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
     font-weight: 400;
     font-size: 0.8rem;
     color: var(--bs-secondary-color);
+    svg {
+      margin-right: 0.3rem;
+    }
+  }
+  /* the bar between the title and its node count, as the output's (styles/jobOutput.scss) */
+  .awx-workflow-sep {
+    align-self: center;
+    width: 1px;
+    height: 1rem;
+    background: var(--af-field-border, var(--bs-border-color));
   }
   .awx-workflow-tools {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    /* as the output's toolbar : its buttons 0.125rem apart (their own padding does the rest), the
-       legend's colours a little room of their own */
-    gap: 0.125rem;
+    /* as the output's toolbar : its framed buttons 0.375rem apart, the legend's colours a little
+       room of their own */
+    gap: 0.375rem;
     font-size: 0.8125rem;
     color: var(--bs-secondary-color);
   }
   .awx-workflow-legend {
     margin-right: 0.5rem;
   }
+  /* between the legend and the buttons : room, no bar ; with the legend's margin and the two gaps
+     around it, as far as the fit from the zoom (1.375rem) */
   .awx-tool-sep {
-    width: 1px;
-    height: 1.25rem;
-    margin: 0 0.25rem;
-    background: var(--af-field-border);
+    width: 0.125rem;
   }
   .awx-tool-icon {
     padding: 0.3rem 0.5rem;
@@ -1081,11 +1100,17 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
   .awx-tool-btn {
     display: inline-flex;
     align-items: center;
+    /* the row's height each, an icon's only (zoom out, zoom in) as tall as a worded one's */
+    align-self: stretch;
+    justify-content: center;
+    /* the output toolbar's buttons' size (styles/jobOutput.scss), on the page and full screen */
+    font-size: 0.9rem;
     gap: 0.375rem;
     padding: 0.3rem 0.6rem;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background: transparent;
+    /* buttons at a glance : a rounded frame on the page's background, as the output toolbar's */
+    border: 1px solid var(--af-field-border);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
     color: var(--bs-body-color);
     &:hover {
       background: var(--bs-secondary-bg);

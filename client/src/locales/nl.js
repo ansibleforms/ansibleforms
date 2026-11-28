@@ -3300,7 +3300,6 @@ export default {
     payload: 'Payload',
     showArtifacts: 'Toon artifacts',
     hideArtifacts: 'Verberg artifacts',
-    refreshOutput: 'Vernieuwen',
     applyFilter: 'Filter toepassen',
     removeFilter: 'Filter verwijderen',
     copyOutput: 'Uitvoer kopiëren',

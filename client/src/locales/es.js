@@ -3310,7 +3310,6 @@ export default {
     payload: 'Payload',
     showArtifacts: 'Mostrar artefactos',
     hideArtifacts: 'Ocultar artefactos',
-    refreshOutput: 'Actualizar',
     applyFilter: 'Aplicar filtro',
     removeFilter: 'Quitar filtro',
     copyOutput: 'Copiar salida',

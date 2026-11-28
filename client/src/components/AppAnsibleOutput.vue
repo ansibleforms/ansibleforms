@@ -5,6 +5,7 @@ import { useAppStore } from '@/stores/app';
 import { jobLogLines } from '@/lib/jobLog';
 import { lineLevel, pairResultLines } from '@/lib/resultLines';
 import axios from 'axios';
+import Helpers from '@/lib/Helpers';
 
 /******************************************************************/
 /*                                                                */
@@ -37,11 +38,6 @@ const props = defineProps({
   numbered: {
     type: Boolean,
     default: false,
-  },
-  // the sections' copy button's tooltip (numbered)
-  copyLabel: {
-    type: String,
-    default: 'Copy',
   },
   // the job's own card's title (numbered) : the playbook, or the AWX job template
   title: {
@@ -371,13 +367,49 @@ const emit = defineEmits(['copy']);
  *     from its start) and its end.
  */
 function copySection(node) {
+  emit('copy', sectionText(node));
+}
+
+/**
+ * A section's lines as plain text : no colours, no line numbers.
+ *
+ * Args:
+ *   node (object): the section's header (copySection).
+ *
+ * Returns:
+ *   string: its text.
+ */
+function sectionText(node) {
   const from = node.index < 0 ? run.value.start : node.index + 1;
   const html = lines.value
     .slice(from, node.end)
     .map((l) => l.html)
     .join('<br>');
-  const text = new DOMParser().parseFromString(html.replace(/<br>/g, '\n'), 'text/html').body.textContent || '';
-  emit('copy', text);
+  return new DOMParser().parseFromString(html.replace(/<br>/g, '\n'), 'text/html').body.textContent || '';
+}
+
+/**
+ * Saves a text as a file, in the browser : a section's or the log file's, as the page's Download
+ * output saves the whole output.
+ *
+ * Args:
+ *   text (string): what the file holds.
+ *   part (string): what it is, in its name (job_42_<part>.txt) ; cut to letters, digits, dots,
+ *     dashes and underscores.
+ */
+function saveText(text, part) {
+  const name = `job_${props.jobId ?? 'output'}_${String(part || 'output').replace(/[^\w.-]+/g, '_')}.txt`;
+  Helpers.forceFileDownload({ data: text, headers: { 'content-disposition': `filename="${name}"` } });
+}
+
+/**
+ * Downloads a section's lines.
+ *
+ * Args:
+ *   node (object): the section's header (copySection).
+ */
+function downloadSection(node) {
+  saveText(sectionText(node), node.name);
 }
 
 // every foldable head : the sections with lines under them, and the job's own card (-1)
@@ -676,6 +708,10 @@ const logFolded = ref(false);
 /**
  * Hands the log file to the page as plain text, as a section's copy does.
  */
+function downloadLog() {
+  // eslint-disable-next-line no-control-regex -- \x1B is the ANSI escape byte dropped
+  saveText(String(props.jobLog || '').replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, ''), 'log');
+}
 function copyLog() {
   // eslint-disable-next-line no-control-regex -- \x1B is the ANSI escape byte we strip
   emit('copy', String(props.jobLog || '').replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, ''));
@@ -712,13 +748,26 @@ function copyLog() {
         <FaIcon v-else-if="group.node.kind == 'job'" icon="scroll" class="af-node-flag" />
         <FaIcon v-else-if="group.node.kind == 'node'" :icon="nodeIcon(group.node.type)" class="af-node-flag" />
         <span class="af-node-name">{{ group.node.name }}</span>
+        <!-- its numbers by its name, as the output's line count by its title : which attempt of a
+             node with retries (or carried over from the previous run), how long, how many lines -->
+        <span class="af-node-sep" aria-hidden="true"></span>
+        <span class="af-node-stats">
+          <span v-if="group.node.attempt"
+            ><FaIcon icon="redo" />{{
+              t('workflow.attempt', { n: group.node.attempt.n, of: group.node.attempt.of })
+            }}</span
+          >
+          <span v-if="group.node.carried"><FaIcon icon="redo" />{{ t('workflow.fromPreviousRun') }}</span>
+          <span v-if="group.node.elapsed"><FaIcon icon="stopwatch" />{{ shortDuration(group.node.elapsed) }}</span>
+          <span><FaIcon icon="list-ol" />{{ t('jobs.lines', { count: group.node.count }) }}</span>
+        </span>
         <AppStatusPill v-if="group.node.status" :status="group.node.status" />
         <span class="af-node-meta">
-          <!-- a workflow node : its extravars and its artifacts (always offered, {} when none),
-               then a bar, then its numbers -->
-          <!-- not for a node carried over from the previous run : it ran no job in this one -->
-          <template v-if="jobId && group.node.kind === 'node' && group.node.graphId != null && !group.node.carried">
-            <span class="af-node-tools">
+          <!-- its buttons : a workflow node's extravars and artifacts (always offered, {} when none ;
+               not for a node carried over from the previous run, it ran no job in this one), then
+               its copy and download -->
+          <span class="af-node-tools">
+            <template v-if="jobId && group.node.kind === 'node' && group.node.graphId != null && !group.node.carried">
               <button
                 v-if="store.profile.options?.showExtraVars"
                 type="button"
@@ -741,31 +790,14 @@ function copyLog() {
                   :icon="nodeData[group.node.index] === 'artifacts' ? 'square-poll-horizontal' : 'square-poll-vertical'"
                 />{{ nodeData[group.node.index] === 'artifacts' ? t('jobs.hideArtifacts') : t('jobs.showArtifacts') }}
               </button>
-            </span>
-            <span
-              v-if="store.profile.options?.showExtraVars || store.profile.options?.showArtifacts"
-              class="af-node-sep"
-              aria-hidden="true"
-            ></span>
-          </template>
-          <!-- which attempt of a node with retries, or that it was carried over from the previous run -->
-          <span v-if="group.node.attempt"
-            ><FaIcon icon="redo" />{{
-              t('workflow.attempt', { n: group.node.attempt.n, of: group.node.attempt.of })
-            }}</span
-          >
-          <span v-if="group.node.carried"><FaIcon icon="redo" />{{ t('workflow.fromPreviousRun') }}</span>
-          <span v-if="group.node.elapsed"><FaIcon icon="stopwatch" />{{ shortDuration(group.node.elapsed) }}</span>
-          <span><FaIcon icon="list-ol" />{{ group.node.count }}</span>
-          <button
-            type="button"
-            class="af-node-copy"
-            :title="copyLabel"
-            :aria-label="copyLabel"
-            @click.stop="copySection(group.node)"
-          >
-            <FaIcon icon="copy" />
-          </button>
+            </template>
+            <button type="button" class="af-node-tool" @click.stop="copySection(group.node)">
+              <FaIcon icon="copy" />{{ t('jobs.copyOutput') }}
+            </button>
+            <button type="button" class="af-node-tool" @click.stop="downloadSection(group.node)">
+              <FaIcon icon="download" />{{ t('jobs.downloadOutput') }}
+            </button>
+          </span>
         </span>
       </div>
       <!-- under the header : its extravars or artifacts, and its lines (a node's dialog scrolls
@@ -849,11 +881,20 @@ function copyLog() {
       <FaIcon :icon="logFolded ? 'angle-down' : 'angle-up'" class="af-node-chevron" />
       <FaIcon icon="file-lines" class="af-node-flag" />
       <span class="af-node-name">{{ t('jobs.logFile') }}</span>
+      <!-- its line count by its name, its copy and download at the right : as a section's header -->
+      <span class="af-node-sep" aria-hidden="true"></span>
+      <span class="af-node-stats"
+        ><span><FaIcon icon="list-ol" />{{ t('jobs.lines', { count: logLines.length }) }}</span></span
+      >
       <span class="af-node-meta">
-        <span><FaIcon icon="list-ol" />{{ logLines.length }}</span>
-        <button type="button" class="af-node-copy" :title="copyLabel" :aria-label="copyLabel" @click.stop="copyLog">
-          <FaIcon icon="copy" />
-        </button>
+        <span class="af-node-tools">
+          <button type="button" class="af-node-tool" @click.stop="copyLog">
+            <FaIcon icon="copy" />{{ t('jobs.copyOutput') }}
+          </button>
+          <button type="button" class="af-node-tool" @click.stop="downloadLog">
+            <FaIcon icon="download" />{{ t('jobs.downloadOutput') }}
+          </button>
+        </span>
       </span>
     </div>
     <div v-if="!logFolded" class="ansible af-ansible-lines">
@@ -1083,7 +1124,9 @@ function copyLog() {
   align-items: center;
   gap: 0.625rem;
   width: 100%;
-  padding: 0.625rem 1rem;
+  padding: 0.375rem 1rem;
+  /* every header of a job's page one height : the output toolbar's, with its buttons */
+  min-height: 2.875rem;
   border: 0;
   background: var(--bs-tertiary-bg);
   text-align: left;
@@ -1100,34 +1143,46 @@ function copyLog() {
   cursor: pointer;
   user-select: none;
 }
-/* a section's copy : quiet, its colour the meta's, a soft background on hover */
-.af-node-copy {
-  /* closer to the line count than the meta's own gap */
-  margin-left: -0.5rem;
+/* a node's Show extravars and Show artifacts : text buttons, the copy button's look */
+/* a section's numbers by its name : small and grey, as the output's line count by its title */
+.af-node-stats {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.4rem;
-  border: 0;
-  border-radius: 0.25rem;
-  background: none;
-  color: inherit;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
   svg {
-    margin: 0 !important;
+    margin-right: 0.3rem;
   }
+}
+/* its buttons one width each, the widest's, as the output toolbar's */
+.af-node-tools {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.375rem;
+}
+/* a section's buttons (a node's extravars and artifacts, every section's copy) : buttons at a
+   glance, a rounded frame on the page's background, as the output toolbar's (styles/jobOutput.scss) */
+.af-node-head .af-node-tool {
+  /* as tall as the output toolbar's buttons, their words its size */
+  justify-content: center;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--af-field-border);
+  border-radius: 0.5rem;
+  background: var(--bs-body-bg);
   &:hover {
     background: var(--bs-secondary-bg);
-    color: var(--bs-body-color);
-  }
-  &:focus-visible {
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem var(--bs-focus-ring-color);
   }
 }
-/* a node's Show extravars and Show artifacts : text buttons, the copy button's look */
-.af-node-tools {
-  display: inline-flex;
-  gap: 0.25rem;
+.af-node-head .af-node-tool.active {
+  border-color: var(--bs-primary-border-subtle);
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
 }
+
 .af-node-tool {
   display: inline-flex;
   align-items: center;
@@ -1148,10 +1203,11 @@ function copyLog() {
   }
 }
 /* the bar between them and the node's numbers */
+/* the bar between a section's name and its numbers : the text's height, centred */
 .af-node-sep {
-  align-self: stretch;
+  align-self: center;
   width: 1px;
-  margin: 0.15rem 0;
+  height: 1rem;
   background: var(--af-field-border, var(--bs-border-color));
 }
 .af-node-chevron {

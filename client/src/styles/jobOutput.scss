@@ -19,6 +19,8 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem 0.375rem 1rem;
+  /* every header of a job's page one height : the output toolbar's, with its buttons */
+  min-height: 2.875rem;
   border-bottom: 1px solid var(--af-field-border);
   background: var(--bs-tertiary-bg);
 }
@@ -38,11 +40,19 @@
   }
 }
 .af-output-count {
-  /* a little further from the title than the label's gap */
-  margin-left: 0.25rem;
   font-weight: 400;
   font-size: 0.8rem;
   color: var(--bs-secondary-color);
+  svg {
+    margin-right: 0.3rem;
+  }
+}
+/* the bar between the title and its line count : as a section's (AppAnsibleOutput's .af-node-sep) */
+.af-output-sep {
+  align-self: center;
+  width: 1px;
+  height: 1rem;
+  background: var(--af-field-border, var(--bs-border-color));
 }
 .af-output-actions {
   display: flex;
@@ -104,6 +114,32 @@
 .af-output-toolbar .af-tool-btn {
   font-size: 0.9rem;
 }
+/* its actions one width each, the widest's : a grid of equal columns, each button centred in its */
+.af-output-toolbar .af-output-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.375rem;
+  .af-tool-btn {
+    justify-content: center;
+  }
+  /* a button's look : a rounded frame on the page's background ; on and danger keep their own */
+  .af-tool-btn:not(.active):not(.af-tool-danger) {
+    border-color: var(--af-field-border);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
+    &:hover {
+      background: var(--bs-secondary-bg);
+    }
+  }
+  .af-tool-btn.active,
+  .af-tool-btn.af-tool-danger {
+    border-radius: 0.5rem;
+  }
+  .af-tool-btn.af-tool-danger {
+    border-color: var(--bs-danger-border-subtle);
+  }
+}
 .af-output-toolbar .af-tool-btn > svg,
 .af-output-label > svg,
 .af-output-toolbar .af-tool-icon {
@@ -134,8 +170,21 @@
 }
 .af-data-tools {
   display: flex;
-  align-items: center;
+  /* the copy as tall as the JSON | YAML frame beside it */
+  align-items: stretch;
   gap: 0.25rem;
+  /* the copy : a button at a glance, framed as the JSON | YAML toggle */
+  > .af-tool-btn:not(.af-tool-icon) {
+    border-color: var(--af-field-border);
+    background: var(--bs-body-bg);
+    &:hover {
+      background: var(--bs-secondary-bg);
+    }
+  }
+  /* the close : plain, centred */
+  > .af-tool-icon {
+    align-self: center;
+  }
 }
 /* JSON | YAML : two buttons in one frame */
 .af-segmented {

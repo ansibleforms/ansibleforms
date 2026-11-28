@@ -3246,7 +3246,6 @@ export default {
     payload: 'Payload',
     showArtifacts: 'Show artifacts',
     hideArtifacts: 'Hide artifacts',
-    refreshOutput: 'Refresh',
     applyFilter: 'Apply filter',
     removeFilter: 'Remove filter',
     copyOutput: 'Copy output',

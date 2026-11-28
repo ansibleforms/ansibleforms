@@ -22,7 +22,6 @@ import { formPath } from '@/lib/formsPath';
 import { jobTypeLabel, jobTypeName, hasArtifacts } from '@/lib/jobTypes';
 import { useNodeOutput } from '@/composables/useNodeOutput';
 import { mayApprove, mayDecide } from '@/lib/jobNotifications';
-import { useRefreshing } from '@/composables/useRefreshing';
 import { relaunchActions, relaunchBody } from '@/lib/relaunchMenu';
 
 // INIT
@@ -763,8 +762,6 @@ function childJobs(id) {
 // the newest read of the job's own output (loadOutput)
 let outputSeq = 0;
 // load job output
-// the output's Refresh : Refreshing... and its arrows turning, at least a second
-const { refreshing: outputRefreshing, refresh: refreshOutput } = useRefreshing();
 async function loadOutput(id, sub = false) {
   if (!id) {
     job.value = null;
@@ -1860,6 +1857,8 @@ onMounted(async () => {
                 >
                   <FaIcon :icon="summaryCollapsed ? 'angle-down' : 'angle-up'" />
                 </button>
+                <!-- the job's icon, as the page's title (Job #404) has it -->
+                <FaIcon icon="file-lines" class="af-job-heading-icon" />
                 <h3 class="af-job-number">{{ job.form || t('jobs.jobTitle', { id: '#' + jobId }) }}</h3>
                 <AppStatusPill :status="job.status" />
                 <AppStatusPill :label="jobTypeName(job)" tone="grey" />
@@ -2030,7 +2029,11 @@ onMounted(async () => {
                   </button>
                   <FaIcon icon="terminal" />
                   <span>{{ t('jobs.output') }}</span>
-                  <span class="af-output-count">{{ t('jobs.lines', { count: outputLines }) }}</span>
+                  <!-- a bar, then its line count : as a section's header (AppAnsibleOutput) -->
+                  <span class="af-output-sep" aria-hidden="true"></span>
+                  <span class="af-output-count"
+                    ><FaIcon icon="list-ol" />{{ t('jobs.lines', { count: outputLines }) }}</span
+                  >
                   <!-- the places the search found, and which one is shown -->
                   <span v-if="outputSearch.trim()" class="af-output-count">{{
                     outputFound.count
@@ -2081,17 +2084,6 @@ onMounted(async () => {
                   >
                     <FaIcon icon="table-cells" />{{ t('jobs.events.button') }}
                   </button>
-                  <!-- its two arrows turn and it says Refreshing... while the output reads again (useRefreshing) -->
-                  <button
-                    type="button"
-                    class="af-tool-btn"
-                    :title="t('jobs.refreshOutput')"
-                    @click="refreshOutput(() => loadOutput(jobId))"
-                  >
-                    <FaIcon icon="sync-alt" :spin="outputRefreshing" />{{
-                      outputRefreshing ? t('common.refreshing') : t('jobs.refreshOutput')
-                    }}
-                  </button>
                   <button type="button" class="af-tool-btn" :title="t('jobs.copyOutput')" @click="copyOutput">
                     <FaIcon icon="copy" />{{ t('jobs.copyOutput') }}
                   </button>
@@ -2140,7 +2132,6 @@ onMounted(async () => {
                     <div v-show="!foldedOutputs.main">
                       <AppAnsibleOutput
                         ref="mainOutput"
-                        :copyLabel="t('jobs.copy')"
                         @copy="(text) => clip(text, true)"
                         :output="filteredJobOutput"
                         :jobLog="job?.job_log"
@@ -2299,7 +2290,9 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.125rem;
+  padding: 0.375rem 1.125rem;
+  /* every header of a job's page one height : the output toolbar's, with its buttons */
+  min-height: 2.875rem;
   border-bottom: 1px solid var(--af-field-border);
   background: var(--bs-tertiary-bg);
   /* over the facts : their hairline on top (a box-shadow 1px up) would cover its border's colour */
@@ -2319,6 +2312,9 @@ onMounted(async () => {
 }
 .af-job-summary-collapsed .af-job-heading {
   border-bottom: 0;
+}
+.af-job-heading-icon {
+  color: var(--bs-secondary-color);
 }
 .af-job-number {
   margin: 0;

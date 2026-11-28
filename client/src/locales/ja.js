@@ -3245,7 +3245,6 @@ export default {
     payload: 'Payload',
     showArtifacts: 'Artifacts を表示',
     hideArtifacts: 'Artifacts を非表示',
-    refreshOutput: '更新',
     applyFilter: 'フィルターを適用',
     removeFilter: 'フィルターを解除',
     copyOutput: '出力をコピー',

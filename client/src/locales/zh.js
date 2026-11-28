@@ -3159,7 +3159,6 @@ export default {
     payload: 'Payload',
     showArtifacts: '显示工件',
     hideArtifacts: '隐藏工件',
-    refreshOutput: '刷新',
     applyFilter: '应用筛选',
     removeFilter: '移除筛选',
     copyOutput: '复制输出',
