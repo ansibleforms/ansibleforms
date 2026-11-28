@@ -34,7 +34,7 @@ On a Linux server, run the installer and answer its questions:
 curl -fsSL https://ansibleforms.com/install | sh
 ```
 
-It installs a controller (the web interface and API, its database and a runner) or a runner alone, on Docker, Podman or Kubernetes.
+It installs a controller with its database and a runner, or a runner alone, on Docker, Podman or Kubernetes.
 
 Run again, it finds an AnsibleForms already installed and upgrades it.
 
