@@ -146,7 +146,7 @@ only, so a stray `feat:` cannot make a 6.6.0.
 
 | What | Where | Used by |
 |---|---|---|
-| GitHub App `ansibleforms-release` (contents and pull requests: read and write) | installed on this repository, on `ansibleforms/website` (the release rebuilds the site), on `ansibleforms/helm-charts` (the release moves the chart's default image), on `ansibleforms/installer` (the release releases the installer) and on `ansibleforms/docker` (the release tags its setup) | release.yml |
+| GitHub App `ansibleforms-release` (contents and pull requests: read and write) | installed on this repository, on `ansibleforms/website` (the release rebuilds the site), on `ansibleforms/helm-charts` (the release moves the chart's default image), on `ansibleforms/installer` (the release releases the installer), on `ansibleforms/builder` and `ansibleforms/runner` (the release releases them) and on `ansibleforms/docker` (the release tags its setup) | release.yml |
 | `RELEASE_APP_CLIENT_ID` | repository variable: the App's client ID | release.yml |
 | `RELEASE_APP_PRIVATE_KEY` | repository secret | release.yml |
 | ruleset on `main` and `release/*` | pull request required, squash only, required checks, no force push | everything |

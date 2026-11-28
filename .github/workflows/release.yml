@@ -16,8 +16,8 @@ name: Release
 #
 # A release also rebuilds ansibleforms.com : the site (ansibleforms/website) pulls
 # CHANGELOG.md and server/help.yaml from here when it is built. It moves the Helm chart's
-# default image (ansibleforms/helm-charts) and releases the installer and the RTE builder with the
-# same version (ansibleforms/installer, ansibleforms/builder).
+# default image (ansibleforms/helm-charts) and releases the installer, the RTE builder and the RTE
+# Runner with the same version (ansibleforms/installer, ansibleforms/builder, ansibleforms/runner).
 
 on:
   push:
@@ -225,6 +225,34 @@ jobs:
         run: |
           gh api repos/ansibleforms/builder/dispatches -f event_type=app-release -f "client_payload[tag]=$TAG"
           echo "ansibleforms/builder releases $TAG"
+
+  # Tells ansibleforms/runner about the release, so the RTE Runner (in Go) is released with the
+  # same version : its Follow app release workflow checks the socket contract is still the Runner's,
+  # moves the Runner to the version and merges that once its CI passed ; its release workflow then
+  # publishes ghcr.io/ansibleforms/ansibleforms-rte-runner and creates the release. The token comes
+  # from the same GitHub App, asked for that one repository. Should this job fail, run "Follow app
+  # release" in ansibleforms/runner by hand with the version.
+  runner:
+    name: Release the RTE Runner
+    needs: [release-please, publish]
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: runner
+
+      - name: Send app-release to ansibleforms/runner
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          gh api repos/ansibleforms/runner/dispatches -f event_type=app-release -f "client_payload[tag]=$TAG"
+          echo "ansibleforms/runner releases $TAG"
 
   # Tells ansibleforms/installer about the release, so the installer is released with the same
   # version: its release workflow builds the binaries with that version written in and creates
