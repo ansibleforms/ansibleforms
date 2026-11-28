@@ -280,6 +280,20 @@ describe("an RTE's items", () => {
     assert.deepEqual(ends[0], [6, 9, "stdout", "success", "done", { a: 1 }, { rethrow: true }]);
   });
 
+  test("a builder's last line is a closing line : ok: [...] when built, [ERROR]: when it failed", async () => {
+    const builderEntry = { rteId: "builder-host-8099", runner: { name: "builder-1", type: "builder" } };
+    await storeItem(builderEntry, 16, { kind: "end", order: 3, stream: "stdout", status: "success", message: "RTE image r:1 built and pushed" });
+    await storeItem(builderEntry, 17, { kind: "end", order: 3, stream: "stdout", status: "failed", message: "the build failed: x" });
+    const last = ends.filter((e) => e[0] === 16 || e[0] === 17).map((e) => [e[2], e[4]]);
+    assert.deepEqual(last, [
+      ["stdout", "ok: [RTE image r:1 built and pushed]"],
+      ["stderr", "[ERROR]: the build failed: x"],
+    ]);
+    const { closingLine } = await import("../src/runners/rteHub.js");
+    assert.deepEqual(closingLine({ status: "aborted", stream: "stderr", message: "aborted" }), { stream: "stderr", message: "aborted" });
+    assert.deepEqual(closingLine({ status: "success", stream: "stdout", message: "ok: [x y]" }), { stream: "stdout", message: "ok: [x y]" });
+  });
+
   test("events, the log and the process's start go where a database-mode RTE wrote them", async () => {
     await storeItem(entry, 7, { kind: "events", events: [{ order: 1, type: "play" }] });
     await storeItem(entry, 7, { kind: "log", content: "a log" });

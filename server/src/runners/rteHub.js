@@ -1739,6 +1739,24 @@ function onItem(entry, msg) {
 }
 
 /**
+ * A builder's last line, as every runner's closing line : ok: [...] when the build succeeded,
+ * [ERROR]: ... in the error stream when it failed ; an aborted build's as it came.
+ *
+ * Args:
+ *   item (object): the end item, { status, stream, message }.
+ *
+ * Returns:
+ *   object: { stream, message }.
+ */
+export function closingLine(item) {
+  const message = String(item.message ?? "");
+  if (!message || /^(ok: \[|\[ERROR\])/.test(message)) return { stream: item.stream, message: item.message };
+  if (item.status === "success") return { stream: "stdout", message: `ok: [${message}]` };
+  if (item.status === "failed") return { stream: "stderr", message: `[ERROR]: ${message}` };
+  return { stream: item.stream, message: item.message };
+}
+
+/**
  * Stores one item : each kind as a database-mode RTE wrote it itself, every one of them safe to
  * store twice (an item resent after a reconnect).
  *
@@ -1769,13 +1787,17 @@ async function storeItem(entry, jobId, item) {
     case "exited":
       await mysql.do("UPDATE AnsibleForms.`jobs` SET pid=NULL WHERE id=?", [jobId]);
       break;
-    case "end":
-      // the end, its last line and its notifications : sent from here, never from the RTE
-      await Job.endJobStatus(jobId, item.order, item.stream, item.status, item.message, item.artifacts || {}, { rethrow: true });
+    case "end": {
+      // the end, its last line and its notifications : sent from here, never from the RTE. A
+      // builder's last line is said as every runner's closing line is (ok: [...], [ERROR]: ...),
+      // so the job's page shows it under the build's card, not in it
+      const last = entry.runner?.type === "builder" ? closingLine(item) : { stream: item.stream, message: item.message };
+      await Job.endJobStatus(jobId, item.order, last.stream, item.status, last.message, item.artifacts || {}, { rethrow: true });
       if (item.status === "aborted") await Job.resetAbortRequested(jobId).catch(() => {});
       await mysql.do("UPDATE AnsibleForms.`jobs` SET host=NULL, pid=NULL WHERE id=?", [jobId]);
       forgetJob(jobId);
       break;
+    }
     case "abandon":
       if (await abandonJobs({ id: jobId })) {
         await Job.printJobOutput(`[ERROR]: ${item.message || "the runner lost the job"}`, "stderr", jobId, (await Job.lastOrder(jobId)) + 1);

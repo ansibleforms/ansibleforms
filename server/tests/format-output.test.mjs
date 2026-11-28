@@ -162,6 +162,7 @@ test("an RTE build's step comes out once, its layers' progress and DONE their la
       record("#8 [stage-1 1/12] FROM base\n#8 " + d + " 1MB / 9MB 0.2s\n#7 [uv 1/1] FROM uv\n#8 ..."),
       record("#8 " + d + " 9MB / 9MB 0.9s done\n#8 DONE 1.0s\n#7 DONE 0.5s"),
       record("#8 [stage-1 1/12] FROM base\n#8 extracting " + d + "\n#8 extracting " + d + " 1.3s done\n#8 DONE 2.4s"),
+      record("#22 exporting to image\n#22 pushing layers\n#22 pushing layers 2.0s done\n#22 resolve x\n#22 resolve x\n#22 DONE 3s"),
     ],
     false,
     "build",
@@ -174,5 +175,10 @@ test("an RTE build's step comes out once, its layers' progress and DONE their la
     "",
     "<span class='has-text-weight-bold'>#7 [uv 1/1] FROM uv</span>",
     "<span class='has-text-success'>#7 DONE 0.5s</span>",
+    "",
+    "<span class='has-text-weight-bold'>#22 exporting to image</span>",
+    "<span class=''>#22 pushing layers 2.0s done</span>",
+    "<span class=''>#22 resolve x</span>",
+    "<span class='has-text-success'>#22 DONE 3s</span>",
   ]);
 });

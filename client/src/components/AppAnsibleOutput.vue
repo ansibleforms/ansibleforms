@@ -589,9 +589,12 @@ const run = computed(() => {
   // its start : after AnsibleForms' own lines (and the blank ones among them)
   let start = 0;
   while (start < all.length && (ownLine(all[start]) || !plain(all[start].html))) start++;
-  // its end : after the recap's own lines, else the output's end
+  // its end : after the recap's own lines, else before AnsibleForms' own lines at the output's end
+  // (a build's closing line : ok: [RTE image ... built and pushed])
   const recap = all.findIndex((l) => /^PLAY RECAP/.test(plain(l.html)));
-  const end = recap >= 0 ? all[recap].end : all.length;
+  let end = all.length;
+  if (recap >= 0) end = all[recap].end;
+  else while (end > start && (ownLine(all[end - 1]) || !plain(all[end - 1].html))) end--;
   if (start >= end) return null;
   // its status : failed when a host failed or was unreachable in the recap
   let status = '';

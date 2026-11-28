@@ -206,7 +206,8 @@ Helpers.friendlyAJVError= (e,property,label,o)=>{
 // side by side (#7, #8, #7 again) and says a step again each time it does more of it. Laid out
 // here, on the whole output, so a page shows it the same while it runs and after :
 //   - each step in one block, where it first came, a blank line before it ; its title once, bold
-//   - a layer's progress (sha256:..., extracting sha256:...) its last line only
+//   - a layer's progress (sha256:..., extracting sha256:...) its last line only, and a line said
+//     again or with how it went (pushing layers, then pushing layers 2.0s done) the last one
 //   - DONE green (its last one only), CACHED cyan, ERROR and CANCELED red
 //   - the lines of no step as they come : Pushed and Signed amber, as a changed line ; the
 //     controller's ok: line green ; an ERROR line and the error stream red
@@ -254,6 +255,10 @@ Helpers.formatBuildOutput = (records)=>{
       }
       // how it ended (DONE, CACHED, ERROR, CANCELED) : its last one, written at its end
       if(/^(DONE|CACHED|ERROR|CANCELED)\b/.test(rest)){ block.end={text,stderr}; continue }
+      // the line before said again, or with how it went (pushing layers, then pushing layers 2.0s
+      // done) : the last one only
+      const prev=block.lines.length>1 ? block.lines[block.lines.length-1] : null
+      if(prev && (text===prev.text || text.startsWith(prev.text+" "))){ block.lines[block.lines.length-1]={text,stderr}; continue }
       block.lines.push({text,stderr})
     }
   }
