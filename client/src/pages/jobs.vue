@@ -22,7 +22,6 @@ import { formPath } from '@/lib/formsPath';
 import { jobTypeLabel, jobTypeName, hasArtifacts } from '@/lib/jobTypes';
 import { useNodeOutput } from '@/composables/useNodeOutput';
 import { mayApprove, mayDecide } from '@/lib/jobNotifications';
-import { useRefreshing } from '@/composables/useRefreshing';
 import { relaunchActions, relaunchBody } from '@/lib/relaunchMenu';
 
 // INIT
@@ -44,6 +43,30 @@ const job = ref(null);
 const jobMissing = ref(false);
 // the summary's facts hidden under its header (the collapse at the header's left)
 const summaryCollapsed = ref(false);
+// the facts' grid, and the empty cells its last row is filled with : the lines between the facts
+// are each fact's own (its left and top), an empty cell would have none
+const factsList = ref(null);
+const blankFacts = ref(0);
+/**
+ * Counts the empty cells the facts' last row needs : its columns (three, two, one as the page
+ * narrows) less the facts in it.
+ */
+function measureFacts() {
+  const dl = factsList.value;
+  if (!dl || !dl.offsetParent) return;
+  const columns = getComputedStyle(dl).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+  const facts = dl.querySelectorAll(':scope > .af-job-fact:not(.af-job-fact-blank)').length;
+  const blanks = (columns - (facts % columns)) % columns;
+  if (blanks !== blankFacts.value) blankFacts.value = blanks;
+}
+// measured again when the grid changes width (its columns) and when its facts change
+const factsObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureFacts) : null;
+watch(factsList, (el, before) => {
+  if (before) factsObserver?.unobserve(before);
+  if (el) factsObserver?.observe(el);
+});
+onUpdated(measureFacts);
+onBeforeUnmount(() => factsObserver?.disconnect());
 // a multistep job's steps, by id, as read with the job : each step's output under the main job's
 const stepJobs = ref({});
 // the outputs of a multistep job folded away by their title : 'main', or a step's id
@@ -739,8 +762,6 @@ function childJobs(id) {
 // the newest read of the job's own output (loadOutput)
 let outputSeq = 0;
 // load job output
-// the output's Refresh : Refreshing... and its arrows turning, at least a second
-const { refreshing: outputRefreshing, refresh: refreshOutput } = useRefreshing();
 async function loadOutput(id, sub = false) {
   if (!id) {
     job.value = null;
@@ -1126,6 +1147,31 @@ watch(
 const relaunchOrigin = computed(() => {
   const origin = job.value?.extravars?.__relaunchOf__;
   return origin && typeof origin === 'object' && origin.id ? origin : null;
+});
+// a re-run's scope : where it started again (the failed node, the failed hosts, else the first
+// node) and what it had to run - the nodes the run it re-ran had still pending (all but those
+// carried over) of the workflow's, the hosts it ran on again (named in its tooltip)
+const rerunScope = computed(() => {
+  const origin = relaunchOrigin.value;
+  if (origin?.scope === 'failedHosts') {
+    const hosts = Array.isArray(job.value?.extravars?.__limitHosts__) ? job.value.extravars.__limitHosts__ : [];
+    return {
+      from: t('jobs.rerunFromFailedHosts'),
+      icon: 'server',
+      label: t('jobs.rerunHosts'),
+      text: hosts.length ? String(hosts.length) : '–',
+      title: hosts.join(', '),
+    };
+  }
+  const nodes = job.value?.awx_workflow?.nodes || [];
+  const pending = nodes.filter((n) => !n.carried).length;
+  return {
+    from: origin?.scope === 'failedNode' ? t('jobs.rerunFromFailedNode') : t('jobs.rerunFromFirstNode'),
+    icon: 'hourglass-half',
+    label: t('jobs.pendingNodes'),
+    text: nodes.length ? t('jobs.countOf', { n: pending, total: nodes.length }) : '–',
+    title: '',
+  };
 });
 // edit and relaunch - navigate to form with pre-filled data
 async function editAndRelaunchJob(id) {
@@ -1809,8 +1855,10 @@ onMounted(async () => {
                   :aria-expanded="!summaryCollapsed"
                   @click="summaryCollapsed = !summaryCollapsed"
                 >
-                  <FaIcon :icon="summaryCollapsed ? 'angles-down' : 'angles-up'" />
+                  <FaIcon :icon="summaryCollapsed ? 'angle-down' : 'angle-up'" />
                 </button>
+                <!-- the job's icon, as the page's title (Job #404) has it -->
+                <FaIcon icon="file-lines" class="af-job-heading-icon" />
                 <h3 class="af-job-number">{{ job.form || t('jobs.jobTitle', { id: '#' + jobId }) }}</h3>
                 <AppStatusPill :status="job.status" />
                 <AppStatusPill :label="jobTypeName(job)" tone="grey" />
@@ -1829,7 +1877,7 @@ onMounted(async () => {
                   <pre class="mb-0 mt-2 af-job-attention-detail">{{ statusDetailYaml }}</pre>
                 </details>
               </div>
-              <dl v-show="!summaryCollapsed" class="af-job-facts">
+              <dl v-show="!summaryCollapsed" ref="factsList" class="af-job-facts">
                 <!-- an ansible job : the hosts it ran on (its limit, else its inventories, else the
                      implicit localhost) ; any other job : its form -->
                 <div v-if="jobHosts" class="af-job-fact">
@@ -1889,7 +1937,7 @@ onMounted(async () => {
                 </div>
                 <div v-else-if="jobPlaybook" class="af-job-fact">
                   <dt><FaIcon icon="scroll" />{{ t('jobs.playbook') }}</dt>
-                  <dd class="font-monospace" :title="jobPlaybook">{{ jobPlaybook }}</dd>
+                  <dd :title="jobPlaybook">{{ jobPlaybook }}</dd>
                 </div>
                 <div class="af-job-fact">
                   <dt><FaIcon icon="user" />{{ t('jobs.launchedBy') }}</dt>
@@ -1901,6 +1949,25 @@ onMounted(async () => {
                       >{{ job.user_type }}</span
                     >
                   </dd>
+                </div>
+                <!-- a re-run : the job it re-ran, where it started again, and what it had to run ; a row of
+                     its own under what ran, the times last -->
+                <div v-if="relaunchOrigin" class="af-job-fact">
+                  <dt><FaIcon icon="redo" />{{ t('jobs.relaunchOf') }}</dt>
+                  <!-- its name (a re-run runs the same form), its number a link to it, as a template's AWX number -->
+                  <dd :title="job.form" class="af-job-fact-split">
+                    <span class="af-job-fact-text">{{ job.form || '–' }}</span><span class="af-job-fact-note"
+                      ><a href="#" @click.prevent="getJob(relaunchOrigin.id)">#{{ relaunchOrigin.id }}</a></span
+                    >
+                  </dd>
+                </div>
+                <div v-if="relaunchOrigin" class="af-job-fact">
+                  <dt><FaIcon icon="forward-step" />{{ t('jobs.rerunFrom') }}</dt>
+                  <dd>{{ rerunScope.from }}</dd>
+                </div>
+                <div v-if="relaunchOrigin" class="af-job-fact">
+                  <dt><FaIcon :icon="rerunScope.icon" />{{ rerunScope.label }}</dt>
+                  <dd :title="rerunScope.title">{{ rerunScope.text }}</dd>
                 </div>
                 <div class="af-job-fact">
                   <dt><FaIcon icon="play" />{{ t('jobs.startTime') }}</dt>
@@ -1915,19 +1982,6 @@ onMounted(async () => {
                   <dd class="af-job-duration">{{ jobDuration }}</dd>
                 </div>
                 <!-- a re-run of another job : which one, and on what -->
-                <div v-if="relaunchOrigin" class="af-job-fact">
-                  <dt><FaIcon icon="redo" />{{ t('jobs.relaunchOf') }}</dt>
-                  <dd class="af-job-fact-split">
-                    <span class="af-job-fact-text"
-                      ><a href="#" @click.prevent="getJob(relaunchOrigin.id)">#{{ relaunchOrigin.id }}</a></span
-                    ><span v-if="relaunchOrigin.scope === 'failedHosts'" class="af-job-fact-note">{{
-                      t('jobs.failedHostsNote')
-                    }}</span
-                    ><span v-else-if="relaunchOrigin.scope === 'failedNode'" class="af-job-fact-note">{{
-                      t('jobs.failedNodeNote')
-                    }}</span>
-                  </dd>
-                </div>
                 <!-- launched from a stored job : its name, a link to its page ; none when this user
                      does not see it, or it was deleted since (the server sends none then) -->
                 <div v-if="job.storedJob" class="af-job-fact">
@@ -1940,6 +1994,13 @@ onMounted(async () => {
                   <dt><FaIcon icon="layer-group" />{{ t('jobs.steps') }}</dt>
                   <dd>{{ job.subjobs.length }}</dd>
                 </div>
+                <!-- the last row's empty cells : their lines drawn as the others' -->
+                <div
+                  v-for="i in blankFacts"
+                  :key="'blank' + i"
+                  class="af-job-fact af-job-fact-blank"
+                  aria-hidden="true"
+                />
               </dl>
             </div>
 
@@ -1968,7 +2029,11 @@ onMounted(async () => {
                   </button>
                   <FaIcon icon="terminal" />
                   <span>{{ t('jobs.output') }}</span>
-                  <span class="af-output-count">{{ t('jobs.lines', { count: outputLines }) }}</span>
+                  <!-- a bar, then its line count : as a section's header (AppAnsibleOutput) -->
+                  <span class="af-output-sep" aria-hidden="true"></span>
+                  <span class="af-output-count"
+                    ><FaIcon icon="list-ol" />{{ t('jobs.lines', { count: outputLines }) }}</span
+                  >
                   <!-- the places the search found, and which one is shown -->
                   <span v-if="outputSearch.trim()" class="af-output-count">{{
                     outputFound.count
@@ -2019,18 +2084,6 @@ onMounted(async () => {
                   >
                     <FaIcon icon="table-cells" />{{ t('jobs.events.button') }}
                   </button>
-                  <span class="af-tool-sep" />
-                  <!-- its two arrows turn and it says Refreshing... while the output reads again (useRefreshing) -->
-                  <button
-                    type="button"
-                    class="af-tool-btn"
-                    :title="t('jobs.refreshOutput')"
-                    @click="refreshOutput(() => loadOutput(jobId))"
-                  >
-                    <FaIcon icon="sync-alt" :spin="outputRefreshing" />{{
-                      outputRefreshing ? t('common.refreshing') : t('jobs.refreshOutput')
-                    }}
-                  </button>
                   <button type="button" class="af-tool-btn" :title="t('jobs.copyOutput')" @click="copyOutput">
                     <FaIcon icon="copy" />{{ t('jobs.copyOutput') }}
                   </button>
@@ -2071,7 +2124,7 @@ onMounted(async () => {
                       @keydown.enter.self.prevent="toggleOutput('main')"
                       @keydown.space.self.prevent="toggleOutput('main')"
                     >
-                      <FaIcon :icon="foldedOutputs.main ? 'chevron-right' : 'chevron-down'" class="af-job-chevron" />
+                      <FaIcon :icon="foldedOutputs.main ? 'angle-down' : 'angle-up'" class="af-job-chevron" />
                       {{ t('jobs.mainJob') }} {{ t('jobs.jobIdNote', { id: jobId }) }}
                       <AppStatusPill :status="job.status" />
                     </h3>
@@ -2079,7 +2132,6 @@ onMounted(async () => {
                     <div v-show="!foldedOutputs.main">
                       <AppAnsibleOutput
                         ref="mainOutput"
-                        :copyLabel="t('jobs.copy')"
                         @copy="(text) => clip(text, true)"
                         :output="filteredJobOutput"
                         :jobLog="job?.job_log"
@@ -2104,10 +2156,7 @@ onMounted(async () => {
                       @keydown.enter.self.prevent="toggleOutput(step.id)"
                       @keydown.space.self.prevent="toggleOutput(step.id)"
                     >
-                      <FaIcon
-                        :icon="foldedOutputs[step.id] ? 'chevron-right' : 'chevron-down'"
-                        class="af-job-chevron"
-                      />
+                      <FaIcon :icon="foldedOutputs[step.id] ? 'angle-down' : 'angle-up'" class="af-job-chevron" />
                       {{ t('jobs.stepN', { n: i + 1 }) }}<template v-if="step.target"> · {{ step.target }}</template>
                       {{ t('jobs.jobIdNote', { id: step.id }) }}
                       <AppStatusPill :status="step.status" />
@@ -2205,6 +2254,8 @@ onMounted(async () => {
   gap: 0.5rem;
   margin: 0;
   padding: 0.625rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
   background: var(--bs-tertiary-bg);
   border-bottom: 1px solid var(--af-field-border);
   cursor: pointer;
@@ -2239,25 +2290,37 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.125rem;
+  padding: 0.375rem 1.125rem;
+  /* every header of a job's page one height : the output toolbar's, with its buttons */
+  min-height: 2.875rem;
   border-bottom: 1px solid var(--af-field-border);
   background: var(--bs-tertiary-bg);
+  /* over the facts : their hairline on top (a box-shadow 1px up) would cover its border's colour */
+  position: relative;
+  z-index: 1;
 }
 /* the collapse : as far in as the output's, as wide ; no line under a collapsed header */
 .af-job-collapse {
   margin-left: calc(-0.5rem - 1px);
   svg {
     width: 0.75rem;
+    /* 1px lower than its box's middle : an up or down caret reads high beside a mostly lowercase
+       title (its weight in its point, the title's in its x-height) */
+    position: relative;
+    top: 1px;
   }
 }
 .af-job-summary-collapsed .af-job-heading {
   border-bottom: 0;
 }
+.af-job-heading-icon {
+  color: var(--bs-secondary-color);
+}
 .af-job-number {
   margin: 0;
-  font-size: 1.25rem;
+  /* the page's headers one size : the job's, the output's, its sections' (AppAnsibleOutput) */
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 /* the facts in a grid of three, the card's body : what ran and who launched it on the first row,
    when and how long on the second ; two columns, then one, as the page narrows. A hairline
@@ -2300,15 +2363,15 @@ onMounted(async () => {
     }
   }
   dd {
+    /* as wide as its value, cut short at the fact's width : its tooltip (title) shows over the
+       value only, not over the room beside it */
+    width: fit-content;
+    max-width: 100%;
     margin: 0;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  dd.font-monospace {
-    font-size: 0.875rem;
-    font-weight: 400;
   }
 }
 /* a value and its note on one line : the value cut short, the note whole */

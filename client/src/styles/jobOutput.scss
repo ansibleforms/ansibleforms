@@ -19,6 +19,8 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem 0.375rem 1rem;
+  /* every header of a job's page one height : the output toolbar's, with its buttons */
+  min-height: 2.875rem;
   border-bottom: 1px solid var(--af-field-border);
   background: var(--bs-tertiary-bg);
 }
@@ -27,7 +29,8 @@
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  /* the job page's headers one size : the job's, the output's, its sections' */
+  font-size: 1rem;
 }
 /* the collapse / expand all : its icon over the sections' chevrons, as wide and as far in */
 .af-output-label .af-tool-icon {
@@ -40,6 +43,16 @@
   font-weight: 400;
   font-size: 0.8rem;
   color: var(--bs-secondary-color);
+  svg {
+    margin-right: 0.3rem;
+  }
+}
+/* the bar between the title and its line count : as a section's (AppAnsibleOutput's .af-node-sep) */
+.af-output-sep {
+  align-self: center;
+  width: 1px;
+  height: 1rem;
+  background: var(--af-field-border, var(--bs-border-color));
 }
 .af-output-actions {
   display: flex;
@@ -89,11 +102,48 @@
     background: var(--bs-danger-bg-subtle);
   }
 }
-.af-tool-sep {
-  width: 1px;
-  height: 1.25rem;
-  margin: 0 0.25rem;
-  background: var(--af-field-border);
+/* the toolbar's words on one line, the title's : the line count and the buttons' words, smaller,
+   sit on its baseline ; the icons and the icon-only buttons stay centred */
+.af-output-toolbar,
+.af-output-label,
+.af-output-actions,
+.af-output-toolbar .af-tool-btn {
+  align-items: baseline;
+}
+/* the toolbar's buttons a little under the title's size */
+.af-output-toolbar .af-tool-btn {
+  font-size: 0.9rem;
+}
+/* its actions one width each, the widest's : a grid of equal columns, each button centred in its */
+.af-output-toolbar .af-output-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.375rem;
+  .af-tool-btn {
+    justify-content: center;
+  }
+  /* a button's look : a rounded frame on the page's background ; on and danger keep their own */
+  .af-tool-btn:not(.active):not(.af-tool-danger) {
+    border-color: var(--af-field-border);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
+    &:hover {
+      background: var(--bs-secondary-bg);
+    }
+  }
+  .af-tool-btn.active,
+  .af-tool-btn.af-tool-danger {
+    border-radius: 0.5rem;
+  }
+  .af-tool-btn.af-tool-danger {
+    border-color: var(--bs-danger-border-subtle);
+  }
+}
+.af-output-toolbar .af-tool-btn > svg,
+.af-output-label > svg,
+.af-output-toolbar .af-tool-icon {
+  align-self: center;
 }
 /* the extravars or artifacts : a section under the toolbar, its own head, scrolled when long */
 .af-output-data {
@@ -120,8 +170,21 @@
 }
 .af-data-tools {
   display: flex;
-  align-items: center;
+  /* the copy as tall as the JSON | YAML frame beside it */
+  align-items: stretch;
   gap: 0.25rem;
+  /* the copy : a button at a glance, framed as the JSON | YAML toggle */
+  > .af-tool-btn:not(.af-tool-icon) {
+    border-color: var(--af-field-border);
+    background: var(--bs-body-bg);
+    &:hover {
+      background: var(--bs-secondary-bg);
+    }
+  }
+  /* the close : plain, centred */
+  > .af-tool-icon {
+    align-self: center;
+  }
 }
 /* JSON | YAML : two buttons in one frame */
 .af-segmented {

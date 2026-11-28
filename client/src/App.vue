@@ -235,15 +235,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- in the bottom-right corner ; lifted above the chat button when it shows there -->
-  <Toaster
-    position="bottom-right"
-    :duration="5000"
-    :close-button="true"
-    :theme="appStore.theme"
-    :expand="true"
-    :offset="toastOffset"
-  />
+  <!-- in the bottom-right corner ; lifted above the chat button when it shows there. In the
+       body, as the dialogs are (Teleport) : inside #app its z-index stays under a dialog's
+       backdrop, and a toast said from a dialog (Copied to clipboard) showed greyed behind it -->
+  <Teleport to="body">
+    <Toaster
+      position="bottom-right"
+      :duration="5000"
+      :close-button="true"
+      :theme="appStore.theme"
+      :expand="true"
+      :offset="toastOffset"
+    />
+  </Teleport>
   <AppChat />
   <!-- asked when a page with unsaved changes is left (useUnsavedGuard) -->
   <AppUnsavedDialog />
