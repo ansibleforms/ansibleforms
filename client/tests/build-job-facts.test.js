@@ -40,3 +40,44 @@ describe("an RTE build's facts", () => {
     }
   });
 });
+
+describe("a job's facts grid", () => {
+  it('fills its last row with empty cells, so their lines are drawn', () => {
+    expect(page).toMatch(/v-for="i in blankFacts"[^>]*class="af-job-fact af-job-fact-blank"/);
+    expect(page).toMatch(/const blanks = \(columns - \(facts % columns\)\) % columns;/);
+    expect(page).toMatch(/ref="factsList"/);
+  });
+});
+
+describe("a re-run's facts", () => {
+  it('name the job it re-ran, where it started again and how far it got', () => {
+    expect(page).toMatch(
+      /t\('jobs\.relaunchOf'\)[\s\S]*?job\.form[\s\S]*?class="af-job-fact-note"[\s\S]*?#\{\{ relaunchOrigin\.id \}\}<\/a>/,
+    );
+    expect(page).toMatch(/t\('jobs\.rerunFrom'\)[\s\S]*?rerunScope\.from/);
+    expect(page).toMatch(/const pending = nodes\.filter\(\(n\) => !n\.carried\)\.length;/);
+    expect(page).toMatch(/t\('jobs\.countOf', \{ n: pending, total: nodes\.length \}\)/);
+  });
+
+  it('come before the times, which close the facts', () => {
+    expect(page.indexOf("t('jobs.rerunFrom')")).toBeLessThan(
+      page.indexOf(`<FaIcon icon="play" />{{ t('jobs.startTime') }}</dt>`),
+    );
+  });
+
+  it('name them in every language', async () => {
+    for (const l of LANGS) {
+      const { default: m } = await import(`../src/locales/${l}.js`);
+      for (const k of [
+        'rerunFrom',
+        'rerunFromFailedNode',
+        'rerunFromFirstNode',
+        'rerunFromFailedHosts',
+        'pendingNodes',
+        'rerunHosts',
+        'countOf',
+      ])
+        expect(m.jobs[k], `${l} ${k}`).toBeTruthy();
+    }
+  });
+});

@@ -276,6 +276,30 @@ function toggle(i) {
   folded.value = next;
 }
 
+// a workflow node's icon, by what it runs : a job template's the playbook's scroll, a workflow's
+// the Workflow fact's, an approval a user's check, a project's sync its branch, an inventory's sync
+// the Hosts fact's server
+const NODE_ICONS = {
+  job: 'scroll',
+  workflow_job: 'diagram-project',
+  workflow_approval: 'user-check',
+  project_update: 'code-branch',
+  inventory_update: 'server',
+};
+
+/**
+ * A workflow node's icon.
+ *
+ * Args:
+ *   type (string|null): what it runs (the graph's node type) ; none for a node the graph lacks.
+ *
+ * Returns:
+ *   string: the icon's name, a job template's scroll when the type is unknown.
+ */
+function nodeIcon(type) {
+  return NODE_ICONS[type] || 'scroll';
+}
+
 /**
  * A workflow card's header, read from its head line : an AWX workflow's node (WORKFLOW NODE
  * [name] (status)) or its summary (WORKFLOW [name] (status)).
@@ -284,7 +308,8 @@ function toggle(i) {
  *   line (object): the head line, with its index and its section's end.
  *
  * Returns:
- *   object: { name, kind, status, elapsed, attempt, carried } - kind 'node' or 'summary' ;
+ *   object: { name, kind, type, status, elapsed, attempt, carried } - kind 'node' or 'summary' ;
+ *   type what a node runs (the graph's), null when unknown ;
  *   elapsed in seconds from the workflow's graph, or null ; attempt { n, of } for a node with
  *   retries (WORKFLOW NODE [name] (failed) #12 attempt 1 of 3), else null ; carried for a node
  *   carried over from the previous run (... #12 carried over).
@@ -306,6 +331,8 @@ function headerOf(line) {
       id,
       // the node's id in the graph : what its extravars and artifacts are read by
       graphId: graphNode?.id ?? null,
+      // what it runs (a job template, a workflow, an approval, a sync) : its icon
+      type: graphNode?.type ?? null,
       name: m[2],
       kind: summary ? 'summary' : 'node',
       // AWX's words as the app's own (its pills' labels) : successful a success, canceled aborted
@@ -683,6 +710,7 @@ function copyLog() {
         <FaIcon :icon="folded.has(group.node.index) ? 'angle-down' : 'angle-up'" class="af-node-chevron" />
         <FaIcon v-if="group.node.kind == 'summary'" icon="flag-checkered" class="af-node-flag" />
         <FaIcon v-else-if="group.node.kind == 'job'" icon="scroll" class="af-node-flag" />
+        <FaIcon v-else-if="group.node.kind == 'node'" :icon="nodeIcon(group.node.type)" class="af-node-flag" />
         <span class="af-node-name">{{ group.node.name }}</span>
         <AppStatusPill v-if="group.node.status" :status="group.node.status" />
         <span class="af-node-meta">
@@ -1128,6 +1156,9 @@ function copyLog() {
 }
 .af-node-chevron {
   width: 0.75rem;
+  /* as far from the icon after it as the toolbar's caret (a button, its own padding) from its
+     icon : the section's icon under the toolbar's */
+  margin-right: 0.625rem;
   color: var(--bs-secondary-color);
 }
 .af-node-name {
