@@ -65,14 +65,10 @@ COPY ./client ./
 # (../server/src/lib/formEngine), and the server itself is only copied further down
 COPY ./server/src/lib/formEngine /app/server/src/lib/formEngine
 
-# Copy build info generator script
-COPY ./scripts/generate-build-info.sh /tmp/generate-build-info.sh
-RUN chmod +x /tmp/generate-build-info.sh
-
-# Generate the client's build-info.json BEFORE the build, in client/ (not dist/, which vite
-# empties) : vite.config.mjs bakes it into the bundle, so the running client knows its own
-# build (issue #660). It is no longer served as a file.
-RUN /tmp/generate-build-info.sh . "$GIT_SHA" "$BUILD_TIME" "$VERSION"
+# The client's build-info.json, BEFORE the build, in client/ (not dist/, which vite empties) :
+# vite.config.mjs bakes it into the bundle, so the running client knows its own build (issue
+# #660). It is no longer served as a file. An empty version : package.json's.
+RUN printf '{"version": "%s", "gitSha": "%s", "dirty": false, "buildTime": "%s"}\n' "$VERSION" "$GIT_SHA" "$BUILD_TIME" > build-info.json
 
 # build client
 RUN npm run build
@@ -91,8 +87,8 @@ RUN npm ci --omit=dev
 # Copy the rest of the code
 COPY ./server .
 
-# Generate server build-info.json
-RUN /tmp/generate-build-info.sh . "$GIT_SHA" "$BUILD_TIME" "$VERSION"
+# the server's build-info.json : the build /api/v2/version and the health page report
+RUN printf '{"version": "%s", "gitSha": "%s", "dirty": false, "buildTime": "%s"}\n' "$VERSION" "$GIT_SHA" "$BUILD_TIME" > build-info.json
 
 # clean files
 RUN rm -f .env.*

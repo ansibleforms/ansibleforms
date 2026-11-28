@@ -13,7 +13,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { readFileSync } from 'node:fs'
 
 // The client's build identity, baked into the bundle (issue #660). The docker build writes
-// build-info.json here, in client/, before it runs vite build (scripts/generate-build-info.sh) ;
+// build-info.json here, in client/, before it runs vite build (the Dockerfile, the release bundle) ;
 // a build without one - CI's client job, a developer's npm run build - is a 'dev' build. It
 // used to be fetched at runtime from /build-info.json, but that file describes the server's
 // disk, not the code running in the tab, and was cached for a year.

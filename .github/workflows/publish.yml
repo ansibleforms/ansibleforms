@@ -102,7 +102,7 @@ jobs:
           {
             echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "sha=$(git rev-parse HEAD)"
-            # short, not the full sha : scripts/generate-build-info.sh writes GIT_SHA verbatim
+            # short, not the full sha : the Dockerfile writes GIT_SHA verbatim
             # into build-info.json and the About dialog has always shown the short form
             echo "sha_short=$(git rev-parse --short=7 HEAD)"
             # GHCR rejects uppercase, and github.repository keeps the owner's case
