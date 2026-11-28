@@ -291,7 +291,7 @@ In dev the `dev:rte` script uses `dev-rte-token-not-a-secret`; never outside a d
 
 | Variable | Where | Meaning |
 |---|---|---|
-| `AF_ROLE` | RTE | `rte` (set in the image); the controller is `all` (unset), `app` or `worker` - see [examples/scale](../../../examples/scale) |
+| `AF_ROLE` | RTE | `rte` (set in the image); the controller is `all` (unset), `app` or `worker` - see [the several-nodes setup](https://github.com/ansibleforms/docker/tree/main/scale) |
 | `RTE_MODE` | RTE | `outbound`, `inbound` or `database` (the default in 7.x, deprecated) |
 | `RTE_TOKEN` | RTE | the token of its socket (or of every call, database mode) ; the controller holds the same value in the runner's RTE credential |
 | `CONTROLLER_URL`, `CONTROLLER_TLS_VERIFY` | RTE | outbound (and a join): the controller's address as people open it ; whether its certificate is checked (1, the default) |
@@ -395,7 +395,7 @@ See [the examples of ansibleforms/rte](https://github.com/ansibleforms/rte/tree/
 `findDefault` by capability (a default per playbook / template rather than
 per type); following multistep and AWX jobs from the worker, so they survive the controller node that
 started them. (The worker role and several controller nodes exist since 7: see
-[examples/scale](../../../examples/scale).)
+[the several-nodes setup](https://github.com/ansibleforms/docker/tree/main/scale).)
 
 ## Tests
 

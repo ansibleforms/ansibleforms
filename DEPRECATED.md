@@ -57,7 +57,7 @@ the removals below, this is what a 6.5 install changes when it moves to 7.
 | a local password set through the application needs `PASSWORD_MIN_LENGTH` (8) characters, and cannot be the username or the default | choose longer passwords ; `PASSWORD_MIN_LENGTH=0` checks no length. Existing passwords keep working |
 | `PROCESS_MAX_BUFFER` (now 50 MB) no longer stops a playbook : past it, the output is no longer stored (the job says so) and the playbook goes on | nothing ; a value set to stop runaway playbooks no longer does |
 | an uncaught exception now ends the process (logged as `crit`) instead of leaving it running in an unknown state | run the containers with a restart policy (the compose example's `unless-stopped`, Kubernetes restarts by itself) |
-| optional : several controller nodes | `AF_ROLE=controller` nodes (`AF_ROLE=app` before 7.8) plus one `AF_ROLE=worker`, sharing the database and the persistent volume - see `examples/scale` |
+| optional : several controller nodes | `AF_ROLE=controller` nodes (`AF_ROLE=app` before 7.8) plus one `AF_ROLE=worker`, sharing the database and the persistent volume - see [the several-nodes setup](https://github.com/ansibleforms/docker/tree/main/scale) |
 
 ## Removed in 7.0.0
 

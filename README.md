@@ -72,7 +72,7 @@ templates and jobs run on the AWX, Semaphore, Rundeck and Jenkins servers set up
 
 To scale out or for high availability, split it: controller nodes (`AF_ROLE=controller`) behind a load balancer and a
 worker (`AF_ROLE=worker`), all from the same image, on one database and one shared volume. A second worker
-waits and takes over when the first stops; [examples/scale](examples/scale) has a compose file.
+waits and takes over when the first stops; [ansibleforms/docker](https://github.com/ansibleforms/docker/tree/main/scale) has a compose file.
 
 ## Contributing
 
