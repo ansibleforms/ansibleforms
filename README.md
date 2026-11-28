@@ -34,7 +34,7 @@ On a Linux server, run the installer and answer its questions:
 curl -fsSL https://ansibleforms.com/install | sh
 ```
 
-It installs a controller (the web interface and API, its database and a runner) or a runner alone, on Docker, Podman or Kubernetes.
+It installs a controller with its database and a runner, or a runner alone, on Docker, Podman or Kubernetes.
 
 Run again, it finds an AnsibleForms already installed and upgrades it.
 
@@ -45,19 +45,9 @@ The [installation guide](https://ansibleforms.com/installation) covers every opt
 | Docker Compose | [ansibleforms/docker](https://github.com/ansibleforms/docker) |
 | Kubernetes (Helm) | [ansibleforms/helm-charts](https://github.com/ansibleforms/helm-charts) |
 
-The images, all on `ghcr.io/ansibleforms`, each for `linux/amd64` and `linux/arm64` under the same tags:
-
-| Image | What it is |
-|---|---|
-| `ansibleforms` | The web app: interface, API, schedules and background work |
-| `ansibleforms-rte-full` | The RTE playbooks run in: ansible with its collections. **The default** |
-| `ansibleforms-rte-core` | A smaller RTE, ansible-core only, to build your own on ([examples](https://github.com/ansibleforms/rte/tree/main/examples)) |
-| `ansibleforms-rte-base` | The RTE without python or ansible, for your own versions of both |
-
 ## Release lines
 
-Two major versions are maintained, each on its own branch with its own changelog and image tags.
-Coming from 6? Read [Upgrading to 7](https://ansibleforms.com/upgrade-7) before you move over.
+Two major versions are maintained, each on its own branch; coming from 6, read [Upgrading to 7](https://ansibleforms.com/upgrade-7) first.
 
 | Branch | Version | Status |
 |---|---|---|
