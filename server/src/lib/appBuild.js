@@ -7,7 +7,7 @@
 import fs from "fs";
 import path from "path";
 
-// the docker build writes build-info.json next to package.json (scripts/generate-build-info.sh) ;
+// the docker build writes build-info.json next to package.json (the Dockerfile, the release bundle) ;
 // a development server has none and reports package.json's version alone
 export function readBuildInfo(dir) {
   let version = "";

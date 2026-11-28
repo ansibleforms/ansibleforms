@@ -165,8 +165,17 @@ jobs:
 
   # Attaches the bundles to the release: AnsibleForms built and ready to run with Node.js, for
   # the installer's native mode (directly on a server, no containers). node-jq and bcrypt bring
-  # native binaries, so each architecture is built on a machine of its own
-  # (scripts/build-bundle.sh). GITHUB_TOKEN uploads to this repository's own release.
+  # native binaries, so each architecture is built on a machine of its own. It builds what the
+  # Dockerfile builds, from the files git tracks at the tag:
+  #
+  #   ansibleforms-<version>-linux-<arch>.tar.gz (+ .sha256)
+  #     ansibleforms/server/         the server with its production modules and the built client
+  #     ansibleforms/bin/ytt         ytt, at the version and checksum of the Dockerfile
+  #     ansibleforms/rte/            the python requirements and collections of the RTE images
+  #                                  (ansibleforms/rte), which the installer installs in a venv
+  #     ansibleforms/versions.env    the version, and the Node.js, Python and uv it runs on
+  #
+  # GITHUB_TOKEN uploads to this repository's own release.
   bundle:
     name: Bundle (${{ matrix.arch }})
     needs: release-please
@@ -190,8 +199,66 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Build the bundle
-        run: ./scripts/build-bundle.sh "${{ needs.release-please.outputs.tag_name }}" dist
+      # one source for each version: the files the images are built from
+      - name: The versions
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rte/rte-core" "$RUNNER_TEMP/rte/rte-full"
+          for f in rte-core/Dockerfile rte-core/requirements.txt rte-full/requirements.txt rte-full/collections.yml; do
+            curl -fsSL -o "$RUNNER_TEMP/rte/$f" "https://raw.githubusercontent.com/ansibleforms/rte/main/$f"
+          done
+          arg() { sed -n "s/^ARG $1=//p" "$2" | head -1; }
+          {
+            echo "NODE_MAJOR=$(tr -d '[:space:]v' < .nvmrc)"
+            echo "PYTHON_VERSION=$(arg PYTHON_VERSION "$RUNNER_TEMP/rte/rte-core/Dockerfile")"
+            echo "UV_VERSION=$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' "$RUNNER_TEMP/rte/rte-core/Dockerfile" | head -1)"
+            echo "YTT_VERSION=$(arg YTT_VERSION Dockerfile)"
+            echo "YTT_SHA256=$(arg "YTT_SHA256_${ARCH^^}" Dockerfile)"
+            echo "GIT_SHA=$(git rev-parse --short=7 HEAD)"
+            echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } > "$RUNNER_TEMP/versions"
+          cat "$RUNNER_TEMP/versions"
+          if grep -E '^[A-Z0-9_]+=$' "$RUNNER_TEMP/versions"; then
+            echo "::error::a version above could not be read"; exit 1
+          fi
+          cat "$RUNNER_TEMP/versions" >> "$GITHUB_ENV"
+
+      # from a clean copy of what git tracks : never a local .env or persistent folder
+      - name: Build the client and the server
+        env:
+          VERSION: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/work"
+          mkdir -p "$work"
+          git ls-files -z client server | tar --null -T - -cf - | tar -xf - -C "$work"
+          info() { printf '{"version": "%s", "gitSha": "%s", "dirty": false, "buildTime": "%s"}\n' "$VERSION" "$GIT_SHA" "$BUILD_TIME" > build-info.json; }
+          (cd "$work/client" && npm ci && info && npm run build)
+          (cd "$work/server" && npm ci --omit=dev && info && rm -f .env.* && rm -rf views persistent && mkdir views && cp -r ../client/dist/. views/)
+
+      - name: Pack the bundle
+        env:
+          VERSION: ${{ needs.release-please.outputs.tag_name }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/stage/ansibleforms"
+          mkdir -p "$stage/bin" "$stage/rte" dist
+          mv "$RUNNER_TEMP/work/server" "$stage/server"
+          curl -fsSL -o "$stage/bin/ytt" "https://github.com/carvel-dev/ytt/releases/download/v${YTT_VERSION}/ytt-linux-${ARCH}"
+          echo "$YTT_SHA256  $stage/bin/ytt" | sha256sum -c -
+          chmod +x "$stage/bin/ytt"
+          cp "$RUNNER_TEMP/rte/rte-core/requirements.txt" "$stage/rte/requirements-core.txt"
+          cp "$RUNNER_TEMP/rte/rte-full/requirements.txt" "$stage/rte/requirements-full.txt"
+          cp "$RUNNER_TEMP/rte/rte-full/collections.yml" "$stage/rte/collections.yml"
+          printf 'VERSION=%s\nNODE_MAJOR=%s\nPYTHON_VERSION=%s\nUV_VERSION=%s\n' \
+            "$VERSION" "$NODE_MAJOR" "$PYTHON_VERSION" "$UV_VERSION" > "$stage/versions.env"
+          name="ansibleforms-${VERSION}-linux-${ARCH}.tar.gz"
+          tar -C "$RUNNER_TEMP/stage" --owner=0 --group=0 -czf "dist/$name" ansibleforms
+          (cd dist && sha256sum "$name" > "$name.sha256" && cat "$name.sha256")
+          echo "Built dist/$name ($(du -h "dist/$name" | cut -f1))"
 
       - name: Attach it to the release
         env:
