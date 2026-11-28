@@ -129,7 +129,7 @@ from this repository's `server/` : its CONTRIBUTING.md says how.
   own (`ubuntu-latest`, `ubuntu-24.04-arm`) and pushes it by digest; a last job then writes one
   manifest list under every tag, so no tag moves unless both architectures built. The Docker
   check builds both architectures too, as ansibleforms/rte does for the RTE images.
-- The controller (`docker/controller/Dockerfile`) needs only node, git, ssh, the mariadb client
+- The controller (`Dockerfile`) needs only node, git, ssh, the mariadb client
   and ytt, and builds from `node:26-trixie-slim` (pinned by digest, moved by Dependabot).
 
 ## A patch release of 6.x

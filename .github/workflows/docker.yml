@@ -11,7 +11,8 @@ on:
   pull_request:
     branches: [main, 'release/**']
     paths:
-      - 'docker/**'
+      - 'Dockerfile'
+      - '.dockerignore'
       - 'server/healthcheck.js'
       - 'client/package.json'
       - 'client/package-lock.json'
@@ -50,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: docker/controller/Dockerfile
+          file: Dockerfile
           push: false
           # Built to prove it builds, never published: say so, or buildx warns that the result
           # goes nowhere.
