@@ -45,15 +45,6 @@ The [installation guide](https://ansibleforms.com/installation) covers every opt
 | Docker Compose | [ansibleforms/docker](https://github.com/ansibleforms/docker) |
 | Kubernetes (Helm) | [ansibleforms/helm-charts](https://github.com/ansibleforms/helm-charts) |
 
-The images, all on `ghcr.io/ansibleforms`, each for `linux/amd64` and `linux/arm64` under the same tags:
-
-| Image | What it is |
-|---|---|
-| `ansibleforms` | The web app: interface, API, schedules and background work |
-| `ansibleforms-rte-full` | The RTE playbooks run in: ansible with its collections. **The default** |
-| `ansibleforms-rte-core` | A smaller RTE, ansible-core only, to build your own on ([examples](https://github.com/ansibleforms/rte/tree/main/examples)) |
-| `ansibleforms-rte-base` | The RTE without python or ansible, for your own versions of both |
-
 ## Release lines
 
 Two major versions are maintained, each on its own branch with its own changelog and image tags.
