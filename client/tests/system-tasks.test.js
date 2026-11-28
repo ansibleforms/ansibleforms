@@ -122,7 +122,7 @@ describe('the list', () => {
 describe('a task in words', () => {
   it('its name and description from the locales by its key, the server words for an unknown key', () => {
     const tr = i18n.global.t;
-    expect(taskName(tr, { key: 'jobCleanup', name: 'Server name' })).toBe('Job cleanup');
+    expect(taskName(tr, { key: 'jobCleanup', name: 'Server name' })).toBe('Remove old jobs');
     expect(taskDescription(tr, { key: 'jobCleanup' })).toMatch(/finished jobs/);
     expect(taskName(tr, { key: 'notATask', name: 'Server name' })).toBe('Server name');
   });
@@ -235,6 +235,12 @@ describe("a task's page", () => {
     );
     expect(page).toMatch(/lastRun\.value\?\.outcome === 'failed' \? lastRun\.value\.result/);
     expect(page).toMatch(/\{\{ lastRun\?\.started_at \? Helpers\.formatServerDate\(lastRun\.started_at\) : '–' \}\}/);
+  });
+
+  it('lists the tasks A to Z by their name in the language shown', () => {
+    const order = getSettings(i18n.global.t).system_tasks.rowOrder;
+    const rows = [{ key: 'runnerDispatch' }, { key: 'abandonedJobs' }, { key: 'nightlyBackup' }];
+    expect([...rows].sort(order).map((r) => r.key)).toEqual(['nightlyBackup', 'abandonedJobs', 'runnerDispatch']);
   });
 
   it("has the Scheduled list's Enabled column first, its page's switch", () => {

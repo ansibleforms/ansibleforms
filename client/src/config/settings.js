@@ -1979,6 +1979,8 @@ export default function getSettings(t) {
       selectable: false,
       noCreate: true,
       openPage: (item) => `/jobs/system/${item.key}`,
+      // A to Z by their name, in the user's language
+      rowOrder: (a, b) => taskName(t, a).localeCompare(taskName(t, b)),
       actions: [],
       // as the scheduled jobs : the name, when it runs, its last run and how it went, its next run
       fields: [

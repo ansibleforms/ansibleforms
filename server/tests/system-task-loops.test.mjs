@@ -272,8 +272,8 @@ describe("the runner hub's loops", () => {
     assert.equal(state.last_outcome, "failed");
     assert.equal(state.last_error.message, "lease lost");
     assert.ok(state.last_error.at);
-    const said = warn.mock.calls.map((c) => c[0]).filter((m) => /Runner inbound dial failed/.test(m));
-    assert.deepEqual(said, ["Runner inbound dial failed: connect ECONNREFUSED", "Runner inbound dial failed: lease lost"]);
+    const said = warn.mock.calls.map((c) => c[0]).filter((m) => /Dial inbound runners failed/.test(m));
+    assert.deepEqual(said, ["Dial inbound runners failed: connect ECONNREFUSED", "Dial inbound runners failed: lease lost"]);
   });
 
   test("a failure is a row once a minute at most per distinct error", async () => {
@@ -331,7 +331,7 @@ describe("the runner hub's loops", () => {
     assert.deepEqual(inserts().map((q) => [q.params[0], q.params[3], q.params[4], q.params[5]]), [
       ["runnerPrune", "failed", "gone", nodeId],
     ]);
-    assert.ok(warn.mock.calls.some((c) => /Runner ended jobs prune failed: gone/.test(c[0])));
+    assert.ok(warn.mock.calls.some((c) => /Prune stale runner jobs failed: gone/.test(c[0])));
     // each Run now its row, the same error within the minute included
     await runLoopNow("runnerPrune");
     assert.equal(inserts().length, 2);
