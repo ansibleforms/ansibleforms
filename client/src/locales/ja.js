@@ -3201,6 +3201,9 @@ export default {
     jobTitle: 'ジョブ {id}',
     output: '出力',
     launchedBy: '実行者',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'RTE 名',
+    rteBuilder: 'RTE ビルダー',
     playbook: 'プレイブック',
     template: 'テンプレート',
     awxJob: 'AWX ジョブ',

@@ -3265,6 +3265,9 @@ export default {
     jobTitle: 'Tasca {id}',
     output: 'Sortida',
     launchedBy: 'Llançat per',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: "Nom de l'RTE",
+    rteBuilder: 'Builder RTE',
     playbook: 'playbook',
     template: 'plantilla',
     awxJob: 'Tasca AWX',

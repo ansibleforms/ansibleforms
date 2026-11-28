@@ -3262,6 +3262,9 @@ export default {
     jobTitle: 'Tarefa {id}',
     output: 'Saída',
     launchedBy: 'Iniciado por',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'Nome do RTE',
+    rteBuilder: 'Builder RTE',
     playbook: 'playbook',
     template: 'modelo',
     awxJob: 'Tarefa AWX',

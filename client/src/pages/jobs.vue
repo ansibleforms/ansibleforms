@@ -1843,6 +1843,17 @@ onMounted(async () => {
                     >
                   </dd>
                 </div>
+                <!-- an RTE build : the image it builds and the builder it ran on, where a job's form is -->
+                <template v-else-if="job.job_type == 'build'">
+                  <div class="af-job-fact">
+                    <dt><FaIcon icon="cube" />{{ t('jobs.rteName') }}</dt>
+                    <dd :title="job.target">{{ job.target || '–' }}</dd>
+                  </div>
+                  <div class="af-job-fact">
+                    <dt><FaIcon icon="hammer" />{{ t('jobs.rteBuilder') }}</dt>
+                    <dd :title="job.runner">{{ job.runner || '–' }}</dd>
+                  </div>
+                </template>
                 <div v-else class="af-job-fact">
                   <dt><FaIcon icon="pen-to-square" />{{ t('jobs.form') }}</dt>
                   <dd :title="job.form">{{ job.form || '–' }}</dd>

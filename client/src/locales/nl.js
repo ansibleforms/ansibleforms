@@ -3256,6 +3256,9 @@ export default {
     jobTitle: 'Job {id}',
     output: 'Uitvoer',
     launchedBy: 'Gestart door',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'RTE-naam',
+    rteBuilder: 'RTE-builder',
     playbook: 'playbook',
     template: 'sjabloon',
     awxJob: 'AWX-job',

@@ -3115,6 +3115,9 @@ export default {
     jobTitle: '作业 {id}',
     output: '输出',
     launchedBy: '启动者',
+    // an RTE build's page : the image it builds and the builder it ran on
+    rteName: 'RTE 名称',
+    rteBuilder: 'RTE 构建器',
     playbook: 'Playbook',
     template: '模板',
     awxJob: 'AWX 作业',
