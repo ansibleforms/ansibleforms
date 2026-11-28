@@ -47,12 +47,12 @@ updates:
     commit-message:
       prefix: ci
 
-  # Moves the digest pins of node:26-trixie(-slim) in docker/controller. The RTE images' pins
+  # Moves the digest pins of node:26-trixie(-slim) in the Dockerfile. The RTE images' pins
   # are moved in ansibleforms/rte, where they are built.
   - package-ecosystem: docker
     open-pull-requests-limit: 100
     directories:
-      - /docker/controller
+      - /
     schedule:
       interval: daily
     commit-message:

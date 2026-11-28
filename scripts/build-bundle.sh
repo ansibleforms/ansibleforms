@@ -15,7 +15,7 @@
 #   ansibleforms-<version>-linux-<arch>.tar.gz
 #     ansibleforms/server/         the server with its production modules and the built client
 #                                  in views/, as /app/dist in the ansibleforms image
-#     ansibleforms/bin/ytt         ytt, at the version and checksum of docker/controller/Dockerfile
+#     ansibleforms/bin/ytt         ytt, at the version and checksum of the Dockerfile
 #     ansibleforms/rte/            the python requirements and collections of the RTE images
 #     ansibleforms/versions.env    the Node.js major (.nvmrc), and the Python and uv versions
 #                                  of rte-core/Dockerfile, which the installer installs
@@ -52,8 +52,8 @@ arg() { sed -n "s/^ARG $1=//p" "$2" | head -1; }
 NODE_MAJOR="$(tr -d '[:space:]v' < .nvmrc)"
 PYTHON_VERSION="$(arg PYTHON_VERSION "$RTE/rte-core/Dockerfile")"
 UV_VERSION="$(sed -n 's#^FROM ghcr.io/astral-sh/uv:\([0-9.]*\).*#\1#p' "$RTE/rte-core/Dockerfile" | head -1)"
-YTT_VERSION="$(arg YTT_VERSION docker/controller/Dockerfile)"
-YTT_SHA256="$(arg "YTT_SHA256_${ARCH^^}" docker/controller/Dockerfile)"
+YTT_VERSION="$(arg YTT_VERSION Dockerfile)"
+YTT_SHA256="$(arg "YTT_SHA256_${ARCH^^}" Dockerfile)"
 for v in NODE_MAJOR PYTHON_VERSION UV_VERSION YTT_VERSION YTT_SHA256; do
   [ -n "${!v}" ] || { echo "could not read $v" >&2; exit 1; }
 done
