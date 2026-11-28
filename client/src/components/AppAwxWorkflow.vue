@@ -1048,7 +1048,8 @@ onBeforeUnmount(() => clearTimeout(slideTimer));
     align-items: center;
     gap: 0.5rem;
     font-weight: 600;
-    font-size: 0.875rem;
+    /* as the output's toolbar (styles/jobOutput.scss) : the job page's headers one size */
+    font-size: 1rem;
   }
   .awx-workflow-count {
     font-weight: 400;

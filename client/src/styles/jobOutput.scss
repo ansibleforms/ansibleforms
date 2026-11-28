@@ -27,7 +27,8 @@
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  /* the job page's headers one size : the job's, the output's, its sections' */
+  font-size: 1rem;
 }
 /* the collapse / expand all : its icon over the sections' chevrons, as wide and as far in */
 .af-output-label .af-tool-icon {

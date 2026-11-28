@@ -2205,6 +2205,8 @@ onMounted(async () => {
   gap: 0.5rem;
   margin: 0;
   padding: 0.625rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
   background: var(--bs-tertiary-bg);
   border-bottom: 1px solid var(--af-field-border);
   cursor: pointer;
@@ -2255,7 +2257,8 @@ onMounted(async () => {
 }
 .af-job-number {
   margin: 0;
-  font-size: 1.25rem;
+  /* the page's headers one size : the job's, the output's, its sections' (AppAnsibleOutput) */
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
