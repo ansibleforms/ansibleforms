@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.9.0](https://github.com/ansibleforms/ansibleforms/compare/7.8.0...7.9.0) (2026-11-28)
+
+
+### Added
+
+* a runner records the RTE image it runs ([e76e515](https://github.com/ansibleforms/ansibleforms/commit/e76e51555bb0da5ffe0d122c481602c93550c85f))
+* a runner's version read from AWX, Semaphore and others ([39d0dea](https://github.com/ansibleforms/ansibleforms/commit/39d0dea9351fa2e8f9ff9a5748a60b3ed4569fbf))
+* an enum's table is sorted by clicking a column header ([0870bb9](https://github.com/ansibleforms/ansibleforms/commit/0870bb9d3c447e3664b130725d55a2747cedcbd5))
+* container registry credentials ([63d7ee0](https://github.com/ansibleforms/ansibleforms/commit/63d7ee02c5440aaac5a221322ab11b6853587ca9))
+* role options to build runtime environment (RTE) images ([4f96744](https://github.com/ansibleforms/ansibleforms/commit/4f9674471349ce9d3b66a7d4e6ddf0ec7df081e9))
+* runtime environment (RTE) builders in Connections ([ebceb9f](https://github.com/ansibleforms/ansibleforms/commit/ebceb9f53930ea10d82f8418a1dd4a5db2051f13))
+* runtime environments (RTE) defined in and built from the Designer ([8f8a823](https://github.com/ansibleforms/ansibleforms/commit/8f8a82351300658aa9b6155eaea2496ac03f057a))
+* signing key credentials ([eb6be4f](https://github.com/ansibleforms/ansibleforms/commit/eb6be4f7aadd9db89bf612f9cd10f0f15c5a74b3))
+* system jobs can be disabled ([4765f83](https://github.com/ansibleforms/ansibleforms/commit/4765f834ad3cf4c7ff70df05a1f64b6f4d778f30))
+* the form's name is passed to the playbook as __formname__ ([#1568](https://github.com/ansibleforms/ansibleforms/issues/1568)) ([3a1e163](https://github.com/ansibleforms/ansibleforms/commit/3a1e16300d1af9b03559e6c571d478f50b436db6))
+
+
+### Fixed
+
+* a config backup restores into the database while a repository holds the roles ([71e6799](https://github.com/ansibleforms/ansibleforms/commit/71e6799a866eefb6ca5dd4b578a6a8a66e116e73))
+* a config seed with `use_for_config` no longer stops the server from starting ([462ae8c](https://github.com/ansibleforms/ansibleforms/commit/462ae8c2c44027ae3f53efc3105eec976f84276e))
+* a database's page has one search box, not two ([60b5c8f](https://github.com/ansibleforms/ansibleforms/commit/60b5c8f05c35ec6171ccf788df5b3322e6928147))
+* a socket runner's job output shows live on its job page ([068cdf5](https://github.com/ansibleforms/ansibleforms/commit/068cdf579afd0478cd8e7ad669ad012023cbbc6e))
+* the date picker keeps its theme colours and its Monday week start ([#1569](https://github.com/ansibleforms/ansibleforms/issues/1569)) ([d407632](https://github.com/ansibleforms/ansibleforms/commit/d407632ea94eff3ea145df65405c01e327889f7d))
+
+
+### Changed
+
+* a runner's type, version and mode shown on its Details ([761ca19](https://github.com/ansibleforms/ansibleforms/commit/761ca198dadbda0e0b848c2ab6ce061d6d105d97))
+* job's page standardized ([82ddc06](https://github.com/ansibleforms/ansibleforms/commit/82ddc061a8dd961aedd4e13541073e7b643b8f45))
+* the app's own runner type is called AnsibleForms ([d441f3b](https://github.com/ansibleforms/ansibleforms/commit/d441f3bb651532d1b8895d4a1c9b1090f07f5161))
+
 ## [7.8.0](https://github.com/ansibleforms/ansibleforms/compare/7.7.0...7.8.0) (2026-11-26)
 
 
